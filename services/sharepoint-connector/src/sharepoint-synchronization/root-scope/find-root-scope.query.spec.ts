@@ -1,5 +1,5 @@
 import { TestBed } from '@suites/unit';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { UniqueScopesService } from '../../unique-api/unique-scopes/unique-scopes.service';
 import { Smeared } from '../../utils/smeared';
 import { createMockSiteConfig } from '../../utils/test-utils/mock-site-config';
@@ -7,8 +7,8 @@ import { FindRootScopeQuery } from './find-root-scope.query';
 
 describe('FindRootScopeQuery', () => {
   let service: FindRootScopeQuery;
-  let getScopeByExternalIdMock: ReturnType<typeof vi.fn>;
-  let listChildrenScopesMock: ReturnType<typeof vi.fn>;
+  let getScopeByExternalIdMock: Mock;
+  let listChildrenScopesMock: Mock;
 
   const siteId = new Smeared('site-123', false);
   const siteName = new Smeared('My Site', false);
@@ -27,8 +27,7 @@ describe('FindRootScopeQuery', () => {
 
     const { unit } = await TestBed.solitary(FindRootScopeQuery)
       .mock<UniqueScopesService>(UniqueScopesService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         getScopeByExternalId: getScopeByExternalIdMock,
         listChildrenScopes: listChildrenScopesMock,
       }))

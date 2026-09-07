@@ -1,7 +1,7 @@
 import { ProxyService } from '@unique-ag/proxy';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { IngestionConfig, ingestionConfig } from '~/config';
 import { MsGraphConnectivityHealthIndicator } from './ms-graph-connectivity-health.indicator';
 
@@ -15,15 +15,15 @@ vi.mock('undici', async (importOriginal) => {
   };
 });
 
-async function getUndiciFetch(): Promise<ReturnType<typeof vi.fn>> {
+async function getUndiciFetch(): Promise<Mock> {
   const { fetch } = await import('undici');
-  return fetch as unknown as ReturnType<typeof vi.fn>;
+  return fetch as unknown as Mock;
 }
 
 describe('MsGraphConnectivityHealthIndicator', () => {
   let indicator: MsGraphConnectivityHealthIndicator;
-  let mockFetch: ReturnType<typeof vi.fn>;
-  let getDispatcher: ReturnType<typeof vi.fn>;
+  let mockFetch: Mock;
+  let getDispatcher: Mock;
   const mockDispatcher = Symbol('dispatcher');
 
   beforeEach(async () => {
@@ -36,8 +36,7 @@ describe('MsGraphConnectivityHealthIndicator', () => {
         connectivityTimeoutMs: TIMEOUT_MS,
       }))
       .mock(ProxyService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getDispatcher,
       }))
       .mock(HealthIndicatorService)

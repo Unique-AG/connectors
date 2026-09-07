@@ -61,7 +61,7 @@ describe('DiscoveryController', () => {
 
     const { unit } = await TestBed.solitary(DiscoveryController)
       .mock<McpOAuthModuleOptions>(MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN)
-      .impl((stubFn) => ({ ...stubFn(), ...mockOptions }))
+      .impl(() => ({ ...mockOptions }))
       .compile();
 
     controller = unit;
@@ -97,7 +97,7 @@ describe('DiscoveryController', () => {
 
       const { unit: controllerWithMinimal } = await TestBed.solitary(DiscoveryController)
         .mock<McpOAuthModuleOptions>(MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN)
-        .impl((stubFn) => ({ ...stubFn(), ...optionsWithoutOptionalFields }))
+        .impl(() => ({ ...optionsWithoutOptionalFields }))
         .compile();
 
       const metadata = controllerWithMinimal.getProtectedResourceMetadata();
@@ -159,7 +159,7 @@ describe('DiscoveryController', () => {
 
       const { unit: minimalController } = await TestBed.solitary(DiscoveryController)
         .mock<McpOAuthModuleOptions>(MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN)
-        .impl((stubFn) => ({ ...stubFn(), ...minimalOptions }))
+        .impl(() => ({ ...minimalOptions }))
         .compile();
 
       const metadata = minimalController.getAuthorizationServerMetadata();

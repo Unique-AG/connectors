@@ -7,8 +7,7 @@ import { MimeTypeResolverService } from './mime-type-resolver.service';
 const buildService = async (overrides: Record<string, string>) => {
   const { unit } = await TestBed.solitary(MimeTypeResolverService)
     .mock(ConfigService)
-    .impl((stub) => ({
-      ...stub(),
+    .impl(() => ({
       get: vi.fn((key: string) => {
         if (key === 'processing.mimeTypeOverridesByExtension') {
           return overrides;

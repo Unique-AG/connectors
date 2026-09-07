@@ -17,7 +17,12 @@ vi.mock('~/utils/sleep', () => ({ sleep: vi.fn().mockResolvedValue(undefined) })
 const mockJobStart = vi.fn();
 const mockJobStop = vi.fn();
 vi.mock('cron', () => ({
-  CronJob: vi.fn().mockImplementation(() => ({ start: mockJobStart, stop: mockJobStop })),
+  CronJob: vi.fn(
+    class MockCronJob {
+      public readonly start = mockJobStart;
+      public readonly stop = mockJobStop;
+    },
+  ),
 }));
 
 // ---------------------------------------------------------------------------

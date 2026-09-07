@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { INGESTION_SOURCE_KIND } from '../../constants/ingestion.constants';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
@@ -12,7 +12,7 @@ import type { ProcessingContext } from '../types/processing-context';
 import { ContentRegistrationStep } from './content-registration.step';
 
 describe('ContentRegistrationStep', () => {
-  let uniqueFileIngestionServiceMock: { registerContent: ReturnType<typeof vi.fn> };
+  let uniqueFileIngestionServiceMock: { registerContent: Mock };
 
   const mockWriteUrl = 'https://upload.com?key=dummyKey';
   const mockIngestionServiceBaseUrl = 'https://api.unique.app/ingestion';
@@ -88,8 +88,7 @@ describe('ContentRegistrationStep', () => {
   it('registers content and updates context in external mode', async () => {
     const { unit } = await TestBed.solitary(ContentRegistrationStep)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((k: string) => {
           if (k === 'sharepoint.baseUrl') {
             return 'https://contoso.sharepoint.com';
@@ -141,8 +140,7 @@ describe('ContentRegistrationStep', () => {
   it('rewrites uploadUrl to ingestion service endpoint in cluster_local mode', async () => {
     const { unit } = await TestBed.solitary(ContentRegistrationStep)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((k: string) => {
           if (k === 'sharepoint.baseUrl') {
             return 'https://contoso.sharepoint.com';
@@ -195,8 +193,7 @@ describe('ContentRegistrationStep', () => {
   it('locks down file access when only scopes inheritance is enabled', async () => {
     const { unit } = await TestBed.solitary(ContentRegistrationStep)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((k: string) => {
           if (k === 'sharepoint.baseUrl') {
             return 'https://contoso.sharepoint.com';

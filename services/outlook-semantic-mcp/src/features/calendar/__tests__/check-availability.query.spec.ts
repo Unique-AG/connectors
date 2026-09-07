@@ -1,6 +1,6 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Temporal } from 'temporal-polyfill';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import type { ResolvedMailboxTimezone } from '~/features/user-utils/resolve-mailbox-timezone.query';
@@ -36,11 +36,7 @@ function makeGraphError(statusCode: number, code: string, message = 'Access deni
 }
 
 function createQuery(
-  opts: {
-    post?: ReturnType<typeof vi.fn>;
-    email?: string;
-    timezone?: ResolvedMailboxTimezone;
-  } = {},
+  opts: { post?: Mock; email?: string; timezone?: ResolvedMailboxTimezone } = {},
 ) {
   const post = opts.post ?? vi.fn().mockResolvedValue({ value: [] });
   const request = {

@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
@@ -20,9 +20,9 @@ import { PipelineStep } from './types/processing-context';
 describe('ProcessingPipelineService', () => {
   let service: ProcessingPipelineService;
   let mockSteps: {
-    aspxProcessing: IPipelineStep & { cleanup?: ReturnType<typeof vi.fn> };
+    aspxProcessing: IPipelineStep & { cleanup?: Mock };
     contentRegistration: IPipelineStep;
-    uploadContent: IPipelineStep & { cleanup: ReturnType<typeof vi.fn> };
+    uploadContent: IPipelineStep & { cleanup: Mock };
     ingestionFinalization: IPipelineStep;
   };
 
@@ -119,8 +119,7 @@ describe('ProcessingPipelineService', () => {
 
     const { unit } = await TestBed.solitary(ProcessingPipelineService)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'processing.stepTimeoutSeconds') {
             return 30;

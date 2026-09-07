@@ -18,7 +18,7 @@ vi.mock('@microsoft/microsoft-graph-client', async (importOriginal) => {
 });
 
 vi.mock('../token.provider', () => ({
-  TokenProvider: vi.fn().mockImplementation(() => ({})),
+  TokenProvider: vi.fn(class MockTokenProvider {}),
 }));
 
 import { TokenProvider } from '../token.provider';

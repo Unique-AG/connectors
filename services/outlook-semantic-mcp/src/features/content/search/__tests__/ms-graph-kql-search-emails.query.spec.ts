@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { GraphBatchRequest } from '../build-ms-graph-kql-batch-requests.query';
 import { MsGraphKqlSearchEmailsQuery } from '../ms-graph-kql-search-emails.query';
@@ -42,7 +42,7 @@ function makeRequest(
 
 function createQuery(opts: {
   delegatedMailboxes?: string[];
-  mockPost?: ReturnType<typeof vi.fn>;
+  mockPost?: Mock;
   idTranslationMap?: Map<string, string>;
   mockBuildResult?: {
     requests: GraphBatchRequest[];

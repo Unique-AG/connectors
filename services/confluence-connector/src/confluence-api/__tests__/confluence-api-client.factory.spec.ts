@@ -79,7 +79,9 @@ describe('ConfluenceApiClientFactory', () => {
 
   it('returns the created client instance', () => {
     const mockClient = createMock<CloudConfluenceApiClient>();
-    vi.mocked(CloudConfluenceApiClient).mockImplementation(() => mockClient);
+    vi.mocked(CloudConfluenceApiClient).mockImplementation(function MockCloudConfluenceApiClient() {
+      return mockClient;
+    });
     const factory = new ConfluenceApiClientFactory(mockServiceRegistry, mockProxyService);
     const config = createMock<ConfluenceConfig>({
       ...baseFields,

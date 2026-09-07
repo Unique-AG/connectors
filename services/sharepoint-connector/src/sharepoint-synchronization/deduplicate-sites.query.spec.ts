@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { DeduplicateSitesQuery } from './deduplicate-sites.query';
 
 describe('DeduplicateSitesQuery', () => {
   let query: DeduplicateSitesQuery;
-  let loggerSpy: ReturnType<typeof vi.fn>;
+  let loggerSpy: Mock;
 
   beforeEach(() => {
     query = new DeduplicateSitesQuery();

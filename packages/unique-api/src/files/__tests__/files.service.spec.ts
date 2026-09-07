@@ -14,7 +14,13 @@ vi.mock('@nestjs/common', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@nestjs/common')>();
   return {
     ...actual,
-    Logger: vi.fn().mockImplementation(() => mockLogger),
+    Logger: vi.fn(
+      class MockLogger {
+        public constructor() {
+          Object.assign(this, mockLogger);
+        }
+      },
+    ),
   };
 });
 

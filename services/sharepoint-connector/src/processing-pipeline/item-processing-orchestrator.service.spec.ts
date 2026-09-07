@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { Smeared } from '../utils/smeared';
@@ -11,7 +11,7 @@ import { ProcessingPipelineService } from './processing-pipeline.service';
 describe('ItemProcessingOrchestratorService', () => {
   let service: ItemProcessingOrchestratorService;
   let mockPipelineService: {
-    processItem: ReturnType<typeof vi.fn>;
+    processItem: Mock;
   };
 
   const createMockFile = (id: string, siteId: string): SharepointContentItem => ({
@@ -83,8 +83,7 @@ describe('ItemProcessingOrchestratorService', () => {
 
     const { unit } = await TestBed.solitary(ItemProcessingOrchestratorService)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'processing.concurrency') {
             return 3;

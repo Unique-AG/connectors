@@ -6,12 +6,6 @@ export default defineConfig({
   test: {
     ...globalConfig.test,
     root: './',
-    include: ['**/*.spec.ts', 'test/**/*.e2e-spec.ts'],
-    setupFiles: ['./test/setup.ts'],
-    coverage: {
-      enabled: true,
-      provider: 'istanbul',
-      reporter: ['json-summary'],
-    },
+    include: ['**/*.spec.ts'],
   },
 });

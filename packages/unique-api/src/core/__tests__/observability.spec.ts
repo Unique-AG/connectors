@@ -1,5 +1,5 @@
 import type { Meter } from '@opentelemetry/api';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { createUniqueApiMetrics } from '../observability';
 
 function createMockMeter() {
@@ -7,8 +7,8 @@ function createMockMeter() {
     createCounter: vi.fn().mockReturnValue({ add: vi.fn() }),
     createHistogram: vi.fn().mockReturnValue({ record: vi.fn() }),
   } as unknown as Meter & {
-    createCounter: ReturnType<typeof vi.fn>;
-    createHistogram: ReturnType<typeof vi.fn>;
+    createCounter: Mock;
+    createHistogram: Mock;
   };
 }
 

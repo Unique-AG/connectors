@@ -16,13 +16,15 @@ vi.mock('@nestjs/common', async () => {
   const actual = await vi.importActual('@nestjs/common');
   return {
     ...actual,
-    Logger: vi.fn().mockImplementation(() => ({
-      log: vi.fn(),
-      error: vi.fn(),
-      warn: vi.fn(),
-      debug: vi.fn(),
-      verbose: vi.fn(),
-    })),
+    Logger: vi.fn(
+      class MockLogger {
+        public readonly log = vi.fn();
+        public readonly error = vi.fn();
+        public readonly warn = vi.fn();
+        public readonly debug = vi.fn();
+        public readonly verbose = vi.fn();
+      },
+    ),
   };
 });
 
@@ -32,12 +34,14 @@ vi.mock('nestjs-pino', async () => {
   return {
     ...actual,
     LoggerModule: { forRootAsync: () => ({}) },
-    Logger: vi.fn().mockImplementation(() => ({
-      log: vi.fn(),
-      error: vi.fn(),
-      warn: vi.fn(),
-      debug: vi.fn(),
-      verbose: vi.fn(),
-    })),
+    Logger: vi.fn(
+      class MockLogger {
+        public readonly log = vi.fn();
+        public readonly error = vi.fn();
+        public readonly warn = vi.fn();
+        public readonly debug = vi.fn();
+        public readonly verbose = vi.fn();
+      },
+    ),
   };
 });

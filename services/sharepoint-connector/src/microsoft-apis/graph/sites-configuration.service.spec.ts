@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { PartialSiteConfigSchema, SiteDefaultsSchema } from '../../config/sharepoint.schema';
 import { createSmeared, Smeared } from '../../utils/smeared';
 import { GraphApiService } from './graph-api.service';
@@ -28,8 +28,8 @@ const SHAREPOINT_LIST_COLUMNS: ListColumn[] = [
 ];
 
 interface MockGraphApiService {
-  getListItems: ReturnType<typeof vi.fn>;
-  getListColumns: ReturnType<typeof vi.fn>;
+  getListItems: Mock;
+  getListColumns: Mock;
 }
 
 async function setupService(sharepointConfig: unknown): Promise<{
@@ -45,8 +45,7 @@ async function setupService(sharepointConfig: unknown): Promise<{
     .mock(GraphApiService)
     .impl(() => graphApi)
     .mock(ConfigService)
-    .impl((stub) => ({
-      ...stub(),
+    .impl(() => ({
       get: vi.fn((key: string) => (key === 'sharepoint' ? sharepointConfig : undefined)),
     }))
     .compile();

@@ -1,5 +1,5 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
@@ -30,9 +30,7 @@ const TEAMS_BLOB = `<div style="width:100%; height:20px"><span style="white-spac
 const GET_BODY_PREFER =
   'outlook.timezone="W. Europe Standard Time", IdType="ImmutableId", outlook.body-content-type="html"';
 
-function createCommand(
-  opts: { patch?: ReturnType<typeof vi.fn>; get?: ReturnType<typeof vi.fn> } = {},
-) {
+function createCommand(opts: { patch?: Mock; get?: Mock } = {}) {
   const patch =
     opts.patch ??
     vi.fn().mockResolvedValue({

@@ -1,5 +1,5 @@
 import { TestBed } from '@suites/unit';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { UniqueScopesService } from '../../unique-api/unique-scopes/unique-scopes.service';
 import { UniqueUsersService } from '../../unique-api/unique-users/unique-users.service';
 import { Smeared } from '../../utils/smeared';
@@ -9,13 +9,13 @@ import { ResolveScopePathCommand } from './resolve-scope-path.command';
 
 describe('CreateRootScopeCommand', () => {
   let service: CreateRootScopeCommand;
-  let getScopeByIdMock: ReturnType<typeof vi.fn>;
-  let createScopesBasedOnPathsMock: ReturnType<typeof vi.fn>;
-  let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
-  let deleteScopeMock: ReturnType<typeof vi.fn>;
-  let createScopeAccessesMock: ReturnType<typeof vi.fn>;
-  let resolveScopePathMock: ReturnType<typeof vi.fn>;
-  let getCurrentUserIdMock: ReturnType<typeof vi.fn>;
+  let getScopeByIdMock: Mock;
+  let createScopesBasedOnPathsMock: Mock;
+  let updateScopeExternalIdMock: Mock;
+  let deleteScopeMock: Mock;
+  let createScopeAccessesMock: Mock;
+  let resolveScopePathMock: Mock;
+  let getCurrentUserIdMock: Mock;
 
   const siteId = new Smeared('site-123', false);
   const siteName = new Smeared('My Site', false);
@@ -50,8 +50,7 @@ describe('CreateRootScopeCommand', () => {
 
     const { unit } = await TestBed.solitary(CreateRootScopeCommand)
       .mock<UniqueScopesService>(UniqueScopesService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         getScopeById: getScopeByIdMock,
         createScopesBasedOnPaths: createScopesBasedOnPathsMock,
         updateScopeExternalId: updateScopeExternalIdMock,
@@ -59,13 +58,11 @@ describe('CreateRootScopeCommand', () => {
         createScopeAccesses: createScopeAccessesMock,
       }))
       .mock<UniqueUsersService>(UniqueUsersService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         getCurrentUserId: getCurrentUserIdMock,
       }))
       .mock<ResolveScopePathCommand>(ResolveScopePathCommand)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         execute: resolveScopePathMock,
       }))
       .compile();
@@ -234,7 +231,7 @@ describe('CreateRootScopeCommand', () => {
     expect(deleteScopeMock).toHaveBeenCalledWith('scope_new', { recursive: true });
 
     // biome-ignore lint/suspicious/noExplicitAny: Accessing private logger for testing
-    const errorLogs = ((service as any).logger.error as ReturnType<typeof vi.fn>).mock.calls;
+    const errorLogs = ((service as any).logger.error as Mock).mock.calls;
     const rollbackLogged = errorLogs.some(([arg]: unknown[]) => {
       if (arg && typeof arg === 'object' && 'msg' in arg) {
         return /roll back/i.test(String((arg as { msg: unknown }).msg));

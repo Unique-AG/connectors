@@ -129,8 +129,7 @@ describe('UniqueApiHealthIndicator', () => {
 
     const { unit } = await TestBed.solitary(UniqueApiHealthIndicator)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'health.connectivityTimeoutMs') {
             return TIMEOUT_MS;
@@ -139,16 +138,14 @@ describe('UniqueApiHealthIndicator', () => {
         }),
       }))
       .mock(ProxyService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getDispatcher: vi.fn((opts: { mode: 'always' | 'never' }) => {
           proxyMode(opts.mode);
           return mockDispatcher;
         }),
       }))
       .mock(TenantRegistry)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getAllTenants: vi.fn(() => tenants),
         run: vi.fn(<R>(tenant: TenantContext, fn: () => R): R => tenantStorage.run(tenant, fn)),
       }))

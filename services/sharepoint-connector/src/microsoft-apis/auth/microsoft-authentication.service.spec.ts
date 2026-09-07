@@ -1,21 +1,23 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { Redacted } from '../../utils/redacted';
 import { MicrosoftAuthenticationService } from './microsoft-authentication.service';
 import { ClientSecretAuthStrategy } from './strategies/client-secret-auth.strategy';
 import { AuthenticationScope } from './types';
 
 vi.mock('@azure/msal-node', () => ({
-  ConfidentialClientApplication: vi.fn().mockImplementation(() => ({
-    acquireTokenByClientCredential: vi.fn(),
-  })),
+  ConfidentialClientApplication: vi.fn(
+    class MockConfidentialClientApplication {
+      public readonly acquireTokenByClientCredential = vi.fn();
+    },
+  ),
 }));
 
 describe('MicrosoftAuthenticationService', () => {
   let mockConfigService: {
-    get: ReturnType<typeof vi.fn>;
+    get: Mock;
   };
   let mockProxyService: {
-    getDispatcher: ReturnType<typeof vi.fn>;
+    getDispatcher: Mock;
   };
   let mockDispatcher: unknown;
 

@@ -87,8 +87,7 @@ describe('FileFilterService', () => {
   beforeEach(async () => {
     const { unit } = await TestBed.solitary(FileFilterService)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'processing.allowedMimeTypes') {
             return ['application/pdf', 'text/plain'];
@@ -269,8 +268,7 @@ describe('FileFilterService', () => {
     beforeEach(async () => {
       const { unit } = await TestBed.solitary(FileFilterService)
         .mock(ConfigService)
-        .impl((stub) => ({
-          ...stub(),
+        .impl(() => ({
           get: vi.fn((key: string) => {
             if (key === 'processing.allowedMimeTypes') {
               return ['text/csv'];

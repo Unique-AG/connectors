@@ -1,6 +1,6 @@
 import { isNullish } from 'remeda';
-import { Smeared } from 'src/utils/smeared';
 import { z } from 'zod';
+import { Smeared } from '../utils/smeared';
 import {
   type PartialSiteConfig,
   type SiteConfig,

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { EnabledUniqueConfig } from '~/config';
 import { RootScopeBootstrapService } from './root-scope-bootstrap.service';
 import { ScopeAccessEntityType, ScopeAccessType } from './unique.dtos';
@@ -16,7 +16,7 @@ const makeService = (
 ) => new RootScopeBootstrapService(config, scopeService as UniqueScopeService);
 
 describe('RootScopeBootstrapService', () => {
-  let mockScopeService: { addScopeAccesses: ReturnType<typeof vi.fn> };
+  let mockScopeService: { addScopeAccesses: Mock };
 
   beforeEach(() => {
     mockScopeService = { addScopeAccesses: vi.fn().mockResolvedValue(undefined) };

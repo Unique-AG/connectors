@@ -172,8 +172,7 @@ describe('UploadContentStep', () => {
   beforeEach(async () => {
     const { unit, unitRef } = await TestBed.solitary(UploadContentStep)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'processing.allowedMimeTypes') {
             return [
@@ -186,8 +185,7 @@ describe('UploadContentStep', () => {
         }),
       }))
       .mock(HttpClientService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         httpAgent: {} as Dispatcher,
         request: vi.fn().mockResolvedValue({
           statusCode: 201,
@@ -195,13 +193,11 @@ describe('UploadContentStep', () => {
         }),
       }))
       .mock(UniqueFilesService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         deleteFile: vi.fn().mockResolvedValue(undefined),
       }))
       .mock(GraphApiService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getFileContentStream: vi.fn().mockResolvedValue(Readable.from(Buffer.from('test content'))),
       }))
       .compile();

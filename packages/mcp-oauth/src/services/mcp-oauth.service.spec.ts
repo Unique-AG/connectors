@@ -35,7 +35,7 @@ describe('McpOAuthService', () => {
 
     const { unit, unitRef } = await TestBed.solitary(McpOAuthService)
       .mock<McpOAuthModuleOptions>(MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN)
-      .impl((stubFn) => ({ ...stubFn(), ...options }))
+      .impl(() => ({ ...options }))
       .compile();
 
     service = unit;

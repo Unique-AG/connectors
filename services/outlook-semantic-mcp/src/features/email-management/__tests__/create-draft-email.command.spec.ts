@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { CreateDraftEmailCommand } from '../create-draft-email.command';
@@ -7,8 +7,8 @@ const USER_PROFILE_ID = { toString: () => 'user-1' } as unknown as UserProfileTy
 const USER_PROFILE = { id: 'user-1', email: 'user@test.com' };
 
 interface MockGraphRequest {
-  header: ReturnType<typeof vi.fn>;
-  post: ReturnType<typeof vi.fn>;
+  header: Mock;
+  post: Mock;
 }
 
 function makeCommand() {

@@ -1,7 +1,7 @@
 import { OAuthClient } from '@unique-ag/mcp-oauth';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Cache } from 'cache-manager';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { DrizzleDatabase } from '~/db';
 import { MockCacheManager, MockDrizzleDatabase, MockEncryptionService } from '../__mocks__';
 import { McpOAuthStore } from './mcp-oauth.store';
@@ -10,7 +10,7 @@ describe('McpOAuthStore', () => {
   let mockDrizzle: MockDrizzleDatabase;
   let mockEncryption: MockEncryptionService;
   let mockCache: MockCacheManager;
-  let mockAmqpConnection: { publish: ReturnType<typeof vi.fn> };
+  let mockAmqpConnection: { publish: Mock };
 
   beforeEach(() => {
     mockDrizzle = new MockDrizzleDatabase();

@@ -1,5 +1,5 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
@@ -38,9 +38,7 @@ function createdEvent(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function createCommand(
-  opts: { post?: ReturnType<typeof vi.fn>; get?: ReturnType<typeof vi.fn> } = {},
-) {
+function createCommand(opts: { post?: Mock; get?: Mock } = {}) {
   const post = opts.post ?? vi.fn().mockResolvedValue(createdEvent());
   const get = opts.get ?? vi.fn().mockResolvedValue({ id: 'cal-own' });
   const request = {

@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { Smeared } from '../../utils/smeared';
 import { FileFilterService } from './file-filter.service';
 import { GraphApiService } from './graph-api.service';
@@ -11,7 +11,7 @@ import type { SharepointContentItem } from './types/sharepoint-content-item.inte
 describe('GraphApiService', () => {
   let service: GraphApiService;
   let mockGraphClient: {
-    api: ReturnType<typeof vi.fn>;
+    api: Mock;
   };
   let mockFileFilterService: Partial<FileFilterService>;
   let maxFilesToScanConfig: number | undefined;
@@ -70,8 +70,7 @@ describe('GraphApiService', () => {
         createClient: () => mockGraphClient,
       }))
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'sharepoint.graphApiRateLimitPerMinuteThousands') {
             return 10;
