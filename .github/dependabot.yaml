@@ -13,13 +13,6 @@ updates:
       prefix: build
     open-pull-requests-limit: 5
     rebase-strategy: disabled
-    groups:
-      minor-and-patch:
-        patterns:
-          - "*"
-        update-types:
-          - minor
-          - patch
 
   - package-ecosystem: uv
     directories:
@@ -35,10 +28,11 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      minor-and-patch:
+      per-dependency:
         patterns:
           - "*"
         update-types:
+          - major
           - minor
           - patch
         group-by: dependency-name
@@ -57,18 +51,11 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      python-runtime:
-        patterns:
-          - "python"
-          - "astral-sh/uv"
-          - "*astral-sh/uv*"
-        update-types:
-          - minor
-        group-by: dependency-name
-      minor-and-patch:
+      per-dependency:
         patterns:
           - "*"
         update-types:
+          - major
           - minor
           - patch
         group-by: dependency-name
@@ -85,13 +72,6 @@ updates:
       prefix: build
     open-pull-requests-limit: 5
     rebase-strategy: disabled
-    groups:
-      minor-and-patch:
-        patterns:
-          - "*"
-        update-types:
-          - minor
-          - patch
 
   - package-ecosystem: terraform
     directories:
@@ -107,10 +87,11 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      minor-and-patch:
+      per-dependency:
         patterns:
           - "*"
         update-types:
+          - major
           - minor
           - patch
         group-by: dependency-name
@@ -129,10 +110,11 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      minor-and-patch:
+      per-dependency:
         patterns:
           - "*"
         update-types:
+          - major
           - minor
           - patch
         group-by: dependency-name
