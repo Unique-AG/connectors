@@ -12,6 +12,7 @@ tools.
 import importlib
 import inspect
 import pathlib
+from collections.abc import Callable
 from typing import Protocol, cast, get_type_hints, runtime_checkable
 
 from pydantic_settings import BaseSettings
@@ -36,6 +37,19 @@ def _name(provider: object) -> str:
     name = getattr(provider, "__name__", None)
     assert isinstance(name, str), f"expected a named provider, got {provider!r}"
     return name
+
+
+def _cached_factory(module: object, name: str) -> Callable[..., object]:
+    return cast("Callable[..., object]", getattr(module, name))
+
+
+def _depends_factory(default: object) -> object | None:
+    return cast("object | None", getattr(default, "factory", None))
+
+
+def _optional_name(value: object) -> str:
+    name = getattr(value, "__name__", None)
+    return name if isinstance(name, str) else type(value).__name__
 
 
 def _provider_modules() -> list[str]:
@@ -90,17 +104,18 @@ def test_cached_providers_do_not_take_unhashable_settings() -> None:
     for module_name in _provider_modules():
         module = importlib.import_module(module_name)
         for name in _cached_provider_names(module_name):
-            factory = getattr(module, name)
-            hints = get_type_hints(factory)
+            factory = _cached_factory(module, name)
+            hints = cast("dict[str, object]", get_type_hints(factory))
             for param_name, hint in hints.items():
                 if param_name == "return":
                     continue
-                if inspect.isclass(hint) and issubclass(hint, BaseSettings):
+                if isinstance(hint, type) and issubclass(hint, BaseSettings):
                     offenders.append(f"{module_name}.{name}({param_name}: {hint.__name__})")
 
     assert offenders == [], (
         "cached providers cannot take BaseSettings as a parameter — FastMCP would fail "
-        "to resolve every tool that depends on them: " + ", ".join(offenders)
+        + "to resolve every tool that depends on them: "
+        + ", ".join(offenders)
     )
 
 
@@ -116,19 +131,18 @@ def test_cached_providers_depend_only_on_cached_factories() -> None:
     for module_name in _provider_modules():
         module = importlib.import_module(module_name)
         for name in _cached_provider_names(module_name):
-            factory = getattr(module, name)
+            factory = _cached_factory(module, name)
             for param in inspect.signature(factory).parameters.values():
-                dep = getattr(param.default, "factory", None)
+                dep = _depends_factory(cast(object, param.default))
                 if dep is None or dep is _CLIENT_FOR_CALLER:
                     continue
                 if not isinstance(dep, _Cached):
-                    offenders.append(
-                        f"{module_name}.{name} -> {getattr(dep, '__name__', type(dep).__name__)}"
-                    )
+                    offenders.append(f"{module_name}.{name} -> {_optional_name(dep)}")
 
     assert offenders == [], (
         "cached providers must Depends only on cached factories or "
-        "get_backstop_client_for_current_caller: " + ", ".join(offenders)
+        + "get_backstop_client_for_current_caller: "
+        + ", ".join(offenders)
     )
 
 
