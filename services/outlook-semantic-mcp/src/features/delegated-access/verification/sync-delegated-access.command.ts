@@ -8,6 +8,7 @@ import {
   DrizzleDatabase,
   delegatedAccessAccounts,
   delegatedAccessDirectories,
+  SOURCES_WITH_DELEGATE_FALLBACK,
   userProfiles,
 } from '~/db';
 import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
@@ -104,7 +105,7 @@ export class SyncDelegatedAccessCommand {
       client,
       ownerEmail,
       onProgress,
-      verifyOnlyFullAccess: ownerProfile.source === 'shared-mailbox',
+      verifyOnlyFullAccess: SOURCES_WITH_DELEGATE_FALLBACK.includes(ownerProfile.source),
     });
     if (verificationResult.hasFullDelegatedAccess) {
       await this.db

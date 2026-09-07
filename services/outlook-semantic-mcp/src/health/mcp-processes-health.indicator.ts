@@ -13,6 +13,7 @@ import {
   DrizzleDatabase,
   delegatedAccessAccounts,
   inboxConfigurations,
+  SOURCES_WITH_OWN_CREDENTIALS,
   subscriptions,
   tokens,
   userProfiles,
@@ -113,7 +114,12 @@ export class McpProcessesHealthIndicator {
     const usersWithOauthAndMicrosoftToken = await this.db
       .select({ totalUsers: count(userProfiles.id) })
       .from(userProfiles)
-      .where(and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken)))
+      .where(
+        and(
+          inArray(userProfiles.source, SOURCES_WITH_OWN_CREDENTIALS),
+          isNotNull(userProfiles.accessToken),
+        ),
+      )
       .then((rows) => rows[0]?.totalUsers);
 
     const details = {
@@ -162,7 +168,7 @@ export class McpProcessesHealthIndicator {
       })
       .from(delegatedAccessAccounts)
       .innerJoin(userProfiles, eq(userProfiles.id, delegatedAccessAccounts.delegateUserId))
-      .where(and(eq(userProfiles.source, 'oauth')));
+      .where(and(inArray(userProfiles.source, SOURCES_WITH_OWN_CREDENTIALS)));
 
     const total = row?.totalDelegated ?? 0;
     const stale = Number(row?.stale ?? 0);
@@ -186,7 +192,7 @@ export class McpProcessesHealthIndicator {
         and(
           eq(userProfiles.id, inboxConfigurations.userProfileId),
           isNotNull(userProfiles.accessToken),
-          eq(userProfiles.source, 'oauth'),
+          inArray(userProfiles.source, SOURCES_WITH_OWN_CREDENTIALS),
         ),
       )
       .innerJoin(

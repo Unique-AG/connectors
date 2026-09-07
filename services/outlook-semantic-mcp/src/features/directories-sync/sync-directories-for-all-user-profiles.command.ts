@@ -1,7 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNotNull, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, directoriesSync, userProfiles } from '~/db';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  directoriesSync,
+  SOURCES_WITH_DELEGATE_FALLBACK,
+  SOURCES_WITH_OWN_CREDENTIALS,
+  userProfiles,
+} from '~/db';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { getRetryAfterMs } from '~/utils/get-retry-after-ms';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
@@ -25,8 +32,11 @@ export class SyncDirectoriesForAllUserProfilesCommand {
       .leftJoin(directoriesSync, eq(directoriesSync.userProfileId, userProfiles.id))
       .where(
         or(
-          eq(userProfiles.source, 'shared-mailbox'),
-          and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken)),
+          inArray(userProfiles.source, SOURCES_WITH_DELEGATE_FALLBACK),
+          and(
+            inArray(userProfiles.source, SOURCES_WITH_OWN_CREDENTIALS),
+            isNotNull(userProfiles.accessToken),
+          ),
         ),
       )
       .orderBy(sql`${directoriesSync.lastDeltaSyncRanAt} asc nulls first`)
