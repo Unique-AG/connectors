@@ -41,6 +41,7 @@ updates:
         update-types:
           - minor
           - patch
+        group-by: dependency-name
 
   - package-ecosystem: docker
     directories:
@@ -63,12 +64,14 @@ updates:
           - "*astral-sh/uv*"
         update-types:
           - minor
+        group-by: dependency-name
       minor-and-patch:
         patterns:
           - "*"
         update-types:
           - minor
           - patch
+        group-by: dependency-name
 
   - package-ecosystem: github-actions
     directory: /
@@ -110,6 +113,7 @@ updates:
         update-types:
           - minor
           - patch
+        group-by: dependency-name
 
   - package-ecosystem: helm
     directories:
@@ -131,3 +135,4 @@ updates:
         update-types:
           - minor
           - patch
+        group-by: dependency-name
