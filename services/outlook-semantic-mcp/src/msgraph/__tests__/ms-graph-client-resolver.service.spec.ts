@@ -35,6 +35,15 @@ function makeManualProfile(id = OWNER_USER_ID) {
   return { id, email: 'owner@example.com', source: 'shared-mailbox' } as any;
 }
 
+function makeDualProfile(id = OWNER_USER_ID) {
+  return {
+    id,
+    email: 'owner@example.com',
+    source: 'shared-mailbox-with-login',
+    accessToken: 'stored-token',
+  } as any;
+}
+
 function createMockDb(delegates: { delegateUserId: string }[]) {
   const orderBy = vi.fn().mockResolvedValue(delegates);
   const where = vi.fn().mockReturnValue({ orderBy });
@@ -307,5 +316,75 @@ describe('MsGraphClientResolver', () => {
     await resolver.run({ userProfile: makeOauthProfile(), fn });
 
     expect(capturedClientUserProfileId).toBe(OWNER_USER_ID);
+  });
+
+  // -------------------------------------------------------------------------
+  // Dual mailbox (shared-mailbox-with-login)
+  // -------------------------------------------------------------------------
+
+  it('dual + no delegates uses self and does not return NO_DELEGATES', async () => {
+    const fn = vi.fn().mockResolvedValue('self-result');
+    const { resolver, factory } = createResolver([]);
+
+    const result = await resolver.run({ userProfile: makeDualProfile(), fn });
+
+    expect(result).toBe('self-result');
+    expect(isNoDelegatesResult(result)).toBe(false);
+    expect(factory.createClientForUser).toHaveBeenCalledOnce();
+    expect(factory.createClientForUser).toHaveBeenCalledWith(OWNER_USER_ID);
+    expect(fn).toHaveBeenCalledWith({
+      client: expect.any(Object),
+      clientUserProfileId: OWNER_USER_ID,
+    });
+  });
+
+  it('dual + delegates tries self first', async () => {
+    const fn = vi.fn().mockResolvedValue('self-first');
+    const { resolver, factory } = createResolver([
+      { delegateUserId: DELEGATE_USER_ID_1 },
+      { delegateUserId: DELEGATE_USER_ID_2 },
+    ]);
+
+    const result = await resolver.run({ userProfile: makeDualProfile(), fn });
+
+    expect(result).toBe('self-first');
+    expect(factory.createClientForUser).toHaveBeenCalledOnce();
+    expect(factory.createClientForUser).toHaveBeenCalledWith(OWNER_USER_ID);
+  });
+
+  it('dual self 401 rotates to a delegate with that delegate as clientUserProfileId', async () => {
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(makeGraphError(401))
+      .mockResolvedValueOnce('from-delegate');
+    const { resolver, factory } = createResolver([{ delegateUserId: DELEGATE_USER_ID_1 }]);
+
+    const result = await resolver.run({ userProfile: makeDualProfile(), fn });
+
+    expect(result).toBe('from-delegate');
+    expect(factory.createClientForUser).toHaveBeenNthCalledWith(1, OWNER_USER_ID);
+    expect(factory.createClientForUser).toHaveBeenNthCalledWith(2, DELEGATE_USER_ID_1);
+    expect(fn).toHaveBeenNthCalledWith(2, {
+      client: expect.any(Object),
+      clientUserProfileId: DELEGATE_USER_ID_1,
+    });
+  });
+
+  it('dual stale preferredDelegateUserId does not outrank self', async () => {
+    const fn = vi.fn().mockResolvedValue('self-not-preferred');
+    const { resolver, factory } = createResolver([
+      { delegateUserId: DELEGATE_USER_ID_1 },
+      { delegateUserId: DELEGATE_USER_ID_2 },
+    ]);
+
+    await resolver.run({
+      userProfile: makeDualProfile(),
+      fn,
+      sharedMailboxConfig: { preferredDelegateUserId: DELEGATE_USER_ID_2 },
+    });
+
+    expect(factory.createClientForUser).toHaveBeenCalledOnce();
+    expect(factory.createClientForUser).toHaveBeenCalledWith(OWNER_USER_ID);
+    expect(factory.createClientForUser).not.toHaveBeenCalledWith(DELEGATE_USER_ID_2);
   });
 });
