@@ -7,6 +7,7 @@ import {
   DRIZZLE,
   DrizzleDatabase,
   directories,
+  SOURCES_ADDRESSED_BY_EMAIL,
   SystemDirectoriesIgnoredForSync,
   SystemDirectoryType,
   UserProfile,
@@ -84,10 +85,9 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
     traceAttrs({ userProfileId: userProfile.id });
 
     traceEvent('Start fetching system directories from microsoft graph');
-    const baseUrl =
-      userProfile.source === 'shared-mailbox'
-        ? `users/${userProfile.email}/mailFolders`
-        : `me/mailFolders`;
+    const baseUrl = SOURCES_ADDRESSED_BY_EMAIL.includes(userProfile.source)
+      ? `users/${userProfile.email}/mailFolders`
+      : `me/mailFolders`;
     const microsoftGraphDirectories: GraphDirectoryInfo[] = [];
     for (const [directoryType, apiName] of Object.entries(
       MAP_SYSTEM_DIRECTORY_TO_MS_GRAPH_API_NAME,
