@@ -1,8 +1,8 @@
 import { OAuthClient } from '@unique-ag/mcp-oauth';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Cache } from 'cache-manager';
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
-import { DrizzleDatabase } from '~/db';
+import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
+import { DrizzleDatabase, sourceOnLoginConflict } from '~/db';
 import { MockCacheManager, MockDrizzleDatabase, MockEncryptionService } from '../__mocks__';
 import { McpOAuthStore } from './mcp-oauth.store';
 
@@ -291,8 +291,7 @@ describe('McpOAuthStore', () => {
       );
     });
 
-    it('login on a shared-mailbox row upgrades source to shared-mailbox-with-login', async () => {
-      mockDrizzle.__nextQueryUserProfile = { source: 'shared-mailbox', accessToken: null };
+    it('on conflict uses sourceOnLoginConflict so a shared-mailbox upgrades and oauth is not flipped', async () => {
       mockDrizzle.__nextInsertReturningRows = [{ id: 'user_profile_upgraded' }];
 
       const unit = new McpOAuthStore(
@@ -307,26 +306,8 @@ describe('McpOAuthStore', () => {
       const insertBuilder = mockDrizzle.insert.mock.results[0]?.value;
       expect(insertBuilder.values.mock.calls[0][0]).not.toHaveProperty('source');
       expect(insertBuilder.onConflictDoUpdate.mock.calls[0][0].set.source).toBe(
-        'shared-mailbox-with-login',
+        sourceOnLoginConflict,
       );
-    });
-
-    it('login on an oauth row leaves source out of the conflict set', async () => {
-      mockDrizzle.__nextQueryUserProfile = { source: 'oauth', accessToken: 'existing-token' };
-      mockDrizzle.__nextInsertReturningRows = [{ id: 'user_profile_oauth' }];
-
-      const unit = new McpOAuthStore(
-        mockDrizzle as unknown as DrizzleDatabase,
-        mockEncryption,
-        mockCache as unknown as Cache,
-        mockAmqpConnection as unknown as AmqpConnection,
-      );
-
-      await unit.upsertUserProfile(mockUser);
-
-      const insertBuilder = mockDrizzle.insert.mock.results[0]?.value;
-      expect(insertBuilder.values.mock.calls[0][0]).not.toHaveProperty('source');
-      expect(insertBuilder.onConflictDoUpdate.mock.calls[0][0].set).not.toHaveProperty('source');
     });
 
     it('brand-new profile has no source in insert values so the column default applies', async () => {
@@ -343,7 +324,6 @@ describe('McpOAuthStore', () => {
 
       const insertBuilder = mockDrizzle.insert.mock.results[0]?.value;
       expect(insertBuilder.values.mock.calls[0][0]).not.toHaveProperty('source');
-      expect(insertBuilder.onConflictDoUpdate.mock.calls[0][0].set).not.toHaveProperty('source');
     });
 
     it('gets user profile by ID', async () => {

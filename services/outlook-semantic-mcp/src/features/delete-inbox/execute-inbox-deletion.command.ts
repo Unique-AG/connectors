@@ -70,31 +70,11 @@ export class ExecuteInboxDeletionCommand {
     await this.updateDeletingHeartbeatAt(userProfile.id);
     this.logger.warn({ ...logContext, msg: 'Directories deleted' });
 
-    if (userProfile.source === 'shared-mailbox') {
-      // We delete the user profile only for shared-mailboxes because the delete command is accessible
-      // via a tool call, the user will call the tool, and after that he could call reconnect inbox, if
-      // we delete the user profile he will not be authenticated anymore and the Mcp will be in a weird
-      // state.
-      await this.db.delete(userProfiles).where(eq(userProfiles.id, userProfile.id));
-      this.logger.warn({
-        ...logContext,
-        msg: 'Deleted user profile and InboxConfiguration for shared-mailbox',
-      });
-    } else {
-      await this.db
-        .delete(inboxConfigurations)
-        .where(eq(inboxConfigurations.userProfileId, userProfileId));
-      this.logger.warn({
-        ...logContext,
-        msg: 'InboxConfiguration deleted',
-      });
-      if (userProfile.source === 'shared-mailbox-with-login') {
-        await this.db
-          .update(userProfiles)
-          .set({ source: 'oauth' })
-          .where(eq(userProfiles.id, userProfile.id));
-      }
-    }
+    await this.db.delete(userProfiles).where(eq(userProfiles.id, userProfile.id));
+    this.logger.warn({
+      ...logContext,
+      msg: 'Deleted user profile and InboxConfiguration',
+    });
 
     this.logger.warn({ ...logContext, msg: 'Inbox deletion finished' });
   }

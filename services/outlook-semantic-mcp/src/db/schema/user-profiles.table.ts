@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import { jsonb, pgEnum, pgTable, unique, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../timestamps.columns';
@@ -44,29 +44,6 @@ export const SOURCES_OWNED_BY_SYNC: readonly UserProfileSource[] = [
   'shared-mailbox-with-login',
 ];
 
-/**
- * Compute the `source` to write on conflict. `null` means leave the existing
- * column untouched (the insert path uses the writer's own default).
- */
-export function upgradedSource(
-  existing: { source: UserProfileSource; hasToken: boolean } | undefined,
-  listedAsSharedMailbox: boolean,
-): UserProfileSource | null {
-  if (!existing) {
-    return null;
-  }
-  if (existing.source === 'shared-mailbox-with-login') {
-    return null;
-  }
-  if (existing.source === 'shared-mailbox' && existing.hasToken) {
-    return 'shared-mailbox-with-login';
-  }
-  if (existing.source === 'oauth' && existing.hasToken && listedAsSharedMailbox) {
-    return 'shared-mailbox-with-login';
-  }
-  return null;
-}
-
 export const userProfiles = pgTable(
   'user_profiles',
   {
@@ -96,5 +73,29 @@ export const userProfileRelations = relations(userProfiles, ({ many }) => ({
   authorizationCodes: many(authorizationCodes),
   tokens: many(tokens),
 }));
+
+// Sync writer. Looks at the existing row: the insert writes access_token = null,
+// so excluded.access_token cannot be used. oauth + token is Case 1; a tokenless
+// oauth row is left unchanged so a real user who shares an address is never flipped.
+export const sourceOnListedMailboxConflict = sql`
+  CASE
+    WHEN ${userProfiles.source} = 'shared-mailbox-with-login' THEN ${userProfiles.source}
+    WHEN ${userProfiles.source} = 'shared-mailbox'
+         AND ${userProfiles.accessToken} IS NOT NULL THEN 'shared-mailbox-with-login'
+    WHEN ${userProfiles.source} = 'oauth'
+         AND ${userProfiles.accessToken} IS NOT NULL THEN 'shared-mailbox-with-login'
+    ELSE ${userProfiles.source}
+  END
+`;
+
+// Login writer. Login always writes a token, so a shared-mailbox row upgrades
+// even when its stored access_token is still null. A plain oauth row must stay
+// oauth — Case 1 (listed later) is sourceOnListedMailboxConflict.
+export const sourceOnLoginConflict = sql`
+  CASE
+    WHEN ${userProfiles.source} = 'shared-mailbox' THEN 'shared-mailbox-with-login'
+    ELSE ${userProfiles.source}
+  END
+`;
 
 export type UserProfile = typeof userProfiles.$inferSelect;

@@ -92,13 +92,15 @@ describe('ExecuteInboxDeletionCommand', () => {
     expect(mockDb.update).toHaveBeenCalledTimes(4);
   });
 
-  it('deletes inboxConfigurations row on completion', async () => {
+  it('deletes the user profile on completion', async () => {
     const command = makeCommand({ db: mockDb, uniqueApi: mockUniqueApi });
 
     await command.run(userProfileId);
 
-    // Deletes: directoriesSync, directories, inboxConfigurations (3 calls total)
+    // Deletes: directoriesSync, directories, userProfiles (inboxConfigurations cascade)
     expect(mockDb.delete).toHaveBeenCalledTimes(3);
+    expect(mockDb.delete).toHaveBeenCalledWith(userProfiles);
+    expect(mockDb.delete).not.toHaveBeenCalledWith(inboxConfigurations);
   });
 
   it('treats missing scope as already deleted and proceeds to cleanup', async () => {
@@ -122,7 +124,7 @@ describe('ExecuteInboxDeletionCommand', () => {
     expect(mockDb.delete).not.toHaveBeenCalled();
   });
 
-  it('keeps a dual mailbox profile and downgrades source to oauth', async () => {
+  it('deletes the user profile for a dual mailbox', async () => {
     mockDb.query.userProfiles.findFirst.mockResolvedValue({
       id: userProfileId,
       providerUserId,
@@ -133,12 +135,10 @@ describe('ExecuteInboxDeletionCommand', () => {
 
     await command.run(userProfileId);
 
-    expect(mockDb.delete).toHaveBeenCalledTimes(3);
-    expect(mockDb.delete).toHaveBeenCalledWith(inboxConfigurations);
-    expect(mockDb.delete).not.toHaveBeenCalledWith(userProfiles);
-    expect(mockDb.update).toHaveBeenCalledTimes(5);
-    expect(mockDb.update).toHaveBeenCalledWith(userProfiles);
-    expect(mockDb.update.mock.results.at(-1)?.value.set).toHaveBeenCalledWith({ source: 'oauth' });
+    expect(mockDb.delete).toHaveBeenCalledWith(userProfiles);
+    expect(mockDb.delete).not.toHaveBeenCalledWith(inboxConfigurations);
+    expect(mockDb.update).toHaveBeenCalledTimes(4);
+    expect(mockDb.update).not.toHaveBeenCalledWith(userProfiles);
   });
 
   it('deletes the user profile for a pure shared-mailbox', async () => {

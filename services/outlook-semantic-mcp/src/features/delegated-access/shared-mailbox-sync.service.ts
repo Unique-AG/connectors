@@ -19,8 +19,8 @@ import {
   DrizzleDatabase,
   inboxConfigurations,
   SOURCES_OWNED_BY_SYNC,
+  sourceOnListedMailboxConflict,
   type UserProfileSource,
-  upgradedSource,
   userProfiles,
 } from '~/db';
 import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
@@ -244,32 +244,43 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       );
 
     if (profilesToRemove.length > 0) {
-      if (this.ingestionCfg.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi) {
-        for (const { id } of profilesToRemove) {
-          const result = await this.deleteInboxDataCommand.run(id);
+      const pureSharedMailboxIds = profilesToRemove
+        .filter((profile) => profile.source === 'shared-mailbox')
+        .map((profile) => profile.id);
+      const dualMailboxIds = profilesToRemove
+        .filter((profile) => profile.source === 'shared-mailbox-with-login')
+        .map((profile) => profile.id);
+
+      if (pureSharedMailboxIds.length > 0) {
+        if (this.ingestionCfg.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi) {
+          for (const id of pureSharedMailboxIds) {
+            const result = await this.deleteInboxDataCommand.run(id);
+            this.logger.log({
+              userProfileId: id,
+              result,
+              msg: 'SharedMailboxSync: triggered deletion for removed shared-mailbox profile',
+            });
+          }
+        } else {
+          await this.db.delete(userProfiles).where(inArray(userProfiles.id, pureSharedMailboxIds));
           this.logger.log({
-            userProfileId: id,
-            result,
-            msg: 'SharedMailboxSync: triggered deletion for removed shared-mailbox profile',
+            userProfileIds: pureSharedMailboxIds,
+            msg: 'SharedMailboxSync: deleted de-listed shared-mailbox profiles',
           });
         }
-      } else {
-        const pureSharedMailboxIds = profilesToRemove
-          .filter((profile) => profile.source === 'shared-mailbox')
-          .map((profile) => profile.id);
-        const dualMailboxIds = profilesToRemove
-          .filter((profile) => profile.source === 'shared-mailbox-with-login')
-          .map((profile) => profile.id);
+      }
 
-        if (pureSharedMailboxIds.length > 0) {
-          await this.db.delete(userProfiles).where(inArray(userProfiles.id, pureSharedMailboxIds));
-        }
-        if (dualMailboxIds.length > 0) {
-          await this.db
-            .update(userProfiles)
-            .set({ source: 'oauth' })
-            .where(inArray(userProfiles.id, dualMailboxIds));
-        }
+      if (dualMailboxIds.length > 0) {
+        // ExecuteInboxDeletionCommand always deletes the profile. Dual rows keep
+        // the OAuth identity and are only reclassified.
+        await this.db
+          .update(userProfiles)
+          .set({ source: 'oauth' })
+          .where(inArray(userProfiles.id, dualMailboxIds));
+        this.logger.log({
+          userProfileIds: dualMailboxIds,
+          msg: 'SharedMailboxSync: downgraded de-listed dual mailboxes to oauth',
+        });
       }
     }
 
@@ -277,24 +288,6 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
 
     // Upsert matched users
     if (allMatchedUsers.length > 0) {
-      const existingRows = await this.db
-        .select({
-          providerUserId: userProfiles.providerUserId,
-          source: userProfiles.source,
-          accessToken: userProfiles.accessToken,
-        })
-        .from(userProfiles)
-        .where(
-          inArray(
-            userProfiles.providerUserId,
-            allMatchedUsers.map((user) => user.id),
-          ),
-        );
-
-      const existingByProviderUserId = new Map(
-        existingRows.map((row) => [row.providerUserId, row] as const),
-      );
-
       type UserProfileInsert = typeof userProfiles.$inferInsert;
       const mappedProfiles: UserProfileInsert[] = allMatchedUsers.map((user) => {
         const rawData: OAuthUserProfile = {
@@ -305,32 +298,22 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
           avatarUrl: undefined,
           raw: user,
         };
-        const existing = existingByProviderUserId.get(user.id);
-        const nextSource = upgradedSource(
-          existing
-            ? { source: existing.source, hasToken: existing.accessToken != null }
-            : undefined,
-          true,
-        );
         return {
           provider: 'microsoft' as const,
           providerUserId: user.id,
           username: user.mail,
           email: user.mail,
           displayName: user.displayName ?? null,
-          // New rows insert as shared-mailbox. When upgradedSource returns null
-          // the existing source is reused so excluded.source is a no-op on conflict.
-          source: nextSource ?? existing?.source ?? 'shared-mailbox',
+          source: 'shared-mailbox',
           accessToken: null,
           refreshToken: null,
           raw: rawData,
         };
       });
 
-      // source is included in the conflict update via excluded.source. upgradedSource
-      // promotes an oauth+token row to shared-mailbox-with-login (Case 1) and leaves
-      // a tokenless oauth row untouched so we never convert a real user who happens
-      // to share an address with the env list.
+      // New rows insert as shared-mailbox. On conflict, sourceOnListedMailboxConflict
+      // upgrades oauth+token (Case 1) and shared-mailbox+token from the existing row.
+      // A tokenless oauth row is left unchanged.
       upsertedSources = await this.db
         .insert(userProfiles)
         .values(mappedProfiles)
@@ -340,7 +323,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
             email: sql.raw(`excluded.${userProfiles.email.name}`),
             username: sql.raw(`excluded.${userProfiles.username.name}`),
             displayName: sql.raw(`excluded.${userProfiles.displayName.name}`),
-            source: sql.raw(`excluded.${userProfiles.source.name}`),
+            source: sourceOnListedMailboxConflict,
           },
         })
         .returning({ id: userProfiles.id, source: userProfiles.source });

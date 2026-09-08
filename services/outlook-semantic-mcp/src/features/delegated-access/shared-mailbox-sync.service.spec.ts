@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpBackendType } from '~/config';
+import { sourceOnListedMailboxConflict } from '~/db';
 import {
   SHARED_MAILBOX_SYNC_CACHE_KEY,
   SharedMailboxSyncService,
@@ -84,11 +85,6 @@ function hashEmails(emails: string[], mcpBackend = McpBackendType.MicrosoftGraph
 function createMockDb(
   profileIds: string[] = [],
   options?: {
-    existingProfiles?: Array<{
-      providerUserId: string;
-      source: string;
-      accessToken: string | null;
-    }>;
     profilesToRemove?: Array<{ id: string; source: string }>;
   },
 ) {
@@ -109,17 +105,15 @@ function createMockDb(
     .mockReturnValueOnce({ onConflictDoUpdate })
     .mockReturnValue({ onConflictDoNothing });
   const insertMock = vi.fn().mockReturnValue({ values });
-  // 1st from().where(): profilesToRemove
-  // 2nd from().where(): existing rows for source upgrade
+  // from().where(): profilesToRemove
   // from().leftJoin().where(): profiles without inbox config
   const profilesWithoutConfigWhere = vi.fn().mockResolvedValue(profileIds.map((id) => ({ id })));
   const leftJoinMock = vi.fn().mockReturnValue({ where: profilesWithoutConfigWhere });
   const selectWhere = vi
     .fn()
-    .mockResolvedValueOnce(
+    .mockResolvedValue(
       options?.profilesToRemove ?? [{ id: 'stale-profile-id', source: 'shared-mailbox' }],
-    )
-    .mockResolvedValue(options?.existingProfiles ?? []);
+    );
   const selectMock = vi.fn().mockReturnValue({
     from: vi.fn().mockReturnValue({
       where: selectWhere,
@@ -140,15 +134,9 @@ function createService(overrides?: {
   factoryResults?: Array<{ client: any; userId: string } | null>;
   cacheResult?: { payload: { envarHash: string; lastSyncedAt: number } } | null;
   profileIds?: string[];
-  existingProfiles?: Array<{
-    providerUserId: string;
-    source: string;
-    accessToken: string | null;
-  }>;
   profilesToRemove?: Array<{ id: string; source: string }>;
 }) {
   const db = createMockDb(overrides?.profileIds ?? [], {
-    existingProfiles: overrides?.existingProfiles,
     profilesToRemove: overrides?.profilesToRemove,
   });
   const config = {
@@ -596,6 +584,10 @@ describe('SharedMailboxSyncService', () => {
         source: 'shared-mailbox',
         accessToken: null,
       });
+      const onConflict =
+        db.insert.mock.results[0]?.value.values.mock.results[0]?.value.onConflictDoUpdate.mock
+          .calls[0][0];
+      expect(onConflict.set.source).toBe(sourceOnListedMailboxConflict);
     });
 
     it('email matching is case-insensitive', async () => {
@@ -744,55 +736,6 @@ describe('SharedMailboxSyncService', () => {
       expect(db.insert).toHaveBeenCalledOnce();
     });
 
-    it('listed email matching an oauth row with a token upgrades source to shared-mailbox-with-login', async () => {
-      const graphUser = { id: 'aad-id', mail: 'shared@example.com', displayName: 'Shared Mailbox' };
-      const mockClient = makeGraphClient([{ value: [graphUser] }]);
-      const { service, db } = createService({
-        config: { sharedMailboxEmails: ['shared@example.com'] },
-        factoryResults: [{ client: mockClient, userId: 'user1' }],
-        existingProfiles: [
-          { providerUserId: 'aad-id', source: 'oauth', accessToken: 'stored-token' },
-        ],
-      });
-
-      await (service as any).runSyncWithRetries();
-
-      const insertedValues = db.insert.mock.results[0]?.value.values.mock.calls[0][0];
-      expect(insertedValues[0].source).toBe('shared-mailbox-with-login');
-    });
-
-    it('listed email matching an oauth row with no token leaves source as oauth', async () => {
-      const graphUser = { id: 'aad-id', mail: 'shared@example.com', displayName: 'Shared Mailbox' };
-      const mockClient = makeGraphClient([{ value: [graphUser] }]);
-      const { service, db } = createService({
-        config: { sharedMailboxEmails: ['shared@example.com'] },
-        factoryResults: [{ client: mockClient, userId: 'user1' }],
-        existingProfiles: [{ providerUserId: 'aad-id', source: 'oauth', accessToken: null }],
-      });
-
-      await (service as any).runSyncWithRetries();
-
-      const insertedValues = db.insert.mock.results[0]?.value.values.mock.calls[0][0];
-      expect(insertedValues[0].source).toBe('oauth');
-    });
-
-    it('listed email matching a tokenless shared-mailbox row leaves source unchanged', async () => {
-      const graphUser = { id: 'aad-id', mail: 'shared@example.com', displayName: 'Shared Mailbox' };
-      const mockClient = makeGraphClient([{ value: [graphUser] }]);
-      const { service, db } = createService({
-        config: { sharedMailboxEmails: ['shared@example.com'] },
-        factoryResults: [{ client: mockClient, userId: 'user1' }],
-        existingProfiles: [
-          { providerUserId: 'aad-id', source: 'shared-mailbox', accessToken: null },
-        ],
-      });
-
-      await (service as any).runSyncWithRetries();
-
-      const insertedValues = db.insert.mock.results[0]?.value.values.mock.calls[0][0];
-      expect(insertedValues[0].source).toBe('shared-mailbox');
-    });
-
     it('de-listing a dual mailbox keeps the profile and downgrades source to oauth', async () => {
       const { service, db } = createService({
         config: { sharedMailboxEmails: [] },
@@ -820,7 +763,7 @@ describe('SharedMailboxSyncService', () => {
       expect(db.update).not.toHaveBeenCalled();
     });
 
-    it('de-listing a dual mailbox on UniqueApi enqueues inbox deletion and does not hard-delete', async () => {
+    it('de-listing a dual mailbox on UniqueApi downgrades to oauth and does not delete', async () => {
       const { service, db, deleteInboxDataCommand } = createService({
         config: { sharedMailboxEmails: [] },
         ingestionConfig: { mcpBackend: McpBackendType.MicrosoftGraphAndUniqueApi },
@@ -830,7 +773,23 @@ describe('SharedMailboxSyncService', () => {
 
       await (service as any).runSyncWithRetries();
 
-      expect(deleteInboxDataCommand.run).toHaveBeenCalledWith('dual-profile-id');
+      expect(deleteInboxDataCommand.run).not.toHaveBeenCalled();
+      expect(db.delete).not.toHaveBeenCalled();
+      expect(db.update).toHaveBeenCalledOnce();
+      expect(db.update.mock.results[0]?.value.set).toHaveBeenCalledWith({ source: 'oauth' });
+    });
+
+    it('de-listing a pure shared-mailbox on UniqueApi enqueues inbox deletion', async () => {
+      const { service, db, deleteInboxDataCommand } = createService({
+        config: { sharedMailboxEmails: [] },
+        ingestionConfig: { mcpBackend: McpBackendType.MicrosoftGraphAndUniqueApi },
+        factoryResults: [null],
+        profilesToRemove: [{ id: 'pure-profile-id', source: 'shared-mailbox' }],
+      });
+
+      await (service as any).runSyncWithRetries();
+
+      expect(deleteInboxDataCommand.run).toHaveBeenCalledWith('pure-profile-id');
       expect(db.delete).not.toHaveBeenCalled();
       expect(db.update).not.toHaveBeenCalled();
     });
