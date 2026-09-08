@@ -9,10 +9,8 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "lint": "biome check .",
-    "lint:fix": "biome check . --write",
-    "format": "biome format .",
-    "format:fix": "biome format . --write",
+    "style": "biome check .",
+    "style:fix": "biome check . --write",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {

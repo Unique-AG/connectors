@@ -72,11 +72,11 @@
         # Node.js development
         # turbo and biome are installed via pnpm (in package.json)
         nodePkgs = with pkgs; [
-          nodejs_24 # matches Dockerfiles
-          corepack_24 # pnpm version managed via corepack
+          nodejs_26 # matches the Dockerfiles and CI
+          (corepack.override { nodejs-slim = pkgs.nodejs-slim_26; }) # pnpm version managed via corepack
         ];
 
-        # Python development (services/kb-mcp, services/office-365-mcp)
+        # Python development (services/backstop-mcp, hello-mcp, kb-mcp, office-365-mcp)
         # uv manages the interpreter and the venv itself — see each service's .python-version
         pythonPkgs = with pkgs; [
           uv

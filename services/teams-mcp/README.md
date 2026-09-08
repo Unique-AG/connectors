@@ -100,7 +100,7 @@ openssl rand -hex 32
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 26
 - pnpm
 - PostgreSQL 17
 - RabbitMQ 4
