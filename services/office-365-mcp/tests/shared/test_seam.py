@@ -1,15 +1,29 @@
-"""What a model is told when Graph says no.
+"""What a model is told when Graph says no, and what it is told when a person says no.
 
 Both routes to a message are driven here: `graph_tool_errors`, the mapping asked directly, and
 `GraphAdviceMiddleware`, which covers every registered tool and the dependency resolution no block
 could reach. Whether the two agree end to end is `tests/test_error_mapping.py`'s subject.
 """
 
+from collections.abc import Mapping
+from typing import cast
+
 import pytest
+from fastmcp import Context
 from fastmcp.exceptions import ToolError
+from fastmcp.server.elicitation import AcceptedElicitation, DeclinedElicitation
 from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools.base import ToolResult
-from mcp.types import CallToolRequestParams
+from mcp.types import (
+    CallToolRequestParams,
+    CreateMessageResult,
+    ElicitRequest,
+    ElicitRequestFormParams,
+    ElicitResult,
+    InputRequiredResult,
+    TextContent,
+)
+from mcp.types.version import LATEST_HANDSHAKE_VERSION, LATEST_MODERN_VERSION
 
 from office_365_mcp.graph_client import (
     GraphFailure,
@@ -20,10 +34,13 @@ from office_365_mcp.graph_client import (
     GraphUnavailable,
 )
 from office_365_mcp.shared.seam import (
+    Confirm,
+    Confirmed,
     GraphAdviceMiddleware,
     TokenExchangeFailed,
     ToolAdvice,
     graph_tool_errors,
+    person_confirms,
 )
 
 _PERMISSION = "Chat.Read"
@@ -290,6 +307,266 @@ class TestTheRefusalThatHappensBeforeGraph:
         assert _CHANNELS in message
         assert "grant the delegated permissions" in message, "plural, or it reads as one of them"
         assert "administrator" in message
+
+
+_AGREE = "create the event"
+_DECLINE = "do not create it"
+_NOTHING_HAPPENED = "No event was created."
+_QUESTION = "Create 'Pricing review' on 2 March at 14:00 UTC and invite nobody?"
+
+
+_ABOUT = "5f5c4e19-0d6b-5a2f-9c31-8e7a4b2d1f60"
+_ANOTHER_REQUEST = "3a5f9c02-1e4d-5b6a-8c7d-9e0f1a2b3c4d"
+
+
+class _Era:
+    def __init__(self, protocol_version: str) -> None:
+        self.protocol_version: str = protocol_version
+
+
+class _Client:
+    """The whole of the `Context` surface `person_confirms` touches.
+
+    `era=None` is a connection with no request context, which the seam treats as not modern.
+    """
+
+    def __init__(
+        self,
+        answer: object = None,
+        *,
+        era: str | None = None,
+        responses: dict[str, object] | None = None,
+        state: str | None = None,
+    ) -> None:
+        self.request_context: _Era | None = None if era is None else _Era(era)
+        self.input_responses: dict[str, object] | None = responses
+        self.request_state: str | None = state
+        self._answer: object = answer
+
+    async def elicit(self, message: str, response_type: object = None) -> object:
+        assert message
+        assert response_type == [_AGREE, _DECLINE], (
+            "the person picks between the two answers the caller named"
+        )
+        if isinstance(self._answer, Exception):
+            raise self._answer
+        return self._answer
+
+
+def _confirming(client: _Client) -> Confirm:
+    """The two types do not overlap, so the cast goes through `object`."""
+    return person_confirms(
+        cast("Context", cast("object", client)),
+        agree=_AGREE,
+        decline=_DECLINE,
+        nothing_happened=_NOTHING_HAPPENED,
+    )
+
+
+def _confirm_with(answer: object, era: str | None) -> Confirm:
+    return _confirming(_Client(answer, era=era))
+
+
+@pytest.mark.parametrize(
+    "era", [None, LATEST_HANDSHAKE_VERSION], ids=["no-request-context", "handshake"]
+)
+class TestHowAWriteIsPutToAPerson:
+    """Both parametrized eras answer inside the call, over `ctx.elicit`.
+
+    The versions come off the SDK, so a future era moves these tests with it.
+    """
+
+    async def test_agreeing_answers_with_no_refusal(self, era: str | None) -> None:
+        confirm = _confirm_with(AcceptedElicitation(data=_AGREE), era)
+
+        assert await confirm(_QUESTION, _ABOUT) is None
+
+    async def test_declining_refuses_and_says_nothing_happened(self, era: str | None) -> None:
+        refusal = await _confirm_with(DeclinedElicitation(), era)(_QUESTION, _ABOUT)
+
+        assert refusal is not None
+        assert isinstance(refusal, str)
+        assert refusal.startswith(_NOTHING_HAPPENED)
+        assert "did not agree" in refusal
+        assert "Do not call this tool again" in refusal
+
+    async def test_answering_anything_but_the_agreement_refuses(self, era: str | None) -> None:
+        refusal = await _confirm_with(AcceptedElicitation(data=_DECLINE), era)(_QUESTION, _ABOUT)
+
+        assert isinstance(refusal, str) and "did not agree" in refusal
+
+    async def test_a_client_that_cannot_ask_writes_nothing(self, era: str | None) -> None:
+        """Fail closed, and say why: an operator cannot tell a broken mailbox from a client
+        that cannot ask."""
+        refusal = await _confirm_with(RuntimeError("elicitation not supported"), era)(
+            _QUESTION, _ABOUT
+        )
+
+        assert refusal is not None
+        assert isinstance(refusal, str)
+        assert refusal.startswith(_NOTHING_HAPPENED)
+        assert "does not support elicitation" in refusal
+        assert "Do not call this tool again" in refusal
+
+    async def test_a_tool_error_from_the_client_is_passed_through_as_it_arrived(
+        self, era: str | None
+    ) -> None:
+        """A `ToolError` is already worded for a caller; re-wording it would guess."""
+        already = ToolError("the client refused the request")
+
+        refusal = await _confirm_with(already, era)(_QUESTION, _ABOUT)
+
+        assert refusal == str(already)
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            DeclinedElicitation(),
+            AcceptedElicitation(data=_DECLINE),
+            RuntimeError("elicitation not supported"),
+            ToolError("the client refused the request"),
+        ],
+        ids=["declined", "another-answer", "cannot-ask", "client-error"],
+    )
+    async def test_no_refusal_is_ever_raised(self, answer: object, era: str | None) -> None:
+        refusal = await _confirm_with(answer, era)(_QUESTION, _ABOUT)
+
+        assert isinstance(refusal, str) and refusal
+
+
+_ACCEPTED_AGREEMENT = ElicitResult(action="accept", content={"value": _AGREE})
+
+# Everything a client can send back that is not this request's agreement.
+_NOT_AN_AGREEMENT: list[object] = [
+    ElicitResult(action="accept", content={"value": _DECLINE}),
+    ElicitResult(action="decline"),
+    ElicitResult(action="cancel"),
+    ElicitResult(action="decline", content={"value": _AGREE}),
+    ElicitResult(action="cancel", content={"value": _AGREE}),
+    ElicitResult(action="accept", content={}),
+    ElicitResult(action="accept", content={"value": "whatever the client felt like"}),
+    CreateMessageResult(
+        role="assistant", content=TextContent(type="text", text=_AGREE), model="a-model"
+    ),
+]
+_NOT_AN_AGREEMENT_IDS = [
+    "the-other-answer",
+    "declined",
+    "cancelled",
+    "declined-but-filled-in",
+    "cancelled-but-filled-in",
+    "empty-content",
+    "off-schema-content",
+    "another-kind-of-answer",
+]
+
+
+def _modern(*, responses: dict[str, object] | None = None, state: str | None = None) -> Confirm:
+    """A 2026-07-28 connection: its `elicit` raises, so a leak back onto the back-channel fails."""
+    return _confirming(
+        _Client(
+            AssertionError("a 2026-07-28 connection has no back-channel to elicit over"),
+            era=LATEST_MODERN_VERSION,
+            responses=responses,
+            state=state,
+        )
+    )
+
+
+async def _the_question() -> InputRequiredResult:
+    question = await _modern()(_QUESTION, _ABOUT)
+
+    assert isinstance(question, InputRequiredResult)
+    return question
+
+
+def _under_its_own_key(question: InputRequiredResult, answer: object) -> dict[str, object]:
+    """A literal key here would let the ask and the answer drift apart unnoticed."""
+    assert question.input_requests is not None
+    (key,) = question.input_requests
+    return {key: answer}
+
+
+async def _answering(answer: object, *, state: str | None = _ABOUT) -> Confirmed:
+    question = await _the_question()
+
+    return await _modern(responses=_under_its_own_key(question, answer), state=state)(
+        _QUESTION, _ABOUT
+    )
+
+
+class TestTheEraWithNoBackChannel:
+    """No server-to-client channel on this era (SEP-2577), so the question travels as a result."""
+
+    async def test_round_one_answers_with_the_question_bound_to_the_request(self) -> None:
+        question = await _the_question()
+
+        assert question.request_state == _ABOUT
+
+    async def test_the_question_carries_the_tools_wording_and_the_two_answers(self) -> None:
+        question = await _the_question()
+
+        assert question.input_requests is not None
+        (request,) = question.input_requests.values()
+        assert isinstance(request, ElicitRequest)
+        assert isinstance(request.params, ElicitRequestFormParams)
+        assert request.params.message == _QUESTION
+        schema = cast(
+            "Mapping[str, Mapping[str, Mapping[str, object]]]", request.params.requested_schema
+        )
+        assert schema["properties"]["value"]["enum"] == [_AGREE, _DECLINE]
+
+    async def test_an_agreement_bound_to_this_request_lets_the_write_happen(self) -> None:
+        assert await _answering(_ACCEPTED_AGREEMENT) is None
+
+    @pytest.mark.parametrize("answer", _NOT_AN_AGREEMENT, ids=_NOT_AN_AGREEMENT_IDS)
+    async def test_nothing_else_a_client_can_send_is_an_agreement(self, answer: object) -> None:
+        refusal = await _answering(answer)
+
+        assert isinstance(refusal, str)
+        assert refusal.startswith(_NOTHING_HAPPENED)
+        assert "did not agree" in refusal
+        assert "Do not call this tool again" in refusal
+
+    @pytest.mark.parametrize("state", [None, _ANOTHER_REQUEST], ids=["no-state", "another-id"])
+    async def test_an_agreement_bound_to_another_request_authorizes_nothing(
+        self, state: str | None
+    ) -> None:
+        """Round two composes its own draft, so an accept for a different one covers nothing."""
+        refusal = await _answering(_ACCEPTED_AGREEMENT, state=state)
+
+        assert isinstance(refusal, str)
+        assert refusal.startswith(_NOTHING_HAPPENED)
+        assert "given for a different request" in refusal
+        assert "Do not call this tool again" in refusal
+
+    async def test_a_client_that_comes_back_with_no_answer_is_asked_again(self) -> None:
+        again = await _modern(responses=None, state=_ABOUT)(_QUESTION, _ABOUT)
+
+        assert isinstance(again, InputRequiredResult)
+        assert again.request_state == _ABOUT
+
+    async def test_an_agreement_filed_under_another_key_is_not_this_question_answered(
+        self,
+    ) -> None:
+        question = await _modern()(_QUESTION, _ABOUT)
+        assert isinstance(question, InputRequiredResult)
+        (minted,) = question.input_requests or {}
+
+        again = await _modern(responses={f"not-{minted}": _ACCEPTED_AGREEMENT}, state=_ABOUT)(
+            _QUESTION, _ABOUT
+        )
+
+        assert isinstance(again, InputRequiredResult)
+        assert again.request_state == _ABOUT
+
+    async def test_no_answer_on_this_era_is_ever_raised(self) -> None:
+        for answer in _NOT_AN_AGREEMENT:
+            assert isinstance(await _answering(answer), str)
+
+        assert isinstance(await _answering(_ACCEPTED_AGREEMENT, state=_ANOTHER_REQUEST), str)
+        assert await _answering(_ACCEPTED_AGREEMENT) is None
+        assert isinstance(await _modern()(_QUESTION, _ABOUT), InputRequiredResult)
 
 
 class TestWhatTheMiddlewareLeavesAlone:

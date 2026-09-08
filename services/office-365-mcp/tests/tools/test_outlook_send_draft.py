@@ -16,12 +16,20 @@ from fastmcp.server.elicitation import (
     DeclinedElicitation,
 )
 from fastmcp.tools import Tool
+from mcp.types import (
+    ElicitRequest,
+    ElicitRequestFormParams,
+    ElicitResult,
+    InputRequiredResult,
+    InputResponse,
+)
+from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.generated.models.message import Message
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE
+from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Confirmed
 from office_365_mcp.tools import outlook_send_draft as sender
 from office_365_mcp.tools.outlook_send_draft import MailSent, a_person_agrees, send_draft
 
@@ -40,6 +48,14 @@ _GRACE = "grace@example.invalid"
 _PAM = "pam@example.invalid"
 
 _SUBJECT = "Invoice 4471"
+
+# Written out rather than imported from the tool: it is what a caller reads.
+_NOTHING_SENT = "Nothing was sent, and the draft is untouched and still in Drafts."
+
+
+def _refusal_of(answer: Confirmed) -> str:
+    assert isinstance(answer, str) and answer, f"the confirmation answered {answer!r}"
+    return answer
 
 
 def _recipient(name: str, address: str) -> dict[str, object]:
@@ -67,17 +83,22 @@ def _reads(graph: respx.MockRouter, payload: dict[str, object]) -> respx.Route:
     return graph.get(_DRAFT_PATH).mock(return_value=httpx.Response(200, json=payload))
 
 
-async def _agrees(draft: Message) -> str | None:
+async def _agrees(draft: Message) -> Confirmed:
     """A person who said yes. Named rather than a lambda, because every call below states which
     side of the gate it is testing."""
     assert draft is not None
     return None
 
 
-async def _refuses(draft: Message) -> str | None:
+async def _refuses(draft: Message) -> Confirmed:
     """A person who said no, in the shape the tool's own refusal takes: answered, never raised."""
     assert draft is not None
     return "Nothing was sent."
+
+
+def _mail_sent(answer: MailSent | InputRequiredResult) -> MailSent:
+    assert isinstance(answer, MailSent), "the send was answered with a question rather than made"
+    return answer
 
 
 def _sends(graph: respx.MockRouter) -> respx.Route:
@@ -160,7 +181,11 @@ class TestHowTheQuestionReachesAPerson:
 
     @staticmethod
     def _context(answer: object) -> Context:
+        """A handshake-era connection: no request context, so answers come back over `elicit`."""
+
         class _Client:
+            request_context: object = None
+
             async def elicit(self, message: str, response_type: object = None) -> object:
                 assert message
                 assert response_type is not None, "the caller must say what it expects back"
@@ -178,17 +203,20 @@ class TestHowTheQuestionReachesAPerson:
     async def test_declining_refuses_and_says_the_draft_survives(self) -> None:
         confirm = a_person_agrees(self._context(DeclinedElicitation()))
 
-        assert "still in Drafts" in (await confirm(Message(subject="Invoice 4471")) or "")
+        refusal = await confirm(Message(subject="Invoice 4471"))
+
+        assert isinstance(refusal, str)
+        assert refusal.startswith(_NOTHING_SENT), refusal
 
     async def test_cancelling_refuses_too(self) -> None:
         confirm = a_person_agrees(self._context(CancelledElicitation()))
 
-        assert "did not agree" in (await confirm(Message(subject="Invoice 4471")) or "")
+        assert "did not agree" in _refusal_of(await confirm(Message(subject="Invoice 4471")))
 
     async def test_answering_anything_but_send_refuses(self) -> None:
         confirm = a_person_agrees(self._context(AcceptedElicitation(data="do not send")))
 
-        assert "did not agree" in (await confirm(Message(subject="Invoice 4471")) or "")
+        assert "did not agree" in _refusal_of(await confirm(Message(subject="Invoice 4471")))
 
     async def test_a_client_that_cannot_ask_sends_nothing(self) -> None:
         """The risk this whole gate carries: a client with no elicitation support can no longer
@@ -196,8 +224,10 @@ class TestHowTheQuestionReachesAPerson:
         broken mailbox from a client limitation otherwise."""
         confirm = a_person_agrees(self._context(RuntimeError("elicitation not supported")))
 
-        answer = await confirm(Message(subject="Invoice 4471"))
-        assert "does not support elicitation" in (answer or "")
+        answer = _refusal_of(await confirm(Message(subject="Invoice 4471")))
+
+        assert "does not support elicitation" in answer
+        assert answer.startswith(_NOTHING_SENT), answer
 
     @pytest.mark.parametrize(
         "answer",
@@ -218,6 +248,199 @@ class TestHowTheQuestionReachesAPerson:
         refusal = await confirm(Message(subject="Invoice 4471"))
 
         assert isinstance(refusal, str) and refusal
+
+
+class _ModernRequest:
+    """The constant comes from the SDK, so a future era moves these tests with it."""
+
+    protocol_version: str = LATEST_MODERN_VERSION
+
+
+def _modern_context(
+    *, answers: Mapping[str, InputResponse] | None = None, state: str | None = None
+) -> Context:
+    """A 2026-07-28 connection: `elicit` raises, so a leak back onto the back-channel fails."""
+
+    class _Client:
+        request_context: _ModernRequest = _ModernRequest()
+        input_responses: Mapping[str, InputResponse] | None = answers
+        request_state: str | None = state
+
+        async def elicit(self, message: str, response_type: object = None) -> object:
+            raise AssertionError(
+                f"a connection with no back-channel was asked {message!r} over it, "
+                + f"expecting {response_type!r} back"
+            )
+
+    return cast("Context", cast("object", _Client()))
+
+
+def _the_question(answer: MailSent | InputRequiredResult) -> tuple[str, str, str]:
+    """Read off the question this call minted, so round two cannot agree with round one by
+    coincidence."""
+    assert isinstance(answer, InputRequiredResult), "the question was never put to anybody"
+    requests = answer.input_requests or {}
+    assert len(requests) == 1, f"one question per call, and this one asked {sorted(requests)}"
+    key = next(iter(requests))
+    request = requests[key]
+    assert isinstance(request, ElicitRequest)
+    params = request.params
+    assert isinstance(params, ElicitRequestFormParams), "the question is not one a client can fill"
+    assert params.message, "the person is asked nothing at all"
+    schema = cast("Mapping[str, object]", params.requested_schema)
+    properties = cast("Mapping[str, object]", schema["properties"])
+    choices = cast("Sequence[str]", cast("Mapping[str, object]", properties["value"])["enum"])
+    assert list(choices) == [sender.SEND, "do not send"], f"the answers offered were {choices}"
+    assert answer.request_state == params.message, (
+        "the answer is bound to the question, so an edited draft cannot be sent on a stale accept"
+    )
+    return key, params.message, choices[0]
+
+
+class TestTheEraWithNoBackChannel:
+    """No server-to-client channel on this era (SEP-2577), so the question travels as a result."""
+
+    async def test_the_first_round_asks_and_never_reaches_the_send(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, _draft())
+        send = _sends(graph)
+
+        answer = await send_draft(
+            client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+        )
+
+        _key, _state, _agrees_with = _the_question(answer)
+        assert read.call_count == 1
+        assert send.call_count == 0, "an unanswered question sent the mail anyway"
+
+    async def test_the_first_round_asks_the_question_this_tool_words(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(
+            graph,
+            _draft(to=[_recipient("Ada Lovelace", _ADA)], cc=[_recipient("Pam Beesly", _PAM)]),
+        )
+
+        answer = await send_draft(
+            client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+        )
+
+        _key, question, _agrees_with = _the_question(answer)
+        assert _SUBJECT in question
+        assert _ADA in question
+        assert _PAM in question
+        assert "cannot be undone" in question
+
+    async def test_the_second_round_sends_the_draft_the_answer_was_bound_to(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        send = _ready(graph)
+        key, state, agrees_with = _the_question(
+            await send_draft(
+                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+            )
+        )
+
+        answer = await send_draft(
+            client,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": agrees_with})},
+                    state=state,
+                )
+            ),
+            draft_ref=_DRAFT_REF,
+        )
+
+        posted = [
+            call.request.url.path
+            for call in cast("Sequence[Call]", graph.calls)
+            if call.request.method == "POST"
+        ]
+
+        assert _mail_sent(answer).subject == _SUBJECT
+        assert send.call_count == 1, "the confirmed send did not happen exactly once"
+        assert len(posted) == 1, f"the two rounds together posted {posted}"
+
+    async def test_an_answer_bound_to_another_question_sends_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The framework unseals a `requestState` only when the retry carries one, so an accept
+        with the field stripped reaches the seam bound to nothing."""
+        send = _ready(graph)
+        key, _state, agrees_with = _the_question(
+            await send_draft(
+                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+            )
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await send_draft(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state="Send the draft 'something else' to nobody?",
+                    )
+                ),
+                draft_ref=_DRAFT_REF,
+            )
+
+        assert send.call_count == 0, "mail went out under an answer nobody gave for this draft"
+
+    async def test_a_second_round_the_person_declined_sends_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        send = _ready(graph)
+        key, state, _agrees_with = _the_question(
+            await send_draft(
+                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+            )
+        )
+
+        with pytest.raises(ToolError, match="did not agree") as raised:
+            _ = await send_draft(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(answers={key: ElicitResult(action="decline")}, state=state)
+                ),
+                draft_ref=_DRAFT_REF,
+            )
+
+        assert str(raised.value).startswith(_NOTHING_SENT)
+        assert send.call_count == 0
+
+    async def test_a_draft_that_went_out_between_the_rounds_is_refused_before_anybody_is_asked(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Two rounds are two pre-reads: `isDraft` decides before the carried answer is read."""
+        read = _reads(graph, _draft())
+        send = _sends(graph)
+        key, state, agrees_with = _the_question(
+            await send_draft(
+                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+            )
+        )
+        _ = read.mock(return_value=httpx.Response(200, json=_draft(is_draft=False)))
+
+        with pytest.raises(ToolError, match="NOTHING WAS SENT BY THIS CALL"):
+            _ = await send_draft(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+                draft_ref=_DRAFT_REF,
+            )
+
+        assert send.call_count == 0, "a message that was no longer a draft was sent anyway"
 
 
 class TestWhatItAsksGraphFor:
@@ -448,7 +671,7 @@ class TestWhatItAnswers:
             ),
         )
 
-        answer = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
 
         assert [address.address for address in answer.to] == [_ADA, _GRACE]
         assert [address.address for address in answer.cc] == [_PAM]
@@ -458,7 +681,7 @@ class TestWhatItAnswers:
     ) -> None:
         _ = _ready(graph, _draft(subject="Invoice 4471 (final)"))
 
-        answer = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
 
         assert answer.subject == "Invoice 4471 (final)"
 
@@ -467,7 +690,7 @@ class TestWhatItAnswers:
     ) -> None:
         _ = _ready(graph, _draft(subject=None))
 
-        answer = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
 
         assert answer.subject is None
 
@@ -476,7 +699,7 @@ class TestWhatItAnswers:
     ) -> None:
         _ = _ready(graph, _draft(cc=[]))
 
-        answer = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
 
         assert answer.cc == []
 
@@ -489,7 +712,7 @@ class TestWhatItAnswers:
         _ = _ready(graph)
         before = datetime.now(UTC)
 
-        answer = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
 
         sent_at = datetime.fromisoformat(answer.sent_at)
         assert sent_at.utcoffset() == UTC.utcoffset(None)

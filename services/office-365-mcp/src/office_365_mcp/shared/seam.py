@@ -4,10 +4,13 @@ becomes. The only file in `shared/` that imports FastMCP.
 Trap: the middleware never sees a `GraphFailure` — FastMCP re-raises a tool failure as `ToolError`
 (fastmcp 4.0.2, `fastmcp/server/server.py:1554-1555`) over the dependency engine's `RuntimeError`,
 so causes are matched two links down `__cause__`, by type, never on message text.
+
+`person_confirms` is the one place a person is asked before a write, and the one place the protocol
+era decides how (`tests/test_layering.py` rule 9).
 """
 
 import re
-from collections.abc import Generator, Iterator, Mapping
+from collections.abc import Awaitable, Callable, Generator, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from types import TracebackType
@@ -18,9 +21,21 @@ from fastmcp import Context
 from fastmcp.dependencies import Dependency, Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import EntraOBOToken
+from fastmcp.server.elicitation import (
+    AcceptedElicitation,
+    handle_elicit_accept,
+    parse_elicit_response_type,
+)
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
-from mcp.types import CallToolRequestParams
+from mcp.types import (
+    CallToolRequestParams,
+    ElicitRequest,
+    ElicitRequestFormParams,
+    ElicitResult,
+    InputRequiredResult,
+)
+from mcp.types.version import MODERN_PROTOCOL_VERSIONS
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import (
@@ -168,6 +183,115 @@ def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> 
         return graph_client_for(transport, access_token)
 
     return Depends(client_for_this_call)
+
+
+# What a refusal says last, so a model does not read "no" as "ask again": MCP gives a server no way
+# to remember that a person already said no to this request.
+_ASK_AGAIN = (
+    "Do not call this tool again for the same request unless the user asks for it in a new message."
+)
+
+# Answered, never raised: a `ToolError` here crosses `graph_step` and records a person saying no
+# as a Graph failure. Guarded by `tests/test_graph_metrics.py`.
+type Confirmed = str | InputRequiredResult | None
+
+# `(question, about)`: `about` is what the answer is bound to, and must change whenever the thing
+# being confirmed changes.
+type Confirm = Callable[[str, str], Awaitable[Confirmed]]
+
+# One question per call, so a fixed key is safe; a second question in one call would collide.
+_CONFIRMATION = "confirm"
+
+
+def _modern_protocol(ctx: Context) -> bool:
+    """True when the negotiated era has no back-channel to elicit over.
+
+    Mirrors the private `Context._is_modern_protocol`, "no request context" included.
+    """
+    request = ctx.request_context
+    return request is not None and request.protocol_version in MODERN_PROTOCOL_VERSIONS
+
+
+def _nobody_to_ask(nothing_happened: str) -> str:
+    return (
+        f"{nothing_happened} This connector asks a person to confirm this, and the MCP "
+        + "client on the other end does not support elicitation, so there was nobody to "
+        + "ask. This is a property of the client and not of the request: retrying will "
+        + "fail the same way. Tell the user that their client cannot confirm this, and "
+        + f"that they can do it in Outlook instead. {_ASK_AGAIN}"
+    )
+
+
+def _not_agreed(nothing_happened: str) -> str:
+    return (
+        f"{nothing_happened} The person at the other end of this conversation was asked to "
+        + "confirm it and did not agree. Nothing was changed, so this is not a failure to "
+        + f"report as one: say that the request was not confirmed. {_ASK_AGAIN}"
+    )
+
+
+def _another_request(nothing_happened: str) -> str:
+    return (
+        f"{nothing_happened} The confirmation that came back was given for a different request "
+        + "than this one, so that agreement does not cover this request, and nothing was changed. "
+        + f"Ask the user again and call this tool with exactly what they confirm. {_ASK_AGAIN}"
+    )
+
+
+def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened: str) -> Confirm:
+    """Ask the caller's own client to put `question` to a person; only `agree` lets the call go on.
+
+    A 2026-07-28 connection has no back-channel (SEP-2577): the question is returned and answered
+    on a second call, bound to `about`.
+    """
+    answers = parse_elicit_response_type([agree, decline])
+
+    async def elicited(question: str) -> str | None:
+        try:
+            answer = await ctx.elicit(question, response_type=[agree, decline])
+        except ToolError as already_a_refusal:
+            return str(already_a_refusal)
+        except Exception:
+            # Every exception: a client with no elicitation capability is reported differently by
+            # different transports, and none of those is a reason to write anyway.
+            return _nobody_to_ask(nothing_happened)
+        if not isinstance(answer, AcceptedElicitation) or answer.data != agree:
+            return _not_agreed(nothing_happened)
+        return None
+
+    def asked(question: str, about: str) -> Confirmed:
+        answered = (ctx.input_responses or {}).get(_CONFIRMATION)
+        if answered is None:
+            # A client that came back without an answer is indistinguishable from a first call.
+            return InputRequiredResult(
+                input_requests={
+                    _CONFIRMATION: ElicitRequest(
+                        params=ElicitRequestFormParams(
+                            message=question, requested_schema=answers.schema
+                        )
+                    )
+                },
+                request_state=about,
+            )
+        if not isinstance(answered, ElicitResult) or answered.action != "accept":
+            return _not_agreed(nothing_happened)
+        # The framework unseals `requestState` only when the re-call carries one, so an accept
+        # that arrives with the field stripped is bound to nothing until this compares it.
+        if ctx.request_state != about:
+            return _another_request(nothing_happened)
+        try:
+            accepted = handle_elicit_accept(answers, answered.content)
+        except Exception:
+            # Every exception: the content is the client's, checked against the schema this
+            # question was asked under, and an answer that fails that check agreed to nothing.
+            return _not_agreed(nothing_happened)
+        chosen = cast("str", accepted.data)
+        return None if chosen == agree else _not_agreed(nothing_happened)
+
+    async def confirm(question: str, about: str) -> Confirmed:
+        return asked(question, about) if _modern_protocol(ctx) else await elicited(question)
+
+    return confirm
 
 
 class Advised(ToolError):

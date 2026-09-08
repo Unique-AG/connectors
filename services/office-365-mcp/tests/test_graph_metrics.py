@@ -251,6 +251,9 @@ class TestAGraphCallIsCountedAndTimed:
         """
 
         class _CannotAsk:
+            # No request context is the handshake era, where the seam asks over the back-channel.
+            request_context: object = None
+
             async def elicit(self, message: str, response_type: object = None) -> object:
                 assert message and response_type is not None
                 raise RuntimeError("elicitation not supported")

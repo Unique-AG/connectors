@@ -65,6 +65,13 @@ disagree with it about. `graph_client/` is the transport they borrow.
    so an `__init__` re-exporting the lot would hide the one thing the package exists to show. A
    package joins the list as soon as its `__init__` exports anything.
 
+9. **Only `shared/seam.py` puts a question to a person.** `Context.elicit` is a capability the
+   protocol era decides: on a 2026-07-28 connection it raises before the wire and the question
+   travels as an `InputRequiredResult` instead, so a tool that called it directly would work on one
+   era and silently refuse on the other, and its unit tests, which stub `Context`, would stay green.
+   `person_confirms` in the seam is where both eras are handled, and every tool that asks goes
+   through it.
+
 Every rule is paired with a guard that fails once the rule has nothing left to check, because a rule
 written down while it forbids nothing gets deleted for the wrong reason later, or worse, kept while
 the thing it covers quietly leaves. None of the rules is conditional: a rule that stops running is a
@@ -1052,5 +1059,49 @@ class TestConfigIsBuiltOnlyAtTheCompositionRoot:
             "only create_app() may construct a config — building one here re-reads the "
             + "environment and quietly ignores whatever create_app was given. Take the value "
             + "as a parameter and let the composition root pass it in:\n  "
+            + "\n  ".join(violations)
+        )
+
+
+def _elicitations(source: str) -> list[int]:
+    """Every line on which `<anything>.elicit(...)` is called."""
+    tree = ast.parse(source)
+    return sorted(
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "elicit"
+    )
+
+
+class TestOnlyTheSeamPutsAQuestionToAPerson:
+    """Rule 9."""
+
+    def test_the_seam_actually_asks(self) -> None:
+        assert _SEAM.is_file(), f"no such file: {_SEAM}"
+        assert _elicitations(_SEAM.read_text()), (
+            "shared/seam.py no longer calls `.elicit(` anywhere, so this rule guards nothing; "
+            "either the confirmation moved, and the rule should follow it, or asking a person "
+            "left this service"
+        )
+
+    def test_catches_the_call_the_rule_exists_for(self) -> None:
+        assert _elicitations(
+            "async def f(ctx):\n    return await ctx.elicit('q', response_type=bool)\n"
+        ) == [2]
+        assert not _elicitations("async def f(ctx):\n    return ctx.elicitation\n")
+
+    def test_no_other_module_asks(self) -> None:
+        violations = [
+            f"{_source_id(source)}:{line}"
+            for source in _sources(_SRC)
+            if source != _SEAM
+            for line in _elicitations(source.read_text())
+        ]
+        assert not violations, (
+            "only shared/seam.py may call `.elicit(`: a direct call works on a handshake-era "
+            + "connection and refuses on a 2026-07-28 one, and the tests that stub Context never "
+            + "notice. Ask through `person_confirms` from shared/seam.py instead:\n  "
             + "\n  ".join(violations)
         )
