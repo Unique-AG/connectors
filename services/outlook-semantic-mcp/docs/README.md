@@ -73,7 +73,7 @@ All permissions are delegated. Mail permissions require no admin consent. This i
 **Calendar (Optional)**
 
 - When `CALENDAR_INTEGRATION` is enabled, AI clients can list calendars, search events, check free/busy, suggest meeting times, respond to invitations, and create, update, or cancel events
-- Live Microsoft Graph query-through — no calendar ingest. Writes notify attendees immediately after in-chat confirmation
+- Live Microsoft Graph query-through — no calendar ingest. `respond_to_invite` notifies immediately; create, update, and cancel wait for in-chat confirmation
 - See [Features — Calendar](./technical/features.md#Calendar) and [Tools — Calendar](./technical/tools.md#Calendar)
 
 **Delegated Mailbox Access (Optional)**

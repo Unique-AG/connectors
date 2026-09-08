@@ -5,7 +5,14 @@ import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import { AppConfig, appConfig, McpBackendType } from '~/config';
-import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  inboxConfigurations,
+  SOURCES_ADDRESSED_BY_EMAIL,
+  SOURCES_WITH_DELEGATE_FALLBACK,
+  userProfiles,
+} from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
@@ -118,8 +125,11 @@ export class FullSyncCommand {
       }
     }
 
-    const graphBasePath =
-      userProfile.source === 'shared-mailbox' ? `users/${userProfileEmail}` : 'me';
+    // Dual mailboxes cannot use `me`: this path is chosen before the token is
+    // resolved, and a delegate token plus `me` would read the delegate's mailbox.
+    const graphBasePath = SOURCES_ADDRESSED_BY_EMAIL.includes(userProfile.source)
+      ? `users/${userProfileEmail}`
+      : 'me';
 
     try {
       const resolverResult = await this.msGraphClientResolver.run({
@@ -151,7 +161,7 @@ export class FullSyncCommand {
             }),
           );
 
-          if (userProfile.source === 'shared-mailbox') {
+          if (SOURCES_WITH_DELEGATE_FALLBACK.includes(userProfile.source)) {
             await this.db
               .update(inboxConfigurations)
               .set({ preferredDelegateUserProfileId: clientUserProfileId })

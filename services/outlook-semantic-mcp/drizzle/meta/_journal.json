@@ -225,6 +225,13 @@
       "when": 1780485635411,
       "tag": "0031_rainy_ultragirl",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1788784257714,
+      "tag": "0032_sloppy_morbius",
+      "breakpoints": true
     }
   ]
 }

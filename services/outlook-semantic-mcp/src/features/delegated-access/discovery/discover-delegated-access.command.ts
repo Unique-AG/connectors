@@ -2,12 +2,20 @@ import assert from 'node:assert';
 import { createSmeared, smearEmail } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, gt, isNotNull, notInArray, or, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, notInArray, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, last } from 'remeda';
 import { AppConfig, appConfig, DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
-import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts, userProfiles } from '~/db';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  delegatedAccessAccounts,
+  SOURCES_WITH_DELEGATE_FALLBACK,
+  SOURCES_WITH_OWN_CREDENTIALS,
+  type UserProfileSource,
+  userProfiles,
+} from '~/db';
 import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { NewTrace } from '~/features/tracing.utils';
@@ -390,13 +398,19 @@ export class DiscoverDelegatedAccessCommand {
     lastFetchedId?: string;
     excludedProfileIds?: string[];
     includeSharedMailboxes: boolean;
-  }): Promise<{ userProfileId: string; email: string; source: string }[]> {
+  }): Promise<{ userProfileId: string; email: string; source: UserProfileSource }[]> {
     const conditionsByMailbox = includeSharedMailboxes
       ? or(
-          and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken)),
-          eq(userProfiles.source, 'shared-mailbox'),
+          and(
+            inArray(userProfiles.source, SOURCES_WITH_OWN_CREDENTIALS),
+            isNotNull(userProfiles.accessToken),
+          ),
+          inArray(userProfiles.source, SOURCES_WITH_DELEGATE_FALLBACK),
         )
-      : and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken));
+      : and(
+          inArray(userProfiles.source, SOURCES_WITH_OWN_CREDENTIALS),
+          isNotNull(userProfiles.accessToken),
+        );
 
     const items = await this.db
       .select({
@@ -419,7 +433,7 @@ export class DiscoverDelegatedAccessCommand {
       .limit(100);
 
     // Type casting is safe because isNotNull(userProfiles.email) ensures email is not null
-    return items as { userProfileId: string; email: string; source: string }[];
+    return items as { userProfileId: string; email: string; source: UserProfileSource }[];
   }
 
   private async updateDelegatedAccess({
@@ -433,7 +447,7 @@ export class DiscoverDelegatedAccessCommand {
     delegateUserId: string;
     ownerUserId: string;
     ownerEmail: string | null;
-    ownerSource: string;
+    ownerSource: UserProfileSource;
   }): Promise<void> {
     if (!ownerEmail) {
       this.logger.warn({ ownerUserId, msg: 'Skipping owner with null email' });
@@ -442,7 +456,8 @@ export class DiscoverDelegatedAccessCommand {
 
     try {
       const apiEndpoint =
-        ownerSource === 'shared-mailbox' || this.config.scan === 'full_access_only'
+        SOURCES_WITH_DELEGATE_FALLBACK.includes(ownerSource) ||
+        this.config.scan === 'full_access_only'
           ? 'messages'
           : 'mailFolders';
       await client.api(`/users/${ownerEmail}/${apiEndpoint}`).top(1).select('id').get();

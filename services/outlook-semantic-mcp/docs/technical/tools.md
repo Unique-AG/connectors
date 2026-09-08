@@ -37,7 +37,7 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | [`cancel_event`](#cancel_event) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
 
 !!! warning "Calendar tools"
-    The eight calendar tools are registered only when `CALENDAR_INTEGRATION=enabled`. They query Microsoft Graph live (no calendar ingest). Writes notify attendees immediately after in-chat confirmation. See [Calendar](#Calendar).
+    The eight calendar tools are registered only when `CALENDAR_INTEGRATION=enabled`. They query Microsoft Graph live (no calendar ingest). `respond_to_invite` notifies immediately; create, update, and cancel wait for in-chat confirmation. See [Calendar](#Calendar).
 
 **Mutating** means the tool writes data to at least one of the following:
 
@@ -670,7 +670,7 @@ Restart the full sync from scratch, discarding all previous progress.
 
 **Available in:** Both modes, only when `CALENDAR_INTEGRATION=enabled`. Live Graph query-through — no calendar ingest, webhooks, or calendar tables. Shared-mailbox **profiles** never call these tools.
 
-Write tools (`respond_to_invite`, `create_event`, `update_event`, `cancel_event`) notify other people immediately after in-chat confirmation. There is no draft state. Confirmation is Accept / Decline on the prompt — there is no extra checkbox. For a recurring `update_event` or `cancel_event`, the prompt also asks this occurrence or the entire series. `cancel_event` notifies attendees; it is not a silent delete.
+`respond_to_invite` notifies the organizer immediately — there is no confirmation prompt. `create_event`, `update_event`, and `cancel_event` notify other people after in-chat confirmation. There is no draft state. Confirmation is Accept / Decline on the prompt — there is no extra checkbox. For a recurring `update_event` or `cancel_event`, the prompt also asks this occurrence or the entire series. `cancel_event` notifies attendees; it is not a silent delete.
 
 If a calendar tool returns `consentRequired: true`, Graph denied calendar permission on the signed-in user's own mailbox (usually missing `Calendars.ReadWrite.Shared`). Ask the user to reconnect Outlook so they run Microsoft OAuth again. Do not call `reconnect_inbox` — that only renews the mail webhook. Do not send them to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a user reconnect. See [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) and [Permissions](./permissions.md).
 
@@ -844,14 +844,14 @@ Ranked free slots via Graph `findMeetingTimes`. Always runs as the signed-in use
 
 ### `respond_to_invite`
 
-Accept, tentatively accept, or decline an invitation. Pass `eventRef` from `search_calendar_events` unchanged. The user must confirm before the organizer is notified.
+Accept, tentatively accept, or decline an invitation. Pass `eventRef` from `search_calendar_events` unchanged. The organizer is notified immediately; there is no confirmation prompt.
 
 **Input parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `eventRef` | object | Yes | From `search_calendar_events`. Never display it. |
-| `response` | `"accept"` \| `"tentativelyAccept"` \| `"decline"` | Yes | Sent immediately after confirmation. |
+| `response` | `"accept"` \| `"tentativelyAccept"` \| `"decline"` | Yes | Sent immediately. |
 | `comment` | string | No | Optional note included with the response. |
 
 ---

@@ -137,6 +137,7 @@ export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
       .innerJoin(userProfiles, eq(userProfiles.id, inboxConfigurations.userProfileId))
       .where(
         and(
+          // Dual mailboxes without delegates are healthy — they have their own token.
           eq(userProfiles.source, 'shared-mailbox'),
           not(
             exists(

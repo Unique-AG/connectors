@@ -735,4 +735,46 @@ describe('FullSyncCommand', () => {
       expect(db.update).not.toHaveBeenCalled();
     });
   });
+
+  describe('graph path', () => {
+    it('oauth mailbox uses me', async () => {
+      const batchCommand = createMockProcessFullSyncBatchCommand('completed');
+      const updateByVersionCommand = createMockUpdateByVersionCommand(true);
+      const db = createMockDb({
+        row: makeRow({ fullSyncState: 'ready', fullSyncLastRunAt: null }),
+      });
+      const command = createCommand({ batchCommand, updateByVersionCommand, db });
+
+      await command.run(USER_PROFILE_ID);
+
+      expect(batchCommand.run).toHaveBeenCalledWith(
+        expect.objectContaining({ graphBasePath: 'me' }),
+      );
+    });
+
+    it('dual mailbox uses users/{email} and never me', async () => {
+      const batchCommand = createMockProcessFullSyncBatchCommand('completed');
+      const updateByVersionCommand = createMockUpdateByVersionCommand(true);
+      const db = createMockDb({
+        row: makeRow({ fullSyncState: 'ready', fullSyncLastRunAt: null }),
+      });
+      db.query.userProfiles.findFirst.mockResolvedValue({
+        id: USER_PROFILE_ID,
+        email: 'shared@example.com',
+        providerUserId: null,
+        source: 'shared-mailbox-with-login',
+        accessToken: 'stored-token',
+      });
+      const command = createCommand({ batchCommand, updateByVersionCommand, db });
+
+      await command.run(USER_PROFILE_ID);
+
+      expect(batchCommand.run).toHaveBeenCalledWith(
+        expect.objectContaining({ graphBasePath: 'users/shared@example.com' }),
+      );
+      expect(batchCommand.run).not.toHaveBeenCalledWith(
+        expect.objectContaining({ graphBasePath: 'me' }),
+      );
+    });
+  });
 });

@@ -14,7 +14,15 @@ import {
   ingestionConfig,
   McpBackendType,
 } from '~/config';
-import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  inboxConfigurations,
+  SOURCES_OWNED_BY_SYNC,
+  sourceOnListedMailboxConflict,
+  type UserProfileSource,
+  userProfiles,
+} from '~/db';
 import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { NonNullishProps } from '~/utils/non-nullish-props';
@@ -219,11 +227,11 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     }
 
     const profilesToRemove = await this.db
-      .select({ id: userProfiles.id })
+      .select({ id: userProfiles.id, source: userProfiles.source })
       .from(userProfiles)
       .where(
         and(
-          eq(userProfiles.source, 'shared-mailbox'),
+          inArray(userProfiles.source, SOURCES_OWNED_BY_SYNC),
           allMatchedUsers.length > 0
             ? not(
                 inArray(
@@ -236,24 +244,46 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       );
 
     if (profilesToRemove.length > 0) {
-      if (this.ingestionCfg.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi) {
-        for (const { id } of profilesToRemove) {
-          const result = await this.deleteInboxDataCommand.run(id);
+      const pureSharedMailboxIds = profilesToRemove
+        .filter((profile) => profile.source === 'shared-mailbox')
+        .map((profile) => profile.id);
+      const dualMailboxIds = profilesToRemove
+        .filter((profile) => profile.source === 'shared-mailbox-with-login')
+        .map((profile) => profile.id);
+
+      if (pureSharedMailboxIds.length > 0) {
+        if (this.ingestionCfg.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi) {
+          for (const id of pureSharedMailboxIds) {
+            const result = await this.deleteInboxDataCommand.run(id);
+            this.logger.log({
+              userProfileId: id,
+              result,
+              msg: 'SharedMailboxSync: triggered deletion for removed shared-mailbox profile',
+            });
+          }
+        } else {
+          await this.db.delete(userProfiles).where(inArray(userProfiles.id, pureSharedMailboxIds));
           this.logger.log({
-            userProfileId: id,
-            result,
-            msg: 'SharedMailboxSync: triggered deletion for removed shared-mailbox profile',
+            userProfileIds: pureSharedMailboxIds,
+            msg: 'SharedMailboxSync: deleted de-listed shared-mailbox profiles',
           });
         }
-      } else {
-        await this.db.delete(userProfiles).where(
-          inArray(
-            userProfiles.id,
-            profilesToRemove.map((p) => p.id),
-          ),
-        );
+      }
+
+      if (dualMailboxIds.length > 0) {
+        // Dual rows keep the OAuth identity and are only reclassified.
+        await this.db
+          .update(userProfiles)
+          .set({ source: 'oauth' })
+          .where(inArray(userProfiles.id, dualMailboxIds));
+        this.logger.log({
+          userProfileIds: dualMailboxIds,
+          msg: 'SharedMailboxSync: downgraded de-listed dual mailboxes to oauth',
+        });
       }
     }
+
+    let upsertedSources: { id: string; source: UserProfileSource }[] = [];
 
     // Upsert matched users
     if (allMatchedUsers.length > 0) {
@@ -273,19 +303,15 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
           username: user.mail,
           email: user.mail,
           displayName: user.displayName ?? null,
-          source: 'shared-mailbox' as const,
+          source: 'shared-mailbox',
           accessToken: null,
           refreshToken: null,
           raw: rawData,
         };
       });
 
-      // source is intentionally omitted from the conflict update: if an Entra identity
-      // already exists as an OAuth row we leave it as oauth. Overwriting source would
-      // silently strip the user's own token-based access and subject them to delegate-only
-      // logic, which is the wrong behaviour for a real user who also happens to be listed
-      // as a shared mailbox.
-      await this.db
+      // New rows are shared-mailbox; conflict SQL upgrades only rows that already have a token.
+      upsertedSources = await this.db
         .insert(userProfiles)
         .values(mappedProfiles)
         .onConflictDoUpdate({
@@ -294,6 +320,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
             email: sql.raw(`excluded.${userProfiles.email.name}`),
             username: sql.raw(`excluded.${userProfiles.username.name}`),
             displayName: sql.raw(`excluded.${userProfiles.displayName.name}`),
+            source: sourceOnListedMailboxConflict,
           },
         })
         .returning({ id: userProfiles.id, source: userProfiles.source });
@@ -301,17 +328,14 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       if (this.ingestionCfg.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi) {
         const ingestionCfg = this.ingestionCfg;
 
-        // Query all shared-mailbox profiles that have no inbox configuration. This is broader than
-        // filtering upsertedProfiles: it also catches profiles whose config was removed by an async
-        // deletion triggered in a previous run. Profiles mid-deletion still have their config row
-        // so they are naturally excluded by the LEFT JOIN / IS NULL predicate.
+        // Recreate missing inbox configs for sync-owned profiles, including after a prior deletion.
         const sharedMailboxesWithMissingInboxConfiguration = await this.db
           .select({ id: userProfiles.id })
           .from(userProfiles)
           .leftJoin(inboxConfigurations, eq(inboxConfigurations.userProfileId, userProfiles.id))
           .where(
             and(
-              eq(userProfiles.source, 'shared-mailbox'),
+              inArray(userProfiles.source, SOURCES_OWNED_BY_SYNC),
               isNull(inboxConfigurations.userProfileId),
             ),
           );
@@ -360,6 +384,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       msg: 'SharedMailboxSync: sync complete',
       upserted: allMatchedUsers.length,
       syncedDomains,
+      sources: upsertedSources.map((row) => row.source),
     });
   }
 

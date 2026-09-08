@@ -35,10 +35,10 @@ function createMockGraphApi() {
 }
 
 function createMockGraphClientFactory(graphApi: ReturnType<typeof createMockGraphApi>) {
+  const api = vi.fn().mockReturnValue(graphApi);
   return {
-    createClientForUser: vi.fn().mockReturnValue({
-      api: vi.fn().mockReturnValue(graphApi),
-    }),
+    createClientForUser: vi.fn().mockReturnValue({ api }),
+    __api: api,
   };
 }
 
@@ -83,13 +83,15 @@ function createCommand({
   graphApi = createMockGraphApi(),
   db = createMockDb(),
   persistentCacheService = createMockPersistentCacheService(),
+  graphClientFactory,
 }: {
   graphApi?: ReturnType<typeof createMockGraphApi>;
   db?: ReturnType<typeof createMockDb>;
   persistentCacheService?: ReturnType<typeof createMockPersistentCacheService>;
+  graphClientFactory?: ReturnType<typeof createMockGraphClientFactory>;
 } = {}): DiscoverDelegatedAccessCommand {
   const command = new DiscoverDelegatedAccessCommand(
-    createMockGraphClientFactory(graphApi) as any,
+    (graphClientFactory ?? createMockGraphClientFactory(graphApi)) as any,
     {} as any,
     {} as any,
     db as any,
@@ -115,7 +117,7 @@ function createCommand({
  */
 function mockFetchBatchForUsers(
   command: DiscoverDelegatedAccessCommand,
-  users: Array<{ userProfileId: string; email: string | null }>,
+  users: Array<{ userProfileId: string; email: string | null; source?: string }>,
 ) {
   const spy = vi.spyOn(command as any, 'fetchBatch');
   spy.mockResolvedValueOnce(users);
@@ -378,5 +380,47 @@ describe('DiscoverDelegatedAccessCommand', () => {
     await command.run();
 
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ excludedProfileIds: [USER_ID_A] }));
+  });
+
+  it('probes a dual owner via /messages and records full delegated access', async () => {
+    graphApi.get.mockResolvedValue(undefined);
+    const graphClientFactory = createMockGraphClientFactory(graphApi);
+    const db = createMockDb();
+    const command = createCommand({ graphApi, db, graphClientFactory });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A, source: 'oauth' },
+      {
+        userProfileId: USER_ID_B,
+        email: EMAIL_B,
+        source: 'shared-mailbox-with-login',
+      },
+    ]);
+
+    await command.run();
+
+    expect(graphClientFactory.__api).toHaveBeenCalledWith(`/users/${EMAIL_B}/messages`);
+    expect(db.__insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ hasFullDelegatedAccess: true }),
+    );
+  });
+
+  it('uses a dual profile as a delegate for another owner', async () => {
+    graphApi.get.mockResolvedValue(undefined);
+    const graphClientFactory = createMockGraphClientFactory(graphApi);
+    const db = createMockDb();
+    const command = createCommand({ graphApi, db, graphClientFactory });
+    mockFetchBatchForUsers(command, [
+      {
+        userProfileId: USER_ID_A,
+        email: EMAIL_A,
+        source: 'shared-mailbox-with-login',
+      },
+      { userProfileId: USER_ID_B, email: EMAIL_B, source: 'oauth' },
+    ]);
+
+    await command.run();
+
+    expect(graphClientFactory.createClientForUser).toHaveBeenCalledWith(USER_ID_A);
+    expect(graphClientFactory.__api).toHaveBeenCalledWith(`/users/${EMAIL_B}/mailFolders`);
   });
 });

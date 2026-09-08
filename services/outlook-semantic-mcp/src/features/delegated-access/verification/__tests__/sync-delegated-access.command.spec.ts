@@ -54,12 +54,14 @@ function createMockGraphClientFactory(graphApi: ReturnType<typeof createMockGrap
 interface DbOptions {
   accounts?: { delegateUserId: string; ownerUserId: string } | null;
   ownerEmail?: string | null;
+  ownerSource?: string;
   directoryCount?: number;
 }
 
 function createMockDb({
   accounts = { delegateUserId: DELEGATE_USER_ID, ownerUserId: OWNER_USER_ID },
   ownerEmail = OWNER_EMAIL,
+  ownerSource = 'oauth',
   directoryCount = 1,
 }: DbOptions = {}) {
   // select chain — returns different values depending on call order
@@ -68,7 +70,9 @@ function createMockDb({
   // 3rd call: count directories
   const selectResults = [
     accounts ? [accounts] : [],
-    ownerEmail !== null && ownerEmail !== undefined ? [{ email: ownerEmail }] : [{ email: null }],
+    ownerEmail !== null && ownerEmail !== undefined
+      ? [{ email: ownerEmail, source: ownerSource }]
+      : [{ email: null, source: ownerSource }],
     [{ count: directoryCount }],
   ];
   let selectCallIndex = 0;
@@ -401,5 +405,18 @@ describe('SyncDelegatedAccessCommand', () => {
     const result = await command.run({ accountsId: ACCOUNTS_ID });
 
     expect(result).not.toMatchObject({ status: 'failed' });
+  });
+
+  it('a dual owner gets verifyOnlyFullAccess and does not list mailFolders after a failed /messages probe', async () => {
+    graphApi.get.mockRejectedValueOnce(makeGraphError(403));
+
+    const db = createMockDb({ ownerSource: 'shared-mailbox-with-login', directoryCount: 0 });
+    const command = createCommand({ graphApi, db });
+
+    const result = await command.run({ accountsId: ACCOUNTS_ID });
+
+    expect(result).toMatchObject({ status: 'success' });
+    expect(graphApi.get).toHaveBeenCalledOnce();
+    expect(db.__delete).toHaveBeenCalledTimes(2);
   });
 });

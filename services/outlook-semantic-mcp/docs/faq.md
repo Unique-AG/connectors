@@ -263,14 +263,16 @@ mailbox searchable. There are two jobs:
   base. Discovery records the access relationship — it does not trigger any
   extra ingestion of a delegated *user* mailbox. The delegate gains search
   visibility into the owner's scope; nothing is copied or merged. Env-listed
-  shared mailboxes are ingested into their own profile via a Full Access
-  delegate's token.
+  shared mailboxes are ingested into their own profile via the mailbox's own
+  token when it has signed in, otherwise via a Full Access delegate's token.
 - **Both users must be connected (ordinary user mailboxes, both modes).**
   Discovery only considers connected users — if the owner has not connected
   their MCP account there is nothing to discover or search. In Mode A the owner
   must also have completed the initial full sync for their emails to be visible
-  to the delegate. Env-listed shared mailboxes do not sign in; only the
-  delegates must be connected.
+  to the delegate. Env-listed shared mailboxes may also sign in; if they have
+  not, only the delegates must be connected. When they have signed in, the
+  mailbox's own token is the primary credential and Full Access delegates are
+  the backup.
 - **Automatic detection.** New delegated access is picked up automatically on the
   next discovery run — no user action is needed. In `granular_access` mode,
   folder-level access details are kept up to date by the verification job.
@@ -283,7 +285,8 @@ mailbox searchable. There are two jobs:
 relationships. **Both users must be connected** for ordinary user mailboxes —
 discovery only considers connected users, so if the owner has not connected
 their account there is nothing to discover or search. Env-listed shared
-mailboxes do not sign in; only the delegates must be connected. Each
+mailboxes may also sign in; if they have not, only the delegates must be
+connected. Each
 `search_emails` call queries the
 discovered delegated mailboxes via live Microsoft Graph KQL in addition to the
 user's own mailbox. **Only full mailbox access is supported in Mode B** —
