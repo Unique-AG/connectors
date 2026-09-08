@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { LogsDiagnosticDataPolicy } from '../config/app.config';
 import { sanitizeGraphqlVariables } from './sanitize-graphql-variables';
@@ -47,10 +48,12 @@ describe('sanitizeGraphqlVariables', () => {
       },
     };
     const result = sanitizeGraphqlVariables(variables, ['input.mimeType']);
+    assert.ok(result);
+    const input = result.input as Record<string, unknown>;
 
-    expect((result?.input as Record<string, unknown>).mimeType).toBe('application/pdf');
-    expect((result?.input as Record<string, unknown>).title).toContain('*');
-    expect((result?.input as Record<string, unknown>).key).toContain('*');
+    expect(input.mimeType).toBe('application/pdf');
+    expect(input.title).toContain('*');
+    expect(input.key).toContain('*');
   });
 
   it('preserves numbers and booleans without smearing', () => {
@@ -60,10 +63,12 @@ describe('sanitizeGraphqlVariables', () => {
       secretString: 'password',
     };
     const result = sanitizeGraphqlVariables(variables, []);
+    assert.ok(result);
+    const input = result.input as Record<string, unknown>;
 
-    expect(result?.storeInternally).toBe(true);
-    expect((result?.input as Record<string, unknown>).byteSize).toBe(1234);
-    expect(result?.secretString).toContain('*');
+    expect(result.storeInternally).toBe(true);
+    expect(input.byteSize).toBe(1234);
+    expect(result.secretString).toContain('*');
   });
 
   it('smears all elements in a non-whitelisted array', () => {
