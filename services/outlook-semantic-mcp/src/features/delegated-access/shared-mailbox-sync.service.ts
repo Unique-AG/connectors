@@ -310,9 +310,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
         };
       });
 
-      // New rows insert as shared-mailbox. On conflict, sourceOnListedMailboxConflict
-      // upgrades oauth+token (Case 1) and shared-mailbox+token from the existing row.
-      // A tokenless oauth row is left unchanged.
+      // New rows are shared-mailbox; conflict SQL upgrades only rows that already have a token.
       upsertedSources = await this.db
         .insert(userProfiles)
         .values(mappedProfiles)
@@ -330,11 +328,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       if (this.ingestionCfg.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi) {
         const ingestionCfg = this.ingestionCfg;
 
-        // Query all sync-owned profiles that have no inbox configuration. Dual mailboxes
-        // are still ingested as shared mailboxes. This is broader than filtering
-        // upsertedProfiles: it also catches profiles whose config was removed by an async
-        // deletion triggered in a previous run. Profiles mid-deletion still have their config row
-        // so they are naturally excluded by the LEFT JOIN / IS NULL predicate.
+        // Recreate missing inbox configs for sync-owned profiles, including after a prior deletion.
         const sharedMailboxesWithMissingInboxConfiguration = await this.db
           .select({ id: userProfiles.id })
           .from(userProfiles)
