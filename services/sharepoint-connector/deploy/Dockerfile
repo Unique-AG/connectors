@@ -58,7 +58,7 @@ COPY --from=pruner /app/out/full/ .
 # Build this package and all workspace dependencies (...), then create standalone deployment
 RUN --mount=type=cache,target=/root/.cache/turbo \
     pnpm turbo build --filter=@unique-ag/${APP_NAME}... && \
-    pnpm --filter=@unique-ag/${APP_NAME} deploy out
+    pnpm --filter=@unique-ag/${APP_NAME} deploy --prod out
 
 # ------------------------------------------------------------------------------
 # Stage 5: runner
