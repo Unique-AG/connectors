@@ -1,6 +1,5 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context } from '@unique-ag/mcp-server-module';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, type Mock, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { RespondToInviteCommand } from '../respond-to-invite.command';
@@ -16,27 +15,7 @@ const EVENT_REF = {
   calendarId: 'cal-own',
 };
 
-const SNAPSHOT = {
-  success: true,
-  message: 'Loaded the event.',
-  event: {
-    eventId: 'evt-1',
-    calendarId: 'cal-own',
-    type: 'singleInstance' as const,
-    seriesMasterId: null,
-    subject: 'Weekly sync',
-    start: { dateTime: '2026-08-26T09:00:00', timeZone: 'W. Europe Standard Time' },
-    end: { dateTime: '2026-08-26T09:30:00', timeZone: 'W. Europe Standard Time' },
-    location: null,
-    organizerName: 'Alex Rivera',
-    organizerEmail: 'alex@example.com',
-    isCancelled: false,
-    attendeeCount: 2,
-  },
-};
-
-function createTool(opts: { get?: Mock; run?: Mock; elicit?: Mock } = {}) {
-  const get = opts.get ?? vi.fn().mockResolvedValue(SNAPSHOT);
+function createTool(opts: { run?: Mock } = {}) {
   const run =
     opts.run ??
     vi.fn().mockResolvedValue({
@@ -44,8 +23,8 @@ function createTool(opts: { get?: Mock; run?: Mock; elicit?: Mock } = {}) {
       message: 'Accepted the invitation. The organizer was notified.',
       response: 'accept',
     });
-  const tool = new RespondToInviteTool({ run: commandRun } as unknown as RespondToInviteCommand);
-  return { tool, run: commandRun };
+  const tool = new RespondToInviteTool({ run } as unknown as RespondToInviteCommand);
+  return { tool, run };
 }
 
 describe(RespondToInviteTool.name, () => {
@@ -55,7 +34,7 @@ describe(RespondToInviteTool.name, () => {
       message: 'Accepted the invitation. The organizer was notified.',
       response: 'accept' as const,
     };
-    const { tool, run } = createTool(vi.fn().mockResolvedValue(output));
+    const { tool, run } = createTool({ run: vi.fn().mockResolvedValue(output) });
     const elicit = vi.fn();
 
     const result = await tool.respondToInvite(
@@ -74,9 +53,9 @@ describe(RespondToInviteTool.name, () => {
   });
 
   it('returns the command failure', async () => {
-    const { tool, run } = createTool(
-      vi.fn().mockResolvedValue({ success: false, message: 'That event was not found.' }),
-    );
+    const { tool, run } = createTool({
+      run: vi.fn().mockResolvedValue({ success: false, message: 'That event was not found.' }),
+    });
 
     const result = await tool.respondToInvite(
       { eventRef: EVENT_REF, response: 'accept' },
