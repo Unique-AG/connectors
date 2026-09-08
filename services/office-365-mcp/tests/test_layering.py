@@ -70,7 +70,7 @@ disagree with it about. `graph_client/` is the transport they borrow.
    travels as an `InputRequiredResult` instead, so a tool that called it directly would work on one
    era and silently refuse on the other, and its unit tests, which stub `Context`, would stay green.
    `person_confirms` in the seam is where both eras are handled, and every tool that asks goes
-   through it. The check is on the call `.elicit(`, whatever the receiver is named.
+   through it.
 
 Every rule is paired with a guard that fails once the rule has nothing left to check, because a rule
 written down while it forbids nothing gets deleted for the wrong reason later, or worse, kept while

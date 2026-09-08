@@ -5,11 +5,8 @@ Trap: the middleware never sees a `GraphFailure` — FastMCP re-raises a tool fa
 (fastmcp 4.0.2, `fastmcp/server/server.py:1554-1555`) over the dependency engine's `RuntimeError`,
 so causes are matched two links down `__cause__`, by type, never on message text.
 
-`person_confirms` is the one way a tool asks a person before it writes: the question is the tool's,
-the two refusals (a person said no, a client that cannot ask) are shared, and both say nothing
-happened. It owns the era too: a handshake connection is asked over the back-channel and answers
-inside the call, and a 2026-07-28 connection has none, so the tool answers with the question and a
-client that can elicit calls it again with the answer.
+`person_confirms` is the one place a person is asked before a write, and the one place the protocol
+era decides how (`tests/test_layering.py` rule 9).
 """
 
 import re
@@ -194,32 +191,28 @@ _ASK_AGAIN = (
     "Do not call this tool again for the same request unless the user asks for it in a new message."
 )
 
-# Answered, never raised, so a person saying no is not recorded as a Graph failure. `None` lets the
-# write happen, a string is the refusal, and an `InputRequiredResult` is the question for a re-call.
+# Answered, never raised: a `ToolError` here crosses `graph_step` and records a person saying no
+# as a Graph failure. Guarded by `tests/test_graph_metrics.py`.
 type Confirmed = str | InputRequiredResult | None
 
-# The question, and what the answer is bound to: a value that changes whenever the thing being
-# confirmed changes. Both creating tools pass the `transactionId` they also send to Graph.
+# `(question, about)`: `about` is what the answer is bound to, and must change whenever the thing
+# being confirmed changes.
 type Confirm = Callable[[str, str], Awaitable[Confirmed]]
 
-# The key this connector's one question is asked under. Every tool here asks at most one thing per
-# call, and the client answers under the key the question was minted with.
+# One question per call, so a fixed key is safe; a second question in one call would collide.
 _CONFIRMATION = "confirm"
 
 
 def _modern_protocol(ctx: Context) -> bool:
-    """True when this connection's era has no server-to-client channel to elicit over.
+    """True when the negotiated era has no back-channel to elicit over.
 
-    `Context._is_modern_protocol` is this same check and is private, so this reads the negotiated
-    version off the public request context, and treats no request context as not modern the way
-    that method documents.
+    Mirrors the private `Context._is_modern_protocol`, "no request context" included.
     """
     request = ctx.request_context
     return request is not None and request.protocol_version in MODERN_PROTOCOL_VERSIONS
 
 
 def _nobody_to_ask(nothing_happened: str) -> str:
-    """A client with no elicitation capability. Shared so both eras refuse in the same words."""
     return (
         f"{nothing_happened} This connector asks a person to confirm this, and the MCP "
         + "client on the other end does not support elicitation, so there was nobody to "
@@ -230,7 +223,6 @@ def _nobody_to_ask(nothing_happened: str) -> str:
 
 
 def _not_agreed(nothing_happened: str) -> str:
-    """A person was asked and said no. Shared so both eras refuse in the same words."""
     return (
         f"{nothing_happened} The person at the other end of this conversation was asked to "
         + "confirm it and did not agree. Nothing was changed, so this is not a failure to "
@@ -239,7 +231,6 @@ def _not_agreed(nothing_happened: str) -> str:
 
 
 def _another_request(nothing_happened: str) -> str:
-    """The answer came back bound to something other than what this call would write."""
     return (
         f"{nothing_happened} The confirmation that came back was given for a different request "
         + "than this one, so that agreement does not cover this request, and nothing was changed. "
@@ -248,26 +239,10 @@ def _another_request(nothing_happened: str) -> str:
 
 
 def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened: str) -> Confirm:
-    """Ask the caller's own client to put a question to a person, and refuse unless they agree.
+    """Ask the caller's own client to put `question` to a person; only `agree` lets the call go on.
 
-    `agree` and `decline` are the two answers the person picks between, and `agree` is the only one
-    that lets the call continue. `nothing_happened` opens both refusals, because what a model needs
-    first is the fact that the write did not happen.
-
-    Elicitation is a capability of the client and not of this server
-    (https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation), so a client that
-    does not support it leaves nobody to ask. On a handshake connection that is a refusal worded
-    here; on a 2026-07-28 connection the client's own driver fails the round instead, and nothing
-    is written either way.
-
-    Two eras, one question. A handshake-era connection is asked over the back-channel and answers
-    inside this call. A 2026-07-28 connection has none (SEP-2577), so the question is answered
-    with: `confirm` hands back the `InputRequiredResult` the tool returns, and a client that can
-    elicit asks the person and calls the tool again with the answer on `ctx.input_responses`.
-    `about` is what ties that answer to the request it was given for, because the second call
-    composes its own draft and only an answer bound to that draft authorizes writing it. The
-    framework verifies `request_state` only when the re-call carries one, so the comparison here
-    is what refuses an accept that arrives without its state.
+    A 2026-07-28 connection has no back-channel (SEP-2577): the question is returned and answered
+    on a second call, bound to `about`.
     """
     answers = parse_elicit_response_type([agree, decline])
 
@@ -287,8 +262,7 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
     def asked(question: str, about: str) -> Confirmed:
         answered = (ctx.input_responses or {}).get(_CONFIRMATION)
         if answered is None:
-            # Nothing has been asked yet, or the client came back without an answer. Both are a
-            # question that still needs putting, and neither is a reason to write.
+            # A client that came back without an answer is indistinguishable from a first call.
             return InputRequiredResult(
                 input_requests={
                     _CONFIRMATION: ElicitRequest(
@@ -301,6 +275,8 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
             )
         if not isinstance(answered, ElicitResult) or answered.action != "accept":
             return _not_agreed(nothing_happened)
+        # The framework unseals `requestState` only when the re-call carries one, so an accept
+        # that arrives with the field stripped is bound to nothing until this compares it.
         if ctx.request_state != about:
             return _another_request(nothing_happened)
         try:

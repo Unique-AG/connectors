@@ -1,10 +1,7 @@
 """The send gate driven by a real MCP client, over the connection an in-process one negotiates.
 
-Every other test of this tool calls `send_draft` with a confirmation built for the occasion, so it
-proves what the tool does with an answer and never that an answer can reach it. The driver that
-carries the question out to a person and the answer back is the client's own, and on a 2026-07-28
-connection it is a second round trip rather than a back-channel call: nothing in a stub exercises
-either. This file is the only place the whole trip runs.
+Every other test builds its own confirmation, so nothing else exercises the client's driver or the
+second round trip a 2026-07-28 connection needs.
 
 Every payload here is synthesised. No message in this file was ever sent from a real mailbox.
 """
@@ -47,9 +44,8 @@ _CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 _CLIENT_TOKEN = "synthetic-fastmcp-session-token"
 _OBO_TOKEN = "synthetic-obo-graph-token"
 
-# The id in the tool's own `GRAPH_CALL_EXAMPLE`. The handle carries it percent-encoded,
-# `shared/handles.py` unquotes it on the way in, and the SDK encodes it again on the way out — so
-# the payload below carries the plain id and the route carries the encoded one.
+# The id in the tool's own `GRAPH_CALL_EXAMPLE`. Handles carry it percent-encoded and the SDK
+# re-encodes it, so the payload holds the plain id and the route the encoded one.
 _DRAFT_ID = "AAMkAGI2SYNTHETIC-draft-0001="
 
 _DRAFT_PATH = "/me/messages/AAMkAGI2SYNTHETIC-draft-0001%3D"
@@ -70,8 +66,6 @@ _ME = {
     "userPrincipalName": "ada@corp.example.invalid",
 }
 
-# `isDraft` is true because a message the mailbox no longer holds as a draft is refused before
-# anybody is asked anything, and a refusal reaches no route at all.
 _DRAFT: Mapping[str, object] = {
     "id": _DRAFT_ID,
     "isDraft": True,
@@ -91,8 +85,7 @@ class _StubOboCredential:
 
 @pytest.fixture
 def obo(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The exchange has to succeed. A refusal here would answer every call with the token advice,
-    and a tool that never ran reaches no route to assert about."""
+    """A failed exchange answers every call with the token advice, before any route is reached."""
     credential = _StubOboCredential()
 
     async def get_obo_credential(
@@ -110,8 +103,7 @@ def obo(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def graph() -> Iterator[respx.MockRouter]:
-    """The two routes this tool makes, and nothing else: a refused send answers 202 the same way,
-    so counting the POSTs is what tells a confirmed send from a refused one."""
+    """A refused send answers 202 the same way, so counting POSTs is what tells the two apart."""
     with respx.mock(base_url=GRAPH_V1, assert_all_called=False) as router:
         _ = router.get("/me").mock(return_value=httpx.Response(200, json=_ME))
         _ = router.get(_DRAFT_PATH).mock(return_value=httpx.Response(200, json=dict(_DRAFT)))
@@ -120,8 +112,7 @@ def graph() -> Iterator[respx.MockRouter]:
 
 
 def _made(router: respx.MockRouter) -> Sequence[Call]:
-    """respx types one call and leaves the list of them unknown, so this is where the cast lives
-    rather than at every index."""
+    """respx types one call and leaves the list unknown, so the cast lives here, not per index."""
     return cast("Sequence[Call]", router.calls)
 
 
@@ -134,8 +125,7 @@ def _object(value: object) -> Mapping[str, object]:
 
 
 def _the_word_for_yes(asked: InputRequest) -> str:
-    """The answer that means agreement, read off the question a call actually minted rather than
-    written out here, so a second round cannot agree with the first by coincidence."""
+    """Read off the question the call minted, so round two cannot agree by coincidence."""
     assert isinstance(asked, ElicitRequest), "the question is not one a person answers"
     params = asked.params
     assert isinstance(params, ElicitRequestFormParams), "the question is not one a client can fill"
@@ -149,7 +139,6 @@ async def _agree(
     _params: ElicitRequestParams,
     _context: object,
 ) -> str:
-    """Agreement, so the send reaches Graph."""
     return sender.SEND
 
 
@@ -159,19 +148,13 @@ async def _decline(
     _params: ElicitRequestParams,
     _context: object,
 ) -> ElicitResult[str]:
-    """A person who said no, answered the way a client answers rather than by raising."""
     return ElicitResult(action="decline")
 
 
 @pytest.fixture
 def app() -> Starlette:
-    """`outlook-send` is the preset an operator deploys this tool in, so the surface under test is
-    that one rather than a server this file assembled.
-
-    Composed rather than registered by hand: `EntraOBOToken` resolves against the server's own auth
-    provider, and a bare `FastMCP` has none, so the call would fail at its `client` dependency and
-    reach no route at all.
-    """
+    """The `outlook-send` preset, composed rather than registered by hand: `EntraOBOToken`
+    resolves against the server's own auth provider, and a bare `FastMCP` has none."""
     return create_app(
         config=AppConfig.model_validate({"public_base_url": "https://office-365-mcp.example"}),
         database_config=DatabaseConfig.model_validate(
@@ -190,8 +173,7 @@ def app() -> Starlette:
 
 @pytest.fixture
 async def an_agreeing_client(app: Starlette) -> AsyncIterator[Client[FastMCPTransport]]:
-    """No `mode`, so this negotiates whatever an in-process client negotiates by default. That
-    default is the whole point of this file."""
+    """No `mode`, deliberately: this negotiates the in-process default."""
     server = cast("FastMCP[None]", app.state.fastmcp_server)
     async with Client(FastMCPTransport(server), elicitation_handler=_agree) as client:
         yield client
@@ -199,7 +181,6 @@ async def an_agreeing_client(app: Starlette) -> AsyncIterator[Client[FastMCPTran
 
 @pytest.fixture
 async def a_declining_client(app: Starlette) -> AsyncIterator[Client[FastMCPTransport]]:
-    """The same server, and a person who says no to the question it asks."""
     server = cast("FastMCP[None]", app.state.fastmcp_server)
     async with Client(FastMCPTransport(server), elicitation_handler=_decline) as client:
         yield client
@@ -210,8 +191,8 @@ class TestTheWholeConfirmationOverARealClient:
     async def test_an_agreed_send_puts_the_mail_on_the_wire_exactly_once(
         self, an_agreeing_client: Client[FastMCPTransport], graph: respx.MockRouter
     ) -> None:
-        """The trip this connector shipped broken: on this era `ctx.elicit` raises, the tool used
-        to read that as a person saying no, and the mail silently never went."""
+        """Regression: `ctx.elicit` raises on this era, which the tool read as a person
+        saying no."""
         assert an_agreeing_client.protocol_version == LATEST_MODERN_VERSION, (
             "this file's whole point is a connection whose era has no back-channel"
         )
@@ -231,8 +212,6 @@ class TestTheWholeConfirmationOverARealClient:
     async def test_a_person_who_says_no_leaves_the_draft_where_it_is(
         self, a_declining_client: Client[FastMCPTransport], graph: respx.MockRouter
     ) -> None:
-        """The half of "never send without an accept" only a real client can prove. The pre-read
-        still happens, because it is what makes the question answerable."""
         with pytest.raises(ToolError, match="did not agree"):
             _ = await a_declining_client.call_tool(
                 sender.TOOL_NAME, dict(sender.GRAPH_CALL_EXAMPLE)
@@ -244,13 +223,8 @@ class TestTheWholeConfirmationOverARealClient:
     async def test_an_accept_that_omits_the_request_state_sends_nothing(
         self, an_agreeing_client: Client[FastMCPTransport], graph: respx.MockRouter
     ) -> None:
-        """The framework unseals and verifies a `requestState` only when the retry carries one, so
-        a client that answers the question and drops the field reaches the seam's own binding check
-        with nothing bound, and that check is the only thing left to refuse it.
-
-        Driven over the session rather than the client, because the client's own driver echoes the
-        state back and this is about the retry that does not.
-        """
+        """Driven over the session, not the client: the client's own driver echoes the state back,
+        and this is the retry that does not."""
         first = await an_agreeing_client.session.call_tool(
             sender.TOOL_NAME, dict(sender.GRAPH_CALL_EXAMPLE), allow_input_required=True
         )
@@ -277,13 +251,8 @@ class TestTheWholeConfirmationOverARealClient:
     async def test_a_client_pinned_to_the_handshake_era_still_asks_and_sends(
         self, app: Starlette, graph: respx.MockRouter
     ) -> None:
-        """The one connection in this file pinned to an era. Everything else here negotiates the
-        default, which is the point of those tests, and this is the only thing that would notice if
-        that default moved back.
-
-        `mode="legacy"` negotiates 2025-11-25, where `ctx.elicit` still has a back-channel and one
-        call carries the whole confirmation.
-        """
+        """The only pinned connection here: `mode="legacy"` negotiates the handshake era, where
+        one call carries the whole confirmation."""
         server = cast("FastMCP[None]", app.state.fastmcp_server)
 
         async with Client(

@@ -220,9 +220,6 @@ SEND = "send"
 _DO_NOT_SEND = "do not send"
 _NOTHING_SENT = "Nothing was sent, and the draft is untouched and still in Drafts."
 
-# The refusal to report, the question nobody has answered yet, or None when the person agreed.
-# Answered rather than raised: a `ToolError` leaving this crosses the block that measures the
-# Graph operation, which then records a person saying no as a Graph failure. See `send_draft`.
 type _Confirm = Callable[[Message], Awaitable[Confirmed]]
 
 
@@ -245,8 +242,7 @@ def a_person_agrees(ctx: Context) -> _Confirm:
             f"Send the draft {draft.subject or '(no subject)'!r} to "
             f"{', '.join(everyone) or 'nobody'}? Sending cannot be undone."
         )
-        # Bound to the question itself, so a subject or recipient changed between the rounds is
-        # refused. The body is not named, Mail.ReadBasic withholds it, so a body edit is not caught.
+        # Bound to the question, so a subject or recipient edited between rounds is refused.
         return await confirm(question, question)
 
     return asked
@@ -261,9 +257,7 @@ async def send_draft(
     belongs between the two requests, and a caller that could omit it would be back to a promise
     in a docstring.
 
-    On a connection with no server-to-client channel the question is answered rather than awaited:
-    `confirm` hands back the question itself, this call returns it instead of sending anything, and
-    a client that can elicit puts it to a person and calls the tool again with their answer.
+    An `InputRequiredResult` is the question, returned unsent for a client to answer and re-call.
     """
     handle = _handle_for(draft_ref)
 
@@ -285,8 +279,6 @@ async def send_draft(
     # `graph_errors` treats a `ToolError` that escapes it as a Graph operation that failed for a
     # reason the seam cannot describe. A message this tool refuses to send is not a Graph failure
     # at all, whether the refusal is the person's, their client's, or "that draft already went".
-    # A question nobody has answered yet leaves the block the same way, and is returned rather
-    # than raised: it is not a refusal at all, it is the send still waiting on a person.
     assert draft is not None, "Graph answered a draft read with no message"
     if asked is not None:
         return asked

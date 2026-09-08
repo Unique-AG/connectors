@@ -49,14 +49,11 @@ _PAM = "pam@example.invalid"
 
 _SUBJECT = "Invoice 4471"
 
-# The sentence every refusal from `shared/seam.py` opens with, because what a model needs first is
-# that the mail did not go. Written out rather than imported: it is what a caller reads.
+# Written out rather than imported from the tool: it is what a caller reads.
 _NOTHING_SENT = "Nothing was sent, and the draft is untouched and still in Drafts."
 
 
 def _refusal_of(answer: Confirmed) -> str:
-    """The refusal a confirmation answered with. A question or an agreement is not one, and a test
-    reading either as prose would assert nothing at all."""
     assert isinstance(answer, str) and answer, f"the confirmation answered {answer!r}"
     return answer
 
@@ -100,8 +97,6 @@ async def _refuses(draft: Message) -> Confirmed:
 
 
 def _mail_sent(answer: MailSent | InputRequiredResult) -> MailSent:
-    """The answer narrowed to a send that happened. A call this tool answered with a question
-    instead reaches no field at all, so a test reading one has to say which it expected."""
     assert isinstance(answer, MailSent), "the send was answered with a question rather than made"
     return answer
 
@@ -186,8 +181,7 @@ class TestHowTheQuestionReachesAPerson:
 
     @staticmethod
     def _context(answer: object) -> Context:
-        """A handshake-era connection: no request context at all, which is the era
-        `shared/seam.py` documents as not modern, so every answer here comes back over `elicit`."""
+        """A handshake-era connection: no request context, so answers come back over `elicit`."""
 
         class _Client:
             request_context: object = None
@@ -257,8 +251,7 @@ class TestHowTheQuestionReachesAPerson:
 
 
 class _ModernRequest:
-    """The one thing `shared/seam.py` reads to decide the era. The constant comes from the SDK
-    rather than the date written out, so a future era moves these tests with it."""
+    """The constant comes from the SDK, so a future era moves these tests with it."""
 
     protocol_version: str = LATEST_MODERN_VERSION
 
@@ -266,11 +259,7 @@ class _ModernRequest:
 def _modern_context(
     *, answers: Mapping[str, InputResponse] | None = None, state: str | None = None
 ) -> Context:
-    """A 2026-07-28 connection, carrying whatever a client already answered and echoed.
-
-    `elicit` raises rather than answering: this era has no server-to-client channel, so a call
-    that reaches it is a leak back onto a channel that is not there.
-    """
+    """A 2026-07-28 connection: `elicit` raises, so a leak back onto the back-channel fails."""
 
     class _Client:
         request_context: _ModernRequest = _ModernRequest()
@@ -287,11 +276,8 @@ def _modern_context(
 
 
 def _the_question(answer: MailSent | InputRequiredResult) -> tuple[str, str, str]:
-    """Round one's own key, what it bound the answer to, and the word that means yes.
-
-    All three are read off the question this call actually minted rather than written out here, so
-    round two cannot agree with round one by coincidence.
-    """
+    """Read off the question this call minted, so round two cannot agree with round one by
+    coincidence."""
     assert isinstance(answer, InputRequiredResult), "the question was never put to anybody"
     requests = answer.input_requests or {}
     assert len(requests) == 1, f"one question per call, and this one asked {sorted(requests)}"
@@ -303,7 +289,6 @@ def _the_question(answer: MailSent | InputRequiredResult) -> tuple[str, str, str
     assert params.message, "the person is asked nothing at all"
     schema = cast("Mapping[str, object]", params.requested_schema)
     properties = cast("Mapping[str, object]", schema["properties"])
-    # The two answers in the order the tool offered them, so the first is the one that means yes.
     choices = cast("Sequence[str]", cast("Mapping[str, object]", properties["value"])["enum"])
     assert list(choices) == [sender.SEND, "do not send"], f"the answers offered were {choices}"
     assert answer.request_state == params.message, (
@@ -313,16 +298,11 @@ def _the_question(answer: MailSent | InputRequiredResult) -> tuple[str, str, str
 
 
 class TestTheEraWithNoBackChannel:
-    """A 2026-07-28 connection has no server-to-client channel (SEP-2577), so the question cannot
-    be awaited inside the call. It is answered instead: this tool returns it, the client puts it to
-    a person, and it calls the tool again with the answer. `shared/seam.py` owns that branch, so
-    every test here drives the real confirmation the registered tool builds."""
+    """No server-to-client channel on this era (SEP-2577), so the question travels as a result."""
 
     async def test_the_first_round_asks_and_never_reaches_the_send(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The pre-read still happens: it is what the question names the recipients off. Nothing
-        after it does."""
         read = _reads(graph, _draft())
         send = _sends(graph)
 
@@ -337,8 +317,6 @@ class TestTheEraWithNoBackChannel:
     async def test_the_first_round_asks_the_question_this_tool_words(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The wording is the tool's on both eras. A question minted for a client to render still
-        names the subject and everyone who receives the mail."""
         _ = _ready(
             graph,
             _draft(to=[_recipient("Ada Lovelace", _ADA)], cc=[_recipient("Pam Beesly", _PAM)]),
@@ -357,8 +335,6 @@ class TestTheEraWithNoBackChannel:
     async def test_the_second_round_sends_the_draft_the_answer_was_bound_to(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The whole trip, and the one assertion that ties it together: the question the person
-        agreed to is the question this round composed, so what went out is what was confirmed."""
         send = _ready(graph)
         key, state, agrees_with = _the_question(
             await send_draft(
@@ -390,10 +366,8 @@ class TestTheEraWithNoBackChannel:
     async def test_an_answer_bound_to_another_question_sends_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A retry that carries a state alongside other arguments is rejected by the framework
-        before this tool runs. A retry that carries the accept and omits the state is not: the
-        framework unseals and verifies a `requestState` only when one is present, so it arrives
-        here bound to nothing and this check is the only thing that refuses it."""
+        """The framework unseals a `requestState` only when the retry carries one, so an accept
+        with the field stripped reaches the seam bound to nothing."""
         send = _ready(graph)
         key, _state, agrees_with = _the_question(
             await send_draft(
@@ -420,8 +394,6 @@ class TestTheEraWithNoBackChannel:
     async def test_a_second_round_the_person_declined_sends_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The refusal is raised rather than answered on this era too, exactly as a handshake
-        refusal is, and it opens with the sentence that says the mail did not go."""
         send = _ready(graph)
         key, state, _agrees_with = _the_question(
             await send_draft(
@@ -444,9 +416,7 @@ class TestTheEraWithNoBackChannel:
     async def test_a_draft_that_went_out_between_the_rounds_is_refused_before_anybody_is_asked(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Two rounds are two pre-reads, and the mailbox can change between them. The second read
-        is what notices, and `isDraft` decides before the answer the client carried is looked at
-        at all — an accept for a message that already went is still not a send."""
+        """Two rounds are two pre-reads: `isDraft` decides before the carried answer is read."""
         read = _reads(graph, _draft())
         send = _sends(graph)
         key, state, agrees_with = _the_question(
