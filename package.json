@@ -33,6 +33,7 @@
     "turbo": "2.10.12",
     "typescript": "catalog:",
     "unplugin-swc": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {
@@ -41,10 +42,9 @@
   "packageManager": "pnpm@10.34.5",
   "pnpm": {
     "overrides": {
-      "minimatch@<3.1.4": "3.1.5",
-      "path-to-regexp@>=8.0.0 <8.4.2": "8.4.2",
-      "lodash@<=4.17.23": "4.18.1",
-      "js-yaml@<4.2.0": "4.2.0"
+      "esbuild@<0.25.0": "0.25.12",
+      "uuid@<11.1.1": "11.1.1",
+      "deepmerge-ts@<8.0.0": "8.0.2"
     }
   }
 }
