@@ -5,7 +5,7 @@ description = "Knowledge Base Search MCP — Unique KB search, content tree, and
 requires-python = ">=3.14"
 dependencies = [
     "cryptography==50.0.1",
-    "fastmcp==3.4.7",
+    "fastmcp==4.0.3",
     "pydantic==2.13.5",
     # fastmcp already depends on py-key-value-aio[filetree,keyring,memory];
     # this adds the postgresql extra (asyncpg) for durable OAuth storage.
@@ -19,7 +19,7 @@ dependencies = [
     "starlette==1.3.1",
     "pydantic-settings==2.14.2",
     "python-dotenv==1.2.1",
-    "mcp==1.29.0",
+    "mcp==2.1.1",
 ]
 
 [project.scripts]
@@ -86,3 +86,6 @@ reportUnusedFunction = "none"
 reportImplicitStringConcatenation = "none"
 reportDeprecated = "none"
 reportUnannotatedClassAttribute = "none"
+
+[tool.uv]
+override-dependencies = ["fastmcp==4.0.3"]

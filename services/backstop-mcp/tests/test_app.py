@@ -52,7 +52,7 @@ class _HttpResponse(Protocol):
 
 
 def _get(client: TestClient, path: str) -> _HttpResponse:
-    return cast("_HttpResponse", client.get(path))  # pyright: ignore[reportUnknownMemberType]
+    return cast("_HttpResponse", client.get(path))
 
 
 def _checks(body: dict[str, object]) -> dict[str, object]:
@@ -67,7 +67,7 @@ def _post_json(
 ) -> _HttpResponse:
     return cast(
         "_HttpResponse",
-        client.post(path, json=body, headers=headers),  # pyright: ignore[reportUnknownMemberType]
+        client.post(path, json=body, headers=headers),
     )
 
 

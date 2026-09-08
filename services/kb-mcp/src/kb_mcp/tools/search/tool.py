@@ -65,10 +65,10 @@ _META = merge_tool_meta(
     description=SEARCH_SYSTEM_PROMPT + " " + TOOL_DESCRIPTION_CITATION_GUIDANCE,
     meta=_META,
     annotations=ToolAnnotations(
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     ),
 )
 async def search(
