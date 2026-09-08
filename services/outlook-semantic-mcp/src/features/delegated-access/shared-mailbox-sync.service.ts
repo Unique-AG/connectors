@@ -271,8 +271,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       }
 
       if (dualMailboxIds.length > 0) {
-        // ExecuteInboxDeletionCommand always deletes the profile. Dual rows keep
-        // the OAuth identity and are only reclassified.
+        // Dual rows keep the OAuth identity and are only reclassified.
         await this.db
           .update(userProfiles)
           .set({ source: 'oauth' })

@@ -54,7 +54,11 @@ describe('ExecuteInboxDeletionCommand', () => {
     mockDb = {
       query: {
         userProfiles: {
-          findFirst: vi.fn().mockResolvedValue({ id: userProfileId, providerUserId }),
+          findFirst: vi.fn().mockResolvedValue({
+            id: userProfileId,
+            providerUserId,
+            source: 'oauth',
+          }),
         },
         inboxConfigurations: {
           findFirst: vi.fn().mockResolvedValue({
@@ -92,15 +96,15 @@ describe('ExecuteInboxDeletionCommand', () => {
     expect(mockDb.update).toHaveBeenCalledTimes(4);
   });
 
-  it('deletes the user profile on completion', async () => {
+  it('deletes inboxConfigurations row on completion', async () => {
     const command = makeCommand({ db: mockDb, uniqueApi: mockUniqueApi });
 
     await command.run(userProfileId);
 
-    // Deletes: directoriesSync, directories, userProfiles (inboxConfigurations cascade)
+    // Deletes: directoriesSync, directories, inboxConfigurations (3 calls total)
     expect(mockDb.delete).toHaveBeenCalledTimes(3);
-    expect(mockDb.delete).toHaveBeenCalledWith(userProfiles);
-    expect(mockDb.delete).not.toHaveBeenCalledWith(inboxConfigurations);
+    expect(mockDb.delete).toHaveBeenCalledWith(inboxConfigurations);
+    expect(mockDb.delete).not.toHaveBeenCalledWith(userProfiles);
   });
 
   it('treats missing scope as already deleted and proceeds to cleanup', async () => {
@@ -124,7 +128,7 @@ describe('ExecuteInboxDeletionCommand', () => {
     expect(mockDb.delete).not.toHaveBeenCalled();
   });
 
-  it('deletes the user profile for a dual mailbox', async () => {
+  it('keeps a dual mailbox profile and deletes only the inbox configuration', async () => {
     mockDb.query.userProfiles.findFirst.mockResolvedValue({
       id: userProfileId,
       providerUserId,
@@ -135,8 +139,9 @@ describe('ExecuteInboxDeletionCommand', () => {
 
     await command.run(userProfileId);
 
-    expect(mockDb.delete).toHaveBeenCalledWith(userProfiles);
-    expect(mockDb.delete).not.toHaveBeenCalledWith(inboxConfigurations);
+    expect(mockDb.delete).toHaveBeenCalledTimes(3);
+    expect(mockDb.delete).toHaveBeenCalledWith(inboxConfigurations);
+    expect(mockDb.delete).not.toHaveBeenCalledWith(userProfiles);
     expect(mockDb.update).toHaveBeenCalledTimes(4);
     expect(mockDb.update).not.toHaveBeenCalledWith(userProfiles);
   });
