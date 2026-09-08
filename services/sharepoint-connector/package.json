@@ -29,7 +29,7 @@
     "test:coverage": "vitest run --config vitest.coverage.config.ts && istanbul-badges-readme --style='square-flat'"
   },
   "dependencies": {
-    "@azure/msal-node": "3.8.10",
+    "@azure/msal-node": "6.0.0",
     "@microsoft/microsoft-graph-client": "catalog:",
     "@nestjs/common": "catalog:",
     "@nestjs/config": "catalog:",
