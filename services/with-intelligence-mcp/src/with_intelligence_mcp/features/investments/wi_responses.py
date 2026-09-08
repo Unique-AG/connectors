@@ -1,4 +1,4 @@
-"""The vendor's investment shapes, from the v3 schemas.
+"""With Intelligence's investment shapes, from the v3 schemas.
 
 An investment is one position: this investor, in that fund, at that amount. `deleted_at` is how
 an exited position is visible at all.
@@ -28,7 +28,7 @@ class InvestmentAmountAttributes(BaseModel):
 
 
 class InvestmentFundAttributes(BaseModel):
-    """`unknown` marks a position whose fund the vendor could not identify."""
+    """`unknown` marks a position whose fund With Intelligence could not identify."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 

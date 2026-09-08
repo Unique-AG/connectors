@@ -1,4 +1,4 @@
-"""The vendor's mandate shapes, from the v3 schemas.
+"""With Intelligence's mandate shapes, from the v3 schemas.
 
 A mandate is a search: this investor is looking to allocate to that kind of strategy, at this
 stage. `status` plus `sub_status` is what makes one actionable or not.

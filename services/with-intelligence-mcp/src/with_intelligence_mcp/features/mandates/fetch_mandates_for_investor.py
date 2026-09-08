@@ -1,4 +1,4 @@
-from with_intelligence_mcp.features.mandates.api_responses import MandateListItemAttributes
+from with_intelligence_mcp.features.mandates.wi_responses import MandateListItemAttributes
 from with_intelligence_mcp.with_intelligence_client import QueryValue, WithIntelligenceClient
 
 MANDATES_PATH = "/v3/mandates"

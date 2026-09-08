@@ -1,6 +1,6 @@
 """What a request needs to authenticate, and who supplies it.
 
-Both live in the transport because that is what sends them. `features/vendor_session` owns the
+Both live in the transport because that is what sends them. `features/wi_session` owns the
 other half — obtaining and refreshing a session — and depends on these types, not the reverse.
 """
 
@@ -9,7 +9,7 @@ from typing import ClassVar, Protocol
 from pydantic import BaseModel, ConfigDict, SecretStr
 
 
-class VendorCredential(BaseModel):
+class WiCredential(BaseModel):
     """A username and password `POST /v3/auth/sign-in` accepts.
 
     `password` is a `SecretStr` so an accidental log line prints `**********`.

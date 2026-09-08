@@ -15,11 +15,11 @@ from pydantic import TypeAdapter
 
 from with_intelligence_mcp.with_intelligence_client.credential import (
     CallerSession,
-    VendorCredential,
+    WiCredential,
 )
 from with_intelligence_mcp.with_intelligence_client.errors import SignInFailed, Unreachable
 from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy
-from with_intelligence_mcp.with_intelligence_client.session import VendorSession
+from with_intelligence_mcp.with_intelligence_client.session import WiSession
 from with_intelligence_mcp.with_intelligence_client.settings import RetrySettings, TransportSettings
 
 logger = logging.getLogger(__name__)
@@ -101,7 +101,7 @@ class WithIntelligenceClientFactory:
             session=session,
         )
 
-    async def sign_in(self, credential: VendorCredential) -> VendorSession:
+    async def sign_in(self, credential: WiCredential) -> WiSession:
         """`POST /v3/auth/sign-in`. Username and password only — no passcode is involved."""
         return await self._auth_call(
             SIGN_IN_PATH,
@@ -111,17 +111,17 @@ class WithIntelligenceClientFactory:
             },
         )
 
-    async def refresh(self, session: VendorSession) -> VendorSession:
+    async def refresh(self, session: WiSession) -> WiSession:
         """`POST /v3/auth/refresh`.
 
-        The vendor may or may not rotate the refresh token here; whatever comes back is stored,
+        With Intelligence may or may not rotate the refresh token here; whatever comes back is stored,
         so both behaviours are handled without knowing which it is.
         """
         return await self._auth_call(
             REFRESH_PATH, {"refreshToken": session.refresh_token.get_secret_value()}
         )
 
-    async def _auth_call(self, path: str, payload: dict[str, str]) -> VendorSession:
+    async def _auth_call(self, path: str, payload: dict[str, str]) -> WiSession:
         from datetime import UTC, datetime
 
         async with self._borrow_http_client() as client:
@@ -144,7 +144,7 @@ class WithIntelligenceClientFactory:
         access, refresh = fields.get("accessToken"), fields.get("refreshToken")
         if not isinstance(access, str) or not isinstance(refresh, str):
             raise SignInFailed(f"{path} returned no accessToken/refreshToken")
-        return VendorSession.model_validate(
+        return WiSession.model_validate(
             {"access_token": access, "refresh_token": refresh, "issued_at": datetime.now(UTC)}
         )
 

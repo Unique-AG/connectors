@@ -13,7 +13,7 @@ from with_intelligence_mcp.features.investors import (
     project_investor,
     resolve_investor,
 )
-from with_intelligence_mcp.features.vendor_session import get_with_intelligence_client
+from with_intelligence_mcp.features.wi_session import get_with_intelligence_client
 from with_intelligence_mcp.with_intelligence_client import WithIntelligenceClient
 
 type GetInvestorResult = (

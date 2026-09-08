@@ -51,7 +51,7 @@ class TestParsingTheRecordedShape:
 
 
 class TestWhatTheToolPublishes:
-    def test_aum_is_labelled_as_millions_with_the_vendors_own_band(
+    def test_aum_is_labelled_as_millions_with_the_wi_band(
         self, projected: InvestorProfileResponse
     ) -> None:
         """135900 is $135.9bn. Publishing it as a bare `value` invites a 6-orders-of-magnitude

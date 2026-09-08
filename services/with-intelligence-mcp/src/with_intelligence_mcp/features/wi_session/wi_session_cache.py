@@ -1,4 +1,4 @@
-"""One live vendor session per authenticated user, in front of the stored one.
+"""One live With Intelligence session per authenticated user, in front of the stored one.
 
 Two layers, because they solve different problems. The in-memory holder keeps a fresh access
 token for its hour so an ordinary tool call touches neither the database nor the encryption key.
@@ -12,35 +12,35 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from with_intelligence_mcp.with_intelligence_client import (
-    VendorSession,
+    WiSession,
     WithIntelligenceClientFactory,
 )
 
 logger = logging.getLogger(__name__)
 
 # Well above any plausible concurrent user count for one process; exists so a long-lived
-# process with high user churn cannot grow the registry without bound.
+# process with high user churn cannot grow this cache without bound.
 MAX_TRACKED_SUBJECTS = 512
 
-type SessionReader = Callable[[], Awaitable[VendorSession]]
+type SessionReader = Callable[[], Awaitable[WiSession]]
 type SessionRenewer = Callable[
-    [Callable[[VendorSession], Awaitable[VendorSession]]], Awaitable[VendorSession]
+    [Callable[[WiSession], Awaitable[WiSession]]], Awaitable[WiSession]
 ]
 
 
 @dataclass
 class _Holder:
-    session: VendorSession | None = None
+    session: WiSession | None = None
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
-class VendorSessionRegistry:
-    """Vendor sessions keyed by MCP subject, cached in front of the store."""
+class WiSessionCache:
+    """With Intelligence sessions keyed by MCP subject, cached in this process."""
 
     def __init__(self, factory: WithIntelligenceClientFactory) -> None:
         self._factory: WithIntelligenceClientFactory = factory
         self._holders: dict[str, _Holder] = {}
-        self._registry_lock: asyncio.Lock = asyncio.Lock()
+        self._holders_lock: asyncio.Lock = asyncio.Lock()
 
     async def access_token(self, subject: str, read: SessionReader, renew: SessionRenewer) -> str:
         holder = await self._holder_for(subject)
@@ -65,7 +65,7 @@ class VendorSessionRegistry:
         read: SessionReader,
         renew: SessionRenewer,
         *,
-        stale: VendorSession | None,
+        stale: WiSession | None,
     ) -> str:
         async with holder.lock:
             current = holder.session
@@ -80,11 +80,11 @@ class VendorSessionRegistry:
                 return stored.access_token.get_secret_value()
 
             holder.session = await renew(self._factory.refresh)
-            logger.info("vendor_session.renewed")
+            logger.info("wi_session.renewed")
             return holder.session.access_token.get_secret_value()
 
     async def _holder_for(self, subject: str) -> _Holder:
-        async with self._registry_lock:
+        async with self._holders_lock:
             holder = self._holders.get(subject)
             if holder is None:
                 if len(self._holders) >= MAX_TRACKED_SUBJECTS:
@@ -99,5 +99,5 @@ class VendorSessionRegistry:
         for subject in idle:
             del self._holders[subject]
         logger.debug(
-            "vendor_session.evicted", extra={"evicted": len(idle), "retained": len(self._holders)}
+            "wi_session.evicted", extra={"evicted": len(idle), "retained": len(self._holders)}
         )

@@ -1,4 +1,4 @@
-from with_intelligence_mcp.features.investors.api_responses import (
+from with_intelligence_mcp.features.investors.wi_responses import (
     ClassificationAttributes,
     ConsultantAttributes,
     EntityAttributes,
@@ -16,7 +16,7 @@ from with_intelligence_mcp.features.investors.responses import (
 
 
 def project_investor(record: InvestorExtendedAttributes) -> InvestorProfileResponse:
-    """Turn the vendor's record into the shape the tool publishes."""
+    """Turn With Intelligence's record into the shape the tool publishes."""
     return InvestorProfileResponse(
         id=record.id,
         name=record.name,

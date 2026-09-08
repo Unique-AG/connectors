@@ -11,9 +11,9 @@ from pydantic import SecretStr
 from with_intelligence_mcp.config import EncryptionConfig
 from with_intelligence_mcp.features.auth import InvalidSessionEnvelopeError, load_key
 from with_intelligence_mcp.features.auth.crypto import decrypt_session, encrypt_session
-from with_intelligence_mcp.with_intelligence_client import VendorSession
+from with_intelligence_mcp.with_intelligence_client import WiSession
 
-SESSION = VendorSession(
+SESSION = WiSession(
     access_token=SecretStr("wi-access-token"),
     refresh_token=SecretStr("wi-refresh-token"),
     issued_at=datetime.now(UTC),
@@ -42,7 +42,7 @@ class TestRoundTrip:
         assert b"wi-access-token" not in blob
 
     def test_freshness_survives_the_round_trip(self) -> None:
-        """`issued_at` is ours, not the vendor's, and is what `is_fresh` reads."""
+        """`issued_at` is ours, not With Intelligence's, and is what `is_fresh` reads."""
         key = Fernet.generate_key()
         restored = decrypt_session(encrypt_session(SESSION, key), key)
         assert restored.is_fresh is True

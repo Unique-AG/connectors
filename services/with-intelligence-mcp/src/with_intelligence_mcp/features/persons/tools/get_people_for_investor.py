@@ -19,7 +19,7 @@ from with_intelligence_mcp.features.persons import (
     fetch_person,
     project_person,
 )
-from with_intelligence_mcp.features.vendor_session import get_with_intelligence_client
+from with_intelligence_mcp.features.wi_session import get_with_intelligence_client
 from with_intelligence_mcp.with_intelligence_client import NotEntitled, WithIntelligenceClient
 
 type GetPeopleResult = (

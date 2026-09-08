@@ -207,7 +207,7 @@ class TestCountsAndScoping:
         assert persons.call_count == 0
 
 
-class TestVendorEncodings:
+class TestWiEncodings:
     """Fields the spec declares as one object and the API sends as a list, and vice versa."""
 
     @respx.mock

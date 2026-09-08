@@ -1,6 +1,6 @@
 """Institutional investors: resolving one by name, and the record behind it."""
 
-from with_intelligence_mcp.features.investors.api_responses import (
+from with_intelligence_mcp.features.investors.wi_responses import (
     ClassificationAttributes,
     InvestorExtendedAttributes,
     InvestorListItemAttributes,

@@ -29,14 +29,14 @@ class PositionResponse(OmitNoneModel):
     asset_classes: list[str] = Field(default_factory=list)
     strategies: list[str] = Field(default_factory=list)
     structures: list[str] = Field(default_factory=list)
-    as_of: str | None = Field(default=None, description="When the vendor last confirmed it.")
+    as_of: str | None = Field(default=None, description="When With Intelligence last confirmed it.")
     is_current: bool = Field(
         default=True, description="False once the position carries an exit date."
     )
     exited_on: str | None = None
     fund_unidentified: bool | None = Field(
         default=None,
-        description="The vendor records the position but could not identify which fund it is in.",
+        description="With Intelligence records the position but could not identify which fund it is in.",
     )
 
 
@@ -46,5 +46,5 @@ class InvestorPositionsResponse(OmitNoneModel):
     investor_id: int
     investor_name: str | None = None
     positions: list[PositionResponse] = Field(default_factory=list)
-    total: int = Field(default=0, description="How many positions the vendor holds in total.")
+    total: int = Field(default=0, description="How many positions With Intelligence holds in total.")
     returned: int = 0

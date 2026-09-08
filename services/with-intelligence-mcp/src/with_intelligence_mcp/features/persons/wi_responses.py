@@ -1,4 +1,4 @@
-"""The vendor's person shapes, from the v3 schemas.
+"""With Intelligence's person shapes, from the v3 schemas.
 
 A person's roles span every organisation they have worked at, so the role that matters has to
 be picked by organisation rather than assumed to be the first.

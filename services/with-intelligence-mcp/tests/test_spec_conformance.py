@@ -1,11 +1,11 @@
-"""Our hand-written wire models, checked field-by-field against the vendor's own schemas.
+"""Our hand-written wire models, checked field-by-field against With Intelligence's own schemas.
 
 The bug this exists for: the models were transcribed from the spec's field *names* without
 reading its nested schemas, so `address.country` was declared `str` when the API sends an
 object. Everything passed, because the test fixture was invented in the same wrong shape — it
 agreed with the code instead of with the API.
 
-The snapshot in `tests/spec/vendor_schemas.json` is pruned to the schemas we model, so a
+The snapshot in `tests/spec/wi_schemas.json` is pruned to the schemas we model, so a
 refresh (`uv run agent-explore/spec.py snapshot`) is a readable diff of the contract we depend
 on. This checks transcription, not live behaviour: whether a field is ever populated, and
 whether the spec itself is honest, only a recorded response can settle.
@@ -20,14 +20,14 @@ from typing import get_args, get_origin
 import pytest
 from pydantic import BaseModel
 
-from with_intelligence_mcp.features.investments.api_responses import (
+from with_intelligence_mcp.features.investments.wi_responses import (
     CurrencyAmountAttributes,
     InvestmentAmountAttributes,
     InvestmentExtendedAttributes,
     InvestmentFundAttributes,
     InvestmentListItemAttributes,
 )
-from with_intelligence_mcp.features.investors.api_responses import (
+from with_intelligence_mcp.features.investors.wi_responses import (
     AddressAttributes,
     AumRangeAttributes,
     ClassificationAttributes,
@@ -40,7 +40,7 @@ from with_intelligence_mcp.features.investors.api_responses import (
     StateAttributes,
     StrategyGroupAttributes,
 )
-from with_intelligence_mcp.features.mandates.api_responses import (
+from with_intelligence_mcp.features.mandates.wi_responses import (
     MandateAmountAttributes,
     MandateExtendedAttributes,
     MandateInvestorAttributes,
@@ -50,7 +50,7 @@ from with_intelligence_mcp.features.mandates.api_responses import (
     MandateServiceAttributes,
     MandateStatusAttributes,
 )
-from with_intelligence_mcp.features.persons.api_responses import (
+from with_intelligence_mcp.features.persons.wi_responses import (
     PersonExtendedAttributes,
     PersonListItemAttributes,
     PersonRoleAttributes,
@@ -58,9 +58,9 @@ from with_intelligence_mcp.features.persons.api_responses import (
 )
 from with_intelligence_mcp.with_intelligence_client import PageInfo
 
-_SNAPSHOT = pathlib.Path(__file__).parent / "spec" / "vendor_schemas.json"
+_SNAPSHOT = pathlib.Path(__file__).parent / "spec" / "wi_schemas.json"
 
-# Our model -> the vendor schema it transcribes, or the several it transcribes where the vendor
+# Our model -> With Intelligence schema it transcribes, or the several it transcribes where With Intelligence
 # declares the same shape under more than one name (`{id, short_name}` appears three times).
 MODELS: dict[type[BaseModel], str | tuple[str, ...]] = {
     InvestorListItemAttributes: "Investor",
@@ -214,7 +214,7 @@ def _matches(ours: tuple[str, object], theirs: tuple[str, object]) -> bool:
             typing.cast("tuple[str, object]", their_detail),
         )
     if our_kind == "model":
-        # The nested class has to transcribe the schema the vendor actually references.
+        # The nested class has to transcribe the schema With Intelligence actually references.
         assert isinstance(our_detail, type)
         return their_detail in _transcribed_by(typing.cast("type[BaseModel]", our_detail))
     return True
@@ -261,14 +261,14 @@ class TestTheDetectionItself:
         assert empty == []
 
     def test_a_string_where_the_spec_says_object_is_caught(self) -> None:
-        """Exactly the bug: `country` declared `str` when the vendor sends a Classification."""
+        """Exactly the bug: `country` declared `str` when With Intelligence sends a Classification."""
         assert not _matches(_our_kind(str | None), ("model", "Classification"))
 
     def test_the_real_nested_declaration_passes(self) -> None:
         assert _matches(_our_kind(ClassificationAttributes | None), ("model", "Classification"))
 
     def test_one_class_may_transcribe_several_identically_shaped_schemas(self) -> None:
-        """The vendor declares `{id, short_name}` under three names; one class covers them."""
+        """With Intelligence declares `{id, short_name}` under three names; one class covers them."""
         assert _matches(
             _our_kind(CurrencyAmountAttributes | None), ("model", "MandateAmountCurrency")
         )
@@ -293,7 +293,7 @@ class TestTheDetectionItself:
         assert not _matches(_our_kind(str | None), ("number", None))
 
     def test_int_and_float_both_satisfy_the_specs_number(self) -> None:
-        """The vendor types every id as `number`; we narrow to int at our own boundary."""
+        """With Intelligence types every id as `number`; we narrow to int at our own boundary."""
         assert _matches(_our_kind(int | None), ("number", None))
         assert _matches(_our_kind(float | None), ("number", None))
 

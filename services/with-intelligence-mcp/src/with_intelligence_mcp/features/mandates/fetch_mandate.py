@@ -1,4 +1,4 @@
-from with_intelligence_mcp.features.mandates.api_responses import MandateExtendedAttributes
+from with_intelligence_mcp.features.mandates.wi_responses import MandateExtendedAttributes
 from with_intelligence_mcp.features.mandates.fetch_mandates_for_investor import MANDATES_PATH
 from with_intelligence_mcp.with_intelligence_client import (
     NotFound,

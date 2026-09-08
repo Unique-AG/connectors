@@ -1,6 +1,6 @@
 """An investor's fund roster: which funds they hold, at what size, and what they have exited."""
 
-from with_intelligence_mcp.features.investments.api_responses import (
+from with_intelligence_mcp.features.investments.wi_responses import (
     CurrencyAmountAttributes,
     InvestmentAmountAttributes,
     InvestmentExtendedAttributes,

@@ -1,4 +1,4 @@
-"""One live vendor session per user, cached in front of the store and renewed under a lock."""
+"""One live With Intelligence session per user, cached in this process and renewed under a lock."""
 
 import asyncio
 from collections.abc import Awaitable, Callable
@@ -6,12 +6,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from with_intelligence_mcp.features.vendor_session import VendorSessionRegistry
-from with_intelligence_mcp.with_intelligence_client import VendorSession
+from with_intelligence_mcp.features.wi_session import WiSessionCache
+from with_intelligence_mcp.with_intelligence_client import WiSession
 
 
-def _session(token: str, *, age: timedelta = timedelta(0)) -> VendorSession:
-    return VendorSession.model_validate(
+def _session(token: str, *, age: timedelta = timedelta(0)) -> WiSession:
+    return WiSession.model_validate(
         {
             "access_token": token,
             "refresh_token": f"refresh-{token}",
@@ -28,7 +28,7 @@ class FakeFactory:
         self._refresh_fails: bool = refresh_fails
         self._delay: float = delay
 
-    async def refresh(self, _session_in: VendorSession) -> VendorSession:
+    async def refresh(self, _session_in: WiSession) -> WiSession:
         self.refreshes += 1
         if self._delay:
             await asyncio.sleep(self._delay)
@@ -44,21 +44,21 @@ class FakeStore:
     the stored session if someone else already renewed it, and writes the renewal back.
     """
 
-    def __init__(self, stored: VendorSession, *, delay: float = 0.0) -> None:
-        self.stored: VendorSession = stored
+    def __init__(self, stored: WiSession, *, delay: float = 0.0) -> None:
+        self.stored: WiSession = stored
         self.reads: int = 0
         self._lock: asyncio.Lock = asyncio.Lock()
         self._delay: float = delay
 
-    async def read(self) -> VendorSession:
+    async def read(self) -> WiSession:
         self.reads += 1
         if self._delay:
             await asyncio.sleep(self._delay)
         return self.stored
 
     async def renew(
-        self, renew: Callable[[VendorSession], Awaitable[VendorSession]]
-    ) -> VendorSession:
+        self, renew: Callable[[WiSession], Awaitable[WiSession]]
+    ) -> WiSession:
         async with self._lock:
             if self.stored.is_fresh:
                 return self.stored
@@ -66,24 +66,24 @@ class FakeStore:
             return self.stored
 
 
-def _registry(factory: FakeFactory) -> VendorSessionRegistry:
-    return VendorSessionRegistry(factory)  # pyright: ignore[reportArgumentType]
+def _cache(factory: FakeFactory) -> WiSessionCache:
+    return WiSessionCache(factory)  # pyright: ignore[reportArgumentType]
 
 
 class TestFirstUse:
     async def test_reads_the_stored_session_on_first_use(self) -> None:
-        """The login already signed in, so the first call needs no vendor round trip."""
+        """The login already signed in, so the first call needs no WI round trip."""
         factory = FakeFactory()
         store = FakeStore(_session("stored"))
-        assert await _registry(factory).access_token("s1", store.read, store.renew) == "stored"
+        assert await _cache(factory).access_token("s1", store.read, store.renew) == "stored"
         assert factory.refreshes == 0
 
     async def test_reuses_a_fresh_token_without_reading_again(self) -> None:
         factory = FakeFactory()
         store = FakeStore(_session("stored"))
-        registry = _registry(factory)
-        first = await registry.access_token("s1", store.read, store.renew)
-        assert await registry.access_token("s1", store.read, store.renew) == first
+        wi = _cache(factory)
+        first = await wi.access_token("s1", store.read, store.renew)
+        assert await wi.access_token("s1", store.read, store.renew) == first
         assert store.reads == 1
 
 
@@ -91,21 +91,21 @@ class TestPerSubject:
     async def test_two_users_get_their_own_session(self) -> None:
         """A shared session would hand one user's data to another."""
         factory = FakeFactory()
-        registry = _registry(factory)
+        wi = _cache(factory)
         alice = FakeStore(_session("alice-token"))
         bob = FakeStore(_session("bob-token"))
-        assert await registry.access_token("alice", alice.read, alice.renew) == "alice-token"
-        assert await registry.access_token("bob", bob.read, bob.renew) == "bob-token"
+        assert await wi.access_token("alice", alice.read, alice.renew) == "alice-token"
+        assert await wi.access_token("bob", bob.read, bob.renew) == "bob-token"
 
     async def test_forgetting_one_user_leaves_the_other(self) -> None:
         factory = FakeFactory()
-        registry = _registry(factory)
+        wi = _cache(factory)
         alice = FakeStore(_session("alice-token"))
         bob = FakeStore(_session("bob-token"))
-        _ = await registry.access_token("alice", alice.read, alice.renew)
-        _ = await registry.access_token("bob", bob.read, bob.renew)
-        registry.forget("bob")
-        assert await registry.access_token("alice", alice.read, alice.renew) == "alice-token"
+        _ = await wi.access_token("alice", alice.read, alice.renew)
+        _ = await wi.access_token("bob", bob.read, bob.renew)
+        wi.forget("bob")
+        assert await wi.access_token("alice", alice.read, alice.renew) == "alice-token"
         assert alice.reads == 1
 
 
@@ -113,25 +113,25 @@ class TestRenewal:
     async def test_an_expired_session_is_refreshed(self) -> None:
         factory = FakeFactory()
         store = FakeStore(_session("old", age=timedelta(hours=2)))
-        registry = _registry(factory)
-        assert await registry.access_token("s1", store.read, store.renew) == "refreshed-1"
+        wi = _cache(factory)
+        assert await wi.access_token("s1", store.read, store.renew) == "refreshed-1"
         assert factory.refreshes == 1
 
     async def test_the_renewal_is_written_back_to_the_store(self) -> None:
         """So the next process to read it gets the renewed session, not the spent one."""
         factory = FakeFactory()
         store = FakeStore(_session("old", age=timedelta(hours=2)))
-        _ = await _registry(factory).access_token("s1", store.read, store.renew)
+        _ = await _cache(factory).access_token("s1", store.read, store.renew)
         assert store.stored.access_token.get_secret_value() == "refreshed-1"
 
     async def test_a_session_a_replica_already_renewed_is_not_refreshed_again(self) -> None:
         """The holder is stale but the row is fresh, so reading it is enough."""
         factory = FakeFactory()
         store = FakeStore(_session("renewed-elsewhere"))
-        registry = _registry(factory)
-        holder = await registry._holder_for("s1")  # pyright: ignore[reportPrivateUsage]
+        wi = _cache(factory)
+        holder = await wi._holder_for("s1")  # pyright: ignore[reportPrivateUsage]
         holder.session = _session("old", age=timedelta(hours=2))
-        token = await registry.access_token("s1", store.read, store.renew)
+        token = await wi.access_token("s1", store.read, store.renew)
         assert token == "renewed-elsewhere"
         assert factory.refreshes == 0
 
@@ -139,28 +139,27 @@ class TestRenewal:
         """There is no password to fall back on, so the caller has to log in again."""
         factory = FakeFactory(refresh_fails=True)
         store = FakeStore(_session("old", age=timedelta(hours=2)))
-        registry = _registry(factory)
+        wi = _cache(factory)
         with pytest.raises(RuntimeError):
-            _ = await registry.access_token("s1", store.read, store.renew)
+            _ = await wi.access_token("s1", store.read, store.renew)
         assert factory.refreshes == 1
 
     async def test_renewed_access_token_forces_a_renewal(self) -> None:
         factory = FakeFactory()
         store = FakeStore(_session("stored"))
-        registry = _registry(factory)
-        _ = await registry.access_token("s1", store.read, store.renew)
-        # A 401 on a token this process still believes is fresh: renew regardless.
+        wi = _cache(factory)
+        _ = await wi.access_token("s1", store.read, store.renew)
         store.stored = _session("stored", age=timedelta(hours=2))
-        assert await registry.renewed_access_token("s1", store.read, store.renew) == "refreshed-1"
+        assert await wi.renewed_access_token("s1", store.read, store.renew) == "refreshed-1"
 
 
 class TestConcurrentRenewal:
     async def test_simultaneous_first_use_reads_once(self) -> None:
         factory = FakeFactory()
         store = FakeStore(_session("stored"), delay=0.02)
-        registry = _registry(factory)
+        wi = _cache(factory)
         tokens = await asyncio.gather(
-            *(registry.access_token("s1", store.read, store.renew) for _ in range(5))
+            *(wi.access_token("s1", store.read, store.renew) for _ in range(5))
         )
         assert store.reads == 1
         assert set(tokens) == {"stored"}
@@ -169,20 +168,20 @@ class TestConcurrentRenewal:
         """Otherwise every in-flight tool call spends its own refresh token."""
         factory = FakeFactory(delay=0.02)
         store = FakeStore(_session("old", age=timedelta(hours=2)))
-        registry = _registry(factory)
+        wi = _cache(factory)
         tokens = await asyncio.gather(
-            *(registry.access_token("s1", store.read, store.renew) for _ in range(5))
+            *(wi.access_token("s1", store.read, store.renew) for _ in range(5))
         )
         assert factory.refreshes == 1
         assert set(tokens) == {"refreshed-1"}
 
     async def test_two_users_expiring_at_once_do_not_block_each_other(self) -> None:
         factory = FakeFactory()
-        registry = _registry(factory)
+        wi = _cache(factory)
         alice = FakeStore(_session("old-alice", age=timedelta(hours=2)))
         bob = FakeStore(_session("old-bob", age=timedelta(hours=2)))
         _ = await asyncio.gather(
-            registry.access_token("alice", alice.read, alice.renew),
-            registry.access_token("bob", bob.read, bob.renew),
+            wi.access_token("alice", alice.read, alice.renew),
+            wi.access_token("bob", bob.read, bob.renew),
         )
         assert factory.refreshes == 2

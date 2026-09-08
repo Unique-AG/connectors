@@ -1,6 +1,6 @@
 """People at an investor: the roster, and the role each holds there."""
 
-from with_intelligence_mcp.features.persons.api_responses import (
+from with_intelligence_mcp.features.persons.wi_responses import (
     PersonExtendedAttributes,
     PersonListItemAttributes,
     PersonRoleAttributes,

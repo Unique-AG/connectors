@@ -19,7 +19,7 @@ from with_intelligence_mcp.features.mandates import (
     fetch_mandates_for_investor,
     project_mandate,
 )
-from with_intelligence_mcp.features.vendor_session import get_with_intelligence_client
+from with_intelligence_mcp.features.wi_session import get_with_intelligence_client
 from with_intelligence_mcp.with_intelligence_client import NotEntitled, WithIntelligenceClient
 
 type GetMandatesResult = (
@@ -44,14 +44,14 @@ async def get_mandates(
     ] = 25,
     updated_since: Annotated[
         str | None,
-        Field(description="ISO date. Only mandates the vendor changed since then."),
+        Field(description="ISO date. Only mandates With Intelligence changed since then."),
     ] = None,
     client: WithIntelligenceClient = Depends(get_with_intelligence_client),
 ) -> GetMandatesResult:
     """An investor's allocation searches: what they are looking to allocate to, at what size,
     how far along each is, and which consultant is running it.
 
-    `status` is the vendor's own vocabulary rather than a boolean — read it instead of assuming
+    `status` is With Intelligence's own vocabulary rather than a boolean — read it instead of assuming
     a mandate is live. `last_reviewed` is when they last confirmed it, so an old date means a
     stale mandate even where the status still reads open. Amounts are in MILLIONS.
     """

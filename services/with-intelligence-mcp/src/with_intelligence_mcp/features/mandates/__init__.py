@@ -1,6 +1,6 @@
 """An investor's allocation searches: what they are looking to allocate to, and how far along."""
 
-from with_intelligence_mcp.features.mandates.api_responses import (
+from with_intelligence_mcp.features.mandates.wi_responses import (
     MandateExtendedAttributes,
     MandateInvestorAttributes,
     MandateListItemAttributes,

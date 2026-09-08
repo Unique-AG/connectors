@@ -8,7 +8,7 @@ and editorial coverage.
 With Intelligence has no OAuth of its own, so this service *is* the OAuth 2.1 authorization
 server for its MCP clients: a client registers dynamically, gets redirected to a login form
 hosted here, and submits the username and password `POST /v3/auth/sign-in` accepts.
-The vendor session that comes back — a 1-hour access token over a 30-day refresh token — is
+With Intelligence session that comes back — a 1-hour access token over a 30-day refresh token — is
 encrypted (Fernet) and stored in Postgres per user, so every tool call acts as that user rather
 than as a shared service account.
 
@@ -38,7 +38,7 @@ features to guard.
 
 ## Adding a feature or tool
 
-1. Create `features/<name>/` with the model layers `api_responses` → `internal_dto` → `responses`.
+1. Create `features/<name>/` with the model layers `wi_responses` → `internal_dto` → `responses`.
 2. Put the fetch in a module named after the function it defines.
 3. Add `dependencies.py` with an `@lru_cache(maxsize=1)` provider only if the feature owns a
    long-lived service, exported through `__init__` and listed in `teardown.PROVIDERS`.
@@ -81,7 +81,7 @@ Point MCP Inspector (`npx @modelcontextprotocol/inspector`) at the endpoint with
 metadata, so the client registers itself, runs PKCE and opens the login form in a browser. Submit
 the username and password the With Intelligence platform accepts — not the one-time passcode from
 their onboarding mail, which sets a password on their site and is never seen by this service. The
-password buys a vendor session and is then discarded — the access and refresh tokens it returns
+password buys a With Intelligence session and is then discarded — the access and refresh tokens it returns
 are what gets encrypted and stored against your user id, so tool calls query With Intelligence as
 you. Idle longer than the 30-day refresh lifetime and you log in again.
 
@@ -117,7 +117,7 @@ uv run ruff format .         # format
 uv run basedpyright .        # type check
 ```
 
-## The vendor API
+## With Intelligence API
 
 Read `.claude/skills/with-intelligence-api/` before adding a feature that touches a new entity.
 Two CLIs under `agent-explore/` answer the two kinds of question:
@@ -131,11 +131,11 @@ uv run agent-explore/explore.py /v3/investors/2504   # behaviour, from a live GE
 `spec.py` needs no credentials — the spec is public. `explore.py` signs in with the username and
 password from `agent-explore/.env`, caches the token and every response, and only ever GETs.
 
-The wire models under `features/*/api_responses.py` are hand-written, and
-`tests/test_spec_conformance.py` checks every field they declare against the vendor's own
+The wire models under `features/*/wi_responses.py` are hand-written, and
+`tests/test_spec_conformance.py` checks every field they declare against With Intelligence's own
 schemas — a field that no longer exists, or one whose type is an object where we wrote a string,
 fails the suite. The schemas it compares against are pruned into
-`tests/spec/vendor_schemas.json`; refresh them, as a deliberate and readable diff, with:
+`tests/spec/wi_schemas.json`; refresh them, as a deliberate and readable diff, with:
 
 ```bash
 uv run agent-explore/spec.py snapshot

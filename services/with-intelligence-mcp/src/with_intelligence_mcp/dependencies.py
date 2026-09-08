@@ -99,7 +99,7 @@ def get_auth_provider() -> WithIntelligenceOAuthProvider:
         secure_cookies=config.public_base_url.scheme == "https",
         session_factory=get_session_factory(),
         encryption_key=get_encryption_key(),
-        vendor_clients=get_with_intelligence_client_factory(),
+        wi_clients=get_with_intelligence_client_factory(),
         throttle=ThrottleConfig(
             max_attempts=auth_config.login_max_attempts,
             window=auth_config.login_attempt_window,

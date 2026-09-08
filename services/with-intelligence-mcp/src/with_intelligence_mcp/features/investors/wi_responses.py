@@ -1,4 +1,4 @@
-"""The vendor's wire shapes, taken field-for-field from the v3 OpenAPI spec.
+"""With Intelligence DTOs.
 
 Only the fields the tools use are declared, and `extra="ignore"` carries the rest of a 40-field
 record past us rather than breaking when it changes. Nested shapes are the spec's own, which is
@@ -14,7 +14,7 @@ from with_intelligence_mcp.with_intelligence_client import SEQUENCE, SINGLE
 
 
 class ClassificationAttributes(BaseModel):
-    """The vendor's `{id, name}` reference, used for most vocabulary values."""
+    """With Intelligence's `{id, name}` reference, used for most vocabulary values."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
@@ -23,7 +23,7 @@ class ClassificationAttributes(BaseModel):
 
 
 class EntityAttributes(BaseModel):
-    """An id and nothing else. The vendor uses it where a name would need another endpoint."""
+    """An id and nothing else. With Intelligence uses it where a name would need another endpoint."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 

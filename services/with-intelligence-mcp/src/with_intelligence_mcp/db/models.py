@@ -58,10 +58,10 @@ class PendingAuthorization(Base):
 
 
 class AuthorizationCode(Base):
-    """A short-lived code minted after a successful vendor login, pending token exchange.
+    """A short-lived code minted after a successful WI login, pending token exchange.
 
     Field shape mirrors `mcp.server.auth.provider.AuthorizationCode`. `subject` is the resolved
-    `user_id`, propagated into the issued tokens so `auth/context.py` can resolve whose vendor
+    `user_id`, propagated into the issued tokens so `auth/context.py` can resolve whose WI
     credential to use.
     """
 
@@ -114,7 +114,7 @@ class OAuthToken(Base):
 
 
 class WithIntelligenceSession(Base):
-    """A user's vendor session — access and refresh token — encrypted at rest.
+    """A user's WI session — access and refresh token — encrypted at rest.
 
     The session rather than their password, deliberately: a database and key compromise then
     yields a credential that is scoped to this API and can be revoked, instead of the password

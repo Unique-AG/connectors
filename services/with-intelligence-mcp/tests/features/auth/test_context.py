@@ -1,4 +1,4 @@
-"""Resolving and renewing the caller's vendor session, and what happens when it cannot be."""
+"""Resolving and renewing the caller's WI session, and what happens when it cannot be."""
 
 import uuid
 from collections.abc import Callable
@@ -12,13 +12,13 @@ from tests.conftest import DatabaseFixture
 from with_intelligence_mcp.db import read_session, transaction
 from with_intelligence_mcp.features.auth import NotConnectedError, WithIntelligenceAuthContext
 from with_intelligence_mcp.features.auth.session_store import get_session, save_session
-from with_intelligence_mcp.with_intelligence_client import VendorSession
+from with_intelligence_mcp.with_intelligence_client import WiSession
 
 KEY = Fernet.generate_key()
 
 
-def _session(token: str, *, age: timedelta = timedelta(0)) -> VendorSession:
-    return VendorSession(
+def _session(token: str, *, age: timedelta = timedelta(0)) -> WiSession:
+    return WiSession(
         access_token=SecretStr(token),
         refresh_token=SecretStr(f"refresh-{token}"),
         issued_at=datetime.now(UTC) - age,
@@ -55,7 +55,7 @@ def _context(
     )
 
 
-async def _store(db: DatabaseFixture, stored: VendorSession) -> str:
+async def _store(db: DatabaseFixture, stored: WiSession) -> str:
     _, factory = db
     async with transaction(factory) as session:
         return await save_session(
@@ -110,7 +110,7 @@ class TestRenewal:
         context, _ = _context(db)
         monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
 
-        async def renew(_stale: VendorSession) -> VendorSession:
+        async def renew(_stale: WiSession) -> WiSession:
             return _session("rotated")
 
         renewed = await context.renew_session(renew)
@@ -129,7 +129,7 @@ class TestRenewal:
         monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
         calls: list[str] = []
 
-        async def renew(_stale: VendorSession) -> VendorSession:
+        async def renew(_stale: WiSession) -> WiSession:
             calls.append("renewed")
             return _session("should-not-happen")
 
@@ -145,7 +145,7 @@ class TestRenewal:
         context, revocations = _context(db)
         monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
 
-        async def refuse(_stale: VendorSession) -> VendorSession:
+        async def refuse(_stale: WiSession) -> WiSession:
             raise RuntimeError("refresh token spent")
 
         with pytest.raises(NotConnectedError, match="could not be renewed"):
@@ -160,7 +160,7 @@ class TestRenewal:
             type(context), "current_subject", _fixed_subject(str(uuid.uuid4())), raising=True
         )
 
-        async def renew(_stale: VendorSession) -> VendorSession:
+        async def renew(_stale: WiSession) -> WiSession:
             return _session("x")
 
         with pytest.raises(NotConnectedError):

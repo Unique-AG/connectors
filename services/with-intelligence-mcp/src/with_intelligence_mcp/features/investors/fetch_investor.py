@@ -1,4 +1,4 @@
-from with_intelligence_mcp.features.investors.api_responses import InvestorExtendedAttributes
+from with_intelligence_mcp.features.investors.wi_responses import InvestorExtendedAttributes
 from with_intelligence_mcp.with_intelligence_client import (
     NotFound,
     WithIntelligenceClient,

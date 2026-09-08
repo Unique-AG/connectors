@@ -1,4 +1,4 @@
-from with_intelligence_mcp.features.investments.api_responses import (
+from with_intelligence_mcp.features.investments.wi_responses import (
     InvestmentListItemAttributes,
 )
 from with_intelligence_mcp.with_intelligence_client import QueryValue, WithIntelligenceClient

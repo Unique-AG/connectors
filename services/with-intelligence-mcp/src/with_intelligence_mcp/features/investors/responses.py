@@ -1,4 +1,4 @@
-"""What the tool returns to the model: trimmed, renamed where the vendor's naming misleads,
+"""What the tool returns to the model: trimmed, renamed where With Intelligence's naming misleads,
 and documented for the model that reads it."""
 
 from typing import ClassVar
@@ -16,7 +16,7 @@ class OmitNoneModel(BaseModel):
 
 
 class NamedValueResponse(OmitNoneModel):
-    id: int | None = Field(default=None, description="The vendor's id, for follow-up filters.")
+    id: int | None = Field(default=None, description="With Intelligence's id, for follow-up filters.")
     name: str | None = None
 
 
@@ -32,7 +32,7 @@ class AumResponse(OmitNoneModel):
         default=None, description="The same figure in millions of USD."
     )
     band: str | None = Field(
-        default=None, description="The vendor's own words for the size, e.g. '> $50bn'."
+        default=None, description="With Intelligence's own words for the size, e.g. '> $50bn'."
     )
     as_of: str | None = Field(default=None, description="Date the figure was reported.")
     currency: str | None = None

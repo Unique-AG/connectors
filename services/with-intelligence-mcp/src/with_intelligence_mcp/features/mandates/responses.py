@@ -19,7 +19,7 @@ class MandateResponse(OmitNoneModel):
 
     id: int
     status: str | None = Field(
-        default=None, description="Where the search stands, in the vendor's own words."
+        default=None, description="Where the search stands, in With Intelligence's own words."
     )
     sub_status: str | None = None
     service: str | None = Field(
@@ -36,7 +36,7 @@ class MandateResponse(OmitNoneModel):
     rfp_link: str | None = None
     last_reviewed: str | None = Field(
         default=None,
-        description="When the vendor last confirmed it. An old date is a stale mandate.",
+        description="When With Intelligence last confirmed it. An old date is a stale mandate.",
     )
     updated_at: str | None = None
     note: str | None = None
@@ -47,11 +47,11 @@ class MandateResponse(OmitNoneModel):
 class InvestorMandatesResponse(OmitNoneModel):
     """An investor's allocation searches, newest first.
 
-    Status is the vendor's vocabulary, not a boolean: read it rather than assuming "active".
+    Status is With Intelligence's vocabulary, not a boolean: read it rather than assuming "active".
     """
 
     investor_id: int
     investor_name: str | None = None
     mandates: list[MandateResponse] = Field(default_factory=list)
-    total: int = Field(default=0, description="How many mandates the vendor holds in total.")
+    total: int = Field(default=0, description="How many mandates With Intelligence holds in total.")
     returned: int = 0

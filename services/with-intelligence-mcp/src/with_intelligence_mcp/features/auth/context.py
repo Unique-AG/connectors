@@ -13,7 +13,7 @@ from with_intelligence_mcp.features.auth.session_store import (
     lock_session,
     replace_session,
 )
-from with_intelligence_mcp.with_intelligence_client import VendorSession
+from with_intelligence_mcp.with_intelligence_client import WiSession
 
 
 class NotConnectedError(ToolError):
@@ -25,7 +25,7 @@ class NotConnectedError(ToolError):
 
 
 class WithIntelligenceAuthContext(BaseModel):
-    """Resolves whose vendor session to use for the in-flight MCP request, and renews it.
+    """Resolves whose WI session to use for the in-flight MCP request, and renews it.
 
     Satisfies the transport's expectations structurally, so that layer never imports this
     module.
@@ -37,8 +37,8 @@ class WithIntelligenceAuthContext(BaseModel):
     encryption_key: bytes
     revoke_tokens_for_subject: Callable[[str], Awaitable[None]]
 
-    async def current_session(self) -> VendorSession:
-        """The calling user's stored vendor session, whatever its freshness."""
+    async def current_session(self) -> WiSession:
+        """The calling user's stored WI session, whatever its freshness."""
         subject = self.require_subject()
         async with read_session(self.session_factory) as session:
             try:
@@ -54,11 +54,11 @@ class WithIntelligenceAuthContext(BaseModel):
         return stored
 
     async def renew_session(
-        self, renew: Callable[[VendorSession], Awaitable[VendorSession]]
-    ) -> VendorSession:
+        self, renew: Callable[[WiSession], Awaitable[WiSession]]
+    ) -> WiSession:
         """Renew under a row lock, so one caller renews and the rest read the result.
 
-        The lock is held across the vendor call on purpose (see `lock_session`), which the
+        The lock is held across With Intelligence call on purpose (see `lock_session`), which the
         transport timeout bounds.
 
         A refused refresh revokes the caller's MCP tokens: without a stored password there is

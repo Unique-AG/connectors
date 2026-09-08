@@ -254,7 +254,7 @@ class TestProjection:
 
     @respx.mock
     async def test_a_sparse_record_does_not_break_parsing(self) -> None:
-        """Unmodelled and missing fields are both normal — the vendor has 40 of them."""
+        """Unmodelled and missing fields are both normal — With Intelligence has 40 of them."""
         respx.get(f"{BASE_URL}/v3/investors/7").mock(
             return_value=httpx.Response(200, json={"id": 7, "unexpected_field": {"a": 1}})
         )

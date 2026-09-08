@@ -4,7 +4,7 @@
     uv run agent-explore/spec.py params /v3/investors
     uv run agent-explore/spec.py schema InvestorExtended
     uv run agent-explore/spec.py response '/v3/investors/{id}'
-    uv run agent-explore/spec.py snapshot            # refresh tests/spec/vendor_schemas.json
+    uv run agent-explore/spec.py snapshot            # refresh tests/spec/wi_schemas.json
 
 Through `uv run`: it imports httpx from the service venv. Output is tab-separated.
 
@@ -157,7 +157,7 @@ SNAPSHOT_ROOTS = (
     "PaginatedMandate",
     "Auth",
 )
-_SNAPSHOT_PATH = Path(__file__).resolve().parent.parent / "tests" / "spec" / "vendor_schemas.json"
+_SNAPSHOT_PATH = Path(__file__).resolve().parent.parent / "tests" / "spec" / "wi_schemas.json"
 
 
 def _referenced_schemas(spec: Json, roots: tuple[str, ...]) -> dict[str, Json]:
@@ -196,7 +196,7 @@ def cmd_snapshot(spec: Json, _target: str) -> None:
     """Write the pruned snapshot the conformance test reads.
 
     Only the schemas we model are kept, so the committed file stays small enough to read in a
-    diff — refreshing it is then a visible change to the vendor contract we depend on.
+    diff — refreshing it is then a visible change to With Intelligence contract we depend on.
     """
     schemas = _referenced_schemas(spec, SNAPSHOT_ROOTS)
     payload = {

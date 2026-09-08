@@ -48,7 +48,7 @@ from with_intelligence_mcp.features.auth.throttle import (
 from with_intelligence_mcp.with_intelligence_client import (
     SignInFailed,
     Unreachable,
-    VendorCredential,
+    WiCredential,
     WithIntelligenceClientFactory,
 )
 
@@ -121,7 +121,7 @@ _EXPIRED_LINK_MESSAGE = (
 
 
 class WithIntelligenceOAuthProvider(OAuthProvider):
-    """FastMCP OAuth 2.1 authorization server whose "login" step is a vendor credential form.
+    """FastMCP OAuth 2.1 authorization server whose "login" step is a With Intelligence credential form.
 
     With Intelligence has no OAuth of its own — so instead of redirecting to a third-party
     identity provider, `authorize()` redirects the browser to our own hosted login page
@@ -136,7 +136,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
 
     _session_factory: async_sessionmaker[AsyncSession]
     _encryption_key: bytes
-    _vendor_clients: WithIntelligenceClientFactory
+    _wi_clients: WithIntelligenceClientFactory
     _throttle: ThrottleConfig
     login_path: str
 
@@ -147,7 +147,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         secure_cookies: bool,
         session_factory: async_sessionmaker[AsyncSession],
         encryption_key: bytes,
-        vendor_clients: WithIntelligenceClientFactory,
+        wi_clients: WithIntelligenceClientFactory,
         throttle: ThrottleConfig,
         login_path: str = "/login",
     ) -> None:
@@ -158,7 +158,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         )
         self._session_factory = session_factory
         self._encryption_key = encryption_key
-        self._vendor_clients = vendor_clients
+        self._wi_clients = wi_clients
         self._throttle = throttle
         self.login_path = login_path
         # `base_url` arrives already validated and trailing-slash-free (`AppConfig.issuer`), so
@@ -312,7 +312,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         if len(username) > MAX_USERNAME_LENGTH:
             return self._form_response(request_id, error="Invalid username or password.")
 
-        # Checked before contacting the vendor — the point of the limit is to stop this
+        # Checked before contacting With Intelligence — the point of the limit is to stop this
         # endpoint being used to test credentials against them at all.
         if await is_throttled(self._session_factory, username, config=self._throttle):
             return self._form_response(
@@ -328,9 +328,9 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         # The sign-in *is* the credential check, and its result is what gets stored: the
         # password is used here and never persisted. From this point on the refresh token is
         # the only way back — see `db/models.WithIntelligenceSession`.
-        credential = VendorCredential(username=username, password=SecretStr(password))
+        credential = WiCredential(username=username, password=SecretStr(password))
         try:
-            vendor_session = await self._vendor_clients.sign_in(credential)
+            wi_session = await self._wi_clients.sign_in(credential)
         except SignInFailed:
             await record_failure(self._session_factory, username, source_ip=_source_ip(request))
             return self._form_response(
@@ -340,8 +340,8 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
             )
         except Unreachable as exc:
             # Not recorded as a failed attempt: nothing was learned about the credential, so
-            # counting it would let a vendor outage lock users out.
-            logger.warning("auth.login.vendor_unreachable", extra={"error": str(exc)})
+            # counting it would let a With Intelligence outage lock users out.
+            logger.warning("auth.login.wi_unreachable", extra={"error": str(exc)})
             return self._form_response(
                 request_id,
                 username=username,
@@ -376,7 +376,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
                     session,
                     str(uuid.uuid4()),
                     username,
-                    vendor_session,
+                    wi_session,
                     self._encryption_key,
                 )
                 session.add(
@@ -671,7 +671,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
     async def revoke_all_tokens_for_subject(self, subject: str) -> None:
         """Revoke every non-revoked token belonging to `subject`.
 
-        Called when a vendor call comes back 401 mid-session and re-signing in does not fix it
+        Called when a With Intelligence call comes back 401 mid-session and re-signing in does not fix it
         (see `auth/context.py`) — the stored password no longer works, so the MCP-facing tokens
         tied to it are forced to fail too, pushing the client back through the login form.
         """

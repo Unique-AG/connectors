@@ -30,7 +30,7 @@ from with_intelligence_mcp.db import LoginAttempt, read_session, transaction
 
 logger = logging.getLogger(__name__)
 
-# Submitted usernames are attacker-controlled and land in a `text` column. Vendor usernames are
+# Submitted usernames are attacker-controlled and land in a `text` column. WI usernames are
 # email addresses, so anything past this is not a real one — rejected before it can be stored, so
 # the throttle table cannot be used to write unbounded rows.
 MAX_USERNAME_LENGTH = 320

@@ -1,4 +1,4 @@
-"""Storing a vendor session: keyed by username, locked for renewal."""
+"""Storing a With Intelligence session: keyed by username, locked for renewal."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -15,13 +15,13 @@ from with_intelligence_mcp.features.auth.session_store import (
     replace_session,
     save_session,
 )
-from with_intelligence_mcp.with_intelligence_client import VendorSession
+from with_intelligence_mcp.with_intelligence_client import WiSession
 
 KEY = Fernet.generate_key()
 
 
-def _session(token: str, *, age: timedelta = timedelta(0)) -> VendorSession:
-    return VendorSession(
+def _session(token: str, *, age: timedelta = timedelta(0)) -> WiSession:
+    return WiSession(
         access_token=SecretStr(token),
         refresh_token=SecretStr(f"refresh-{token}"),
         issued_at=datetime.now(UTC) - age,
@@ -48,7 +48,7 @@ class TestSaving:
         assert stored.refresh_token.get_secret_value() == "refresh-first"
 
     async def test_the_issued_at_survives_the_round_trip(self, db: DatabaseFixture) -> None:
-        """Freshness is inferred from it — the vendor sends no expiry."""
+        """Freshness is inferred from it — With Intelligence sends no expiry."""
         _, factory = db
         issued = datetime.now(UTC) - timedelta(minutes=20)
         async with transaction(factory) as session:
@@ -56,7 +56,7 @@ class TestSaving:
                 session,
                 str(uuid.uuid4()),
                 _username("issued-at"),
-                VendorSession(
+                WiSession(
                     access_token=SecretStr("a"),
                     refresh_token=SecretStr("r"),
                     issued_at=issued,

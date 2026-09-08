@@ -1,4 +1,4 @@
-"""The two coercions that absorb the vendor's inconsistent array encoding.
+"""The two coercions that absorb With Intelligence's inconsistent array encoding.
 
 Each has been wrong in production once, so both directions are pinned here rather than left to
 the feature tests that happen to exercise them.

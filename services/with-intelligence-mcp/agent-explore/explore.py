@@ -52,7 +52,7 @@ def _sign_in(base_url: str, username: str, password: str) -> str:
     if response.status_code != 200:
         raise SystemExit(
             f"sign-in failed with {response.status_code}. Check the credentials in .env; "
-            + "a fresh account must set its password on the vendor's site first."
+            + "a fresh account must set its password on With Intelligence's site first."
         )
     body = cast(dict[str, object], response.json())
     token = body.get("accessToken")

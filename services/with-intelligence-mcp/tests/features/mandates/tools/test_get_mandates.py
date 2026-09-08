@@ -58,7 +58,7 @@ def _mock(mandates: list[dict[str, object]], *, total: int | None = None) -> Non
 class TestStatus:
     @respx.mock
     async def test_reports_status_and_sub_status_verbatim(self) -> None:
-        """The vendor's vocabulary, not a boolean — "Open / Shortlisting" is the useful fact."""
+        """With Intelligence's vocabulary, not a boolean — "Open / Shortlisting" is the useful fact."""
         _mock([OPEN_SEARCH])
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)

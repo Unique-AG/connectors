@@ -19,7 +19,7 @@ from with_intelligence_mcp.dependencies import (
     get_with_intelligence_client_factory,
     get_with_intelligence_config,
 )
-from with_intelligence_mcp.features.vendor_session import get_vendor_session_registry
+from with_intelligence_mcp.features.wi_session import get_wi_session_cache
 
 
 class CachedProvider(Protocol):
@@ -38,7 +38,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_with_intelligence_client_factory,
     get_auth_context,
     get_auth_provider,
-    get_vendor_session_registry,
+    get_wi_session_cache,
 )
 
 

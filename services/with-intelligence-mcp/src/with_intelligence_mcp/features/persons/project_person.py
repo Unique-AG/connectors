@@ -1,4 +1,4 @@
-from with_intelligence_mcp.features.persons.api_responses import (
+from with_intelligence_mcp.features.persons.wi_responses import (
     PersonExtendedAttributes,
     PersonRoleAttributes,
 )

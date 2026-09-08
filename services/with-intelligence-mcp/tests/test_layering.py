@@ -4,7 +4,7 @@
 2. `with_intelligence_client/` must not import `features/`.
 3. `with_intelligence_client/` must not import `config` — it takes its own settings types.
 4. A package is entered through its `__init__`, never through its modules.
-5. Feature model layers flow downward: `responses` -> `internal_dto` -> `api_responses`, with
+5. Feature model layers flow downward: `responses` -> `internal_dto` -> `wi_responses`, with
    `*Response` / `*Dto` / `*Attributes` classes in the matching module. `tools/` is exempt.
 6. A logic module is named after the symbol it defines. `features/auth/` is out of scope:
    its filenames mirror the OAuth concepts they implement (`provider`, `throttle`, `crypto`),
@@ -39,10 +39,10 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     f"{_PACKAGE}.with_intelligence_client",
 )
 
-_MODEL_LAYERS: tuple[str, ...] = ("api_responses", "internal_dto", "responses")
+_MODEL_LAYERS: tuple[str, ...] = ("wi_responses", "internal_dto", "responses")
 _MODEL_LAYER_RANK = {name: index for index, name in enumerate(_MODEL_LAYERS)}
 _CLASS_SUFFIX_LAYER = {
-    "Attributes": "api_responses",
+    "Attributes": "wi_responses",
     "Dto": "internal_dto",
     "Response": "responses",
 }
@@ -247,7 +247,7 @@ class TestRule5FeatureModelLayersFlowDownward:
                 if _MODEL_LAYER_RANK[imported] >= _MODEL_LAYER_RANK[layer]:
                     found.append(
                         f"{source.relative_to(_SRC)}:{line} {layer} imports {imported} "
-                        + "(layers flow responses -> internal_dto -> api_responses)"
+                        + "(layers flow responses -> internal_dto -> wi_responses)"
                     )
         assert found == [], "; ".join(found)
 
@@ -316,7 +316,7 @@ class TestTheDetectionItself:
 
     def test_catches_the_client_importing_a_feature(self) -> None:
         assert _imports_under(
-            "from with_intelligence_mcp.features.auth import VendorSession", _FEATURES_PREFIX
+            "from with_intelligence_mcp.features.auth import WiSession", _FEATURES_PREFIX
         ) == [f"{_PACKAGE}.features.auth"]
 
     def test_catches_the_client_importing_config(self) -> None:
@@ -342,11 +342,11 @@ class TestTheDetectionItself:
     def test_recognises_the_model_layers(self) -> None:
         assert _layer_of("responses") == "responses"
         assert _layer_of("internal_dto") == "internal_dto"
-        assert _layer_of("api_responses_investor") == "api_responses"
+        assert _layer_of("wi_responses_investor") == "wi_responses"
         assert _layer_of("fetch_investor") is None
 
     def test_ranks_the_layers_downward(self) -> None:
-        assert _MODEL_LAYER_RANK["api_responses"] < _MODEL_LAYER_RANK["internal_dto"]
+        assert _MODEL_LAYER_RANK["wi_responses"] < _MODEL_LAYER_RANK["internal_dto"]
         assert _MODEL_LAYER_RANK["internal_dto"] < _MODEL_LAYER_RANK["responses"]
 
     def test_pascal_cases_a_module_stem(self) -> None:

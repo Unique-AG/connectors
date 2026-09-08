@@ -141,7 +141,7 @@ class WithIntelligenceConfig(BaseSettings):
 
     default_page_size: int = Field(default=50, ge=1, le=500)
 
-    # Our own politeness bound: the vendor publishes no concurrency limit, only 429 on every path.
+    # Our own politeness bound: With Intelligence publishes no concurrency limit, only 429 on every path.
     max_concurrent_requests_per_user: int = Field(default=5, ge=1)
 
     max_retry_attempts: int = Field(default=3, ge=1)
@@ -231,7 +231,7 @@ class AuthConfig(BaseSettings):
 
     cleanup_interval_hours: float = Field(default=6.0, gt=0)
 
-    # Without this, the login form forwards any username/password pair to the vendor, which
+    # Without this, the login form forwards any username/password pair to With Intelligence, which
     # makes it a credential-testing oracle for anyone who can start an OAuth flow.
     login_max_attempts: int = Field(default=10, ge=1)
     login_attempt_window_minutes: int = Field(default=15, ge=1)

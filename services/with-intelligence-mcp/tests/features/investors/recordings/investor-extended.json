@@ -1,5 +1,5 @@
 {
-  "_shape": "GET /v3/investors/{id}, recorded from the live API. Structure verbatim; every value is placeholder — the vendor's data is licensed and not ours to commit.",
+  "_shape": "GET /v3/investors/{id}, recorded from the live API. Structure verbatim; every value is placeholder — With Intelligence's data is licensed and not ours to commit.",
   "id": 2504,
   "name": "Example Retirement System (ERS)",
   "updated_at": "2026-08-17T13:13:23",

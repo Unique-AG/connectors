@@ -1,6 +1,6 @@
 """The OAuth flow end to end: authorize, login form, code exchange, refresh, revocation.
 
-The vendor sign-in is mocked at the HTTP boundary with respx rather than by patching the
+With Intelligence sign-in is mocked at the HTTP boundary with respx rather than by patching the
 factory, so the login path exercises the real `_auth_call` — including how it reads
 `accessToken`/`refreshToken` out of the response.
 """
@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from starlette.requests import Request
 
 from tests.conftest import DatabaseFixture
-from tests.helpers import BASE_URL, sign_in_ok, vendor_factory
+from tests.helpers import BASE_URL, sign_in_ok, wi_factory
 from with_intelligence_mcp.db import LoginAttempt, PendingAuthorization, read_session
 from with_intelligence_mcp.db import WithIntelligenceSession as SessionRow
 from with_intelligence_mcp.features.auth import ThrottleConfig
@@ -43,7 +43,7 @@ def _make_provider(
         secure_cookies=True,
         session_factory=factory,
         encryption_key=Fernet.generate_key(),
-        vendor_clients=vendor_factory(),
+        wi_clients=wi_factory(),
         # Effectively off unless a test asks for it, so no test depends on how many failed
         # logins its neighbours happened to make.
         throttle=throttle or ThrottleConfig(max_attempts=1_000_000, window=timedelta(minutes=15)),
@@ -195,7 +195,7 @@ class TestLoginSubmission:
         assert "state=xyz" in location
 
     @respx.mock
-    async def test_the_vendor_session_is_stored_and_the_password_is_not(
+    async def test_the_wi_session_is_stored_and_the_password_is_not(
         self, db: DatabaseFixture
     ) -> None:
         """The password buys a session and is then discarded — only the session is at rest."""
@@ -243,7 +243,7 @@ class TestLoginSubmission:
             assert result.scalar_one() == 1
 
     @respx.mock
-    async def test_a_vendor_outage_does_not_burn_the_budget(self, db: DatabaseFixture) -> None:
+    async def test_a_wi_outage_does_not_burn_the_budget(self, db: DatabaseFixture) -> None:
         """Nothing was learned about the credential, so counting it would lock users out."""
         respx.post(_SIGN_IN).mock(side_effect=httpx.ConnectError("down"))
         provider = _make_provider(db)
@@ -284,7 +284,7 @@ class TestLoginSubmission:
         assert sorted(r.status_code for r in responses) == [302, 400]
 
     @respx.mock
-    async def test_missing_fields_are_reported_without_calling_the_vendor(
+    async def test_missing_fields_are_reported_without_calling_wi(
         self, db: DatabaseFixture
     ) -> None:
         route = respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
@@ -297,7 +297,7 @@ class TestLoginSubmission:
 
 class TestLoginCsrf:
     @respx.mock
-    async def test_a_submission_without_the_cookie_never_reaches_the_vendor(
+    async def test_a_submission_without_the_cookie_never_reaches_wi(
         self, db: DatabaseFixture
     ) -> None:
         route = respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
@@ -354,7 +354,7 @@ class TestLoginCsrf:
 
 class TestLoginThrottling:
     @respx.mock
-    async def test_stops_calling_the_vendor_once_the_budget_is_spent(
+    async def test_stops_calling_wi_once_the_budget_is_spent(
         self, db: DatabaseFixture
     ) -> None:
         route = respx.post(_SIGN_IN).mock(return_value=httpx.Response(401))
@@ -439,7 +439,7 @@ class TestTokenLifecycle:
 
     @respx.mock
     async def test_the_subject_is_the_stored_users_id(self, db: DatabaseFixture) -> None:
-        """This is what lets a tool call resolve whose vendor session to use."""
+        """This is what lets a tool call resolve whose WI session to use."""
         respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
         provider = _make_provider(db)
         _, factory = db

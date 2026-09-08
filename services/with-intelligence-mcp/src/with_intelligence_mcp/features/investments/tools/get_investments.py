@@ -19,7 +19,7 @@ from with_intelligence_mcp.features.investors import (
     fetch_investor,
     resolve_investor,
 )
-from with_intelligence_mcp.features.vendor_session import get_with_intelligence_client
+from with_intelligence_mcp.features.wi_session import get_with_intelligence_client
 from with_intelligence_mcp.with_intelligence_client import NotEntitled, WithIntelligenceClient
 
 type GetInvestmentsResult = (
@@ -44,7 +44,7 @@ async def get_investments(
         str | None,
         Field(
             description=(
-                "ISO date. Only positions the vendor changed since then — how to answer "
+                "ISO date. Only positions With Intelligence changed since then — how to answer "
                 "'what moved in the last 12 months'."
             )
         ),
@@ -55,7 +55,7 @@ async def get_investments(
     and which positions they have exited.
 
     Amounts are in MILLIONS of the stated currency. A position with an exit date is no longer
-    held — do not present it as current. `fund_unidentified` means the vendor records the
+    held — do not present it as current. `fund_unidentified` means With Intelligence records the
     position but not which fund it is in, which is not the same as holding nothing.
     """
     resolved = await _resolve(client, name, investor_id)

@@ -19,7 +19,7 @@ from with_intelligence_mcp.with_intelligence_client.client import (
 )
 from with_intelligence_mcp.with_intelligence_client.credential import (
     CallerSession,
-    VendorCredential,
+    WiCredential,
 )
 from with_intelligence_mcp.with_intelligence_client.errors import (
     ApiError,
@@ -38,7 +38,7 @@ from with_intelligence_mcp.with_intelligence_client.factory import (
 )
 from with_intelligence_mcp.with_intelligence_client.pagination import Page, PageInfo, parse_page
 from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy
-from with_intelligence_mcp.with_intelligence_client.session import VendorSession
+from with_intelligence_mcp.with_intelligence_client.session import WiSession
 from with_intelligence_mcp.with_intelligence_client.settings import RetrySettings, TransportSettings
 
 __all__ = [
@@ -60,8 +60,8 @@ __all__ = [
     "SignInFailed",
     "TransportSettings",
     "Unreachable",
-    "VendorCredential",
-    "VendorSession",
+    "WiCredential",
+    "WiSession",
     "WithIntelligenceClient",
     "WithIntelligenceClientFactory",
     "WithIntelligenceError",

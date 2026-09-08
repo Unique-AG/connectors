@@ -4,7 +4,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from pydantic import BaseModel, SecretStr, ValidationError
 
 from with_intelligence_mcp.config import EncryptionConfig
-from with_intelligence_mcp.with_intelligence_client import VendorSession
+from with_intelligence_mcp.with_intelligence_client import WiSession
 
 
 class InvalidSessionEnvelopeError(ValueError):
@@ -40,8 +40,8 @@ def load_key(config: EncryptionConfig) -> bytes:
     return key
 
 
-def encrypt_session(session: VendorSession, key: bytes) -> bytes:
-    """Encrypt a vendor session for storage with Fernet (AES-128-CBC + HMAC)."""
+def encrypt_session(session: WiSession, key: bytes) -> bytes:
+    """Encrypt a With Intelligence session for storage with Fernet (AES-128-CBC + HMAC)."""
     plaintext = (
         _SessionPayload(
             access_token=session.access_token.get_secret_value(),
@@ -54,7 +54,7 @@ def encrypt_session(session: VendorSession, key: bytes) -> bytes:
     return Fernet(key).encrypt(plaintext)
 
 
-def decrypt_session(blob: bytes, key: bytes) -> VendorSession:
+def decrypt_session(blob: bytes, key: bytes) -> WiSession:
     """Decrypt a session blob previously produced by `encrypt_session`."""
     try:
         plaintext = Fernet(key).decrypt(blob)
@@ -70,7 +70,7 @@ def decrypt_session(blob: bytes, key: bytes) -> VendorSession:
             "Decrypted session payload has an unexpected shape"
         ) from exc
 
-    return VendorSession(
+    return WiSession(
         access_token=SecretStr(payload.access_token),
         refresh_token=SecretStr(payload.refresh_token),
         issued_at=payload.issued_at,
