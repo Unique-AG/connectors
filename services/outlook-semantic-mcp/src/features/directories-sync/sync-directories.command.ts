@@ -117,17 +117,26 @@ export class SyncDirectoriesCommand {
     }
 
     const { shouldSyncDirectories, deltaLink, syncStatsId } = deltaQueryResult;
+    const tokenKind = activeDelegateUserId === userProfile.id ? 'own' : 'delegate';
     traceEvent('delta sync completed', {
       shouldSyncDirectories: shouldSyncDirectories,
       deltaLinkPresent: isNonNullish(deltaLink),
+      tokenKind,
     });
     const logContext: Attributes = {
       userProfileId: userProfile.id,
       userEmail: userEmail.toString(),
+      source: userProfile.source,
+      tokenKind,
+      clientUserProfileId: activeDelegateUserId,
       shouldSyncDirectories,
       shouldForceDirectoriesSync,
       syncStatsId,
     };
+    this.logger.log({
+      ...logContext,
+      msg: `Directory sync using ${tokenKind} token`,
+    });
     traceAttrs({ ...logContext, deltaLinkPresent: isNonNullish(deltaLink) });
     if (shouldSyncDirectories || shouldForceDirectoriesSync) {
       traceEvent(`Run directories sync`);
