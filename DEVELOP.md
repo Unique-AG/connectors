@@ -6,11 +6,11 @@
 nix develop  # or: direnv allow (.envrc is committed)
 ```
 
-Provides all required tools (Node.js 24, pnpm, terraform, kubectl, helm, etc.) with pinned versions.
+Provides all required tools (Node.js 26, pnpm, terraform, kubectl, helm, etc.) with pinned versions.
 
 **Option B: Manual**
 
-- Node.js >= 24
+- Node.js 26
 - pnpm (version in `package.json` `packageManager` field)
 
 ```bash
