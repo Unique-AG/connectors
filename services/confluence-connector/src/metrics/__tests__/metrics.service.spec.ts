@@ -140,24 +140,22 @@ describe('Metrics', () => {
   });
 
   describe('recordFileDiffEvents', () => {
-    it.each([
-      'new',
-      'updated',
-      'deleted',
-      'moved',
-    ] as const)('adds count with diff_result_type=%s', (diffResultType) => {
-      const { metricService, counters } = makeMetricService();
-      const metrics = new Metrics(metricService);
+    it.each(['new', 'updated', 'deleted', 'moved'] as const)(
+      'adds count with diff_result_type=%s',
+      (diffResultType) => {
+        const { metricService, counters } = makeMetricService();
+        const metrics = new Metrics(metricService);
 
-      tenantStorage.run(tenant, () => {
-        metrics.recordFileDiffEvents(1, diffResultType);
-      });
+        tenantStorage.run(tenant, () => {
+          metrics.recordFileDiffEvents(1, diffResultType);
+        });
 
-      expect(counters.get('cfc_file_diff_events_total')?.add).toHaveBeenCalledWith(1, {
-        tenant: 'test-tenant',
-        diff_result_type: diffResultType,
-      });
-    });
+        expect(counters.get('cfc_file_diff_events_total')?.add).toHaveBeenCalledWith(1, {
+          tenant: 'test-tenant',
+          diff_result_type: diffResultType,
+        });
+      },
+    );
   });
 
   describe('recordApiError', () => {

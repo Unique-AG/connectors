@@ -67,19 +67,14 @@ describe('AppConfigSchema', () => {
   });
 
   describe('logLevel', () => {
-    it.each([
-      'fatal',
-      'error',
-      'warn',
-      'info',
-      'debug',
-      'trace',
-      'silent',
-    ] as const)('accepts "%s"', (logLevel) => {
-      const result = AppConfigSchema.parse({ ...validConfig, logLevel });
+    it.each(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const)(
+      'accepts "%s"',
+      (logLevel) => {
+        const result = AppConfigSchema.parse({ ...validConfig, logLevel });
 
-      expect(result.logLevel).toBe(logLevel);
-    });
+        expect(result.logLevel).toBe(logLevel);
+      },
+    );
 
     it('rejects an invalid log level', () => {
       expect(() => AppConfigSchema.parse({ ...validConfig, logLevel: 'verbose' })).toThrow();

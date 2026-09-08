@@ -70,7 +70,7 @@ export class CreateDraftEmailCommand {
 
     const attachments = input.attachments;
 
-    if (!attachments || !attachments.length) {
+    if (!attachments?.length) {
       return createDraftResult;
     }
 
