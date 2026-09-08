@@ -38,7 +38,6 @@ catalog:
   "@swc/core": 1.16.1
   "@types/amqplib": 0.10.8
   "@types/express": 5.0.6
-  "@types/js-yaml": 4.0.9
   "@types/node": 26.4.0
   "@types/passport-microsoft": 2.1.1
   "@types/pg": 8.23.1
@@ -54,7 +53,7 @@ catalog:
   graphql: 16.14.2
   graphql-request: 7.3.4
   istanbul-badges-readme: 1.9.0
-  js-yaml: 4.3.2
+  js-yaml: 5.4.1
   keyv: 5.6.0
   nestjs-otel: 8.1.0
   nestjs-pino: 4.6.1
