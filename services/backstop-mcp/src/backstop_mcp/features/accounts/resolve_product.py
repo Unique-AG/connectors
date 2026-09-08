@@ -1,6 +1,6 @@
 """Resolve a Backstop product from a trusted id, a short name, or a name.
 
-Do not route this through `resolve_party`. That primitive is trusted id or `/quick-search` of a
+Do not route this through `ResolvePartyQuery`. That primitive is trusted id or `/quick-search` of a
 display name. Product callers also type `productShortName` (`CGUP`), and that path is not covered:
 
 - `GET /quick-search?filter[searchTypes][eq]=PRODUCT` for `CGUP` is empty.
@@ -17,7 +17,7 @@ A name or short name has no by-id equivalent. `/products` accepts `filter[name][
 `shortName` is not a filter field (`filter[shortName][eq]` is 400), so a LIKE on a short name
 like `CGUP` returns empty. Name search therefore tries `filter[name][like]` first (one request
 for "Dispersion"), and only walks the unfiltered catalog when that misses — which is what
-`productShortName` needs. Duplicate short names (`BLUC`) go through one `elicit_choice`. The
+`productShortName` needs. Duplicate short names (`BLUC`) elicit once. The
 same response hydrates `short_name`.
 
 Walking the catalog to the end is what lets `not_found` mean *absent* instead of *not on this
@@ -44,10 +44,9 @@ from backstop_mcp.backstop_client import (
 from backstop_mcp.features.accounts.api_responses import ProductAttributes
 from backstop_mcp.features.accounts.internal_dto import ProductResolution, ResolvedProductDto
 from backstop_mcp.features.resolution import (
-    Ambiguous,
     Candidate,
     NotFound,
-    elicit_choice,
+    elicit_if_ambiguous,
     from_candidates,
 )
 
@@ -212,13 +211,7 @@ async def resolve_product(
     outcome = _match_product(await _index_products(client, name_like=product), product)
     if isinstance(outcome, NotFound):
         outcome = _match_product(await _index_products(client), product)
-    if isinstance(outcome, Ambiguous):
-        return await elicit_choice(
-            ctx,
-            outcome,
-            prompt=(f'Multiple {outcome.scope} matched "{outcome.query}". Which one did you mean?'),
-        )
-    return outcome
+    return await elicit_if_ambiguous(ctx, outcome)
 
 
 async def resolve_product_query(

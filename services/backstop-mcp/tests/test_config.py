@@ -84,7 +84,7 @@ class TestBackstopConfigDefaults:
         assert config.activity_tag_ttl_minutes == 24 * 60
         assert config.system_user_ttl_minutes == 24 * 60
         # Custom-field catalogs ship on (measured 6.15 s walk). The other two stay off until
-        # their histograms say otherwise — see `features/cached_catalog.py`.
+        # their histograms say otherwise — see `caching/cached_value.py`.
         assert config.custom_field_schema_cache_enabled is True
         assert config.activity_tag_cache_enabled is False
         assert config.system_user_cache_enabled is False

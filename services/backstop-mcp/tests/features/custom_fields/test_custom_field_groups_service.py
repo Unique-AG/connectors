@@ -1,7 +1,8 @@
 """What is specific to the custom-field group catalog.
 
-The TTL, single-flight and serve-stale protocol behind `get` is `CachedCatalog`, exercised for
-this service among the others in `tests/features/test_cached_catalog.py`.
+The TTL, single-flight and serve-stale protocol behind `get` is `CachedValue`, exercised in
+`tests/test_cached_value.py`. Service-to-Backstop wiring is in
+`tests/features/test_cached_catalog.py`.
 """
 
 from collections.abc import AsyncGenerator, Callable
@@ -40,7 +41,9 @@ class TestCustomFieldGroupsService:
     ) -> None:
         """A group is only readable in context: the path it sits on and its parent group."""
         base_url = f"{BASE_URL}/custom-field-groups-projection"
-        service = CustomFieldGroupsService.with_ttl_minutes(ttl_minutes=60)
+        service = CustomFieldGroupsService.with_ttl_minutes(
+            client=clients(base_url), ttl_minutes=60
+        )
         respx.get(f"{base_url}/custom-field-groups").mock(
             return_value=httpx.Response(
                 200,
@@ -59,7 +62,7 @@ class TestCustomFieldGroupsService:
             )
         )
 
-        groups, cache = await service.get(clients(base_url))
+        groups, cache = await service.get()
 
         assert cache == "ok"
         assert groups["9"].name == "Status"

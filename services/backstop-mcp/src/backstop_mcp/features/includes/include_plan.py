@@ -12,12 +12,16 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from types import UnionType
-from typing import cast, get_args, get_origin, overload
+from typing import ClassVar, get_args, get_origin, overload
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 from pydantic.fields import FieldInfo
 
-from backstop_mcp.backstop_client import BackstopApiResourceDocument, follow_included
+from backstop_mcp.backstop_client import (
+    BackstopApiResourceDocument,
+    Included,
+    IncludedResource,
+)
 from backstop_mcp.features.includes.responses import (
     ActivityInclude,
     ActivityIncludesResponse,
@@ -74,7 +78,7 @@ class IncludePlan[ResponseT: BaseModel]:
         """
         projected: dict[str, BaseModel | list[BaseModel]] = {}
         for planned in self.planned:
-            models = _side_loaded(document=document, planned=planned)
+            models = _include_resources(document=document, planned=planned)
             if not planned.to_one:
                 projected[planned.name] = models
             elif models:
@@ -157,27 +161,34 @@ def _target(*, field: FieldInfo, where: str) -> tuple[type[BaseModel], bool]:
     return inner, True
 
 
-def _side_loaded[AttrT](
+class _IncludeAttributes(BaseModel):
+    """Wire attributes of the resource an `Include` names; extras stay so `id` can be folded in."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow")
+
+
+_IncludeResource = IncludedResource[_IncludeAttributes]
+
+
+def _include_resources[AttrT](
     *, document: BackstopApiResourceDocument[AttrT], planned: _PlannedInclude
 ) -> list[BaseModel]:
-    """Every side-loaded resource for one include, projected, with the unusable ones dropped."""
+    """Every related resource for one include, projected, with the unusable ones dropped."""
     resource = document.data
-    raw_resources = follow_included(document.included, resource, planned.include.relationship)
-    if (
-        not raw_resources
-        and resource is not None
-        and resource.related_ids(planned.include.relationship)
-    ):
+    entries = Included(document.included).related(
+        resource, planned.include.relationship, schema=_IncludeResource
+    )
+    if not entries and resource is not None and resource.related_ids(planned.include.relationship):
         logger.warning(
             "includes.side_load.unresolved",
             extra={"include": planned.name, "relationship": planned.include.relationship},
         )
     return [
-        model for raw in raw_resources if (model := _project(raw=raw, planned=planned)) is not None
+        model for entry in entries if (model := _project(entry=entry, planned=planned)) is not None
     ]
 
 
-def _with_resource_id(raw: dict[str, object]) -> object:
+def _with_resource_id(entry: _IncludeResource) -> dict[str, object]:
     """A resource's `attributes`, with its JSON:API `id` folded in.
 
     `id` is a top-level member of a resource object, not one of its attributes, so a projection
@@ -185,27 +196,33 @@ def _with_resource_id(raw: dict[str, object]) -> object:
     inside `attributes` — Backstop puts foreign keys there, not this resource's own identity —
     and a model that declares no `id` field drops it again under `extra="ignore"`.
     """
-    attributes = raw.get("attributes")
-    if not isinstance(attributes, dict):
-        return attributes
-    entries = cast("dict[object, object]", attributes)
-    return {**{str(key): value for key, value in entries.items()}, "id": raw.get("id")}
+    return {**entry.attributes.model_dump(), "id": entry.id}
 
 
-def _project(*, raw: dict[str, object], planned: _PlannedInclude) -> BaseModel | None:
-    """One side-loaded resource as the field's model, or `None` if unusable."""
-    if raw.get("type") != planned.include.resource_type:
+def _project(*, entry: _IncludeResource, planned: _PlannedInclude) -> BaseModel | None:
+    """One related resource as the field's model, or `None` if unusable."""
+    if entry.type != planned.include.resource_type:
         logger.warning(
             "includes.side_load.unexpected_type",
             extra={
                 "include": planned.name,
                 "expected_type": planned.include.resource_type,
-                "actual_type": raw.get("type"),
+                "actual_type": entry.type,
             },
         )
         return None
+    # `included_resource` reads a present non-object `attributes` as `{}` so a strict schema
+    # can still drop the entry. Include projections are not strict — every field is optional —
+    # so that empty mapping would otherwise become a hollow record (id, no address). Treat it
+    # as unreadable: one broken location must not look like a real one.
+    if not entry.attributes.model_dump():
+        logger.warning(
+            "includes.side_load.unreadable",
+            extra={"include": planned.name, "resource_type": planned.include.resource_type},
+        )
+        return None
     try:
-        return planned.model.model_validate(_with_resource_id(raw))
+        return planned.model.model_validate(_with_resource_id(entry))
     except ValidationError as exc:
         logger.warning(
             "includes.side_load.unreadable",

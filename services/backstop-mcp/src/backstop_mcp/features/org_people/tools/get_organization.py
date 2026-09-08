@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Sequence
 from typing import Annotated, Literal
 
@@ -8,78 +7,20 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
-from backstop_mcp.features.custom_fields import (
-    CustomFieldFilters,
-    CustomFieldsService,
-    ResolvedCustomFieldValueResponse,
-    get_custom_fields_service,
-)
+from backstop_mcp.features.custom_fields import CustomFieldFilters
 from backstop_mcp.features.data_hygiene import AsOfResponse
-from backstop_mcp.features.includes import OrganizationInclude, OrganizationIncludesResponse
-from backstop_mcp.features.org_people import OrganizationRecordResponse, fetch_organization
+from backstop_mcp.features.includes import OrganizationInclude
+from backstop_mcp.features.org_people import GetOrganizationQuery, OrganizationResolvedResponse
+from backstop_mcp.features.org_people.dependencies import get_organization_query_factory
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    resolve_party,
+    ResolvePartyQuery,
+    get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
-from backstop_mcp.models import CoercedId, OmitNoneModel, coerce_ids, published_output_schema
-
-
-class OrganizationResolvedResponse(OmitNoneModel):
-    """`get_organization`'s response once the organization was found and fetched.
-
-    `organization` holds the record's own fields (the JSON:API resource's `attributes`) — not
-    the enclosing document, whose `type`/`id` are already echoed under `resolved`.
-    `as_of` is plain provenance (`modifiedTimestamp` / `modifiedBy`); relay it, do not treat
-    age as a staleness verdict.
-    """
-
-    status: Literal["resolved"] = Field(
-        default="resolved",
-        description="Always 'resolved': the organization was found and fetched.",
-    )
-    organization: OrganizationRecordResponse = Field(
-        description=(
-            "The organization's own Backstop attributes. Known keys (`name`, "
-            "`modifiedTimestamp`, `modifiedBy`) are documented; other keys are this "
-            "instance's fields passed through unchanged. Custom-field values are under "
-            "`custom_field_values`, not on this record."
-        )
-    )
-    resolved: ResolvedPartyResponse = Field(
-        description=(
-            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
-            "`party_id` later — never invent them."
-        )
-    )
-    as_of: AsOfResponse | None = Field(
-        default=None,
-        description=(
-            "When and by whom the organization record was last saved. Omitted when "
-            "unknown. Relay this; do not treat age as a staleness verdict."
-        ),
-    )
-    included: OrganizationIncludesResponse | None = Field(
-        default=None,
-        description=(
-            "The related records asked for through `include`, side-loaded on the same request. "
-            "Absent when no include was asked for."
-        ),
-    )
-    custom_field_values: list[ResolvedCustomFieldValueResponse] = Field(
-        default_factory=list,
-        description=(
-            "Custom-field values on this record, joined to the catalog (definition id, name, "
-            "layout, group, type, and value). Fields may belong to the organization or to the "
-            "shared party catalog. Empty when the record has none or the catalog could not be "
-            "loaded. Slice with the custom_field_* filters rather than fetching again."
-        ),
-    )
-
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
+from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 type GetOrganizationResponse = (
     PartyAmbiguousResponse | NotFoundResponse | OrganizationResolvedResponse
@@ -130,7 +71,10 @@ async def get_organization(
         Sequence[OrganizationInclude],
         Field(
             description=(
-                "Related records to side-load on the same request, returned under `included`: "
+                "snake_case only: locations, email_addresses, primary_contact, representative. "
+                "Categories and custom-field values are already on the organization "
+                "(`categories`, `custom_field_values`); they are not include keys. Related "
+                "records to side-load on the same request, returned under `included`: "
                 "`locations` for the postal addresses on file with their per-address phone "
                 "numbers; `email_addresses` for the organization's address book, with retired "
                 "addresses flagged rather than hidden; `primary_contact` for the person "
@@ -189,8 +133,8 @@ async def get_organization(
             ),
         ),
     ] = (),
-    client: BackstopClient = Depends(get_backstop_client),
-    custom_fields: CustomFieldsService = Depends(get_custom_fields_service),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
+    get_organization_query: GetOrganizationQuery = Depends(get_organization_query_factory),
 ) -> GetOrganizationResponse:
     """Fetch one Backstop organization by trusted Party ID or by name/email search.
 
@@ -199,6 +143,9 @@ async def get_organization(
     you have it; this tool accepts only `organizations`. Otherwise pass `search`
     (organization name or email) and let the server resolve it.
     Exactly one of party_id or search must be provided.
+
+    Call like: {"party_id": "<id from prior resolve echo>",
+    "include": ["locations", "primary_contact"]}
 
     Pass `include` to side-load related records on the same request — addresses, the email
     address book, the primary contact, the representative. They come back under `included`,
@@ -221,30 +168,20 @@ async def get_organization(
     Call `list_custom_fields` for the catalog itself. `numberOfEmployees` is not a roster —
     use `get_people_for_party` for the people Backstop actually links to this organization.
     """
-    result = await resolve_party(
-        ctx,
-        client,
+    result = await resolve_party_query.run(
         search_type=search_type if search_type is not None else "organizations",
         party_id=party_id,
         search=search,
     )
+    result = await elicit_if_ambiguous(ctx, result)
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 
     party = result.value
-    fetched, _ = await asyncio.gather(
-        fetch_organization(
-            client,
-            party_id=party.id,
-            include=include,
-        ),
-        custom_fields.load_catalog(client),
-    )
-    organization = fetched.organization
-    custom_field_values = await custom_fields.join_values(
-        client,
-        organization.regular_custom_field_values,
-        filters=CustomFieldFilters(
+    fetched = await get_organization_query.run(
+        party_id=party.id,
+        include=include,
+        custom_fields_filters=CustomFieldFilters(
             tabs=tuple(custom_field_tabs),
             groups=tuple(custom_field_groups),
             group_ids=tuple(custom_field_group_ids),
@@ -252,6 +189,7 @@ async def get_organization(
             names=tuple(custom_field_names),
         ),
     )
+    organization = fetched.organization
     return OrganizationResolvedResponse(
         organization=organization,
         resolved=ResolvedPartyResponse.from_party(
@@ -260,5 +198,5 @@ async def get_organization(
         ),
         as_of=AsOfResponse.from_attributes(organization),
         included=fetched.included,
-        custom_field_values=custom_field_values,
+        custom_field_values=fetched.custom_field_values,
     )

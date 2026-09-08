@@ -7,15 +7,12 @@ from fastmcp.server.dependencies import without_injected_parameters
 from pydantic import TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
 
-from backstop_mcp.features.opportunities.tools.search_opportunities import (
-    SearchOpportunitiesResolvedResponse,
-    search_opportunities,
-)
+from backstop_mcp.features.opportunities import SearchOpportunitiesResolvedResponse
+from backstop_mcp.features.opportunities.tools.search_opportunities import search_opportunities
 from backstop_mcp.server.tools import TOOLS
-from tests.features.opportunities.test_fetch_opportunities import VOCABULARY
+from tests.features.opportunities.conftest import VOCABULARY, make_search_opportunities_query
 from tests.helpers import (
     BASE_URL,
-    opportunity_stages_service,
     recorded_requests,
     resource,
     tool_client,
@@ -89,6 +86,16 @@ def _deal(
     }
 
 
+_EMPTY_DEFINITIONS: dict[str, object] = {"data": [], "links": {"next": None}}
+
+
+def _stub_supporting_collections(base_url: str) -> None:
+    respx.get(f"{base_url}/opportunity-stages").mock(return_value=_stages_page())
+    respx.get(f"{base_url}/custom-field-definitions").mock(
+        return_value=httpx.Response(200, json=_EMPTY_DEFINITIONS)
+    )
+
+
 def _included() -> list[dict[str, object]]:
     return [
         resource("42482", "opportunity-stages", name="IDD"),
@@ -133,14 +140,13 @@ class TestSearchOpportunities:
                 total=1,
             )
         )
-        respx.get(f"{base_url}/opportunity-stages").mock(return_value=_stages_page())
+        _stub_supporting_collections(base_url)
 
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_opportunities(
                     representative="blazarus",
-                    client=client,
-                    opportunity_stages_service=opportunity_stages_service(),
+                    search_opportunities_query=make_search_opportunities_query(client),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -181,15 +187,14 @@ class TestSearchOpportunities:
                 total=3,
             )
         )
-        respx.get(f"{base_url}/opportunity-stages").mock(return_value=_stages_page())
+        _stub_supporting_collections(base_url)
 
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_opportunities(
                     is_open=True,
                     stage="IDD",
-                    client=client,
-                    opportunity_stages_service=opportunity_stages_service(),
+                    search_opportunities_query=make_search_opportunities_query(client),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -210,15 +215,14 @@ class TestSearchOpportunities:
                 total=3,
             )
         )
-        respx.get(f"{base_url}/opportunity-stages").mock(return_value=_stages_page())
+        _stub_supporting_collections(base_url)
 
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_opportunities(
                     mode="aggregate",
                     group_by="stage",
-                    client=client,
-                    opportunity_stages_service=opportunity_stages_service(),
+                    search_opportunities_query=make_search_opportunities_query(client),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -231,31 +235,32 @@ class TestSearchOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_unreadable_row_is_dropped_not_raised(self) -> None:
+    async def test_unreadable_amount_is_treated_as_absent(self) -> None:
+        """Lenient page schema: a bad scalar is omitted, not a dropped row."""
         base_url = tenant("so-drop")
-        bad = _deal("bad", name="x", stage_id="42482", requestedAmount="nope")
         respx.get(f"{base_url}/opportunities").mock(
             return_value=_page(
-                bad,
+                _deal("bad", name="x", stage_id="42482", requestedAmount="nope"),
                 _deal("1", name="ok", stage_id="42482"),
                 included=_included(),
                 total=2,
             )
         )
-        respx.get(f"{base_url}/opportunity-stages").mock(return_value=_stages_page())
+        _stub_supporting_collections(base_url)
 
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_opportunities(
-                    client=client,
-                    opportunity_stages_service=opportunity_stages_service(),
+                    fields=["name", "requested_amount"],
+                    search_opportunities_query=make_search_opportunities_query(client),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
 
         rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
-        assert [item["id"] for item in rows] == ["1"]
-        assert result.coverage.rows_dropped == 1
+        assert [item["id"] for item in rows] == ["bad", "1"]
+        assert "requested_amount" not in rows[0]
+        assert result.coverage.rows_dropped == 0
 
     @pytest.mark.asyncio
     @respx.mock
@@ -274,13 +279,12 @@ class TestSearchOpportunities:
                 _page(second, included=_included(), total=2),
             ]
         )
-        respx.get(f"{base_url}/opportunity-stages").mock(return_value=_stages_page())
+        _stub_supporting_collections(base_url)
 
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_opportunities(
-                    client=client,
-                    opportunity_stages_service=opportunity_stages_service(),
+                    search_opportunities_query=make_search_opportunities_query(client),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -305,14 +309,13 @@ class TestSearchOpportunities:
                 total=2,
             )
         )
-        respx.get(f"{base_url}/opportunity-stages").mock(return_value=_stages_page())
+        _stub_supporting_collections(base_url)
 
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_opportunities(
                     fields=["name"],
-                    client=client,
-                    opportunity_stages_service=opportunity_stages_service(),
+                    search_opportunities_query=make_search_opportunities_query(client),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -321,6 +324,34 @@ class TestSearchOpportunities:
         assert [item["id"] for item in rows] == ["1", "2"]
         assert [item["name"] for item in rows] == ["Koch - CATS Select", "Other"]
         assert set(rows[0]) == {"id", "name"}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_catalog_failure_keeps_the_rows(self) -> None:
+        base_url = tenant("so-catalog-down")
+        respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                _deal("1", name="Koch - CATS Select", stage_id="42482"),
+                included=_included(),
+                total=1,
+            )
+        )
+        respx.get(f"{base_url}/opportunity-stages").mock(return_value=_stages_page())
+        respx.get(f"{base_url}/custom-field-definitions").mock(
+            return_value=httpx.Response(500, json={"errors": [{"detail": "down"}]})
+        )
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    search_opportunities_query=make_search_opportunities_query(client),
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        assert [item["id"] for item in rows] == ["1"]
+        assert result.custom_fields_unavailable is True
 
 
 class TestSearchOpportunitiesInput:

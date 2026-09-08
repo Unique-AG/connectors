@@ -12,37 +12,21 @@ A 403 on one stream (Backstop refusing a linked entity) is reported on that grou
 other streams are kept — otherwise a forbidden document/email wipes a successful calls page.
 """
 
-import asyncio
 import logging
-from collections.abc import Coroutine
-from urllib.parse import quote
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 
-from backstop_mcp.backstop_client import (
-    BackstopApiError,
-    BackstopApiResourceDocument,
-    BackstopClient,
-)
-from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.activity_history import (
-    ActivityGroupResponse,
-    ActivityHistoryResolvedResponse,
     ActivityHistorySettings,
-    ActivityPageDto,
-    ActivityType,
-    EmailPageDto,
+    GetActivityHistoryQuery,
     GetActivityHistoryResponse,
-    ResolvedPartyAsOfResponse,
-    TimelineRecord,
-    fetch_activities_page,
     get_activity_history_settings,
-    group_activity_page,
-    to_timeline_record,
 )
+from backstop_mcp.features.activity_history.dependencies import get_activity_history_query_factory
+from backstop_mcp.features.party_resolver import ResolvePartyQuery, get_resolve_party_query_factory
 from backstop_mcp.models import published_output_schema
 
 from ._page_input import (
@@ -50,7 +34,6 @@ from ._page_input import (
     ActivityHistoryNextPageInput,
     ActivityHistoryPageInput,
     FetchArgs,
-    PartyRecordResponse,
     extract_fetch_activity_history_args,
 )
 
@@ -76,8 +59,11 @@ __all__ = [
 async def get_activity_history(
     ctx: Context,
     request: ActivityHistoryPageInput,
-    client: BackstopClient = Depends(get_backstop_client),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     activity_history: ActivityHistorySettings = Depends(get_activity_history_settings),
+    get_activity_history_query: GetActivityHistoryQuery = Depends(
+        get_activity_history_query_factory
+    ),
 ) -> GetActivityHistoryResponse:
     """Party-scoped stream pages. Do not start here — always use `search_activities` first.
 
@@ -89,9 +75,9 @@ async def get_activity_history(
     not "no notes" — retry those types on `search_activities` with `include_description`.
 
     Pass `request.type="first"` with `search_type` plus a trusted `party_id` (from a prior resolve
-    echo — never invent or guess one) or `search` to start. When retrying with `party_id`, pass
-    that resolve's `search_type` — a contact or employee id is not a people id. Default
-    `activity_types` are all five streams including
+    echo — never invent or guess one) or `search` to start. A `party_id` without `search_type` is
+    rejected. When retrying with `party_id`, pass that resolve's `search_type` — a contact or
+    employee id is not a people id. Default `activity_types` are all five streams including
     `document`. The response is `groups`: one entry per requested stream, not a single merged
     timeline. Each group's `date_range` is that page's span (min/max `occurred_at` among its
     dated items), not a cumulative window.
@@ -121,9 +107,16 @@ async def get_activity_history(
     the full untruncated body and the attachment list. History email ids are from `/emails`
     and do not work there — use `search_activities` for email body. `search_activities` rows
     use the same argument.
+
+    Call like: {"request": {"type": "first", "search_type": "organizations",
+    "party_id": "<id from prior resolve echo>", "activity_types": ["call"]}}
+    Continue: {"request": {"type": "next", "search_type": "organizations",
+    "entity_id": "<resolved.id>", "next": {"call": {"limit": 15, "offset": 15}}}}
+    Arguments live on `request`, not at the top level. Echo each `groups[type].next` object;
+    do not pass raw integers.
     """
     args = await extract_fetch_activity_history_args(
-        ctx, client, request, page_size=activity_history.page_size
+        ctx, resolve_party_query, request, page_size=activity_history.page_size
     )
     if not isinstance(args, FetchArgs):
         return args
@@ -136,85 +129,23 @@ async def get_activity_history(
             "streams": list(args.continuations),
         },
     )
-    party_path = f"/{args.segment}/{quote(args.entity_id, safe='')}"
-    document = await client.get(
-        party_path,
-        schema=BackstopApiResourceDocument[PartyRecordResponse],
+    result = await get_activity_history_query.run(
+        segment=args.segment,
+        entity_id=args.entity_id,
+        party=args.party,
+        continuations=args.continuations,
+        gist_max_chars=activity_history.gist_max_chars,
     )
-    page_calls: dict[ActivityType, Coroutine[None, None, ActivityPageDto | EmailPageDto]] = {
-        activity_type: fetch_activities_page(
-            client,
-            activity_type=activity_type,
-            segment=args.segment,
-            entity_id=args.entity_id,
-            limit=continuation.limit,
-            offset=continuation.offset,
-            since=continuation.since,
-            until=continuation.until,
-            activity_tag_ids=continuation.activity_tag_ids or (),
-        )
-        for activity_type, continuation in args.continuations.items()
-    }
-    settled = await asyncio.gather(*page_calls.values(), return_exceptions=True)
-
-    gist_max_chars = activity_history.gist_max_chars
-    groups: dict[ActivityType, ActivityGroupResponse[TimelineRecord]] = {}
-    for (activity_type, continuation), result in zip(
-        args.continuations.items(), settled, strict=True
-    ):
-        if isinstance(result, BackstopApiError) and result.status_code == 403:
-            logger.warning(
-                "activity_history.stream.forbidden",
-                extra={
-                    "segment": args.segment,
-                    "entity_id": args.entity_id,
-                    "stream": activity_type,
-                    "detail": result.detail,
-                },
-            )
-            groups[activity_type] = ActivityGroupResponse(
-                activity_type=activity_type,
-                items=(),
-                error=result.detail,
-            )
-            continue
-        if isinstance(result, BaseException):
-            raise result
-        grouped = group_activity_page(
-            result.items,
-            activity_type=activity_type,
-            end_of_stream=result.end_of_stream,
-            limit=continuation.limit,
-            offset=continuation.offset,
-            since=continuation.since,
-            until=continuation.until,
-            activity_tag_ids=continuation.activity_tag_ids,
-        )
-        wire_items = tuple(
-            to_timeline_record(item, gist_max_chars=gist_max_chars) for item in grouped.items
-        )
-        groups[activity_type] = ActivityGroupResponse(
-            activity_type=grouped.activity_type,
-            items=wire_items,
-            date_range=grouped.date_range,
-            next=grouped.next,
-        )
-
-    attributes = document.require_data(path=party_path).attributes
     open_streams = [
-        activity_type for activity_type, group in groups.items() if group.next is not None
+        activity_type for activity_type, group in result.groups.items() if group.next is not None
     ]
-
     logger.info(
         "activity_history.get.completed",
         extra={
             "segment": args.segment,
             "entity_id": args.entity_id,
-            "streams": list(groups),
+            "streams": list(result.groups),
             "open_streams": open_streams,
         },
     )
-    return ActivityHistoryResolvedResponse(
-        resolved=ResolvedPartyAsOfResponse.from_party(args.party, attributes=attributes),
-        groups=groups,
-    )
+    return result

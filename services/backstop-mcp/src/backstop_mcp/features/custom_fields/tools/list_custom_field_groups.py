@@ -4,39 +4,18 @@ from typing import Annotated, Literal
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.custom_fields import (
     CustomFieldDefinitionDto,
     CustomFieldGroupMemberResponse,
     CustomFieldGroupResponse,
     CustomFieldGroupsService,
     CustomFieldsService,
+    ListCustomFieldGroupsResponse,
     get_custom_field_groups_service,
     get_custom_fields_service,
 )
-
-
-class ListCustomFieldGroupsResponse(BaseModel):
-    """Layout groups from the standard Backstop custom-field group catalog."""
-
-    status: Literal["ok"] = Field(default="ok", description="Always 'ok'.")
-    cache: Literal["ok", "stale"] = Field(
-        description=(
-            "'ok' when both catalogs were fetched this call or are still fresh; 'stale' when a "
-            "previous catalog is served because refresh failed."
-        )
-    )
-    groups: list[CustomFieldGroupResponse] = Field(
-        description=(
-            "Layout groups in catalog order. Each group's full_path_name is the tab-to-section "
-            "path Backstop publishes, parent is the immediate parent group when nested, and "
-            "membership is the definitions whose group_id matches this group. Groups with no "
-            "matching definitions are still present with an empty membership list."
-        )
-    )
 
 
 def _join_id(resource_id: str) -> int | None:
@@ -89,7 +68,6 @@ async def list_custom_field_groups(
         bool,
         Field(description="Do not pass true unless the user reports a missing field."),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client),
     custom_fields: CustomFieldsService = Depends(get_custom_fields_service),
     custom_field_groups: CustomFieldGroupsService = Depends(get_custom_field_groups_service),
 ) -> ListCustomFieldGroupsResponse:
@@ -98,10 +76,13 @@ async def list_custom_field_groups(
     Use when you need the standard Backstop custom-field group catalog: group ids, names,
     full_path_name tab-to-section segments, parent {id, name, parent_id}, and field membership
     joined by group_id from the definition catalog. Instance tab and section names come back as
-    data. Pass refresh=true only when the user reports a missing field.
+    data. Pass refresh=true only when the user reports a missing field. Takes only `refresh`.
+    Field definitions are list_custom_fields (`entity_types`).
+
+    Call like: {}
     """
-    groups, groups_cache = await custom_field_groups.get(client, refresh=refresh)
-    definitions, definitions_cache = await custom_fields.get(client, refresh=refresh)
+    groups, groups_cache = await custom_field_groups.get(refresh=refresh)
+    definitions, definitions_cache = await custom_fields.get(refresh=refresh)
     membership = _membership_by_group_id(definitions)
     return ListCustomFieldGroupsResponse(
         cache=_cache_status(groups_cache, definitions_cache),

@@ -7,7 +7,6 @@ from typing import Annotated, ClassVar, Literal, Self
 
 from fastmcp import Context
 from pydantic import (
-    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -16,21 +15,22 @@ from pydantic import (
     model_validator,
 )
 
-from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_history import (
     ActivityContinuationResponse,
     ActivityType,
     Segment,
 )
-from backstop_mcp.features.data_hygiene import ProvenanceAttributes
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
+    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    REQUIRED_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyDto,
-    resolve_party,
+    ResolvePartyQuery,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
 
 logger = logging.getLogger(__name__)
 
@@ -47,46 +47,32 @@ _NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_lengt
 class ActivityHistoryFirstPageInput(BaseModel):
     """Start a new activity timeline for a party."""
 
-    type: Literal["first"]
+    type: Literal["first"] = Field(
+        description=(
+            "Required. Must be `first` to start a party's timeline. A `next` request uses "
+            "the other shape and cannot omit this discriminator."
+        )
+    )
     search_type: Annotated[
         SearchType,
-        Field(
-            description=(
-                "Which Backstop collection to resolve the party against — fold the caller's "
-                "wording to one of the four. A company, firm, fund, institution, or manager is "
-                "`organizations`; any human is `people`. Pick `contacts` or `employees` only "
-                "when a prior resolve echoed one (echo it back — a contact or employee id is "
-                "not a people id) or the caller clearly means an internal staff member."
-            ),
-        ),
+        Field(description=REQUIRED_SEARCH_TYPE_DESCRIPTION),
     ]
     party_id: Annotated[
         _NonEmptyStr | None,
-        Field(
-            description=(
-                "Trusted Backstop Party ID from a prior resolve echo (`id` / `search_type` / "
-                "`name`). Never invent or guess. Exactly one of `party_id` or `search` must be "
-                "provided."
-            ),
-        ),
+        Field(description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None
     search: Annotated[
         _NonEmptyStr | None,
-        Field(
-            description=(
-                "Name or email to resolve when no trusted `party_id` is available. Exactly one "
-                "of `party_id` or `search` must be provided."
-            ),
-        ),
+        Field(description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None
     activity_types: Annotated[
         list[ActivityType] | None,
         Field(
             min_length=1,
             description=(
-                "Which streams to fetch: any of meeting, call, note, email, document. Defaults "
-                "to all five (meeting, call, note, email, document). Must be non-empty when "
-                "provided."
+                "Which streams to fetch: meeting, call, note, email, document. `call` is "
+                "this tool's token for calls; `search_activities` uses `meeting_call`. "
+                "Defaults to all five. Must be non-empty when provided."
             ),
         ),
     ] = None
@@ -170,7 +156,13 @@ class ActivityHistoryFirstPageInput(BaseModel):
 class ActivityHistoryNextPageInput(BaseModel):
     """Fetch the next page of a timeline already in progress."""
 
-    type: Literal["next"]
+    type: Literal["next"] = Field(
+        description=(
+            "Required. Must be `next` to continue a timeline already in progress. Echo "
+            "`search_type`, `entity_id`, and `next` from the prior response — do not start "
+            "a new resolve on this shape."
+        )
+    )
     search_type: Annotated[
         SearchType,
         Field(
@@ -194,11 +186,12 @@ class ActivityHistoryNextPageInput(BaseModel):
         Field(
             min_length=1,
             description=(
-                "Map of `activity_type` to that stream's `next` from a prior response's "
-                "`groups`. Omit streams whose `groups[type].next` is absent (or null) — those "
-                "streams are exhausted. At least one entry is required. A one-entry map "
-                "deepens a single stream; several entries continue those streams together. "
-                "Never invent or guess."
+                "Map of `activity_type` to that stream's prior `groups[type].next` object "
+                "(`limit`, `offset`, optional `since`/`until`/`activity_tag_ids`). Echo the "
+                "object; do not pass bare integers. Omit streams whose `groups[type].next` is "
+                "absent (or null) — those streams are exhausted. At least one entry is "
+                "required. A one-entry map deepens a single stream; several entries continue "
+                "those streams together. Never invent or guess."
             ),
         ),
     ]
@@ -214,26 +207,6 @@ type ActivityHistoryPageInput = Annotated[
     ActivityHistoryFirstPageInput | ActivityHistoryNextPageInput,
     Field(discriminator="type"),
 ]
-
-
-class PartyRecordResponse(ProvenanceAttributes):
-    """Minimal attributes this tool needs from the party fetch: a display name plus provenance.
-
-    `extra="ignore"`, not `"allow"` — unlike `get_person`/`get_organization`, this tool never
-    surfaces the raw attribute dump, only `name` (for the resolve echo) and provenance (for
-    `as_of`). People records often omit `name` and send `firstName`/`lastName` instead; keep
-    those so a `type="next"` page (where `ResolvedPartyDto.name` is None) can still rebuild it.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    name: str | None = None
-    first_name: str | None = Field(
-        default=None, validation_alias=AliasChoices("firstName", "first_name")
-    )
-    last_name: str | None = Field(
-        default=None, validation_alias=AliasChoices("lastName", "last_name")
-    )
 
 
 class FetchArgs(BaseModel):
@@ -260,7 +233,7 @@ def effective_activity_types(
 
 async def extract_fetch_activity_history_args(
     ctx: Context,
-    client: BackstopClient,
+    resolve_party_query: ResolvePartyQuery,
     request: ActivityHistoryFirstPageInput | ActivityHistoryNextPageInput,
     *,
     page_size: int,
@@ -300,13 +273,12 @@ async def extract_fetch_activity_history_args(
             limit=limit,
             activity_tag_ids=activity_tag_ids,
         ):
-            result = await resolve_party(
-                ctx,
-                client,
+            result = await resolve_party_query.run(
                 search_type=search_type,
                 party_id=party_id,
                 search=search,
             )
+            result = await elicit_if_ambiguous(ctx, result)
             if not isinstance(result, Resolved):
                 logger.info(
                     "activity_history.args.unresolved",

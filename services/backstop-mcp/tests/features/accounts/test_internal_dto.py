@@ -1,7 +1,8 @@
 from datetime import date
 
+from backstop_mcp.backstop_client import Included
 from backstop_mcp.features.accounts import (
-    AccountApiResponse,
+    AccountApiResource,
     AccountOwnerDto,
     AccountRecordDto,
     AccountRowResponse,
@@ -55,8 +56,8 @@ def _from_resource(
     included: list[dict[str, object]] | None = None,
 ) -> AccountRecordDto:
     return AccountRecordDto.from_resource(
-        AccountApiResponse.model_validate(body),
-        included=[] if included is None else included,
+        AccountApiResource.model_validate(body),
+        included=Included([] if included is None else included),
     )
 
 

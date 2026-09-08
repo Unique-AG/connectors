@@ -22,6 +22,7 @@ from backstop_mcp.backstop_client import (
     BackstopTransientAuthError,
     BackstopUnreachableError,
     BackstopUntrustedUrlError,
+    CallerSession,
     PageResult,
     SinglePage,
 )
@@ -336,7 +337,8 @@ class TestAuthRecheck:
         client._gate = stuck  # pyright: ignore[reportPrivateUsage]
         started = time.monotonic()
 
-        outcome = await client._probe_system_info(budget_seconds=0.2)  # pyright: ignore[reportPrivateUsage]
+        session = CallerSession(credential=_credential())
+        outcome = await client._probe_system_info(session, budget_seconds=0.2)  # pyright: ignore[reportPrivateUsage]
 
         assert outcome == "error"
         assert time.monotonic() - started < 2.0

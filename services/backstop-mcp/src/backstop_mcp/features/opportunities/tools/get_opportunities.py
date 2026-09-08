@@ -13,7 +13,7 @@ opportunities, so the whole sub-collection is walked.
 
 import logging
 from collections.abc import Sequence
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
@@ -21,98 +21,32 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
-from backstop_mcp.features.custom_fields import (
-    CustomFieldFilters,
-    CustomFieldsService,
-    get_custom_fields_service,
-)
+from backstop_mcp.features.custom_fields import CustomFieldFilters
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.opportunities import (
-    OpportunityFetchResponse,
-    OpportunityResponse,
-    OpportunityStagesService,
+    GetOpportunitiesQuery,
+    OpportunitiesResolvedResponse,
     OpportunityStatus,
-    fetch_opportunities,
-    get_opportunity_stages_service,
 )
+from backstop_mcp.features.opportunities.dependencies import get_opportunities_query_factory
 from backstop_mcp.features.party_resolver import (
+    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    REQUIRED_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    resolve_party,
+    ResolvePartyQuery,
+    get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
-from backstop_mcp.models import CoercedId, OmitNoneModel, coerce_ids, published_output_schema
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
+from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 logger = logging.getLogger(__name__)
-
-
-class OpportunitiesResolvedResponse(OmitNoneModel):
-    """`get_opportunities` once the party was found and its pipeline fetched.
-
-    `total` / `open_count` / `closed_count` are over everything fetched — the party's complete
-    set — so `status="open"` still reports how many closed deals exist. `previous_stage` on each
-    deal names the stage it just left, and is omitted until it has moved at all.
-    """
-
-    status: Literal["resolved"] = Field(
-        default="resolved",
-        description="Always 'resolved': the party was found and its pipeline fetched.",
-    )
-    resolved: ResolvedPartyResponse = Field(
-        description=(
-            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
-            "`party_id` later — never invent them."
-        )
-    )
-    opportunities: tuple[OpportunityResponse, ...] = Field(
-        description=(
-            "The deals matching the requested status, newest first by the day each entered "
-            + "its current stage."
-        )
-    )
-    total: int = Field(
-        description=(
-            "Every opportunity fetched for this party, before filtering by status — so the "
-            + "number they have in total."
-        )
-    )
-    open_count: int = Field(
-        description=(
-            "How many of those are open, whatever status was asked for — so an answer about "
-            + "open deals still says how many exist."
-        )
-    )
-    closed_count: int = Field(
-        description="How many of those are closed, counted the same way as `open_count`."
-    )
-    custom_fields_unavailable: bool = Field(
-        default=False,
-        description=(
-            "True when the custom-field catalog could not be loaded, so `custom_field_values` "
-            "is empty rather than 'none recorded'."
-        ),
-    )
-
 
 type GetOpportunitiesResponse = (
     PartyAmbiguousResponse | NotFoundResponse | OpportunitiesResolvedResponse
 )
-
-
-def _resolved_response(
-    *, resolved: ResolvedPartyResponse, fetched: OpportunityFetchResponse
-) -> OpportunitiesResolvedResponse:
-    return OpportunitiesResolvedResponse(
-        resolved=resolved,
-        opportunities=fetched.opportunities,
-        total=fetched.total,
-        open_count=fetched.open_count,
-        closed_count=fetched.closed_count,
-        custom_fields_unavailable=fetched.custom_fields_unavailable,
-    )
 
 
 @tool(
@@ -128,34 +62,15 @@ async def get_opportunities(
     ctx: Context,
     search_type: Annotated[
         SearchType,
-        Field(
-            description=(
-                "Which Backstop collection to resolve the party against — fold the caller's "
-                "wording to one of the four. A company, firm, fund, institution, or manager is "
-                "`organizations`; any human is `people`. Pick `contacts` or `employees` only "
-                "when a prior resolve echoed one (echo it back — a contact or employee id is "
-                "not a people id) or the caller clearly means an internal staff member."
-            ),
-        ),
+        Field(description=REQUIRED_SEARCH_TYPE_DESCRIPTION),
     ],
     party_id: Annotated[
         str | None,
-        Field(
-            description=(
-                "Trusted Backstop Party ID from a prior resolve echo (`id` / `search_type` / "
-                "`name`). Never invent or guess. Exactly one of `party_id` or `search` must be "
-                "provided."
-            ),
-        ),
+        Field(description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None,
     search: Annotated[
         str | None,
-        Field(
-            description=(
-                "Name or email to resolve when no trusted `party_id` is available. Exactly one "
-                "of `party_id` or `search` must be provided."
-            ),
-        ),
+        Field(description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None,
     status: Annotated[
         OpportunityStatus,
@@ -186,15 +101,17 @@ async def get_opportunities(
             ),
         ),
     ] = (),
-    client: BackstopClient = Depends(get_backstop_client),
-    opportunity_stages_service: OpportunityStagesService = Depends(get_opportunity_stages_service),
-    custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
+    get_opportunities_query: GetOpportunitiesQuery = Depends(get_opportunities_query_factory),
 ) -> GetOpportunitiesResponse:
     """Fetch a party's opportunities: stage, stage timing, and how each deal got there.
 
-    Pass `search_type` plus a trusted `party_id` (from a prior resolve echo — never invent or
-    guess one) or `search`. When retrying with `party_id`, pass that resolve's `search_type`
-    — a contact or employee id is not a people id.
+    Required: `search_type` plus exactly one of `party_id` or `search`. A `party_id` without
+    `search_type` is rejected. Pass a trusted `party_id` from a prior resolve echo — never
+    invent or guess one — or `search`. When retrying with `party_id`, pass that resolve's
+    `search_type` — a contact or employee id is not a people id.
+
+    Call like: {"search_type": "organizations", "party_id": "<id from prior resolve echo>"}
 
     There is no cursor. The whole party's pipeline is returned, filtered by `status` (`open` /
     `closed` / `all`, default `all`) and ordered newest-first by the day each deal entered its
@@ -212,13 +129,12 @@ async def get_opportunities(
     `custom_fields_unavailable` is true, an empty list means the catalog could not be loaded,
     not that the deal has no Master Pipeline data.
     """
-    result = await resolve_party(
-        ctx,
-        client,
+    result = await resolve_party_query.run(
         search_type=search_type,
         party_id=party_id,
         search=search,
     )
+    result = await elicit_if_ambiguous(ctx, result)
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 
@@ -227,26 +143,20 @@ async def get_opportunities(
         "opportunities.get.start",
         extra={"segment": party.search_type, "entity_id": party.id, "status": status},
     )
-    fetched = await fetch_opportunities(
-        client,
+    fetched = await get_opportunities_query.run(
         segment=party.search_type,
         entity_id=party.id,
         status=status,
-        opportunity_stages_service=opportunity_stages_service,
-        custom_fields_service=custom_fields_service,
-        custom_field_filters=CustomFieldFilters(
+        custom_fields_filters=CustomFieldFilters(
             definition_ids=coerce_ids(custom_field_definition_ids),
             names=tuple(custom_field_names),
         ),
     )
-    logger.info(
-        "opportunities.get.completed",
-        extra={
-            "segment": party.search_type,
-            "entity_id": party.id,
-            "status": status,
-            "total": fetched.total,
-            "returned": len(fetched.opportunities),
-        },
+    return OpportunitiesResolvedResponse(
+        resolved=ResolvedPartyResponse.from_party(party),
+        opportunities=fetched.opportunities,
+        total=fetched.total,
+        open_count=fetched.open_count,
+        closed_count=fetched.closed_count,
+        custom_fields_unavailable=fetched.custom_fields_unavailable,
     )
-    return _resolved_response(resolved=ResolvedPartyResponse.from_party(party), fetched=fetched)

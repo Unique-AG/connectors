@@ -14,7 +14,13 @@ from typing import Self
 
 from pydantic import Field
 
-from backstop_mcp.features.accounts.api_responses import InvestorQualificationAttributes
+from backstop_mcp.backstop_client import Included, IncludedResource
+from backstop_mcp.features.accounts.api_responses import (
+    AccountApiResource,
+    InvestorQualificationAttributes,
+    InvestorTypeAttributes,
+    OwnerAttributes,
+)
 from backstop_mcp.features.accounts.internal_dto import (
     AccountOwnerDto,
     AccountRecordDto,
@@ -77,6 +83,25 @@ class OwnerResponse(OmitNoneModel):
             return None
         return cls(id=owner.id, name=owner.name, resource_type=owner.resource_type)
 
+    @classmethod
+    def from_included(cls, owner: IncludedResource[OwnerAttributes] | None) -> Self | None:
+        """The `owner` include as an identity.
+
+        `specificResource` wins over the JSON:API envelope: an organization owner arrives as a
+        `contacts` resource, and `organizations` is the answer a caller can act on. The id is taken
+        from the *same* reference as the type, never mixed.
+        """
+        if owner is None:
+            return None
+        specific = owner.attributes.specific_resource
+        if specific is not None and specific.resource_type is not None:
+            return cls(
+                id=specific.resource_id,
+                name=owner.attributes.name,
+                resource_type=specific.resource_type,
+            )
+        return cls(id=owner.id, name=owner.attributes.name, resource_type=owner.type)
+
 
 class InvestorTypeResponse(OmitNoneModel):
     """The account's investor type, identity only."""
@@ -89,6 +114,14 @@ class InvestorTypeResponse(OmitNoneModel):
         if investor_type is None:
             return None
         return cls(id=investor_type.id, name=investor_type.name)
+
+    @classmethod
+    def from_included(
+        cls, investor_type: IncludedResource[InvestorTypeAttributes] | None
+    ) -> Self | None:
+        if investor_type is None:
+            return None
+        return cls(id=investor_type.id, name=investor_type.attributes.name)
 
 
 class InvestorQualificationResponse(OmitNoneModel):
@@ -216,6 +249,40 @@ class AccountRowResponse(OmitNoneModel):
             new_issue_eligible=account.new_issue_eligible,
             us_domiciled=account.us_domiciled,
             is_open=account.is_open,
+        )
+
+    @classmethod
+    def from_resource(
+        cls,
+        resource: AccountApiResource,
+        *,
+        included: Included,
+    ) -> Self:
+        attributes = resource.attributes
+        return cls(
+            id=resource.id,
+            name=attributes.name,
+            owner=OwnerResponse.from_included(
+                included.first(resource, "owner", schema=IncludedResource[OwnerAttributes])
+            ),
+            investor_type=InvestorTypeResponse.from_included(
+                included.first(
+                    resource, "investorType", schema=IncludedResource[InvestorTypeAttributes]
+                )
+            ),
+            currency=attributes.currency,
+            account_start_date=attributes.account_start_date,
+            closed_date=attributes.closed_date,
+            ownership_type=attributes.ownership_type,
+            investor_qualification=InvestorQualificationResponse.from_attributes(
+                attributes.investor_qualification
+            ),
+            is_employee_account=attributes.is_employee_account,
+            is_gp_account=attributes.is_gp_account,
+            aml_check_complete=attributes.aml_check_complete,
+            new_issue_eligible=attributes.new_issue_eligible,
+            us_domiciled=attributes.us_domiciled,
+            is_open="closed_date" not in attributes.model_fields_set,
         )
 
 

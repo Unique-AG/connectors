@@ -55,8 +55,8 @@ async def clients() -> AsyncGenerator[ClientBuilder]:
         await factory.aclose()
 
 
-def _service(*, ttl_minutes: int = 60) -> OpportunityStagesService:
-    return OpportunityStagesService.with_ttl_minutes(ttl_minutes=ttl_minutes)
+def _service(client: BackstopClient, *, ttl_minutes: int = 60) -> OpportunityStagesService:
+    return OpportunityStagesService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
 
 
 def _stage_resource(row: dict[str, object]) -> dict[str, object]:
@@ -87,7 +87,7 @@ def _stages_response(*rows: dict[str, object]) -> httpx.Response:
 
 def _age_past_ttl(service: OpportunityStagesService) -> None:
     past = datetime.now(UTC) - timedelta(minutes=90)
-    service._freshness.mark(past)  # pyright: ignore[reportPrivateUsage]
+    service._cache._freshness.mark(past)  # pyright: ignore[reportPrivateUsage]
 
 
 def _age_past_failure_cooldown(service: OpportunityStagesService) -> None:
@@ -105,7 +105,7 @@ class TestFetchingTheVocabulary:
             return_value=_stages_response(*LIVE_STAGES)
         )
 
-        stages = await _service().get(clients(base_url))
+        stages = await _service(clients(base_url)).get_catalog()
 
         assert route.calls.last.request.url.params["page[limit]"] == "100"
         assert len(stages) == 7
@@ -135,7 +135,7 @@ class TestFetchingTheVocabulary:
             return_value=_stages_response(*LIVE_STAGES)
         )
 
-        stages = await _service().get(clients(base_url))
+        stages = await _service(clients(base_url)).get_catalog()
 
         assert set(stages["42482"].model_dump()) == {"id", "name", "closed", "sort_order"}
 
@@ -150,7 +150,7 @@ class TestFetchingTheVocabulary:
             )
         )
 
-        stages = await _service().get(clients(base_url))
+        stages = await _service(clients(base_url)).get_catalog()
 
         assert list(stages) == ["1"]
 
@@ -162,13 +162,13 @@ class TestInMemoryTtl:
         self, clients: ClientBuilder
     ) -> None:
         base_url = f"{BASE_URL}/stages-ttl-fresh"
-        service = _service()
+        service = _service(clients(base_url))
         route = respx.get(f"{base_url}/opportunity-stages").mock(
             return_value=_stages_response(*LIVE_STAGES)
         )
 
-        first = await service.get(clients(base_url))
-        second = await service.get(clients(base_url))
+        first = await service.get_catalog()
+        second = await service.get_catalog()
 
         assert route.call_count == 1
         assert first == second
@@ -177,7 +177,7 @@ class TestInMemoryTtl:
     @respx.mock
     async def test_get_past_ttl_fetches_again(self, clients: ClientBuilder) -> None:
         base_url = f"{BASE_URL}/stages-ttl-expired"
-        service = _service()
+        service = _service(clients(base_url))
         route = respx.get(f"{base_url}/opportunity-stages").mock(
             side_effect=[
                 _stages_response({"id": "1", "name": "Prospect", "sortOrder": 1, "closed": False}),
@@ -188,9 +188,9 @@ class TestInMemoryTtl:
             ]
         )
 
-        await service.get(clients(base_url))
+        await service.get_catalog()
         _age_past_ttl(service)
-        stages = await service.get(clients(base_url))
+        stages = await service.get_catalog()
 
         assert route.call_count == 2
         assert sorted(stages) == ["1", "2"]
@@ -209,8 +209,7 @@ class TestInMemoryTtl:
         """The holder is still inside the fetch when the other two arrive, so only the lock
         can collapse them: the TTL is not marked yet."""
         base_url = f"{BASE_URL}/stages-single-flight"
-        service = _service()
-        client = clients(base_url)
+        service = _service(clients(base_url))
 
         fetch_started = asyncio.Event()
         release_fetch = asyncio.Event()
@@ -223,9 +222,9 @@ class TestInMemoryTtl:
         route = respx.get(f"{base_url}/opportunity-stages").mock(side_effect=blocked_stages)
 
         results = await asyncio.gather(
-            service.get(client),
-            service.get(client),
-            service.get(client),
+            service.get_catalog(),
+            service.get_catalog(),
+            service.get_catalog(),
             self._join_in_flight(fetch_started, release_fetch),
         )
 
@@ -239,14 +238,14 @@ class TestInMemoryTtl:
         self, clients: ClientBuilder
     ) -> None:
         base_url = f"{BASE_URL}/stages-copy"
-        service = _service()
+        service = _service(clients(base_url))
         respx.get(f"{base_url}/opportunity-stages").mock(
             return_value=_stages_response(*LIVE_STAGES)
         )
 
-        first = await service.get(clients(base_url))
+        first = await service.get_catalog()
         del first["96018"]
-        second = await service.get(clients(base_url))
+        second = await service.get_catalog()
 
         assert "96018" in second
 
@@ -263,7 +262,7 @@ class TestFailureIsNotAnEmptyVocabulary:
         )
 
         with pytest.raises(httpx.ConnectError):
-            await _service().get(clients(base_url))
+            await _service(clients(base_url)).get_catalog()
 
     @pytest.mark.asyncio
     @respx.mock
@@ -272,7 +271,7 @@ class TestFailureIsNotAnEmptyVocabulary:
     ) -> None:
         """The stored failure is re-raised, not softened into an empty vocabulary."""
         base_url = f"{BASE_URL}/stages-cooldown"
-        service = _service()
+        service = _service(clients(base_url))
         route = respx.get(f"{base_url}/opportunity-stages").mock(
             side_effect=[
                 httpx.ConnectError("backstop down"),
@@ -281,9 +280,9 @@ class TestFailureIsNotAnEmptyVocabulary:
         )
 
         with pytest.raises(httpx.ConnectError):
-            await service.get(clients(base_url))
+            await service.get_catalog()
         with pytest.raises(httpx.ConnectError):
-            await service.get(clients(base_url))
+            await service.get_catalog()
 
         assert route.call_count == 1
 
@@ -291,16 +290,16 @@ class TestFailureIsNotAnEmptyVocabulary:
     @respx.mock
     async def test_a_failure_past_the_cooldown_is_retried(self, clients: ClientBuilder) -> None:
         base_url = f"{BASE_URL}/stages-cooldown-expired"
-        service = _service()
+        service = _service(clients(base_url))
         route = respx.get(f"{base_url}/opportunity-stages").mock(
             side_effect=httpx.ConnectError("backstop down")
         )
 
         with pytest.raises(httpx.ConnectError):
-            await service.get(clients(base_url))
+            await service.get_catalog()
         _age_past_failure_cooldown(service)
         with pytest.raises(httpx.ConnectError):
-            await service.get(clients(base_url))
+            await service.get_catalog()
 
         assert route.call_count == 2
 
@@ -311,7 +310,7 @@ class TestFailureIsNotAnEmptyVocabulary:
     ) -> None:
         """A failure must not cache an empty vocabulary, nor outlive the fetch that recovers."""
         base_url = f"{BASE_URL}/stages-failure-then-success"
-        service = _service()
+        service = _service(clients(base_url))
         route = respx.get(f"{base_url}/opportunity-stages").mock(
             side_effect=[
                 httpx.ConnectError("backstop down"),
@@ -320,9 +319,9 @@ class TestFailureIsNotAnEmptyVocabulary:
         )
 
         with pytest.raises(httpx.ConnectError):
-            await service.get(clients(base_url))
+            await service.get_catalog()
         _age_past_failure_cooldown(service)
-        stages = await service.get(clients(base_url))
+        stages = await service.get_catalog()
 
         assert route.call_count == 2
         assert len(stages) == 7

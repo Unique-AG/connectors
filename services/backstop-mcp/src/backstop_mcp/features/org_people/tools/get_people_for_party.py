@@ -17,23 +17,21 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
-from backstop_mcp.features.data_hygiene import (
-    EmploymentIndexFactory,
-    get_employment_index_factory,
-)
 from backstop_mcp.features.org_people import (
+    GetPeopleForOrganizationQuery,
     OrgPeopleResolvedResponse,
-    fetch_people_for_organization,
+)
+from backstop_mcp.features.org_people.dependencies import (
+    get_people_for_organization_query_factory,
 )
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    resolve_party,
+    ResolvePartyQuery,
+    get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -58,9 +56,9 @@ async def get_people_for_party(
         str | None,
         Field(
             description=(
-                "Trusted Backstop organization Party ID from a prior resolve echo "
-                "(`id` / `search_type` / `name`). Never invent or guess. Exactly one of "
-                "`party_id` or `search` must be provided."
+                "The argument is `party_id`. Trusted Backstop organization Party ID from a "
+                "prior resolve echo (`id` / `search_type` / `name`). Never invent or guess. "
+                "Exactly one of `party_id` or `search` must be provided."
             ),
         ),
     ] = None,
@@ -92,12 +90,17 @@ async def get_people_for_party(
             ),
         ),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client),
-    employment_index_factory: EmploymentIndexFactory = Depends(get_employment_index_factory),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
+    get_people_for_organization_query: GetPeopleForOrganizationQuery = Depends(
+        get_people_for_organization_query_factory
+    ),
 ) -> GetPeopleForPartyResponse:
     """List the people Backstop links to an organization, with employment status at that org.
 
     Pass a trusted `party_id` (from a prior resolve echo — never invent one) or `search`.
+
+    Call like: {"search_type": "organizations", "party_id": "<id from prior resolve echo>"}
+
     This is the roster of current staff: `numberOfEmployees` on `get_organization` is often 0
     even when people are on file. Name and email come from `/employees` (same ids as people)
     side-loaded with employment relationships on that walk — not a fetch per person.
@@ -113,13 +116,12 @@ async def get_people_for_party(
     if (party_id is None) == (search is None):
         raise ValueError("Exactly one of party_id or search must be provided")
 
-    result = await resolve_party(
-        ctx,
-        client,
+    result = await resolve_party_query.run(
         search_type=search_type if search_type is not None else "organizations",
         party_id=party_id,
         search=search,
     )
+    result = await elicit_if_ambiguous(ctx, result)
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 
@@ -128,9 +130,7 @@ async def get_people_for_party(
         "org_people.start",
         extra={"entity_id": party.id, "include_former": include_former},
     )
-    listing = await fetch_people_for_organization(
-        client,
-        employment_index_factory,
+    listing = await get_people_for_organization_query.run(
         organization_id=party.id,
         include_former=include_former,
     )
@@ -143,6 +143,9 @@ async def get_people_for_party(
             "people_omitted": listing.people_omitted,
         },
     )
-    return OrgPeopleResolvedResponse.from_listing(
-        listing, resolved=ResolvedPartyResponse.from_party(party)
+    return OrgPeopleResolvedResponse.from_people(
+        resolved=ResolvedPartyResponse.from_party(party),
+        people=listing.people,
+        former_omitted=listing.former_omitted,
+        people_omitted=listing.people_omitted,
     )

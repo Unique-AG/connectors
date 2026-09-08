@@ -1,7 +1,7 @@
 """`get_tasks_for_party`: open and completed follow-ups on one party."""
 
-from datetime import date
-from typing import Annotated, Literal, Self
+import logging
+from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
@@ -9,66 +9,23 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
+    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    REQUIRED_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    resolve_party,
+    ResolvePartyQuery,
+    get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
-from backstop_mcp.features.tasks import MAX_TASK_SCAN_RECORDS, TaskDto, fetch_tasks_for_party
-from backstop_mcp.models import OmitNoneModel, published_output_schema
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
+from backstop_mcp.features.tasks import GetTasksForPartyQuery, TaskFilter, TasksResolvedResponse
+from backstop_mcp.features.tasks.dependencies import get_tasks_for_party_query_factory
+from backstop_mcp.models import published_output_schema
 
-type TaskFilter = Literal["open", "completed", "all"]
-
-
-class TaskRowResponse(OmitNoneModel):
-    """One CRM task on the resolved party."""
-
-    id: str = Field(description="Backstop id of this task. Echo it; never invent one.")
-    title: str | None = Field(default=None, description="Task title as Backstop publishes it.")
-    status: str | None = Field(default=None, description="Backstop's status string, when present.")
-    description: str | None = Field(default=None, description="Task body, when Backstop sends one.")
-    due_date: date | None = Field(default=None, description="Due day, when set.")
-    completed_date: date | None = Field(
-        default=None, description="Day the task was completed, if any."
-    )
-    is_open: bool = Field(description="False when completed, complete, done, closed, or dated so.")
-
-    @classmethod
-    def from_dto(cls, row: TaskDto) -> Self:
-        return cls.model_validate(row.model_dump())
-
-
-class TasksResolvedResponse(OmitNoneModel):
-    """A party's tasks after the paired entity filter and the client-side status split."""
-
-    status: Literal["resolved"] = Field(
-        default="resolved",
-        description="Always 'resolved': the party was found and its tasks fetched.",
-    )
-    resolved: ResolvedPartyResponse = Field(
-        description=(
-            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
-            "`party_id` later — never invent them."
-        )
-    )
-    tasks: tuple[TaskRowResponse, ...] = Field(
-        description="Tasks matching `status`, after the client-side open/completed split."
-    )
-    total: int = Field(description="Every task fetched for this party, before the status filter.")
-    open_count: int = Field(description="How many of those are open.")
-    completed_count: int = Field(description="How many of those are completed.")
-    scan_truncated: bool = Field(
-        description=(
-            f"True when the walk stopped at the {MAX_TASK_SCAN_RECORDS}-task scan ceiling, so "
-            "these counts are floors rather than totals."
-        )
-    )
-
+logger = logging.getLogger(__name__)
 
 type GetTasksForPartyResponse = PartyAmbiguousResponse | NotFoundResponse | TasksResolvedResponse
 
@@ -88,29 +45,18 @@ async def get_tasks_for_party(
         SearchType,
         Field(
             description=(
-                "Which Backstop collection to resolve the party against. Organizations use "
-                "OrganizationBean on the tasks filter; people use PersonBean. Echo a prior "
-                "resolve's search_type — a contact id is not a people id."
+                REQUIRED_SEARCH_TYPE_DESCRIPTION
+                + " Organizations use OrganizationBean on the tasks filter; people use PersonBean."
             )
         ),
     ],
     party_id: Annotated[
         str | None,
-        Field(
-            description=(
-                "Trusted Backstop Party ID from a prior resolve echo. Never invent or guess. "
-                "Exactly one of `party_id` or `search` must be provided."
-            )
-        ),
+        Field(description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None,
     search: Annotated[
         str | None,
-        Field(
-            description=(
-                "Name or email to resolve when no trusted `party_id` is available. Exactly "
-                "one of `party_id` or `search` must be provided."
-            )
-        ),
+        Field(description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None,
     status: Annotated[
         TaskFilter,
@@ -121,30 +67,43 @@ async def get_tasks_for_party(
             )
         ),
     ] = "all",
-    client: BackstopClient = Depends(get_backstop_client),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
+    get_tasks_for_party_query: GetTasksForPartyQuery = Depends(get_tasks_for_party_query_factory),
 ) -> GetTasksForPartyResponse:
     """List a party's CRM tasks.
+
+    Required: `search_type` plus exactly one of `party_id` or `search`. A `party_id` without
+    `search_type` is rejected.
+
+    Call like: {"search_type": "organizations",
+    "party_id": "<id from prior resolve echo>", "status": "open"}
 
     Both `filter[entityType]` and `filter[entityId]` are always sent. Either alone is
     silently ignored and returns every task in the instance. Organizations use
     `OrganizationBean` casing — `organizations` or `ORGANIZATION` fail closed. Status is
     not filterable on the wire; open vs completed is split here.
     """
-    result = await resolve_party(
-        ctx, client, search_type=search_type, party_id=party_id, search=search
+    result = await resolve_party_query.run(
+        search_type=search_type, party_id=party_id, search=search
     )
+    result = await elicit_if_ambiguous(ctx, result)
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value
-    listing = await fetch_tasks_for_party(client, search_type=party.search_type, entity_id=party.id)
-    selected = tuple(
-        row for row in listing.rows if status == "all" or (row.is_open is (status == "open"))
+    logger.info(
+        "tasks.get.start",
+        extra={"segment": party.search_type, "entity_id": party.id, "status": status},
+    )
+    fetched = await get_tasks_for_party_query.run(
+        search_type=party.search_type,
+        entity_id=party.id,
+        status=status,
     )
     return TasksResolvedResponse(
         resolved=ResolvedPartyResponse.from_party(party),
-        tasks=tuple(TaskRowResponse.from_dto(row) for row in selected),
-        total=len(listing.rows),
-        open_count=sum(1 for row in listing.rows if row.is_open),
-        completed_count=sum(1 for row in listing.rows if not row.is_open),
-        scan_truncated=listing.scan_truncated,
+        tasks=fetched.tasks,
+        total=fetched.total,
+        open_count=fetched.open_count,
+        completed_count=fetched.completed_count,
+        scan_truncated=fetched.scan_truncated,
     )

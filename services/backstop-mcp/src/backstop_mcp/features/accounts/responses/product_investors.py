@@ -1,15 +1,10 @@
 """`get_product_investors` response: a product's accounts and owners, no figures."""
 
-from typing import Literal, Self
+from typing import Literal
 
 from pydantic import Field
 
-from backstop_mcp.features.accounts.internal_dto import AccountListingDto, ResolvedProductDto
-from backstop_mcp.features.accounts.responses.shared import (
-    AccountRowResponse,
-    ProductRefResponse,
-    closed_hint,
-)
+from backstop_mcp.features.accounts.responses.shared import AccountRowResponse, ProductRefResponse
 from backstop_mcp.models import OmitNoneModel
 
 
@@ -45,17 +40,3 @@ class ProductInvestorsResolvedResponse(OmitNoneModel):
             "treating an empty list as 'this product has no investors'."
         ),
     )
-
-    @classmethod
-    def from_listing(cls, listing: AccountListingDto, *, product: ResolvedProductDto) -> Self:
-        accounts = tuple(AccountRowResponse.from_record(account) for account in listing.accounts)
-        return cls(
-            product=ProductRefResponse.from_product(product),
-            accounts=accounts,
-            closed_omitted=listing.closed_omitted,
-            include_closed_hint=closed_hint(
-                closed_omitted=listing.closed_omitted,
-                returned=len(accounts),
-                subject="product",
-            ),
-        )

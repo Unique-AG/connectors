@@ -9,22 +9,22 @@ from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import ToolMeta
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
+from backstop_mcp.features.opportunities import OpportunitiesResolvedResponse
 from backstop_mcp.features.opportunities.tools.get_opportunities import (
     GetOpportunitiesResponse,
-    OpportunitiesResolvedResponse,
     get_opportunities,
 )
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools import TOOLS
-from tests.features.opportunities.test_fetch_opportunities import VOCABULARY
+from tests.features.opportunities.conftest import VOCABULARY, make_get_opportunities_query
 from tests.features.party_resolver.helpers import (
     BASE_URL,
     collection,
     ctx_decline,
     ctx_never_elicit,
+    make_resolve_party_query,
     resource,
 )
-from tests.helpers import custom_fields_service, opportunity_stages_service
 from tests.server.tools.helpers import object_dict, tool_model, tool_model_union, tool_payload
 
 _ORG_ID = "341764767"
@@ -125,7 +125,6 @@ class TestGetOpportunities:
     @respx.mock
     async def test_trusted_party_id_returns_the_pipeline(self, client: BackstopClient) -> None:
 
-        stages = respx.get(_STAGES_URL).mock(return_value=_stages_response())
         opportunities = respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(_open_deal(), included=[_side_loaded_stage("42482")])
         )
@@ -135,14 +134,12 @@ class TestGetOpportunities:
                 ctx_never_elicit(),
                 search_type="organizations",
                 party_id=_ORG_ID,
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             OpportunitiesResolvedResponse,
         )
 
-        assert stages.call_count == 1
         assert opportunities.call_count == 1
         assert result.resolved.id == _ORG_ID
         assert result.resolved.search_type == "organizations"
@@ -151,6 +148,7 @@ class TestGetOpportunities:
         assert result.closed_count == 0
         assert result.opportunities[0].stage == "IDD"
         assert result.opportunities[0].previous_stage == "Client Approval"
+        assert result.custom_fields_unavailable is False
 
     @pytest.mark.asyncio
     @respx.mock
@@ -172,9 +170,8 @@ class TestGetOpportunities:
                 ctx_never_elicit(),
                 search_type="organizations",
                 search="Koch",
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -198,9 +195,8 @@ class TestGetOpportunities:
                 ctx_never_elicit(),
                 search_type="people",
                 party_id="p9",
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -224,9 +220,8 @@ class TestGetOpportunities:
                 ctx_never_elicit(),
                 search_type="contacts",
                 party_id="c7",
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -253,9 +248,8 @@ class TestGetOpportunities:
                 search_type="organizations",
                 party_id=_ORG_ID,
                 status="open",
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -290,9 +284,8 @@ class TestGetOpportunities:
                 ctx_never_elicit(),
                 search_type="organizations",
                 party_id=_ORG_ID,
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             )
         )
 
@@ -319,9 +312,8 @@ class TestGetOpportunities:
                 ctx_never_elicit(),
                 search_type="organizations",
                 search="NoSuchOrg",
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             GetOpportunitiesResponse,
         )
@@ -348,9 +340,8 @@ class TestGetOpportunities:
                 ctx_decline(),
                 search_type="organizations",
                 search="Koch",
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             GetOpportunitiesResponse,
         )
@@ -366,18 +357,15 @@ class TestGetOpportunities:
     async def test_a_failed_stages_fetch_fails_the_call(self, client: BackstopClient) -> None:
 
         respx.get(_STAGES_URL).mock(return_value=httpx.Response(500, json={"errors": []}))
-        respx.get(_OPPORTUNITIES_URL).mock(
-            return_value=_page(_open_deal(), included=[_side_loaded_stage("42482")])
-        )
+        respx.get(_OPPORTUNITIES_URL).mock(return_value=_page(_open_deal()))
 
         with pytest.raises(BackstopApiError):
             await get_opportunities(
                 ctx_never_elicit(),
                 search_type="organizations",
                 party_id=_ORG_ID,
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             )
 
     @pytest.mark.asyncio
@@ -394,9 +382,8 @@ class TestGetOpportunities:
                 ctx_never_elicit(),
                 search_type="organizations",
                 party_id=_ORG_ID,
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             )
 
     def test_docstring_says_there_is_no_cursor_and_names_previous_stage(self) -> None:
@@ -463,9 +450,8 @@ class TestGetOpportunities:
                 ctx_never_elicit(),
                 search_type="organizations",
                 party_id=_ORG_ID,
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -475,7 +461,6 @@ class TestGetOpportunities:
         assert values[0].name == "Probability"
         assert values[0].field_type == "PERCENT"
         assert values[0].value == 0.3
-        assert result.custom_fields_unavailable is False
 
     @pytest.mark.asyncio
     @respx.mock
@@ -499,9 +484,8 @@ class TestGetOpportunities:
                 ctx_never_elicit(),
                 search_type="organizations",
                 party_id=_ORG_ID,
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -511,9 +495,7 @@ class TestGetOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_catalog_failure_keeps_the_pipeline_and_flags_unavailable(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_catalog_failure_keeps_the_pipeline(self, client: BackstopClient) -> None:
         respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(_open_deal(), included=[_side_loaded_stage("42482")])
@@ -527,9 +509,8 @@ class TestGetOpportunities:
                 ctx_never_elicit(),
                 search_type="organizations",
                 party_id=_ORG_ID,
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -590,9 +571,8 @@ class TestGetOpportunities:
                 search_type="organizations",
                 party_id=_ORG_ID,
                 custom_field_names=["Probability"],
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -650,9 +630,8 @@ class TestGetOpportunities:
                 party_id=_ORG_ID,
                 custom_field_names=["Probability"],
                 custom_field_definition_ids=["8648265"],
-                client=client,
-                opportunity_stages_service=opportunity_stages_service(),
-                custom_fields_service=custom_fields_service(),
+                resolve_party_query=make_resolve_party_query(client),
+                get_opportunities_query=make_get_opportunities_query(client),
             ),
             OpportunitiesResolvedResponse,
         )

@@ -7,6 +7,8 @@ from fastmcp.server.elicitation import AcceptedElicitation
 from mcp.server.elicitation import CancelledElicitation, DeclinedElicitation
 from mcp.types import ClientCapabilities
 
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.features.party_resolver import GetPartyNameQuery, ResolvePartyQuery
 from tests.helpers import BASE_URL, collection, credential, resource
 
 __all__ = [
@@ -20,8 +22,19 @@ __all__ = [
     "ctx_no_elicitation_capability",
     "ctx_stalls",
     "ctx_unsupported",
+    "make_get_party_name_query",
+    "make_resolve_party_query",
     "resource",
 ]
+
+
+def make_get_party_name_query(client: BackstopClient) -> GetPartyNameQuery:
+    return GetPartyNameQuery(client=client)
+
+
+def make_resolve_party_query(client: BackstopClient) -> ResolvePartyQuery:
+    return ResolvePartyQuery(client=client, get_party_name_query=make_get_party_name_query(client))
+
 
 type ElicitFn = Callable[..., Awaitable[object]]
 

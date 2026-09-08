@@ -18,16 +18,17 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.accounts import (
+    GetTimeSeriesQuery,
     ProductAmbiguousResponse,
     TimeSeriesEntityType,
     TimeSeriesName,
     TimeSeriesResolvedResponse,
-    fetch_time_series,
-    require_series_for_entity,
+    raise_if_invalid_series,
     resolve_product_query,
 )
+from backstop_mcp.features.accounts.dependencies import get_time_series_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import published_output_schema
 
@@ -117,7 +118,8 @@ async def get_time_series(
             ),
         ),
     ] = None,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    get_time_series_query: GetTimeSeriesQuery = Depends(get_time_series_query_factory),
 ) -> GetTimeSeriesResponse:
     """Dated points of one time series on one account or one product.
 
@@ -146,7 +148,7 @@ async def get_time_series(
         raise ValueError(f"entity_id {entity_id!r} must not contain '/'")
     if start_date is not None and end_date is not None and start_date > end_date:
         raise ValueError("start_date must not be after end_date")
-    require_series_for_entity(entity_type, series)
+    raise_if_invalid_series(entity_type, series)
 
     resolved_id = entity_id
     if entity_type == "products":
@@ -166,8 +168,7 @@ async def get_time_series(
         },
     )
     try:
-        points = await fetch_time_series(
-            client,
+        result = await get_time_series_query.run(
             entity_type=entity_type,
             entity_id=resolved_id,
             series=series,
@@ -185,12 +186,7 @@ async def get_time_series(
             "entity_type": entity_type,
             "entity_id": resolved_id,
             "series": series,
-            "points": len(points),
+            "points": len(result.points),
         },
     )
-    return TimeSeriesResolvedResponse.from_points(
-        entity_type=entity_type,
-        entity_id=resolved_id,
-        series=series,
-        points=points,
-    )
+    return result

@@ -8,11 +8,8 @@ from fastmcp.server.dependencies import without_injected_parameters
 from pydantic import TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
 
-from backstop_mcp.features.custom_fields import CustomFieldEntityType
-from backstop_mcp.features.custom_fields.tools.list_custom_fields import (
-    ListCustomFieldsResponse,
-    list_custom_fields,
-)
+from backstop_mcp.features.custom_fields import CustomFieldEntityType, ListCustomFieldsResponse
+from backstop_mcp.features.custom_fields.tools.list_custom_fields import list_custom_fields
 from tests.features.party_resolver.helpers import BASE_URL, resource
 from tests.helpers import custom_fields_service, recorded_requests, tool_client
 from tests.server.tools.helpers import tool_model, tool_payload
@@ -20,7 +17,7 @@ from tests.server.tools.helpers import tool_model, tool_payload
 # The published input schema: the tool's signature with the `Depends(...)` collaborators and
 # `Context` stripped, which is what FastMCP validates a call against.
 _INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(list_custom_fields))
-_FETCH_LOGGER = "backstop_mcp.features.custom_fields.fetch_custom_field_definitions"
+_FETCH_LOGGER = "backstop_mcp.features.custom_fields.custom_fields_service"
 
 
 def tenant(name: str) -> str:
@@ -99,8 +96,7 @@ class TestListCustomFieldsTool:
                         CustomFieldEntityType.PEOPLE,
                     ],
                     refresh=True,
-                    client=client,
-                    custom_fields=custom_fields_service(),
+                    custom_fields=custom_fields_service(client),
                 ),
                 ListCustomFieldsResponse,
             )
@@ -150,8 +146,7 @@ class TestListCustomFieldsTool:
                     await list_custom_fields(
                         entity_types=[CustomFieldEntityType.ORGANIZATIONS],
                         refresh=True,
-                        client=client,
-                        custom_fields=custom_fields_service(),
+                        custom_fields=custom_fields_service(client),
                     ),
                     ListCustomFieldsResponse,
                 )
@@ -205,14 +200,12 @@ class TestListCustomFieldsTool:
             "page[offset]=1000&page[limit]=1000&sentinel=literal-next"
         )
         route = _definitions_route(base_url, first_definition)
-        service = custom_fields_service()
-
         async with tool_client(base_url) as client:
+            service = custom_fields_service(client)
             first = tool_model(
                 await list_custom_fields(
                     entity_types=[CustomFieldEntityType.ORGANIZATIONS],
                     refresh=True,
-                    client=client,
                     custom_fields=service,
                 ),
                 ListCustomFieldsResponse,
@@ -228,7 +221,6 @@ class TestListCustomFieldsTool:
                     await list_custom_fields(
                         entity_types=[CustomFieldEntityType.ORGANIZATIONS],
                         refresh=True,
-                        client=client,
                         custom_fields=service,
                     ),
                     ListCustomFieldsResponse,
@@ -266,8 +258,7 @@ class TestListCustomFieldsTool:
                         CustomFieldEntityType.ORGANIZATIONS,
                     ],
                     refresh=True,
-                    client=client,
-                    custom_fields=custom_fields_service(),
+                    custom_fields=custom_fields_service(client),
                 ),
                 ListCustomFieldsResponse,
             )
@@ -287,8 +278,7 @@ class TestListCustomFieldsTool:
                 await list_custom_fields(
                     entity_types=[CustomFieldEntityType.PEOPLE],
                     refresh=True,
-                    client=client,
-                    custom_fields=custom_fields_service(),
+                    custom_fields=custom_fields_service(client),
                 ),
                 ListCustomFieldsResponse,
             )
@@ -301,14 +291,12 @@ class TestListCustomFieldsTool:
     async def test_surfaces_stale_cache(self) -> None:
         base_url = tenant("cf-list-stale")
         route = _definitions_route(base_url, _investor_status())
-        service = custom_fields_service()
-
         async with tool_client(base_url) as client:
+            service = custom_fields_service(client)
             first = tool_model(
                 await list_custom_fields(
                     entity_types=[CustomFieldEntityType.ORGANIZATIONS],
                     refresh=True,
-                    client=client,
                     custom_fields=service,
                 ),
                 ListCustomFieldsResponse,
@@ -321,7 +309,6 @@ class TestListCustomFieldsTool:
                 await list_custom_fields(
                     entity_types=[CustomFieldEntityType.ORGANIZATIONS],
                     refresh=True,
-                    client=client,
                     custom_fields=service,
                 ),
                 ListCustomFieldsResponse,

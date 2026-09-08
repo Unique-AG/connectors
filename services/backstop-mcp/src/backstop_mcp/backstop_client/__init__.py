@@ -9,11 +9,15 @@ Nothing here imports `config` either: the tuning knobs arrive as the frozen type
 """
 
 from backstop_mcp.backstop_client.client import (
+    SYSTEM_INFO_PATH,
     BackstopClient,
 )
 from backstop_mcp.backstop_client.credential import (
+    AuthFailureHook,
     BackstopCredentialSecret,
     CallerAuthContext,
+    CallerSession,
+    CallerSessionProvider,
 )
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
@@ -36,14 +40,10 @@ from backstop_mcp.backstop_client.json_api import (
     BackstopApiCollectionDocument,
     BackstopApiResource,
     BackstopApiResourceDocument,
-    IncludedIndex,
+    Included,
     IncludedResource,
     ResourceRef,
-    follow_included,
-    follow_indexed,
-    included_by_type,
     included_resource,
-    index_included,
 )
 from backstop_mcp.backstop_client.pagination import (
     PageResult,
@@ -55,6 +55,7 @@ from backstop_mcp.backstop_client.retry import RetryPolicy
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
 
 __all__ = [
+    "AuthFailureHook",
     "BackstopApiCollectionDocument",
     "BackstopApiError",
     "BackstopApiResource",
@@ -72,18 +73,17 @@ __all__ = [
     "BackstopUnreachableError",
     "BackstopUntrustedUrlError",
     "CallerAuthContext",
-    "IncludedIndex",
+    "CallerSession",
+    "CallerSessionProvider",
+    "Included",
     "IncludedResource",
     "PageResult",
     "ResourceRef",
     "RetryPolicy",
     "RetrySettings",
+    "SYSTEM_INFO_PATH",
     "SinglePage",
-    "follow_included",
-    "follow_indexed",
-    "included_by_type",
     "included_resource",
-    "index_included",
     "mcp_session_was_revoked",
     "paginate_all",
     "parse_page",
