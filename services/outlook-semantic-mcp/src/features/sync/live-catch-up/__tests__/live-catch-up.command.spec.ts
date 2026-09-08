@@ -93,7 +93,7 @@ function createMockDb({
         id: string;
         email: string;
         providerUserId: string;
-        source: 'oauth' | 'shared-mailbox';
+        source: 'oauth' | 'shared-mailbox' | 'shared-mailbox-with-login';
       }
     | undefined;
   lockResult?: {
