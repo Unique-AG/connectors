@@ -140,7 +140,7 @@ class TestRenewal:
     async def test_a_refused_renewal_revokes_the_callers_mcp_tokens(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """With no stored password there is nothing to retry with, so the client must re-login."""
+        """The password is not stored, so a refused refresh requires another login."""
         user_id = await _store(db, _session("dead", age=timedelta(hours=2)))
         context, revocations = _context(db)
         monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)

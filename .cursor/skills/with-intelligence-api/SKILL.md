@@ -63,7 +63,7 @@ GET  /v3/...              Authorization: Bearer <accessToken>
 ```
 
 - **Access token lives 1 hour. Refresh token lives 30 days.**
-- **There is no one-time passcode in this exchange.** The passcode in the vendor's onboarding
+- **There is no one-time passcode in this exchange.** The passcode in With Intelligence's onboarding
   mail is the *initial password*, spent once on `POST /v3/auth/set-password` by a human, before
   any programmatic use. Do not design a passcode step into a login flow.
 - Whether `/v3/auth/refresh` *rotates* the refresh token or returns the same one is still

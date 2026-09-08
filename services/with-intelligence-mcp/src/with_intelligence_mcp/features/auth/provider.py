@@ -671,9 +671,8 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
     async def revoke_all_tokens_for_subject(self, subject: str) -> None:
         """Revoke every non-revoked token belonging to `subject`.
 
-        Called when a With Intelligence call comes back 401 mid-session and re-signing in does not fix it
-        (see `auth/context.py`) — the stored password no longer works, so the MCP-facing tokens
-        tied to it are forced to fail too, pushing the client back through the login form.
+        Called when a WI session cannot be renewed (see `auth/context.py`). The password is not
+        stored, so the MCP-facing tokens are revoked to send the client through the login form.
         """
         async with transaction(self._session_factory) as session:
             await session.execute(

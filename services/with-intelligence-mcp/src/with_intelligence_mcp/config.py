@@ -125,8 +125,9 @@ class AssetClassGroup(StrEnum):
 class WithIntelligenceConfig(BaseSettings):
     """Where to reach the v3 REST API and how hard to lean on it.
 
-    No credentials: each MCP client completes this service's own login form, and the username
-    and password it submits are encrypted per user in Postgres. Spec: /v3/docs/json (public).
+    No service-account credentials: each MCP client completes this service's own login form.
+    The password creates a WI session and is discarded; the session tokens are encrypted per
+    user in Postgres. Spec: /v3/docs/json (public).
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="WITH_INTELLIGENCE_")
@@ -254,7 +255,7 @@ class AuthConfig(BaseSettings):
 
 
 class EncryptionConfig(BaseSettings):
-    """Key used to encrypt stored With Intelligence credentials at rest."""
+    """Key used to encrypt stored WI sessions at rest."""
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_prefix="WITH_INTELLIGENCE_MCP_"

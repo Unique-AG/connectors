@@ -62,7 +62,7 @@ class AuthorizationCode(Base):
 
     Field shape mirrors `mcp.server.auth.provider.AuthorizationCode`. `subject` is the resolved
     `user_id`, propagated into the issued tokens so `auth/context.py` can resolve whose WI
-    credential to use.
+    session to use.
     """
 
     __tablename__: str = "authorization_codes"
@@ -82,7 +82,7 @@ class AuthorizationCode(Base):
 class OAuthToken(Base):
     """An issued MCP-facing access/refresh token pair.
 
-    Only a SHA-256 hash of each token is stored: unlike the credential blob, which is useless
+    Only a SHA-256 hash of each token is stored: unlike the WI session blob, which is useless
     without the Fernet key, a leaked plaintext token here would be directly usable.
 
     `family_id` is shared by every rotation descending from one grant, so a replayed
@@ -117,7 +117,7 @@ class WithIntelligenceSession(Base):
     """A user's WI session — access and refresh token — encrypted at rest.
 
     The session rather than their password, deliberately: a database and key compromise then
-    yields a credential that is scoped to this API and can be revoked, instead of the password
+    yields tokens that are scoped to this API and can be revoked, instead of the password
     to the user's whole With Intelligence account.
 
     The cost is that the refresh token is the only way back. It lives 30 days, so a user idle

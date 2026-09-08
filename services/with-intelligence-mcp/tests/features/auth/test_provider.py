@@ -526,7 +526,7 @@ class TestTokenLifecycle:
 
     @respx.mock
     async def test_revoking_a_subject_invalidates_every_token(self, db: DatabaseFixture) -> None:
-        """What a stored password that stopped working triggers, pushing the user to re-login."""
+        """A WI session that cannot be renewed pushes the user to re-login."""
         respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
         provider = _make_provider(db)
         client, code = await self._login(provider, _unique("subject-revoke"))
