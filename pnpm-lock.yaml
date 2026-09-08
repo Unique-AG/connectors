@@ -89,8 +89,8 @@ catalogs:
       specifier: 8.23.1
       version: 8.23.1
     '@types/supertest':
-      specifier: 6.0.3
-      version: 6.0.3
+      specifier: 7.2.1
+      version: 7.2.1
     '@vitest/coverage-istanbul':
       specifier: 3.2.7
       version: 3.2.7
@@ -402,7 +402,7 @@ importers:
         version: 1.0.17
       '@types/supertest':
         specifier: 'catalog:'
-        version: 6.0.3
+        version: 7.2.1
       '@vitest/coverage-istanbul':
         specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
@@ -734,7 +734,7 @@ importers:
         version: 26.4.0
       '@types/supertest':
         specifier: 'catalog:'
-        version: 6.0.3
+        version: 7.2.1
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
@@ -861,7 +861,7 @@ importers:
         version: 26.4.0
       '@types/supertest':
         specifier: 'catalog:'
-        version: 6.0.3
+        version: 7.2.1
       '@vitest/coverage-istanbul':
         specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
@@ -1081,7 +1081,7 @@ importers:
         version: 8.23.1
       '@types/supertest':
         specifier: 'catalog:'
-        version: 6.0.3
+        version: 7.2.1
       '@vitest/coverage-istanbul':
         specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
@@ -1235,7 +1235,7 @@ importers:
         version: 26.4.0
       '@types/supertest':
         specifier: 'catalog:'
-        version: 6.0.3
+        version: 7.2.1
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
@@ -1413,7 +1413,7 @@ importers:
         version: 8.23.1
       '@types/supertest':
         specifier: 'catalog:'
-        version: 6.0.3
+        version: 7.2.1
       '@vitest/coverage-istanbul':
         specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
@@ -1543,7 +1543,7 @@ importers:
         version: 26.4.0
       '@types/supertest':
         specifier: 'catalog:'
-        version: 6.0.3
+        version: 7.2.1
       '@vitest/coverage-istanbul':
         specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
@@ -3936,8 +3936,8 @@ packages:
   '@types/superagent@8.1.9':
     resolution: {integrity: sha512-pTVjI73witn+9ILmoJdajHGW2jkSaOzhiFYF1Rd3EQ94kymLqB9PjD9ISg7WaALC7+dCHT0FGe9T2LktLq/3GQ==}
 
-  '@types/supertest@6.0.3':
-    resolution: {integrity: sha512-8WzXq62EXFhJ7QsH3Ocb/iKQ/Ty9ZVWnVzoTKc9tyyFRRF3a74Tk2+TLFgaFFw364Ere+npzHKEJ6ga2LzIL7w==}
+  '@types/supertest@7.2.1':
+    resolution: {integrity: sha512-4CbBvoYVLHL7+yhbYrZET0vsvuyXTC05aRe7dNQkwMzm56auceoy6Yu3K50uZmwfHna1os3CMSgM/3QVkUtPTw==}
 
   '@vitest/coverage-istanbul@3.2.7':
     resolution: {integrity: sha512-/o+QIJBJCBZm7FdyAMqYKvr8Cd0YsqPt9UwVT6bAA+U9Ae8AR39ZAjq7xnmKCO64TkzPm0Vvi7jzYZWLdu6Y5A==}
@@ -8825,7 +8825,7 @@ snapshots:
       '@types/node': 26.4.0
       form-data: 4.0.6
 
-  '@types/supertest@6.0.3':
+  '@types/supertest@7.2.1':
     dependencies:
       '@types/methods': 1.1.4
       '@types/superagent': 8.1.9
