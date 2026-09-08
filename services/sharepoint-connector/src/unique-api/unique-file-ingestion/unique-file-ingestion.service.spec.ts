@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { EnabledDisabledMode } from '../../constants/enabled-disabled-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { Smeared } from '../../utils/smeared';
@@ -19,7 +19,7 @@ import type {
 
 describe('UniqueFileIngestionService', () => {
   let service: UniqueFileIngestionService;
-  let ingestionClientMock: { request: ReturnType<typeof vi.fn> };
+  let ingestionClientMock: { request: Mock };
 
   beforeEach(async () => {
     ingestionClientMock = {
@@ -38,8 +38,7 @@ describe('UniqueFileIngestionService', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Not testing IngestionHttpClient, mock is unused
       .impl(() => ({}) as any)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'unique') {
             return { storeInternally: EnabledDisabledMode.Enabled };
@@ -148,8 +147,7 @@ describe('UniqueFileIngestionService', () => {
         .mock(IngestionHttpClient)
         .impl(() => mockHttpClient)
         .mock(ConfigService)
-        .impl((stub) => ({
-          ...stub(),
+        .impl(() => ({
           get: vi.fn((key: string) => {
             if (key === 'unique') {
               return { storeInternally: EnabledDisabledMode.Enabled };
@@ -207,8 +205,7 @@ describe('UniqueFileIngestionService', () => {
         .mock(IngestionHttpClient)
         .impl(() => mockHttpClient)
         .mock(ConfigService)
-        .impl((stub) => ({
-          ...stub(),
+        .impl(() => ({
           get: vi.fn((key: string) => {
             if (key === 'unique') {
               return { storeInternally: EnabledDisabledMode.Enabled };
@@ -266,8 +263,7 @@ describe('UniqueFileIngestionService', () => {
         .mock(IngestionHttpClient)
         .impl(() => mockHttpClient)
         .mock(ConfigService)
-        .impl((stub) => ({
-          ...stub(),
+        .impl(() => ({
           get: vi.fn((key: string) => {
             if (key === 'unique') {
               return { storeInternally: EnabledDisabledMode.Enabled };

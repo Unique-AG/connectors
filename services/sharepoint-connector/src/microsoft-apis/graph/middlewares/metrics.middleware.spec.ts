@@ -1,20 +1,20 @@
 import { type Context, GraphClientError, GraphError } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { Config } from '../../../config';
 import { MetricsMiddleware } from './metrics.middleware';
 
 describe('MetricsMiddleware', () => {
   let middleware: MetricsMiddleware;
   let mockNextMiddleware: {
-    execute: ReturnType<typeof vi.fn>;
+    execute: Mock;
   };
   let mockHistogram: {
-    record: ReturnType<typeof vi.fn>;
+    record: Mock;
   };
   let mockCounter: {
-    add: ReturnType<typeof vi.fn>;
+    add: Mock;
   };
   let mockConfigService: ConfigService<Config, true>;
 
@@ -680,7 +680,7 @@ describe('MetricsMiddleware', () => {
   });
 
   describe('endpoint extraction with sensitive data concealment', () => {
-    let loggerDebugSpy: ReturnType<typeof vi.fn>;
+    let loggerDebugSpy: Mock;
 
     const createConcealingConfigService = (): ConfigService<Config, true> => {
       return {
@@ -699,16 +699,15 @@ describe('MetricsMiddleware', () => {
     beforeEach(() => {
       loggerDebugSpy = vi.fn();
       // Mock the Logger constructor to return an object with debug method
-      vi.mocked(Logger).mockImplementation(
-        () =>
-          ({
-            debug: loggerDebugSpy,
-            log: vi.fn(),
-            error: vi.fn(),
-            warn: vi.fn(),
-            verbose: vi.fn(),
-          }) as unknown as Logger,
-      );
+      vi.mocked(Logger).mockImplementation(function MockLogger() {
+        return {
+          debug: loggerDebugSpy,
+          log: vi.fn(),
+          error: vi.fn(),
+          warn: vi.fn(),
+          verbose: vi.fn(),
+        } as unknown as Logger;
+      });
     });
 
     afterEach(() => {

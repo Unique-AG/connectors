@@ -10,7 +10,12 @@ vi.mock('~/features/tracing.utils', () => ({
 }));
 
 vi.mock('cron', () => ({
-  CronJob: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
+  CronJob: vi.fn(
+    class MockCronJob {
+      public readonly start = vi.fn();
+      public readonly stop = vi.fn();
+    },
+  ),
 }));
 
 // Avoid drizzle's union() being called on mock query builders
@@ -94,7 +99,12 @@ function createServiceWithIngestionConfig({ amqp = createMockAmqp(), db = create
 describe('LiveCatchupSchedulerService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(CronJob).mockImplementation(() => ({ start: vi.fn(), stop: vi.fn() }) as any);
+    vi.mocked(CronJob).mockImplementation(
+      class MockCronJob {
+        public readonly start = vi.fn();
+        public readonly stop = vi.fn();
+      } as any,
+    );
   });
 
   describe('cron job wiring', () => {

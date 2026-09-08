@@ -1,7 +1,7 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context } from '@unique-ag/mcp-server-module';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetCalendarEventQuery } from '../get-calendar-event.query';
 import { RespondToInviteCommand } from '../respond-to-invite.command';
@@ -36,13 +36,7 @@ const SNAPSHOT = {
   },
 };
 
-function createTool(
-  opts: {
-    get?: ReturnType<typeof vi.fn>;
-    run?: ReturnType<typeof vi.fn>;
-    elicit?: ReturnType<typeof vi.fn>;
-  } = {},
-) {
+function createTool(opts: { get?: Mock; run?: Mock; elicit?: Mock } = {}) {
   const get = opts.get ?? vi.fn().mockResolvedValue(SNAPSHOT);
   const run =
     opts.run ??

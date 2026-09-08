@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { EnabledUniqueConfig } from '~/config';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { PostAuthorizationListener } from './post-authorization.listener';
@@ -22,7 +22,7 @@ const userAuthorizedEvent = (id: string) => ({
 });
 
 describe('PostAuthorizationListener', () => {
-  let mockSubscriptionCreate: { enqueueSubscriptionRequested: ReturnType<typeof vi.fn> };
+  let mockSubscriptionCreate: { enqueueSubscriptionRequested: Mock };
 
   beforeEach(() => {
     mockSubscriptionCreate = {

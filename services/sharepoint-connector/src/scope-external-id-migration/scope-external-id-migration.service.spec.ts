@@ -1,5 +1,5 @@
 import { TestBed } from '@suites/unit';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
 import { EXTERNAL_ID_PREFIX } from '../utils/scope-external-id';
@@ -18,8 +18,8 @@ const folderScope = scope('folder-1', 'drive-1', `spc:folder:${ROOT_SITE_ID}/ite
 
 describe('ScopeExternalIdMigrationService', () => {
   let service: ScopeExternalIdMigrationService;
-  let listScopesByExternalIdPrefixMock: ReturnType<typeof vi.fn>;
-  let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+  let listScopesByExternalIdPrefixMock: Mock;
+  let updateScopeExternalIdMock: Mock;
 
   beforeEach(async () => {
     listScopesByExternalIdPrefixMock = vi.fn();
@@ -27,8 +27,7 @@ describe('ScopeExternalIdMigrationService', () => {
 
     const { unit } = await TestBed.solitary(ScopeExternalIdMigrationService)
       .mock<UniqueScopesService>(UniqueScopesService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         listScopesByExternalIdPrefix: listScopesByExternalIdPrefixMock,
         updateScopeExternalId: updateScopeExternalIdMock,
       }))

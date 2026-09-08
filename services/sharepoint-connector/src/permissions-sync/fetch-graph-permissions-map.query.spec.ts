@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import {
   SimpleIdentitySet,
@@ -20,8 +20,8 @@ vi.mock('@nestjs/common', async (importOriginal) => {
 describe('FetchGraphPermissionsMapQuery', () => {
   let query: FetchGraphPermissionsMapQuery;
   let graphApiService: GraphApiService;
-  let loggerWarnSpy: ReturnType<typeof vi.fn>;
-  let loggerLogSpy: ReturnType<typeof vi.fn>;
+  let loggerWarnSpy: Mock;
+  let loggerLogSpy: Mock;
 
   const mockSiteId = 'site-123';
   const mockSiteName = 'TestSite';
@@ -96,21 +96,19 @@ describe('FetchGraphPermissionsMapQuery', () => {
   beforeEach(async () => {
     loggerWarnSpy = vi.fn();
     loggerLogSpy = vi.fn();
-    vi.mocked(Logger).mockImplementation(
-      () =>
-        ({
-          log: loggerLogSpy,
-          error: vi.fn(),
-          warn: loggerWarnSpy,
-          debug: vi.fn(),
-          verbose: vi.fn(),
-        }) as unknown as Logger,
-    );
+    vi.mocked(Logger).mockImplementation(function MockLogger() {
+      return {
+        log: loggerLogSpy,
+        error: vi.fn(),
+        warn: loggerWarnSpy,
+        debug: vi.fn(),
+        verbose: vi.fn(),
+      } as unknown as Logger;
+    });
 
     const { unit, unitRef } = await TestBed.solitary(FetchGraphPermissionsMapQuery)
       .mock<GraphApiService>(GraphApiService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         getDriveItemPermissions: vi.fn(),
         getListItemPermissions: vi.fn(),
       }))

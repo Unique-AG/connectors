@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { AllDelegatesFailedError, NO_DELEGATES } from '~/msgraph/ms-graph-client-resolver.service';
 import { LiveCatchUpCommand } from '../live-catch-up.command';
 
@@ -193,7 +193,7 @@ function createCommand({
   ingestEmailCommand: ReturnType<typeof createMockIngestEmailCommand>;
   syncDirectories: ReturnType<typeof createMockSyncDirectoriesCommand>;
   db: ReturnType<typeof createMockDb>;
-  resolver?: { run: ReturnType<typeof vi.fn> };
+  resolver?: { run: Mock };
 }): LiveCatchUpCommand {
   return new LiveCatchUpCommand(
     (resolver ?? createMockMsGraphClientResolver(graphApi)) as any,

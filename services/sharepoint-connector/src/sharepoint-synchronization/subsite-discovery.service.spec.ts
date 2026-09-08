@@ -1,12 +1,12 @@
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { Smeared } from '../utils/smeared';
 import { SubsiteDiscoveryService } from './subsite-discovery.service';
 
 describe('SubsiteDiscoveryService', () => {
   let service: SubsiteDiscoveryService;
-  let mockGraphApiService: { getSubsites: ReturnType<typeof vi.fn> };
+  let mockGraphApiService: { getSubsites: Mock };
 
   beforeEach(async () => {
     mockGraphApiService = {

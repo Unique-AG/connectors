@@ -1,5 +1,5 @@
 import { TestBed } from '@suites/unit';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { ScopeExternalIdMigrationService } from '../../scope-external-id-migration/scope-external-id-migration.service';
 import { UniqueScopesService } from '../../unique-api/unique-scopes/unique-scopes.service';
 import { UniqueUsersService } from '../../unique-api/unique-users/unique-users.service';
@@ -14,16 +14,16 @@ import { RootScopeResolutionError } from './root-scope-resolution.error';
 
 describe('InitializeRootScopeCommand', () => {
   let command: InitializeRootScopeCommand;
-  let getScopeByIdMock: ReturnType<typeof vi.fn>;
-  let createScopeAccessesMock: ReturnType<typeof vi.fn>;
-  let getCurrentUserIdMock: ReturnType<typeof vi.fn>;
-  let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
-  let updateScopeParentMock: ReturnType<typeof vi.fn>;
-  let rootMigrationMock: ReturnType<typeof vi.fn>;
-  let externalIdMigrationMock: ReturnType<typeof vi.fn>;
-  let resolveScopePathMock: ReturnType<typeof vi.fn>;
-  let findRootScopeMock: ReturnType<typeof vi.fn>;
-  let createRootScopeMock: ReturnType<typeof vi.fn>;
+  let getScopeByIdMock: Mock;
+  let createScopeAccessesMock: Mock;
+  let getCurrentUserIdMock: Mock;
+  let updateScopeExternalIdMock: Mock;
+  let updateScopeParentMock: Mock;
+  let rootMigrationMock: Mock;
+  let externalIdMigrationMock: Mock;
+  let resolveScopePathMock: Mock;
+  let findRootScopeMock: Mock;
+  let createRootScopeMock: Mock;
 
   const siteName = createSmeared('test-site-name');
 
@@ -44,41 +44,34 @@ describe('InitializeRootScopeCommand', () => {
 
     const { unit } = await TestBed.solitary(InitializeRootScopeCommand)
       .mock<UniqueScopesService>(UniqueScopesService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         getScopeById: getScopeByIdMock,
         createScopeAccesses: createScopeAccessesMock,
         updateScopeExternalId: updateScopeExternalIdMock,
         updateScopeParent: updateScopeParentMock,
       }))
       .mock<UniqueUsersService>(UniqueUsersService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         getCurrentUserId: getCurrentUserIdMock,
       }))
       .mock<RootScopeMigrationService>(RootScopeMigrationService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         migrateIfNeeded: rootMigrationMock,
       }))
       .mock<ScopeExternalIdMigrationService>(ScopeExternalIdMigrationService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         migrateIfNeeded: externalIdMigrationMock,
       }))
       .mock<ResolveScopePathCommand>(ResolveScopePathCommand)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         execute: resolveScopePathMock,
       }))
       .mock<FindRootScopeQuery>(FindRootScopeQuery)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         execute: findRootScopeMock,
       }))
       .mock<CreateRootScopeCommand>(CreateRootScopeCommand)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         execute: createRootScopeMock,
       }))
       .compile();

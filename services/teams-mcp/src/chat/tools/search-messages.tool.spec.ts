@@ -2,7 +2,7 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context } from '@unique-ag/mcp-server-module';
 import { TestBed } from '@suites/unit';
 import { TraceService } from 'nestjs-otel';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { SearchService } from '../search.service';
 import { SearchMessagesInputSchema, SearchMessagesTool } from './search-messages.tool';
 
@@ -41,7 +41,7 @@ describe('SearchMessagesInputSchema', () => {
 
 describe('SearchMessagesTool', () => {
   let unit: SearchMessagesTool;
-  let searchMessages: ReturnType<typeof vi.fn>;
+  let searchMessages: Mock;
 
   const request = { user: { userProfileId: 'user-profile-1' } } as McpAuthenticatedRequest;
   const context = {} as Context;

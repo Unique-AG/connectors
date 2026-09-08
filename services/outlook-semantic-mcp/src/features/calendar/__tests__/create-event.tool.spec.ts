@@ -1,7 +1,7 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context } from '@unique-ag/mcp-server-module';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { CreateEventCommand } from '../create-event.command';
 import {
@@ -32,12 +32,7 @@ const OWN_PRIMARY = {
 };
 
 function createTool(
-  opts: {
-    run?: ReturnType<typeof vi.fn>;
-    elicit?: ReturnType<typeof vi.fn>;
-    calendar?: Record<string, unknown>;
-    getCalendar?: ReturnType<typeof vi.fn>;
-  } = {},
+  opts: { run?: Mock; elicit?: Mock; calendar?: Record<string, unknown>; getCalendar?: Mock } = {},
 ) {
   const run =
     opts.run ??

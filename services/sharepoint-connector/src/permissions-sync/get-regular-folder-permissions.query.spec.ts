@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { DiscoveredSubsite } from '../sharepoint-synchronization/subsite-discovery.service';
 import { Smeared } from '../utils/smeared';
@@ -14,7 +14,7 @@ vi.mock('@nestjs/common', async (importOriginal) => {
 
 describe('GetRegularFolderPermissionsQuery', () => {
   let query: GetRegularFolderPermissionsQuery;
-  let loggerWarnSpy: ReturnType<typeof vi.fn>;
+  let loggerWarnSpy: Mock;
 
   const mockSiteId = 'site-123';
   const rootPath = new Smeared('TestSite', false);
@@ -77,16 +77,15 @@ describe('GetRegularFolderPermissionsQuery', () => {
 
   beforeEach(async () => {
     loggerWarnSpy = vi.fn();
-    vi.mocked(Logger).mockImplementation(
-      () =>
-        ({
-          log: vi.fn(),
-          error: vi.fn(),
-          warn: loggerWarnSpy,
-          debug: vi.fn(),
-          verbose: vi.fn(),
-        }) as unknown as Logger,
-    );
+    vi.mocked(Logger).mockImplementation(function MockLogger() {
+      return {
+        log: vi.fn(),
+        error: vi.fn(),
+        warn: loggerWarnSpy,
+        debug: vi.fn(),
+        verbose: vi.fn(),
+      } as unknown as Logger;
+    });
 
     const { unit } = await TestBed.solitary(GetRegularFolderPermissionsQuery).compile();
     query = unit;

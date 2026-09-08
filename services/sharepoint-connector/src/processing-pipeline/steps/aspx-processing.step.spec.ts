@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import type { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
@@ -12,7 +12,7 @@ import { AspxProcessingStep } from './aspx-processing.step';
 describe('AspxProcessingStep', () => {
   let step: AspxProcessingStep;
   let mockConfigService: {
-    get: ReturnType<typeof vi.fn>;
+    get: Mock;
   };
   let mockApiService: GraphApiService;
 
@@ -80,8 +80,7 @@ describe('AspxProcessingStep', () => {
       .mock(ConfigService)
       .impl(() => mockConfigService)
       .mock(GraphApiService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getAspxPageContent: vi.fn().mockResolvedValue({
           canvasContent: '<p>Test content</p>',
           wikiField: undefined,

@@ -112,8 +112,7 @@ describe('ConnectivityHealthIndicator', () => {
   async function buildIndicator(): Promise<void> {
     const { unit } = await TestBed.solitary(ConnectivityHealthIndicator)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'health.connectivityTimeoutMs') {
             return TIMEOUT_MS;
@@ -122,13 +121,11 @@ describe('ConnectivityHealthIndicator', () => {
         }),
       }))
       .mock(ProxyService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getDispatcher: vi.fn(() => mockDispatcher),
       }))
       .mock(TenantRegistry)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getAllTenants: vi.fn(() => tenants),
       }))
       .mock(HealthIndicatorService)

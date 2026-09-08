@@ -1,6 +1,6 @@
 import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { Smeared } from '@unique-ag/utils';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import { ContentType } from '../../confluence-api/types/confluence-api.types';
 import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
@@ -52,8 +52,8 @@ function makeService(
   },
 ): {
   service: FileDiffService;
-  performFileDiff: ReturnType<typeof vi.fn>;
-  getCountByKeyPrefix: ReturnType<typeof vi.fn>;
+  performFileDiff: Mock;
+  getCountByKeyPrefix: Mock;
 } {
   const performFileDiff = vi.fn(performFileDiffImpl);
   const getCountByKeyPrefix = vi.fn().mockResolvedValue(options?.totalFilesInUnique ?? 0);

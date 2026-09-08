@@ -63,7 +63,7 @@ describe('OAuthStrategyService', () => {
 
     const { unit } = await TestBed.solitary(OAuthStrategyService)
       .mock<McpOAuthModuleOptions>(MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN)
-      .impl((stubFn) => ({ ...stubFn(), ...options }))
+      .impl(() => ({ ...options }))
       .compile();
 
     service = unit;

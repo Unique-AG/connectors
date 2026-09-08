@@ -1,6 +1,6 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { createMock } from '@golevelup/ts-vitest';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-auth';
 import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
 import { getTenantConfigs } from '../../config/tenant-config-loader';
@@ -23,7 +23,13 @@ vi.mock('@nestjs/common', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@nestjs/common')>();
   return {
     ...actual,
-    Logger: vi.fn().mockImplementation(() => mockLogger),
+    Logger: vi.fn(
+      class MockLogger {
+        public constructor() {
+          Object.assign(this, mockLogger);
+        }
+      },
+    ),
   };
 });
 
@@ -104,7 +110,7 @@ function createMockUniqueApiClient() {
 function createRegistry(configs: NamedTenantConfig[]): {
   registry: TenantRegistry;
   serviceRegistry: ServiceRegistry;
-  mockUniqueApiFactory: { create: ReturnType<typeof vi.fn> };
+  mockUniqueApiFactory: { create: Mock };
 } {
   vi.mocked(getTenantConfigs).mockReturnValue(configs);
 

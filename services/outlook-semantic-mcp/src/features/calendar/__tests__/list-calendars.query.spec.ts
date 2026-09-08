@@ -1,5 +1,5 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -20,7 +20,7 @@ function makeGraphError(statusCode: number, code: string): GraphError {
   return err;
 }
 
-function createQuery(opts: { email?: string; get?: ReturnType<typeof vi.fn> }) {
+function createQuery(opts: { email?: string; get?: Mock }) {
   const get = opts.get ?? vi.fn().mockResolvedValue({ value: [] });
   const request = {
     select: vi.fn().mockReturnThis(),

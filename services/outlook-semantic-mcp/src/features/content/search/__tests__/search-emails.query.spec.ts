@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import {
   convertUserProfileIdToTypeId,
@@ -59,8 +59,8 @@ function makeUniqueResult(
 }
 
 describe('SearchEmailsQuery', () => {
-  let semanticSearchQuery: { run: ReturnType<typeof vi.fn> };
-  let msGraphKqlQuery: { run: ReturnType<typeof vi.fn> };
+  let semanticSearchQuery: { run: Mock };
+  let msGraphKqlQuery: { run: Mock };
   let instance: SearchEmailsQuery;
 
   beforeEach(() => {

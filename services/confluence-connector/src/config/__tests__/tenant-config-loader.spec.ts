@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { dump } from 'js-yaml';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { AuthMode } from '../confluence.schema';
 
 vi.mock('node:fs', () => ({
@@ -119,8 +119,8 @@ describe('tenant-config-loader', () => {
   }
 
   function setupFsMocks(
-    globSync: ReturnType<typeof vi.fn>,
-    readFileSync: ReturnType<typeof vi.fn>,
+    globSync: Mock,
+    readFileSync: Mock,
     configs: { path: string; config: Record<string, unknown> }[],
   ) {
     globSync.mockReturnValue(configs.map((c) => c.path));
@@ -132,8 +132,8 @@ describe('tenant-config-loader', () => {
   }
 
   function setupSingleConfig(
-    globSync: ReturnType<typeof vi.fn>,
-    readFileSync: ReturnType<typeof vi.fn>,
+    globSync: Mock,
+    readFileSync: Mock,
     config: Record<string, unknown>,
     path = '/config/acme-tenant-config.yaml',
   ) {

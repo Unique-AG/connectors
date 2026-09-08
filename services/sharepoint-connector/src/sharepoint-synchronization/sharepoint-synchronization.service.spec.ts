@@ -1,5 +1,5 @@
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import { SiteSyncStep } from '../constants/sync-step.enum';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
@@ -25,34 +25,34 @@ describe('SharepointSynchronizationService', () => {
   let mockGraphApiService: Partial<GraphApiService>;
   let mockSitesConfigurationService: Partial<SitesConfigurationService>;
   let mockContentSyncService: {
-    syncContentForSite: ReturnType<typeof vi.fn>;
+    syncContentForSite: Mock;
   };
   let mockPermissionsSyncService: {
-    syncPermissionsForSite: ReturnType<typeof vi.fn>;
+    syncPermissionsForSite: Mock;
   };
   let mockScopeManagementService: {
-    batchCreateScopes: ReturnType<typeof vi.fn>;
-    resetRootScope: ReturnType<typeof vi.fn>;
-    deleteStaleScopes: ReturnType<typeof vi.fn>;
+    batchCreateScopes: Mock;
+    resetRootScope: Mock;
+    deleteStaleScopes: Mock;
   };
   let mockSubsiteDiscoveryService: {
-    discoverAllSubsites: ReturnType<typeof vi.fn>;
+    discoverAllSubsites: Mock;
   };
   let mockInitializeRootScopeCommand: {
-    execute: ReturnType<typeof vi.fn>;
+    execute: Mock;
   };
   let mockDeduplicateSitesQuery: {
-    execute: ReturnType<typeof vi.fn>;
+    execute: Mock;
   };
   let mockFindRootScopeQuery: {
-    execute: ReturnType<typeof vi.fn>;
+    execute: Mock;
   };
   let mockUniqueScopesService: {
-    getScopeById: ReturnType<typeof vi.fn>;
-    deleteScope: ReturnType<typeof vi.fn>;
+    getScopeById: Mock;
+    deleteScope: Mock;
   };
   let mockUniqueFilesService: {
-    deleteFilesBySiteId: ReturnType<typeof vi.fn>;
+    deleteFilesBySiteId: Mock;
   };
 
   const mockFile: SharepointContentItem = {
@@ -889,7 +889,7 @@ describe('SharepointSynchronizationService', () => {
       expect.any(Set),
     );
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
-    const getAllSiteItemsMock = mockGraphApiService.getAllSiteItems as ReturnType<typeof vi.fn>;
+    const getAllSiteItemsMock = mockGraphApiService.getAllSiteItems as Mock;
     expect(
       mockSubsiteDiscoveryService.discoverAllSubsites.mock.invocationCallOrder[0],
     ).toBeLessThan(getAllSiteItemsMock.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER);

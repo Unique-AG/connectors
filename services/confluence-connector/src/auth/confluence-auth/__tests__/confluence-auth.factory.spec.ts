@@ -12,21 +12,27 @@ import { OAuth2LoAuthStrategy } from '../strategies/oauth2lo-auth.strategy';
 import { PatAuthStrategy } from '../strategies/pat-auth.strategy';
 
 vi.mock('../strategies/oauth2lo-auth.strategy', () => ({
-  OAuth2LoAuthStrategy: vi.fn().mockImplementation(() => ({
-    getAuthorizationHeader: vi.fn().mockResolvedValue('Bearer oauth-token'),
-  })),
+  OAuth2LoAuthStrategy: vi.fn(
+    class MockOAuth2LoAuthStrategy {
+      public readonly getAuthorizationHeader = vi.fn().mockResolvedValue('Bearer oauth-token');
+    },
+  ),
 }));
 
 vi.mock('../strategies/pat-auth.strategy', () => ({
-  PatAuthStrategy: vi.fn().mockImplementation(() => ({
-    getAuthorizationHeader: vi.fn().mockResolvedValue('Bearer pat-token'),
-  })),
+  PatAuthStrategy: vi.fn(
+    class MockPatAuthStrategy {
+      public readonly getAuthorizationHeader = vi.fn().mockResolvedValue('Bearer pat-token');
+    },
+  ),
 }));
 
 vi.mock('../strategies/basic-auth.strategy', () => ({
-  BasicAuthStrategy: vi.fn().mockImplementation(() => ({
-    getAuthorizationHeader: vi.fn().mockResolvedValue('Basic dXNlcjpwYXNz'),
-  })),
+  BasicAuthStrategy: vi.fn(
+    class MockBasicAuthStrategy {
+      public readonly getAuthorizationHeader = vi.fn().mockResolvedValue('Basic dXNlcjpwYXNz');
+    },
+  ),
 }));
 
 const mockProxyService = createMock<ProxyService>();

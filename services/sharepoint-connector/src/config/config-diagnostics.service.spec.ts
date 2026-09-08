@@ -23,8 +23,7 @@ describe('ConfigDiagnosticsService', () => {
   beforeEach(async () => {
     const { unit, unitRef } = await TestBed.solitary(ConfigDiagnosticsService)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn(),
       }))
       .compile();

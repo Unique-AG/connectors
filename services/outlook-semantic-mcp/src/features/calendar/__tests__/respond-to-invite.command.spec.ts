@@ -1,5 +1,5 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -22,7 +22,7 @@ function makeGraphError(statusCode: number, code: string, message = 'Access deni
   return err;
 }
 
-function createCommand(opts: { post?: ReturnType<typeof vi.fn>; email?: string } = {}) {
+function createCommand(opts: { post?: Mock; email?: string } = {}) {
   const post = opts.post ?? vi.fn().mockResolvedValue(undefined);
   const request = {
     header: vi.fn().mockReturnThis(),

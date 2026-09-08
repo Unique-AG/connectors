@@ -1,19 +1,21 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { Redacted } from '../../../utils/redacted';
 import { ClientSecretAuthStrategy } from './client-secret-auth.strategy';
 
 vi.mock('@azure/msal-node', () => ({
-  ConfidentialClientApplication: vi.fn().mockImplementation(() => ({
-    acquireTokenByClientCredential: vi.fn(),
-  })),
+  ConfidentialClientApplication: vi.fn(
+    class MockConfidentialClientApplication {
+      public readonly acquireTokenByClientCredential = vi.fn();
+    },
+  ),
 }));
 
 describe('ClientSecretAuthStrategy', () => {
   let strategy: ClientSecretAuthStrategy;
   let mockMsalClient: {
-    acquireTokenByClientCredential: ReturnType<typeof vi.fn>;
+    acquireTokenByClientCredential: Mock;
   };
 
   const testScopes = ['https://graph.microsoft.com/.default'];
@@ -32,14 +34,17 @@ describe('ClientSecretAuthStrategy', () => {
     mockMsalClient = {
       acquireTokenByClientCredential: vi.fn(),
     };
-    vi.mocked(ConfidentialClientApplication).mockImplementation(() => mockMsalClient as never);
+    vi.mocked(ConfidentialClientApplication).mockImplementation(
+      function MockConfidentialClientApplication() {
+        return mockMsalClient as never;
+      },
+    );
 
     const mockDispatcher = {};
 
     const { unitRef } = await TestBed.solitary(ClientSecretAuthStrategy)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'sharepoint') {
             return mockSharepointConfig;

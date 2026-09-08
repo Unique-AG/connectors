@@ -1,7 +1,7 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context } from '@unique-ag/mcp-server-module';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -49,14 +49,7 @@ const OWN_PRIMARY = {
   },
 };
 
-function createTool(
-  opts: {
-    get?: ReturnType<typeof vi.fn>;
-    getCalendar?: ReturnType<typeof vi.fn>;
-    run?: ReturnType<typeof vi.fn>;
-    elicit?: ReturnType<typeof vi.fn>;
-  } = {},
-) {
+function createTool(opts: { get?: Mock; getCalendar?: Mock; run?: Mock; elicit?: Mock } = {}) {
   const get = opts.get ?? vi.fn().mockResolvedValue(SNAPSHOT);
   const getCalendar = opts.getCalendar ?? vi.fn().mockResolvedValue(OWN_PRIMARY);
   const run =

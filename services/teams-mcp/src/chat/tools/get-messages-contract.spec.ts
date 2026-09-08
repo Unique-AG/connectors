@@ -2,7 +2,7 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context } from '@unique-ag/mcp-server-module';
 import { TestBed } from '@suites/unit';
 import { TraceService } from 'nestjs-otel';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { type MsChatMessage } from '../chat.dtos';
 import { ChatService } from '../chat.service';
 import { GetChannelMessagesInputSchema, GetChannelMessagesTool } from './get-channel-messages.tool';
@@ -70,7 +70,7 @@ describe.each([
 
 describe('GetChatMessagesTool', () => {
   let unit: GetChatMessagesTool;
-  let getChatMessages: ReturnType<typeof vi.fn>;
+  let getChatMessages: Mock;
 
   beforeEach(async () => {
     getChatMessages = vi.fn().mockResolvedValue([htmlMessage]);
@@ -144,7 +144,7 @@ describe('GetChatMessagesTool', () => {
 
 describe('GetChannelMessagesTool', () => {
   let unit: GetChannelMessagesTool;
-  let getChannelMessages: ReturnType<typeof vi.fn>;
+  let getChannelMessages: Mock;
 
   beforeEach(async () => {
     getChannelMessages = vi.fn().mockResolvedValue([htmlMessage]);

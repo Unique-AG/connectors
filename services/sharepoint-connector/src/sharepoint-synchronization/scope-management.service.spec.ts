@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { TestBed } from '@suites/unit';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
@@ -117,7 +117,7 @@ describe('ScopeManagementService', () => {
   };
 
   let service: ScopeManagementService;
-  let createScopesMock: ReturnType<typeof vi.fn>;
+  let createScopesMock: Mock;
 
   beforeEach(async () => {
     createScopesMock = vi.fn().mockResolvedValue(
@@ -131,8 +131,7 @@ describe('ScopeManagementService', () => {
 
     const { unit } = await TestBed.solitary(ScopeManagementService)
       .mock<UniqueScopesService>(UniqueScopesService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         createScopesBasedOnPaths: createScopesMock,
         listScopesByExternalIdPrefix: vi.fn().mockResolvedValue([]),
       }))
@@ -291,7 +290,7 @@ describe('ScopeManagementService', () => {
     });
 
     describe('subsite external ID assignment', () => {
-      let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+      let updateScopeExternalIdMock: Mock;
 
       const makeSubsite = (name: string, relativePath: string, siteId: string) => ({
         siteId: new Smeared(siteId, false),
@@ -344,8 +343,7 @@ describe('ScopeManagementService', () => {
 
         const { unit } = await TestBed.solitary(ScopeManagementService)
           .mock<UniqueScopesService>(UniqueScopesService)
-          .impl((stubFn) => ({
-            ...stubFn(),
+          .impl(() => ({
             createScopesBasedOnPaths: vi.fn().mockImplementation((paths: string[]) =>
               paths.map((path, i) => ({
                 id: `scope-${i}`,
@@ -515,15 +513,14 @@ describe('ScopeManagementService', () => {
   });
 
   describe('updateNewlyCreatedScopesWithExternalId', () => {
-    let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+    let updateScopeExternalIdMock: Mock;
 
     beforeEach(async () => {
       updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
 
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
-        .impl((stubFn) => ({
-          ...stubFn(),
+        .impl(() => ({
           updateScopeExternalId: updateScopeExternalIdMock,
         }))
         .compile();
@@ -716,8 +713,8 @@ describe('ScopeManagementService', () => {
   });
 
   describe('markStaleScopesForDeletion', () => {
-    let listScopesByExternalIdPrefixMock: ReturnType<typeof vi.fn>;
-    let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+    let listScopesByExternalIdPrefixMock: Mock;
+    let updateScopeExternalIdMock: Mock;
 
     beforeEach(async () => {
       listScopesByExternalIdPrefixMock = vi.fn().mockResolvedValue([]);
@@ -725,8 +722,7 @@ describe('ScopeManagementService', () => {
 
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
-        .impl((stubFn) => ({
-          ...stubFn(),
+        .impl(() => ({
           listScopesByExternalIdPrefix: listScopesByExternalIdPrefixMock,
           updateScopeExternalId: updateScopeExternalIdMock,
         }))
@@ -895,8 +891,8 @@ describe('ScopeManagementService', () => {
   });
 
   describe('batchCreateScopes stale marking', () => {
-    let listScopesByExternalIdPrefixMock: ReturnType<typeof vi.fn>;
-    let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+    let listScopesByExternalIdPrefixMock: Mock;
+    let updateScopeExternalIdMock: Mock;
 
     beforeEach(async () => {
       listScopesByExternalIdPrefixMock = vi.fn().mockResolvedValue([]);
@@ -904,8 +900,7 @@ describe('ScopeManagementService', () => {
 
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
-        .impl((stubFn) => ({
-          ...stubFn(),
+        .impl(() => ({
           createScopesBasedOnPaths: vi.fn().mockResolvedValue(
             mockScopes.map(({ id, name, parentId, externalId }) => ({
               id,
@@ -1007,8 +1002,8 @@ describe('ScopeManagementService', () => {
   });
 
   describe('deleteStaleScopes', () => {
-    let listScopesByExternalIdPrefixMock: ReturnType<typeof vi.fn>;
-    let deleteScopeMock: ReturnType<typeof vi.fn>;
+    let listScopesByExternalIdPrefixMock: Mock;
+    let deleteScopeMock: Mock;
 
     beforeEach(async () => {
       listScopesByExternalIdPrefixMock = vi.fn().mockResolvedValue([]);
@@ -1016,8 +1011,7 @@ describe('ScopeManagementService', () => {
 
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
-        .impl((stubFn) => ({
-          ...stubFn(),
+        .impl(() => ({
           listScopesByExternalIdPrefix: listScopesByExternalIdPrefixMock,
           deleteScope: deleteScopeMock,
         }))
@@ -1118,9 +1112,9 @@ describe('ScopeManagementService', () => {
   });
 
   describe('resetRootScope', () => {
-    let listChildrenScopesMock: ReturnType<typeof vi.fn>;
-    let deleteScopeMock: ReturnType<typeof vi.fn>;
-    let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+    let listChildrenScopesMock: Mock;
+    let deleteScopeMock: Mock;
+    let updateScopeExternalIdMock: Mock;
 
     beforeEach(async () => {
       listChildrenScopesMock = vi.fn().mockResolvedValue([]);
@@ -1132,8 +1126,7 @@ describe('ScopeManagementService', () => {
 
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
-        .impl((stubFn) => ({
-          ...stubFn(),
+        .impl(() => ({
           listChildrenScopes: listChildrenScopesMock,
           deleteScope: deleteScopeMock,
           updateScopeExternalId: updateScopeExternalIdMock,

@@ -1,15 +1,15 @@
 import { TestBed } from '@suites/unit';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { Smeared } from '../utils/smeared';
 import { RootScopeMigrationService } from './root-scope-migration.service';
 
 describe('RootScopeMigrationService', () => {
   let service: RootScopeMigrationService;
-  let getScopeByExternalIdMock: ReturnType<typeof vi.fn>;
-  let listChildrenScopesMock: ReturnType<typeof vi.fn>;
-  let bulkMoveScopesMock: ReturnType<typeof vi.fn>;
-  let deleteScopeMock: ReturnType<typeof vi.fn>;
+  let getScopeByExternalIdMock: Mock;
+  let listChildrenScopesMock: Mock;
+  let bulkMoveScopesMock: Mock;
+  let deleteScopeMock: Mock;
 
   beforeEach(async () => {
     getScopeByExternalIdMock = vi.fn();
@@ -19,8 +19,7 @@ describe('RootScopeMigrationService', () => {
 
     const { unit } = await TestBed.solitary(RootScopeMigrationService)
       .mock<UniqueScopesService>(UniqueScopesService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         getScopeByExternalId: getScopeByExternalIdMock,
         listChildrenScopes: listChildrenScopesMock,
         bulkMoveScopes: bulkMoveScopesMock,

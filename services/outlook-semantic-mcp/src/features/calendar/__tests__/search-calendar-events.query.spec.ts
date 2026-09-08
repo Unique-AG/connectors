@@ -1,6 +1,6 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Temporal } from 'temporal-polyfill';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import {
@@ -140,7 +140,7 @@ function createQuery(opts: {
     calendars?: CalendarRef[];
   };
   timezone?: ResolvedMailboxTimezone;
-  get?: ReturnType<typeof vi.fn>;
+  get?: Mock;
   getByPath?: Record<string, unknown | Error>;
 }) {
   const get = opts.get ?? vi.fn().mockResolvedValue({ value: [] });

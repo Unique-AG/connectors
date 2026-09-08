@@ -1,12 +1,12 @@
 import { type Context } from '@unique-ag/mcp-server-module';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from '@nestjs/common';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { ConfirmSchema, confirmWrite } from '../confirm-write';
 
 const SCHEMA = ConfirmSchema;
 
-function run(elicit: ReturnType<typeof vi.fn>) {
+function run(elicit: Mock) {
   const warn = vi.fn();
   const result = confirmWrite({
     context: { elicit } as unknown as Context,
