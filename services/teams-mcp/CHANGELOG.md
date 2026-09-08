@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.7](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.6...teams-mcp@0.4.7) (2026-09-08)
+
+
+### Bug Fixes
+
+* **backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** bump base chart dependency to 0.1.0-87990c ([#915](https://github.com/Unique-AG/connectors/issues/915)) ([1bc27a7](https://github.com/Unique-AG/connectors/commit/1bc27a713ab7e2a5bf36671fa1f1f294497c649e))
+
+
+### Dependencies
+
+* bump @opentelemetry/instrumentation-pg from 0.73.0 to 0.74.0 ([#938](https://github.com/Unique-AG/connectors/issues/938)) ([e68832a](https://github.com/Unique-AG/connectors/commit/e68832adc6426aeb1c40d84464b06f0be84af5ab))
+* bump node from 26.7.0-trixie-slim to 26.8.1-trixie-slim in /services/teams-mcp/deploy ([#925](https://github.com/Unique-AG/connectors/issues/925)) ([64c6ad5](https://github.com/Unique-AG/connectors/commit/64c6ad5715ba8c32bc1028700aa549208a956a8c))
+* put every dependency in the right group, name what was missing, and hold shared versions in the pnpm catalog ([#958](https://github.com/Unique-AG/connectors/issues/958)) ([794092f](https://github.com/Unique-AG/connectors/commit/794092faa348052eddf2be580ed61fc771684b6f))
+* stop shipping dev dependencies in the service images ([#978](https://github.com/Unique-AG/connectors/issues/978)) ([29c1613](https://github.com/Unique-AG/connectors/commit/29c1613b89b5dd0edb0cd2dd92bdf921bf26c18a))
+* upgrade biome to 2.5.12 and fix what its new rules flag ([#967](https://github.com/Unique-AG/connectors/issues/967)) ([02bb1dc](https://github.com/Unique-AG/connectors/commit/02bb1dc03307689255d8bbf647fd8b1c611dac67))
+* upgrade vitest to 5.0.0 and migrate the mocks it breaks ([#970](https://github.com/Unique-AG/connectors/issues/970)) ([9474b72](https://github.com/Unique-AG/connectors/commit/9474b72bc43b99f6e2bf996794145c0aad84f519))
+
 ## [0.4.6](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.5...teams-mcp@0.4.6) (2026-09-01)
 
 
