@@ -9,8 +9,6 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
@@ -18,10 +16,11 @@ from backstop_mcp.features.party_resolver import (
     SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    resolve_party,
+    ResolvePartyQuery,
+    get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
 from backstop_mcp.features.tasks import GetTasksForPartyQuery, TaskFilter, TasksResolvedResponse
 from backstop_mcp.features.tasks.dependencies import get_tasks_for_party_query_factory
 from backstop_mcp.models import published_output_schema
@@ -68,7 +67,7 @@ async def get_tasks_for_party(
             )
         ),
     ] = "all",
-    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     get_tasks_for_party_query: GetTasksForPartyQuery = Depends(get_tasks_for_party_query_factory),
 ) -> GetTasksForPartyResponse:
     """List a party's CRM tasks.
@@ -84,9 +83,10 @@ async def get_tasks_for_party(
     `OrganizationBean` casing — `organizations` or `ORGANIZATION` fail closed. Status is
     not filterable on the wire; open vs completed is split here.
     """
-    result = await resolve_party(
-        ctx, client, search_type=search_type, party_id=party_id, search=search
+    result = await resolve_party_query.run(
+        search_type=search_type, party_id=party_id, search=search
     )
+    result = await elicit_if_ambiguous(ctx, result)
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value

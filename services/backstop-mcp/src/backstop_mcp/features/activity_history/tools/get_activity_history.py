@@ -19,8 +19,6 @@ from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.activity_history import (
     ActivityHistorySettings,
     GetActivityHistoryQuery,
@@ -28,6 +26,7 @@ from backstop_mcp.features.activity_history import (
     get_activity_history_settings,
 )
 from backstop_mcp.features.activity_history.dependencies import get_activity_history_query_factory
+from backstop_mcp.features.party_resolver import ResolvePartyQuery, get_resolve_party_query_factory
 from backstop_mcp.models import published_output_schema
 
 from ._page_input import (
@@ -60,7 +59,7 @@ __all__ = [
 async def get_activity_history(
     ctx: Context,
     request: ActivityHistoryPageInput,
-    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     activity_history: ActivityHistorySettings = Depends(get_activity_history_settings),
     get_activity_history_query: GetActivityHistoryQuery = Depends(
         get_activity_history_query_factory
@@ -117,7 +116,7 @@ async def get_activity_history(
     do not pass raw integers.
     """
     args = await extract_fetch_activity_history_args(
-        ctx, client, request, page_size=activity_history.page_size
+        ctx, resolve_party_query, request, page_size=activity_history.page_size
     )
     if not isinstance(args, FetchArgs):
         return args

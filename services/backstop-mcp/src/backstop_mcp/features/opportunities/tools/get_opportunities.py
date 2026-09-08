@@ -21,8 +21,6 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.custom_fields import CustomFieldFilters
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.opportunities import (
@@ -37,10 +35,11 @@ from backstop_mcp.features.party_resolver import (
     SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    resolve_party,
+    ResolvePartyQuery,
+    get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -102,7 +101,7 @@ async def get_opportunities(
             ),
         ),
     ] = (),
-    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     get_opportunities_query: GetOpportunitiesQuery = Depends(get_opportunities_query_factory),
 ) -> GetOpportunitiesResponse:
     """Fetch a party's opportunities: stage, stage timing, and how each deal got there.
@@ -130,13 +129,12 @@ async def get_opportunities(
     `custom_fields_unavailable` is true, an empty list means the catalog could not be loaded,
     not that the deal has no Master Pipeline data.
     """
-    result = await resolve_party(
-        ctx,
-        client,
+    result = await resolve_party_query.run(
         search_type=search_type,
         party_id=party_id,
         search=search,
     )
+    result = await elicit_if_ambiguous(ctx, result)
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 

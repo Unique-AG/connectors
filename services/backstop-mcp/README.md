@@ -74,8 +74,7 @@ refactoring a feature.
 
 **Deprecated — do not copy.** Do not add a new `fetch_*.py` at a feature root. Domain reads
 go through `GetXQuery.run`. Catalog walks go through a `*Service`. Leave
-`party_resolver/fetch_party_name.py` and `accounts/utils/fetch_series.py` as they are —
-those are leftover names, not a template.
+`accounts/utils/fetch_series.py` as it is — that is a leftover name, not a template.
 
 Three rules an agent will otherwise break, each enforced by a test: a tool is registered by being
 added to `server/tools/registry.py` as well as written, and nothing under `features/` may import

@@ -1,7 +1,7 @@
 """Product index, account listing, series latest-point, and holdings / time-series shapes.
 
 `resolve_product` matches id, `productShortName`, and name against one `GET /products` page.
-It does not use `resolve_party`: that path is `/quick-search`, which misses short names.
+It does not use `ResolvePartyQuery`: that path is `/quick-search`, which misses short names.
 Account listing walks `/accounts` with `include=owner,investorType` (and `product` by party).
 Figures are `sort=-date` (first 10 rows) then `max(date)` — not a `filter[date][ge]` window —
 except `get_time_series`, which paginates the dated series.

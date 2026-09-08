@@ -158,7 +158,7 @@ PartyBatchAmbiguousResponse = BatchAmbiguousResponse[PartyCandidateResponse, Res
 def unresolved_party_response(
     result: Unresolved[ResolvedPartyDto],
 ) -> PartyAmbiguousResponse | NotFoundResponse:
-    """Convert a non-`Resolved` `resolve_party` outcome into the standard tool response."""
+    """Convert a non-`Resolved` party resolution into the standard tool response."""
     return unresolved_response(
         result,
         ambiguous_model=PartyAmbiguousResponse,

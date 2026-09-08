@@ -301,6 +301,17 @@ async def elicit_choice[T](
     return ambiguous
 
 
+async def elicit_if_ambiguous[T](ctx: Context, outcome: Resolution[T]) -> Resolution[T]:
+    """Policy step 2: several matches on a single call → ask; otherwise leave the outcome."""
+    if not isinstance(outcome, Ambiguous):
+        return outcome
+    return await elicit_choice(
+        ctx,
+        outcome,
+        prompt=f'Multiple {outcome.scope} matched "{outcome.query}". Which one did you mean?',
+    )
+
+
 # --- LLM-facing response models -------------------------------------------------------------
 
 

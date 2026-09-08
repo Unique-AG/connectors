@@ -12,11 +12,10 @@ before designing from swagger. The live instance is read-only: never `POST` / `P
 
 ## Deprecated layout (do not copy)
 
-The catalog trio, `tasks`, `org_people`, `accounts`, and `activity_history` already follow
-the opportunities layout. Do not copy leftover `fetch_*` files into new work
-(`accounts/utils/fetch_series.py`, `party_resolver/fetch_party_name.py`). Those names stay
-only because they still have callers; they are not the template. Do not add a `fetch_*`
-filename ban while they exist.
+The catalog trio, `tasks`, `org_people`, `accounts`, `activity_history`, and
+`party_resolver` already follow the opportunities layout. Do not copy leftover `fetch_*` files into new work
+(`accounts/utils/fetch_series.py`). That name stays only because it still has callers; it
+is not the template. Do not add a `fetch_*` filename ban while it exists.
 
 What that older layout did, and what to do instead:
 

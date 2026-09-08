@@ -7,8 +7,6 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.custom_fields import CustomFieldFilters
 from backstop_mcp.features.data_hygiene import AsOfResponse
 from backstop_mcp.features.includes import OrganizationInclude
@@ -17,10 +15,11 @@ from backstop_mcp.features.org_people.dependencies import get_organization_query
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    resolve_party,
+    ResolvePartyQuery,
+    get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 type GetOrganizationResponse = (
@@ -134,7 +133,7 @@ async def get_organization(
             ),
         ),
     ] = (),
-    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     get_organization_query: GetOrganizationQuery = Depends(get_organization_query_factory),
 ) -> GetOrganizationResponse:
     """Fetch one Backstop organization by trusted Party ID or by name/email search.
@@ -169,13 +168,12 @@ async def get_organization(
     Call `list_custom_fields` for the catalog itself. `numberOfEmployees` is not a roster —
     use `get_people_for_party` for the people Backstop actually links to this organization.
     """
-    result = await resolve_party(
-        ctx,
-        client,
+    result = await resolve_party_query.run(
         search_type=search_type if search_type is not None else "organizations",
         party_id=party_id,
         search=search,
     )
+    result = await elicit_if_ambiguous(ctx, result)
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 

@@ -30,6 +30,7 @@ from tests.features.party_resolver.helpers import (
     collection,
     ctx_decline,
     ctx_never_elicit,
+    make_resolve_party_query,
     resource,
 )
 from tests.helpers import custom_fields_service, recorded_requests
@@ -139,7 +140,7 @@ class TestGetOrganization:
             await get_organization(
                 ctx_never_elicit(),
                 search="Capstone",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -189,7 +190,7 @@ class TestGetOrganization:
             await get_organization(
                 ctx_decline(),
                 search="Capstone",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -244,7 +245,7 @@ class TestGetOrganization:
                 ctx_never_elicit(),
                 party_id="trusted-9",
                 search_type="organizations",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -264,7 +265,7 @@ class TestGetOrganization:
     async def test_trusted_party_id_is_percent_encoded_in_request_path(
         self, client: BackstopClient
     ) -> None:
-        # Defense in depth alongside the '/' rejection in resolve_party.py: any character that
+        # Defense in depth alongside the '/' rejection in ResolvePartyQuery: any character that
         # could otherwise change the request's structure (here, a space) must be encoded
         # rather than interpolated raw into the path.
 
@@ -285,7 +286,7 @@ class TestGetOrganization:
             await get_organization(
                 ctx_never_elicit(),
                 party_id="trusted 9",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -306,7 +307,7 @@ class TestGetOrganization:
             await get_organization(
                 ctx_never_elicit(),
                 party_id="../admin",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -331,7 +332,7 @@ class TestGetOrganization:
             await get_organization(
                 ctx_never_elicit(),
                 party_id="trusted-9",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -356,7 +357,7 @@ class TestGetOrganization:
             await get_organization(
                 ctx_never_elicit(),
                 search="Capstoen",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -401,7 +402,7 @@ class TestGetOrganization:
             await get_organization(
                 ctx_never_elicit(),
                 search="Capstone",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -447,7 +448,7 @@ class TestGetOrganizationIncludes:
                 ctx_never_elicit(),
                 party_id="o42",
                 include=["locations"],
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -494,7 +495,7 @@ class TestGetOrganizationIncludes:
                 ctx_never_elicit(),
                 party_id="o42",
                 include=["email_addresses"],
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -552,7 +553,7 @@ class TestGetOrganizationIncludes:
                 ctx_never_elicit(),
                 party_id="o42",
                 include=["primary_contact"],
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -616,7 +617,7 @@ class TestGetOrganizationIncludes:
                 ctx_never_elicit(),
                 party_id="o42",
                 include=["representative"],
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -653,7 +654,7 @@ class TestGetOrganizationIncludes:
             await get_organization(
                 ctx_never_elicit(),
                 party_id="o42",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -679,7 +680,7 @@ class TestGetOrganizationIncludes:
                 ctx_never_elicit(),
                 party_id="o42",
                 include=["locations", "email_addresses", "primary_contact", "representative"],
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -711,7 +712,7 @@ class TestGetOrganizationIncludes:
                 ctx_never_elicit(),
                 party_id="o42",
                 include=["primary_contact"],
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -752,7 +753,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             await get_organization(
                 ctx_never_elicit(),
                 party_id="o42",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -789,7 +790,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             await get_organization(
                 ctx_never_elicit(),
                 party_id="o42",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -818,7 +819,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             await get_organization(
                 ctx_never_elicit(),
                 party_id="o42",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -844,7 +845,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             await get_organization(
                 ctx_never_elicit(),
                 party_id="o42",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -988,7 +989,7 @@ async def _organization_custom_fields(
         await get_organization(
             ctx_never_elicit(),
             party_id="o42",
-            client=client,
+            resolve_party_query=make_resolve_party_query(client),
             get_organization_query=make_get_organization_query(client, custom_fields=catalog),
             custom_field_tabs=custom_field_tabs,
             custom_field_groups=custom_field_groups,
@@ -1221,7 +1222,7 @@ class TestGetOrganizationCustomFields:
             await get_organization(
                 ctx_never_elicit(),
                 party_id="o42",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
@@ -1254,7 +1255,7 @@ class TestGetOrganizationCustomFields:
             await get_organization(
                 ctx_never_elicit(),
                 party_id="o42",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),

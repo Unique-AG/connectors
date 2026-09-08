@@ -22,8 +22,7 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
-from backstop_mcp.dependencies import get_backstop_client_for_current_caller
+from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.accounts import (
     GetHoldingsQuery,
     HoldingListingDto,
@@ -35,14 +34,16 @@ from backstop_mcp.features.party_resolver import (
     PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     REQUIRED_SEARCH_TYPE_DESCRIPTION,
     SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    GetPartyNameQuery,
     PartyAmbiguousResponse,
     ResolvedPartyDto,
     ResolvedPartyResponse,
-    fetch_party_name,
-    resolve_party,
+    ResolvePartyQuery,
+    get_party_name_query_factory,
+    get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,8 @@ async def get_accounts_for_party(
             ),
         ),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
+    get_party_name_query: GetPartyNameQuery = Depends(get_party_name_query_factory),
     get_holdings_query: GetHoldingsQuery = Depends(get_holdings_query_factory),
 ) -> GetAccountsForPartyResponse:
     """What a person or organization holds: their accounts, with balances, across products.
@@ -116,13 +118,12 @@ async def get_accounts_for_party(
     `product`. An empty list with `closed_omitted>0` means every owned account is closed — pass
     `include_closed=true` rather than reading that as "owns nothing".
     """
-    result = await resolve_party(
-        ctx,
-        client,
+    result = await resolve_party_query.run(
         search_type=search_type,
         party_id=party_id,
         search=search,
     )
+    result = await elicit_if_ambiguous(ctx, result)
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 
@@ -137,7 +138,7 @@ async def get_accounts_for_party(
     )
     listing = await get_holdings_query.run(owner_id=party.id, include_closed=include_closed)
     if _listing_is_empty(listing) and party.name is None:
-        confirmed = await _confirm_party(client, party)
+        confirmed = await _confirm_party(get_party_name_query, party)
         if confirmed is None:
             logger.info(
                 "accounts.for_party.unverified_party_id",
@@ -169,7 +170,7 @@ def _listing_is_empty(listing: HoldingListingDto) -> bool:
 
 
 async def _confirm_party(
-    client: BackstopClient, party: ResolvedPartyDto
+    get_party_name_query: GetPartyNameQuery, party: ResolvedPartyDto
 ) -> ResolvedPartyDto | None:
     """The party with its name filled in, or `None` when Backstop has no such record.
 
@@ -178,7 +179,7 @@ async def _confirm_party(
     propagate: "we could not check" must not be reported as "no such party".
     """
     try:
-        name = await fetch_party_name(client, search_type=party.search_type, party_id=party.id)
+        name = await get_party_name_query.run(search_type=party.search_type, party_id=party.id)
     except BackstopApiError as exc:
         if exc.status_code == 404:
             return None

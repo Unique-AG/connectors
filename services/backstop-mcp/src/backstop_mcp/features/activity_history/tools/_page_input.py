@@ -15,7 +15,6 @@ from pydantic import (
     model_validator,
 )
 
-from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_history import (
     ActivityContinuationResponse,
     ActivityType,
@@ -28,10 +27,10 @@ from backstop_mcp.features.party_resolver import (
     SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyDto,
-    resolve_party,
+    ResolvePartyQuery,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
 
 logger = logging.getLogger(__name__)
 
@@ -234,7 +233,7 @@ def effective_activity_types(
 
 async def extract_fetch_activity_history_args(
     ctx: Context,
-    client: BackstopClient,
+    resolve_party_query: ResolvePartyQuery,
     request: ActivityHistoryFirstPageInput | ActivityHistoryNextPageInput,
     *,
     page_size: int,
@@ -274,13 +273,12 @@ async def extract_fetch_activity_history_args(
             limit=limit,
             activity_tag_ids=activity_tag_ids,
         ):
-            result = await resolve_party(
-                ctx,
-                client,
+            result = await resolve_party_query.run(
                 search_type=search_type,
                 party_id=party_id,
                 search=search,
             )
+            result = await elicit_if_ambiguous(ctx, result)
             if not isinstance(result, Resolved):
                 logger.info(
                     "activity_history.args.unresolved",

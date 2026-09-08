@@ -41,6 +41,7 @@ from tests.features.party_resolver.helpers import (
     collection,
     ctx_decline,
     ctx_never_elicit,
+    make_resolve_party_query,
     resource,
 )
 from tests.server.tools.helpers import object_dict, tool_model, tool_model_union, tool_payload
@@ -145,7 +146,7 @@ class TestFirstCallByTrustedPartyId:
             await get_activity_history(
                 ctx_never_elicit(),
                 _first(search_type="organizations", party_id="o42"),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             ),
@@ -202,7 +203,7 @@ class TestFirstCallBySearch:
                     search="Capstone",
                     activity_types=["meeting"],
                 ),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             ),
@@ -240,7 +241,7 @@ class TestFirstCallBySearch:
             await get_activity_history(
                 ctx_decline(),
                 _first(search_type="organizations", search="Capstone"),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             ),
@@ -282,7 +283,7 @@ class TestFirstCallBySearch:
             await get_activity_history(
                 ctx_never_elicit(),
                 _first(search_type="people", search="Nope"),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             ),
@@ -336,7 +337,7 @@ class TestFirstCallBySearch:
             await get_activity_history(
                 ctx_never_elicit(),
                 _first(search_type="people", search="Jane Contact", activity_types=["meeting"]),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             ),
@@ -390,7 +391,7 @@ class TestFirstCallBySearch:
                     search_type="contacts",
                     activity_types=["meeting"],
                 ),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             ),
@@ -433,7 +434,7 @@ class TestResumedCall:
                     entity_id="o42",
                     next={"meeting": ActivityContinuationResponse(limit=10, offset=3)},
                 ),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             ),
@@ -485,7 +486,7 @@ class TestResumedCall:
                     entity_id="p9",
                     next={"meeting": ActivityContinuationResponse(limit=10, offset=3)},
                 ),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             ),
@@ -534,7 +535,7 @@ class TestResumedCall:
         first_result = await get_activity_history(
             ctx_never_elicit(),
             _first(search_type="organizations", party_id="o42"),
-            client=client,
+            resolve_party_query=make_resolve_party_query(client),
             activity_history=_SETTINGS,
             get_activity_history_query=make_get_activity_history_query(client),
         )
@@ -560,7 +561,7 @@ class TestResumedCall:
                     "next": {"email": raw_email_next},
                 }
             ),
-            client=client,
+            resolve_party_query=make_resolve_party_query(client),
             activity_history=_SETTINGS,
             get_activity_history_query=make_get_activity_history_query(client),
         )
@@ -694,7 +695,7 @@ class TestPartialFailurePropagates:
                     party_id="o5",
                     activity_types=["meeting", "note"],
                 ),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             )
@@ -736,7 +737,7 @@ class TestPartialFailurePropagates:
                     party_id="o5",
                     activity_types=["call", "document"],
                 ),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             ),
@@ -770,7 +771,7 @@ class TestDocumentInclusion:
                     party_id="o9",
                     activity_types=["document"],
                 ),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             ),
@@ -800,7 +801,7 @@ class TestWireOmitsNone:
             await get_activity_history(
                 ctx_never_elicit(),
                 _first(search_type="organizations", party_id="o42", activity_types=["meeting"]),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
             )

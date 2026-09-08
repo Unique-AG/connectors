@@ -16,12 +16,7 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import (
-    BackstopAuthError,
-    BackstopClient,
-    BackstopRateLimitError,
-)
-from backstop_mcp.dependencies import get_backstop_client_for_current_caller
+from backstop_mcp.backstop_client import BackstopAuthError, BackstopRateLimitError
 from backstop_mcp.features.activity_history import (
     ENTITY_ACTIVITY_TYPES,
     MAX_RETRIEVABLE,
@@ -37,10 +32,11 @@ from backstop_mcp.features.activity_history.dependencies import get_search_activ
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     ResolvedPartyResponse,
-    resolve_party,
+    ResolvePartyQuery,
+    get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import Resolved
+from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -276,7 +272,7 @@ async def search_activities(
             ),
         ),
     ] = None,
-    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     search_activities_query: SearchActivitiesQuery = Depends(get_search_activities_query_factory),
 ) -> GetSearchActivitiesResponse:
     """Search activities firm-wide or for one party: meetings, calls, notes, emails, documents.
@@ -327,9 +323,10 @@ async def search_activities(
     resolved_party: ResolvedPartyResponse | None = None
     scoped_party_id: str | None = None
     if search_type is not None:
-        outcome = await resolve_party(
-            ctx, client, search_type=search_type, party_id=party_id, search=search
+        outcome = await resolve_party_query.run(
+            search_type=search_type, party_id=party_id, search=search
         )
+        outcome = await elicit_if_ambiguous(ctx, outcome)
         if not isinstance(outcome, Resolved):
             return unresolved_party_response(outcome)
         resolved_party = ResolvedPartyResponse.from_party(outcome.value)

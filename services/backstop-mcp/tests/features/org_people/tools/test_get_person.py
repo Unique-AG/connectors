@@ -31,6 +31,7 @@ from tests.features.party_resolver.helpers import (
     collection,
     ctx_decline,
     ctx_never_elicit,
+    make_resolve_party_query,
     resource,
 )
 from tests.helpers import build_employment_index_factory, custom_fields_service
@@ -137,7 +138,7 @@ class TestGetPerson:
             await get_person(
                 ctx_never_elicit(),
                 search="Jane Doe",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -193,7 +194,7 @@ class TestGetPerson:
             await get_person(
                 ctx_never_elicit(),
                 search="Jane Doe",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -240,7 +241,7 @@ class TestGetPerson:
             await get_person(
                 ctx_never_elicit(),
                 search="Jane Contact",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -283,7 +284,7 @@ class TestGetPerson:
                 ctx_never_elicit(),
                 party_id="c9",
                 search_type="contacts",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -318,7 +319,7 @@ class TestGetPerson:
             await get_person(
                 ctx_decline(),
                 search="Jane",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -371,7 +372,7 @@ class TestGetPerson:
             await get_person(
                 ctx_never_elicit(),
                 search="Jane Doe",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -414,7 +415,7 @@ class TestGetPersonIncludes:
                 ctx_never_elicit(),
                 party_id="p9",
                 include=["email_addresses"],
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -471,7 +472,7 @@ class TestGetPersonIncludes:
                 ctx_never_elicit(),
                 party_id="p9",
                 include=["email_addresses", "company"],
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -504,7 +505,7 @@ class TestGetPersonIncludes:
             await get_person(
                 ctx_never_elicit(),
                 party_id="p9",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -569,7 +570,7 @@ class TestGetPersonIncludes:
                 ctx_never_elicit(),
                 party_id="p9",
                 include=["locations", "representative"],
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -621,7 +622,7 @@ class TestGetPersonOmitsNullsFromTheWire:
             await get_person(
                 ctx_never_elicit(),
                 party_id="p9",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -659,7 +660,7 @@ class TestGetPersonOmitsNullsFromTheWire:
             await get_person(
                 ctx_never_elicit(),
                 party_id="p9",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -687,7 +688,7 @@ class TestGetPersonOmitsNullsFromTheWire:
             await get_person(
                 ctx_never_elicit(),
                 party_id="p9",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -719,7 +720,7 @@ class TestGetPersonOmitsNullsFromTheWire:
             await get_person(
                 ctx_never_elicit(),
                 party_id="p9",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -779,7 +780,7 @@ class TestGetPersonCustomFields:
             await get_person(
                 ctx_never_elicit(),
                 party_id="p9",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
@@ -807,7 +808,7 @@ class TestGetPersonCustomFields:
                 ctx_never_elicit(),
                 party_id="p9",
                 custom_field_definition_ids=cast(list[CoercedId], [202]),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
