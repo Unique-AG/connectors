@@ -20,6 +20,9 @@ with `uv run backstop-mcp` (http://localhost:9010/mcp), then this script.
 Requires `op` signed in, `CURSOR_API_KEY`, and `BACKSTOP_SERVICE_USERNAME` /
 `BACKSTOP_SERVICE_API_TOKEN`. The script completes the local MCP OAuth form
 itself; no Cursor-app login is needed.
+
+`cursor-sdk` is not a locked service dependency. Install it locally before a
+run: `uv pip install cursor-sdk==1.0.31`.
 """
 
 from __future__ import annotations
@@ -35,28 +38,30 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from functools import cache
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Literal, cast
 from urllib.parse import parse_qs, urlparse
 
 import httpx
-from cursor_sdk import (
-    Agent,
-    AgentOptions,
-    CursorAgentError,
-    HttpMcpServerConfig,
-    LocalAgentOptions,
-    ModelParameterValue,
-    ModelSelection,
-)
 from dotenv import load_dotenv
 from pydantic import TypeAdapter, ValidationError
+from test_set_classify import (
+    DEFAULT_MCP_NAME,
+    JudgeScore,
+    ToolCall,
+    Verdict,
+    _as_string_map,
+    _split_tools,
+    _tool_call_name,
+    _verdict,
+)
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_MCP_URL = "http://localhost:9010/mcp"
-DEFAULT_MCP_NAME = "backstop"
 DEFAULT_MODEL = "grok-4.6"
 RUNS_DIR = HERE / ".test-set-runs"
 _OAUTH_REDIRECT = "http://127.0.0.1:9/callback"
@@ -67,32 +72,35 @@ _USE_CASE = re.compile(r"^## Use case ([A-Z])\b")
 _TABLE_ROW = re.compile(r"^\| (.+) \| (.+) \|$")
 _JSON_OBJECT: TypeAdapter[dict[str, object]] = TypeAdapter(dict[str, object])
 _JSON_VALUE: TypeAdapter[object] = TypeAdapter(object)
+_CURSOR_SDK_SPEC = "cursor-sdk==1.0.31"
 
-MCP_TOOLS = frozenset(
-    {
-        "get_organization",
-        "get_person",
-        "list_custom_fields",
-        "list_custom_field_groups",
-        "list_activity_tags",
-        "list_system_users",
-        "get_activity_history",
-        "get_activity_detail",
-        "search_activities",
-        "get_opportunities",
-        "get_opportunities_by_ids",
-        "search_opportunities",
-        "get_time_series",
-        "get_product",
-        "get_product_investors",
-        "get_accounts_for_party",
-        "get_capital_flows",
-        "get_people_for_party",
-        "get_tasks_for_party",
-    }
-)
 
-Verdict = Literal["pass", "partial", "fail", "error"]
+@cache
+def _cursor_sdk() -> SimpleNamespace:
+    try:
+        from cursor_sdk import (
+            Agent,
+            AgentOptions,
+            CursorAgentError,
+            HttpMcpServerConfig,
+            LocalAgentOptions,
+            ModelParameterValue,
+            ModelSelection,
+        )
+    except ImportError as exc:
+        raise SystemExit(
+            "cursor-sdk is not a locked service dependency. Install it locally "
+            + f"with `uv pip install {_CURSOR_SDK_SPEC}` to run the harness."
+        ) from exc
+    return SimpleNamespace(
+        Agent=Agent,
+        AgentOptions=AgentOptions,
+        CursorAgentError=CursorAgentError,
+        HttpMcpServerConfig=HttpMcpServerConfig,
+        LocalAgentOptions=LocalAgentOptions,
+        ModelParameterValue=ModelParameterValue,
+        ModelSelection=ModelSelection,
+    )
 
 
 @dataclass(frozen=True)
@@ -101,21 +109,6 @@ class Case:
     group: str
     question: str
     expected: str
-
-
-@dataclass
-class ToolCall:
-    name: str
-    status: str
-
-
-@dataclass
-class JudgeScore:
-    verdict: Literal["pass", "partial", "fail"]
-    reason: str
-    contradictions: list[str] = field(default_factory=list)
-    missing: list[str] = field(default_factory=list)
-    invented: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -701,42 +694,45 @@ def _refresh_mcp_auth(auth: McpAuthState) -> None:
     auth.expires_at = refreshed.expires_at
 
 
-def _model_selection(model_id: str) -> ModelSelection:
+def _model_selection(model_id: str) -> object:
+    sdk = _cursor_sdk()
     if model_id == "grok-4.6":
-        return ModelSelection(
+        return sdk.ModelSelection(
             id=model_id,
             params=(
-                ModelParameterValue(id="effort", value="high"),
-                ModelParameterValue(id="fast", value="false"),
+                sdk.ModelParameterValue(id="effort", value="high"),
+                sdk.ModelParameterValue(id="fast", value="false"),
             ),
         )
-    return ModelSelection(id=model_id)
+    return sdk.ModelSelection(id=model_id)
 
 
-def _answer_options(harness: Harness, *, case_id: str, cwd: str) -> AgentOptions:
-    return AgentOptions(
+def _answer_options(harness: Harness, *, case_id: str, cwd: str) -> object:
+    sdk = _cursor_sdk()
+    return sdk.AgentOptions(
         api_key=harness.api_key,
         model=_model_selection(harness.model),
         name=f"mcp-test-set-{case_id}",
         tools=["mcp"],
         disallowed_tools=["task", "shell", "webSearch", "edit"],
         mcp_servers={
-            DEFAULT_MCP_NAME: HttpMcpServerConfig(
+            DEFAULT_MCP_NAME: sdk.HttpMcpServerConfig(
                 url=harness.mcp_url,
                 headers={"Authorization": f"Bearer {harness.mcp_auth.access_token}"},
             )
         },
-        local=LocalAgentOptions(cwd=cwd, setting_sources=[]),
+        local=sdk.LocalAgentOptions(cwd=cwd, setting_sources=[]),
     )
 
 
-def _judge_options(harness: Harness, *, case_id: str, cwd: str) -> AgentOptions:
-    return AgentOptions(
+def _judge_options(harness: Harness, *, case_id: str, cwd: str) -> object:
+    sdk = _cursor_sdk()
+    return sdk.AgentOptions(
         api_key=harness.api_key,
         model=_model_selection(harness.judge_model),
         name=f"mcp-test-set-judge-{case_id}",
         tools=[],
-        local=LocalAgentOptions(cwd=cwd, setting_sources=[]),
+        local=sdk.LocalAgentOptions(cwd=cwd, setting_sources=[]),
     )
 
 
@@ -756,9 +752,10 @@ def _require_mcp(mcp_url: str) -> None:
 def _run_case(case: Case, *, harness: Harness) -> CaseResult:
     if not harness.quiet:
         print(f"\n=== {case.case_id}  {case.question}", flush=True)
+    sdk = _cursor_sdk()
     try:
         answer, tool_calls, run_status, agent_id, run_id = _ask_mcp(case, harness=harness)
-    except CursorAgentError as exc:
+    except sdk.CursorAgentError as exc:
         return CaseResult(
             case_id=case.case_id,
             question=case.question,
@@ -779,7 +776,7 @@ def _run_case(case: Case, *, harness: Harness) -> CaseResult:
     if harness.judge and run_status == "finished" and answer:
         try:
             score = _judge_answer(case, answer=answer, tools=mcp_tools, harness=harness)
-        except CursorAgentError as exc:
+        except sdk.CursorAgentError as exc:
             return CaseResult(
                 case_id=case.case_id,
                 question=case.question,
@@ -822,7 +819,9 @@ def _ask_mcp(case: Case, *, harness: Harness) -> tuple[str, list[ToolCall], str,
     prompt = _answer_prompt(case)
     with (
         tempfile.TemporaryDirectory(prefix="test-set-") as cwd,
-        Agent.create(_answer_options(harness, case_id=case.case_id, cwd=cwd)) as agent,
+        _cursor_sdk().Agent.create(
+            _answer_options(harness, case_id=case.case_id, cwd=cwd)
+        ) as agent,
     ):
         run = agent.send(prompt)
         if not harness.quiet:
@@ -890,9 +889,10 @@ def _judge_answer(case: Case, *, answer: str, tools: Sequence[str], harness: Har
         f"Agent answer:\n{answer}"
     )
     with tempfile.TemporaryDirectory(prefix="test-set-judge-") as cwd:
-        result = Agent.prompt(prompt, _judge_options(harness, case_id=case.case_id, cwd=cwd))
+        sdk = _cursor_sdk()
+        result = sdk.Agent.prompt(prompt, _judge_options(harness, case_id=case.case_id, cwd=cwd))
     if result.status == "error":
-        raise CursorAgentError(f"judge run {result.id} status=error")
+        raise sdk.CursorAgentError(f"judge run {result.id} status=error")
     return _parse_judge(result.result)
 
 
@@ -900,7 +900,7 @@ def _parse_judge(text: str) -> JudgeScore:
     payload = _extract_json_object(text)
     verdict = payload.get("verdict")
     if verdict not in {"pass", "partial", "fail"}:
-        raise CursorAgentError(f"judge returned unusable verdict: {verdict!r}")
+        raise _cursor_sdk().CursorAgentError(f"judge returned unusable verdict: {verdict!r}")
     reason = payload.get("reason")
     return JudgeScore(
         verdict=cast(Literal["pass", "partial", "fail"], verdict),
@@ -918,11 +918,11 @@ def _extract_json_object(text: str) -> dict[str, object]:
     start = candidate.find("{")
     end = candidate.rfind("}")
     if start == -1 or end == -1:
-        raise CursorAgentError("judge did not return JSON")
+        raise _cursor_sdk().CursorAgentError("judge did not return JSON")
     try:
         return _JSON_OBJECT.validate_json(candidate[start : end + 1])
     except ValidationError as exc:
-        raise CursorAgentError("judge JSON did not parse") from exc
+        raise _cursor_sdk().CursorAgentError("judge JSON did not parse") from exc
 
 
 def _string_list(value: object) -> list[str]:
@@ -930,75 +930,6 @@ def _string_list(value: object) -> list[str]:
         return []
     items = cast(list[object], value)
     return [item for item in items if isinstance(item, str)]
-
-
-def _split_tools(calls: Sequence[ToolCall]) -> tuple[list[str], list[str]]:
-    mcp_tools: list[str] = []
-    other: list[str] = []
-    seen: set[str] = set()
-    for call in calls:
-        if call.status == "running" or call.name in seen:
-            continue
-        seen.add(call.name)
-        if _is_mcp_tool(call.name):
-            mcp_tools.append(call.name)
-        else:
-            other.append(call.name)
-    return mcp_tools, other
-
-
-def _tool_call_name(message: object) -> str:
-    """Cursor's local agent reports the MCP gateway as `mcp`, not the Backstop tool.
-
-    `tools=["mcp"]` in `_answer_options` is that gateway. The inner Backstop name, when
-    present, is in `args` (`toolName` / `tool` / …). Prefer that so the judge sees
-    `get_accounts_for_party` instead of `(none)`.
-    """
-    name = getattr(message, "name", "")
-    if not isinstance(name, str) or not name:
-        return ""
-    inner = _inner_mcp_tool_name(getattr(message, "args", None))
-    return inner or name
-
-
-def _inner_mcp_tool_name(args: object) -> str:
-    mapped = _as_string_map(args)
-    if mapped is None:
-        return ""
-    for key in ("toolName", "tool_name", "tool", "name"):
-        value = mapped.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return ""
-
-
-def _is_mcp_tool(name: str) -> bool:
-    """True for a Backstop MCP tool or the Cursor `mcp` gateway that fronts them."""
-    normalized = name.lower().replace("-", "_")
-    if normalized in {DEFAULT_MCP_NAME.lower().replace("-", "_"), "mcp"}:
-        return True
-    return any(normalized == tool or normalized.endswith(f"_{tool}") for tool in MCP_TOOLS)
-
-
-def _verdict(
-    *,
-    run_status: str,
-    mcp_tools: Sequence[str],
-    other_tools: Sequence[str],
-    judge: JudgeScore | None,
-    answer: str,
-) -> Verdict:
-    if run_status != "finished":
-        return "error"
-    if other_tools:
-        return "fail"
-    if not mcp_tools:
-        return "fail"
-    if not answer.strip():
-        return "fail"
-    if judge is None:
-        return "pass"
-    return judge.verdict
 
 
 def _is_failure(result: CaseResult, *, strict: bool) -> bool:
@@ -1112,18 +1043,6 @@ def _header(response: httpx.Response, name: str) -> str:
 
 def _json_body(response: httpx.Response) -> object:
     return cast(object, response.json())
-
-
-def _as_string_map(value: object) -> dict[str, object] | None:
-    if not isinstance(value, dict):
-        return None
-    raw = cast(dict[object, object], value)
-    out: dict[str, object] = {}
-    for key, item in raw.items():
-        if not isinstance(key, str):
-            return None
-        out[key] = item
-    return out
 
 
 def _object_list(value: object) -> list[dict[str, object]]:

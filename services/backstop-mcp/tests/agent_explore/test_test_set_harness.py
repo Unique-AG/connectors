@@ -16,7 +16,7 @@ _EXPLORE = Path(__file__).resolve().parents[2] / "agent-explore"
 if str(_EXPLORE) not in sys.path:
     sys.path.insert(0, str(_EXPLORE))
 
-from test_set import (  # noqa: E402
+from test_set_classify import (  # noqa: E402
     JudgeScore,
     ToolCall,
     _is_mcp_tool,  # pyright: ignore[reportPrivateUsage]

@@ -48,7 +48,6 @@ dev = [
     "basedpyright==1.39.10",
     "respx==0.23.1",
     "testcontainers[postgres]==4.15.0",
-    "cursor-sdk==1.0.31",
 ]
 
 [tool.pytest.ini_options]
@@ -77,6 +76,7 @@ venv = ".venv"
 pythonVersion = "3.14"
 typeCheckingMode = "all"
 include = ["src", "tests", "agent-explore"]
+exclude = ["agent-explore/test_set.py"]
 extraPaths = ["src", ".", "agent-explore"]
 reportUnusedCallResult = false
 reportMissingTypeStubs = false
