@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.6.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.5.1...outlook-semantic-mcp@3.6.0) (2026-09-08)
+
+
+### Features
+
+* **outlook-semantic-mcp:** allow env-listed shared mailboxes to sign in ([#973](https://github.com/Unique-AG/connectors/issues/973)) ([698adff](https://github.com/Unique-AG/connectors/commit/698adff1a05fef410c1dab2a2098a7eca9081e6f))
+
+
+### Dependencies
+
+* bump markdown-it in / ([#957](https://github.com/Unique-AG/connectors/issues/957)) ([0293964](https://github.com/Unique-AG/connectors/commit/029396469cbf799d01601a2508c984696bfc1cd8))
+* put every dependency in the right group, name what was missing, and hold shared versions in the pnpm catalog ([#958](https://github.com/Unique-AG/connectors/issues/958)) ([794092f](https://github.com/Unique-AG/connectors/commit/794092faa348052eddf2be580ed61fc771684b6f))
+* upgrade biome to 2.5.12 and fix what its new rules flag ([#967](https://github.com/Unique-AG/connectors/issues/967)) ([02bb1dc](https://github.com/Unique-AG/connectors/commit/02bb1dc03307689255d8bbf647fd8b1c611dac67))
+* upgrade vitest to 5.0.0 and migrate the mocks it breaks ([#970](https://github.com/Unique-AG/connectors/issues/970)) ([9474b72](https://github.com/Unique-AG/connectors/commit/9474b72bc43b99f6e2bf996794145c0aad84f519))
+
 ## [3.5.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.5.0...outlook-semantic-mcp@3.5.1) (2026-09-07)
 
 
