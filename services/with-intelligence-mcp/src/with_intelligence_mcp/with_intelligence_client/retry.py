@@ -1,9 +1,4 @@
-"""When to try an upstream request again.
-
-429 is documented on every path with no published budget, so it is retried with backoff and a
-`Retry-After` honoured when sent. 5xx and network errors are retried; 4xx other than 429 are
-not — a 403 will be a 403 next time too.
-"""
+"""Retry policy for transient WI API failures."""
 
 from dataclasses import dataclass
 
