@@ -5,7 +5,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes } from '@opentelemetry/api';
 import { and, eq, inArray } from 'drizzle-orm';
 import { isNonNullish, isNullish } from 'remeda';
-import { DirectoriesSync, directories, directoriesSync } from '~/db';
+import { DirectoriesSync, directories, directoriesSync, SOURCES_ADDRESSED_BY_EMAIL } from '~/db';
 import { DRIZZLE, DrizzleDatabase } from '~/db/drizzle.module';
 import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import {
@@ -71,10 +71,9 @@ export class SyncDirectoriesCommand {
       userProfile,
       fn: async ({ client, clientUserProfileId }) => {
         activeDelegateUserId = clientUserProfileId;
-        const initialDeltaEndpoint =
-          userProfile.source === 'shared-mailbox'
-            ? `/users/${userProfile.email}/mailFolders/delta`
-            : `/me/mailFolders/delta`;
+        const initialDeltaEndpoint = SOURCES_ADDRESSED_BY_EMAIL.includes(userProfile.source)
+          ? `/users/${userProfile.email}/mailFolders/delta`
+          : `/me/mailFolders/delta`;
         try {
           return await this.runDeltaQuery(userProfile.id, client, initialDeltaEndpoint, syncStats);
         } catch (err) {
@@ -118,17 +117,26 @@ export class SyncDirectoriesCommand {
     }
 
     const { shouldSyncDirectories, deltaLink, syncStatsId } = deltaQueryResult;
+    const tokenKind = activeDelegateUserId === userProfile.id ? 'own' : 'delegate';
     traceEvent('delta sync completed', {
       shouldSyncDirectories: shouldSyncDirectories,
       deltaLinkPresent: isNonNullish(deltaLink),
+      tokenKind,
     });
     const logContext: Attributes = {
       userProfileId: userProfile.id,
       userEmail: userEmail.toString(),
+      source: userProfile.source,
+      tokenKind,
+      clientUserProfileId: activeDelegateUserId,
       shouldSyncDirectories,
       shouldForceDirectoriesSync,
       syncStatsId,
     };
+    this.logger.log({
+      ...logContext,
+      msg: `Directory sync using ${tokenKind} token`,
+    });
     traceAttrs({ ...logContext, deltaLinkPresent: isNonNullish(deltaLink) });
     if (shouldSyncDirectories || shouldForceDirectoriesSync) {
       traceEvent(`Run directories sync`);
@@ -146,8 +154,9 @@ export class SyncDirectoriesCommand {
       .set({
         deltaLink,
         lastDeltaSyncRanAt: new Date(),
-        synchronizedByUserProfileId:
-          userProfile.source === 'shared-mailbox' ? (activeDelegateUserId ?? null) : null,
+        synchronizedByUserProfileId: SOURCES_ADDRESSED_BY_EMAIL.includes(userProfile.source)
+          ? (activeDelegateUserId ?? null)
+          : null,
       })
       .where(eq(directoriesSync.id, syncStatsId))
       .execute();

@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.1.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.0...sharepoint-connector@3.1.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **confluence-connector,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** allow azurerm v4 or v5 (&gt;= 4, &lt; 6) in remaining modules ([#768](https://github.com/Unique-AG/connectors/issues/768)) ([dcdd34f](https://github.com/Unique-AG/connectors/commit/dcdd34f521aac36ffa7d388c0478b7e4e8237368))
+* **sharepoint-connector:** log scan progress for skipped items ([#877](https://github.com/Unique-AG/connectors/issues/877)) ([d75b5c9](https://github.com/Unique-AG/connectors/commit/d75b5c9f1edffcdd61cb506e68c35ca3a307a334))
+* **sharepoint-connector:** page SharePoint site group members past the first 100 ([#876](https://github.com/Unique-AG/connectors/issues/876)) ([05bb758](https://github.com/Unique-AG/connectors/commit/05bb7581435c743bd0e6407e7dae478684b72fec))
+
 ## [3.1.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.0.0...sharepoint-connector@3.1.0) (2026-07-20)
 
 

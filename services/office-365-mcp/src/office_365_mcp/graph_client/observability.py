@@ -1,12 +1,12 @@
 """What each Graph call cost, counted per operation and per step.
 
-An **operation** is one tool call; a **step** is one Graph call inside it.
+An **operation** is one tool call. A **step** is one Graph call inside it.
 
-HARD RULE: both labels are names this code chose — `list_chats`, `resolve_meeting` — and never a
-URL or a path. A label taken off a Graph URL is a new time series per chat, per message and per
-meeting, and an unbounded label set takes a Prometheus down rather than showing up as a bad
-dashboard. `tests/test_graph_metrics.py` enforces this over every module in `src/` and pins the
-step vocabulary to an exact set.
+HARD RULE: both labels are names this code chose — `teams_list_chats`, `resolve_meeting` — and
+never a URL or a path. A label taken off a Graph URL is a new time series per chat, per message
+and per meeting, and an unbounded label set takes a Prometheus down rather than showing up as a
+bad dashboard. `tests/test_graph_metrics.py` enforces this over every module in `src/` and pins
+the step vocabulary to an exact set.
 
 The instruments are created on the OpenTelemetry *API* under the meter name
 `office_365_mcp/metrics.py` uses, so both halves land in one instrumentation scope, and the API
@@ -36,8 +36,8 @@ __all__ = [
     "record_pages_scanned",
 ]
 
-# Constants because the instruments below and the test that scrapes for them must agree: a test
-# that spelled them again would pass over a typo.
+# Constants because the instruments below and the test that scrapes for them must agree: restating
+# them in a test hides a typo instead of catching one.
 GRAPH_OPERATIONS_TOTAL = "graph_operations_total"
 GRAPH_OPERATION_DURATION_SECONDS = "graph_operation_duration_seconds"
 GRAPH_THROTTLED_TOTAL = "graph_throttled_total"
@@ -47,7 +47,7 @@ GRAPH_STEP_DURATION_SECONDS = "graph_step_duration_seconds"
 
 # Deliberately the whole service's name, not this package's own. The Prometheus exporter puts the
 # meter name on every sample as `otel_scope_name`, so any instrument this service adds later under
-# a scope of its own would split its metrics into two families of labels for no reader's benefit.
+# a scope of its own splits its metrics into two families of labels, for no reader's benefit.
 _METER_NAME = "office_365_mcp"
 
 _meter = metrics.get_meter(_METER_NAME)
@@ -66,9 +66,10 @@ _operation_duration = _meter.create_histogram(
     GRAPH_OPERATION_DURATION_SECONDS,
     unit="s",
     description=(
-        "Wall-clock time one Graph operation took, including the SDK's Retry-After waits and every "
-        "page a paged walk read. This is what an MCP client waited for, not what one HTTP request "
-        "took."
+        "Wall-clock time one Graph operation took. This includes the SDK's Retry-After waits and "
+        "every page a paged walk read. It leaves out any wait a tool marked as not Microsoft's, "
+        "such as `outlook_send_draft` asking a person to confirm. For the whole wait an MCP "
+        "client saw, person included, read `mcp_call_duration_seconds`."
     ),
 )
 _steps = _meter.create_counter(
@@ -84,7 +85,7 @@ _step_duration = _meter.create_histogram(
     unit="s",
     description=(
         "Wall-clock time one Graph call inside an operation took. This is the axis that says which "
-        "call in a slow tool was the slow one; the operation histogram says only that the tool was "
+        "call in a slow tool was the slow one. The operation histogram says only that the tool was "
         "slow."
     ),
 )
@@ -114,9 +115,9 @@ _OPERATION: ContextVar[str | None] = ContextVar("office_365_mcp_graph_operation"
 def graph_operation(operation: str | None) -> Generator[None]:
     """Name the operation every Graph call inside this block is counted under.
 
-    No name leaves the one in scope alone rather than clearing it: the nameless case is every
-    `graph_step` block, and clearing there would hide the operation from `collect_pages` for the
-    whole of a walk running inside one.
+    No name leaves the one already in scope alone, rather than clearing it. The nameless case is
+    every `graph_step` block, and clearing the operation there hides it from `collect_pages` for
+    the whole of a walk that runs inside one.
     """
     if operation is None:
         yield
@@ -135,9 +136,9 @@ def current_graph_operation() -> str | None:
 def record_graph_call(operation: str | None, *, status: str, seconds: float) -> None:
     """Count one Graph operation and how long it took.
 
-    Nothing is recorded without an operation. An `operation="unknown"` bucket would be worse than a
-    missing series: a dashboard would show it as a real operation with real latency, hiding the tool
-    that forgot to name itself inside it.
+    Nothing is recorded without an operation. An `operation="unknown"` bucket is worse than a
+    missing series: a dashboard shows it as a real operation with real latency, and that hides the
+    tool that forgot to name itself inside it.
     """
     if operation is None:
         return

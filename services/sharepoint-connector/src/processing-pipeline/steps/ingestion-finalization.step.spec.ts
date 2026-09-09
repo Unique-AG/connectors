@@ -17,8 +17,7 @@ describe('IngestionFinalizationStep', () => {
   beforeEach(async () => {
     const { unit } = await TestBed.solitary(IngestionFinalizationStep)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((k: string) => {
           if (k === 'sharepoint.baseUrl') {
             return 'https://contoso.sharepoint.com';

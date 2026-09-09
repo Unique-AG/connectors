@@ -1,5 +1,5 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
@@ -8,7 +8,7 @@ import { GetCalendarQuery } from '../get-calendar.query';
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const OWN_EMAIL = 'me@example.com';
 
-function createQuery(opts: { get?: ReturnType<typeof vi.fn> } = {}) {
+function createQuery(opts: { get?: Mock } = {}) {
   const get = opts.get ?? vi.fn().mockResolvedValue({ id: 'cal-own', name: 'Calendar' });
   const api = vi.fn().mockReturnValue({ select: vi.fn().mockReturnThis(), get });
   const query = new GetCalendarQuery(

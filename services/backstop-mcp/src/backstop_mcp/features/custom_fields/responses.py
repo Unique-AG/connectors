@@ -1,9 +1,10 @@
 """Published custom-field catalog and resolved-value response models."""
 
-from typing import ClassVar, Self
+from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from backstop_mcp.features.custom_fields.entity_types import CustomFieldEntityType
 from backstop_mcp.features.custom_fields.internal_dto import (
     CustomFieldDefinitionDto,
     CustomFieldEntityReferenceDto,
@@ -20,6 +21,8 @@ __all__ = [
     "CustomFieldGroupMemberResponse",
     "CustomFieldGroupParentResponse",
     "CustomFieldGroupResponse",
+    "ListCustomFieldGroupsResponse",
+    "ListCustomFieldsResponse",
     "ResolvedCustomFieldValueResponse",
 ]
 
@@ -305,3 +308,43 @@ class ResolvedCustomFieldValueResponse(OmitNoneModel):
             value=value,
             outside_current_options=resolved.outside_current_options or None,
         )
+
+
+class ListCustomFieldsResponse(BaseModel):
+    """Custom-field definitions grouped by the requested entity types."""
+
+    status: Literal["ok"] = Field(default="ok", description="Always 'ok'.")
+    cache: Literal["ok", "stale"] = Field(
+        description=(
+            "'ok' when the catalog was fetched this call or is still fresh; 'stale' when a "
+            "previous catalog is served because refresh failed."
+        )
+    )
+    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinitionResponse]] = Field(
+        description=(
+            "Custom-field definitions keyed by the requested standard Backstop entity type. "
+            "An entity with no definitions is still present with an empty list. Definitions may "
+            "be associated with a party or a concrete Backstop entity resource and include layout "
+            "group metadata such as group_id when available."
+        )
+    )
+
+
+class ListCustomFieldGroupsResponse(BaseModel):
+    """Layout groups from the standard Backstop custom-field group catalog."""
+
+    status: Literal["ok"] = Field(default="ok", description="Always 'ok'.")
+    cache: Literal["ok", "stale"] = Field(
+        description=(
+            "'ok' when both catalogs were fetched this call or are still fresh; 'stale' when a "
+            "previous catalog is served because refresh failed."
+        )
+    )
+    groups: list[CustomFieldGroupResponse] = Field(
+        description=(
+            "Layout groups in catalog order. Each group's full_path_name is the tab-to-section "
+            "path Backstop publishes, parent is the immediate parent group when nested, and "
+            "membership is the definitions whose group_id matches this group. Groups with no "
+            "matching definitions are still present with an empty membership list."
+        )
+    )

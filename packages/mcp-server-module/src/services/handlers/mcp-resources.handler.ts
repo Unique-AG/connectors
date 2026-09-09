@@ -51,7 +51,7 @@ export class McpResourcesHandler extends McpHandlerBase {
       };
     });
 
-    mcpServer.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    mcpServer.server.setRequestHandler(ReadResourceRequestSchema, async (request, extra) => {
       this.logger.debug('ReadResourceRequestSchema is being called');
 
       const uri = request.params.uri;
@@ -85,7 +85,10 @@ export class McpResourcesHandler extends McpHandlerBase {
           httpRequest,
           providerClass,
           uri,
-          this.createContext(mcpServer, request),
+          this.createContext(mcpServer, {
+            mcpRequest: request,
+            requestHandlerExtra: extra,
+          }),
           params,
           methodName,
         );

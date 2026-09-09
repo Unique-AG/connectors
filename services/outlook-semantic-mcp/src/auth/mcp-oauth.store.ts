@@ -21,6 +21,7 @@ import {
   authorizationCodes,
   oauthClients,
   oauthSessions,
+  sourceOnLoginConflict,
   tokens,
   userProfiles,
 } from '../db/schema';
@@ -173,7 +174,10 @@ export class McpOAuthStore implements IOAuthStore {
       .values(mappedProfile)
       .onConflictDoUpdate({
         target: [userProfiles.provider, userProfiles.providerUserId],
-        set: mappedProfile,
+        set: {
+          ...mappedProfile,
+          source: sourceOnLoginConflict,
+        },
       })
       .returning({ id: userProfiles.id });
     if (!saved) {

@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { ProxyService } from '../proxy/proxy.service';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { UniqueApiHealthIndicator } from './unique-api-health.indicator';
@@ -14,14 +14,14 @@ vi.mock('undici', () => ({
   fetch: vi.fn(),
 }));
 
-async function getUndiciFetch(): Promise<ReturnType<typeof vi.fn>> {
+async function getUndiciFetch(): Promise<Mock> {
   const { fetch } = await import('undici');
-  return fetch as unknown as ReturnType<typeof vi.fn>;
+  return fetch as unknown as Mock;
 }
 
 describe('UniqueApiHealthIndicator', () => {
   let indicator: UniqueApiHealthIndicator;
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: Mock;
   const mockDispatcher = Symbol('dispatcher');
 
   beforeEach(async () => {
@@ -29,8 +29,7 @@ describe('UniqueApiHealthIndicator', () => {
 
     const { unit } = await TestBed.solitary(UniqueApiHealthIndicator)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'health.connectivityTimeoutMs') {
             return TIMEOUT_MS;
@@ -46,13 +45,11 @@ describe('UniqueApiHealthIndicator', () => {
         }),
       }))
       .mock(ProxyService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getDispatcher: vi.fn(() => mockDispatcher),
       }))
       .mock(UniqueAuthService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getToken: vi.fn().mockResolvedValue('test-token'),
       }))
       .mock(HealthIndicatorService)
@@ -210,8 +207,7 @@ describe('UniqueApiHealthIndicator', () => {
   it('reports down with AUTH_FAILURE when getToken() rejects', async () => {
     const { unit: failingIndicator } = await TestBed.solitary(UniqueApiHealthIndicator)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'health.connectivityTimeoutMs') {
             return TIMEOUT_MS;
@@ -227,13 +223,11 @@ describe('UniqueApiHealthIndicator', () => {
         }),
       }))
       .mock(ProxyService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getDispatcher: vi.fn(() => mockDispatcher),
       }))
       .mock(UniqueAuthService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getToken: vi.fn().mockRejectedValue(new Error('Zitadel is down')),
       }))
       .mock(HealthIndicatorService)
@@ -262,8 +256,7 @@ describe('UniqueApiHealthIndicator', () => {
     const extraHeaders = { 'x-custom': 'value' };
     const { unit: clusterIndicator } = await TestBed.solitary(UniqueApiHealthIndicator)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'health.connectivityTimeoutMs') {
             return TIMEOUT_MS;
@@ -280,13 +273,11 @@ describe('UniqueApiHealthIndicator', () => {
         }),
       }))
       .mock(ProxyService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getDispatcher: vi.fn(() => mockDispatcher),
       }))
       .mock(UniqueAuthService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getToken: vi.fn(),
       }))
       .mock(HealthIndicatorService)

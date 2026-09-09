@@ -1,7 +1,10 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { CronJob } from 'cron';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SOURCES_WITH_DELEGATE_FALLBACK } from '~/db';
 import { LiveCatchupSchedulerService } from '../live-catchup-scheduler.service';
 
 vi.mock('~/features/tracing.utils', () => ({
@@ -10,7 +13,12 @@ vi.mock('~/features/tracing.utils', () => ({
 }));
 
 vi.mock('cron', () => ({
-  CronJob: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
+  CronJob: vi.fn(
+    class MockCronJob {
+      public readonly start = vi.fn();
+      public readonly stop = vi.fn();
+    },
+  ),
 }));
 
 // Avoid drizzle's union() being called on mock query builders
@@ -94,7 +102,12 @@ function createServiceWithIngestionConfig({ amqp = createMockAmqp(), db = create
 describe('LiveCatchupSchedulerService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(CronJob).mockImplementation(() => ({ start: vi.fn(), stop: vi.fn() }) as any);
+    vi.mocked(CronJob).mockImplementation(
+      class MockCronJob {
+        public readonly start = vi.fn();
+        public readonly stop = vi.fn();
+      } as any,
+    );
   });
 
   describe('cron job wiring', () => {
@@ -144,6 +157,25 @@ describe('LiveCatchupSchedulerService', () => {
       expect(service.runRecheckLiveCatchupsForSharedMailboxes).toHaveBeenCalledOnce();
       expect(service.runStuckLiveCatchUpsRecovery).not.toHaveBeenCalled();
       expect(service.runRecheckLiveCatchupsForOauthUsersWhich).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('source partition', () => {
+    it('places a dual mailbox in the shared-mailbox recheck branch and not the oauth branch', () => {
+      const scheduler = readFileSync(
+        path.join(__dirname, '../live-catchup-scheduler.service.ts'),
+        'utf8',
+      );
+      const utils = readFileSync(path.join(__dirname, '../sync-scheduler.utils.ts'), 'utf8');
+
+      expect(scheduler).toMatch(/eq\(userProfiles\.source, 'oauth'\)/);
+      expect(scheduler).toMatch(/inArray\(userProfiles\.source, SOURCES_WITH_DELEGATE_FALLBACK\)/);
+      expect(scheduler.match(/eq\(userProfiles\.source, 'shared-mailbox'\)/g)).toHaveLength(1);
+      expect(utils).toMatch(/inArray\(userProfiles\.source, SOURCES_WITH_DELEGATE_FALLBACK\)/);
+      expect(SOURCES_WITH_DELEGATE_FALLBACK).toEqual([
+        'shared-mailbox',
+        'shared-mailbox-with-login',
+      ]);
     });
   });
 

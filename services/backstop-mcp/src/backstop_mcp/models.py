@@ -1,4 +1,4 @@
-"""Shared pydantic bases used by tool-facing response models."""
+"""Shared pydantic bases and field types used by tool-facing models."""
 
 from collections.abc import Sequence
 from typing import Annotated, cast
@@ -11,6 +11,8 @@ from pydantic import (
     TypeAdapter,
     model_serializer,
 )
+
+StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
 
 def _coerce_id(value: object) -> object:

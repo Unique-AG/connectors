@@ -1,8 +1,8 @@
 """Readiness via the one Postgres connection this service depends on: the OAuth state store's.
 
-The probe asks the store itself, through the same wrapper chain. A probe that opened its own
-connection was tried, and negotiated TLS differently: it could report ready while every sign-in
-failed.
+The probe asks the store itself, through the same wrapper chain. The team tried a probe that
+opened its own connection. That probe negotiated TLS differently, and it reported ready while
+every sign-in failed.
 """
 
 import asyncio
@@ -20,10 +20,10 @@ _PROBE_KEY = "probe"
 
 # Trap: nothing below this call has a deadline. The store hands asyncpg a bare DSN, so there is no
 # command_timeout, and pool acquisition with timeout=None waits on the queue forever. uvicorn does
-# not cancel the handler when kubelet stops waiting, so an unbounded probe would park a waiter for
-# the process's lifetime—and, worse, hold BaseStore.setup's lock, queueing every later probe and
-# every per-request token validation behind it. Cancelling here leaves that lock released and
-# setup incomplete, so the next probe retries.
+# not cancel the handler when kubelet stops waiting, so an unbounded probe parks a waiter for the
+# process's lifetime. Worse, it holds BaseStore.setup's lock and queues every later probe and every
+# per-request token validation behind it. Cancelling here releases that lock and leaves setup
+# incomplete, so the next probe retries.
 #
 # Kept below the chart's readiness timeoutSeconds (3) so this deadline is the one that fires: the
 # handler answers 503 itself instead of kubelet abandoning a request nothing ends.
@@ -34,8 +34,8 @@ async def ready_response(oauth_storage: AsyncKeyValue) -> JSONResponse:
     """Readiness response reporting the checks that ran.
 
     Postgres is a hard dependency, so an unreachable database means not ready. A database too slow
-    to answer within `_PROBE_TIMEOUT_SECONDS` is reported the same way—not ready is the honest
-    answer when no sign-in would complete either.
+    to answer within `_PROBE_TIMEOUT_SECONDS` is reported the same way. Not ready is the honest
+    answer when no sign-in completes either.
     """
     database_ok = True
     try:

@@ -16,31 +16,27 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import (
-    BackstopAuthError,
-    BackstopClient,
-    BackstopRateLimitError,
-)
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.backstop_client import BackstopAuthError, BackstopRateLimitError
 from backstop_mcp.features.activity_history import (
     ENTITY_ACTIVITY_TYPES,
     MAX_RETRIEVABLE,
     ActivityAggregateBy,
     EntityActivityType,
     GetSearchActivitiesResponse,
+    SearchActivitiesQuery,
     SearchActivitiesResolvedResponse,
     SearchActivitiesUnavailableResponse,
     aggregate_entity_activities,
-    fetch_entity_activities,
-    party_bean,
 )
+from backstop_mcp.features.activity_history.dependencies import get_search_activities_query_factory
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     ResolvedPartyResponse,
-    resolve_party,
+    ResolvePartyQuery,
+    get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import Resolved
+from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -99,9 +95,9 @@ SearchRowField = Literal[
 
 
 def _is_wide_sweep(
-    *, associated_withs: Sequence[str], activity_tags: Sequence[str], authors: Sequence[str]
+    *, party_id: str | None, activity_tags: Sequence[str], authors: Sequence[str]
 ) -> bool:
-    return not associated_withs and not activity_tags and not authors
+    return party_id is None and not activity_tags and not authors
 
 
 def _add_years(day: date, years: int) -> date:
@@ -123,10 +119,10 @@ def _date_window(
 
 @tool(
     annotations=ToolAnnotations(
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     ),
     output_schema=published_output_schema(GetSearchActivitiesResponse),
 )
@@ -158,8 +154,9 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "Party collection when scoping to one person or organization. Required with "
-                "`party_id` or `search`. Omit with both of those for a firm-wide search."
+                "Required when passing `party_id` or `search` — never pass a `party_id` "
+                "without this. Party collection: organizations, people, contacts, or "
+                "employees. Omit with both of those for a firm-wide search."
             ),
         ),
     ] = None,
@@ -168,9 +165,10 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "Trusted Backstop Party ID from a prior resolve echo. Sent as "
-                "`associatedWiths: PartyBean_{id}`. Never invent one. Exactly one of "
-                "`party_id` or `search` when scoping to a party."
+                "The argument is `party_id`. Trusted Backstop Party ID from a prior "
+                "resolve echo. Sent as `associatedWiths: PartyBean_{id}`. Always pass "
+                "together with `search_type` — `party_id` alone is rejected. Never invent "
+                "one. Exactly one of `party_id` or `search` when scoping to a party."
             ),
         ),
     ] = None,
@@ -179,8 +177,9 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "Name or email to resolve when no trusted `party_id` is available. Exactly "
-                "one of `party_id` or `search` when scoping to a party."
+                "Name or email to resolve when no trusted `party_id` is available. Always "
+                "pass together with `search_type`. Exactly one of `party_id` or `search` "
+                "when scoping to a party."
             ),
         ),
     ] = None,
@@ -189,9 +188,10 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "Activity streams to include. Default is every stream this endpoint serves: "
-                "meeting_call, meeting, document, email, email_blast, note. Within this list "
-                "the filter is OR."
+                "Allowed tokens: meeting_call, meeting, document, email, email_blast, note. "
+                "Calls are `meeting_call` — `get_activity_history` uses `call` for the same "
+                "stream. Default is every stream this endpoint serves. Within this list the "
+                "filter is OR."
             ),
         ),
     ] = None,
@@ -272,14 +272,20 @@ async def search_activities(
             ),
         ),
     ] = None,
-    client: BackstopClient = Depends(get_backstop_client),
+    resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
+    search_activities_query: SearchActivitiesQuery = Depends(get_search_activities_query_factory),
 ) -> GetSearchActivitiesResponse:
     """Search activities firm-wide or for one party: meetings, calls, notes, emails, documents.
 
     Always start here when the question has a date window. Pass `start_date` and `end_date`;
     omitting `start_date` uses one year before `end_date`, omitting `end_date` uses today.
-    Optionally scope to a party (`search_type` plus `party_id` or `search`), restrict `types`,
+    Optionally scope to a party (`search_type` plus `party_id` or `search` — a `party_id`
+    without `search_type` is rejected), restrict `types`,
     filter `activity_tag_ids` (OR, unlike get_activity_history), and filter `authors` by email.
+
+    Call like: {"search_type": "organizations",
+    "party_id": "<id from prior resolve echo>",
+    "types": ["meeting_call", "meeting", "note"]}
 
     This is the primary activity tool; `get_activity_history` is fallback only. It is an
     undocumented UI search (`POST /entity-activities`) and may 404 or refuse the credential
@@ -315,24 +321,23 @@ async def search_activities(
         raise ValueError("party_id or search is required when search_type is provided")
 
     resolved_party: ResolvedPartyResponse | None = None
-    associated_withs: tuple[str, ...] = ()
+    scoped_party_id: str | None = None
     if search_type is not None:
-        outcome = await resolve_party(
-            ctx, client, search_type=search_type, party_id=party_id, search=search
+        outcome = await resolve_party_query.run(
+            search_type=search_type, party_id=party_id, search=search
         )
+        outcome = await elicit_if_ambiguous(ctx, outcome)
         if not isinstance(outcome, Resolved):
             return unresolved_party_response(outcome)
         resolved_party = ResolvedPartyResponse.from_party(outcome.value)
-        associated_withs = (party_bean(outcome.value.id),)
+        scoped_party_id = outcome.value.id
 
     tag_ids = tuple(activity_tag_ids) if activity_tag_ids else ()
     author_emails = tuple(authors) if authors else ()
     selected_types: tuple[EntityActivityType, ...] = (
         tuple(types) if types else ENTITY_ACTIVITY_TYPES
     )
-    wide = _is_wide_sweep(
-        associated_withs=associated_withs, activity_tags=tag_ids, authors=author_emails
-    )
+    wide = _is_wide_sweep(party_id=scoped_party_id, activity_tags=tag_ids, authors=author_emails)
     if include_description and wide:
         raise ValueError(
             "include_description is refused on a wide sweep; pass a party, "
@@ -363,24 +368,23 @@ async def search_activities(
         },
     )
     try:
-        fetch = await fetch_entity_activities(
-            client,
+        fetch = await search_activities_query.run(
             start_date=start_date,
             end_date=end_date,
             types=selected_types,
-            associated_withs=associated_withs,
+            party_id=scoped_party_id,
             activity_tags=tag_ids,
             authors=author_emails,
             include_description=include_description,
             max_rows=None if mode == "aggregate" else row_cap,
         )
-    except (BackstopAuthError, BackstopRateLimitError):
+    except BackstopAuthError, BackstopRateLimitError:
         # Neither is "this endpoint is unavailable". A dead credential fails the documented
         # fallback the same way, and a rate limit is a "slow down" that naming a second tool
         # would answer with more load.
         raise
     except Exception as exc:
-        # Broad on purpose, matching `fetch_holdings`: HTTP status, transport timeout,
+        # Broad on purpose, matching `GetHoldingsQuery`: HTTP status, transport timeout,
         # schema-validation failure, and a 401 that re-verified (`BackstopTransientAuthError`)
         # all mean the same thing here — the undocumented endpoint did not answer usably. A
         # `httpx.TimeoutException` reaches this frame raw (the client lets transport errors
@@ -389,7 +393,7 @@ async def search_activities(
         # to produce.
         logger.warning(
             "activity_history.search.primary_unavailable",
-            extra={"error": f"{type(exc).__name__}: {exc}"},
+            exc_info=exc,
         )
         return SearchActivitiesUnavailableResponse(message=_FALLBACK_MESSAGE)
 

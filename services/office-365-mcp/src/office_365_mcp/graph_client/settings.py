@@ -9,13 +9,14 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class GraphSettings:
-    """Both timeouts are cut from the SDK's defaults of 100 s read and 30 s connect, which are sized
-    for batch clients: four attempts at 100 s each, plus Retry-After sleeps, is 15 minutes per tool
-    call. `max_retries` keeps the SDK's 3, because waiting out Retry-After is Graph's contract.
+    """Both timeouts are cut down from the SDK's defaults of 100 s read and 30 s connect, which are
+    sized for batch clients. Four attempts at 100 s each, plus Retry-After sleeps, add up to 15
+    minutes per tool call. `max_retries` keeps the SDK's 3, because waiting out Retry-After is part
+    of Graph's contract.
 
-    TRAP: these are what the service ships with, not what it runs with — `create_app` passes all
-    three from the matching `AppConfig` fields. They are repeated here so a `GraphSettings()` in a
-    test is the deployed shape.
+    TRAP: these are the values the service ships with, not the values it runs with. `create_app`
+    passes all three from the matching `AppConfig` fields. This class repeats the values so a
+    `GraphSettings()` in a test matches the deployed shape.
     """
 
     request_timeout_seconds: float = 30.0

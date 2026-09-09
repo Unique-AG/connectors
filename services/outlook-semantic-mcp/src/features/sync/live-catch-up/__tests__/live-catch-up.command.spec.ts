@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { AllDelegatesFailedError, NO_DELEGATES } from '~/msgraph/ms-graph-client-resolver.service';
 import { LiveCatchUpCommand } from '../live-catch-up.command';
 
@@ -93,7 +93,7 @@ function createMockDb({
         id: string;
         email: string;
         providerUserId: string;
-        source: 'oauth' | 'shared-mailbox';
+        source: 'oauth' | 'shared-mailbox' | 'shared-mailbox-with-login';
       }
     | undefined;
   lockResult?: {
@@ -193,7 +193,7 @@ function createCommand({
   ingestEmailCommand: ReturnType<typeof createMockIngestEmailCommand>;
   syncDirectories: ReturnType<typeof createMockSyncDirectoriesCommand>;
   db: ReturnType<typeof createMockDb>;
-  resolver?: { run: ReturnType<typeof vi.fn> };
+  resolver?: { run: Mock };
 }): LiveCatchUpCommand {
   return new LiveCatchUpCommand(
     (resolver ?? createMockMsGraphClientResolver(graphApi)) as any,
@@ -598,7 +598,7 @@ describe('LiveCatchUpCommand', () => {
 
   describe('MsGraphClientResolver paths', () => {
     function makeReadyDb(
-      source: 'oauth' | 'shared-mailbox' = 'oauth',
+      source: 'oauth' | 'shared-mailbox' | 'shared-mailbox-with-login' = 'oauth',
       email = 'user@example.com',
       lockOverrides: { preferredDelegateUserProfileId?: string | null } = {},
     ) {
@@ -696,6 +696,46 @@ describe('LiveCatchUpCommand', () => {
       await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
       expect(capturedApiArg).toBe(`users/${sharedEmail}/messages`);
+    });
+
+    it('dual mailbox → graphBasePath uses users/{email} and never me', async () => {
+      const sharedEmail = 'shared@example.com';
+      let capturedApiArg: string | undefined;
+      graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+      const resolver = {
+        run: vi
+          .fn()
+          .mockImplementation(
+            async ({
+              fn,
+            }: {
+              fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<unknown>;
+            }) => {
+              const client = {
+                api: vi.fn().mockImplementation((path: string) => {
+                  capturedApiArg ??= path;
+                  return graphApi;
+                }),
+              };
+              return fn({ client, clientUserProfileId: USER_PROFILE_ID });
+            },
+          ),
+      };
+
+      const db = makeReadyDb('shared-mailbox-with-login', sharedEmail);
+      const command = createCommand({
+        graphApi,
+        ingestEmailCommand,
+        db,
+        syncDirectories,
+        resolver,
+      });
+
+      await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+      expect(capturedApiArg).toBe(`users/${sharedEmail}/messages`);
+      expect(capturedApiArg).not.toBe('me/messages');
     });
 
     it('passes preferredDelegateUserProfileId from inbox config to resolver as sharedMailboxConfig', async () => {

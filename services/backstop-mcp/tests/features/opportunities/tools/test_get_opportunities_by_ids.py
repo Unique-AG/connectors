@@ -9,17 +9,17 @@ from fastmcp.server.dependencies import without_injected_parameters
 from pydantic import TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.opportunities import MAX_OPPORTUNITY_IDS
+from backstop_mcp.features.opportunities import (
+    MAX_OPPORTUNITY_IDS,
+    GetOpportunitiesByIdsResponse,
+)
 from backstop_mcp.features.opportunities.tools.get_opportunities_by_ids import (
-    OpportunitiesByIdsResolvedResponse,
     get_opportunities_by_ids,
 )
 from backstop_mcp.server.tools import TOOLS
-from tests.features.opportunities.test_fetch_opportunities import VOCABULARY
+from tests.features.opportunities.conftest import VOCABULARY, make_get_opportunities_by_ids_query
 from tests.helpers import (
     BASE_URL,
-    custom_fields_service,
-    opportunity_stages_service,
     recorded_requests,
     resource,
 )
@@ -183,18 +183,16 @@ async def _call(
     include_stage_history: bool = False,
     custom_field_names: Sequence[str] = (),
     custom_field_definition_ids: Sequence[str] = (),
-) -> OpportunitiesByIdsResolvedResponse:
+) -> GetOpportunitiesByIdsResponse:
     return tool_model(
         await get_opportunities_by_ids(
             ids=ids,
             include_stage_history=include_stage_history,
             custom_field_names=custom_field_names,
             custom_field_definition_ids=custom_field_definition_ids,
-            client=client,
-            opportunity_stages_service=opportunity_stages_service(),
-            custom_fields_service=custom_fields_service(),
+            get_opportunities_by_ids_query=make_get_opportunities_by_ids_query(client),
         ),
-        OpportunitiesByIdsResolvedResponse,
+        GetOpportunitiesByIdsResponse,
     )
 
 
@@ -227,7 +225,6 @@ class TestGetOpportunitiesByIds:
         assert result.opportunities[0].stage_history == ()
         assert result.not_found == ()
         assert result.errors == ()
-        assert result.custom_fields_unavailable is False
 
     @pytest.mark.asyncio
     @respx.mock
@@ -415,9 +412,7 @@ class TestGetOpportunitiesByIds:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_catalog_failure_keeps_the_deals_and_flags_unavailable(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_catalog_failure_keeps_the_deals(self, client: BackstopClient) -> None:
         respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_open_deal(), included=_deal_included())

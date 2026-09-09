@@ -45,6 +45,8 @@ Least-privilege justification for each scope is in [Required Microsoft Graph per
 
 If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `c55409b0-c2c3-4dcc-96c9-ceb85a729ba5`.
 
+Consenting the correct directory is not enough if Unique hosts a dedicated Teams MCP for that customer: the MCP OAuth login still defaults to `/common`, and Microsoft can open the signed-in admin's home tenant (often production) instead of the foreign tenant that holds the Enterprise Application. Pin login with `mcpConfig.microsoft.signInTenantId` (env `MICROSOFT_SIGN_IN_TENANT_ID`) set to that directory's GUID — see [Teams MCP - Authentication — OAuth authority](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1803026436/Teams+MCP+-+Authentication#OAuth-authority-MICROSOFT_SIGN_IN_TENANT_ID).
+
 Self-hosted deployments provision their own app registration instead — see [Teams MCP - Authentication](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1803026436/Teams+MCP+-+Authentication#Self-Hosted). Request only the permissions in the table above (`UNIQUE_INTEGRATION=enabled`, `CHAT_INTEGRATION=disabled`).
 
 ## Teams Graph transcript API access

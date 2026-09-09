@@ -182,26 +182,26 @@ function allCalendarSchemaTokens(): Set<string> {
 }
 
 describe('calendar tool schema harmony', () => {
-  it.each(registeredTools())('$name has _meta and a description on every input and output field', ({
-    name,
-    options,
-  }) => {
-    const meta = options._meta as Record<string, string> | undefined;
-    expect(meta?.['unique.app/icon'], `${name} icon`).toBe('calendar');
-    expect(meta?.['unique.app/system-prompt']?.length ?? 0).toBeGreaterThan(0);
-    expect(meta?.['unique.app/tool-format-information']?.length ?? 0).toBeGreaterThan(0);
-    expect(options.description?.length ?? 0).toBeGreaterThan(0);
-    expect(options.outputSchema, `${name} outputSchema`).toBeDefined();
+  it.each(registeredTools())(
+    '$name has _meta and a description on every input and output field',
+    ({ name, options }) => {
+      const meta = options._meta as Record<string, string> | undefined;
+      expect(meta?.['unique.app/icon'], `${name} icon`).toBe('calendar');
+      expect(meta?.['unique.app/system-prompt']?.length ?? 0).toBeGreaterThan(0);
+      expect(meta?.['unique.app/tool-format-information']?.length ?? 0).toBeGreaterThan(0);
+      expect(options.description?.length ?? 0).toBeGreaterThan(0);
+      expect(options.outputSchema, `${name} outputSchema`).toBeDefined();
 
-    const input = z.toJSONSchema(options.parameters, { io: 'input' }) as JsonSchema;
-    const output = z.toJSONSchema(
-      options.outputSchema as NonNullable<typeof options.outputSchema>,
-      { io: 'output' },
-    ) as JsonSchema;
+      const input = z.toJSONSchema(options.parameters, { io: 'input' }) as JsonSchema;
+      const output = z.toJSONSchema(
+        options.outputSchema as NonNullable<typeof options.outputSchema>,
+        { io: 'output' },
+      ) as JsonSchema;
 
-    expect(missingFieldDescriptions(input, 'input', input.$defs ?? {})).toEqual([]);
-    expect(missingFieldDescriptions(output, 'output', output.$defs ?? {})).toEqual([]);
-  });
+      expect(missingFieldDescriptions(input, 'input', input.$defs ?? {})).toEqual([]);
+      expect(missingFieldDescriptions(output, 'output', output.$defs ?? {})).toEqual([]);
+    },
+  );
 
   it('describes a shared output field the same way in every tool that returns it', () => {
     // The three resolvedWindow blocks were copy-pasted and had already drifted on
@@ -240,19 +240,17 @@ describe('calendar tool schema harmony', () => {
     ]);
   });
 
-  it.each(
-    registeredTools(),
-  )('$name description and system prompt only name fields from calendar tool schemas', ({
-    name,
-    options,
-  }) => {
-    const allowed = allCalendarSchemaTokens();
-    const meta = options._meta as Record<string, string> | undefined;
-    const unknown = camelCaseTokens(
-      `${options.description ?? ''}\n${meta?.['unique.app/system-prompt'] ?? ''}`,
-    ).filter((token) => !allowed.has(token));
-    expect(unknown, `${name} unknown field tokens`).toEqual([]);
-  });
+  it.each(registeredTools())(
+    '$name description and system prompt only name fields from calendar tool schemas',
+    ({ name, options }) => {
+      const allowed = allCalendarSchemaTokens();
+      const meta = options._meta as Record<string, string> | undefined;
+      const unknown = camelCaseTokens(
+        `${options.description ?? ''}\n${meta?.['unique.app/system-prompt'] ?? ''}`,
+      ).filter((token) => !allowed.has(token));
+      expect(unknown, `${name} unknown field tokens`).toEqual([]);
+    },
+  );
 
   it('format information and server instructions only name fields that exist on calendar tools', () => {
     const allowed = allCalendarSchemaTokens();

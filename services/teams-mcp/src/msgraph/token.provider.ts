@@ -8,6 +8,7 @@ import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { z } from 'zod';
+import { microsoftOAuthTokenUrl } from '../auth/microsoft.provider';
 import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import { userProfiles } from '../drizzle/schema';
 import { MicrosoftReauthRequiredException } from '../utils/microsoft-reauth.exception';
@@ -24,6 +25,7 @@ export class TokenProvider implements AuthenticationProvider {
   private readonly userProfileId: string;
   private readonly clientId: string;
   private readonly clientSecret: string;
+  private readonly signInTenantId: string;
   private readonly scopes: string[];
   private readonly drizzle: DrizzleDatabase;
   private readonly encryptionService: AesGcmEncryptionService;
@@ -33,11 +35,13 @@ export class TokenProvider implements AuthenticationProvider {
       userProfileId,
       clientId,
       clientSecret,
+      signInTenantId,
       scopes,
     }: {
       userProfileId: string;
       clientId: string;
       clientSecret: string;
+      signInTenantId: string;
       scopes: string[];
     },
     {
@@ -51,6 +55,7 @@ export class TokenProvider implements AuthenticationProvider {
     this.userProfileId = userProfileId;
     this.clientId = clientId;
     this.clientSecret = clientSecret;
+    this.signInTenantId = signInTenantId;
     this.scopes = scopes;
     this.drizzle = drizzle;
     this.encryptionService = encryptionService;
@@ -85,7 +90,7 @@ export class TokenProvider implements AuthenticationProvider {
 
     try {
       // Microsoft OAuth2 token refresh endpoint
-      const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      const response = await fetch(microsoftOAuthTokenUrl(this.signInTenantId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

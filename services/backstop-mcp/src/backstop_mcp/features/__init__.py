@@ -21,9 +21,9 @@ Layering rules, both enforced by `tests/test_layering.py`:
   feature package, which is how `custom_fields` came to import `server.tools` before. Tools
   do not import `server/` either; they take `Depends(...)`.
 * **Nothing under `backstop_client/` may import from here.** Features may use the shared
-  infrastructure (`backstop_client`, `db`, `config`, `logging`, `metrics`, `coerce`) freely, but
-  that traffic is one-way: a type both sides need belongs in the infrastructure module, with
-  `features/` supplying the implementation (see `backstop_client/credential.py`).
+  infrastructure (`backstop_client`, `caching`, `db`, `config`, `logging`, `metrics`, `coerce`)
+  freely, but that traffic is one-way: a type both sides need belongs in the infrastructure
+  module, with `features/` supplying the implementation (see `backstop_client/credential.py`).
 
 Note the asymmetry in the first list item: `features/` may read `config` directly, while
 `backstop_client/` may not (a third rule, also enforced by `tests/test_layering.py`). A feature is
@@ -39,7 +39,7 @@ stopped matching Backstop's:
   "this data came from Backstop".
 * **`*Attributes`** — a raw Backstop wire shape, 1:1 with their data model, under their field
   names (`CustomFieldDefinitionAttributes`).
-* **`*Dto`** — computed internally and never published (`AccountRecordDto`, `ActivityItemDto`).
+* **`*Dto`** — computed internally and never published (`AccountRecordDto`, `EntityActivityDto`).
   A model that later ships to MCP clients moves to `*Response`.
 * **`*Response`** — our curated, model-facing shape: trimmed, renamed where Backstop's naming
   would mislead, and documented for the model that consumes it. Used for nested pieces as much as

@@ -73,7 +73,7 @@ describe('McpAuthJwtGuard', () => {
 
     const { unit, unitRef } = await TestBed.solitary(McpAuthJwtGuard)
       .mock<McpOAuthModuleOptions>(MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN)
-      .impl((stubFn) => ({ ...stubFn(), ...options }))
+      .impl(() => ({ ...options }))
       .compile();
 
     guard = unit;

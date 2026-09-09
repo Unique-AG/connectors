@@ -21,8 +21,7 @@ describe('SyncStatusStore', () => {
   beforeEach(async () => {
     const { unit } = await TestBed.solitary(SyncStatusStore)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn(() => HISTORY_SIZE),
       }))
       .compile();

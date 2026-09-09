@@ -142,7 +142,10 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         amqpConnection: AmqpConnection,
         proxyService: ProxyService,
       ) => ({
-        provider: createMicrosoftOAuthProvider(proxyService.getHttpAgent({ mode: 'always' })),
+        provider: createMicrosoftOAuthProvider(
+          proxyService.getHttpAgent({ mode: 'always' }),
+          configService.get('microsoft.signInTenantId', { infer: true }),
+        ),
 
         clientId: configService.get('microsoft.clientId', { infer: true }),
         clientSecret: configService.get('microsoft.clientSecret', {

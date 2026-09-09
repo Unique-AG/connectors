@@ -1,6 +1,6 @@
 import type { Client, PageCollection } from '@microsoft/microsoft-graph-client';
 import type { TraceService } from 'nestjs-otel';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import type { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { ChatService, GRAPH_CHATS_PAGE_LIMIT } from './chat.service';
 
@@ -21,8 +21,8 @@ function makePage(value: Record<string, unknown>[], nextLink?: string): PageColl
 
 function makeService(page: PageCollection): {
   service: ChatService;
-  api: ReturnType<typeof vi.fn>;
-  top: ReturnType<typeof vi.fn>;
+  api: Mock;
+  top: Mock;
 } {
   const top = vi.fn();
   const api = vi.fn(() => {

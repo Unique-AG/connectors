@@ -150,6 +150,26 @@ For SaaS deployments serving users from multiple Microsoft 365 organizations:
 
 See [Authentication Architecture - Single App Registration Architecture](../technical/architecture.md#single-app-registration-architecture) for details.
 
+#### OAuth authority (`MICROSOFT_SIGN_IN_TENANT_ID`)
+
+Teams MCP talks to Microsoft identity on:
+
+```
+https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize
+https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token
+```
+
+`<tenant>` comes from `MICROSOFT_SIGN_IN_TENANT_ID` (Helm `mcpConfig.microsoft.signInTenantId`). This is the directory the **login window should open** — the foreign tenant that holds the Enterprise Application (service principal). It is independent of `clientId`/`clientSecret` and is **not** the tenant that owns Unique's app registration.
+
+| When | Value |
+|------|-------|
+| Users should choose their directory at login | `common` (default) |
+| Login must open a specific tenant's service principal (for example a customer's UAT directory instead of the admin's home tenant) | That directory's GUID |
+
+`organizations` and `consumers` are also valid Microsoft tenant aliases.
+
+If Microsoft returns **AADSTS50194**, `/common` is not accepted for that Enterprise Application — set `signInTenantId` to the directory that holds it.
+
 ### Secret Management
 
 #### Client Secret

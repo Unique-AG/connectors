@@ -18,7 +18,8 @@ from backstop_mcp.features.activity_history.tools.search_activities import (
     search_activities,
 )
 from backstop_mcp.server.tools import TOOLS
-from tests.features.party_resolver.helpers import ctx_never_elicit
+from tests.features.activity_history.conftest import make_search_activities_query
+from tests.features.party_resolver.helpers import ctx_never_elicit, make_resolve_party_query
 from tests.helpers import BASE_URL, client_factory, credential, recorded_json_bodies
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
@@ -88,7 +89,8 @@ class TestSearchActivities:
                 search_type="people",
                 party_id=_PARTY_ID,
                 activity_tag_ids=["474963", "455289"],
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -124,7 +126,8 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2020, 1, 1),
                 end_date=date(2020, 1, 2),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -144,7 +147,8 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             ),
             SearchActivitiesUnavailableResponse,
         )
@@ -169,7 +173,8 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             ),
             SearchActivitiesUnavailableResponse,
         )
@@ -187,7 +192,8 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             )
 
     @pytest.mark.asyncio
@@ -218,7 +224,8 @@ class TestSearchActivities:
                     ctx_never_elicit(),
                     start_date=date(2024, 1, 1),
                     end_date=date(2026, 8, 20),
-                    client=client,
+                    resolve_party_query=make_resolve_party_query(client),
+                    search_activities_query=make_search_activities_query(client),
                 ),
                 SearchActivitiesUnavailableResponse,
             )
@@ -238,7 +245,8 @@ class TestSearchActivities:
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
                 include_description=True,
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             )
 
     @pytest.mark.asyncio
@@ -250,7 +258,8 @@ class TestSearchActivities:
                 end_date=date(2026, 8, 20),
                 mode="aggregate",
                 group_by="type",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             )
 
     @pytest.mark.asyncio
@@ -273,7 +282,8 @@ class TestSearchActivities:
                 activity_tag_ids=["474963"],
                 mode="aggregate",
                 group_by="type",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -297,7 +307,8 @@ class TestSearchActivities:
                 include_description=True,
                 mode="aggregate",
                 group_by="type",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             )
 
     @pytest.mark.asyncio
@@ -310,7 +321,8 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -333,7 +345,8 @@ class TestSearchActivities:
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
                 fields=["id", "title"],
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -362,7 +375,8 @@ class TestSearchActivities:
                 end_date=date(2026, 8, 20),
                 activity_tag_ids=["474963"],
                 include_description=True,
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -397,7 +411,8 @@ class TestSearchActivities:
             ctx_never_elicit(),
             end_date=date(2024, 12, 31),
             max_rows=1000,
-            client=client,
+            resolve_party_query=make_resolve_party_query(client),
+            search_activities_query=make_search_activities_query(client),
         )
 
         filters = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
@@ -412,7 +427,8 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2026, 8, 21),
                 end_date=date(2026, 8, 20),
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
             )
 
     def test_from_fetch_marks_a_mid_scan_failure_as_partial(self) -> None:

@@ -1,21 +1,27 @@
 import { createMock } from '@golevelup/ts-vitest';
 import type { ConfigService } from '@nestjs/config';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
-const mockAgentInstances: Array<{ close: ReturnType<typeof vi.fn> }> = [];
-const mockProxyAgentInstances: Array<{ close: ReturnType<typeof vi.fn> }> = [];
+const mockAgentInstances: Array<{ close: Mock }> = [];
+const mockProxyAgentInstances: Array<{ close: Mock }> = [];
 
 vi.mock('undici', () => ({
-  Agent: vi.fn().mockImplementation(() => {
-    const inst = { close: vi.fn() };
-    mockAgentInstances.push(inst);
-    return inst;
-  }),
-  ProxyAgent: vi.fn().mockImplementation(() => {
-    const inst = { close: vi.fn() };
-    mockProxyAgentInstances.push(inst);
-    return inst;
-  }),
+  Agent: vi.fn(
+    class MockAgent {
+      public readonly close = vi.fn();
+      public constructor() {
+        mockAgentInstances.push(this);
+      }
+    },
+  ),
+  ProxyAgent: vi.fn(
+    class MockProxyAgent {
+      public readonly close = vi.fn();
+      public constructor() {
+        mockProxyAgentInstances.push(this);
+      }
+    },
+  ),
 }));
 
 vi.mock('node:fs', () => ({

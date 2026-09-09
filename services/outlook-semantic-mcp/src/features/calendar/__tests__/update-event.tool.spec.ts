@@ -1,7 +1,7 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context } from '@unique-ag/mcp-server-module';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetCalendarQuery } from '../get-calendar.query';
 import { GetCalendarEventQuery } from '../get-calendar-event.query';
@@ -50,14 +50,7 @@ const OWN_PRIMARY = {
   },
 };
 
-function createTool(
-  opts: {
-    get?: ReturnType<typeof vi.fn>;
-    getCalendar?: ReturnType<typeof vi.fn>;
-    run?: ReturnType<typeof vi.fn>;
-    elicit?: ReturnType<typeof vi.fn>;
-  } = {},
-) {
+function createTool(opts: { get?: Mock; getCalendar?: Mock; run?: Mock; elicit?: Mock } = {}) {
   const get = opts.get ?? vi.fn().mockResolvedValue(OCCURRENCE);
   const getCalendar = opts.getCalendar ?? vi.fn().mockResolvedValue(OWN_PRIMARY);
   const run =
@@ -146,7 +139,7 @@ describe(UpdateEventTool.name, () => {
 
   it('does not update when the client cannot show a confirmation prompt', async () => {
     const { tool, run, elicit } = createTool({
-      elicit: vi.fn().mockRejectedValue(new Error('This client does not support elicitation')),
+      elicit: vi.fn().mockRejectedValue(new Error('Client does not support form elicitation.')),
     });
 
     const result = await tool.updateEvent(

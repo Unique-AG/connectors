@@ -1583,9 +1583,9 @@
         "high-priority"
       ]
     },
-    "extraManifests": {
+    "extraObjects": {
       "type": "array",
-      "description": "Additional raw Kubernetes manifests to include",
+      "description": "Additional raw Kubernetes manifests to include once at the chart root, alongside the chart's own templates. Each item is a full manifest (apiVersion/kind/metadata/spec); tpl-rendered.",
       "items": {
         "type": "object"
       }
@@ -2196,6 +2196,11 @@
             "clientId": {
               "type": "string",
               "description": "The client ID of the Microsoft App Registration"
+            },
+            "signInTenantId": {
+              "type": "string",
+              "description": "Sign-in tenant ID the OAuth login should open. Set a GUID when sign-in must use the Enterprise Application (service principal) in a foreign tenant. Leave as common when users choose their directory at login. Independent of clientId/clientSecret; not the tenant that owns the app registration.",
+              "default": "common"
             },
             "publicWebhookUrl": {
               "type": "string",

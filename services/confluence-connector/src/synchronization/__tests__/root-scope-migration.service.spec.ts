@@ -1,5 +1,5 @@
 import type { UniqueApiClient } from '@unique-ag/unique-api';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { RootScopeMigrationService } from '../root-scope-migration.service';
 
 const NEW_ROOT_ID = 'new-root-scope-id';
@@ -9,10 +9,10 @@ const EXTERNAL_ID = 'confc:cloud:cloud-abc-123';
 interface MockDeps {
   service: RootScopeMigrationService;
   scopes: {
-    getByExternalId: ReturnType<typeof vi.fn>;
-    listChildren: ReturnType<typeof vi.fn>;
-    bulkMove: ReturnType<typeof vi.fn>;
-    delete: ReturnType<typeof vi.fn>;
+    getByExternalId: Mock;
+    listChildren: Mock;
+    bulkMove: Mock;
+    delete: Mock;
   };
 }
 

@@ -1,4 +1,4 @@
-"""Fidelity: `fetch_holdings_table` against a real recorded payload, not a hand-written fixture.
+"""Fidelity: `GetHoldingsQuery.run` against a real recorded table payload.
 
 Every other test in this feature builds its own JSON, which means a field Backstop renames — or an
 alias that was wrong from the start — stays invisible: the fixture and the model are written from
@@ -23,11 +23,8 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.accounts import (
-    HoldingListingDto,
-    HoldingRowDto,
-    fetch_holdings_table,
-)
+from backstop_mcp.features.accounts import HoldingListingDto, HoldingRowDto
+from tests.features.accounts.conftest import make_get_holdings_query
 from tests.helpers import BASE_URL
 
 _RECORDINGS = Path(__file__).parent / "recordings"
@@ -51,7 +48,7 @@ def _recorded_body(name: str) -> dict[str, object]:
 
 async def _replay(client: BackstopClient, name: str, **kwargs: bool) -> HoldingListingDto:
     respx.get(_URL).mock(return_value=httpx.Response(200, json=_recorded_body(name)))
-    return await fetch_holdings_table(client, entity_id="recording", **kwargs)
+    return await make_get_holdings_query(client).run(owner_id="recording", **kwargs)
 
 
 @pytest.mark.asyncio

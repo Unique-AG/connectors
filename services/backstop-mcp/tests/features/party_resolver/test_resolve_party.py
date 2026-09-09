@@ -5,8 +5,8 @@ import httpx
 import pytest
 import respx
 from fastmcp.server.elicitation import AcceptedElicitation
-from mcp.shared.exceptions import McpError
-from mcp.types import METHOD_NOT_FOUND, ClientCapabilities, ErrorData
+from mcp.shared.exceptions import MCPError
+from mcp.types import METHOD_NOT_FOUND, ClientCapabilities
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
@@ -16,8 +16,6 @@ from backstop_mcp.features.party_resolver import (
     PartyResolveItemDto,
     QuickSearchOptionsDto,
     ResolvedPartyDto,
-    resolve_parties,
-    resolve_party,
     unresolved_parties_response,
     unresolved_party_response,
 )
@@ -30,6 +28,7 @@ from backstop_mcp.features.resolution import (
     NotFoundResponse,
     Resolved,
     elicit_choice,
+    elicit_if_ambiguous,
 )
 from tests.features.party_resolver.helpers import (
     BASE_URL,
@@ -39,10 +38,10 @@ from tests.features.party_resolver.helpers import (
     ctx_accept,
     ctx_cancel,
     ctx_decline,
-    ctx_never_elicit,
     ctx_no_elicitation_capability,
     ctx_stalls,
     ctx_unsupported,
+    make_resolve_party_query,
     resource,
 )
 
@@ -51,9 +50,7 @@ class TestTrustedPartyId:
     @pytest.mark.asyncio
     @respx.mock
     async def test_resolves_trusted_party_id_without_http(self, client: BackstopClient) -> None:
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             party_id="org-123",
         )
@@ -67,9 +64,7 @@ class TestTrustedPartyId:
     @pytest.mark.asyncio
     @respx.mock
     async def test_passes_through_optional_name_on_trusted_id(self, client: BackstopClient) -> None:
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="people",
             party_id="person-9",
             name="Ada Lovelace",
@@ -106,9 +101,7 @@ class TestEmailSearch:
             return_value=httpx.Response(200, json=collection())
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="people",
             search=email,
         )
@@ -146,9 +139,7 @@ class TestEmailSearch:
             return_value=httpx.Response(200, json=collection())
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="people",
             search=raw,
         )
@@ -174,9 +165,7 @@ class TestEmailSearch:
             return_value=httpx.Response(200, json=collection())
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search=email,
         )
@@ -208,9 +197,7 @@ class TestEmailSearch:
             return_value=httpx.Response(200, json=collection())
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="people",
             search="  bob@example.com  ",
         )
@@ -231,9 +218,7 @@ class TestEmailSearch:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="people",
             search="Capstone Partners",
         )
@@ -254,9 +239,7 @@ class TestEmailSearch:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await resolve_party(
-            ctx_never_elicit(),
-            client,
+        await make_resolve_party_query(client).run(
             search_type="people",
             search="@example.com",
         )
@@ -276,9 +259,7 @@ class TestEmailSearch:
         )
 
         with pytest.raises(BackstopResponseSchemaError) as exc_info:
-            await resolve_party(
-                ctx_never_elicit(),
-                client,
+            await make_resolve_party_query(client).run(
                 search_type="organizations",
                 search=email,
             )
@@ -298,9 +279,7 @@ class TestQuickSearch:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
@@ -330,9 +309,7 @@ class TestQuickSearch:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
             quick_search_options=QuickSearchOptionsDto(
@@ -368,9 +345,7 @@ class TestQuickSearch:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Jane",
             quick_search_options=QuickSearchOptionsDto(enhance_search_types=True),
@@ -397,9 +372,7 @@ class TestQuickSearch:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Jane",
             quick_search_options=QuickSearchOptionsDto(enhance_search_types=True),
@@ -432,9 +405,7 @@ class TestQuickSearch:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Jane",
             quick_search_options=QuickSearchOptionsDto(enhance_search_types=True),
@@ -467,9 +438,7 @@ class TestQuickSearch:
         )
 
         with pytest.raises(BackstopResponseSchemaError) as exc_info:
-            await resolve_party(
-                ctx_never_elicit(),
-                client,
+            await make_resolve_party_query(client).run(
                 search_type="organizations",
                 search="Capstone",
             )
@@ -492,9 +461,7 @@ class TestQuickSearch:
         )
 
         with pytest.raises(BackstopResponseSchemaError) as exc_info:
-            await resolve_party(
-                ctx_never_elicit(),
-                client,
+            await make_resolve_party_query(client).run(
                 search_type="organizations",
                 search="Capstone",
             )
@@ -521,9 +488,7 @@ class TestCandidateLabel:
             )
         )
 
-        result = await resolve_party(
-            ctx_decline(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Koch",
             quick_search_options=QuickSearchOptionsDto(enhance_search_types=True),
@@ -550,9 +515,7 @@ class TestCandidateLabel:
             )
         )
 
-        result = await resolve_party(
-            ctx_decline(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="unknown",
         )
@@ -566,7 +529,7 @@ class TestCandidateLabel:
 
 class TestSearchTypeMapping:
     """`/quick-search` rejects our lowercase `SearchType` outright (400 InvalidParameterException);
-    it wants its own uppercase enum. Driven through `resolve_party` with a name, which is the
+    it wants its own uppercase enum. Driven through `ResolvePartyQuery.run` with a name, the
     production path that reaches quick-search.
     """
 
@@ -580,9 +543,7 @@ class TestSearchTypeMapping:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await resolve_party(
-            ctx_never_elicit(),
-            client,
+        await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
@@ -597,9 +558,7 @@ class TestSearchTypeMapping:
         )
         respx.get(f"{BASE_URL}/people").mock(return_value=httpx.Response(200, json=collection()))
 
-        await resolve_party(
-            ctx_never_elicit(),
-            client,
+        await make_resolve_party_query(client).run(
             search_type="people",
             search="Ada Lovelace",
         )
@@ -617,9 +576,7 @@ class TestSearchTypeMapping:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await resolve_party(
-            ctx_never_elicit(),
-            client,
+        await make_resolve_party_query(client).run(
             search_type="contacts",
             search="Ada Lovelace",
         )
@@ -637,9 +594,7 @@ class TestSearchTypeMapping:
         )
         respx.get(f"{BASE_URL}/employees").mock(return_value=httpx.Response(200, json=collection()))
 
-        await resolve_party(
-            ctx_never_elicit(),
-            client,
+        await make_resolve_party_query(client).run(
             search_type="employees",
             search="Ada Lovelace",
         )
@@ -672,9 +627,7 @@ class TestPartyIdFromResourceId:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
@@ -696,9 +649,7 @@ class TestPartyIdFromResourceId:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
@@ -718,9 +669,7 @@ class TestPartyIdFromResourceId:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
@@ -747,9 +696,7 @@ class TestPartyIdFromResourceId:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
@@ -769,9 +716,7 @@ class TestHitCounts:
             return_value=httpx.Response(200, json=collection())
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Unknown Co",
         )
@@ -790,9 +735,7 @@ class TestHitCounts:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
@@ -814,9 +757,7 @@ class TestHitCounts:
             )
         )
 
-        result = await resolve_party(
-            ctx_decline(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
@@ -844,9 +785,7 @@ class TestLikeFallback:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Investment Advisors",
         )
@@ -878,9 +817,7 @@ class TestLikeFallback:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="people",
             search="Glenn",
         )
@@ -906,9 +843,7 @@ class TestLikeFallback:
             return_value=httpx.Response(200, json=collection())
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
@@ -941,8 +876,7 @@ class TestBatchResolve:
             )
         )
 
-        result = await resolve_parties(
-            client,
+        result = await make_resolve_party_query(client).run_batch(
             search_type="organizations",
             items=[
                 PartyResolveItemDto(party_id="trusted-1", name="Trusted Org"),
@@ -978,8 +912,7 @@ class TestBatchResolve:
             )
         )
 
-        result = await resolve_parties(
-            client,
+        result = await make_resolve_party_query(client).run_batch(
             search_type="organizations",
             items=[
                 PartyResolveItemDto(party_id="trusted-1"),
@@ -1012,8 +945,7 @@ class TestBatchResolve:
         )
 
         async def run() -> object:
-            return await resolve_parties(
-                client,
+            return await make_resolve_party_query(client).run_batch(
                 search_type="organizations",
                 items=[PartyResolveItemDto(search=f"Co {i}") for i in range(3)],
             )
@@ -1047,8 +979,7 @@ class TestBatchResolve:
             )
         )
 
-        result = await resolve_parties(
-            client,
+        result = await make_resolve_party_query(client).run_batch(
             search_type="organizations",
             items=[PartyResolveItemDto(search="Nope"), PartyResolveItemDto(search="Alpha")],
         )
@@ -1082,9 +1013,7 @@ class TestConfirmName:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             party_id="org-7",
             confirm_name=True,
@@ -1099,9 +1028,7 @@ class TestConfirmName:
     async def test_confirm_name_is_skipped_when_the_name_is_already_known(
         self, client: BackstopClient
     ) -> None:
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             party_id="org-7",
             name="Already Known",
@@ -1121,9 +1048,7 @@ class TestConfirmName:
             )
         )
 
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             party_id="org-7",
             name="   ",
@@ -1140,9 +1065,7 @@ class TestConfirmName:
         self, client: BackstopClient
     ) -> None:
         """Callers that fetch the record anyway shouldn't pay for a second request."""
-        result = await resolve_party(
-            ctx_never_elicit(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             party_id="org-7",
         )
@@ -1156,9 +1079,7 @@ class TestInvalidArgs:
     @pytest.mark.asyncio
     async def test_rejects_both_party_id_and_search(self, client: BackstopClient) -> None:
         with pytest.raises(ValueError, match="Exactly one of party_id or search"):
-            await resolve_party(
-                ctx_never_elicit(),
-                client,
+            await make_resolve_party_query(client).run(
                 search_type="organizations",
                 party_id="o1",
                 search="Capstone",
@@ -1167,9 +1088,7 @@ class TestInvalidArgs:
     @pytest.mark.asyncio
     async def test_rejects_neither_party_id_nor_search(self, client: BackstopClient) -> None:
         with pytest.raises(ValueError, match="Exactly one of party_id or search"):
-            await resolve_party(
-                ctx_never_elicit(),
-                client,
+            await make_resolve_party_query(client).run(
                 search_type="organizations",
             )
 
@@ -1179,9 +1098,7 @@ class TestInvalidArgs:
         # request path (e.g. `/organizations/{id}`) — a '/' could redirect that request to
         # an unintended path/endpoint, so it's rejected here rather than trusted blindly.
         with pytest.raises(ValueError, match="must not contain '/'"):
-            await resolve_party(
-                ctx_never_elicit(),
-                client,
+            await make_resolve_party_query(client).run(
                 search_type="organizations",
                 party_id="../admin",
             )
@@ -1241,12 +1158,11 @@ class TestElicitChoice:
             return_value=httpx.Response(200, json=_two_org_hits())
         )
 
-        result = await resolve_party(
-            ctx_accept("Capstone B (organization)"),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
+        result = await elicit_if_ambiguous(ctx_accept("Capstone B (organization)"), result)
 
         assert isinstance(result, Resolved)
         assert result.value.id == "o2"
@@ -1259,12 +1175,11 @@ class TestElicitChoice:
             return_value=httpx.Response(200, json=_two_org_hits())
         )
 
-        result = await resolve_party(
-            ctx_decline(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
+        result = await elicit_if_ambiguous(ctx_decline(), result)
 
         assert isinstance(result, Ambiguous)
         assert [c.value.id for c in result.candidates] == ["o1", "o2"]
@@ -1276,12 +1191,11 @@ class TestElicitChoice:
             return_value=httpx.Response(200, json=_two_org_hits())
         )
 
-        result = await resolve_party(
-            ctx_cancel(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
+        result = await elicit_if_ambiguous(ctx_cancel(), result)
 
         assert isinstance(result, Ambiguous)
         assert len(result.candidates) == 2
@@ -1293,16 +1207,27 @@ class TestElicitChoice:
             return_value=httpx.Response(200, json=_two_org_hits())
         )
 
-        result = await resolve_party(
-            ctx_unsupported(),
-            client,
+        result = await make_resolve_party_query(client).run(
             search_type="organizations",
             search="Capstone",
         )
+        result = await elicit_if_ambiguous(ctx_unsupported(), result)
 
         assert isinstance(result, Ambiguous)
         assert result.query == "Capstone"
         assert result.scope == "organizations"
+
+    @pytest.mark.asyncio
+    async def test_elicit_if_ambiguous_leaves_resolved(self) -> None:
+        resolved = Resolved(
+            value=ResolvedPartyDto(id="o1", search_type="organizations", name="Solo")
+        )
+        assert await elicit_if_ambiguous(ctx_unsupported(), resolved) is resolved
+
+    @pytest.mark.asyncio
+    async def test_elicit_if_ambiguous_leaves_not_found(self) -> None:
+        missing = NotFound(query="Nope", scope="organizations")
+        assert await elicit_if_ambiguous(ctx_unsupported(), missing) is missing
 
     @pytest.mark.asyncio
     async def test_elicit_method_not_found_returns_ambiguous(self) -> None:
@@ -1312,7 +1237,7 @@ class TestElicitChoice:
             nonlocal elicit_calls
             elicit_calls += 1
             _ = message, response_type
-            raise McpError(ErrorData(code=METHOD_NOT_FOUND, message="Method not found"))
+            raise MCPError(code=METHOD_NOT_FOUND, message="Method not found")
 
         ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
         result = await elicit_choice(

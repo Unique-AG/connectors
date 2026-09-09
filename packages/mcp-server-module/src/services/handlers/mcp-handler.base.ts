@@ -1,11 +1,14 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Fork of @rekog-labs/MCP-Nest */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import {
   ElicitRequestFormParams,
   ErrorCode,
   McpError,
+  type Notification,
   Progress,
+  type Request,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
@@ -21,6 +24,11 @@ import {
 import { formatZodError } from '../../utils/format-zod-error';
 import { McpRegistryService } from '../mcp-registry.service';
 
+interface McpRequestScope {
+  mcpRequest: McpRequest;
+  requestHandlerExtra: Pick<RequestHandlerExtra<Request, Notification>, 'requestId' | 'signal'>;
+}
+
 export abstract class McpHandlerBase {
   protected logger: Logger;
 
@@ -32,7 +40,9 @@ export abstract class McpHandlerBase {
     this.logger = new Logger(loggerContext);
   }
 
-  protected createContext(mcpServer: McpServer, mcpRequest: McpRequest): Context {
+  protected createContext(mcpServer: McpServer, requestScope: McpRequestScope): Context {
+    const { mcpRequest, requestHandlerExtra } = requestScope;
+
     // handless stateless traffic where notifications and progress are not supported
     if ((mcpServer.server.transport as any).sessionId === undefined) {
       return this.createStatelessContext(mcpServer, mcpRequest);
@@ -81,12 +91,18 @@ export abstract class McpHandlerBase {
         schema: z.ZodObject<T>,
         message: string,
       ): Promise<FormElicitResult<T>> => {
-        const result = await mcpServer.server.elicitInput({
-          message,
-          requestedSchema: z.toJSONSchema(schema, {
-            io: 'input',
-          }) as ElicitRequestFormParams['requestedSchema'],
-        });
+        const result = await mcpServer.server.elicitInput(
+          {
+            message,
+            requestedSchema: z.toJSONSchema(schema, {
+              io: 'input',
+            }) as ElicitRequestFormParams['requestedSchema'],
+          },
+          {
+            relatedRequestId: requestHandlerExtra.requestId,
+            signal: requestHandlerExtra.signal,
+          },
+        );
         const action = result.action;
         if (isDeclienOrCancelAction(action)) {
           return { action, content: undefined };
@@ -106,7 +122,7 @@ export abstract class McpHandlerBase {
         // - .refine(val => val.startsWith('A')) — can't be expressed in JSON Schema, AJV skips it, Zod enforces
         //  it
         // - .transform(s => s.trim()) — AJV doesn't transform, Zod would apply it
-        const safeParsed = schema.safeParse(result.content);
+        const safeParsed = schema.safeParse(result.content ?? {});
         if (!safeParsed.success) {
           throw new McpError(ErrorCode.InvalidParams, formatZodError(safeParsed.error));
         }
@@ -126,12 +142,18 @@ export abstract class McpHandlerBase {
       }): Promise<UrlElicitResult> => {
         const sendCompletionNotification =
           mcpServer.server.createElicitationCompletionNotifier(elicitationId);
-        const result = await mcpServer.server.elicitInput({
-          mode: 'url',
-          elicitationId,
-          message,
-          url,
-        });
+        const result = await mcpServer.server.elicitInput(
+          {
+            mode: 'url',
+            elicitationId,
+            message,
+            url,
+          },
+          {
+            relatedRequestId: requestHandlerExtra.requestId,
+            signal: requestHandlerExtra.signal,
+          },
+        );
         return { action: result.action, sendCompletionNotification };
       },
       mcpServer,

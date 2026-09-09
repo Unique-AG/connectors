@@ -2,6 +2,10 @@
 {{- with .Values.mcpConfig.microsoft }}
 - name: MICROSOFT_CLIENT_ID
   value: {{ tpl .clientId $ | quote }}
+{{- if .signInTenantId }}
+- name: MICROSOFT_SIGN_IN_TENANT_ID
+  value: {{ .signInTenantId | quote }}
+{{- end }}
 {{- if .publicWebhookUrl }}
 - name: MICROSOFT_PUBLIC_WEBHOOK_URL
   value: {{ .publicWebhookUrl | quote }}

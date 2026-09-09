@@ -1,5 +1,5 @@
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { createSmeared } from '../../utils/smeared';
 import {
   PrincipalType,
@@ -21,7 +21,7 @@ function createMembership(id: number): SiteGroupMembership {
 
 describe('SharepointRestClientService', () => {
   let service: SharepointRestClientService;
-  let requestBatch: ReturnType<typeof vi.fn>;
+  let requestBatch: Mock;
 
   const siteName = createSmeared('Contoso');
   const managedPath = 'sites' as const;

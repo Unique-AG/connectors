@@ -10,9 +10,7 @@ export default defineConfig({
     setupFiles: ['./test/setup.ts'],
     coverage: {
       enabled: true,
-      all: false,
       provider: 'istanbul',
-      include: ['src/**', 'test/**'],
       reporter: ['json-summary'],
     },
   },

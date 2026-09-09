@@ -1,6 +1,6 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Temporal } from 'temporal-polyfill';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import type { ResolvedMailboxTimezone } from '~/features/user-utils/resolve-mailbox-timezone.query';
@@ -35,9 +35,7 @@ function makeGraphError(statusCode: number, code: string): GraphError {
   return err;
 }
 
-function createQuery(
-  opts: { post?: ReturnType<typeof vi.fn>; timezone?: ResolvedMailboxTimezone } = {},
-) {
+function createQuery(opts: { post?: Mock; timezone?: ResolvedMailboxTimezone } = {}) {
   const post = opts.post ?? vi.fn().mockResolvedValue({ meetingTimeSuggestions: [] });
   const request = {
     header: vi.fn().mockReturnThis(),

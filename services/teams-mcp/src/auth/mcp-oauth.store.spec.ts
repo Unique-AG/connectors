@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { MockCacheManager, MockDrizzleDatabase, MockEncryptionService } from '../__mocks__';
 import { McpOAuthStore } from './mcp-oauth.store';
 
@@ -7,7 +7,7 @@ describe('McpOAuthStore', () => {
   let mockDrizzle: MockDrizzleDatabase;
   let mockEncryption: MockEncryptionService;
   let mockCache: MockCacheManager;
-  let mockAmqp: { publish: ReturnType<typeof vi.fn> };
+  let mockAmqp: { publish: Mock };
 
   beforeEach(() => {
     mockDrizzle = new MockDrizzleDatabase();

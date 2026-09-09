@@ -17,7 +17,12 @@ from backstop_mcp.features.accounts import PartyAccountsResolvedResponse
 from backstop_mcp.features.accounts.tools.get_accounts_for_party import get_accounts_for_party
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools import TOOLS
-from tests.features.party_resolver.helpers import ctx_never_elicit
+from tests.features.accounts.conftest import make_get_holdings_query
+from tests.features.party_resolver.helpers import (
+    ctx_never_elicit,
+    make_get_party_name_query,
+    make_resolve_party_query,
+)
 from tests.helpers import BASE_URL, resource
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
@@ -168,7 +173,9 @@ async def _call(client: BackstopClient, *, include_closed: bool = False) -> obje
         search_type="organizations",
         party_id=_ORG_ID,
         include_closed=include_closed,
-        client=client,
+        resolve_party_query=make_resolve_party_query(client),
+        get_party_name_query=make_get_party_name_query(client),
+        get_holdings_query=make_get_holdings_query(client),
     )
 
 
@@ -263,7 +270,9 @@ class TestOwnsNothingIsVerified:
                 ctx_never_elicit(),
                 search_type="organizations",
                 party_id=_ORG_ID,
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                get_party_name_query=make_get_party_name_query(client),
+                get_holdings_query=make_get_holdings_query(client),
             ),
             PartyAccountsResolvedResponse,
         )
@@ -285,7 +294,9 @@ class TestOwnsNothingIsVerified:
                 ctx_never_elicit(),
                 search_type="organizations",
                 party_id=_ORG_ID,
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                get_party_name_query=make_get_party_name_query(client),
+                get_holdings_query=make_get_holdings_query(client),
             ),
             NotFoundResponse,
         )
@@ -308,7 +319,9 @@ class TestOwnsNothingIsVerified:
                 ctx_never_elicit(),
                 search_type="organizations",
                 search="PSP Investments",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                get_party_name_query=make_get_party_name_query(client),
+                get_holdings_query=make_get_holdings_query(client),
             ),
             PartyAccountsResolvedResponse,
         )
@@ -329,7 +342,9 @@ class TestOwnsNothingIsVerified:
             ctx_never_elicit(),
             search_type="organizations",
             party_id=_ORG_ID,
-            client=client,
+            resolve_party_query=make_resolve_party_query(client),
+            get_party_name_query=make_get_party_name_query(client),
+            get_holdings_query=make_get_holdings_query(client),
         )
 
         assert not confirm.called
@@ -348,7 +363,9 @@ class TestOwnsNothingIsVerified:
                 ctx_never_elicit(),
                 search_type="organizations",
                 party_id=_ORG_ID,
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                get_party_name_query=make_get_party_name_query(client),
+                get_holdings_query=make_get_holdings_query(client),
             ),
             PartyAccountsResolvedResponse,
         )
@@ -390,7 +407,9 @@ class TestResolution:
                 ctx_never_elicit(),
                 search_type="organizations",
                 search="No Such Org",
-                client=client,
+                resolve_party_query=make_resolve_party_query(client),
+                get_party_name_query=make_get_party_name_query(client),
+                get_holdings_query=make_get_holdings_query(client),
             ),
             NotFoundResponse,
         )
@@ -412,6 +431,8 @@ class TestContract:
         assert "data_caveat" in doc
         assert "undocumented" in doc
         assert "may 404" in doc
+        assert "search_type" in doc
+        assert "rejected" in doc
 
     def test_output_schema_explains_provenance_and_the_zero_trap(self) -> None:
         meta = get_fastmcp_meta(get_accounts_for_party)

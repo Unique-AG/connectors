@@ -1,6 +1,6 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Temporal } from 'temporal-polyfill';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import {
@@ -140,7 +140,7 @@ function createQuery(opts: {
     calendars?: CalendarRef[];
   };
   timezone?: ResolvedMailboxTimezone;
-  get?: ReturnType<typeof vi.fn>;
+  get?: Mock;
   getByPath?: Record<string, unknown | Error>;
 }) {
   const get = opts.get ?? vi.fn().mockResolvedValue({ value: [] });
@@ -556,24 +556,27 @@ describe(SearchCalendarEventsQuery.name, () => {
   it.each([
     ['403', makeGraphError(403, 'ErrorAccessDenied')],
     ['404', makeGraphError(404, 'ErrorItemNotFound')],
-  ])('keeps other calendars and records a note when one calendarView returns %s', async (_label, error) => {
-    const { query } = createQuery({
-      calendars: [OWN_CALENDAR, DELEGATED_CALENDAR],
-      getByPath: {
-        [OWN_VIEW]: { value: [graphEvent()] },
-        [OWNER_VIEW]: error,
-      },
-    });
+  ])(
+    'keeps other calendars and records a note when one calendarView returns %s',
+    async (_label, error) => {
+      const { query } = createQuery({
+        calendars: [OWN_CALENDAR, DELEGATED_CALENDAR],
+        getByPath: {
+          [OWN_VIEW]: { value: [graphEvent()] },
+          [OWNER_VIEW]: error,
+        },
+      });
 
-    const result = await query.run(
-      USER_PROFILE_ID,
-      search({ calendars: [OWN_CALENDAR_REF, DELEGATED_CALENDAR_REF] }),
-    );
+      const result = await query.run(
+        USER_PROFILE_ID,
+        search({ calendars: [OWN_CALENDAR_REF, DELEGATED_CALENDAR_REF] }),
+      );
 
-    expect(result.success).toBe(true);
-    expect(result.events).toHaveLength(1);
-    expect(result.searchNotes).toEqual([`Could not read calendar "Banker" (${OWNER_EMAIL}).`]);
-  });
+      expect(result.success).toBe(true);
+      expect(result.events).toHaveLength(1);
+      expect(result.searchNotes).toEqual([`Could not read calendar "Banker" (${OWNER_EMAIL}).`]);
+    },
+  );
 
   it('passes through consentRequired from list_calendars', async () => {
     const { query } = createQuery({

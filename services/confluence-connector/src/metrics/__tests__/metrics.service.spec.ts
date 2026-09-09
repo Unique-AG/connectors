@@ -1,7 +1,7 @@
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import type { Counter, Histogram, ObservableGauge } from '@opentelemetry/api';
 import type { MetricService } from 'nestjs-otel';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { createMockTenant } from '../../synchronization/__mocks__/sync.fixtures';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
 import { Metrics, SyncPhase } from '../metrics.service';
@@ -140,24 +140,22 @@ describe('Metrics', () => {
   });
 
   describe('recordFileDiffEvents', () => {
-    it.each([
-      'new',
-      'updated',
-      'deleted',
-      'moved',
-    ] as const)('adds count with diff_result_type=%s', (diffResultType) => {
-      const { metricService, counters } = makeMetricService();
-      const metrics = new Metrics(metricService);
+    it.each(['new', 'updated', 'deleted', 'moved'] as const)(
+      'adds count with diff_result_type=%s',
+      (diffResultType) => {
+        const { metricService, counters } = makeMetricService();
+        const metrics = new Metrics(metricService);
 
-      tenantStorage.run(tenant, () => {
-        metrics.recordFileDiffEvents(1, diffResultType);
-      });
+        tenantStorage.run(tenant, () => {
+          metrics.recordFileDiffEvents(1, diffResultType);
+        });
 
-      expect(counters.get('cfc_file_diff_events_total')?.add).toHaveBeenCalledWith(1, {
-        tenant: 'test-tenant',
-        diff_result_type: diffResultType,
-      });
-    });
+        expect(counters.get('cfc_file_diff_events_total')?.add).toHaveBeenCalledWith(1, {
+          tenant: 'test-tenant',
+          diff_result_type: diffResultType,
+        });
+      },
+    );
   });
 
   describe('recordApiError', () => {
@@ -230,9 +228,7 @@ describe('Metrics', () => {
       const phaseGauge = getOrThrow(gauges, 'cfc_sync_phase');
       expect(phaseGauge.addCallback).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
-      const callback = phaseGauge.addCallback.mock.calls[0]![0] as (obs: {
-        observe: ReturnType<typeof vi.fn>;
-      }) => void;
+      const callback = phaseGauge.addCallback.mock.calls[0]![0] as (obs: { observe: Mock }) => void;
 
       const observe = vi.fn();
       callback({ observe });
@@ -257,9 +253,7 @@ describe('Metrics', () => {
       const pagesGauge = getOrThrow(gauges, 'cfc_sync_pages_total');
       expect(pagesGauge.addCallback).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
-      const callback = pagesGauge.addCallback.mock.calls[0]![0] as (obs: {
-        observe: ReturnType<typeof vi.fn>;
-      }) => void;
+      const callback = pagesGauge.addCallback.mock.calls[0]![0] as (obs: { observe: Mock }) => void;
 
       const observe = vi.fn();
       callback({ observe });
@@ -278,9 +272,7 @@ describe('Metrics', () => {
       const attGauge = getOrThrow(gauges, 'cfc_sync_attachments_total');
       expect(attGauge.addCallback).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
-      const callback = attGauge.addCallback.mock.calls[0]![0] as (obs: {
-        observe: ReturnType<typeof vi.fn>;
-      }) => void;
+      const callback = attGauge.addCallback.mock.calls[0]![0] as (obs: { observe: Mock }) => void;
 
       const observe = vi.fn();
       callback({ observe });
@@ -325,9 +317,7 @@ describe('Metrics', () => {
       const phaseGauge = getOrThrow(gauges, 'cfc_sync_phase');
       expect(phaseGauge.addCallback).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
-      const callback = phaseGauge.addCallback.mock.calls[0]![0] as (obs: {
-        observe: ReturnType<typeof vi.fn>;
-      }) => void;
+      const callback = phaseGauge.addCallback.mock.calls[0]![0] as (obs: { observe: Mock }) => void;
 
       const observe = vi.fn();
       callback({ observe });

@@ -1,5 +1,5 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -21,7 +21,7 @@ function makeGraphError(statusCode: number, code: string): GraphError {
   return err;
 }
 
-function createQuery(opts: { get?: ReturnType<typeof vi.fn> } = {}) {
+function createQuery(opts: { get?: Mock } = {}) {
   const get =
     opts.get ??
     vi.fn().mockResolvedValue({

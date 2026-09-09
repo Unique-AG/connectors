@@ -18,7 +18,10 @@ from backstop_mcp.features.accounts.internal_dto import (
     ShareDto,
 )
 from backstop_mcp.features.accounts.responses.shared import closed_hint
-from backstop_mcp.features.party_resolver import ResolvedPartyResponse
+from backstop_mcp.features.party_resolver import (
+    RESOLVED_PARTY_ECHO_DESCRIPTION,
+    ResolvedPartyResponse,
+)
 from backstop_mcp.models import OmitNoneModel
 
 _TABLE_CAVEAT = (
@@ -207,12 +210,7 @@ class PartyAccountsResolvedResponse(OmitNoneModel):
         default="resolved",
         description="Always 'resolved': the party was found and its holdings listed.",
     )
-    resolved: ResolvedPartyResponse = Field(
-        description=(
-            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
-            "`party_id` later — never invent them."
-        )
-    )
+    resolved: ResolvedPartyResponse = Field(description=RESOLVED_PARTY_ECHO_DESCRIPTION)
     holdings: tuple[HoldingRowResponse, ...] = Field(
         description="The accounts this party owns, across products, with their snapshot figures."
     )

@@ -1,14 +1,14 @@
 import type { Context } from '@microsoft/microsoft-graph-client';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { TokenRefreshMiddleware } from './token-refresh.middleware';
 
 describe('TokenRefreshMiddleware', () => {
   let middleware: TokenRefreshMiddleware;
   let mockAuthProvider: {
-    getAccessToken: ReturnType<typeof vi.fn>;
+    getAccessToken: Mock;
   };
   let mockNextMiddleware: {
-    execute: ReturnType<typeof vi.fn>;
+    execute: Mock;
   };
 
   beforeEach(() => {

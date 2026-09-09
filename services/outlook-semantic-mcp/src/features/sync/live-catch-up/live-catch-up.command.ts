@@ -10,6 +10,8 @@ import {
   DRIZZLE,
   DrizzleDatabase,
   inboxConfigurations,
+  SOURCES_ADDRESSED_BY_EMAIL,
+  SOURCES_WITH_DELEGATE_FALLBACK,
   subscriptions,
   UserProfile,
   userProfiles,
@@ -313,8 +315,9 @@ export class LiveCatchUpCommand {
         this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
       );
 
-      const graphBasePath =
-        userProfile.source === 'shared-mailbox' ? `users/${userProfile.email}` : 'me';
+      const graphBasePath = SOURCES_ADDRESSED_BY_EMAIL.includes(userProfile.source)
+        ? `users/${userProfile.email}`
+        : 'me';
 
       const resolverResult = await this.msGraphClientResolver.run({
         userProfile,
@@ -347,7 +350,7 @@ export class LiveCatchUpCommand {
       }
 
       if (
-        userProfile.source === 'shared-mailbox' &&
+        SOURCES_WITH_DELEGATE_FALLBACK.includes(userProfile.source) &&
         preferredDelegateUserProfileId !== resolverResult.clientUserProfileId
       ) {
         this.logger.debug({

@@ -73,7 +73,7 @@ openssl rand -hex 32
 
 ### Prerequisites
 
-- Node.js >= 24
+- Node.js 26
 - pnpm
 - A Temenos DataHub API key for the target environment
 

@@ -1,8 +1,15 @@
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, desc, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { swapIndices } from 'remeda';
-import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts, UserProfile, userProfiles } from '~/db';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  delegatedAccessAccounts,
+  SOURCES_WITH_OWN_CREDENTIALS,
+  UserProfile,
+  userProfiles,
+} from '~/db';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 
@@ -20,9 +27,20 @@ export class NoDelegatesFoundError extends Error {
 
 export class AllDelegatesFailedError extends Error {
   public constructor(ownerUserId: string) {
-    super(`All delegates exhausted (401/403) for owner: ${ownerUserId}`);
+    super(`All credentials exhausted (401/403) for owner: ${ownerUserId}`);
     this.name = 'AllDelegatesFailedError';
   }
+}
+
+function preferDelegate(
+  delegates: { delegateUserId: string }[],
+  preferredDelegateUserId: string | undefined,
+): { delegateUserId: string }[] {
+  const preferredIdx = delegates.findIndex((d) => d.delegateUserId === preferredDelegateUserId);
+  if (preferredIdx > 0) {
+    return swapIndices(delegates, 0, preferredIdx);
+  }
+  return delegates;
 }
 
 @Injectable()
@@ -38,16 +56,20 @@ export class MsGraphClientResolver {
    * Resolves a Graph client for `userProfile` and calls `fn` with it.
    *
    * - **oauth profiles** — creates a client directly for the user's own token; `fn` is called once.
-   * - **shared-mailbox profiles** — queries `delegatedAccessAccounts` for delegates ordered by
-   *   `lastVerifiedAt DESC`, then tries each in turn (up to `maxDelegates`, default 3). A 401/403
-   *   from Graph moves to the next candidate; any other error is rethrown immediately. If all
-   *   candidates exhaust with 401/403, `AllDelegatesFailedError` is thrown.
+   *   A 401/403 propagates rather than becoming `AllDelegatesFailedError`.
+   * - **shared-mailbox profiles** — queries `delegatedAccessAccounts` for full-access delegates
+   *   ordered by `lastVerifiedAt DESC NULLS LAST`, then tries each in turn (up to `maxDelegates`,
+   *   default 3). A 401/403 from Graph moves to the next candidate; any other error is rethrown
+   *   immediately. If all candidates exhaust with 401/403, `AllDelegatesFailedError` is thrown.
+   * - **shared-mailbox-with-login profiles** — same candidate loop, but the mailbox's own token is
+   *   tried first. `preferredDelegateUserId` is swapped to the front of the *delegate* segment only,
+   *   so a stale preferred delegate cannot outrank the mailbox's own credential.
    *
    * Graph paths inside `fn` should use the `userProfile` from the outer scope
-   * (e.g. `users/${userProfile.email}/…`).
+   * (e.g. `users/${userProfile.email}/…`) whenever a delegate token might be selected.
    *
    * Return type depends on `throwIfNoDelegates`:
-   * - omitted / `false` → returns `NO_DELEGATES` symbol when no delegates exist (shared-mailbox only); use `isNoDelegates()` to check
+   * - omitted / `false` → returns `NO_DELEGATES` symbol when no credentials exist; use `isNoDelegates()` to check
    * - `true`            → throws `NoDelegatesFoundError` instead; return type narrows to `T`
    *
    * @example
@@ -72,7 +94,8 @@ export class MsGraphClientResolver {
       client: Client;
       /** The user profile ID the client is authenticated as.
        * For `oauth` profiles this equals `userProfile.id`.
-       * For `shared-mailbox` profiles this is the delegated OAuth user that was selected. */
+       * For shared-mailbox profiles this is the delegated user that was selected.
+       * For shared-mailbox-with-login this is the mailbox itself when self wins, otherwise a delegate. */
       clientUserProfileId: string;
     }) => Promise<T>;
     sharedMailboxConfig: {
@@ -88,7 +111,8 @@ export class MsGraphClientResolver {
       client: Client;
       /** The user profile ID the client is authenticated as.
        * For `oauth` profiles this equals `userProfile.id`.
-       * For `shared-mailbox` profiles this is the delegated OAuth user that was selected. */
+       * For shared-mailbox profiles this is the delegated user that was selected.
+       * For shared-mailbox-with-login this is the mailbox itself when self wins, otherwise a delegate. */
       clientUserProfileId: string;
     }) => Promise<T>;
     sharedMailboxConfig?: {
@@ -104,7 +128,8 @@ export class MsGraphClientResolver {
       client: Client;
       /** The user profile ID the client is authenticated as.
        * For `oauth` profiles this equals `userProfile.id`.
-       * For `shared-mailbox` profiles this is the delegated OAuth user that was selected. */
+       * For shared-mailbox profiles this is the delegated user that was selected.
+       * For shared-mailbox-with-login this is the mailbox itself when self wins, otherwise a delegate. */
       clientUserProfileId: string;
     }) => Promise<T>;
     sharedMailboxConfig?: {
@@ -123,40 +148,45 @@ export class MsGraphClientResolver {
       return fn({ client, clientUserProfileId: userProfile.id });
     }
 
-    // source === 'shared-mailbox': use delegated access
-    let delegates = await this.db
+    const delegates = await this.db
       .select({ delegateUserId: delegatedAccessAccounts.delegateUserId })
       .from(delegatedAccessAccounts)
       .innerJoin(
         userProfiles,
         and(
           eq(userProfiles.id, delegatedAccessAccounts.delegateUserId),
-          eq(userProfiles.source, 'oauth'),
+          inArray(userProfiles.source, SOURCES_WITH_OWN_CREDENTIALS),
           isNotNull(userProfiles.accessToken),
         ),
       )
-      .where(eq(delegatedAccessAccounts.ownerUserId, userProfile.id))
-      .orderBy(desc(delegatedAccessAccounts.lastVerifiedAt));
+      .where(
+        and(
+          eq(delegatedAccessAccounts.ownerUserId, userProfile.id),
+          eq(delegatedAccessAccounts.hasFullDelegatedAccess, true),
+        ),
+      )
+      .orderBy(sql`${delegatedAccessAccounts.lastVerifiedAt} DESC NULLS LAST`);
 
-    if (delegates.length === 0) {
+    const ordered = preferDelegate(delegates, preferredDelegateUserId);
+    const candidates = userProfile.accessToken
+      ? [{ delegateUserId: userProfile.id }, ...ordered]
+      : ordered;
+
+    if (candidates.length === 0) {
       if (throwIfNoDelegates) {
         throw new NoDelegatesFoundError(userProfile.id);
       }
       return NO_DELEGATES;
     }
 
-    const preferredIdx = delegates.findIndex((d) => d.delegateUserId === preferredDelegateUserId);
-    if (preferredIdx > 0) {
-      delegates = swapIndices(delegates, 0, preferredIdx);
-    }
-    const candidates = delegates.slice(0, maxDelegates);
+    const tried = candidates.slice(0, maxDelegates);
 
-    for (const delegate of candidates) {
+    for (const delegate of tried) {
       const client = this.graphClientFactory.createClientForUser(delegate.delegateUserId);
       try {
         return await fn({ client, clientUserProfileId: delegate.delegateUserId });
       } catch (error) {
-        // 401 and 403 both cycle to the next delegate. This also covers failed token refreshes:
+        // 401 and 403 both cycle to the next candidate. This also covers failed token refreshes:
         // TokenRefreshMiddleware catches any refreshAccessToken() failure, swallows it, and
         // preserves the original 401 response — so a dead refresh token surfaces here as
         // GraphError(401) and is handled by the same branch. No separate flag needed.
@@ -167,7 +197,7 @@ export class MsGraphClientResolver {
       }
     }
 
-    this.logger.warn({ ownerUserId: userProfile.id, msg: 'All delegates exhausted (401/403)' });
+    this.logger.warn({ ownerUserId: userProfile.id, msg: 'All credentials exhausted (401/403)' });
     throw new AllDelegatesFailedError(userProfile.id);
   }
 }

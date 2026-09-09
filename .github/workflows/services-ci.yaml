@@ -12,6 +12,7 @@ on:
       - "pnpm-lock.yaml"
       - ".github/workflows/services-ci.yaml"
       - ".github/workflows/_template-ci.yaml"
+      - "scripts/render-values-schema.sh"
   workflow_dispatch:
     inputs:
       services:
@@ -30,7 +31,7 @@ permissions:
 
 jobs:
   detect-changes:
-    name: Detect changes
+    name: Detect changes (Node)
     runs-on: ubuntu-slim
     outputs:
       services: ${{ steps.build-matrix.outputs.services }}
@@ -50,6 +51,10 @@ jobs:
               - 'packages/**'
             lockfile:
               - 'pnpm-lock.yaml'
+            workflow:
+              - '.github/workflows/services-ci.yaml'
+              - '.github/workflows/_template-ci.yaml'
+              - 'scripts/render-values-schema.sh'
 
       # Builds a JSON array of service names to fan out into parallel CI matrix jobs.
       # Handles three scenarios:
@@ -66,6 +71,7 @@ jobs:
           SERVICES_FILES: ${{ steps.filter.outputs.services_files }}
           PACKAGES_CHANGED: ${{ steps.filter.outputs.packages }}
           LOCKFILE_CHANGED: ${{ steps.filter.outputs.lockfile }}
+          WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
         run: |
           # Node/TS workspace services only (package.json). Python services use python-ci.yaml.
           list_node_services() {
@@ -92,8 +98,7 @@ jobs:
               done
               services=$(printf '%s\n' "${valid[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             fi
-          elif [ "$PACKAGES_CHANGED" = "true" ] || [ "$LOCKFILE_CHANGED" = "true" ]; then
-            # Packages or lockfile changed — run CI for all Node services to catch breakage
+          elif [ "$PACKAGES_CHANGED" = "true" ] || [ "$LOCKFILE_CHANGED" = "true" ] || [ "$WORKFLOW_CHANGED" = "true" ]; then
             services=$(list_node_services | jq -R -s -c 'split("\n") | map(select(length > 0))')
           elif [ "$SERVICES_CHANGED" = "true" ]; then
             services=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | while read -r s; do

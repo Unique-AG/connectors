@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { UniqueApiFeatureModuleOptions } from '../../config/unique-api-feature-module-options';
 import type { UniqueApiClient, UniqueApiClientFactory } from '../../types';
 import { UniqueApiClientRegistryImpl } from '../unique-api-client.registry';
@@ -107,9 +107,7 @@ describe('UniqueApiClientRegistryImpl', () => {
       const client2 = createMockClient();
       const factory = { create: vi.fn() } as unknown as UniqueApiClientFactory;
 
-      (factory.create as ReturnType<typeof vi.fn>)
-        .mockReturnValueOnce(client1)
-        .mockReturnValueOnce(client2);
+      (factory.create as Mock).mockReturnValueOnce(client1).mockReturnValueOnce(client2);
 
       const registry = new UniqueApiClientRegistryImpl(factory);
 

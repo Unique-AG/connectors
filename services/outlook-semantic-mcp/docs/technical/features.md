@@ -96,7 +96,7 @@ Available in both modes. Behaviour is identical.
 
 Delegated access lets a user ("the delegate") search another user's mailbox ("the owner") when Microsoft Exchange has granted them access. The MCP server detects these relationships automatically via background scans controlled by [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) — no per-user configuration is needed beyond enabling that setting.
 
-For ordinary user mailboxes, **both the owner and the delegate must have connected the MCP** — if the owner has not signed in, there is nothing to discover or search. Shared mailboxes listed in [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](../operator/configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS) are the exception: they do not sign in; only the delegates need to connect.
+For ordinary user mailboxes, **both the owner and the delegate must have connected the MCP** — if the owner has not signed in, there is nothing to discover or search. Shared mailboxes listed in [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](../operator/configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS) may also sign in; if they have not, only the delegates need to connect. When they have signed in, the mailbox's own token is the primary credential and Full Access delegates are the backup.
 
 ### What's supported
 
@@ -106,15 +106,15 @@ Four delegation configurations are supported:
 
 2. **User shares specific folders via Outlook desktop** — a user shares individual folders (e.g. Inbox, RFQ) with another user directly from Outlook desktop, without Exchange admin involvement. **Mode A only** — requires [`DELEGATED_ACCESS_SCAN=granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN). See [Setup — User shares specific folders](#2.-User-shares-specific-folders-(no-admin-needed)) for the required root-mailbox visibility step.
 
-3. **Microsoft 365 shared mailbox with no sign-in** — a typical shared mailbox that has no login of its own. List its address in [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](../operator/configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS). Delegates with Full Access can search it; nobody signs into the MCP as the shared mailbox. See [Setup — Shared mailboxes](#3.-Shared-mailboxes).
+3. **Microsoft 365 shared mailbox with no sign-in** — a typical shared mailbox that has no login of its own. List its address in [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](../operator/configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS). Delegates with Full Access can search it. See [Setup — Shared mailboxes](#3.-Shared-mailboxes).
 
-4. **Sign-in-eligible mailbox used as a shared inbox** — a normal user mailbox (or a shared mailbox that has sign-in enabled) that several people use. Either list it in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS` and never log in to it in the MCP (same path as 3), or have users sign in to it during MCP authorization and use it as a normal Outlook account. See [Setup — Shared mailboxes](#3.-Shared-mailboxes).
+4. **Sign-in-eligible mailbox used as a shared inbox** — a normal user mailbox (or a shared mailbox that has sign-in enabled) that several people use. List it in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`. Users may also sign in to it during MCP authorization: the mailbox's own token is then primary and Full Access delegates are the backup. See [Setup — Shared mailboxes](#3.-Shared-mailboxes).
 
 ### What's not supported
 
 - **Application-permission based access** — the MCP uses delegated permissions only (acting on behalf of a signed-in user). It does not support application-level access to mailboxes.
 - **Access paths not visible via the Microsoft Graph API** — only access detectable via the Graph messages or mailFolders endpoints is supported. Access paths that bypass these endpoints (e.g. internal APIs used by Outlook desktop) are not visible to the MCP.
-- **Detecting access for users who have not connected the MCP** — for ordinary user mailboxes, both the owner and the delegate must be connected. Shared mailboxes listed in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS` do not sign in; only the delegates must be connected.
+- **Detecting access for users who have not connected the MCP** — for ordinary user mailboxes, both the owner and the delegate must be connected. Shared mailboxes listed in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS` may also sign in; if they have not, only the delegates must be connected.
 - **Folder-level access in Mode B** — [`granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) requires Mode A. In Mode B, only delegates with full mailbox access can search delegated mailboxes.
 - **Folder-level access on env-listed shared mailboxes** — shared-mailbox profiles are discovered with Full Access only (`/messages`). Grant Full Access to every user who needs to search them.
 
@@ -180,25 +180,19 @@ Use this path when a user wants to share individual folders with a colleague wit
 
 Two mailbox types are supported. Pick the path that matches how the mailbox is set up in Microsoft 365.
 
-**Type 1 — Microsoft 365 shared mailbox with no sign-in.** This is the usual shared mailbox: it has no password and nobody logs into it. Register it with the MCP by listing its address in [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](../operator/configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS). Do not complete MCP authorization as that mailbox.
+**Type 1 — Microsoft 365 shared mailbox with no sign-in.** This is the usual shared mailbox: it has no password and nobody logs into it. Register it with the MCP by listing its address in [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](../operator/configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS).
 
-**Type 2 — Sign-in-eligible mailbox used as a shared inbox.** A normal user mailbox, or a shared mailbox that has sign-in enabled. Choose exactly one of:
+**Type 2 — Sign-in-eligible mailbox used as a shared inbox.** A normal user mailbox, or a shared mailbox that has sign-in enabled. List it in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`. Completing MCP authorization as that account is optional and supported: the mailbox's own token becomes the primary credential and Full Access delegates remain the backup. If nobody signs in, it behaves like type 1.
 
-- **2.1 List it and never log in to it in the MCP.** Put the address in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS` and do not complete MCP authorization as that account. Delegates with Full Access query it the same way as type 1.
-- **2.2 Users connect to it as a normal Outlook account.** During MCP authorization they sign in with that mailbox's credentials. It is then a regular connected mailbox (own tokens; in Mode A, its own ingest). Do **not** list it in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`. If it is already connected as an OAuth profile, later listing it in the env var does not convert it to a shared-mailbox profile.
-
-**Setup for type 1 and type 2.1** (env-listed, no MCP login):
+**Setup for type 1 and type 2** (env-listed):
 
 1. Set [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) to `full_access_only` or `granular_access`.
 2. Set [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](../operator/configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS) to a comma-separated list of mailbox addresses (Helm: `mcpConfig.delegatedAccess.sharedMailboxEmails`).
 3. Grant **Full Access** to every user who needs to search the mailbox, using Exchange admin center or PowerShell (see [Step 1 above](#1.-Exchange-admin-grants-Full-Access)).
-4. Those users connect **their own** MCP accounts. Nobody signs in as the shared mailbox.
-5. Wait for shared-mailbox sync (startup, or `DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE`, default every 6 hours) and then for delegated-access discovery. At least one connected Full Access delegate is required: discovery and Mode A ingest run as that delegate against Graph (`/users/{shared-mailbox}/…`).
+4. Those users connect **their own** MCP accounts. The shared mailbox itself may also sign in; if it does not, ingest and Graph calls run as a Full Access delegate.
+5. Wait for shared-mailbox sync (startup, or `DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE`, default every 6 hours) and then for delegated-access discovery. Discovery and Mode A ingest address the mailbox as `/users/{shared-mailbox}/…`. When the mailbox has signed in, its own token is tried first; on 401/403 the call rotates to a Full Access delegate.
 
-**Setup for type 2.2** (login as a normal Outlook account):
-
-1. During MCP authorization, sign in with the mailbox's own credentials, the same way as any other Outlook account.
-2. If other people also need to search that mailbox, grant them Full Access and have them connect their own accounts (same as [Step 1](#1.-Exchange-admin-grants-Full-Access)). Both the mailbox owner (the login in step 1) and each delegate must be connected.
+If you later remove an address from the env list, a mailbox that had signed in stays as a normal OAuth user and ingested shared-mailbox content is deleted. A mailbox that never signed in is removed entirely.
 
 ### Behavior
 
@@ -214,10 +208,10 @@ For a detailed description of how delegated access works at runtime, see the exi
 |---|---|---|
 | **Full Access delegation** | Supported — delegate searches owner's ingested emails | Supported — live keyword search against owner's mailbox |
 | **Folder-level delegation** | Supported ([`granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) only) | Not supported — search requires full mailbox access (see [Known limitations](#Known-Limitations)) |
-| **Env-listed shared mailbox** | Supported — ingested via a Full Access delegate's token; mailbox itself does not sign in | Supported — live keyword search via a delegate |
-| **Sign-in-eligible mailbox, MCP login (type 2.2)** | Supported — treated as a normal connected mailbox | Supported — treated as a normal connected mailbox |
+| **Env-listed shared mailbox** | Supported — ingested via the mailbox's own token when it has signed in, otherwise via a Full Access delegate | Supported — live keyword search via own token or a delegate |
+| **Sign-in-eligible mailbox that also logs in** | Supported — listed *and* signed in; own token first, delegates as backup | Supported — same credential ladder |
 | **Folder filtering** | Supported in `granular_access` | Supported for own mailbox and full-access delegated mailboxes only |
-| **Ingestion** | Owner's inbox, plus env-listed shared-mailbox profiles (via a delegate). Delegated *user* mailboxes are not re-ingested | No ingestion |
+| **Ingestion** | Owner's inbox, plus env-listed shared-mailbox profiles (own token first, then a delegate). Delegated *user* mailboxes are not re-ingested | No ingestion |
 | **Revocation detection** | Background scan: discovery (every 12 h), verification (every 4 h) | Immediate (live Graph query) |
 
 Configure scanning via [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
@@ -235,7 +229,7 @@ Live query-through to Microsoft Graph. No calendar ingest, webhooks, or calendar
 - List own calendars and calendars shared with the signed-in user (that they accepted). Holiday and birthday calendars appear in the list — skip those by name.
 - Search events in a time window. Relative ranges (`today`, `thisWeek`, `nextWeek`, `next7Days`, …) resolve in the mailbox timezone. Weeks start Monday. Each result includes the full plain-text body (Graph already converted; may be truncated).
 - Free/busy (`check_availability`) and ranked slot suggestions (`suggest_meeting_times`).
-- Create, update, cancel, and respond to invitations. Writes have no draft state: the user confirms with Accept / Decline on the prompt; invitations and cancellations notify attendees immediately. `cancel_event` is not a silent delete. `create_event` / `update_event` `body` is an HTML fragment sent to Graph unchanged (not Markdown). Search still returns plain text.
+- Create, update, cancel, and respond to invitations. Writes have no draft state. `respond_to_invite` notifies the organizer immediately. `create_event`, `update_event`, and `cancel_event` wait for Accept / Decline on the prompt, then notify attendees. `cancel_event` is not a silent delete. `create_event` / `update_event` `body` is an HTML fragment sent to Graph unchanged (not Markdown). Search still returns plain text.
 - Shared calendars. A shared calendar is owned by somebody else but stored in the caller's mailbox, so it resolves under `/me` like any other calendar — `ownerEmail` is who it belongs to. Pass `calendarRef` / `eventRef` from list/search unchanged.
 
 **What's not supported yet**

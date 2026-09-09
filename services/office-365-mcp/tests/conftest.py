@@ -1,6 +1,7 @@
 from collections.abc import Generator
 
 import pytest
+from kiota_http.middleware import retry_handler
 from testcontainers.community.postgres import PostgresContainer
 
 
@@ -23,3 +24,22 @@ def postgres_container() -> Generator[PostgresContainer]:
     the suite — a prefix per test file, or a random uuid."""
     with PostgresContainer("postgres:17-alpine") as postgres:
         yield postgres
+
+
+class RecordedSleeps:
+    """Stands in for the `asyncio` module inside the SDK's retry handler, which only calls
+    `await asyncio.sleep(delay)`. Patching `asyncio.sleep` globally would slow everything else on
+    the loop."""
+
+    def __init__(self) -> None:
+        self.delays: list[float] = []
+
+    async def sleep(self, delay: float) -> None:
+        self.delays.append(delay)
+
+
+@pytest.fixture
+def retry_sleeps(monkeypatch: pytest.MonkeyPatch) -> RecordedSleeps:
+    recorded = RecordedSleeps()
+    monkeypatch.setattr(retry_handler, "asyncio", recorded)
+    return recorded

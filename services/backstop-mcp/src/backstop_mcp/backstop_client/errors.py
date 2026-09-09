@@ -185,7 +185,7 @@ class BackstopApiError(ToolError):
         self.errors = errors
 
     @classmethod
-    def from_response(cls, response: httpx.Response) -> "BackstopApiError":
+    def from_response(cls, response: httpx.Response) -> BackstopApiError:
         """Turn a 4xx/5xx `httpx.Response` into the right `BackstopApiError` subclass.
 
         Parses the full JSON:API `errors[]` body (accepting `detail` and/or `title`), falling back
@@ -361,7 +361,7 @@ def _parse_retry_after(response: httpx.Response) -> float | None:
         pass
     try:
         when = parsedate_to_datetime(retry_after)
-    except (TypeError, ValueError, IndexError):
+    except TypeError, ValueError, IndexError:
         logger.warning(
             "backstop.retry_after.unparseable",
             extra={"retry_after": retry_after},

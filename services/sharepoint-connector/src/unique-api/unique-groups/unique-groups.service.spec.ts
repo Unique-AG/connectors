@@ -1,11 +1,11 @@
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { SCOPE_MANAGEMENT_CLIENT } from '../clients/unique-graphql.client';
 import { UniqueGroupsService } from './unique-groups.service';
 
 describe('UniqueGroupsService', () => {
   let service: UniqueGroupsService;
-  let request: ReturnType<typeof vi.fn>;
+  let request: Mock;
 
   beforeEach(async () => {
     request = vi.fn().mockResolvedValue({ addGroupMembers: [] });

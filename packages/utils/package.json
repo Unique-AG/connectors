@@ -9,23 +9,21 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "lint": "biome check .",
-    "lint:fix": "biome check . --write",
-    "format": "biome format .",
-    "format:fix": "biome format . --write",
+    "style": "biome check .",
+    "style:fix": "biome check . --write",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "remeda": "2.45.0"
+    "remeda": "catalog:"
   },
   "devDependencies": {
-    "@swc/core": "1.16.1",
-    "@types/node": "26.4.0",
-    "typeid-js": "1.2.0",
-    "typescript": "5.9.3",
-    "unplugin-swc": "1.5.11",
-    "vitest": "3.2.7",
-    "zod": "4.4.3"
+    "@swc/core": "catalog:",
+    "@types/node": "catalog:",
+    "typeid-js": "catalog:",
+    "typescript": "catalog:",
+    "unplugin-swc": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:"
   },
   "peerDependencies": {
     "typeid-js": "^1.2.0",

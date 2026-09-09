@@ -16,8 +16,9 @@ from office_365_mcp.graph_client import (
     GraphUnavailable,
     graph_errors,
 )
+from tests.conftest import RecordedSleeps
 
-from .conftest import GRAPH_V1, RecordedSleeps
+from .conftest import GRAPH_V1
 
 REQUEST_ID = "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
 

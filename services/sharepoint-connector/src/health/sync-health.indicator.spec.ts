@@ -18,8 +18,7 @@ function makeSyncRecord(overrides: Partial<SyncRecord> = {}): SyncRecord {
   };
 }
 
-const configGetImpl = (stub: CallableFunction) => ({
-  ...stub(),
+const configGetImpl = () => ({
   get: vi.fn((key: string) => {
     if (key === 'health.syncHistorySize') {
       return HISTORY_SIZE;

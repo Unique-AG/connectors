@@ -2,15 +2,34 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes ten MCP
-tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
-most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
-channels of one of those teams; `browse_channel`, what was posted in one of those channels;
-`search_messages`, full-text search across every Teams message they can see; `read_message`,
-one of those messages in full; `list_meeting_transcripts`, whether a Teams meeting was
-transcribed and a handle for each transcript; `read_transcript`, what was said in one of those
-meetings as speaker-attributed, timestamped turns; and `list_meeting_recordings`, whether a meeting
-was recorded, how long each recording runs and who may download it — each one a file of its own,
+Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-nine
+MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
+most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
+channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
+`teams_search_messages`, full-text search across every Teams message they can see; `teams_read_message`,
+one of those messages in full; `teams_list_meeting_transcripts`, whether a Teams meeting was
+transcribed and a handle for each transcript; `teams_read_transcript`, what was said in one of those
+meetings as speaker-attributed, timestamped turns; and `teams_list_meeting_recordings`, whether a meeting
+was recorded, how long each recording runs and who may download it; and `outlook_search_mail`,
+which finds a message in the signed-in user's own Outlook mailbox, and `outlook_read_mail`,
+which reads one of those in full; and `outlook_browse_folders`, one level of the mail folder
+tree; and `outlook_find_recipient`, which resolves a name to the address it sends from — each
+one a file of its own — plus `outlook_read_thread`, every message of one conversation this
+mailbox holds; `outlook_list_mail`, the newest messages of one folder in receipt order; and
+`outlook_get_mailbox_settings`, which shows the inbox rules, the automatic reply and the
+categories; and `outlook_mark_mail`, the first tool here that changes anything; and
+`outlook_move_mail`, which files messages into a folder and is how this connector erases one; and
+`outlook_draft_mail`, which composes a draft it cannot send; and `outlook_draft_reply`,
+which drafts a reply or a forward from a message this connector found; and `outlook_send_draft`,
+the only tool here that puts mail on the wire; and `outlook_set_automatic_reply`,
+which turns the out-of-office on for a bounded window or off; and `outlook_disable_mail_rule`,
+which switches one inbox rule off and cannot switch one on; and `outlook_list_calendars`,
+every calendar this mailbox reaches, the user's own and every one another person delegated;
+and `outlook_list_events`, what sits on one of those calendars between two dates; and
+`outlook_read_event`, one of those events in full with every attendee and their answer; and
+`outlook_create_event`, which puts one event on the user's own calendar and sends the
+invitations as it does; and `outlook_create_event_on_behalf`, which does the same on a calendar
+somebody delegated, under that person's name,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -63,6 +82,15 @@ copies would be a bug a caller could see — a handle one tool minted and anothe
 answers to "who am I", a refusal that sounds like a different server. What does not belong there is
 anything one tool could own — a description, an argument, an answer shape, a request, a refusal.
 
+**`handles.py` spells one segment per family, and one family spells two.** Every `teams:///`
+family and every `outlook:///` mail family names a single id, and so does a calendar: Microsoft
+documents that a container type supports no immutable id, because its regular ids
+*"were already constant"*. An event is `outlook:///events/{calendar}/{event}`, two
+segments, because an event id is only meaningful beside the calendar it was read from — Graph
+answers a different id for the same meeting in a delegated copy — and the read is addressed as
+`/me/calendars/{calendar}/events/{event}` with both halves. `teams:///transcripts/{a}/{b}` is the
+same shape for the same reason.
+
 The layering rules are that **`shared/` imports no tool module, and only `shared/seam.py` imports
 FastMCP** — the seam is where the framework is spoken, which is what keeps it out of the handle
 grammar and the rest of the vocabulary; that **`graph_client/` imports nothing of this application
@@ -105,9 +133,14 @@ starting. Some only make every login fail, with no startup error:
   (Entra omits OIDC scopes from the scp claim, so a custom scope is the only gate)
 - `"requestedAccessTokenVersion": 2` in the manifest
 - A client secret (ENTRA_CLIENT_SECRET required for On-Behalf-Of)
-- A single tenant ID (common/organizations/consumers rejected at startup; the provider validates
-  all tokens against one issuer derived from this value, so multi-tenant values would reject all of
-  them rather than accept all tenants due to issuer mismatch)
+- A tenant: one tenant's ID, or `organizations` for a multi-tenant registration
+  (`sign_in_audience = "AzureADMultipleOrgs"` in the Terraform module). Under `organizations` any
+  Entra tenant's users can sign in; each access token is accepted only if its `iss` is
+  `https://login.microsoftonline.com/{tid}/v2.0` for its own `tid`, and the On-Behalf-Of
+  exchange is made against that tenant, as Microsoft's rules for multi-tenant token validation and
+  for the exchange both require. There is no tenant allowlist: consent in the user's own
+  tenant is the gate. `common` and `consumers` are rejected at startup, because personal Microsoft
+  accounts have no Microsoft 365 mailbox or Teams to read.
 
 **Graph permissions.** Tools declare what they need. `create_app` passes the union of the *selected*
 tools' permissions to the provider as `additional_authorize_scopes`. Entra issues one token per
@@ -116,18 +149,29 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
-| `User.Read` | Delegated | No | `get_me`, `list_meeting_recordings` (the organiser-only check) |
-| `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` (chats) |
-| `Team.ReadBasic.All` | Delegated | No | `list_teams` |
-| `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
-| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `browse_channel`, `search_messages`, `read_message` (channels) |
-| `OnlineMeetings.Read` | Delegated | No | `list_meeting_transcripts`, `list_meeting_recordings` (resolving a join URL to a meeting) |
-| `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `list_meeting_transcripts`, `read_transcript` |
-| `OnlineMeetingRecording.Read.All` | Delegated | **Yes** | `list_meeting_recordings` |
+| `User.Read` | Delegated | No | `get_me`, `teams_list_meeting_recordings` (the organizer-only check), `outlook_search_mail` (the id exchange), `outlook_find_recipient` (the signed-in user every row's `external` is judged against), `outlook_list_calendars` (whose calendar a row is) |
+| `Chat.Read` | Delegated | No | `teams_list_chats`, `teams_search_messages`, `teams_read_message` (chats) |
+| `Team.ReadBasic.All` | Delegated | No | `teams_list_my_teams` |
+| `Channel.ReadBasic.All` | Delegated | No | `teams_list_channels` |
+| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `teams_browse_channel`, `teams_search_messages`, `teams_read_message` (channels) |
+| `OnlineMeetings.Read` | Delegated | No | `teams_list_meeting_transcripts`, `teams_list_meeting_recordings` (resolving a join URL to a meeting) |
+| `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `teams_list_meeting_transcripts`, `teams_read_transcript` |
+| `OnlineMeetingRecording.Read.All` | Delegated | **Yes** | `teams_list_meeting_recordings` |
+| `Mail.Read` | Delegated | No | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient` (the fallback), `outlook_read_thread`, `outlook_list_mail` |
+| `People.Read` | Delegated | No | `outlook_find_recipient` |
+| `MailboxSettings.Read` | Delegated | No | `outlook_get_mailbox_settings` |
+| `Mail.ReadWrite` | Delegated | No | `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` |
+| `Mail.Send` | Delegated | No | `outlook_send_draft` |
+| `Mail.ReadBasic` | Delegated | No | `outlook_send_draft` (the pre-read) |
+| `MailboxSettings.ReadWrite` | Delegated | No | `outlook_set_automatic_reply`, `outlook_disable_mail_rule` |
+| `Calendars.Read` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event_on_behalf` (the pre-read) |
+| `Calendars.Read.Shared` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event_on_behalf` (the pre-read) |
+| `Calendars.ReadWrite` | Delegated | No | `outlook_create_event` |
+| `Calendars.ReadWrite.Shared` | Delegated | No | `outlook_create_event_on_behalf` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
-`ChannelMessage.Read.All` can still list its teams, and `list_teams`' own 403 names only the
+`ChannelMessage.Read.All` can still list its teams, and `teams_list_my_teams`' own 403 names only the
 permission its own request needed rather than sending an administrator after one that was never
 missing.
 
@@ -139,7 +183,7 @@ its own tuple, which is what its 403 is worded from.
 
 The two rows a tool appears in *parenthesised* are the per-surface case, and it is the reason
 `MessageHandle.permission` exists. Graph's permissions for a message read are per surface, so
-`read_message` has to redeem both — the token is exchanged before the tool sees its argument — while
+`teams_read_message` has to redeem both — the token is exchanged before the tool sees its argument — while
 its 403 names only the one the read was actually made under. Naming both there would be the same
 defect as naming none: an administrator handed two names may grant the one that was never missing.
 
@@ -151,17 +195,17 @@ access, or `Set-CsTeamsMeetingConfiguration -EnableGraphTranscriptAccess $true -
 There is no Graph API to set it and no request-side workaround, so it is an onboarding step next to
 admin consent rather than something this connector can fix; `services/teams-mcp` learned this in PR
 #762 and `docs/recordings-and-transcripts/operator.md` documents it. Until it is on, every call to
-`list_meeting_transcripts` and `read_transcript` fails with that remedy named — and only those two:
+`teams_list_meeting_transcripts` and `teams_read_transcript` fails with that remedy named — and only those two:
 Microsoft scopes the setting to transcript resources, so nothing else here is affected. The
 neighbouring `-EnableAttributedTranscripts` setting is *not* a prerequisite: when it is off,
-`read_transcript` degrades to Microsoft's unattributed format and reports `speaker_attribution:
+`teams_read_transcript` degrades to Microsoft's unattributed format and reports `speaker_attribution:
 false` rather than failing.
 
 **That setting does not cover recordings, and the asymmetry is why they are a separate tool.**
 Microsoft scopes it to transcript resources only — the change-notification reference says so in as
 many words — and neither recordings reference page publishes a tenant control or an inner error code
-of its own. So in a default tenant (the switch off, admin consent granted) `list_meeting_transcripts`
-answers `403` while `list_meeting_recordings` answers normally, which one combined artifact tool
+of its own. So in a default tenant (the switch off, admin consent granted) `teams_list_meeting_transcripts`
+answers `403` while `teams_list_meeting_recordings` answers normally, which one combined artifact tool
 could not do without either failing the whole call or growing a status per artifact — and the
 per-artifact status is exactly what makes the "read `status` first" shape unreadable.
 `OnlineMeetingRecording.Read.All` needs admin consent in its own right and separately from the
@@ -173,14 +217,14 @@ which one is missing.
 here.** Graph streams an MP4 inline with no ranged contract on that path, a Teams meeting can run
 thirty hours, and a model cannot watch video — so a tool that returned one would be a defect wearing
 a feature's clothes. `recordingContentUrl` is no better: it opens only with this connector's own
-bearer token, so passing it on is either useless or a token leak. What `list_meeting_recordings`
-answers is "there is a 47-minute recording from Tuesday, only the organiser can download it, and
+bearer token, so passing it on is either useless or a token leak. What `teams_list_meeting_recordings`
+answers is "there is a 47-minute recording from Tuesday, only the organizer can download it, and
 here is the transcript instead" — existence, start and end, a derived `duration_seconds` (Microsoft
 publishes no duration property at all), and `content_correlation_id`, which is Microsoft's own link
 to the transcript of the same call. Layering rule 7 forbids any module from addressing a single
 recording, because that is the only door to those bytes and the change that opens it looks like a
-convenience. The organiser-only rule is reported rather than recited: Microsoft permits only the
-meeting organiser to download a recording under delegated access, the *metadata* is not so
+convenience. The organizer-only rule is reported rather than recited: Microsoft permits only the
+meeting organizer to download a recording under delegated access, the *metadata* is not so
 restricted, and answering "there is no recording" for a participant would be a wrong answer nobody
 could detect — so an unreachable recording is always listed, with `content_access` saying which side
 of the rule this user is on.
@@ -190,7 +234,7 @@ asking for both: `OnlineMeetings.Read` is the least privilege Microsoft document
 join URL to a meeting and needs no administrator, while reading a transcript resource needs one.
 A tenant can grant the first and withhold the second. Neither Graph's 403 nor Entra's AADSTS65001
 says which of the two is missing, so every refusal names both. Only the lister spends both —
-`read_transcript` is handed a meeting id somebody already resolved, so it declares the
+`teams_read_transcript` is handed a meeting id somebody already resolved, so it declares the
 admin-consented one alone and still answers in a tenant that withholds `OnlineMeetings.Read`.
 
 `ChannelMessage.Read.All` is the broad one, and it is requested deliberately. `Chat.Read` alone is
@@ -198,11 +242,11 @@ enough for Graph to *accept* a `chatMessage` search, but Microsoft documents tha
 returns more than the equivalent GET would, and every channel-message GET in v1.0 requires
 `ChannelMessage.Read.All` — so without it a search silently covers chats only and reports nothing
 missing. Asking for it at sign-in makes a tenant that withholds it fail visibly at consent rather
-than serve half an answer per query. It is also what `browse_channel` spends on its one request, and
-what `read_message` needs for a channel message. It is the first permission here that needs an
+than serve half an answer per query. It is also what `teams_browse_channel` spends on its one request, and
+what `teams_read_message` needs for a channel message. It is the first permission here that needs an
 administrator, and the first row where one tool needs two: neither Graph's 403 nor Entra's
 AADSTS65001 says which of the two was missing, so
-`search_messages` names both in every refusal — handed one name, an administrator may grant the
+`teams_search_messages` names both in every refusal — handed one name, an administrator may grant the
 permission that was never missing and watch the identical failure. A search has no choice about
 that, because a search happens before anything knows which surface a hit will be on; a *read* does,
 which is why its 403 names one. `shared/seam.py` writes the same names out once more, by hand, as
@@ -210,6 +254,17 @@ which is why its 403 names one. `shared/seam.py` writes the same names out once 
 those same files, so a misspelling is on both sides of the comparison and holds — and Entra rejects
 an authorize request carrying a scope it does not know, which fails every sign-in for every user.
 Adding a name there is the deliberate act this table records.
+
+**`Mail.Read` is the first permission here that needs no administrator and still reads a message
+body.** Microsoft publishes `AdminConsentRequired: No` for every delegated `Mail.*` permission, so
+an Outlook read surface costs a tenant nothing an administrator has to sign, where every Teams
+preset past `teams-chat` costs one. That is Microsoft's rule about the permission and not a promise
+about a tenant: a tenant running a restricted user-consent policy still stops an unprivileged user
+at "Need admin approval", and nothing in this service's logs says so.
+
+`Mail.ReadBasic` is deliberately not used *by the read surface*. It withholds `body`, `previewBody`, attachments and
+extended properties, and a hit list with no preview is a list of subjects a model cannot triage —
+so it would buy a second name on the consent screen and no narrower access to anything read here.
 
 The channel inventory is two permissions, and they are separate scopes on purpose:
 `Channel.ReadBasic.All` lists a team's channels, `ChannelMessage.Read.All` reads what was posted in
@@ -243,38 +298,143 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 
 | preset | what it can do | tools besides `get_me` | permissions | admin consents |
 | --- | --- | --- | --- | :-: |
-| `teams-chat` | name the live conversations — not read them | `list_chats` | `User.Read`, `Chat.Read` | 0 |
-| `teams-messages` | find a message anywhere and read it in full | `list_chats`, `search_messages`, `read_message` | + `ChannelMessage.Read.All` | 1 |
-| `teams-channels` | walk a team's channels and read what was posted | `list_teams`, `list_channels`, `browse_channel` | `User.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All` | 1 |
-| `teams-transcripts` | find a meeting and read what was said | `list_chats`, `list_meeting_transcripts`, `read_transcript` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | 1 |
-| `teams-recordings` | say whether a meeting was recorded and who may get at it | `list_chats`, `list_meeting_recordings` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | 1 |
-| `teams-meetings` | both of the above for one meeting | `list_chats`, `list_meeting_transcripts`, `read_transcript`, `list_meeting_recordings` | + both meeting permissions | 2 |
-| `teams` | everything | every tool there is | all eight | 3 |
+| `teams-chat` | name the live conversations — not read them | `teams_list_chats` | `User.Read`, `Chat.Read` | 0 |
+| `teams-messages` | find a message anywhere and read it in full | `teams_list_chats`, `teams_search_messages`, `teams_read_message` | + `ChannelMessage.Read.All` | 1 |
+| `teams-channels` | walk a team's channels and read what was posted | `teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel` | `User.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All` | 1 |
+| `teams-transcripts` | find a meeting and read what was said | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | 1 |
+| `teams-recordings` | say whether a meeting was recorded and who may get at it | `teams_list_chats`, `teams_list_meeting_recordings` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | 1 |
+| `teams-meetings` | both of the above for one meeting | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | + both meeting permissions | 2 |
+| `teams` | every Teams tool | the nine of them | all eight | 3 |
+| `outlook-read` | find a message, read it in full, walk the folder tree, read a thread, list a folder in receipt order, and resolve a name to an address | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
+| `outlook-write` | the read surface, plus marking, filing and drafting | + `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | + `Mail.ReadWrite` | 0 |
+| `outlook-send` | the above, plus sending a draft the user can already read | + `outlook_send_draft` | + `Mail.Send`, `Mail.ReadBasic` | 0 |
+| `outlook-mailbox` | say what is quietly acting on the mailbox — the rules, the automatic reply, the categories | `outlook_get_mailbox_settings` | `User.Read`, `MailboxSettings.Read` | 0 |
+| `outlook-automate` | the above, plus setting the automatic reply and switching an inbox rule off | + `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | + `MailboxSettings.ReadWrite` | 0 |
+| `outlook-calendar` | name every calendar this mailbox reaches, own and delegated, read what sits on one between two dates, and read one event in full | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` | `User.Read`, `Calendars.Read`, `Calendars.Read.Shared` | 0 |
+| `outlook-calendar-write` | the read tier, plus creating one event on the user's own calendar and inviting people to it | + `outlook_create_event` | + `Calendars.ReadWrite` | 0 |
+| `outlook-calendar-delegate` | the above, plus creating an event on a calendar somebody delegated, as that person | + `outlook_create_event_on_behalf` | + `Calendars.ReadWrite.Shared` | 0 |
 
-`get_me` is always on, which is why no *curated* preset lists it — each of those six rows is one
-tool wider than its third column. (`teams` is the registry itself, `get_me` included.) Read the second column before choosing: `teams-chat` is the narrowest surface there
+`get_me` is always on, which is why no preset lists it — each of those rows is one
+tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
 is and the only one that asks for **no** administrator, and the reason it costs nothing is exactly
-that it cannot read a *chat* message — the two tools that can (`search_messages`, `read_message`)
+that it cannot read a *chat* message — the two tools that can (`teams_search_messages`, `teams_read_message`)
 both declare `ChannelMessage.Read.All`, which an administrator has to grant even though the message
 is a chat. Reading chat messages is `teams-messages`.
 
-`teams` is *derived* — every tool in the registry — so it needs no maintenance as tools land. The rest
-are named sets, each with a test asserting what it costs a tenant and that every *argument* its tools
-require can be minted by another member of the same preset. The names carry a product axis from the
+Every preset is a named set written out by hand, `teams` included, each with a test asserting what
+it costs a tenant and that every *argument* its tools require can be minted by another member of
+the same preset. `teams` names the nine Teams tools rather than the registry, and that is the one
+line of maintenance this table buys: a preset derived from the registry would take in the first
+tool of another product on the day it lands, put that tool's permission on the consent screen of
+every `teams` deployment, and cost every signed-in user a fresh sign-in — with no edit for anyone
+to review. `tests/test_tool_selection.py` refuses a derived preset, and refuses a registered tool
+that no preset names. The names carry a product axis from the
 start: `outlook-*` and `sharepoint-*` join the table as those tools land, without re-cutting these.
+
+**The Outlook rows are three axes, not one ladder.** Mail content goes `outlook-read` →
+`outlook-write` → `outlook-send`, each row adding one permission to the row above. Mailbox
+configuration goes `outlook-mailbox` → `outlook-automate`, and touches no `Mail.*` permission at
+all. Calendars start at `outlook-calendar` and touch neither. The axes never meet, because they are
+unrelated: an out-of-office reply has nothing to do with sending mail as the user, a
+forwarding-rule audit has nothing to do with reading one, and a calendar read has nothing to do
+with any of them. A single cumulative chain made `outlook-automate` require `Mail.Send`, which is
+the defect this shape exists to prevent. A deployment that wants two axes names the tools in
+`TOOLS_ENABLED`.
+
+**The calendar axis carries `Calendars.Read.Shared` on its read tier, and that is why it is one
+ladder.** A calendar another person delegated arrives as a plain row of `GET /me/calendars`, and
+Microsoft names `Calendars.Read.Shared` as the least privileged permission for reading that row. So
+a deployment that reads the signed-in user's own calendars pays the same two permissions as one
+that reads a colleague's, and cutting the read tier in two buys a tenant nothing at all. Writing is
+where the tiers earn their names.
+
+**A create sends, and there is no draft to inspect first.** Microsoft states that a create with
+attendees mails invitations to all of them, that this keeps the organizer's and the attendees'
+views consistent, and that it *"can't be configured"*. `isDraft` on an event is an unsent-*updates*
+flag and not a state a client asks for. So the two creating tools are the only calendar tools that
+reach a person outside the mailbox, and this connector cannot recall what they sent. Each one reads
+the calendar first, then puts the event to the user through MCP elicitation before anything is
+written, and a decline creates nothing. The question names the subject, the start, the end, the
+zone, whether the event covers whole days, the place, whether it is a Teams meeting, how the body
+opens and every address: all of it is bound into the id the answer authorizes, and none of it is
+visible to the person anywhere else.
+`outlook_create_event` asks unless the event names nobody and no place. An empty attendee list is
+a private appointment nobody is told about, and a `location` reaches Graph as nothing but text:
+Microsoft books a room only as an attendee a caller adds, documents nothing about a display name
+that names one, and so leaves no way to rule out that a room's mailbox was reached. Both tools
+answer `invitations_sent` off the attendees Graph stored rather than off the arguments. On a
+2026-07-28 connection, which has no channel for a server to ask a person anything, the tool
+answers with the question instead and a client that can elicit calls it again with the answer,
+and nothing is written before an accept that is bound to the same request.
+
+**`outlook-calendar-delegate` is the tier to argue about, and one tool wide.** Microsoft's
+delegated route is `POST /me/calendars/{delegated-calendar-id}/events` under
+`Calendars.ReadWrite.Shared`, and Microsoft states of its own worked example that the organizer is
+the calendar owner, that the delegate's identity appears only in the sender property of the
+event message, and that no property of the returned event names the delegate. So recipients see an
+invitation from the owner and the signed-in user appears nowhere in the event. That is Exchange
+behaving as designed, and it is also the whole of the argument for putting this tool behind its own
+preset name. `outlook_create_event_on_behalf` reads the calendar first, refuses when `can_edit` is
+false, and always asks the person at the other end to confirm, naming the owner. That pre-read is
+declared twice, as `Calendars.Read` and as `Calendars.Read.Shared`, because Microsoft names the
+first on `calendar-get` and the second on the delegated-create walkthrough for the same request.
+The read tier already carries both, so the delegate tier still costs a tenant one permission.
+
+**`outlook-mailbox` is two tools and one permission on purpose.** `outlook_get_mailbox_settings`
+answers "is something forwarding my mail?", and a tenant that wants that answer should not have to
+grant the ability to read a message body to get it. It also cannot answer its own headline question
+completely, and says so in every response: Exchange mailbox forwarding set with
+`Set-Mailbox -ForwardingSmtpAddress` is invisible to every endpoint this connector can call, so an
+empty rule list is not evidence that mail is not being forwarded.
+
+**A write tier asks for `Mail.Read` and `Mail.ReadWrite` both, and that is deliberate.**
+`Mail.ReadWrite` supersedes `Mail.Read`, so a consent screen carrying a reader and a writer shows
+two mail permissions where one would do. `resolve()` unions what the *selected tools* declare and
+each tool declares what its own request needs, which is what makes a 403 name the permission that
+was actually missing rather than the widest one in the deployment — the same reason
+`Team.ReadBasic.All` is separate from `ChannelMessage.Read.All` above. Collapsing them here would
+buy one line on a consent screen and cost every refusal its precision.
+
+**Zero admin consents is not zero administrator.** Every delegated Outlook permission here is
+published by Microsoft as `AdminConsentRequired: No`, and so is every delegated `Calendars.*`
+permission, so the preset table's last column is honestly zero for every Outlook row. A tenant
+running a restricted user-consent policy still stops an unprivileged user at "Need admin
+approval", and nothing in this service's logs says so.
+
+**`outlook-send` is the tier to argue about, and it is one tool wide.** `outlook_send_draft` takes
+an `outlook:///drafts/{id}` handle and nothing else, and only `outlook_draft_mail` and
+`outlook_draft_reply` mint one — so it can send what this connector composed in the same session
+and cannot send a message a reader found. It takes no recipient, subject or body argument either:
+what leaves the mailbox is exactly what a person can already read in their Drafts folder. Microsoft's
+one-shot `POST /me/sendMail` is deliberately never used, because it is the only send that can set
+`saveToSentItems: false` and leave no trace anywhere, and it answers `202` with an empty body so
+nothing can be reported about what it did. On a 2026-07-28 connection, which has no channel for a
+server to ask a person anything mid-call, the tool answers with the question instead and a client
+that can elicit calls it again with the answer — so nothing is sent before an accept bound to that
+same question.
+
+**`MailboxSettings.ReadWrite` is the permission to read hardest, and its display text does not say
+so.** Entra shows it as "Read and write user mailbox settings". It is also the only delegated
+permission that can create an inbox rule, and Microsoft's own worked example for that endpoint is
+`forwardTo` together with `stopProcessingRules` — a standing instruction that copies mail out of
+the tenant, survives the conversation that made it, and needs no `Mail.Send` anywhere in the
+deployment. Nothing here creates a rule, and `outlook_set_automatic_reply` refuses `alwaysEnabled`
+for the same family of reason: a reply with no end date outlives the session and fires at every
+future sender. `outlook-automate` is the one tier where "0 admin consents" is the least
+interesting number in the row.
 
 The `teams-transcripts` row is the one this knob was built for: reading meeting transcripts costs
 **one** admin consent and does not drag in `ChannelMessage.Read.All`, the permission to read every
 channel message in the tenant. It does need one thing no permission can carry — Graph access to Teams
 transcripts is a tenant-wide Teams setting, off by default, that only a Teams administrator can turn
-on (Teams admin centre → Meetings → Meeting settings → Transcript API access). `list_meeting_recordings`
+on (Teams admin centre → Meetings → Meeting settings → Transcript API access). `teams_list_meeting_recordings`
 is **not** behind that switch, which is why the two are separately selectable.
 
 Nothing stops a hand-written `TOOLS_ENABLED` from enabling a tool whose arguments nothing in the
-selection can mint — `read_transcript` without `list_meeting_transcripts`, say. That is deliberate:
+selection can mint — `teams_read_transcript` without `teams_list_meeting_transcripts`, say. That is deliberate:
 a tool that takes a `teams:///` handle names the tool that mints it in its own refusal, on first use,
 and the alternative is a declaration on every tool file plus a validator to read it. (A tool that
-takes a plain Graph id, like `list_channels`, answers a fabricated one with the generic "check the id
+takes a plain Graph id, like `teams_list_channels`, answers a fabricated one with the generic "check the id
 came from a tool response verbatim".) The presets we ship are checked, per argument.
 
 `get_me` is **always on**, whatever the selection. It is how the server resolves "me"—the identity
@@ -337,7 +497,7 @@ exchange hands the caller's Graph token as a string; this package sends it.
 - **Two levels of measurement, and why both.** `graph_operations_total` and
   `graph_operation_duration_seconds` count one *tool call*; `graph_steps_total` and
   `graph_step_duration_seconds` count one *Graph call inside it*. The operation says a tool got
-  slower, the step says which of its Graph calls did — `list_meeting_recordings` makes three. Both
+  slower, the step says which of its Graph calls did — `teams_list_meeting_recordings` makes three. Both
   labels are names chosen in code and never read off a URL, which is a hard rule rather than a
   preference: a Graph URL here is made of almost nothing but chat, message and meeting ids, and a
   label taken off one is a time series per id. `tests/test_graph_metrics.py` enforces that over every
@@ -345,7 +505,7 @@ exchange hands the caller's Graph token as a string; this package sends it.
 
 - **Paging follows @odata.nextLink** via `collect_pages`, with item and scan caps. A channel's
   messages are the exception and are not walked at all: Graph allows about one request a second on
-  a given channel for the whole app across the tenant, so `browse_channel` makes exactly one and
+  a given channel for the whole app across the tenant, so `teams_browse_channel` makes exactly one and
   `$top` is its window. Search uses from/size offsets.
 
 
@@ -366,6 +526,48 @@ exchange hands the caller's Graph token as a string; this package sends it.
   them (`MAX_EMPTY_PAGES`, and it is not pooled with the scan cap: an empty page spends no scan
   budget, so a shared budget is no bound on empty pages at all), and raises `GraphPagingUnending`
   rather than answering short — because a short answer means a cap.
+
+- **A calendar answers "next week" through `calendarView` and never through `/me/events`.**
+  Microsoft says the events collection holds single instance meetings and series masters, and that
+  a calendar view returns the occurrences, exceptions and single instances inside a time range. So
+  a weekly series shows once per week in `outlook_list_events` and once in total in the other
+  collection. `startDateTime` and `endDateTime` are required, and Microsoft states that both are
+  read with the offset written into the value and are not affected by `Prefer: outlook.timezone`,
+  so this connector renders each bound with the offset of the zone the caller named.
+
+- **Times come back in UTC, and this connector converts them here rather than in Exchange.**
+  Graph's `start` and `end` are a naive wall-clock string beside a zone name, and Microsoft states
+  that without `Prefer: outlook.timezone` those values are returned in UTC. That header is sent
+  nowhere. Every answer reports Graph's own two values verbatim and adds the same instant converted
+  with `zoneinfo`, so nothing is lost, and a zone name Exchange rejects cannot fail a whole call.
+  The `dateTime` string carries seven fractional digits, which is one more than
+  `datetime.fromisoformat` accepts.
+
+- **There is no draft state for an event, so a create sends.** Microsoft states that creating an
+  event with attendees mails invitations to all of them and that this *"can't be configured"*, and
+  that `isDraft` marks unsent *updates* rather than an unsent event. An event with an empty
+  attendee list notifies nobody, though a `location` can still name a room's mailbox and Microsoft
+  documents no way to rule that out. So the two creating tools ask a person first, through MCP
+  elicitation, showing both bounds, the zone, whether the event covers whole days, the place, the
+  Teams setting and the body beside the guest list, and nothing here recalls an invitation.
+  `outlook_create_event` asks unless the event names nobody and no place; the delegated create
+  asks either way.
+
+- **Every create carries a `transactionId` and is never retried.** Microsoft publishes the property
+  as the way a client app stops the server from acting twice on one retried POST, and publishes no
+  rule for what a duplicate does. Both halves are therefore used: the id is a uuid5 over the target
+  (the user's own calendar, or the delegated calendar's id) and every value the request carried, so
+  the same request composes the same id, and a request that differs in subject, time, zone, place,
+  body, attendees or the Teams setting composes another. The request also opts out of the SDK's
+  retry middleware. One 503 that Graph already acted on is one invitation rather than four.
+
+- **A calendar id and an event id are mailbox-scoped.** Microsoft states that a share recipient's
+  calendar and event ids used against another mailbox return an error, so only the local-copy
+  routes are used — `/me/calendars/{id}` and `/me/calendars/{id}/events/{id}` — and nothing here
+  addresses `/users/{id}/...`. The same meeting therefore carries a different event id in a
+  delegated copy than in the owner's own mailbox, which is why an event handle names its calendar
+  too. An event read or minted here sends `Prefer: IdType="ImmutableId"`; a container type carries
+  no immutable id, and Microsoft says its regular ids were already constant.
 
 - **Trap:** The SDK bearer provider does not consult the allowed-hosts validator, so the host and
   scheme checks live in `_CallerTokenProvider` itself. The live exposure is `@odata.nextLink`: a next

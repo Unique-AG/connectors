@@ -26,6 +26,17 @@ mock_provider "azuread" {
         "OnlineMeetings.Read"              = "66666666-6666-6666-6666-666666666666"
         "OnlineMeetingTranscript.Read.All" = "77777777-7777-7777-7777-777777777777"
         "OnlineMeetingRecording.Read.All"  = "88888888-8888-8888-8888-888888888888"
+        "Mail.Read"                        = "a1111111-1111-1111-1111-111111111111"
+        "People.Read"                      = "a2222222-2222-2222-2222-222222222222"
+        "MailboxSettings.Read"             = "a3333333-3333-3333-3333-333333333333"
+        "Mail.ReadWrite"                   = "a4444444-4444-4444-4444-444444444444"
+        "Mail.Send"                        = "a5555555-5555-5555-5555-555555555555"
+        "Mail.ReadBasic"                   = "a6666666-6666-6666-6666-666666666666"
+        "MailboxSettings.ReadWrite"        = "a7777777-7777-7777-7777-777777777777"
+        "Calendars.Read"                   = "b1111111-1111-1111-1111-111111111111"
+        "Calendars.Read.Shared"            = "b2222222-2222-2222-2222-222222222222"
+        "Calendars.ReadWrite"              = "b3333333-3333-3333-3333-333333333333"
+        "Calendars.ReadWrite.Shared"       = "b4444444-4444-4444-4444-444444444444"
       }
     }
   }
@@ -166,13 +177,120 @@ run "preset_teams_meetings" {
   }
 }
 
-run "the_order_is_the_registrys_and_never_the_callers" {
+run "the_mock_covers_every_requestable_permission" {
   variables {
-    tools_enabled = ["read_message", "list_chats"]
+    tools_preset = "teams"
   }
 
   assert {
-    condition     = join(",", local.tools) == "get_me,list_chats,read_message"
+    condition = length(setsubtract(
+      toset(local.requestable_permissions),
+      toset(keys(azuread_service_principal.msgraph.oauth2_permission_scope_ids)),
+    )) == 0
+    error_message = "the azuread mock has no scope id for ${join(", ", sort(setsubtract(toset(local.requestable_permissions), toset(keys(azuread_service_principal.msgraph.oauth2_permission_scope_ids)))))} — every other run that names one fails with a bare `Invalid index` on main.tf, which does not say the mock is what is short."
+  }
+}
+
+run "preset_outlook_read" {
+  variables {
+    tools_preset = "outlook-read"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read"
+    error_message = "outlook-read composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_mailbox" {
+  variables {
+    tools_preset = "outlook-mailbox"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,MailboxSettings.Read"
+    error_message = "outlook-mailbox composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_write" {
+  variables {
+    tools_preset = "outlook-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,Mail.ReadWrite"
+    error_message = "outlook-write composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_send" {
+  variables {
+    tools_preset = "outlook-send"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,Mail.ReadWrite,Mail.Send,Mail.ReadBasic"
+    error_message = "outlook-send composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_automate" {
+  variables {
+    tools_preset = "outlook-automate"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,MailboxSettings.Read,MailboxSettings.ReadWrite"
+    error_message = "outlook-automate composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_calendar" {
+  variables {
+    tools_preset = "outlook-calendar"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared"
+    error_message = "outlook-calendar composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_calendar_write" {
+  variables {
+    tools_preset = "outlook-calendar-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadWrite"
+    error_message = "outlook-calendar-write composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_calendar_delegate" {
+  variables {
+    tools_preset = "outlook-calendar-delegate"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadWrite,Calendars.ReadWrite.Shared"
+    error_message = "outlook-calendar-delegate composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "every delegated Calendars permission is AdminConsentRequired: No, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
+run "the_order_is_the_registrys_and_never_the_callers" {
+  variables {
+    tools_enabled = ["teams_read_message", "teams_list_chats"]
+  }
+
+  assert {
+    condition     = join(",", local.tools) == "get_me,teams_list_chats,teams_read_message"
     error_message = "caller order leaked into the tool list: ${join(",", local.tools)}"
   }
 
@@ -184,11 +302,11 @@ run "the_order_is_the_registrys_and_never_the_callers" {
 
 run "get_me_joins_every_selection" {
   variables {
-    tools_enabled = ["list_teams"]
+    tools_enabled = ["teams_list_my_teams"]
   }
 
   assert {
-    condition     = join(",", local.tools) == "get_me,list_teams"
+    condition     = join(",", local.tools) == "get_me,teams_list_my_teams"
     error_message = "ALWAYS_ON was not joined: ${join(",", local.tools)}"
   }
 
@@ -200,11 +318,11 @@ run "get_me_joins_every_selection" {
 
 run "naming_the_always_on_tool_explicitly_is_accepted" {
   variables {
-    tools_enabled = ["get_me", "list_chats"]
+    tools_enabled = ["get_me", "teams_list_chats"]
   }
 
   assert {
-    condition     = join(",", local.tools) == "get_me,list_chats"
+    condition     = join(",", local.tools) == "get_me,teams_list_chats"
     error_message = "resolved ${join(",", local.tools)}"
   }
 }
@@ -231,7 +349,7 @@ run "the_registration_is_signable_in_through" {
 
   assert {
     condition     = one(azuread_application.office_365_mcp.api).requested_access_token_version == 2
-    error_message = "a v1 access token carries the sts.windows.net issuer, which this service's single-issuer check rejects"
+    error_message = "a v1 access token carries the sts.windows.net issuer, which this service's issuer check rejects for one tenant and for every tenant alike"
   }
 }
 
@@ -284,7 +402,7 @@ run "both_selections_are_refused" {
 
   variables {
     tools_preset  = "teams"
-    tools_enabled = ["list_chats"]
+    tools_enabled = ["teams_list_chats"]
   }
 
   expect_failures = [var.tools_enabled]
@@ -304,7 +422,7 @@ run "an_unknown_tool_is_refused" {
   command = plan
 
   variables {
-    tools_enabled = ["list_chats", "read_transcripts"]
+    tools_enabled = ["teams_list_chats", "read_transcripts"]
   }
 
   expect_failures = [var.tools_enabled]
@@ -314,7 +432,7 @@ run "the_comma_separated_env_var_form_is_refused" {
   command = plan
 
   variables {
-    tools_enabled = ["list_chats,read_message"]
+    tools_enabled = ["teams_list_chats,teams_read_message"]
   }
 
   expect_failures = [var.tools_enabled]
@@ -509,14 +627,14 @@ run "a_single_tenant_registration_emits_a_tenant_id" {
   }
 }
 
-run "a_multi_tenant_registration_emits_no_tenant_id" {
+run "a_multi_tenant_registration_emits_the_organizations_authority" {
   variables {
     tools_preset     = "teams-chat"
     sign_in_audience = "AzureADMultipleOrgs"
   }
 
   assert {
-    condition     = output.deployment_env["unique-qa"].mcpConfig.entra.tenantId == null
-    error_message = "the customer-tenant overlay carries ${coalesce(output.deployment_env["unique-qa"].mcpConfig.entra.tenantId, "null")} as its tenant id"
+    condition     = output.deployment_env["unique-qa"].mcpConfig.entra.tenantId == "organizations"
+    error_message = "the customer-tenant overlay carries ${coalesce(output.deployment_env["unique-qa"].mcpConfig.entra.tenantId, "null")} as its tenant id, not the organizations authority the pod validates every tenant's tokens under"
   }
 }

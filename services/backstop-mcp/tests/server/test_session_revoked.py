@@ -48,11 +48,11 @@ def _client() -> TestClient:
 
 
 def _get(client: TestClient, path: str) -> _HttpResponse:
-    return cast("_HttpResponse", client.get(path))  # pyright: ignore[reportUnknownMemberType]
+    return cast("_HttpResponse", client.get(path))
 
 
 def _post(client: TestClient, path: str) -> _HttpResponse:
-    return cast("_HttpResponse", client.post(path))  # pyright: ignore[reportUnknownMemberType]
+    return cast("_HttpResponse", client.post(path))
 
 
 class TestSessionRevokedToUnauthorizedMiddleware:

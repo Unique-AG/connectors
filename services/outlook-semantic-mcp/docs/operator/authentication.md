@@ -110,7 +110,7 @@ The redirect URI is derived from `SELF_URL`: the app registration redirect URI m
 
 ### Tenant Configuration
 
-The Entra ID app registration's **sign-in audience** controls which users can authenticate. The service works identically in both modes — there is no code-level difference, no `MICROSOFT_TENANT_ID` environment variable, and no runtime tenant configuration. The choice is made once at app registration time.
+The Entra ID app registration's **sign-in audience** controls which users can authenticate. That choice is made once at app registration time. Separately, `MICROSOFT_SIGN_IN_TENANT_ID` can pin the OAuth login window to a specific directory — see [OAuth authority](#oauth-authority-microsoft_sign_in_tenant_id).
 
 | Question | → Pick |
 |----------|--------|
@@ -151,6 +151,26 @@ Users from any Microsoft 365 organization can sign in. When a user authenticates
 - **Data isolation**: All tenants share the same database. Data is scoped per-user; there is no tenant-level isolation boundary within the service.
 - **Enterprise Application management**: Each customer tenant admin can independently control user assignment and revoke access from their Azure Portal.
 - **Compliance**: Some organizations require dedicated infrastructure for data residency — deploy a separate instance per tenant with single-tenant configuration in that case.
+
+#### OAuth authority (`MICROSOFT_SIGN_IN_TENANT_ID`)
+
+Outlook Semantic MCP talks to Microsoft identity on:
+
+```
+https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize
+https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token
+```
+
+`<tenant>` comes from `MICROSOFT_SIGN_IN_TENANT_ID` (Helm `mcpConfig.microsoft.signInTenantId`). This is the directory the **login window should open** — the foreign tenant that holds the Enterprise Application (service principal). It is independent of `clientId`/`clientSecret` and is **not** the tenant that owns Unique's app registration.
+
+| When | Value |
+|------|-------|
+| Users should choose their directory at login | `common` (default) |
+| Login must open a specific tenant's service principal (for example a customer's UAT directory instead of the admin's home tenant) | That directory's GUID |
+
+`organizations` and `consumers` are also valid Microsoft tenant aliases.
+
+If Microsoft returns **AADSTS50194**, `/common` is not accepted for that Enterprise Application — set `signInTenantId` to the directory that holds it.
 
 ### Secret Management
 

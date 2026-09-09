@@ -1,5 +1,5 @@
 import { TestBed } from '@suites/unit';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { UniqueScopesService } from '../../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope } from '../../unique-api/unique-scopes/unique-scopes.types';
 import { ResolveScopePathCommand } from './resolve-scope-path.command';
@@ -12,8 +12,8 @@ const buildScope = (overrides: Partial<Scope> & Pick<Scope, 'id' | 'name'>): Sco
 
 describe('ResolveScopePathCommand', () => {
   let service: ResolveScopePathCommand;
-  let getScopeByIdMock: ReturnType<typeof vi.fn>;
-  let createScopeAccessesMock: ReturnType<typeof vi.fn>;
+  let getScopeByIdMock: Mock;
+  let createScopeAccessesMock: Mock;
 
   const userId = 'user-123';
 
@@ -23,8 +23,7 @@ describe('ResolveScopePathCommand', () => {
 
     const { unit } = await TestBed.solitary(ResolveScopePathCommand)
       .mock<UniqueScopesService>(UniqueScopesService)
-      .impl((stubFn) => ({
-        ...stubFn(),
+      .impl(() => ({
         getScopeById: getScopeByIdMock,
         createScopeAccesses: createScopeAccessesMock,
       }))

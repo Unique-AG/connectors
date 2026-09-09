@@ -15,7 +15,8 @@ from tests.features.data_hygiene.helpers import (
     person_org,
     relationship_types,
 )
-from tests.features.party_resolver.helpers import ctx_never_elicit
+from tests.features.org_people.conftest import make_get_people_for_organization_query
+from tests.features.party_resolver.helpers import ctx_never_elicit, make_resolve_party_query
 from tests.helpers import BASE_URL, build_employment_index_factory
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
@@ -69,8 +70,10 @@ class TestGetPeopleForParty:
             await get_people_for_party(
                 ctx_never_elicit(),
                 party_id=_ORG,
-                client=client,
-                employment_index_factory=_INDEX,
+                resolve_party_query=make_resolve_party_query(client),
+                get_people_for_organization_query=make_get_people_for_organization_query(
+                    client, employment_index_factory=_INDEX
+                ),
             ),
             OrgPeopleResolvedResponse,
         )
@@ -100,8 +103,10 @@ class TestGetPeopleForParty:
             await get_people_for_party(
                 ctx_never_elicit(),
                 party_id=_ORG,
-                client=client,
-                employment_index_factory=_INDEX,
+                resolve_party_query=make_resolve_party_query(client),
+                get_people_for_organization_query=make_get_people_for_organization_query(
+                    client, employment_index_factory=_INDEX
+                ),
             ),
             OrgPeopleResolvedResponse,
         )
@@ -137,8 +142,10 @@ class TestGetPeopleForParty:
             await get_people_for_party(
                 ctx_never_elicit(),
                 party_id=_ORG,
-                client=client,
-                employment_index_factory=_INDEX,
+                resolve_party_query=make_resolve_party_query(client),
+                get_people_for_organization_query=make_get_people_for_organization_query(
+                    client, employment_index_factory=_INDEX
+                ),
             ),
             OrgPeopleResolvedResponse,
         )
@@ -162,8 +169,10 @@ class TestGetPeopleForParty:
             await get_people_for_party(
                 ctx_never_elicit(),
                 search="No Such Org",
-                client=client,
-                employment_index_factory=_INDEX,
+                resolve_party_query=make_resolve_party_query(client),
+                get_people_for_organization_query=make_get_people_for_organization_query(
+                    client, employment_index_factory=_INDEX
+                ),
             ),
             NotFoundResponse,
         )

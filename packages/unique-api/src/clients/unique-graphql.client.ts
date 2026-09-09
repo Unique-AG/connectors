@@ -6,6 +6,7 @@ import {
 } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
+import type { DocumentNode } from 'graphql';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
 import { isNonNullish } from 'remeda';
@@ -181,8 +182,12 @@ export class UniqueGraphqlClient {
   }
 }
 
+function isDocumentNode(document: RequestDocument): document is DocumentNode {
+  return typeof document !== 'string' && 'kind' in document;
+}
+
 function extractOperationName(document: RequestDocument): string {
-  const query = typeof document === 'string' ? document : (document.loc?.source.body ?? '');
+  const query = isDocumentNode(document) ? (document.loc?.source.body ?? '') : document.toString();
   const match = query.match(/(?:query|mutation|subscription)\s+(\w+)/);
   return match?.[1] ?? 'unknown';
 }

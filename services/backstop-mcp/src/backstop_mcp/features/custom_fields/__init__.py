@@ -30,6 +30,8 @@ from backstop_mcp.features.custom_fields.responses import (
     CustomFieldGroupMemberResponse,
     CustomFieldGroupParentResponse,
     CustomFieldGroupResponse,
+    ListCustomFieldGroupsResponse,
+    ListCustomFieldsResponse,
     ResolvedCustomFieldValueResponse,
 )
 
@@ -49,6 +51,8 @@ __all__ = [
     "CustomFieldGroupResponse",
     "CustomFieldGroupsService",
     "CustomFieldsService",
+    "ListCustomFieldGroupsResponse",
+    "ListCustomFieldsResponse",
     "RegularCustomFieldValues",
     "RegularCustomFieldValuesAttributes",
     "ResolvedCustomFieldValueResponse",

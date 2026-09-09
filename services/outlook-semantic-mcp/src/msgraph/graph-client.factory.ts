@@ -14,12 +14,12 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, desc, eq, ilike, isNotNull, notInArray } from 'drizzle-orm';
+import { and, desc, ilike, inArray, isNotNull, notInArray } from 'drizzle-orm';
 import { MetricService } from 'nestjs-otel';
 import type { AppConfigNamespaced, MicrosoftConfigNamespaced } from '~/config';
 import { getScopes } from '../auth/microsoft.provider';
 import { DRIZZLE, DrizzleDatabase } from '../db/drizzle.module';
-import { userProfiles } from '../db/schema';
+import { SOURCES_WITH_OWN_CREDENTIALS, userProfiles } from '../db/schema';
 import { MetricsMiddleware } from './metrics.middleware';
 import { TokenProvider } from './token.provider';
 import { TokenRefreshMiddleware } from './token-refresh.middleware';
@@ -28,6 +28,7 @@ import { TokenRefreshMiddleware } from './token-refresh.middleware';
 export class GraphClientFactory {
   private readonly clientId: string;
   private readonly clientSecret: string;
+  private readonly signInTenantId: string;
   private readonly scopes: string[];
 
   public constructor(
@@ -46,6 +47,7 @@ export class GraphClientFactory {
     this.clientSecret = this.configService.get('microsoft.clientSecret', {
       infer: true,
     }).value;
+    this.signInTenantId = this.configService.get('microsoft.signInTenantId', { infer: true });
     this.scopes = getScopes();
   }
 
@@ -59,7 +61,7 @@ export class GraphClientFactory {
     const profile = await this.drizzle.query.userProfiles.findFirst({
       where: and(
         // We filter only users which can get an oauth token
-        eq(userProfiles.source, 'oauth'),
+        inArray(userProfiles.source, SOURCES_WITH_OWN_CREDENTIALS),
         isNotNull(userProfiles.accessToken),
         excludeIds && excludeIds.length > 0 ? notInArray(userProfiles.id, excludeIds) : undefined,
         domain ? ilike(userProfiles.email, `%@${domain}`) : undefined,
@@ -81,6 +83,7 @@ export class GraphClientFactory {
         userProfileId,
         clientId: this.clientId,
         clientSecret: this.clientSecret,
+        signInTenantId: this.signInTenantId,
         scopes: this.scopes,
       },
       {

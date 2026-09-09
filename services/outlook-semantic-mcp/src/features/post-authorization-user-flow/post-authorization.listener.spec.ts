@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { type AppConfig, McpBackendType } from '~/config';
 import type { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
@@ -28,8 +28,8 @@ const userAuthorizedEvent = (userProfileId: string) => ({
 
 describe('PostAuthorizationListener', () => {
   const userProfileId = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
-  let mockSubscriptionCreateService: { subscribe: ReturnType<typeof vi.fn> };
-  let mockSyncDirectoriesCommand: { run: ReturnType<typeof vi.fn> };
+  let mockSubscriptionCreateService: { subscribe: Mock };
+  let mockSyncDirectoriesCommand: { run: Mock };
 
   beforeEach(() => {
     mockSubscriptionCreateService = {

@@ -10,11 +10,17 @@ tools.
 """
 
 import importlib
+import inspect
 import pathlib
-from typing import Protocol, cast, runtime_checkable
+from collections.abc import Callable
+from typing import Protocol, cast, get_type_hints, runtime_checkable
+
+from pydantic_settings import BaseSettings
 
 from backstop_mcp import dependencies
 from backstop_mcp.teardown import PROVIDERS, close_singletons
+
+_CLIENT_FOR_CALLER = dependencies.get_backstop_client_for_current_caller
 
 _SRC = pathlib.Path(__file__).parent.parent / "src" / "backstop_mcp"
 
@@ -31,6 +37,19 @@ def _name(provider: object) -> str:
     name = getattr(provider, "__name__", None)
     assert isinstance(name, str), f"expected a named provider, got {provider!r}"
     return name
+
+
+def _cached_factory(module: object, name: str) -> Callable[..., object]:
+    return cast("Callable[..., object]", getattr(module, name))
+
+
+def _depends_factory(default: object) -> object | None:
+    return cast("object | None", getattr(default, "factory", None))
+
+
+def _optional_name(value: object) -> str:
+    name = getattr(value, "__name__", None)
+    return name if isinstance(name, str) else type(value).__name__
 
 
 def _provider_modules() -> list[str]:
@@ -70,6 +89,60 @@ def test_every_cached_provider_is_torn_down() -> None:
     )
     assert declared - defined == set(), (
         "teardown.PROVIDERS names something that is no longer a cached provider"
+    )
+
+
+def test_cached_providers_do_not_take_unhashable_settings() -> None:
+    """FastMCP resolves Depends, then calls the factory with those values.
+
+    `@lru_cache` hashes every argument. A pydantic settings object is unhashable, so a
+    `BackstopConfig` (or any BaseSettings) parameter makes the factory raise TypeError
+    and the tool fail with `Failed to resolve dependency '…'`. Read config inside the
+    body instead, like `get_custom_fields_service`.
+    """
+    offenders: list[str] = []
+    for module_name in _provider_modules():
+        module = importlib.import_module(module_name)
+        for name in _cached_provider_names(module_name):
+            factory = _cached_factory(module, name)
+            hints = cast("dict[str, object]", get_type_hints(factory))
+            for param_name, hint in hints.items():
+                if param_name == "return":
+                    continue
+                if isinstance(hint, type) and issubclass(hint, BaseSettings):
+                    offenders.append(f"{module_name}.{name}({param_name}: {hint.__name__})")
+
+    assert offenders == [], (
+        "cached providers cannot take BaseSettings as a parameter — FastMCP would fail "
+        + "to resolve every tool that depends on them: "
+        + ", ".join(offenders)
+    )
+
+
+def test_cached_providers_depend_only_on_cached_factories() -> None:
+    """An uncached Depends is a new object every request.
+
+    That is the same breakage as an unhashable settings argument: `@lru_cache` either
+    TypeErrors or misses every call, and FastMCP reports `Failed to resolve dependency`.
+    `get_backstop_client_for_current_caller` is the one uncached Depends allowed — it
+    returns the process-wide client from the cached factory.
+    """
+    offenders: list[str] = []
+    for module_name in _provider_modules():
+        module = importlib.import_module(module_name)
+        for name in _cached_provider_names(module_name):
+            factory = _cached_factory(module, name)
+            for param in inspect.signature(factory).parameters.values():
+                dep = _depends_factory(cast(object, param.default))
+                if dep is None or dep is _CLIENT_FOR_CALLER:
+                    continue
+                if not isinstance(dep, _Cached):
+                    offenders.append(f"{module_name}.{name} -> {_optional_name(dep)}")
+
+    assert offenders == [], (
+        "cached providers must Depends only on cached factories or "
+        + "get_backstop_client_for_current_caller: "
+        + ", ".join(offenders)
     )
 
 

@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { ProxyService } from '../proxy/proxy.service';
 import { ConnectivityHealthIndicator } from './connectivity-health.indicator';
 
@@ -12,14 +12,14 @@ vi.mock('undici', () => ({
   fetch: vi.fn(),
 }));
 
-async function getUndiciFetch(): Promise<ReturnType<typeof vi.fn>> {
+async function getUndiciFetch(): Promise<Mock> {
   const { fetch } = await import('undici');
-  return fetch as unknown as ReturnType<typeof vi.fn>;
+  return fetch as unknown as Mock;
 }
 
 describe('ConnectivityHealthIndicator', () => {
   let indicator: ConnectivityHealthIndicator;
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: Mock;
   const mockDispatcher = Symbol('dispatcher');
 
   beforeEach(async () => {
@@ -27,8 +27,7 @@ describe('ConnectivityHealthIndicator', () => {
 
     const { unit } = await TestBed.solitary(ConnectivityHealthIndicator)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'health.connectivityTimeoutMs') {
             return TIMEOUT_MS;
@@ -40,8 +39,7 @@ describe('ConnectivityHealthIndicator', () => {
         }),
       }))
       .mock(ProxyService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         getDispatcher: vi.fn(() => mockDispatcher),
       }))
       .mock(HealthIndicatorService)

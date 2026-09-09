@@ -1,0 +1,1 @@
+ALTER TYPE "public"."user_profile_source" ADD VALUE 'shared-mailbox-with-login';

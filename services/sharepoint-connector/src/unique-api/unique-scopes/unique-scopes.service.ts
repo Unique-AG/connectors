@@ -1,9 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientError } from 'graphql-request';
 import { isNullish } from 'remeda';
-import { Smeared } from 'src/utils/smeared';
 import { BatchProcessorService } from '../../shared/services/batch-processor.service';
 import { normalizeError } from '../../utils/normalize-error';
+import { Smeared } from '../../utils/smeared';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   BULK_MOVE_LOG_SAFE_KEYS,

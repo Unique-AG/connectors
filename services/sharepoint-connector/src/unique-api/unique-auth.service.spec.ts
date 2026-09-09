@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { HttpClientService } from '../shared/services/http-client.service';
 import { Redacted } from '../utils/redacted';
 import { UniqueAuthService } from './unique-auth.service';
@@ -21,7 +21,7 @@ const MOCK_UNIQUE_CONFIG = Object.freeze({
 
 describe('UniqueAuthService', () => {
   let service: UniqueAuthService;
-  let mockHttpClientService: { request: ReturnType<typeof vi.fn> };
+  let mockHttpClientService: { request: Mock };
 
   beforeEach(async () => {
     mockHttpClientService = {
@@ -41,8 +41,7 @@ describe('UniqueAuthService', () => {
 
     const { unit } = await TestBed.solitary(UniqueAuthService)
       .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
+      .impl(() => ({
         get: vi.fn((key: string) => {
           if (key === 'unique') {
             return MOCK_UNIQUE_CONFIG;

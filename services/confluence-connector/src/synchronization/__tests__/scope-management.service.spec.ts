@@ -1,5 +1,5 @@
 import type { UniqueApiClient } from '@unique-ag/unique-api';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { IngestionConfig } from '../../config/ingestion.schema';
 import type { ConfluenceApiClient } from '../../confluence-api/confluence-api-client';
 import type { Metrics } from '../../metrics';
@@ -13,25 +13,25 @@ const INSTANCE_ID = 'abc-123-instance';
 interface MockDeps {
   service: ScopeManagementService;
   scopes: {
-    getById: ReturnType<typeof vi.fn>;
-    createFromPaths: ReturnType<typeof vi.fn>;
-    updateExternalId: ReturnType<typeof vi.fn>;
-    createAccesses: ReturnType<typeof vi.fn>;
-    listChildren: ReturnType<typeof vi.fn>;
-    delete: ReturnType<typeof vi.fn>;
+    getById: Mock;
+    createFromPaths: Mock;
+    updateExternalId: Mock;
+    createAccesses: Mock;
+    listChildren: Mock;
+    delete: Mock;
   };
   files: {
-    deleteByKeyPrefix: ReturnType<typeof vi.fn>;
+    deleteByKeyPrefix: Mock;
   };
   confluenceApi: {
-    resolveInstanceIdentifier: ReturnType<typeof vi.fn>;
+    resolveInstanceIdentifier: Mock;
   };
   metrics: {
-    recordOrphanedScopesCleaned: ReturnType<typeof vi.fn>;
-    recordOrphanedFilesCleaned: ReturnType<typeof vi.fn>;
+    recordOrphanedScopesCleaned: Mock;
+    recordOrphanedFilesCleaned: Mock;
   };
   migrationService: {
-    migrateIfNeeded: ReturnType<typeof vi.fn>;
+    migrateIfNeeded: Mock;
   };
 }
 

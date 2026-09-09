@@ -3,7 +3,7 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { type Mocked, TestBed } from '@suites/unit';
 import { type NextFunction, type Request, type Response } from 'express';
 import passport from 'passport';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { IOAuthStore } from '../interfaces/io-auth-store.interface';
 import {
   MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN,
@@ -78,7 +78,7 @@ describe('OAuthController', () => {
 
     const { unit, unitRef } = await TestBed.solitary(OAuthController)
       .mock<McpOAuthModuleOptions>(MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN)
-      .impl((stubFn) => ({ ...stubFn(), ...mockOptions }))
+      .impl(() => ({ ...mockOptions }))
       .compile();
 
     controller = unit;
@@ -193,8 +193,7 @@ describe('OAuthController', () => {
           mockNext,
         );
 
-        const sessionCall = (store.storeOAuthSession as ReturnType<typeof vi.fn>).mock
-          .calls[0]?.[1];
+        const sessionCall = (store.storeOAuthSession as Mock).mock.calls[0]?.[1];
         expect(sessionCall.state).toBeDefined();
         expect(sessionCall.state).toMatch(/^[A-Za-z0-9_-]+$/); // Base64url format
       });
