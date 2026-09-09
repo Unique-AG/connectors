@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from typing import cast
@@ -25,8 +24,6 @@ from with_intelligence_mcp.with_intelligence_client.pagination import Page, pars
 from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy, parse_retry_after
 from with_intelligence_mcp.with_intelligence_client.settings import TransportSettings
 
-logger = logging.getLogger(__name__)
-
 type QueryValue = str | int | float | bool | Sequence[str | int]
 type Gate = Callable[[str], AbstractAsyncContextManager[None]]
 
@@ -34,8 +31,6 @@ _JSON = TypeAdapter(object)
 
 
 class WithIntelligenceClient:
-    """One caller's view of the API, over a pool and gates the factory owns."""
-
     def __init__(
         self,
         settings: TransportSettings,
