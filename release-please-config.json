@@ -189,7 +189,7 @@
         {
           "type": "toml",
           "path": "uv.lock",
-          "jsonpath": "$.package[?(@.source.editable)].version"
+          "jsonpath": "$.package[?(@.name == 'backstop-mcp' && @.source.editable)].version"
         }
       ]
     },

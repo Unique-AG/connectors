@@ -39,6 +39,7 @@ office-365-mcp = services/office-365-mcp/**
 aes-gcm-encryption = packages/aes-gcm-encryption/**
 instrumentation = packages/instrumentation/**
 logger = packages/logger/**
+mcp-credential-auth = packages/mcp-credential-auth/**
 mcp-oauth = packages/mcp-oauth/**
 mcp-server-module = packages/mcp-server-module/**
 probe = packages/probe/**

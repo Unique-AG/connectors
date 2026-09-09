@@ -10,6 +10,7 @@ on:
   # files it guards change, whatever the PR merges into.
   pull_request:
     paths:
+      - "packages/mcp-credential-auth/**"
       - "services/**"
       - ".github/workflows/python-ci.yaml"
       - "scripts/render-values-schema.sh"
@@ -34,6 +35,8 @@ jobs:
     runs-on: ubuntu-slim
     outputs:
       packages: ${{ steps.build-matrix.outputs.packages }}
+      shared-auth-changed: ${{ steps.filter.outputs.shared_auth }}
+      workflow-changed: ${{ steps.filter.outputs.workflow }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -45,6 +48,8 @@ jobs:
           filters: |
             services:
               - 'services/**'
+            shared_auth:
+              - 'packages/mcp-credential-auth/**'
             workflow:
               - '.github/workflows/python-ci.yaml'
               - 'scripts/render-values-schema.sh'
@@ -61,6 +66,7 @@ jobs:
           INPUT_PACKAGES: ${{ github.event.inputs.packages }}
           SERVICES_CHANGED: ${{ steps.filter.outputs.services }}
           SERVICES_FILES: ${{ steps.filter.outputs.services_files }}
+          SHARED_AUTH_CHANGED: ${{ steps.filter.outputs.shared_auth }}
           WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
         run: |
           list_python_services() {
@@ -89,6 +95,8 @@ jobs:
             fi
           elif [ "$WORKFLOW_CHANGED" = "true" ]; then
             packages=$(list_python_services | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          elif [ "$SHARED_AUTH_CHANGED" = "true" ]; then
+            packages='["backstop-mcp"]'
           elif [ "$SERVICES_CHANGED" = "true" ]; then
             packages=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | while read -r pkg; do
               [ -f "services/$pkg/pyproject.toml" ] && echo "$pkg"
@@ -151,6 +159,45 @@ jobs:
 
       - name: Check formatting of the files ruff does not own
         run: pnpm exec biome check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Typecheck
+        run: uv run basedpyright
+
+      - name: Run tests
+        run: uv run pytest
+
+  test-shared-auth:
+    name: Test mcp-credential-auth
+    needs: detect-changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.shared-auth-changed == 'true' ||
+      needs.detect-changes.outputs.workflow-changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/mcp-credential-auth
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: "0.11.33"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Check formatting
+        run: uv run ruff format --check .
 
       - name: Lint
         run: uv run ruff check .
