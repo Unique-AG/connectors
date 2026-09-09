@@ -33,6 +33,10 @@ mock_provider "azuread" {
         "Mail.Send"                        = "a5555555-5555-5555-5555-555555555555"
         "Mail.ReadBasic"                   = "a6666666-6666-6666-6666-666666666666"
         "MailboxSettings.ReadWrite"        = "a7777777-7777-7777-7777-777777777777"
+        "Calendars.Read"                   = "b1111111-1111-1111-1111-111111111111"
+        "Calendars.Read.Shared"            = "b2222222-2222-2222-2222-222222222222"
+        "Calendars.ReadWrite"              = "b3333333-3333-3333-3333-333333333333"
+        "Calendars.ReadWrite.Shared"       = "b4444444-4444-4444-4444-444444444444"
       }
     }
   }
@@ -239,6 +243,44 @@ run "preset_outlook_automate" {
   assert {
     condition     = join(",", local.permissions) == "User.Read,MailboxSettings.Read,MailboxSettings.ReadWrite"
     error_message = "outlook-automate composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_calendar" {
+  variables {
+    tools_preset = "outlook-calendar"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared"
+    error_message = "outlook-calendar composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_calendar_write" {
+  variables {
+    tools_preset = "outlook-calendar-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadWrite"
+    error_message = "outlook-calendar-write composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_calendar_delegate" {
+  variables {
+    tools_preset = "outlook-calendar-delegate"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadWrite,Calendars.ReadWrite.Shared"
+    error_message = "outlook-calendar-delegate composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "every delegated Calendars permission is AdminConsentRequired: No, and this needs ${join(",", local.admin_consent)}"
   }
 }
 

@@ -51,6 +51,12 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Mail.Send": False,
     "Mail.ReadBasic": False,
     "MailboxSettings.ReadWrite": False,
+    # Microsoft publishes AdminConsentRequired: No for every delegated Calendars permission, the
+    # two `.Shared` ones included.
+    "Calendars.Read": False,
+    "Calendars.Read.Shared": False,
+    "Calendars.ReadWrite": False,
+    "Calendars.ReadWrite.Shared": False,
 }
 
 _LABEL_WIDTH = 17

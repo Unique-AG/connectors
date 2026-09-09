@@ -13,8 +13,10 @@ risks a gateway timeout. `body` alone on twenty-five messages is tens of thousan
 nobody asked for.
 """
 
+import re
 from typing import Literal, Self
 
+from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.message import Message
 from msgraph.generated.models.recipient import Recipient
 from pydantic import BaseModel, Field
@@ -40,6 +42,10 @@ SUMMARY_FIELDS: tuple[str, ...] = (
 # Microsoft's own documented length for `bodyPreview`, named here because two tools quote it to a
 # model. If the number drifts in just one tool, that tool promises something the other does not.
 PREVIEW_CHARACTERS = 255
+
+# One SMTP address, no display name and no list: Exchange either rejects `Ada <ada@x.invalid>` or
+# silently reads the whole string as a name.
+ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
 
 # The well-known folder names Graph accepts in a URL path are the seven of seventeen that a
@@ -92,6 +98,14 @@ class MailAddress(BaseModel):
         if recipient is None or recipient.email_address is None:
             return None
         return cls(name=recipient.email_address.name, address=recipient.email_address.address)
+
+    @classmethod
+    def from_email_address(cls, address: EmailAddress | None) -> Self | None:
+        """Graph does not wrap a calendar's `owner` in a `recipient`; it is a bare `emailAddress`
+        (https://learn.microsoft.com/en-us/graph/api/resources/calendar)."""
+        if address is None:
+            return None
+        return cls(name=address.name, address=address.address)
 
     @classmethod
     def each_of(cls, recipients: list[Recipient] | None) -> list[Self]:
