@@ -5,20 +5,21 @@ into `engine.py` / `models.py`, so a table moving between modules is not a chang
 feature that reads it. Enforced by `tests/test_layering.py`.
 """
 
+from mcp_credential_auth import (
+    AuthorizationCode,
+    LoginAttempt,
+    OAuthClient,
+    OAuthToken,
+    PendingAuthorization,
+)
+
 from backstop_mcp.db.engine import (
     create_engine,
     create_session_factory,
     read_session,
     transaction,
 )
-from backstop_mcp.db.models import (
-    AuthorizationCode,
-    BackstopCredential,
-    LoginAttempt,
-    OAuthClient,
-    OAuthToken,
-    PendingAuthorization,
-)
+from backstop_mcp.db.models import BackstopCredential
 
 __all__ = [
     "AuthorizationCode",
