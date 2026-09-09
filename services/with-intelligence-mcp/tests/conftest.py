@@ -42,7 +42,9 @@ def _migrate(url: str) -> None:
     environment_before = os.environ.copy()
     os.environ["DB_URL"] = url
     try:
-        command.upgrade(Config(str(_SERVICE_ROOT / "alembic.ini")), "head")
+        config = Config(str(_SERVICE_ROOT / "alembic.ini"))
+        command.upgrade(config, "head")
+        command.check(config)
     finally:
         os.environ.clear()
         os.environ.update(environment_before)

@@ -1,6 +1,6 @@
 """create oauth, session and login-attempt tables
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: 7dab073eb40c
 Revises:
 Create Date: 2026-09-01 00:00:00.000000
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "a1b2c3d4e5f6"
+revision: str = "7dab073eb40c"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
