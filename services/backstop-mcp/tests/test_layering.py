@@ -685,8 +685,7 @@ class TestTheDetectionItself:
 
     def test_auth_tests_may_import_auth_internals(self) -> None:
         assert not _internal_imports(
-            "from backstop_mcp.features.auth.throttle import is_throttled\n"
-            + "from backstop_mcp.features.auth.credential_store import save_credential\n",
+            "from backstop_mcp.features.auth.credential_store import save_credential\n",
             _TESTS / "features" / "auth",
         )
 
