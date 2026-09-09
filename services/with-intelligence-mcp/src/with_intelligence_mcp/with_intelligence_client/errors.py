@@ -1,9 +1,4 @@
-"""One exception per outcome a caller has to tell apart.
-
-`NotEntitled` exists because 403 is a documented answer on every path: the account is not
-licensed for what was asked. A tool must report that rather than return a thin answer, since
-"not licensed" and "nothing there" otherwise look identical.
-"""
+"""WI client errors."""
 
 
 class WithIntelligenceError(Exception):

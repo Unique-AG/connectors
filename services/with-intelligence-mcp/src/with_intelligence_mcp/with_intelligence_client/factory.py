@@ -1,7 +1,4 @@
-"""Ownership of every process-wide HTTP resource: one pool, one gate registry, one retry policy.
-
-Nothing here re-reads the environment — what the provider was handed is what every request uses.
-"""
+"""Shared WI HTTP client resources."""
 
 import asyncio
 import logging
@@ -116,11 +113,7 @@ class WithIntelligenceClientFactory:
         )
 
     async def refresh(self, session: WiSession) -> WiSession:
-        """`POST /v3/auth/refresh`.
-
-        With Intelligence may or may not rotate the refresh token here; whatever comes back is
-        stored, so both behaviours are handled without knowing which it is.
-        """
+        """Refresh a WI session."""
         return await self._auth_call(
             REFRESH_PATH, {"refreshToken": session.refresh_token.get_secret_value()}
         )

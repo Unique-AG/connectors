@@ -9,11 +9,7 @@ _EARLY_RENEWAL = timedelta(minutes=1)
 
 
 class WiSession(BaseModel):
-    """What `/v3/auth/sign-in` and `/v3/auth/refresh` return, plus when we got it.
-
-    With Intelligence sends no expiry, so `issued_at` is ours and `is_fresh` is inferred from the
-    documented lifetime rather than read off the token.
-    """
+    """WI access and refresh tokens."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 

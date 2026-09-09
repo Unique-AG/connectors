@@ -1,9 +1,4 @@
-"""HTTP transport for the With Intelligence v3 REST API.
-
-Infrastructure the features consume: it must not import `features/` or `config`
-(`tests/test_layering.py`). A type both sides need lives here, with `features/` supplying the
-implementation — see `CallerSession`.
-"""
+"""With Intelligence v3 HTTP client."""
 
 from with_intelligence_mcp.with_intelligence_client.as_sequence import (
     SEQUENCE,
