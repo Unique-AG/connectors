@@ -9,10 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from unique_mcp.monitoring import setup_ops
 
-from with_intelligence_mcp.dependencies import get_app_config, get_engine
+from with_intelligence_mcp.dependencies import (
+    get_app_config,
+    get_auth_config,
+    get_auth_provider,
+    get_engine,
+    get_session_factory,
+)
+from with_intelligence_mcp.features.auth import cleanup_lifespan
 from with_intelligence_mcp.logging import configure_logging
 from with_intelligence_mcp.metrics import configure_metrics
 from with_intelligence_mcp.server.instructions import INSTRUCTIONS
@@ -23,32 +30,32 @@ logger = logging.getLogger(__name__)
 
 
 def create_app() -> Starlette:
-    """Assemble the ASGI app.
-
-    Logging, metrics, FastMCP, TOOLS, setup_ops, /ready, middleware, lifespan
-    `close_singletons()`.
-
-    No authorization server yet: until the auth feature lands, `FastMCP` is built without an
-    auth provider and the login routes it will own do not exist. Every other piece of the
-    composition root is in place, so adding it is one wiring change rather than a new file.
-    """
+    """Assemble the ASGI app: logging, metrics, FastMCP, TOOLS, setup_ops, /ready, /login,
+    lifespan `close_singletons()`."""
     config = get_app_config()
+    auth_config = get_auth_config()
 
     configure_logging(config)
     configure_metrics(config)
 
     engine = get_engine()
+    session_factory = get_session_factory()
+    auth_provider = get_auth_provider()
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None]:
+        # Stop the auth sweep before disposing the engine — otherwise `cleanup_lifespan`'s
+        # cancel/await runs after the pool is already closed.
         try:
-            yield
+            async with cleanup_lifespan(session_factory, auth_config):
+                yield
         finally:
             await close_singletons()
 
     mcp = FastMCP(
         "With Intelligence MCP",
         version=config.version,
+        auth=auth_provider,
         lifespan=lifespan,
         instructions=INSTRUCTIONS,
     )
@@ -60,22 +67,23 @@ def create_app() -> Starlette:
 
     @mcp.custom_route("/ready", methods=["GET"])
     async def ready(_request: Request) -> JSONResponse:
-        """Postgres readiness — stock `setup_ops` `/probe` is process-up only."""
         return await _ready_response(engine)
 
-    return mcp.http_app(
-        middleware=[
-            Middleware(OpenTelemetryMiddleware),
-            ops_middleware,
-        ]
-    )
+    @mcp.custom_route(auth_provider.login_path, methods=["GET"])
+    async def login_get(request: Request) -> Response:
+        return await auth_provider.handle_login_get(request)
+
+    @mcp.custom_route(auth_provider.login_path, methods=["POST"])
+    async def login_post(request: Request) -> Response:
+        return await auth_provider.handle_login_post(request)
+
+    return mcp.http_app(middleware=[Middleware(OpenTelemetryMiddleware), ops_middleware])
 
 
 async def _ready_response(engine: AsyncEngine) -> JSONResponse:
-    """Readiness, reporting the checks it actually ran.
+    """Postgres readiness — stock `setup_ops` `/probe` is process-up only.
 
-    Postgres is a hard dependency — OAuth token validation will read it on every request — so an
-    unreachable database means not ready.
+    A hard dependency now: OAuth token validation reads the database on every request.
     """
     database_ok = True
     try:

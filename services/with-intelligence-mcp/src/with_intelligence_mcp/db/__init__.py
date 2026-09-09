@@ -1,9 +1,12 @@
-"""Postgres: the engine/session helpers and the ORM tables this service owns.
+"""Postgres: engine/session helpers and the ORM tables this service owns."""
 
-The public surface of the package. Callers take what they need from here rather than reaching
-into `engine.py` / `models.py`, so a table moving between modules is not a change to every
-feature that reads it. Enforced by `tests/test_layering.py`.
-"""
+from mcp_credential_auth import (
+    AuthorizationCode,
+    LoginAttempt,
+    OAuthClient,
+    OAuthToken,
+    PendingAuthorization,
+)
 
 from with_intelligence_mcp.db.engine import (
     create_engine,
@@ -11,10 +14,19 @@ from with_intelligence_mcp.db.engine import (
     read_session,
     transaction,
 )
-from with_intelligence_mcp.db.models import Base
+from with_intelligence_mcp.db.models import (
+    Base,
+    WithIntelligenceSession,
+)
 
 __all__ = [
+    "AuthorizationCode",
     "Base",
+    "LoginAttempt",
+    "OAuthClient",
+    "OAuthToken",
+    "PendingAuthorization",
+    "WithIntelligenceSession",
     "create_engine",
     "create_session_factory",
     "read_session",

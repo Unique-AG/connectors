@@ -1,14 +1,20 @@
-"""The ORM tables this service owns.
+from datetime import datetime
 
-Empty of tables so far, deliberately: every table this service will hold — registered OAuth
-clients, pending authorizations, issued token families, and the encrypted With Intelligence
-session per user — belongs to the auth feature, and lands in the same change as the code that
-reads it. `Base` exists now because `db/migrations/env.py` needs metadata to autogenerate
-against, and `alembic upgrade head` on an empty `versions/` is a no-op rather than an error.
-"""
-
-from sqlalchemy.orm import DeclarativeBase
+from mcp_credential_auth import AuthBase as Base
+from sqlalchemy import DateTime, LargeBinary, String, func
+from sqlalchemy.orm import Mapped, mapped_column
 
 
-class Base(DeclarativeBase):
-    pass
+class WithIntelligenceSession(Base):
+    __tablename__: str = "with_intelligence_sessions"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    wi_username: Mapped[str] = mapped_column(String, unique=True, index=True)
+    encrypted_blob: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+__all__ = ["Base", "WithIntelligenceSession"]

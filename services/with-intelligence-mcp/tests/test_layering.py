@@ -1,49 +1,18 @@
 """The structural rules this package's layout depends on.
 
-Most are vacuous today because there are no features yet. The rule is in place before the code
-it governs, and `TestTheDetectionItself` proves each detector actually fires, so a rule cannot
-pass merely by having nothing to inspect.
+1. `features/` must not import `server/`.
+2. `with_intelligence_client/` must not import `features/`.
+3. `with_intelligence_client/` must not import `config` — it takes its own settings types.
+4. A package is entered through its `__init__`, never through its modules.
+5. Feature model layers flow downward: `responses` -> `internal_dto` -> `wi_responses`, with
+   `*Response` / `*Dto` / `*Attributes` classes in the matching module. `tools/` is exempt.
+6. A logic module is named after the symbol it defines. `features/auth/` is out of scope:
+   its filenames mirror the OAuth concepts they implement (`provider`, `throttle`, `crypto`),
+   which is what makes the package readable against the spec.
+7. Every tool module defines one `@tool` named after the file, and appears in `TOOLS`.
 
-1. **`features/` must not import `server/`.** `features/` is what the connector does; `server/`
-   is how it's exposed over MCP. The server wires features together, so it imports them freely —
-   the reverse is an inversion. Tools declare collaborators as `Depends(...)` parameters rather
-   than importing `server/`.
-
-2. **`with_intelligence_client/` must not import `features/`.** The HTTP client is
-   infrastructure that features consume; it importing one back is the same inversion. A type
-   both sides need lives in the transport package, with `features/` supplying the implementation.
-
-3. **`with_intelligence_client/` must not import `config`.** The transport takes its own frozen
-   settings types, translated from `WithIntelligenceConfig` by `dependencies`. `features/` is
-   deliberately *not* subject to this rule: a feature is allowed to be configured — a transport
-   is only allowed to be told.
-
-4. **A package is entered through its `__init__`, never through its modules.** From outside,
-   `from with_intelligence_mcp.db import transaction` — not `...db.engine import transaction`.
-   Each package's `__all__` is then the whole of what it promises, and everything else is free
-   to move. Tests walk the same rule, except tool tests, which import the tool under test from
-   its own module because individual tool modules are not a public import surface.
-
-5. **Feature model layers flow downward.** A `*Attributes` class lives in `api_responses*`, a
-   `*Dto` class in `internal_dto*`, and a `*Response` class in `responses*`. Imports among
-   those three run one way only (`responses` → `internal_dto` → `api_responses`). No model
-   declares `extra="forbid"`. A feature's `tools/` declare their own models — a tool's wire
-   contract lives beside it — and are exempt.
-
-6. **A logic module is named after the symbol it defines.** The filename stem, or the PascalCase
-   of it, must be a top-level function, class, or assignment in that file — `fetch_investor.py`
-   holds `fetch_investor`, `vocabulary_service.py` holds `VocabularyService`. Vocabulary modules
-   (`api_responses*`, `internal_dto*`, `responses*`, `entity_types.py`, `settings.py`,
-   `dependencies.py`) keep their names; `_`-prefixed modules are private shared utilities.
-
-7. **Every tool module is registered.** A non-private module under `features/<feature>/tools/`
-   defines exactly one `@tool`-decorated function named after the file, and that name appears on
-   `TOOLS`. A file that is never registered fails the suite rather than shipping an unreachable
-   tool.
-
-Rules 1–6 are asserted by walking the AST rather than importing anything, so a violation is
-reported with a file and line instead of an ImportError at collection time. Rule 7 uses AST for
-the `@tool` shape and imports `TOOLS` for the registry check.
+Most are vacuous while `features/` is empty, which is why `TestTheDetectionItself` proves each
+detector fires — otherwise the suite reports seven guards that never inspected anything.
 """
 
 import ast
@@ -63,24 +32,24 @@ _FEATURES_PREFIX = f"{_PACKAGE}.features"
 _CLIENT_PREFIX = f"{_PACKAGE}.with_intelligence_client"
 _CONFIG_MODULE = f"{_PACKAGE}.config"
 
-# Packages that publish a surface: outside code imports the package, never a module inside it.
 # A new package belongs here as soon as its `__init__` exports anything. `features/` and
-# `server/` are not among them: they are groupings whose `__init__` is documentation, so
-# `server.tools` is itself the unit being imported.
+# `server/` are groupings, so `server.tools` is itself the unit being imported.
 _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     f"{_PACKAGE}.db",
     f"{_PACKAGE}.with_intelligence_client",
 )
 
-_MODEL_LAYERS: tuple[str, ...] = ("api_responses", "internal_dto", "responses")
+_MODEL_LAYERS: tuple[str, ...] = ("wi_responses", "internal_dto", "responses")
 _MODEL_LAYER_RANK = {name: index for index, name in enumerate(_MODEL_LAYERS)}
 _CLASS_SUFFIX_LAYER = {
-    "Attributes": "api_responses",
+    "Attributes": "wi_responses",
     "Dto": "internal_dto",
     "Response": "responses",
 }
 
-# Modules named for a vocabulary rather than for a symbol they define (rule 6).
+_LOGIC_NAME_EXEMPT_FEATURES = frozenset({"auth"})
+
+# Named for a vocabulary rather than a symbol they define (rule 6).
 _VOCABULARY_FILES = frozenset(
     {
         "__init__.py",
@@ -97,7 +66,6 @@ def _python_sources(root: pathlib.Path) -> list[pathlib.Path]:
 
 
 def _imported_modules(tree: ast.AST) -> list[tuple[str, int]]:
-    """Every module an AST imports, as `(dotted name, line number)`."""
     found: list[tuple[str, int]] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -108,7 +76,6 @@ def _imported_modules(tree: ast.AST) -> list[tuple[str, int]]:
 
 
 def _imports_under(source: str, prefix: str) -> list[str]:
-    """Modules imported by `source` that sit at or under `prefix`. The shared detector."""
     tree = ast.parse(source)
     return [
         module
@@ -127,7 +94,6 @@ def _violations(source: pathlib.Path, prefix: str) -> list[str]:
 
 
 def _reaches_past_init(module: str) -> str | None:
-    """The public-surface package `module` reaches past, if any (rule 4)."""
     for package in _PUBLIC_SURFACE_PACKAGES:
         if module.startswith(f"{package}."):
             return package
@@ -135,13 +101,11 @@ def _reaches_past_init(module: str) -> str | None:
 
 
 def _is_inside(directory: pathlib.Path, package: str) -> bool:
-    """Whether `directory` is the package's own tree — where internal imports are allowed."""
     own = _SRC.parent / pathlib.Path(*package.split("."))
     return directory == own or own in directory.parents
 
 
 def _layer_of(name: str) -> str | None:
-    """The model layer a filename stem or module tail names."""
     for layer in _MODEL_LAYERS:
         if name == layer or name.startswith(f"{layer}_"):
             return layer
@@ -182,7 +146,6 @@ def _tool_decorated_names(tree: ast.AST) -> list[str]:
 
 
 def _feature_tool_modules() -> list[pathlib.Path]:
-    """Non-private `*.py` under `features/<feature>/tools/`."""
     return [
         source
         for source in _python_sources(_FEATURES)
@@ -191,6 +154,15 @@ def _feature_tool_modules() -> list[pathlib.Path]:
         and not source.name.startswith("_")
         and source.name != "__init__.py"
     ]
+
+
+def _feature_of(source: pathlib.Path) -> str | None:
+    """Which feature package a source file belongs to, if any."""
+    try:
+        relative = source.relative_to(_FEATURES)
+    except ValueError:
+        return None
+    return relative.parts[0] if len(relative.parts) > 1 else None
 
 
 def _is_under_feature_tools(source: pathlib.Path) -> bool:
@@ -275,7 +247,7 @@ class TestRule5FeatureModelLayersFlowDownward:
                 if _MODEL_LAYER_RANK[imported] >= _MODEL_LAYER_RANK[layer]:
                     found.append(
                         f"{source.relative_to(_SRC)}:{line} {layer} imports {imported} "
-                        + "(layers flow responses -> internal_dto -> api_responses)"
+                        + "(layers flow responses -> internal_dto -> wi_responses)"
                     )
         assert found == [], "; ".join(found)
 
@@ -293,6 +265,8 @@ class TestRule6ModuleNamedAfterItsSymbol:
         found: list[str] = []
         for source in _python_sources(_FEATURES):
             if source.name in _VOCABULARY_FILES or source.name.startswith("_"):
+                continue
+            if _feature_of(source) in _LOGIC_NAME_EXEMPT_FEATURES:
                 continue
             if _layer_of(source.stem) is not None:
                 continue
@@ -333,11 +307,7 @@ class TestRule7EveryToolModuleIsRegistered:
 
 
 class TestTheDetectionItself:
-    """The rules are only worth having if they fail on the things they're meant to catch.
-
-    Every rule above is vacuous while `features/` is empty, so without these the suite would
-    report seven passing guards that have never inspected anything.
-    """
+    """The rules are only worth having if they fail on what they are meant to catch."""
 
     def test_catches_a_feature_importing_the_server(self) -> None:
         assert _imports_under(
@@ -372,11 +342,11 @@ class TestTheDetectionItself:
     def test_recognises_the_model_layers(self) -> None:
         assert _layer_of("responses") == "responses"
         assert _layer_of("internal_dto") == "internal_dto"
-        assert _layer_of("api_responses_investor") == "api_responses"
+        assert _layer_of("wi_responses_investor") == "wi_responses"
         assert _layer_of("fetch_investor") is None
 
     def test_ranks_the_layers_downward(self) -> None:
-        assert _MODEL_LAYER_RANK["api_responses"] < _MODEL_LAYER_RANK["internal_dto"]
+        assert _MODEL_LAYER_RANK["wi_responses"] < _MODEL_LAYER_RANK["internal_dto"]
         assert _MODEL_LAYER_RANK["internal_dto"] < _MODEL_LAYER_RANK["responses"]
 
     def test_pascal_cases_a_module_stem(self) -> None:
@@ -392,6 +362,12 @@ class TestTheDetectionItself:
             )
         )
         assert names == {"fetch_investor", "VocabularyService", "PAGE_SIZE", "ToolFunction"}
+
+    def test_the_rule_6_exemption_is_scoped_to_one_package(self) -> None:
+        assert _feature_of(_FEATURES / "auth" / "provider.py") == "auth"
+        assert _feature_of(_FEATURES / "investors" / "fetch_investor.py") == "investors"
+        assert _feature_of(_SRC / "config.py") is None
+        assert "investors" not in _LOGIC_NAME_EXEMPT_FEATURES
 
     def test_recognises_a_tool_decorated_function(self) -> None:
         names = _tool_decorated_names(
