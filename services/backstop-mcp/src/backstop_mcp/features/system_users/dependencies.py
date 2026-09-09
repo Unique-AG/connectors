@@ -3,7 +3,12 @@ from functools import lru_cache
 from fastmcp.dependencies import Depends
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client_for_current_caller, get_backstop_config
+from backstop_mcp.dependencies import (
+    get_backstop_client_for_current_caller,
+    get_backstop_config,
+    get_current_caller_username,
+)
+from backstop_mcp.features.system_users.internal_dto import SystemUserDto
 from backstop_mcp.features.system_users.system_users_service import SystemUsersService
 
 
@@ -21,3 +26,10 @@ def get_system_users_service(
         ttl_minutes=config.system_user_ttl_minutes,
         caching_enabled=config.system_user_cache_enabled,
     )
+
+
+async def get_current_caller_system_user(
+    username: str = Depends(get_current_caller_username),
+    system_users: SystemUsersService = Depends(get_system_users_service),
+) -> SystemUserDto:
+    return await system_users.resolve_by_user_name(username)

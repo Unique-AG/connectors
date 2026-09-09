@@ -2,6 +2,8 @@ import logging
 from datetime import timedelta
 from typing import Self
 
+from fastmcp.exceptions import ToolError
+
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.caching import CachedValue, CacheFreshness
 from backstop_mcp.features.system_users.api_responses import SystemUserAttributes
@@ -45,8 +47,8 @@ class SystemUsersService:
     Users come from a real Backstop fetch and live in one in-memory dict keyed by user id.
     `/system-users` has no search filter. A name or login lookup would otherwise dump the
     whole roster, so this service walks once, caches `{id: dto}`, and callers substring-filter
-    that map in memory. Until a fetch succeeds there is nothing to serve. Constructed by
-    `get_system_users_service` in this feature's `dependencies.py`.
+    that map in memory or resolve a login exactly. Until a fetch succeeds there is nothing to
+    serve. Constructed by `get_system_users_service` in this feature's `dependencies.py`.
 
     The TTL, single-flight and serve-stale protocol behind `get` is the composed `CachedValue`.
     """
@@ -75,3 +77,22 @@ class SystemUsersService:
         self, *, refresh: bool = False
     ) -> tuple[dict[str, SystemUserDto], CacheFreshness]:
         return await self._cache.get(lambda: _fetch_system_users(self._client), refresh=refresh)
+
+    async def resolve_by_user_name(self, username: str) -> SystemUserDto:
+        catalog, _freshness = await self.get()
+        needle = username.casefold()
+        matches = [
+            user
+            for user in catalog.values()
+            if user.user_name is not None and user.user_name.casefold() == needle
+        ]
+        if not matches:
+            raise ToolError(
+                f"The authenticated Backstop login {username!r} has no matching system user."
+            )
+        if len(matches) > 1:
+            raise ToolError(
+                f"The authenticated Backstop login {username!r} matches more than one "
+                + "system user."
+            )
+        return matches[0]
