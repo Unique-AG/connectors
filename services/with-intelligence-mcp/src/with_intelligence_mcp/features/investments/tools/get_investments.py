@@ -27,7 +27,7 @@ type GetInvestmentsResult = (
 )
 
 
-@tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
+@tool(annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True))
 async def get_investments(
     name: Annotated[
         str | None,

@@ -1,5 +1,5 @@
-from with_intelligence_mcp.features.persons.wi_responses import PersonExtendedAttributes
 from with_intelligence_mcp.features.persons.fetch_people_for_organisation import PERSONS_PATH
+from with_intelligence_mcp.features.persons.wi_responses import PersonExtendedAttributes
 from with_intelligence_mcp.with_intelligence_client import (
     NotFound,
     WithIntelligenceClient,

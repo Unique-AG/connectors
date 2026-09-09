@@ -1,9 +1,9 @@
-from with_intelligence_mcp.features.investments.wi_responses import (
-    InvestmentExtendedAttributes,
-)
 from with_intelligence_mcp.features.investments.responses import (
     PositionAmountResponse,
     PositionResponse,
+)
+from with_intelligence_mcp.features.investments.wi_responses import (
+    InvestmentExtendedAttributes,
 )
 from with_intelligence_mcp.features.investors import ClassificationAttributes
 

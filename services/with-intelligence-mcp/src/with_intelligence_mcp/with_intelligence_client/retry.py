@@ -17,7 +17,7 @@ class RetryPolicy:
     max_wait_seconds: float
 
     @classmethod
-    def from_settings(cls, settings: RetrySettings) -> "RetryPolicy":
+    def from_settings(cls, settings: RetrySettings) -> RetryPolicy:
         return cls(
             max_attempts=settings.max_attempts,
             max_wait_seconds=settings.max_wait_ms / 1000,

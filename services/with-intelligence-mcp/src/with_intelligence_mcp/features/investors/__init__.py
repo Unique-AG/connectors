@@ -1,10 +1,5 @@
 """Institutional investors: resolving one by name, and the record behind it."""
 
-from with_intelligence_mcp.features.investors.wi_responses import (
-    ClassificationAttributes,
-    InvestorExtendedAttributes,
-    InvestorListItemAttributes,
-)
 from with_intelligence_mcp.features.investors.fetch_investor import INVESTORS_PATH, fetch_investor
 from with_intelligence_mcp.features.investors.project_investor import project_investor
 from with_intelligence_mcp.features.investors.resolve_investor import resolve_investor
@@ -17,6 +12,11 @@ from with_intelligence_mcp.features.investors.responses import (
 )
 from with_intelligence_mcp.features.investors.search_investors_by_name import (
     search_investors_by_name,
+)
+from with_intelligence_mcp.features.investors.wi_responses import (
+    ClassificationAttributes,
+    InvestorExtendedAttributes,
+    InvestorListItemAttributes,
 )
 
 __all__ = [

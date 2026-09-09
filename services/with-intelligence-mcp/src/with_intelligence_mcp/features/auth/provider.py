@@ -121,7 +121,7 @@ _EXPIRED_LINK_MESSAGE = (
 
 
 class WithIntelligenceOAuthProvider(OAuthProvider):
-    """FastMCP OAuth 2.1 authorization server whose "login" step is a With Intelligence credential form.
+    """FastMCP OAuth 2.1 authorization server.
 
     With Intelligence has no OAuth of its own — so instead of redirecting to a third-party
     identity provider, `authorize()` redirects the browser to our own hosted login page
@@ -547,7 +547,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
 
     async def _rotate_refresh_token(
         self, refresh_token: RefreshToken, scopes: list[str]
-    ) -> "_RefreshOutcome":
+    ) -> _RefreshOutcome:
         """Do the rotation and report what happened. Raises nothing the caller must translate."""
         token_hash = _hash_token(refresh_token.token)
         now = datetime.now(UTC)

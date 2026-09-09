@@ -90,7 +90,7 @@ class WithIntelligenceClientFactory:
     def settings(self) -> TransportSettings:
         return self._settings
 
-    def for_session(self, session: CallerSession) -> "WithIntelligenceClient":
+    def for_session(self, session: CallerSession) -> WithIntelligenceClient:
         from with_intelligence_mcp.with_intelligence_client.client import WithIntelligenceClient
 
         return WithIntelligenceClient(
@@ -114,8 +114,8 @@ class WithIntelligenceClientFactory:
     async def refresh(self, session: WiSession) -> WiSession:
         """`POST /v3/auth/refresh`.
 
-        With Intelligence may or may not rotate the refresh token here; whatever comes back is stored,
-        so both behaviours are handled without knowing which it is.
+        With Intelligence may or may not rotate the refresh token here; whatever comes back is
+        stored, so both behaviours are handled without knowing which it is.
         """
         return await self._auth_call(
             REFRESH_PATH, {"refreshToken": session.refresh_token.get_secret_value()}

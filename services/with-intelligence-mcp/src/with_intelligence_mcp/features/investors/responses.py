@@ -16,7 +16,9 @@ class OmitNoneModel(BaseModel):
 
 
 class NamedValueResponse(OmitNoneModel):
-    id: int | None = Field(default=None, description="With Intelligence's id, for follow-up filters.")
+    id: int | None = Field(
+        default=None, description="With Intelligence's id, for follow-up filters."
+    )
     name: str | None = None
 
 

@@ -1,11 +1,5 @@
 """People at an investor: the roster, and the role each holds there."""
 
-from with_intelligence_mcp.features.persons.wi_responses import (
-    PersonExtendedAttributes,
-    PersonListItemAttributes,
-    PersonRoleAttributes,
-    RoleOrganisationAttributes,
-)
 from with_intelligence_mcp.features.persons.fetch_people_for_organisation import (
     PERSONS_PATH,
     fetch_people_for_organisation,
@@ -15,6 +9,12 @@ from with_intelligence_mcp.features.persons.project_person import project_person
 from with_intelligence_mcp.features.persons.responses import (
     PeopleForInvestorResponse,
     PersonResponse,
+)
+from with_intelligence_mcp.features.persons.wi_responses import (
+    PersonExtendedAttributes,
+    PersonListItemAttributes,
+    PersonRoleAttributes,
+    RoleOrganisationAttributes,
 )
 
 __all__ = [

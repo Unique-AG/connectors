@@ -1,5 +1,5 @@
-from with_intelligence_mcp.features.investors.wi_responses import InvestorListItemAttributes
 from with_intelligence_mcp.features.investors.fetch_investor import INVESTORS_PATH
+from with_intelligence_mcp.features.investors.wi_responses import InvestorListItemAttributes
 from with_intelligence_mcp.with_intelligence_client import (
     Page,
     QueryValue,

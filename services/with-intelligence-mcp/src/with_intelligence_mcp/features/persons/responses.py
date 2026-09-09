@@ -15,7 +15,9 @@ class PersonResponse(OmitNoneModel):
     job_title: str | None = Field(default=None, description="Their title at this organisation.")
     seniority: str | None = Field(
         default=None,
-        description="With Intelligence's seniority band. The closest thing to a decision-maker signal.",
+        description=(
+            "With Intelligence's seniority band. The closest thing to a decision-maker signal."
+        ),
     )
     specialisms: list[str] = Field(
         default_factory=list, description="What they cover — often several."

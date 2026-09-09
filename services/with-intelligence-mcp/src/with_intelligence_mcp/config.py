@@ -142,7 +142,8 @@ class WithIntelligenceConfig(BaseSettings):
 
     default_page_size: int = Field(default=50, ge=1, le=500)
 
-    # Our own politeness bound: With Intelligence publishes no concurrency limit, only 429 on every path.
+    # Our own politeness bound: With Intelligence publishes no concurrency limit,
+    # only 429 on every path.
     max_concurrent_requests_per_user: int = Field(default=5, ge=1)
 
     max_retry_attempts: int = Field(default=3, ge=1)

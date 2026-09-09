@@ -1,10 +1,3 @@
-from with_intelligence_mcp.features.investors.wi_responses import (
-    ClassificationAttributes,
-    ConsultantAttributes,
-    EntityAttributes,
-    InvestorExtendedAttributes,
-    StrategyGroupAttributes,
-)
 from with_intelligence_mcp.features.investors.html_to_markdown import html_to_markdown
 from with_intelligence_mcp.features.investors.responses import (
     AumResponse,
@@ -12,6 +5,13 @@ from with_intelligence_mcp.features.investors.responses import (
     InvestorProfileResponse,
     NamedValueResponse,
     StrategyGroupResponse,
+)
+from with_intelligence_mcp.features.investors.wi_responses import (
+    ClassificationAttributes,
+    ConsultantAttributes,
+    EntityAttributes,
+    InvestorExtendedAttributes,
+    StrategyGroupAttributes,
 )
 
 

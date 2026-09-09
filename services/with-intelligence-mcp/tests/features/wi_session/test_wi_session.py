@@ -56,9 +56,7 @@ class FakeStore:
             await asyncio.sleep(self._delay)
         return self.stored
 
-    async def renew(
-        self, renew: Callable[[WiSession], Awaitable[WiSession]]
-    ) -> WiSession:
+    async def renew(self, renew: Callable[[WiSession], Awaitable[WiSession]]) -> WiSession:
         async with self._lock:
             if self.stored.is_fresh:
                 return self.stored

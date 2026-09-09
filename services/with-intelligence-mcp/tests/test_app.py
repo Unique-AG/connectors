@@ -1,6 +1,6 @@
 """`create_app` driven as a real ASGI app, so the lifespan and middleware actually run."""
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Protocol, cast
 
 import pytest
@@ -11,23 +11,27 @@ from with_intelligence_mcp.app import create_app
 from with_intelligence_mcp.server.tools import TOOLS
 
 
-# TestClient's httpx responses are partially unknown to this repo's type-checking mode.
 class _HttpResponse(Protocol):
-    @property
-    def status_code(self) -> int: ...
-    @property
-    def text(self) -> str: ...
-    @property
-    def headers(self) -> dict[str, str]: ...
-    def json(self) -> dict[str, object]: ...
+    status_code: int
+    text: str
+    headers: Mapping[str, str]
+
+    def json(self) -> object: ...
 
 
 def _get(client: TestClient, path: str) -> _HttpResponse:
-    return cast("_HttpResponse", client.get(path))  # pyright: ignore[reportUnknownMemberType]
+    return cast(_HttpResponse, cast(object, client.get(path)))
 
 
-def _headers(response: _HttpResponse) -> dict[str, str]:
-    return {key.lower(): value for key, value in response.headers.items()}
+def _headers(response: object) -> dict[str, str]:
+    headers = cast(_HttpResponse, response).headers
+    return {key.lower(): value for key, value in headers.items()}
+
+
+def _json_object(response: _HttpResponse) -> dict[str, object]:
+    body = response.json()
+    assert isinstance(body, dict)
+    return cast("dict[str, object]", body)
 
 
 def _checks(body: dict[str, object]) -> dict[str, object]:
@@ -55,7 +59,7 @@ class TestOpsEndpoints:
     def test_ready_reports_the_database_it_checked(self, client: TestClient) -> None:
         response = _get(client, "/ready")
         assert response.status_code == 200
-        body = response.json()
+        body = _json_object(response)
         assert body["status"] == "healthy"
         assert _checks(body) == {"database": True}
 
@@ -71,7 +75,7 @@ class TestReadinessWithoutADatabase:
         with TestClient(create_app()) as client:
             response = _get(client, "/ready")
             assert response.status_code == 503
-            body = response.json()
+            body = _json_object(response)
             assert body["status"] == "unhealthy"
             assert _checks(body) == {"database": False}
             assert _get(client, "/health").status_code == 200
@@ -94,34 +98,28 @@ class TestMcpEndpoint:
 class TestAuthIsRequired:
     def test_an_anonymous_initialize_is_refused(self, client: TestClient) -> None:
         """The whole point of the auth slice: no tool call without a login."""
-        response = cast(
-            "_HttpResponse",
-            client.post(  # pyright: ignore[reportUnknownMemberType]
-                "/mcp",
-                headers={"accept": "application/json, text/event-stream"},
-                json={
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "initialize",
-                    "params": {
-                        "protocolVersion": "2025-06-18",
-                        "capabilities": {},
-                        "clientInfo": {"name": "test", "version": "0"},
-                    },
+        response = client.post(
+            "/mcp",
+            headers={"accept": "application/json, text/event-stream"},
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "0"},
                 },
-            ),
+            },
         )
         assert response.status_code == 401
 
     def test_the_401_points_at_the_resource_metadata(self, client: TestClient) -> None:
         """How a client discovers where to authenticate."""
-        response = cast(
-            "_HttpResponse",
-            client.post(  # pyright: ignore[reportUnknownMemberType]
-                "/mcp",
-                headers={"accept": "application/json, text/event-stream"},
-                json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
-            ),
+        response = client.post(
+            "/mcp",
+            headers={"accept": "application/json, text/event-stream"},
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
         )
         assert response.status_code == 401
         assert "resource_metadata" in _headers(response)["www-authenticate"]
@@ -129,7 +127,7 @@ class TestAuthIsRequired:
     def test_the_authorization_server_advertises_registration_and_pkce(
         self, client: TestClient
     ) -> None:
-        metadata = _get(client, "/.well-known/oauth-authorization-server").json()
+        metadata = _json_object(_get(client, "/.well-known/oauth-authorization-server"))
         registration = metadata["registration_endpoint"]
         methods = metadata["code_challenge_methods_supported"]
         assert isinstance(registration, str)

@@ -28,7 +28,7 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
 @asynccontextmanager
 async def read_session(
     factory: async_sessionmaker[AsyncSession],
-) -> AsyncGenerator[AsyncSession, None]:
+) -> AsyncGenerator[AsyncSession]:
     """Reads only, never commits. Use `transaction()` for anything that writes."""
     async with factory() as session:
         yield session
@@ -37,7 +37,7 @@ async def read_session(
 @asynccontextmanager
 async def transaction(
     factory: async_sessionmaker[AsyncSession],
-) -> AsyncGenerator[AsyncSession, None]:
+) -> AsyncGenerator[AsyncSession]:
     """Committed on clean exit; `async with` rolls back on error."""
     async with factory() as session:
         yield session

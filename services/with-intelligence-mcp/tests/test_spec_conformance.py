@@ -60,8 +60,8 @@ from with_intelligence_mcp.with_intelligence_client import PageInfo
 
 _SNAPSHOT = pathlib.Path(__file__).parent / "spec" / "wi_schemas.json"
 
-# Our model -> With Intelligence schema it transcribes, or the several it transcribes where With Intelligence
-# declares the same shape under more than one name (`{id, short_name}` appears three times).
+# Our model -> With Intelligence schema it transcribes, or the several it transcribes where
+# With Intelligence declares the same shape under more than one name.
 MODELS: dict[type[BaseModel], str | tuple[str, ...]] = {
     InvestorListItemAttributes: "Investor",
     InvestorExtendedAttributes: "InvestorExtended",
@@ -261,14 +261,14 @@ class TestTheDetectionItself:
         assert empty == []
 
     def test_a_string_where_the_spec_says_object_is_caught(self) -> None:
-        """Exactly the bug: `country` declared `str` when With Intelligence sends a Classification."""
+        """Catches a string where With Intelligence sends a Classification."""
         assert not _matches(_our_kind(str | None), ("model", "Classification"))
 
     def test_the_real_nested_declaration_passes(self) -> None:
         assert _matches(_our_kind(ClassificationAttributes | None), ("model", "Classification"))
 
     def test_one_class_may_transcribe_several_identically_shaped_schemas(self) -> None:
-        """With Intelligence declares `{id, short_name}` under three names; one class covers them."""
+        """One class can cover several identically shaped schemas."""
         assert _matches(
             _our_kind(CurrencyAmountAttributes | None), ("model", "MandateAmountCurrency")
         )

@@ -1,8 +1,8 @@
+from with_intelligence_mcp.features.persons.responses import PersonResponse
 from with_intelligence_mcp.features.persons.wi_responses import (
     PersonExtendedAttributes,
     PersonRoleAttributes,
 )
-from with_intelligence_mcp.features.persons.responses import PersonResponse
 
 
 def project_person(record: PersonExtendedAttributes, organisation_id: int) -> PersonResponse:

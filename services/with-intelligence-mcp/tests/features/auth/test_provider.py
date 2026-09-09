@@ -354,9 +354,7 @@ class TestLoginCsrf:
 
 class TestLoginThrottling:
     @respx.mock
-    async def test_stops_calling_wi_once_the_budget_is_spent(
-        self, db: DatabaseFixture
-    ) -> None:
+    async def test_stops_calling_wi_once_the_budget_is_spent(self, db: DatabaseFixture) -> None:
         route = respx.post(_SIGN_IN).mock(return_value=httpx.Response(401))
         provider = _make_provider(
             db, throttle=ThrottleConfig(max_attempts=2, window=timedelta(minutes=15))

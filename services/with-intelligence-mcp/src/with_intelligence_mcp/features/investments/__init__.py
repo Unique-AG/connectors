@@ -1,12 +1,5 @@
 """An investor's fund roster: which funds they hold, at what size, and what they have exited."""
 
-from with_intelligence_mcp.features.investments.wi_responses import (
-    CurrencyAmountAttributes,
-    InvestmentAmountAttributes,
-    InvestmentExtendedAttributes,
-    InvestmentFundAttributes,
-    InvestmentListItemAttributes,
-)
 from with_intelligence_mcp.features.investments.fetch_investment import fetch_investment
 from with_intelligence_mcp.features.investments.fetch_investments_for_investor import (
     INVESTMENTS_PATH,
@@ -17,6 +10,13 @@ from with_intelligence_mcp.features.investments.responses import (
     InvestorPositionsResponse,
     PositionAmountResponse,
     PositionResponse,
+)
+from with_intelligence_mcp.features.investments.wi_responses import (
+    CurrencyAmountAttributes,
+    InvestmentAmountAttributes,
+    InvestmentExtendedAttributes,
+    InvestmentFundAttributes,
+    InvestmentListItemAttributes,
 )
 
 __all__ = [

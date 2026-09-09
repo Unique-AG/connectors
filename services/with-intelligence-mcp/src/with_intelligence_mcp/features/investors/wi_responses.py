@@ -23,7 +23,10 @@ class ClassificationAttributes(BaseModel):
 
 
 class EntityAttributes(BaseModel):
-    """An id and nothing else. With Intelligence uses it where a name would need another endpoint."""
+    """An id and nothing else.
+
+    With Intelligence uses it where a name would need another endpoint.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 

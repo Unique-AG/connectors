@@ -53,9 +53,7 @@ class WithIntelligenceAuthContext(BaseModel):
             raise self._not_connected()
         return stored
 
-    async def renew_session(
-        self, renew: Callable[[WiSession], Awaitable[WiSession]]
-    ) -> WiSession:
+    async def renew_session(self, renew: Callable[[WiSession], Awaitable[WiSession]]) -> WiSession:
         """Renew under a row lock, so one caller renews and the rest read the result.
 
         The lock is held across the WI refresh call on purpose (see `lock_session`), which the

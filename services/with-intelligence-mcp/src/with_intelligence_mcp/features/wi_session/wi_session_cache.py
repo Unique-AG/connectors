@@ -23,9 +23,7 @@ logger = logging.getLogger(__name__)
 MAX_TRACKED_SUBJECTS = 512
 
 type SessionReader = Callable[[], Awaitable[WiSession]]
-type SessionRenewer = Callable[
-    [Callable[[WiSession], Awaitable[WiSession]]], Awaitable[WiSession]
-]
+type SessionRenewer = Callable[[Callable[[WiSession], Awaitable[WiSession]]], Awaitable[WiSession]]
 
 
 @dataclass

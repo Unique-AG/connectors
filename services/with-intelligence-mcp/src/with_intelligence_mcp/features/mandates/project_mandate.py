@@ -1,11 +1,11 @@
 from with_intelligence_mcp.features.investors import ClassificationAttributes
-from with_intelligence_mcp.features.mandates.wi_responses import (
-    MandateExtendedAttributes,
-    MandateNoteAttributes,
-)
 from with_intelligence_mcp.features.mandates.responses import (
     MandateAmountResponse,
     MandateResponse,
+)
+from with_intelligence_mcp.features.mandates.wi_responses import (
+    MandateExtendedAttributes,
+    MandateNoteAttributes,
 )
 
 

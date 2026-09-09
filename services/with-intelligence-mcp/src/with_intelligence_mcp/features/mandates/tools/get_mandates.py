@@ -27,7 +27,7 @@ type GetMandatesResult = (
 )
 
 
-@tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
+@tool(annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True))
 async def get_mandates(
     name: Annotated[
         str | None,
@@ -51,9 +51,9 @@ async def get_mandates(
     """An investor's allocation searches: what they are looking to allocate to, at what size,
     how far along each is, and which consultant is running it.
 
-    `status` is With Intelligence's own vocabulary rather than a boolean — read it instead of assuming
-    a mandate is live. `last_reviewed` is when they last confirmed it, so an old date means a
-    stale mandate even where the status still reads open. Amounts are in MILLIONS.
+    `status` is With Intelligence's own vocabulary rather than a boolean — read it instead of
+    assuming a mandate is live. `last_reviewed` is when they last confirmed it, so an old date
+    means a stale mandate even where the status still reads open. Amounts are in MILLIONS.
     """
     resolved = await _resolve(client, name, investor_id)
     if not isinstance(resolved, int):
