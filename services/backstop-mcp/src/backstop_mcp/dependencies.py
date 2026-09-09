@@ -132,6 +132,16 @@ def get_backstop_client_for_current_caller(
     return factory.for_current_caller()
 
 
+async def get_current_caller_username(
+    factory: BackstopClientFactory = Depends(get_backstop_client_factory),
+) -> str:
+    """The in-flight caller's Backstop username.
+
+    Uncached: username is per-caller, not a process singleton.
+    """
+    return await factory.current_caller_username()
+
+
 def transport_settings(config: BackstopConfig) -> BackstopTransportSettings:
     """Translate the env-parsed Backstop config into the transport's own settings type.
 

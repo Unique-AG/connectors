@@ -186,6 +186,15 @@ class BackstopClientFactory:
             self._caller_client = self._client(self._current_caller_session)
         return self._caller_client
 
+    async def current_caller_username(self) -> str:
+        """The in-flight caller's Backstop username — identity only, never the token."""
+        assert self._auth is not None, (
+            "BackstopClientFactory was built without an auth context; "
+            "current_caller_username() needs one to resolve the caller's credential"
+        )
+        session = await self._current_caller_session()
+        return session.credential.username
+
     async def _current_caller_session(self) -> CallerSession:
         assert self._auth is not None
         auth = self._auth
