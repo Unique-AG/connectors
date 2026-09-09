@@ -1,12 +1,6 @@
-"""`outlook_list_events`: the window it asks for, the calendar it addresses, what it refuses.
-
-The two window bounds are most of this file. Microsoft interprets `startDateTime` and `endDateTime`
-by the offset written into the value itself and by nothing else, so a bound rendered without an
-offset, or in the wrong zone, answers a different week correctly. The assertions below pin both
-bounds byte for byte in a zone two hours ahead of UTC and in UTC, pin that no
-`Prefer: outlook.timezone` reaches Graph, and pin that the conversion happens here instead.
-
-Every response body here is synthesised. None came from a real mailbox.
+"""Microsoft interprets `startDateTime` and `endDateTime` by the offset written into the value
+itself and by nothing else, so a bound rendered without an offset, or in the wrong zone, answers
+a different week correctly.
 """
 
 from collections.abc import Mapping, Sequence
@@ -131,11 +125,8 @@ def _page(*events: dict[str, object], next_link: str | None = None) -> httpx.Res
 
 
 def _fields(node: object, at: str, *, root: Mapping[str, object]) -> dict[str, object]:
-    """Every field of a published schema, at every depth.
-
-    Pydantic publishes a nested model as a `$ref` into the schema's own `$defs` rather than
-    inline, so a walk that does not follow one checks the top level and calls it the whole answer.
-    """
+    """Pydantic publishes a nested model as a `$ref` into the schema's own `$defs` rather than
+    inline, so a walk that skips it checks only the top level and calls that the whole answer."""
     schema = _resolved(node, root=root)
     found: dict[str, object] = {}
     properties = schema.get("properties")
@@ -179,8 +170,6 @@ class TestTheQueryItComposes:
     async def test_both_bounds_carry_the_offset_of_the_zone_that_was_asked_for(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """Microsoft interprets these two by the offset written into the value and by nothing
-        else, so a bound with no offset is read as UTC and asks about a different week."""
         _ = await lister.list_events(
             client,
             starts_on=_SUMMER_MONDAY,
@@ -197,8 +186,6 @@ class TestTheQueryItComposes:
     async def test_the_end_bound_opens_the_day_after_the_last_one_asked_for(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """A window whose two dates are the same day holds that whole day, which needs an end bound
-        24 hours later rather than an equal one."""
         _ = await lister.list_events(
             client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_MONDAY, limit=25
         )
@@ -320,8 +307,7 @@ class TestTheQueryItComposes:
         self, client: GraphServiceClient, my_calendar: respx.Route, my_view: respx.Route
     ) -> None:
         """`Prefer: outlook.timezone` would move the conversion into Exchange, where a zone name it
-        rejects fails the whole request instead of costing one field. This tool converts with
-        `zoneinfo` and leaves Microsoft answering in UTC."""
+        rejects fails the whole request instead of costing one field."""
         _ = await lister.list_events(
             client,
             starts_on=_SUMMER_MONDAY,
@@ -418,7 +404,6 @@ class TestWhatItAnswers:
     async def test_each_row_carries_the_handle_that_reads_the_event(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """Both halves: the calendar id from the pre-read, and the event id from the row."""
         my_view.mock(return_value=_page(_event_payload(_FIRST_ID), _event_payload(_SECOND_ID)))
 
         answer = await lister.list_events(
@@ -457,8 +442,6 @@ class TestWhatItAnswers:
     async def test_the_rows_are_converted_into_the_zone_that_was_asked_for(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """Microsoft answers in UTC without `Prefer: outlook.timezone`, and Graph's own two values
-        come back beside the converted one rather than instead of it."""
         my_view.mock(
             return_value=_page(
                 _event_payload(
@@ -490,8 +473,6 @@ class TestWhatItAnswers:
     async def test_the_window_that_was_asked_for_comes_back_with_the_rows(
         self, client: GraphServiceClient
     ) -> None:
-        """The zone decides which week the answer is about, so an answer that does not state it
-        cannot be checked."""
         answer = await lister.list_events(
             client,
             starts_on=_SUMMER_MONDAY,
@@ -602,7 +583,6 @@ class TestWhatItAnswers:
     async def test_with_person_keeps_the_row_that_person_was_only_invited_to(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """A meeting with Dana is one Dana attends, whoever sent the invitation."""
         my_view.mock(
             return_value=_page(
                 _event_payload(_FIRST_ID, organizer=_ADA, attendees=(_BOB,)),
@@ -644,8 +624,6 @@ class TestWhatItAnswers:
     async def test_a_person_fragment_matches_a_display_name_without_regard_to_case(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """A user names a colleague, so the fragment has to reach a display name and not only an
-        address."""
         my_view.mock(return_value=_page(_event_payload(_FIRST_ID, attendees=(_DANA,))))
 
         answer = await lister.list_events(
@@ -683,8 +661,6 @@ class TestWhatItAnswers:
     async def test_both_fragments_together_narrow_rather_than_widen(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """A caller who names a person and a subject asked about one meeting, so a row has to
-        satisfy both rather than either."""
         my_view.mock(
             return_value=_page(
                 _event_payload(_FIRST_ID, subject="Pricing review", attendees=(_DANA,)),
@@ -849,8 +825,6 @@ class TestWhatItRefuses:
     async def test_the_widest_window_the_cap_allows_is_accepted(
         self, client: GraphServiceClient, my_calendar: respx.Route, my_view: respx.Route
     ) -> None:
-        """Both dates are inside the window, so the cap counts the days covered rather than the
-        distance between the two dates."""
         opens = date(2026, 1, 1)
 
         _ = await lister.list_events(
@@ -969,7 +943,6 @@ class TestTheSchemaItPublishes:
     async def test_the_window_is_the_only_thing_a_caller_has_to_supply(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Every other argument narrows an answer this tool gives without it."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -981,8 +954,6 @@ class TestTheSchemaItPublishes:
     async def test_the_zone_defaults_to_utc_rather_than_to_a_guess(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """A guess at the user's zone reads as a fact about their calendar, and an hour is exactly
-        the size of mistake nobody notices."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -1009,11 +980,8 @@ class TestTheSchemaItPublishes:
     async def test_a_fragment_too_short_to_filter_anything_is_refused_by_the_schema(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """One character matches most of a calendar while reading as a filter that worked.
-
-        An optional string publishes as an `anyOf` of the constrained string and null, so the
-        bound sits on the first branch rather than on the property.
-        """
+        """An optional string publishes as an `anyOf` of the constrained string and null, so the
+        bound sits on the first branch rather than on the property."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -1029,11 +997,8 @@ class TestTheSchemaItPublishes:
     async def test_the_description_sends_a_model_to_local_for_an_all_day_row(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Graph holds an all-day event at midnight UTC, so the converted `iso` names a time of
-        day and, west of UTC, the day before. `local` is the field that answers which day, and the
-        description states that fact rather than claiming `iso` carries no date at all, which is
-        false in UTC and east of it.
-        """
+        """Graph holds an all-day event at midnight UTC, so `iso` names the day before only west
+        of UTC; the description says so rather than claim `iso` carries no date at all."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -1066,9 +1031,6 @@ class TestTheSchemaItPublishes:
     async def test_every_field_of_the_answer_says_what_it_is(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Asserted over the published schema rather than the model classes: a description that
-        never reaches the wire is not one. The window's three fields are unique to this tool, and
-        the rows are the shared summary, so both halves are walked here."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -1123,6 +1085,4 @@ class TestGraphFailures:
         assert lister.GRAPH_PERMISSIONS == ("Calendars.Read", "Calendars.Read.Shared")
 
     def test_a_calendar_that_will_not_resolve_is_answered_with_the_recovery_that_fits(self) -> None:
-        """A 404 here is not the default "check you copied the id" advice: the way in is a handle
-        this connector minted, so the recovery is to list the calendars again."""
         assert "outlook_list_calendars" in lister.GRAPH_NOT_FOUND

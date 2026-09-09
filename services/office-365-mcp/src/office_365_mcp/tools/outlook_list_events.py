@@ -1,50 +1,14 @@
 """`outlook_list_events` — one calendar's occurrences over a date window, never a recurrence rule.
 
-"What is on next week" is a question about occurrences, and only one Graph collection answers it.
-`GET /me/events` "contains single instance meetings and series masters", and Microsoft points
-elsewhere for the rest: "To get expanded event instances, you can get the calendar view"
-(https://learn.microsoft.com/en-us/graph/api/user-list-events). A series master carries a
-`recurrence` rule and one start date, so a listing built on `/events` reports a weekly meeting as
-one row in the week it was created and as nothing at all in the week somebody asked about.
-`calendarView` reports "the occurrences, exceptions and single instances of events in a calendar
-view defined by a time range" (https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview),
-which is this tool's whole promise. `startDateTime` and `endDateTime` are required there, so a
-window is not an optional narrowing of this call. It is the call.
-
-**The two window bounds carry their own offset, and no header changes that.** "The values of
-startDateTime and endDateTime are interpreted using the timezone offset specified in the value and
-aren't impacted by the value of the Prefer: outlook.timezone header if present. If no timezone
-offset is included in the value, it is interpreted as UTC"
-(https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview). So `shared.calendar`
-renders both bounds with the offset of the zone the caller named, and midnight in Zurich asks for a
-different eight days than midnight in UTC.
-
-**This tool sends no `Prefer: outlook.timezone`, on purpose.** Microsoft documents the other side
-of that: "If not specified, those time values are returned in UTC" (same page). Every row therefore
-arrives in UTC and `shared.calendar.event_time` converts it with `zoneinfo`, beside Graph's own two
-verbatim values. That header moves the conversion into Exchange, where a zone name it rejects
-fails the whole request instead of costing one field.
-
-**Two Graph calls, and the calendar is read first.** An event id is only meaningful beside the
-calendar it was read from, and Graph puts no calendar id on a `calendarView` row. So the calendar
-read supplies both halves of every handle this tool mints, and the envelope that says whose
-calendar was listed and whether the user can see private items in it. That read is
-`shared.calendar.calendar_of`, which two other tools share, and the listing that follows always
-addresses `/me/calendars/{id}/calendarView` with the id it returned.
-
-**`Prefer: IdType="ImmutableId"` on the listing.** The ids it mints become handles, and a handle
-built from a `RestId` dies the moment Outlook files the event elsewhere. `outlook_read_event` sends
-the same preference on the way in, so the two agree about which id space a handle is spelled in.
-The collection is built per request: kiota's `RequestConfiguration.headers` default is one object
-shared process-wide, so a preference set once leaks onto every other Graph call and still fails to
-reach page two. This tool hands that same collection to `collect_pages`.
-
-**`with_person` and `subject_contains` are predicates over the rows, never `$filter`.** Microsoft
-documents no `$filter` over `attendees`, and the ordering this tool promises is `$orderby` on
-`start/dateTime`, which Microsoft's own samples use. A filter composed against undocumented support
-answers `200 OK` and the wrong rows. So both fragments run through `collect_pages(matches=...)`,
-which is also why a narrow fragment over a busy calendar reports `capped`: the scan ran out before
-`limit` filled.
+`GET /me/events` returns series masters, not occurrences: "To get expanded event instances, you can
+get the calendar view" (https://learn.microsoft.com/en-us/graph/api/user-list-events). So this tool
+reads `calendarView`, whose required `startDateTime`/`endDateTime` carry their own offset and
+"aren't impacted by the value of the Prefer: outlook.timezone header"; with no offset they are UTC
+(https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview). That header is not sent,
+so rows arrive in UTC and `zoneinfo` converts them. Graph puts no calendar id on a `calendarView`
+row, so the calendar is read first and supplies half of every handle minted here. Microsoft
+documents no `$filter` over `attendees`, so `with_person` and `subject_contains` are predicates
+over the rows, which is also why a narrow fragment can report `capped`.
 """
 
 from collections.abc import Callable, Mapping
@@ -84,13 +48,8 @@ STEP_EVENTS = "calendar_events"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.Read", "Calendars.Read.Shared")
 
-# One week of the signed-in user's own primary calendar: the default call, and the one that reaches
-# Graph with no handle from a previous response.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"starts_on": "2026-03-02", "ends_on": "2026-03-08"}
 
-# The default 404 advice says to check that the id came from a tool response, verbatim. A calendar
-# handle is this connector's own, so that advice sends a model looking for a typing mistake that
-# cannot be there.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 will not return this calendar, so this tool cannot list any event in it. If the "
     + "caller used `calendar_ref`, the handle is well formed. The calendar was most likely "
@@ -104,16 +63,10 @@ GRAPH_NOT_FOUND = (
 
 MAX_RESULTS = 50
 
-# UTC and nothing cleverer. A guess at the user's own zone reads as a fact about their calendar,
-# and an hour is exactly the size of mistake nobody notices.
 DEFAULT_TIME_ZONE = "UTC"
 
-# One or two characters match most of a calendar, so a fragment shorter than this filters nothing
-# while reading as a filter that worked.
 MIN_FRAGMENT_CHARACTERS = 2
 
-# Microsoft's own samples order a calendar view on this, and it is the order this tool promises: a
-# window read from its start.
 _EARLIEST_FIRST = "start/dateTime"
 
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
@@ -268,7 +221,6 @@ async def list_events(
     subject_contains: str | None = None,
     limit: int,
 ) -> CalendarEvents:
-    """The occurrences of one calendar between two dates, and the window they answer."""
     assert 1 <= limit <= MAX_RESULTS, f"limit must be within 1..{MAX_RESULTS}, got {limit}"
     zone = zone_named(time_zone)
     if zone is None:
@@ -319,11 +271,6 @@ async def list_events(
 
 
 def _calendar_named(calendar_ref: str | None) -> str | None:
-    """The calendar id the handle addresses, or None for the mailbox's own primary calendar.
-
-    None reaches `calendar_of` as "no calendar named", which is the same value an absent argument
-    produces. A refused handle never gets that far.
-    """
     if calendar_ref is None:
         return None
     handle = calendar_handle(calendar_ref)
@@ -333,19 +280,12 @@ def _calendar_named(calendar_ref: str | None) -> str | None:
 
 
 def _days_covered(starts_on: date, ends_on: date) -> int:
-    """How many whole days the window holds. Both dates are inside it, so one date in both is one
-    day and not zero."""
     return (ends_on - starts_on).days + 1
 
 
 def _matching(
     *, with_person: str | None, subject_contains: str | None
 ) -> Callable[[Event], bool] | None:
-    """The predicate `collect_pages` applies to every row, or None when the caller named neither.
-
-    Two fragments together narrow rather than widen: a row has to satisfy both. A caller who names
-    a person and a subject asked one question about one meeting, not for two lists joined.
-    """
     if with_person is None and subject_contains is None:
         return None
 
@@ -359,10 +299,8 @@ def _matching(
 
 def _headers() -> HeadersCollection:
     """Built per request: kiota's `RequestConfiguration.headers` defaults to one collection shared
-    by every configuration in the process. So a preference added to it leaks onto every Graph call,
-    the calendar read of this same tool included. This tool hands the same collection to
-    `collect_pages`, whose `PageIterator` otherwise starts from an empty one and fetches page two in
-    the other id space."""
+    process-wide, and `collect_pages` needs this same collection or page two arrives as `RestId`s.
+    """
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
     return headers

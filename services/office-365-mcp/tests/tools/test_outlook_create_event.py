@@ -85,7 +85,6 @@ def _calendar(
     is_default: bool | None = True,
     providers: Sequence[str] | None = ("teamsForBusiness",),
 ) -> dict[str, object]:
-    """Graph's answer to the pre-read: the projection `shared/calendar.py` asks for."""
     return {
         "id": calendar_id,
         "name": name,
@@ -134,7 +133,6 @@ def _created(
     web_link: str | None = _WEB_LINK,
     transaction_id: str | None = _TRANSACTION_ID,
 ) -> dict[str, object]:
-    """Graph's 201, which is a whole event whatever the request named."""
     return {
         "id": event_id,
         "subject": subject,
@@ -156,9 +154,8 @@ def _created(
 
 
 def _event_message() -> dict[str, object]:
-    """The shape Microsoft's delegated-create walkthrough shows for its step 2: an `eventMessage`
-    envelope carrying the event under an `event` key, rather than the event itself. The SDK
-    deserializes it into `Event` and records what arrived in `@odata.type`."""
+    """Microsoft's delegated-create walkthrough answers step 2 with an `eventMessage` envelope
+    carrying the event under an `event` key; the SDK deserializes it into `Event` regardless."""
     return {
         "@odata.type": "#microsoft.graph.eventMessage",
         "id": _MESSAGE_ID,
@@ -180,14 +177,11 @@ def _creates(graph: respx.MockRouter, payload: dict[str, object] | None = None) 
 
 
 def _ready(graph: respx.MockRouter, payload: dict[str, object] | None = None) -> respx.Route:
-    """The calendar mocked and the create mocked, answering the create for a test about the read."""
     _ = _reads(graph)
     return _creates(graph, payload)
 
 
 async def _agrees(question: str, about: str) -> str | None:
-    """A person who said yes. Named rather than a lambda, because every call below states which
-    side of the gate it is testing."""
     assert question, "the person was asked nothing at all"
     assert about, "the answer was bound to nothing"
     return None
@@ -215,11 +209,8 @@ async def _create(
     online_meeting: bool = False,
     confirm: Confirm = _agrees,
 ) -> CreatedEvent:
-    """One valid call, so a test that is about something else says only that thing.
-
-    Narrowed to the event, because a call whose question is still open answers with the question.
-    Only `TestTheEraWithNoBackChannel` drives that, and it calls `create_event` through `_round`.
-    """
+    """One confirmed call narrowed to the event; a call whose question is still open would
+    return the question instead, exercised separately via `_round`."""
     created = await create_event(
         client,
         subject=subject,
@@ -253,8 +244,6 @@ def _sent_at(route: respx.Route, index: int) -> dict[str, object]:
 
 
 def _invited(sent: Mapping[str, object]) -> list[tuple[str, str]]:
-    """Each attendee on the wire as its address and its `type`, which is the whole of what the
-    request says about a person."""
     return [
         (
             cast("str", cast("Mapping[str, object]", one["emailAddress"])["address"]),
@@ -269,11 +258,8 @@ def _object(value: object) -> Mapping[str, object]:
 
 
 def _described(schema: Mapping[str, object]) -> tuple[list[str], list[str]]:
-    """Every field of the answer's JSON Schema at every depth, and the ones saying nothing.
-
-    Walked over the schema rather than over the model classes, because a nested model is published
-    under `$defs` and a walk of the top level alone never reaches it.
-    """
+    """Walks the schema, not the model classes, at every depth: a nested model is published
+    under `$defs`, and a top-level-only walk never reaches it."""
     owners = [("CreatedEvent", schema), *_object(schema.get("$defs", {})).items()]
     every: list[str] = []
     silent: list[str] = []
@@ -286,7 +272,6 @@ def _described(schema: Mapping[str, object]) -> tuple[list[str], list[str]]:
 
 
 async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
-    """The published schema and annotations, which is the surface a client actually reads."""
     mcp: FastMCP = FastMCP(name="schema-under-test")
     creator.register(mcp, transport)
     tool = await mcp.get_tool(creator.TOOL_NAME)
@@ -298,8 +283,6 @@ class TestWhatItSendsToGraph:
     async def test_it_reads_the_default_calendar_and_then_creates_one_event(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Two requests, in this order. Counting every call is the check that survives somebody
-        adding a third under a path this test did not think to name."""
         read = _reads(graph)
         create = _creates(graph)
 
@@ -314,8 +297,6 @@ class TestWhatItSendsToGraph:
     async def test_it_never_addresses_a_calendar_by_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """This tool writes to the mailbox's own default calendar and takes no calendar argument,
-        so a named-calendar route means an id reached it from somewhere."""
         _ = _ready(graph)
         named = graph.get(_NAMED_CALENDAR).mock(return_value=httpx.Response(200, json=_calendar()))
         named_events = graph.post(_NAMED_CALENDAR_EVENTS).mock(
@@ -341,9 +322,8 @@ class TestWhatItSendsToGraph:
     async def test_the_preference_does_not_leak_onto_the_calendar_read(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Kiota's `RequestConfiguration.headers` default is one collection shared by every
-        configuration in the process, so a header added to it survives into the next call. Two
-        creates are what makes that visible: the second read follows the first create."""
+        """Kiota's RequestConfiguration.headers default is one collection shared across every
+        configuration in the process, so a header added to it survives into the next call."""
         read = _reads(graph)
         _ = _creates(graph)
 
@@ -358,8 +338,6 @@ class TestWhatItSendsToGraph:
     async def test_the_calendar_read_asks_for_the_shared_projection(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph returns nothing a projection does not name, and the answer reports the calendar
-        that was written to."""
         read = _reads(graph)
         _ = _creates(graph)
 
@@ -391,10 +369,8 @@ class TestWhatItSendsToGraph:
     async def test_the_two_times_go_on_the_wire_with_the_zone_exactly_as_written(
         self, client: GraphServiceClient, graph: respx.MockRouter, time_zone: str
     ) -> None:
-        """This connector translates no zone name and validates none. A translation into the other
-        family changes which instant the meeting is at, and Exchange owns which names a mailbox
-        takes: `Europe/Zurich` is a real IANA key that Microsoft's own list for a create leaves
-        out, and it still reaches Graph as written."""
+        """Europe/Zurich is a real IANA key Microsoft's own list for a create leaves out; this
+        connector translates and validates no zone name, so it reaches Graph exactly as written."""
         create = _ready(graph)
 
         _ = await _create(client, time_zone=time_zone)
@@ -441,8 +417,6 @@ class TestWhatItSendsToGraph:
     async def test_two_identical_calls_ask_under_the_same_transaction_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """This is the whole point of sending one: a client that timed out and called again asks
-        the server to recognize the second request as the first."""
         create = _ready(graph)
 
         _ = await _create(client, attendees=[_GRACE, _ADA])
@@ -453,7 +427,6 @@ class TestWhatItSendsToGraph:
     async def test_a_different_subject_asks_under_a_different_transaction_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Two genuinely different meetings must not be deduplicated into one."""
         create = _ready(graph)
 
         _ = await _create(client, subject="Pricing review")
@@ -474,8 +447,6 @@ class TestWhatItSendsToGraph:
     async def test_nothing_it_sends_carries_a_property_no_argument_offers(
         self, client: GraphServiceClient, graph: respx.MockRouter, absent: str
     ) -> None:
-        """There is no argument for any of these, so there is nothing to put in the request. This
-        is what the missing arguments buy, checked on the wire rather than on the signature."""
         create = _ready(graph)
 
         _ = await _create(client, attendees=[_ADA], location="Room 3", body_html="<p>Agenda</p>")
@@ -513,8 +484,6 @@ class TestWhatItSendsToGraph:
     async def test_a_place_with_whitespace_around_it_is_trimmed_rather_than_refused(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The gate, the wire and the `transactionId` all key on the value this tool normalized,
-        so the trim happens once, in the draft, rather than at each of the three."""
         create = _ready(graph)
 
         _ = await _create(client, attendees=[], location="  Room 3  ", confirm=_agrees)
@@ -552,8 +521,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_a_refusal_writes_nothing_after_the_read_that_precedes_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The question follows the calendar read, which changes nothing, and precedes the create.
-        A refusal therefore leaves the calendar exactly as the read found it."""
         read = _reads(graph)
         create = _creates(graph)
 
@@ -566,8 +533,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_a_client_that_cannot_ask_creates_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The risk this gate carries: a client with no elicitation support can no longer create
-        an event with attendees. It has to fail closed, and it has to say why."""
         create = _ready(graph)
         confirm = a_person_agrees(_context(RuntimeError("elicitation not supported")))
 
@@ -579,9 +544,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_the_question_is_asked_after_the_calendar_read_and_before_the_create(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The read is what tells this tool whether the calendar takes the Teams meeting the call
-        asked for, so it comes first and nobody is asked about an event the calendar refuses. It
-        changes nothing, and the create is the only request the question stands in front of."""
         read = _reads(graph)
         create = _creates(graph)
         made_when_asked: list[tuple[int, int]] = []
@@ -601,10 +563,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_the_question_names_the_subject_both_bounds_the_zone_and_everybody_invited(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A person cannot answer "invite these people" without being told who they are, and the
-        optional list is mail too. Both bounds, because a start alone makes a 14:00-14:15 meeting
-        and a 14:00-22:00 one one question, and the end is bound into the id the answer
-        authorizes."""
         create = _ready(graph)
         asked: list[str] = []
         bound: list[str] = []
@@ -631,8 +589,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         assert _GRACE in question
         assert f"{_PAM} (optional)" in question, "an optional attendee reads as a required one"
         assert "cannot recall" in question
-        # What was confirmed is what was written: the id the answer is bound to is the id the
-        # create carries, so an answer given for another draft cannot authorize this one.
         assert bound == [_sent(create)["transactionId"]]
 
     async def test_an_optional_attendee_on_their_own_is_still_asked_about(
@@ -649,9 +605,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_an_event_with_nobody_on_it_and_nowhere_to_be_is_never_put_to_a_person(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """An empty attendee list notifies nobody, so there is nobody to protect and no reason to
-        interrupt the user for a private appointment. It holds only with no `location` either: a
-        place is a mailbox this tool cannot rule out, and the test below is the other half."""
         create = _ready(graph)
         asked: list[str] = []
 
@@ -669,10 +622,8 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_a_place_with_nobody_invited_is_still_put_to_a_person(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft books a room only as a `resource` attendee that a caller adds, and documents
-        nothing about a display name that names one. This tool sends `location` as text, so it
-        cannot say the room was not reached, and an empty attendee list is not proof that nobody
-        was mailed. The question is what covers that, and the create waits for it."""
+        """Microsoft books a room only as a `resource` attendee; free-text `location` cannot
+        confirm one was reached, so an empty attendee list is not proof nobody was mailed."""
         create = _ready(graph)
         asked: list[str] = []
 
@@ -689,9 +640,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_a_place_of_nothing_but_whitespace_asks_nobody_and_names_no_place_on_the_wire(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """It passed the schema, was a location on the wire, was no location for the gate and
-        composed the id no location composes: three answers to one question. One normalization in
-        the draft is what makes it one value, and the id proves the three now agree."""
         create = _ready(graph)
         asked: list[str] = []
 
@@ -711,7 +659,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_a_place_with_nobody_invited_that_the_person_declined_is_never_posted(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The other half of the same gate: asking and then writing anyway is not a gate."""
         read = _reads(graph)
         create = _creates(graph)
 
@@ -724,9 +671,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_the_question_shows_the_place_the_teams_setting_and_how_the_body_opens(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Every one of these is bound into the `transactionId` the answer authorizes and named
-        nowhere else. A person who cannot see the room, the joining link or the HTML body that
-        recipients receive is agreeing to a subject line."""
         create = _ready(graph)
         asked: list[str] = []
 
@@ -754,8 +698,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_the_question_says_an_all_day_event_covers_whole_days(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`all_day` is bound into the id the answer authorizes, and midnight to midnight reads as
-        a meeting that begins at midnight until the question says which of the two it is."""
         _ = _ready(graph)
         asked: list[str] = []
 
@@ -782,8 +724,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_a_question_about_an_event_that_names_none_of_the_four_shows_none_of_them(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The fragment is dropped rather than shown empty, so a plain meeting is asked about in
-        one sentence and nothing in the question implies a room or a link that is not there."""
         _ = _ready(graph)
         asked: list[str] = []
 
@@ -803,8 +743,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_the_question_for_a_place_with_nobody_invited_says_nobody_is_invited(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """This question has no guest list to name, so it says so outright rather than leaving the
-        person to infer it from a sentence that names a room and no people."""
         _ = _ready(graph)
         asked: list[str] = []
 
@@ -857,9 +795,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     async def test_a_refusal_this_tool_words_opens_by_saying_no_event_was_created(
         self, answer: object
     ) -> None:
-        """What a model needs first is the fact that the write did not happen. These are the three
-        words this tool hands the shared confirmation, and they are what tell a model that the
-        calendar is untouched rather than half written."""
         confirm = a_person_agrees(_context(answer))
 
         refusal = await confirm(
@@ -870,8 +805,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         assert refusal.startswith("No event was created.")
 
     async def test_a_refusal_the_client_itself_composed_is_passed_through(self) -> None:
-        """A `ToolError` from the client is already a refusal in the caller's own words, and
-        rewording it loses why the client said no."""
         confirm = a_person_agrees(_context(ToolError("the client refused the request")))
 
         answer = await confirm("Create 'Pricing review'?", _TRANSACTION_ID)
@@ -911,11 +844,8 @@ class _ModernRequest:
 def _modern_context(
     *, answers: Mapping[str, InputResponse] | None = None, state: str | None = None
 ) -> Context:
-    """A 2026-07-28 connection, carrying whatever a client already answered and echoed.
-
-    `elicit` raises rather than answering: this era has no server-to-client channel, so a call
-    that reaches it is a leak back onto a channel that is not there.
-    """
+    """A 2026-07-28 connection has no server-to-client channel, so `elicit` raises rather than
+    answering when a call reaches for it."""
 
     class _Client:
         request_context: _ModernRequest = _ModernRequest()
@@ -948,11 +878,8 @@ async def _round(
 
 
 def _the_question(answer: CreatedEvent | InputRequiredResult) -> tuple[str, str, str]:
-    """Round one's own key, what it bound the answer to, and the word that means yes.
-
-    All three are read off the question this call actually minted rather than written out here, so
-    round two cannot agree with round one by coincidence.
-    """
+    """Round one's key, bound value and yes-word are read off the minted question rather than
+    hardcoded, so round two cannot agree with round one by coincidence."""
     assert isinstance(answer, InputRequiredResult), "the question was never put to anybody"
     requests = answer.input_requests or {}
     assert len(requests) == 1, f"one question per call, and this one asked {sorted(requests)}"
@@ -971,16 +898,12 @@ def _the_question(answer: CreatedEvent | InputRequiredResult) -> tuple[str, str,
 
 
 class TestTheEraWithNoBackChannel:
-    """A 2026-07-28 connection has no server-to-client channel (SEP-2577), so the question cannot
-    be awaited inside the call. It is answered instead: this tool returns it, the client puts it to
-    a person, and it calls the tool again with the answer. `shared/seam.py` owns that branch, so
-    every test here drives the real confirmation the registered tool builds."""
+    """A 2026-07-28 connection has no server-to-client channel (SEP-2577): the tool returns
+    the question instead of awaiting it, and the client resubmits with the answer."""
 
     async def test_the_first_round_asks_and_never_reaches_the_create(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The calendar read still happens: it is what refuses a Teams meeting the calendar does
-        not take before anybody is asked. Nothing after it does."""
         read = _reads(graph)
         create = _creates(graph)
 
@@ -993,8 +916,6 @@ class TestTheEraWithNoBackChannel:
     async def test_the_first_round_asks_the_question_this_tool_words(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The wording is the tool's on both eras. A question minted for a client to render is
-        still the sentence that names who receives mail."""
         _ = _ready(graph)
 
         answer = await _round(client, confirm=a_person_agrees(_modern_context()))
@@ -1012,9 +933,6 @@ class TestTheEraWithNoBackChannel:
     async def test_the_second_round_creates_the_event_under_the_id_it_was_agreed_to_by(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The whole trip, and the one assertion that ties it together: the id the person's answer
-        came back bound to is the id the create carries, so what was written is what was
-        confirmed."""
         create = _ready(graph)
         key, state, agree = _the_question(
             await _round(client, confirm=a_person_agrees(_modern_context()))
@@ -1037,11 +955,8 @@ class TestTheEraWithNoBackChannel:
     async def test_an_answer_bound_to_another_request_creates_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A retry that carries a state alongside other arguments is rejected by the framework
-        before this tool runs. A retry that carries the accept and omits the state is not: the
-        framework unseals and verifies a `requestState` only when one is present, so it arrives
-        here bound to nothing and this check is the only thing that refuses it.
-        `tests/tools/test_calendar_surface.py` drives that path through a real client."""
+        """fastmcp verifies requestState only when the retry carries one; an accept omitting it
+        arrives here bound to nothing, covered elsewhere via a real client."""
         create = _ready(graph)
         key, _state, agree = _the_question(
             await _round(client, confirm=a_person_agrees(_modern_context()))
@@ -1063,8 +978,6 @@ class TestTheEraWithNoBackChannel:
     async def test_a_second_round_the_person_declined_creates_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The refusal is this tool's own words on this era too, and it is raised rather than
-        answered, exactly as a handshake refusal is."""
         create = _ready(graph)
         key, state, _agree = _the_question(
             await _round(client, confirm=a_person_agrees(_modern_context()))
@@ -1083,9 +996,6 @@ class TestTheEraWithNoBackChannel:
 
 
 class TestWhatItRefuses:
-    """Every one of these is raised before the first request, because there is nothing to undo at
-    that point. Each test asserts that Graph was never reached at all."""
-
     @pytest.mark.parametrize(
         "starts_at",
         [
@@ -1138,10 +1048,8 @@ class TestWhatItRefuses:
     async def test_a_time_it_cannot_read_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, starts_at: str
     ) -> None:
-        """The last five are shapes `datetime.fromisoformat` reads, which Python 3.11 widened to
-        the whole of ISO 8601. `shared.calendar.wall_clock` is what decides here, and a create
-        sends the caller's own string, so an accepted value of any of these shapes is what Exchange
-        is asked to read."""
+        """datetime.fromisoformat reads these shapes since Python 3.11 widened it to all of ISO
+        8601, and an accepted string reaches Exchange exactly as the caller wrote it."""
         _ = _ready(graph)
 
         with pytest.raises(ToolError, match="YYYY-MM-DDTHH:MM"):
@@ -1161,9 +1069,8 @@ class TestWhatItRefuses:
     async def test_an_all_day_event_that_is_not_midnight_to_midnight_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, starts_at: str, ends_at: str
     ) -> None:
-        """Microsoft: "If true, regardless of whether it's a single-day or multi-day event, start,
-        and endtime must be set to midnight and be in the same time zone" (resources/event). Every
-        one of these passes the order check and the length check, so nothing else refuses it."""
+        """Microsoft: "start and end time must be set to midnight and be in the same time zone"
+        for an all-day event, regardless of span (resources/event)."""
         _ = _ready(graph)
 
         with pytest.raises(ToolError, match="midnight"):
@@ -1174,7 +1081,6 @@ class TestWhatItRefuses:
     async def test_the_all_day_refusal_names_both_times_it_was_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A model cannot tell which of the two bounds to move without being told both."""
         _ = _ready(graph)
 
         with pytest.raises(ToolError, match="midnight") as raised:
@@ -1208,8 +1114,6 @@ class TestWhatItRefuses:
     async def test_a_meeting_longer_than_a_day_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A timed event that runs longer than a day is almost always a date typed for the wrong
-        day rather than a meeting somebody meant."""
         _ = _ready(graph)
 
         with pytest.raises(ToolError, match=f"{MAX_TIMED_EVENT_HOURS} hours"):
@@ -1220,7 +1124,6 @@ class TestWhatItRefuses:
     async def test_a_meeting_of_exactly_a_day_is_allowed(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The ceiling is a ceiling and not a bound below it: a whole-day workshop is real."""
         create = _ready(graph)
 
         _ = await _create(client, starts_at="2026-03-02T09:00", ends_at="2026-03-03T09:00")
@@ -1296,7 +1199,6 @@ class TestWhatItRefuses:
     async def test_more_addresses_than_the_ceiling_never_reach_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Every address here is a person who receives mail this connector cannot recall."""
         _ = _ready(graph)
         too_many = [f"guest{index}@example.invalid" for index in range(MAX_ATTENDEES + 1)]
 
@@ -1308,7 +1210,6 @@ class TestWhatItRefuses:
     async def test_the_two_lists_are_counted_against_one_ceiling(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Splitting a guest list across the two arguments must not buy twice the ceiling."""
         _ = _ready(graph)
         half = [f"guest{index}@example.invalid" for index in range(MAX_ATTENDEES)]
 
@@ -1321,8 +1222,6 @@ class TestWhatItRefuses:
     async def test_one_person_in_both_lists_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, optional: str
     ) -> None:
-        """Microsoft is then told two different things about whether their attendance is needed,
-        and case is not a second person."""
         _ = _ready(graph)
 
         with pytest.raises(ToolError, match="invited once"):
@@ -1334,9 +1233,6 @@ class TestWhatItRefuses:
     async def test_one_person_twice_in_the_same_list_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, again: str
     ) -> None:
-        """This tool invites each address once. Case is not a second person, exactly as it is not
-        across the two lists, and `shared.calendar.repeated_address` is what decides for both
-        creating tools."""
         _ = _ready(graph)
 
         with pytest.raises(ToolError, match="each address once") as raised:
@@ -1370,9 +1266,6 @@ class TestWhatItRefuses:
 
 
 class TestTheTeamsMeetingACalendarDoesNotTake:
-    """`allowedOnlineMeetingProviders` arrives on the pre-read, so the answer is in hand before
-    anybody is asked and before the POST. A read leaves nothing to undo."""
-
     async def test_a_teams_meeting_on_a_calendar_that_lists_other_providers_is_never_posted(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -1388,8 +1281,6 @@ class TestTheTeamsMeetingACalendarDoesNotTake:
     async def test_the_calendar_refuses_the_meeting_before_anybody_is_asked_about_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """This refusal is a property of the calendar and not of the arguments, so a person asked
-        first is asked about an event that is refused whatever they answer."""
         _ = _reads(graph, _calendar(providers=["skypeForBusiness"]))
         create = _creates(graph)
         asked: list[str] = []
@@ -1412,8 +1303,6 @@ class TestTheTeamsMeetingACalendarDoesNotTake:
         graph: respx.MockRouter,
         providers: Sequence[str] | None,
     ) -> None:
-        """An empty or an absent list is not evidence, so refusing on it refuses a create that
-        works."""
         _ = _reads(graph, _calendar(providers=providers))
         create = _creates(graph)
 
@@ -1434,8 +1323,6 @@ class TestTheTeamsMeetingACalendarDoesNotTake:
     async def test_an_event_with_no_online_meeting_is_created_whatever_the_calendar_allows(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The providers say what an online meeting on this calendar can be, and nothing about an
-        event that carries none."""
         _ = _reads(graph, _calendar(providers=["skypeForBusiness"]))
         create = _creates(graph)
 
@@ -1451,8 +1338,6 @@ class TestTheCallsItNeverMakes:
     async def test_it_never_answers_or_cancels_an_event(
         self, client: GraphServiceClient, graph: respx.MockRouter, route: str
     ) -> None:
-        """None of these is in this PR's surface, and each one mails somebody. A creating tool
-        reaching for one is a send nobody declared."""
         _ = _ready(graph)
         mutating = graph.post(f"{_ONE_EVENT}/{route}").mock(return_value=httpx.Response(202))
 
@@ -1478,11 +1363,8 @@ class TestTheRetryItRefuses:
     async def test_a_create_graph_answers_503_is_never_posted_a_second_time(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The single most important line in the tool. The SDK retries POST on 429, 503 and 504
-        three times by default, and Microsoft documents no comparison rule for `transactionId`, so
-        an unguarded create is four meetings and four sets of invitations.
-        `tests/graph_client/test_client.py::TestANonIdempotentCallIsNotRetried` proves the default
-        this overrides."""
+        """The SDK retries POST on 429/503/504 three times by default; Microsoft defines no
+        comparison rule for transactionId, so an unguarded create sends four sets of invitations."""
         _ = _reads(graph)
         create = graph.post(_EVENTS).mock(return_value=httpx.Response(503))
 
@@ -1495,8 +1377,6 @@ class TestTheRetryItRefuses:
     async def test_a_throttled_create_is_not_repeated_either(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """429 is on the same retry list, and a create that already reached Exchange has already
-        mailed everybody on it."""
         _ = _reads(graph)
         create = graph.post(_EVENTS).mock(
             return_value=httpx.Response(429, headers={"Retry-After": "12"})
@@ -1527,11 +1407,8 @@ class TestWhatItAnswers:
     async def test_a_response_that_is_not_an_event_raises_rather_than_answering(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft's delegated-create walkthrough answers its step 2 with an `eventMessage`
-        envelope, and `user-post-events` documents an event. The SDK deserializes either one into
-        `Event`, so an unchecked answer hands back the MESSAGE id in the handle and an empty
-        attendee list as nobody invited. The message names what arrived and says the event exists,
-        because this fires after the POST already succeeded."""
+        """Microsoft's delegated-create walkthrough answers step 2 with an eventMessage envelope,
+        which the SDK deserializes into Event too, minting a handle around the message id."""
         _ = _ready(graph, _event_message())
 
         with pytest.raises(AssertionError, match="eventMessage") as raised:
@@ -1588,8 +1465,6 @@ class TestWhatItAnswers:
     async def test_stored_attendees_mean_the_invitations_are_already_gone(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """This is this connector's own inference and not a Graph property: Microsoft mails every
-        attendee of a new event and documents that this cannot be configured."""
         _ = _ready(graph, _created(attendees=[_attendee(_ADA)]))
 
         answer = await _create(client, attendees=[_ADA])
@@ -1645,8 +1520,6 @@ class TestWhatItAnswers:
     async def test_the_transaction_id_is_read_off_the_response(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft returns it only when a client set it, so a value here says the server saw the
-        request this connector made."""
         _ = _ready(graph, _created(transaction_id=_TRANSACTION_ID))
 
         answer = await _create(client)
@@ -1687,8 +1560,6 @@ class TestWhatItAnswers:
     async def test_the_location_and_the_link_come_off_the_response(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Both are read off the 201 and neither is echoed from the arguments, so what Microsoft
-        stored for the place is what the user is told, whatever text this call sent."""
         _ = _ready(graph, _created(location={"displayName": "Room 3 (Zurich)"}))
 
         answer = await _create(client, location="Room 3")
@@ -1719,7 +1590,6 @@ class TestWhatItAnswers:
     async def test_it_reports_which_calendar_it_wrote_to(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A user with more than one calendar has to be able to see which one this was."""
         _ = _reads(graph, _calendar(name="Ada Lovelace", is_default=True))
         _ = _creates(graph)
 
@@ -1741,9 +1611,8 @@ class TestWhatItAnswers:
         assert answer.calendar.is_mine is None
 
     async def test_every_field_of_the_answer_says_what_it_is(self) -> None:
-        """Walked over `CreatedEvent.model_json_schema()`, which is the JSON Schema a client reads,
-        and over its `$defs`, where every nested model lands. A description a field carries only in
-        the class docstring is not one a model ever sees."""
+        """Walks CreatedEvent.model_json_schema(), the JSON Schema a client reads, into its
+        $defs too; a description only in a class docstring is not one a model ever sees."""
         every, silent = _described(CreatedEvent.model_json_schema())
 
         # Guards the guard: a walk that stops descending passes by finding nothing to check.
@@ -1761,8 +1630,6 @@ class TestTheSchemaItPublishes:
     async def test_the_zone_is_required_and_has_no_default(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """A default zone is a zone nobody chose. A meeting an hour off looks identical to a
-        correct one in the answer, so the argument has to be asked for."""
         parameters, _tool = await _registered(transport)
 
         time_zone = _object(_object(parameters["properties"])["time_zone"])
@@ -1772,9 +1639,8 @@ class TestTheSchemaItPublishes:
     async def test_the_zone_argument_names_an_iana_example_microsoft_documents_for_a_create(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Microsoft accepts every Windows zone name and a finite list of IANA names
-        (resources/datetimetimezone). `Europe/Zurich` is a real IANA key that the list leaves out,
-        so it is the wrong name for the example a model copies."""
+        """Microsoft accepts every Windows zone name and a finite IANA list
+        (resources/datetimetimezone); Europe/Zurich is a real IANA key that list leaves out."""
         parameters, _tool = await _registered(transport)
 
         described = cast(
@@ -1788,9 +1654,6 @@ class TestTheSchemaItPublishes:
     async def test_a_zone_that_writes_a_question_of_its_own_never_reaches_this_tool(
         self, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """The zone reaches the question a person answers verbatim, so a `?` in it closes the real
-        sentence and forges one that invites nobody. The shape is published, so the refusal costs
-        no request and nobody is asked."""
         _parameters, tool = await _registered(transport)
 
         with pytest.raises(ValidationError, match="match pattern"):
@@ -1808,8 +1671,6 @@ class TestTheSchemaItPublishes:
     async def test_a_zone_name_either_family_spells_satisfies_the_published_shape(
         self, transport: httpx.AsyncClient, zone: str
     ) -> None:
-        """A shape that refuses a forged question and a real zone together refuses the meeting.
-        Read off the published schema, so this asserts what a client is actually held to."""
         parameters, _tool = await _registered(transport)
 
         published = _object(_object(parameters["properties"])["time_zone"])
@@ -1829,8 +1690,6 @@ class TestTheSchemaItPublishes:
     async def test_it_requires_the_subject_the_two_times_the_zone_and_the_attendee_list(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """`attendees` is required and is allowed to be empty: an empty list is the caller saying
-        nobody is invited, and an absent one is the caller not having thought about it."""
         parameters, _tool = await _registered(transport)
 
         assert cast("Sequence[str]", parameters["required"]) == [
@@ -1863,8 +1722,6 @@ class TestTheSchemaItPublishes:
     async def test_no_wiring_of_this_server_is_published_as_an_argument(
         self, transport: httpx.AsyncClient, word: str
     ) -> None:
-        """The Graph client and the MCP context are injected. A model that can name either can
-        aim the call somewhere nobody chose."""
         parameters, _tool = await _registered(transport)
 
         properties = _object(parameters["properties"])
@@ -1876,8 +1733,6 @@ class TestTheSchemaItPublishes:
     async def test_no_argument_offers_something_this_tool_cannot_do(
         self, transport: httpx.AsyncClient, word: str
     ) -> None:
-        """The absence of the argument is the control: a runtime refusal still publishes it, and a
-        published argument is an invitation the model takes."""
         parameters, _tool = await _registered(transport)
 
         properties = _object(parameters["properties"])
@@ -1897,9 +1752,6 @@ class TestTheSchemaItPublishes:
     async def test_a_place_longer_than_the_ceiling_never_reaches_this_tool_at_all(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The bound is published rather than checked in the body, so a model reads it before it
-        writes and the refusal costs no request. It bounds what reaches the calendar; the question
-        a person answers quotes at most 120 characters of the place whatever this ceiling is."""
         parameters, tool = await _registered(transport)
 
         text = next(
@@ -1927,9 +1779,8 @@ class TestTheSchemaItPublishes:
     async def test_a_later_call_with_no_optional_attendees_invites_nobody(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The published default is declared on the `Field` rather than in the signature, where a
-        `[]` is one list for the life of the process. This is the other half of that: two
-        calls in one process, and the second one invites nobody."""
+        """The published default is declared on the Field rather than the signature, where a
+        mutable `[]` default would be one list shared for the life of the process."""
         create = _ready(graph)
 
         _ = await _create(client, optional_attendees=[_PAM], confirm=_agrees)
@@ -1940,9 +1791,6 @@ class TestTheSchemaItPublishes:
     async def test_the_online_meeting_argument_says_the_calendar_can_refuse_it_outright(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """A model that reads only this argument otherwise learns of the refusal from the refusal.
-        The providers the calendar allows are named in it, because they are what to tell the user
-        instead of the joining link."""
         parameters, _tool = await _registered(transport)
 
         described = cast(
@@ -1968,14 +1816,10 @@ class TestHowItDeclaresItself:
         assert creator.GRAPH_PERMISSIONS == ("Calendars.ReadWrite",)
 
     def test_its_steps_are_the_two_calls_it_makes_and_the_read_is_the_shared_one(self) -> None:
-        """Three tools read one calendar. If each named its own step, one request carries three
-        names in the metrics."""
         assert creator.STEP_CREATE == "create_event"
         assert STEP_CALENDAR == "calendar"
 
     def test_its_example_call_invites_nobody(self) -> None:
-        """The startup probe exercises the real call. An example with an attendee on it asks a
-        person to confirm, and mails somebody when they agree."""
         assert creator.GRAPH_CALL_EXAMPLE == {
             "subject": "Pricing review",
             "starts_at": "2026-03-02T14:00",
@@ -2000,8 +1844,6 @@ class TestHowItDeclaresItself:
     async def test_the_description_opens_with_the_create_being_a_send(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """What a model is told is the only place these facts exist for it: nothing downstream
-        re-reads the tool file."""
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
@@ -2014,9 +1856,6 @@ class TestHowItDeclaresItself:
     async def test_the_description_names_what_it_cannot_do_and_where_to_go_instead(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The other create is conditional, because the `outlook-calendar-write` preset runs this
-        tool without it. A description that names a tool the deployment does not expose sends a
-        model after something that is not there."""
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""
@@ -2030,8 +1869,6 @@ class TestHowItDeclaresItself:
     async def test_the_description_says_what_to_do_when_the_call_times_out(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """A timeout is the one failure where calling again is the wrong move: the invitations can
-        already have gone out."""
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""
@@ -2050,8 +1887,6 @@ class TestHowItDeclaresItself:
     async def test_the_description_says_a_person_is_asked_before_any_invitation_goes_out(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """A model told to get agreement itself reads the tool's own refusal as its own failure to
-        ask."""
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
@@ -2061,8 +1896,6 @@ class TestHowItDeclaresItself:
     async def test_the_description_says_the_stored_attendees_are_the_ones_to_read_back(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Microsoft books a room only as a `resource` attendee, so the stored list is the only
-        place an attendee nobody asked for can show up at all."""
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
@@ -2073,7 +1906,6 @@ class TestTheFailuresItPassesOn:
     async def test_a_refused_calendar_read_creates_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The read is first, so a permission problem is met before anybody is invited."""
         _ = graph.get(_CALENDAR).mock(
             return_value=httpx.Response(
                 403, json={"error": {"code": "ErrorAccessDenied", "message": "denied"}}

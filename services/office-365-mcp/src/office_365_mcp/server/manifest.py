@@ -51,9 +51,8 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Mail.Send": False,
     "Mail.ReadBasic": False,
     "MailboxSettings.ReadWrite": False,
-    # Microsoft publishes AdminConsentRequired: No for all five delegated Calendars permissions,
-    # the two `.Shared` ones included. Again, that is Microsoft's rule about the permission and not
-    # a promise about a tenant.
+    # Microsoft publishes AdminConsentRequired: No for every delegated Calendars permission, the
+    # two `.Shared` ones included.
     "Calendars.Read": False,
     "Calendars.Read.Shared": False,
     "Calendars.ReadWrite": False,

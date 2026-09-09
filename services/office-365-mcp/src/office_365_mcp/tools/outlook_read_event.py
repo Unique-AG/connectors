@@ -1,45 +1,13 @@
 """`outlook_read_event` — one event in full, from a handle another tool minted, and no attachment.
 
-`GET /me/calendars/{calendar_id}/events/{event_id}` with an explicit `$select` is most of this
-tool. Microsoft documents that exact route
-(https://learn.microsoft.com/en-us/graph/api/event-get). What the projection adds to a listing
-row, and what it leaves out, both matter.
-
-**A listing row already answers "which meeting". This tool answers "what does it say".** The
-listing selects the same fields for every row and no body, because a body on twenty-five rows is
-tens of thousands of tokens nobody asked for. So this projection is the shared summary list plus
-the seven properties only a full read needs: the body, whether an attachment exists, whether the
-organizer asked for an answer, whether a new time is proposable, whether the attendee list is
-hidden, and the two zones the event was created in. `attendees` is where one named person's answer
-is. `owner_response` on the row is the calendar owner's answer and nobody else's.
-
-**The text preference is a request. The response is the answer.** Microsoft documents
-`Prefer: outlook.body-content-type` on this operation: "The format of the body property to be
-returned in. Values can be 'text' or 'html'. A `Preference-Applied` header is returned as
-confirmation if this `Prefer` header is specified" (https://learn.microsoft.com/en-us/graph/api/
-event-get). The same page also states, of this same operation, "Currently, this operation returns
-event bodies in only HTML format". The two statements disagree, so this tool asks for text and
-believes only the response. The SDK's typed `get()` hands back the deserialized event and no
-response headers at all, so `Preference-Applied` never survives deserialization. `contentType` on
-the body does. This tool reports that instead of assuming its own request won. It strips no markup
-of its own: a hand-rolled stripper turns a `<script>` block or a conditional comment into text
-that reads as prose from the organizer.
-
-**This tool sends `Prefer: IdType="ImmutableId"` on the one request it makes.** Microsoft
-documents this header as the way to ask Graph to *answer* in immutable ids, and states that
-container types such as `calendar` support no immutable id because their regular ids were already
-constant (https://learn.microsoft.com/en-us/graph/outlook-immutable-id). Whether Graph also
-re-parses a path id in the space this header names is not documented. So this connector sends the
-header for one id space across the whole surface, not because of that claim.
-
-**Two things this deliberately does not ask for.** This tool fetches no attachment.
-`hasAttachments` is a boolean, and there is no route from this tool to a byte of one. And this tool
-caps the body rather than paging it, because Graph publishes no way to read the rest of one.
-
-**A calendar id and an event id are one address, not two.** Microsoft states that an id from one
-mailbox does not resolve in another (https://learn.microsoft.com/en-us/graph/
-outlook-get-shared-events-calendars), and Graph puts no calendar id on an event row. So the handle
-carries both halves and the reader addresses the calendar the row was listed from.
+Microsoft documents `Prefer: outlook.body-content-type` on `GET /events/{id}` and, on the same
+page, that "Currently, this operation returns event bodies in only HTML format"
+(https://learn.microsoft.com/en-us/graph/api/event-get). The two disagree, so this tool asks for
+text and reports the body's own `contentType`: the SDK's typed `get()` returns the deserialized
+event and no response headers, so `Preference-Applied` never survives deserialization. An id from
+one mailbox does not resolve in another and Graph puts no calendar id on an event row, so the
+handle carries both halves and the read addresses the calendar the row was listed from
+(https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars).
 """
 
 from collections.abc import Mapping
@@ -80,8 +48,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "outlook:///events/AAMkSYNTHETIC-cal-0001%3D/AAMkAGI2SYNTHETIC-immutable-0001%3D"
 }
 
-# The default 404 advice says to check that the id came from a tool response verbatim.
-# That advice does not apply here. This handle already did.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this event. The handle is well formed, so this is not a bad "
     + "argument. It is also not evidence that the event never existed: Graph answers 'it was "
@@ -94,8 +60,6 @@ GRAPH_NOT_FOUND = (
     + "expected to still exist, list the window again, and read the new handle it returns."
 )
 
-# Everything a listing row reads, plus the seven properties only a full read needs.
-# No attachment is selected. See the module docstring for the reason.
 _EVENT_FIELDS: tuple[str, ...] = (
     *SUMMARY_FIELDS,
     "body",
@@ -261,8 +225,6 @@ class CalendarEvent(EventSummary):
 
 @dataclass(frozen=True, slots=True)
 class _Body:
-    """What became of the one body Graph returned."""
-
     text: str | None
     is_plain_text: bool
     truncated: bool
@@ -275,7 +237,6 @@ _NO_BODY = _Body(text=None, is_plain_text=False, truncated=False, characters=0)
 async def read_event(
     client: GraphServiceClient, *, uri: str, time_zone: str = "UTC"
 ) -> CalendarEvent:
-    """The event `uri` addresses, with every instant rendered in `time_zone`, in one request."""
     handle = event_handle(uri)
     if handle is None:
         raise ToolError(_BAD_HANDLE)
@@ -295,9 +256,8 @@ async def read_event(
 
 
 def _request() -> RequestConfiguration[_EventQuery]:
-    """Built per call: kiota's `RequestConfiguration.headers` defaults to one collection shared by
-    every configuration in the process. A preference added to that leaks onto every Graph call.
-    """
+    """Built per call: kiota's `RequestConfiguration.headers` defaults to one collection
+    shared process-wide, so a preference added to it leaks onto every Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_TEXT_BODY)
     headers.add(*_PREFER_IMMUTABLE_IDS)
@@ -308,8 +268,6 @@ def _request() -> RequestConfiguration[_EventQuery]:
 
 
 def _answer(event: Event, *, calendar_id: str, zone: ZoneInfo) -> CalendarEvent:
-    """`calendar_id` comes from the handle: Graph puts no calendar id on an event row, and the
-    calendar this event was read from is half of the handle the answer carries."""
     summary = EventSummary.from_event(event, calendar_id=calendar_id, zone=zone)
     body = _body_of(event)
     return CalendarEvent(
@@ -347,7 +305,6 @@ def _answer(event: Event, *, calendar_id: str, zone: ZoneInfo) -> CalendarEvent:
 
 
 def _body_of(event: Event) -> _Body:
-    """The body Graph returned, capped, or nothing when Graph returned the property empty."""
     body = event.body
     if body is None or body.content is None or not body.content.strip():
         return _NO_BODY

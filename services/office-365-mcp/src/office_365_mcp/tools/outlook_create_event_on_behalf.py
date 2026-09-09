@@ -1,74 +1,14 @@
 """`outlook_create_event_on_behalf` — one event on somebody else's calendar, under their name.
 
-**The signed-in user appears nowhere on what this creates.** Microsoft's own walkthrough of the
-delegated create has Adele, a delegate, create an event in Alex' calendar. Of the resulting event
-it says "**organizer** is Alex", and then: "Adele's identity appears only in the **sender**
-property of the **eventMessage** and not in the associated **event**". When Alex reads the event
-back, "No property in the returned **event** indicates the delegate, Adele"
-(https://learn.microsoft.com/en-us/graph/outlook-create-event-in-shared-delegated-calendar). So
-the attendees see the calendar owner invite them, the calendar owner's own copy names nobody else,
-and this connector's transcript is the only record that a delegate acted. That is what the
-confirmation below exists for.
-
-**Two calls, and the read comes first.** Step 1 of that walkthrough is "Adele gets the calendar
-that Alex has delegated to her" and step 2 is "Adele sends a meeting invitation to Christie and
-Megan on Alex' behalf". The read is not a formality here. It answers three questions: who owns the
-calendar, which is what makes the confirmation answerable, `canEdit`, which Microsoft
-describes for the delegated row as "true since as delegate, Adele has write access to
-non-private events in the delegated calendar", and `allowedOnlineMeetingProviders`, which names
-the online-meeting providers that calendar takes. A calendar shared read-only reports `canEdit`
-false, and a calendar that names providers without Teams among them refuses `online_meeting`. This
-file refuses on both before the create rather than after a Graph error.
-
-**A create is a send, and there is no draft.** "When you create an event that includes attendees,
-the server sends invitations to all attendees. This ensures consistency between the organizer's
-and attendees' views of the event and can't be configured"
-(https://learn.microsoft.com/en-us/graph/api/user-post-events). No argument here suppresses that
-and none can, because Microsoft publishes none. `isDraft` on an event is unsent *updates*: "Set to
-false if all changes are sent, or if the event is an appointment without any attendees"
-(https://learn.microsoft.com/en-us/graph/api/resources/event).
-
-**The confirmation is unconditional, unlike the own-calendar create's.** An event with no
-attendees notifies nobody, but on a delegated calendar it still writes into another person's day,
-under that person's name, where they find it without ever being asked. So the question goes to a
-person whether the attendee lists are empty or not.
-
-**Three permissions, in the order the two calls happen.** Microsoft names the least privileged
-delegated permission for step 1 as `Calendars.Read.Shared` and for step 2 as
-`Calendars.ReadWrite.Shared`. Step 1 is `GET /me/calendars/{id}`, and that operation's own table
-names `Calendars.ReadBasic`, `Calendars.Read` and `Calendars.ReadWrite` and no `.Shared` scope at
-all (https://learn.microsoft.com/en-us/graph/api/calendar-get). Two Microsoft pages name two
-permissions for one request, so the read is declared under both of them. `Calendars.Read` costs a
-tenant nothing here, because every calendar preset carries it for the read tools already. The
-On-Behalf-Of token is minted for exactly what this file declares, so declaring the write alone
-answers a 403 to this tool's own pre-read. The write permission is broad by Microsoft's own
-description — "Allows the app to create, read, update and delete events in all calendars in the
-organization user has permissions to access. This includes delegate and shared calendars"
-(https://learn.microsoft.com/en-us/graph/permissions-reference) — and that breadth is exactly why
-the preset that carries this tool is the one to argue about.
-
-**`no_retry()` and `transactionId` together.** The SDK retries `POST` on 429, 503 and 504 three
-times by default, so an unguarded create sends the same invitation up to four times. Microsoft's
-one defense is the client-set id: "A custom identifier specified by a client app for the server to
-avoid redundant POST operations in case of client retries to create the same event" (resources
-/event). It documents no comparison window for it, so the retries are switched off as well and
-`transaction_id_for` derives the id from the draft and the calendar.
-
-**Only the `/me/calendars/{id}/events` route.** Microsoft states that a calendar or event id from
-another mailbox "would return an error"
-(https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars), so every id this
-connector reads or mints lives in the signed-in user's own mailbox, including the local copy of a
-delegated calendar. `POST /me/events` is the own-calendar route and is never reached from here.
-
-**`Prefer: IdType="ImmutableId"` on the create.** The answer mints an event handle out of the 201.
-Without the header the id belongs to the `RestId` space, where it changes as soon as Outlook moves
-the item, and the reader answers a 404 that means nothing in particular
-(https://learn.microsoft.com/en-us/graph/outlook-immutable-id).
-
-**There is no recurrence, attachment or `hideAttendees` argument, and their absence is the
-control.** One call creates one occurrence. `event_body` in `shared/calendar.py` sets none of
-those properties, so none of them is spellable here, and a series or an attachment on another
-person's calendar is not something a model can reach by filling in a field.
+- The event names only the calendar owner as organizer; the delegate appears on the invitation mail
+  (https://learn.microsoft.com/en-us/graph/outlook-create-event-in-shared-delegated-calendar).
+- A create with attendees sends those invitations under the owner's name, and the SDK retries `POST`
+  three times on 429, 503 and 504, hence `no_retry()` and the client-set `transactionId`
+  (https://learn.microsoft.com/en-us/graph/api/user-post-events).
+- Only `/me/calendars/{id}/events`: an id from another mailbox "would return an error"
+  (https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars).
+- `Prefer: IdType="ImmutableId"` on the create, or the id is a `RestId` that changes when Outlook
+  moves the item (https://learn.microsoft.com/en-us/graph/outlook-immutable-id).
 """
 
 from collections.abc import Mapping, Sequence
@@ -126,21 +66,16 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_create_event_on_behalf"
 
-# The same spelling the own-calendar create uses. One Graph request creates an event whichever
-# calendar it lands on, and two names for it make one request read as two on a dashboard.
 STEP_CREATE = "create_event"
 
-# In the order the two calls happen: read the calendar, then write to it. The read is declared
-# twice, because `calendar-get` names `Calendars.Read` for it and Microsoft's delegated-create
-# walkthrough names `Calendars.Read.Shared` for the same request.
+# The read is declared twice: `calendar-get` names `Calendars.Read` for `GET /me/calendars/{id}`
+# and Microsoft's delegated-create walkthrough names `Calendars.Read.Shared` for the same request.
 GRAPH_PERMISSIONS: tuple[str, ...] = (
     "Calendars.Read",
     "Calendars.Read.Shared",
     "Calendars.ReadWrite.Shared",
 )
 
-# Synthetic throughout, and the attendee list is empty on purpose: an example that invited
-# somebody puts the registry's own permission probe behind a person's confirmation.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "calendar_ref": "outlook:///calendars/AAMkSYNTHETIC-cal-0001%3D",
     "subject": "Pricing review",
@@ -150,9 +85,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "attendees": [],
 }
 
-# Read by `tools/__init__.py` into the 404 advice table. The default advice, to check the id came
-# from a tool response verbatim, is wrong here because it did: `calendar_ref` is a handle this
-# connector minted.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return the calendar this call named, and NO EVENT WAS CREATED. The "
     + "handle is well formed, so this is not a bad argument. Either the calendar was removed, or "
@@ -168,7 +100,6 @@ _AGREE = "create"
 _DECLINE = "do not create"
 _NOTHING_HAPPENED = "No event was created."
 
-# What a question calls the owner when Graph named neither a display name nor an address.
 _THE_OWNER = "the person who owns that calendar"
 
 _DESCRIPTION = f"""\
@@ -440,14 +371,8 @@ async def create_event_on_behalf(
 ) -> CreatedEventOnBehalf | InputRequiredResult:
     """Read the calendar `calendar_ref` addresses, put the create to a person, then create it.
 
-    `confirm` has no default. The read is what makes the question answerable, because the owner's
-    name comes off it, so the confirmation belongs between the two requests. A caller that
-    omits it is back to a promise in a docstring.
-
-    On a connection with no server-to-client channel the question cannot be answered inside one
-    call, so `confirm` answers with the question itself and this returns it: a client that can
-    elicit puts it to a person and calls this tool again, and the second call re-reads the calendar
-    and re-composes the same draft before it writes anything.
+    A connection with no server-to-client channel cannot answer inside the call: `confirm` hands the
+    question back and this returns it, and the second call re-reads and re-composes the same draft.
     """
     assert 1 <= len(subject) <= MAX_SUBJECT_CHARACTERS, (
         f"the subject is bounded by the schema, got {len(subject)} characters"
@@ -487,11 +412,8 @@ async def create_event_on_behalf(
                 client, calendar_id=calendar.id, draft=draft, transaction=transaction
             )
 
-    # This function decides inside the block above, and raises every refusal outside it.
-    # `graph_errors` treats a `ToolError` that escapes it as a Graph operation that failed for a
-    # reason the seam cannot describe. An event this tool refuses to create is not a Graph failure
-    # at all, whether the refusal is the person's, their client's, or "that calendar is read-only".
-    # A question still waiting for an answer leaves the block the same way, and is returned.
+    # Decided inside the block, raised outside it: `graph_errors` reads an escaping `ToolError` as a
+    # Graph failure, and neither a refusal nor a question still waiting for its answer is one.
     if asked is not None:
         return asked
     if refused is not None:
@@ -513,12 +435,6 @@ def _composed(
     all_day: bool,
     online_meeting: bool,
 ) -> EventDraft:
-    """The draft these arguments describe, once every one of them is answerable.
-
-    Every argument refusal happens here, before the first Graph request. A create that reached
-    Microsoft and then failed validation is a create nobody can be sure did not send an
-    invitation.
-    """
     opens = _moment("starts_at", starts_at)
     closes = _moment("ends_at", ends_at)
     if closes <= opens:
@@ -530,7 +446,6 @@ def _composed(
     optional = _addresses(optional_attendees, argument="optional_attendees")
     if len(required) + len(optional) > MAX_ATTENDEES:
         raise ToolError(_too_many_people(len(required) + len(optional)))
-    # Each list already names every address once, so a repeat across the two is the only one left.
     if repeated_address([*required, *optional]) is not None:
         raise ToolError(_ADDRESS_IN_BOTH_LISTS)
     return EventDraft(
@@ -548,24 +463,14 @@ def _composed(
 
 
 def _placed(location: str | None) -> str | None:
-    """One place, or none at all: a location of nothing but whitespace is not a place.
-
-    The gate that names it in the question, the `Location` on the wire and `transaction_id_for`
-    all read this one value, so a value only one of the three treats as empty splits the three.
-    """
     if location is None:
         return None
     return location.strip() or None
 
 
 def _moment(argument: str, value: str) -> datetime:
-    """One bound as a local wall-clock time, for the comparison and the length check only.
-
-    `wall_clock` in `shared/calendar.py` is the one speller for the shape both creates accept, so
-    the two tools refuse the same values. The value that reaches Graph is the caller's own string,
-    not this datetime: Microsoft reads `dateTime` beside the `timeZone` name, and reformatting the
-    string here changes which instant the event is at for a zone this connector cannot resolve.
-    """
+    """One wall-clock time, for the order and the length checks only: the caller's own string is
+    what reaches Graph, beside the `time_zone` name Microsoft reads both bounds in."""
     moment = wall_clock(value)
     if moment is None:
         raise ToolError(_bad_moment(argument, value))
@@ -580,12 +485,6 @@ def _one_span(span: timedelta, *, all_day: bool) -> None:
 
 
 def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
-    """Each entry trimmed, once every one of them is one address that the list names once.
-
-    `repeated_address` in `shared/calendar.py` is the one speller for the repeat, so this tool and
-    the own-calendar create accept the same lists. One list is checked against itself for the same
-    reason the two lists are checked against each other: this tool takes each person once.
-    """
     trimmed = tuple(address.strip() for address in addresses)
     for address in trimmed:
         if ONE_ADDRESS.match(address) is None:
@@ -597,13 +496,6 @@ def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
 
 
 def _no_teams_meeting(calendar: Calendar) -> str | None:
-    """The refusal for a calendar Microsoft says takes no Teams meeting, and None otherwise.
-
-    `providers_without_teams` in `shared/calendar.py` is the one speller for that reading of the
-    pre-read, so this tool and the own-calendar create refuse the same calendars. It answers None
-    for an empty or an absent list, which is Graph naming no provider rather than Graph refusing
-    Teams.
-    """
     allowed = providers_without_teams(calendar)
     if allowed is None:
         return None
@@ -618,14 +510,6 @@ def _no_teams_meeting(calendar: Calendar) -> str | None:
 
 
 def _question(calendar: Calendar, draft: EventDraft) -> str:
-    """What the person at the other end is asked, before anything reaches the owner's calendar.
-
-    The owner is named twice on purpose. The calendar the event lands on is one fact, and whose
-    name goes out on it is the other, and only the second one is the surprising half. Both bounds
-    are named here, because a 14:00-14:15 and a 14:00-22:00 draft are one event in somebody's day
-    and another. `draft_details` adds whole days, the place, the Teams meeting and the body, and
-    the two together name everything the `transactionId` binds.
-    """
     owner = _owner_named(calendar)
     invited = _everyone(draft)
     if invited:
@@ -647,11 +531,6 @@ def _question(calendar: Calendar, draft: EventDraft) -> str:
 
 
 def _owner_named(calendar: Calendar) -> str:
-    """Microsoft names a calendar's owner with a display name, an address, or neither.
-
-    Whichever it is, it is text Graph holds rather than text this connector wrote, and it reaches
-    the question three times, so it is cut to the ceiling every quoted value in a question shares.
-    """
     owner = calendar.owner
     if owner is None:
         return _THE_OWNER
@@ -664,24 +543,14 @@ def _everyone(draft: EventDraft) -> list[str]:
 
 
 def a_person_agrees(ctx: Context) -> Confirm:
-    """This tool's own three words for the confirmation `shared/seam.py` puts to a person.
-
-    Named rather than written inline in `register`, so a test can drive the same confirmation the
-    registered tool builds instead of one that only resembles it.
-    """
     return person_confirms(ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_HAPPENED)
 
 
 async def _created(
     client: GraphServiceClient, *, calendar_id: str, draft: EventDraft, transaction: str
 ) -> Event:
-    """The create itself. One request, not retried, and answered with Graph's own 201.
-
-    `transaction` is composed by the caller rather than here, because the same string is what the
-    confirmation was bound to. `created_event` is what reads that 201: Microsoft's own walkthrough
-    answers this step with an `eventMessage` envelope, and an unchecked answer mints an event
-    handle around a message id.
-    """
+    """Microsoft's delegated-create walkthrough answers this step with an `eventMessage` envelope,
+    so `created_event` checks the 201 before a handle is minted around a message id."""
     with graph_step(STEP_CREATE):
         created = await client.me.calendars.by_calendar_id(calendar_id).events.post(
             event_body(draft, transaction_id=transaction),
@@ -701,12 +570,8 @@ def _immutable_ids() -> HeadersCollection:
 
 
 def _answer(created: Event, *, calendar: Calendar, draft: EventDraft) -> CreatedEventOnBehalf:
-    """Everything about the event comes off Graph's 201, and the calendar off the pre-read.
-
-    Only the zone comes from the arguments, because it decides what `iso` is rendered in. A zone
-    name Graph accepts and `zoneinfo` cannot resolve, such as `W. Europe Standard Time`, leaves UTC
-    as the zone to render in, and `EventTime` still carries Microsoft's own two values verbatim.
-    """
+    """Graph accepts Windows zone names such as `W. Europe Standard Time` that `zoneinfo` cannot
+    resolve, so `iso` falls back to UTC; `EventTime` still carries Microsoft's own two values."""
     assert created.id is not None, (
         "Graph created an event it gave no id, which cannot be addressed. The event was created, "
         "and any invitations went out."
@@ -828,9 +693,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        # The default lives in the `Field` rather than in the signature: a `[]` in a parameter
-        # default is one shared list for the life of the process. Pydantic copies this one per
-        # call, and the schema still publishes `"default": []`.
+        # The default lives in the `Field` rather than in the signature: a `[]` parameter default is
+        # one list shared for the life of the process, and pydantic copies this one per call.
         optional_attendees: Annotated[
             list[str],
             Field(

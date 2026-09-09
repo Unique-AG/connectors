@@ -43,11 +43,8 @@ SUMMARY_FIELDS: tuple[str, ...] = (
 # model. If the number drifts in just one tool, that tool promises something the other does not.
 PREVIEW_CHARACTERS = 255
 
-# One SMTP address and nothing else: no display name, no angle brackets, no second address. A model
-# that packs `Ada <ada@x.invalid>` or `a@x.invalid, b@y.invalid` into one string names somebody
-# Exchange either rejects or silently reads as a name, and both are quietly wrong. Four tools take
-# a list of addresses from a model — two draft mail, two create an event — and each one refuses in
-# its own words. What none of them decides on its own is which strings are one address.
+# One SMTP address, no display name and no list: Exchange either rejects `Ada <ada@x.invalid>` or
+# silently reads the whole string as a name.
 ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
 
@@ -104,12 +101,8 @@ class MailAddress(BaseModel):
 
     @classmethod
     def from_email_address(cls, address: EmailAddress | None) -> Self | None:
-        """The same shape from a bare `emailAddress`, or None when Graph named nobody.
-
-        Graph wraps a mail recipient in a `recipient` and does not wrap a calendar's `owner`
-        (https://learn.microsoft.com/en-us/graph/api/resources/calendar): that property is an
-        `emailAddress` on its own.
-        """
+        """Graph does not wrap a calendar's `owner` in a `recipient`; it is a bare `emailAddress`
+        (https://learn.microsoft.com/en-us/graph/api/resources/calendar)."""
         if address is None:
             return None
         return cls(name=address.name, address=address.address)

@@ -230,7 +230,6 @@ class TestTheMailHandleGrammar:
     @pytest.mark.parametrize(
         "uri",
         [
-            # The other five families, so one parser cannot answer for another.
             f"outlook:///folders/{_FOLDER_ID}",
             f"outlook:///drafts/{_DRAFT_ID}",
             f"outlook:///rules/{_RULE_ID}",
@@ -306,10 +305,6 @@ class TestTheMailHandleGrammar:
 
 
 class TestTheCalendarHandleGrammar:
-    """Two more families under the mail scheme. A calendar is one segment because a calendar id is
-    constant, and an event is two because an event id is only meaningful beside the calendar it was
-    read from."""
-
     def test_a_calendar_handle_round_trips_its_id(self) -> None:
         handle = handles.CalendarHandle(_CALENDAR_ID)
 
@@ -345,7 +340,6 @@ class TestTheCalendarHandleGrammar:
     @pytest.mark.parametrize(
         "uri",
         [
-            # The other five families, so one parser cannot answer for another.
             f"outlook:///messages/{_MAIL_ID}",
             f"outlook:///folders/{_FOLDER_ID}",
             f"outlook:///drafts/{_DRAFT_ID}",
@@ -366,7 +360,6 @@ class TestTheCalendarHandleGrammar:
     @pytest.mark.parametrize(
         "uri",
         [
-            # The family an event is reached *from*: a lister takes one and mints the other.
             f"outlook:///calendars/{_CALENDAR_ID}",
             f"outlook:///messages/{_MAIL_ID}",
             f"outlook:///drafts/{_DRAFT_ID}",

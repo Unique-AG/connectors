@@ -1,5 +1,3 @@
-"""Every response body here is synthesised. None came from a real mailbox."""
-
 from collections.abc import Mapping, Sequence
 from typing import cast
 
@@ -153,7 +151,6 @@ class TestWhatItAsksGraphFor:
     async def test_it_never_asks_for_an_attachment_or_the_recurrence_rule(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Not asking is the whole of the control: there is no filter downstream of `$select`."""
         route = _reads(graph, _payload(body=_body("Agenda attached.")))
 
         _ = await _read(client)
@@ -199,11 +196,7 @@ class TestWhatItAsksGraphFor:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """kiota's `RequestConfiguration.headers` defaults to one `HeadersCollection` shared by
-        every configuration in the process, so a header added to the default leaks everywhere.
-
-        `shared/identity.py`'s `GET /me` is the witness because it passes a `RequestConfiguration`
-        of its own; a call passing none would keep passing while the leak came back.
-        """
+        every configuration in the process, so a header added to the default leaks everywhere."""
         _ = _reads(graph, _payload(body=_body("Agenda attached.")))
         profile = graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
 
@@ -327,8 +320,6 @@ class TestTheAttendeesItReports:
     async def test_an_attendee_who_never_answered_reports_no_time_at_all(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph fills the year 1 rather than a null, and reporting it as a timestamp reads as a
-        response from before the calendar existed."""
         _ = _reads(
             graph,
             _payload(
@@ -403,8 +394,6 @@ class TestWhatItAnswers:
     async def test_the_times_are_converted_into_the_zone_that_was_asked_for(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Without `Prefer: outlook.timezone` Graph renders both bounds in UTC, and 13:00 UTC in
-        March is 14:00 in Zurich."""
         _ = _reads(graph, _payload(body=_body("Agenda.")))
 
         answer = await _read(client, time_zone="Europe/Zurich")
@@ -544,8 +533,6 @@ class TestWhatItRefuses:
     async def test_a_uri_that_is_not_an_event_handle_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, uri: str
     ) -> None:
-        """A calendar handle names the container and not an event in it, a mail handle addresses
-        another surface, and a bare event id addresses nothing without its calendar."""
         route = _reads(graph, _payload(body=_body("Agenda.")))
 
         with pytest.raises(ToolError, match="outlook_list_events"):
@@ -560,13 +547,8 @@ class TestWhatItRefuses:
     async def test_a_zone_name_the_time_zone_database_lacks_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, time_zone: str
     ) -> None:
-        """An unknown name reaches `zone_named` as a lookup failure, and a name that is not a
-        relative path, such as an empty string, reaches it as a `ValueError` instead. A Windows
-        name is the one a model reads off a previous answer, because Graph returns those.
-
-        `CEST` and `PST` are refused where `CET` and `EST` resolve: the tz database carries a few
-        legacy abbreviation-shaped keys and no daylight ones, so this is not a rule about shape.
-        """
+        """The tz database carries a few legacy abbreviation-shaped keys such as `CET` and `EST`
+        but no daylight ones, so `CEST` and `PST` are refused although they look the same shape."""
         route = _reads(graph, _payload(body=_body("Agenda.")))
 
         with pytest.raises(ToolError, match="IANA"):
@@ -625,8 +607,6 @@ class TestTheSchemaItPublishes:
         assert cast("Sequence[str]", parameters["required"]) == ["uri"]
 
     async def test_the_zone_defaults_to_utc(self, transport: httpx.AsyncClient) -> None:
-        """A default of the user's own zone is not available: this tool reads no mailbox
-        settings."""
         parameters = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
@@ -648,7 +628,6 @@ class TestTheSchemaItPublishes:
         assert "`Europe/Berlin`" in described
 
     async def test_it_takes_two_arguments_and_no_others(self, transport: httpx.AsyncClient) -> None:
-        """Neither `client` nor a context reaches the wire."""
         parameters = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
@@ -668,8 +647,6 @@ class TestTheSchemaItPublishes:
     async def test_every_field_of_the_answer_says_what_it_is(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Asserted over the published schema rather than the model class: a description that
-        never reaches the wire is not one."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         reader.register(mcp, transport)
         tool = await mcp.get_tool(reader.TOOL_NAME)
@@ -743,8 +720,6 @@ class TestTheFailuresItPassesOn:
             _ = await _read(client)
 
     def test_a_404_is_answered_with_the_recovery_and_not_with_a_canceled_meeting(self) -> None:
-        """The default 404 advice says to check the id came from a tool response verbatim. This
-        handle already did, so the advice a model needs is to list the window again."""
         assert "outlook_list_events" in reader.GRAPH_NOT_FOUND
         assert "never that the meeting was canceled" in reader.GRAPH_NOT_FOUND
         assert "this is not a bad argument" in reader.GRAPH_NOT_FOUND
@@ -759,11 +734,8 @@ async def _registered(transport: httpx.AsyncClient) -> Mapping[str, object]:
 
 
 def _fields(schema: Mapping[str, object], *, path: str = "") -> dict[str, object]:
-    """Every field of the published output schema, named by its path.
-
-    `$defs` is walked because pydantic publishes a nested model once and references it: a nested
-    field with nothing to say about it is invisible to a walk that stops at `properties`.
-    """
+    """`$defs` is walked because pydantic publishes a nested model once and references it: a
+    nested field with nothing to say about it is invisible to a walk that stops at `properties`."""
     found = {f"{path}{name}": field for name, field in _mapping(schema.get("properties")).items()}
     for name, defined in _mapping(schema.get("$defs")).items():
         found.update(_fields(_mapping(defined), path=f"{name}."))
@@ -771,5 +743,4 @@ def _fields(schema: Mapping[str, object], *, path: str = "") -> dict[str, object
 
 
 def _mapping(value: object) -> Mapping[str, object]:
-    """One node of a JSON schema, or an empty mapping for a key the schema does not carry."""
     return cast("Mapping[str, object]", value) if isinstance(value, Mapping) else {}

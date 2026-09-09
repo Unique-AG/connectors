@@ -1,80 +1,14 @@
 """`outlook_create_event` — one event on the user's own calendar, created and invited in one call.
 
-**A create is a send, and Microsoft states it as a property of the API.** "When you create an
-event that includes attendees, the server sends invitations to all attendees. This ensures
-consistency between the organizer's and attendees' views of the event and can't be configured"
-(https://learn.microsoft.com/en-us/graph/api/user-post-events). So this file has no way to create
-an event quietly and mail the invitations later, and no argument asks for one. Every address in
-`attendees` receives mail from Microsoft the moment the POST succeeds, and this connector has no
-recall.
-
-**There is no draft state for an event, which is why a person is asked first.** `isDraft` looks
-like the mail story and is not: "Set to true if the user has updated the meeting in Outlook but
-hasn't sent the updates to attendees. Set to false if all changes are sent, or if the event is an
-appointment without any attendees" (https://learn.microsoft.com/en-us/graph/api/resources/event).
-It flags unsent *updates* to an event that already exists. The mail surface can compose into
-Drafts and let a human press Send. A calendar cannot. The confirmation this tool asks for is
-therefore the only thing between a model and somebody else's inbox. It happens after the calendar
-read and before the create: the read changes nothing, and it is also what tells this file whether
-the calendar takes a Teams meeting, so a create the calendar itself refuses asks nobody. A draft
-that names anybody or any place is asked about: both attendee lists, and `location` too, because
-Microsoft documents a room as a mailbox that is invited rather than typed and documents nothing
-about a display name that names one, so a place is put to a person like an attendee. Only an event
-with nobody invited and nowhere to be is created without a question: it notifies nobody and names
-nobody's mailbox, so there is nobody to protect and no reason to interrupt the user. The question
-shows the subject, both bounds, the zone, whether the event covers whole days, the place, the Teams
-setting, how the body opens and every address (`shared/calendar.py` composes the fragment that
-follows the times for both creates), so an agreement is an agreement to the event a person read
-rather than to its subject line.
-
-**`no_retry()` and `transactionId` answer the same failure from two sides.** "A custom identifier
-specified by a client app for the server to avoid redundant POST operations in case of client
-retries to create the same event … This property is only returned in a response payload if an app
-has set it" (resources/event). Microsoft documents neither a window nor a comparison rule for it,
-so it is a request that the server deduplicate rather than a guarantee. `no_retry()` is the half
-this connector controls: the SDK retries `POST` on 429, 503 and 504 three times by default, and a
-503 that arrives after Exchange already created the event is four meetings and four sets of
-invitations. `shared/calendar.py` derives the id from the draft, so the same request composes the
-same id whichever call makes it.
-
-**The zone reaches Graph exactly as the caller wrote it, and the times carry no zone at all.**
-"You can specify the time zone for each of the start and end times of the event as part of their
-values, because the start and end properties are of dateTimeTimeZone type. First find the
-supported time zones to make sure you set only time zones that have been configured for the user's
-mailbox server" (user-post-events). Microsoft accepts every Windows zone name there and a fixed
-list of IANA names (resources/datetimetimezone), so this file validates neither: Exchange owns
-which of those a mailbox takes, and a translation into the other family changes which instant the
-meeting is at. `starts_at` and `ends_at` are refused when they carry an offset or a `Z`, because
-two zones in one request are two answers to the same question, and Graph reads the one in
-`time_zone`.
-
-**There is no `recurrence`, `hideAttendees`, `responseRequested`, `allowNewTimeProposals` or
-attachment argument, and their absence is the control.** A recurring series created from one
-sentence is one mistake repeated for a year. `hideAttendees` writes a meeting whose attendees
-cannot see each other, which is a property no attendee can discover afterward. An attachment
-cannot be minted here at all: this connector has no content store, so the only source is the
-model. A runtime refusal still publishes the argument, and a published argument is an invitation.
-
-**The default calendar is read before the create, because the answer's handle needs its id.**
-Graph puts no calendar id on an event it returns, and an event id is only meaningful beside the
-calendar it lives in (`shared/handles.py`). The same read also names the calendar in the answer,
-so a user who has more than one can see which one was written to, and it carries
-`allowedOnlineMeetingProviders`, which is what refuses a Teams meeting on a calendar that lists
-other providers.
-
-**The answer's attendees are the ones Microsoft stored, never the ones this call asked for.**
-Microsoft books a room as an attendee the caller adds and documents no other way in: "if the
-meeting location has been set up as a resource … Invite the resource as an attendee. Set the
-attendee type property as `resource`" (user-post-events). This tool adds no such attendee and
-sends `location` as text (`Location(display_name=…)` in `shared/calendar.py`). Whether Exchange
-books a room from that text alone is documented nowhere, which is why a named place is asked about
-like an attendee and why the attendees on the answer are the record: an answer echoed from the
-arguments agrees with the request whatever the calendar now holds.
-
-**`isOnlineMeeting` is a one-way door.** "After you set isOnlineMeeting to `true`, Microsoft Graph
-initializes onlineMeeting. Subsequently, Outlook ignores any further changes to isOnlineMeeting,
-and the meeting remains available online" (resources/event). Nothing in this connector removes a
-Teams meeting from an event once it is on one.
+- A create with attendees always sends the invitations, and Microsoft documents that this "can't be
+  configured" (https://learn.microsoft.com/en-us/graph/api/user-post-events).
+- An event has no draft state: `isDraft` flags unsent *updates* to an event that already exists
+  (https://learn.microsoft.com/en-us/graph/api/resources/event), so the confirmation is the gate.
+- `starts_at`, `ends_at` and `time_zone` reach Graph verbatim. Microsoft accepts every Windows zone
+  name and a fixed list of IANA names, and translating between the families moves the instant.
+- The SDK retries `POST` three times on 429, 503 and 504, so the create sets `no_retry()` plus
+  Microsoft's client-set `transactionId`, which is documented with no comparison window.
+- `isOnlineMeeting` is one-way: Outlook "ignores any further changes" to it (resources/event).
 """
 
 from collections.abc import Mapping, Sequence
@@ -135,9 +69,6 @@ STEP_CREATE = "create_event"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.ReadWrite",)
 
-# An empty attendee list on purpose: nobody is invited, so the probe reaches Graph without a
-# confirmation and without mailing anybody. The zone is `UTC`, which both Graph and `zoneinfo`
-# resolve.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "subject": "Pricing review",
     "starts_at": "2026-03-02T14:00",
@@ -146,12 +77,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "attendees": [],
 }
 
-# What `transaction_id_for` is told the target is. This tool writes to one calendar only, the
-# mailbox's own default one, and Microsoft's route for it is `POST /me/events`.
 _ME = "me"
 
-# The zone this connector converts the answer into when Graph's own name does not resolve. The two
-# verbatim values in `EventTime` still say what Microsoft holds, so nothing is lost by it.
+# Graph accepts Windows zone names such as `W. Europe Standard Time` that `zoneinfo` cannot resolve.
 _FALLBACK_ZONE = ZoneInfo("UTC")
 
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
@@ -437,29 +365,10 @@ async def create_event(
     online_meeting: bool = False,
     confirm: Confirm,
 ) -> CreatedEvent | InputRequiredResult:
-    """Read the default calendar, put the event to a person when it names anybody or any place,
-    then create it.
+    """Read the calendar, ask a person when the event names anybody or any place, then create it.
 
-    A place is a mailbox this call cannot rule out. Microsoft documents a room as a `resource`
-    attendee a caller adds, and documents nothing about a display name that names one, so
-    `location` reaches the question exactly as an address does. Only an event with nobody invited
-    and nowhere to be is written without one.
-
-    `confirm` has no default. Microsoft mails every attendee as the event is created, so the
-    question is the only thing between this call and somebody else's inbox, and a caller free to
-    omit it puts the whole gate back in a docstring.
-
-    On a connection with no server-to-client channel the question is answered rather than awaited:
-    `confirm` hands back the question itself, this call returns it instead of creating anything,
-    and a client that can elicit puts it to a person and calls the tool again with their answer.
-
-    The read comes before the question. It carries `allowedOnlineMeetingProviders`, so a Teams
-    meeting on a calendar that lists other providers is refused before anybody is asked about an
-    event that is refused whatever they answer.
-
-    Every refusal is raised before the POST, so nothing is created and nobody is mailed. Only the
-    calendar pre-read can precede one, and a read leaves nothing to undo, which is the whole
-    reason the validation is not left to Exchange.
+    A connection with no server-to-client channel cannot answer inside the call: `confirm` hands the
+    question back and this returns it, for the client to put to a person and call again with.
     """
     assert 1 <= len(subject) <= MAX_SUBJECT_CHARACTERS, (
         f"the subject is bounded by the schema, got {len(subject)} characters"
@@ -479,9 +388,8 @@ async def create_event(
 
     created: Event | None = None
     asked: InputRequiredResult | None = None
-    # One id for both halves of the same request: what the answer is bound to, and what Microsoft
-    # is asked to deduplicate on. It is derived from the draft, so the round that answers the
-    # question composes it again and only an answer bound to that draft authorizes writing it.
+    # Derived from the draft rather than minted: the round that answers the question composes the
+    # same id, which is both the `request_state` an answer is bound to and Graph's dedup key.
     transaction = transaction_id_for(_ME, draft)
     with graph_errors(TOOL_NAME):
         calendar = await calendar_of(client, calendar_id=None)
@@ -500,12 +408,8 @@ async def create_event(
                     ),
                 )
 
-    # Decided inside the block above and raised outside it. `graph_errors` reads a `ToolError`
-    # that escapes it as a Graph operation that failed for a reason the seam cannot describe, and
-    # neither a person saying no nor a calendar that takes no Teams meeting is a Graph failure at
-    # all. On a handshake connection `not_graph` keeps the wait for the answer out of Microsoft's
-    # own latency histogram; on a 2026-07-28 one there is no wait inside this call, and the
-    # question nobody has answered yet leaves the block the same way, returned not raised.
+    # Raised outside the block on purpose: `graph_errors` records an escaping `ToolError` as a Graph
+    # operation that failed for a reason it cannot describe, and a refusal is not one.
     if asked is not None:
         return asked
     if refused is not None:
@@ -528,7 +432,6 @@ def _drafted(
     all_day: bool,
     online_meeting: bool,
 ) -> EventDraft:
-    """Every argument checked, and the draft the shared vocabulary turns into a request body."""
     opens = _moment("starts_at", starts_at)
     closes = _moment("ends_at", ends_at)
     if closes <= opens:
@@ -554,25 +457,13 @@ def _drafted(
 
 
 def _place(location: str | None) -> str | None:
-    """One value for the gate, the wire and the `transactionId`: whitespace alone is no place.
-
-    A location of `" "` otherwise reaches Graph as a location, reaches the question as one nobody
-    can read, and composes the same id as no location at all.
-    """
     stripped = None if location is None else location.strip()
     return stripped or None
 
 
 def _moment(argument: str, value: str) -> datetime:
-    """One wall-clock time, in the one shape `_not_a_time` promises and no other.
-
-    `shared.calendar.wall_clock` is what decides, so the two creating tools accept the same shapes.
-    A value it refuses gets one of two refusals, and `_a_zone_of_its_own` only picks which: a time
-    with an offset or a `Z` is a different mistake from a value that is no time at all.
-
-    Nothing about the parsed value reaches Graph. `starts_at` and `ends_at` go on the wire as the
-    caller wrote them, and this is only how the order and the length of the event are checked.
-    """
+    """One wall-clock time, for the order and the length checks only: the caller's own string is
+    what reaches Graph, beside the `time_zone` name Microsoft reads both bounds in."""
     moment = wall_clock(value)
     if moment is not None:
         return moment
@@ -582,12 +473,6 @@ def _moment(argument: str, value: str) -> datetime:
 
 
 def _a_zone_of_its_own(value: str) -> bool:
-    """Whether `value` states a zone rather than only a wall-clock time.
-
-    `datetime.fromisoformat` reads a trailing `Z` as UTC and an offset as that offset, so both
-    arrive as a `tzinfo`. It accepts more shapes than this tool does, which is why it words a
-    refusal here and never grants one.
-    """
     try:
         return datetime.fromisoformat(value).tzinfo is not None
     except ValueError:
@@ -602,7 +487,6 @@ def _within_one_event(length: timedelta, *, all_day: bool) -> None:
 
 
 def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
-    """One list, every entry a single address and every person on it once."""
     trimmed = tuple(address.strip() for address in addresses)
     for address in trimmed:
         if ONE_ADDRESS.match(address) is None:
@@ -616,7 +500,6 @@ def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
 
 
 def _invited_once(required: tuple[str, ...], optional: tuple[str, ...]) -> None:
-    """The two lists are one guest list, counted and de-duplicated as one."""
     if len(required) + len(optional) > MAX_ATTENDEES:
         raise ToolError(_TOO_MANY_ATTENDEES)
     both = {address.casefold() for address in required} & {
@@ -628,33 +511,17 @@ def _invited_once(required: tuple[str, ...], optional: tuple[str, ...]) -> None:
 
 
 def _no_teams_meeting_here(calendar: Calendar) -> str | None:
-    """The refusal for a Teams meeting on a calendar that lists other providers, or None.
-
-    `providers_without_teams` is what decides, so both creating tools refuse the same calendars.
-    The pre-read already carries `allowedOnlineMeetingProviders`, so this costs no request. An
-    empty or an absent list is not evidence, so the create goes ahead on one.
-    """
     allowed = providers_without_teams(calendar)
     return None if allowed is None else _no_teams_meeting(allowed)
 
 
 def a_person_agrees(ctx: Context) -> Confirm:
-    """This tool's own three words for the confirmation `shared/seam.py` puts to a person.
-
-    Named rather than written inline in `register`, so a test can drive the same confirmation the
-    registered tool builds instead of one that only resembles it.
-    """
     return person_confirms(
         ctx, agree=_CREATE, decline=_DO_NOT_CREATE, nothing_happened=_NOTHING_CREATED
     )
 
 
 def _question(draft: EventDraft) -> str:
-    """The subject, both bounds, the zone, everyone who receives mail, and `draft_details` for the
-    rest. Both bounds, because a 14:00-14:15 meeting and a 14:00-22:00 one are one afternoon.
-
-    An event with nobody invited reaches this only by naming a place, and says so.
-    """
     invited = list(draft.attendees) + [f"{one} (optional)" for one in draft.optional_attendees]
     said = draft_details(draft)
     details = f", {said}" if said else ""
@@ -677,7 +544,6 @@ def _immutable_ids() -> HeadersCollection:
 
 
 def _answer(created: Event, *, calendar: Calendar, zone: ZoneInfo) -> CreatedEvent:
-    """Everything but the calendar comes off Graph's 201, and nothing off the arguments."""
     assert created.id is not None, (
         "Graph created an event it gave no id, which cannot be addressed. The event was created, "
         "and any invitations went out."
@@ -787,9 +653,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        # The default lives in the `Field` rather than in the signature: a `[]` in a parameter
-        # default is one shared list for the life of the process. Pydantic copies this one per
-        # call, and the schema still publishes `"default": []`.
+        # The default lives in the `Field` rather than in the signature: a `[]` parameter default is
+        # one list shared for the life of the process, and pydantic copies this one per call.
         optional_attendees: Annotated[
             list[str],
             Field(

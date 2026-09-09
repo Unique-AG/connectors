@@ -1,8 +1,3 @@
-"""`outlook_list_calendars`: what it asks Graph for, whose calendar each row is, what it answers.
-
-Every response body here is synthesised. No calendar, name or address came from a real mailbox.
-"""
-
 from collections.abc import Mapping, Sequence
 from typing import cast
 
@@ -28,12 +23,10 @@ _TEAM_ID = "AAMkADRpSYNTHETIC-cal-0003="
 # `canShare` false, `canViewPrivateItems` false and `canEdit` true on it.
 _DELEGATOR = {"name": "Alex Wilber", "address": "alexw@example.invalid"}
 
-# `mail` on the signed-in user of `tests/tools/conftest.py`.
 _OWN_OWNER = {"name": "Ada Lovelace", "address": "ada@example.invalid"}
 
-# `userPrincipalName` on the same user, in a case Exchange did not use. A calendar owner is stated
-# with one address or the other, so a comparison on `mail` alone reports this row as another
-# person's.
+# `userPrincipalName` on the same user, in a case Exchange did not use: a calendar owner is stated
+# with one address or the other, so a comparison on `mail` alone misses this row.
 _OWN_OWNER_BY_SIGN_IN_NAME = {"name": "Ada Lovelace", "address": "ADA@CORP.EXAMPLE.INVALID"}
 
 
@@ -88,11 +81,8 @@ def _page(*calendars: dict[str, object], next_link: str | None = None) -> httpx.
 
 
 def _fields(node: object, at: str, *, root: Mapping[str, object]) -> dict[str, object]:
-    """Every field of a published schema, at every depth.
-
-    Pydantic publishes a nested model as a `$ref` into the schema's own `$defs` rather than
-    inline, so a walk that does not follow one checks the top level and calls it the whole answer.
-    """
+    """Pydantic publishes a nested model as a `$ref` into the schema's own `$defs` rather than
+    inline, so a walk that skips it checks only the top level and calls that the whole answer."""
     schema = _resolved(node, root=root)
     found: dict[str, object] = {}
     properties = schema.get("properties")
@@ -183,8 +173,7 @@ class TestTheQueryItComposes:
         self, client: GraphServiceClient, calendars: respx.Route
     ) -> None:
         """Microsoft documents that container types such as `calendar` do not support the
-        immutable-id preference, and no calendar time is rendered here, so `outlook.timezone` has
-        nothing to render either."""
+        immutable-id preference, and no time is rendered here for `outlook.timezone` either."""
         calendars.mock(return_value=_page(_own()))
 
         _ = await lister.list_calendars(client)
@@ -194,8 +183,6 @@ class TestTheQueryItComposes:
     async def test_each_of_the_two_reads_happens_exactly_once(
         self, client: GraphServiceClient, signed_in: respx.Route, calendars: respx.Route
     ) -> None:
-        """One `/me` read serves every row: re-reading it per calendar turns an inventory into one
-        request per calendar for an answer that never changes."""
         calendars.mock(return_value=_page(_own(), _delegated()))
 
         _ = await lister.list_calendars(client)
@@ -329,8 +316,7 @@ class TestWhatItAnswers:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """The cursor route is registered before the bare one, which respx matches in registration
-        order: the bare path matches a `$skiptoken` request too, and answers every page.
-        """
+        order: the bare path matches a `$skiptoken` request too, and answers every page."""
         graph.get(_CALENDARS, params={"$skiptoken": "second"}).mock(
             return_value=_page(_delegated())
         )
@@ -347,9 +333,6 @@ class TestWhatItAnswers:
     async def test_a_cap_that_left_more_calendars_on_offer_says_capped(
         self, client: GraphServiceClient, graph: respx.MockRouter, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """`capped` is the difference between "this mailbox has one calendar" and "this listing
-        stopped at one". The cap is patched rather than answered with 201 synthetic calendars.
-        """
         monkeypatch.setattr(lister, "MAX_CALENDARS", 1)
         graph.get(_CALENDARS, params={"$skiptoken": "second"}).mock(
             return_value=_page(_delegated())
@@ -367,8 +350,6 @@ class TestWhatItAnswers:
     async def test_a_mailbox_graph_reported_no_calendar_for_answers_an_empty_listing(
         self, client: GraphServiceClient, calendars: respx.Route
     ) -> None:
-        """An empty listing is an answer, not a failure. It does not happen for a licensed mailbox,
-        and the field description says which permission explains it."""
         calendars.mock(return_value=_page())
 
         listed = await lister.list_calendars(client)
@@ -379,8 +360,6 @@ class TestWhatItAnswers:
 
 class TestTheSchemaItPublishes:
     async def test_it_publishes_no_arguments_at_all(self, transport: httpx.AsyncClient) -> None:
-        """This is the one calendar tool a model reaches with nothing in hand. An argument here
-        would be a handle no earlier call minted."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -393,10 +372,8 @@ class TestTheSchemaItPublishes:
     async def test_the_delegated_create_is_named_as_a_tool_this_deployment_might_not_run(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Three presets register this tool and only the delegate one registers
-        outlook_create_event_on_behalf, so a flat "this `uri` goes to that tool" sends a model to a
-        tool that is not there. The mention stays conditional.
-        """
+        """Only the delegate preset registers outlook_create_event_on_behalf, so a flat "this
+        `uri` goes to that tool" would send a model to a tool that is not there."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -408,8 +385,6 @@ class TestTheSchemaItPublishes:
     async def test_every_field_of_the_answer_says_what_it_is(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Asserted over the published schema rather than the model classes: a description that
-        never reaches the wire is not one."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -437,8 +412,6 @@ class TestGraphFailures:
     async def test_a_refused_identity_read_stops_before_the_calendars_are_asked_for(
         self, client: GraphServiceClient, graph: respx.MockRouter, calendars: respx.Route
     ) -> None:
-        """Without the signed-in user no row answers `is_mine`, which is the question this tool
-        exists for, so the second request is not worth making."""
         graph.get("/me").mock(
             return_value=httpx.Response(
                 403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}

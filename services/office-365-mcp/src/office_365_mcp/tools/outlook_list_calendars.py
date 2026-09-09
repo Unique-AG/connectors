@@ -1,36 +1,12 @@
 """`outlook_list_calendars` — every calendar this mailbox reaches, and the handle for each one.
 
-**One request answers "whose calendars can I see", and Graph offers no narrower shape.** Microsoft:
-"Get all the user's calendars (`/calendars` navigation property), get the calendars from the
-default calendar group or from a specific calendar group"
-(https://learn.microsoft.com/en-us/graph/api/user-list-calendars). This tool asks for all of them.
-The calendar-group routes split the same set by a folder the user arranged, which answers a
-question nobody here asks.
-
-**A calendar another person delegated is a plain row of this listing, named after that person.**
-Microsoft's walkthrough signs in as Adele, who holds Alex' delegated calendar, calls
-`GET /me/calendars`, and reports that the response "includes the response code HTTP 200, Adele's
-own primary calendar, and a copy of the calendar delegated by Alex in Adele's mailbox", where
-"**canEdit** is true since as delegate, Adele has write access to non-private events in the
-delegated calendar" and "**owner** is `Alex Wilber` indicating it is Alex' calendar"
-(https://learn.microsoft.com/en-us/graph/outlook-create-event-in-shared-delegated-calendar). The
-row's `name` in that sample is the string `Alex Wilber`. So the name of a delegated calendar is a
-person, and the primary calendar of the signed-in user is called `Calendar`.
-
-**Nothing in the row says "this one is shared", so this connector derives it.** `calendar` in v1.0
-publishes no `isSharedWithMe` property (https://learn.microsoft.com/en-us/graph/api/resources/
-calendar). `owner` is the only property that separates a delegated row from an own one, and
-`canEdit` is true on both. That is why this tool reads `GET /me` first: `is_mine` is the owner
-address compared against the signed-in user's `mail` and `userPrincipalName`, and a comparison
-needs both of those values. Without the `/me` read the answer carries no `is_mine` at all.
-
-**`Calendars.Read` alone hides the rows that matter here.** Microsoft's delegated walkthrough says
-of this exact call: "Use the least privileged delegated permission, `Calendars.Read.Shared`". So
-this tool declares that permission beside `Calendars.Read`, and a tenant that consents to only the
-first one gets an inventory of the user's own calendars and no delegated one. Microsoft's own least
-privileged permission for the route is `Calendars.ReadBasic`. This tool does not use it, because
-every other calendar tool of this connector needs `Calendars.Read`, and a second permission on the
-consent screen that buys one listing is a worse trade than a shared one.
+- A delegated calendar is a plain row of `GET /me/calendars`, named after its owner, with `canEdit`
+  true: https://learn.microsoft.com/en-us/graph/outlook-create-event-in-shared-delegated-calendar
+- `calendar` in v1.0 publishes no sharing flag, so `is_mine` is this connector's own comparison of
+  `owner` against the `/me` read's `mail` and `userPrincipalName`:
+  https://learn.microsoft.com/en-us/graph/api/resources/calendar
+- Microsoft names `Calendars.Read.Shared` as the least privileged permission for this call, so a
+  tenant that consents only to `Calendars.Read` gets a short listing rather than a refusal.
 """
 
 from collections.abc import Mapping
@@ -53,21 +29,14 @@ TOOL_NAME = "outlook_list_calendars"
 
 STEP = "calendars"
 
-# `Calendars.Read` covers the user's own calendars. `Calendars.Read.Shared` is what Microsoft names
-# as the least privileged permission for reading a delegated calendar, so without it the listing is
-# short rather than refused. `User.Read` covers the `/me` read that `is_mine` is decided against.
 GRAPH_PERMISSIONS: tuple[str, ...] = (
     "Calendars.Read",
     "Calendars.Read.Shared",
     identity.GRAPH_PERMISSION,
 )
 
-# No arguments at all is the only call this tool has. It reaches Graph without a handle from any
-# earlier response, which is what makes it the entry point of the calendar surface.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
-# A mailbox with more calendars than this is not one a model reads its way through. The walk stops
-# and says so, rather than spending pages on a list nobody reads to the end.
 MAX_CALENDARS = 200
 
 # Bound rather than aliased with `type`. This name serves as the query parameters' constructor and
@@ -117,19 +86,11 @@ class Calendars(BaseModel):
 
 
 async def list_calendars(client: GraphServiceClient) -> Calendars:
-    """Every calendar of the mailbox, each one judged against the signed-in user.
-
-    The `/me` read comes first and its failure ends the call: an answer whose every `is_mine` is
-    null says a delegated calendar and an own one are indistinguishable, which is the one question
-    this tool exists to answer.
-    """
     with graph_errors(TOOL_NAME):
         user = await identity.signed_in_user(client)
         with graph_step(STEP):
-            # No request header travels with this call. Microsoft documents that container types
-            # such as `calendar` do not support `Prefer: IdType="ImmutableId"`, and that their
-            # regular ids "were already constant"
-            # (https://learn.microsoft.com/en-us/graph/outlook-immutable-id).
+            # Container types such as `calendar` support no immutable id, so no `Prefer` header
+            # travels here: https://learn.microsoft.com/en-us/graph/outlook-immutable-id
             first_page = await client.me.calendars.get(
                 request_configuration=RequestConfiguration[_CalendarsQuery](
                     query_parameters=_CalendarsQuery(

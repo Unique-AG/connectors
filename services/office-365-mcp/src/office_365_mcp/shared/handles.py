@@ -37,17 +37,14 @@ this connector keeps them apart: a draft is a message with `isDraft` set. Splitt
 families keeps a message that a reader found from being spelled as a draft and handed to the tool
 that sends.
 
-A calendar is one segment too. Graph says that container types such as `calendar` support no
-immutable id, "but their regular IDs were already constant"
-(https://learn.microsoft.com/en-us/graph/outlook-immutable-id), so one id addresses one
-calendar for as long as it exists.
+A calendar is one segment: Graph says container types such as `calendar` support no immutable id,
+"but their regular IDs were already constant"
+(https://learn.microsoft.com/en-us/graph/outlook-immutable-id).
 
-An event is TWO segments, and it is the calendar id that comes first. An event id is only
-meaningful beside the calendar it was read from: the reader addresses
-`/me/calendars/{calendar_id}/events/{event_id}` and needs both. Microsoft states that an id from
-another mailbox "would return an error"
-(https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars), so the pair is the
-whole address. This is the shape of `teams:///transcripts/{a}/{b}`, and for the same reason.
+An event is two segments, the calendar id first: the read route is
+`/me/calendars/{calendar_id}/events/{event_id}`, and Microsoft says an id from another mailbox
+"would return an error"
+(https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars).
 """
 
 import re
@@ -163,9 +160,8 @@ class MailRuleHandle:
 
 @dataclass(frozen=True, slots=True)
 class CalendarHandle:
-    """This identifies one calendar of the signed-in user's mailbox, including a calendar that
-    another person shared with them: Graph lists a delegated calendar in `GET /me/calendars` as a
-    row of its own (https://learn.microsoft.com/en-us/graph/api/user-list-calendars)."""
+    """Graph lists a calendar another person shared in `GET /me/calendars` as a row of its own
+    (https://learn.microsoft.com/en-us/graph/api/user-list-calendars)."""
 
     calendar_id: str
 
@@ -176,9 +172,6 @@ class CalendarHandle:
 
 @dataclass(frozen=True, slots=True)
 class EventHandle:
-    """This identifies an event by the calendar it was read from and its own id, because the read
-    route needs both."""
-
     calendar_id: str
     event_id: str
 

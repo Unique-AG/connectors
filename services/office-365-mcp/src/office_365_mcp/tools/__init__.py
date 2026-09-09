@@ -242,10 +242,6 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",
     ),
-    # One ladder, not two axes, and the reason is what a tenant is asked to grant. Reading a
-    # calendar another person delegated costs `Calendars.Read.Shared`, so the read tier already
-    # carries the permission that a delegated deployment would otherwise be the first to ask for.
-    # Writing as another person is the tier to argue about, and it is the last row.
     "outlook-calendar": (
         "outlook_list_calendars",
         "outlook_list_events",

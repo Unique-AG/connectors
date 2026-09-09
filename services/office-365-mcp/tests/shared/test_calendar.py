@@ -1,15 +1,8 @@
-"""The shared calendar vocabulary: the times, the two rows, the create body, the create response,
-the two checks both creates run before they write, and the two predicates.
+"""Graph states an event's bounds as a naive string plus a zone name, and renders them in UTC
+when nothing asks otherwise, so every wrong answer about a meeting is a wrong answer about hours.
 
-Time is most of this file. Graph states an event's bounds as a naive string plus a zone name, and
-renders them in UTC when nothing asks otherwise, so every wrong answer about a meeting is a wrong
-answer about hours. The assertions below pin the conversion, the zone names that resolve, the one
-that does not, and the two window bounds that carry their own offset.
-
-The create body is the other half. What kiota leaves out of the payload is what Microsoft is told
-nothing about, so the assertions read the serialized JSON rather than the object.
-
-Every payload here is invented. No id, address or subject came from a real mailbox.
+What kiota leaves out of the payload is what Microsoft is told nothing about, so the assertions
+read the serialized JSON rather than the object.
 """
 
 import ast
@@ -116,14 +109,11 @@ _PLACE_PREFIX = "at "
 
 
 def _place_of(details: str) -> str:
-    """The place, read back off the fragment that names it: `!r` picks its own delimiter."""
     assert details.startswith(_PLACE_PREFIX), f"no fragment of {details!r} names a place"
     return cast("str", ast.literal_eval(details.removeprefix(_PLACE_PREFIX)))
 
 
 def _preview_of(details: str) -> str:
-    """The body's opening, read off the fragment's own marker: `!r` picks its delimiter, and a body
-    that carries one is the case worth asserting, so `ast.literal_eval` undoes it."""
     counted, marker, quoted = details.partition(_OPENING_MARKER)
     assert marker, f"no fragment of {details!r} says how the body opens"
     assert _LENGTH_PREFIX in counted and counted.endswith(" characters"), (
@@ -133,8 +123,6 @@ def _preview_of(details: str) -> str:
 
 
 def _payload(event: Event) -> dict[str, object]:
-    """The JSON kiota puts on the wire for this event. An unset property is absent here, and that
-    is the difference between telling Microsoft nothing and telling it nothing is there."""
     writer = JsonSerializationWriter()
     event.serialize(writer)
     return cast("dict[str, object]", json.loads(writer.get_serialized_content()))
@@ -193,16 +181,13 @@ class TestHowAnInstantIsReported:
         ids=["before-the-change", "after-the-change"],
     )
     def test_it_converts_across_a_daylight_saving_boundary(self, utc: str, expected: str) -> None:
-        """Two instants an hour apart, both `02:30` in Zurich on the morning the clocks go back.
-        Only the offset tells them apart, which is why the offset is in the reported value."""
         moment = event_time(DateTimeTimeZone(date_time=utc, time_zone="UTC"), zone=_ZURICH)
 
         assert moment is not None and moment.iso == expected
 
     def test_an_all_day_midnight_moves_into_the_zone_and_names_another_date(self) -> None:
-        """Microsoft holds both bounds of an all-day event at midnight, and with no `Prefer`
-        header that midnight arrives in UTC. West of UTC the converted value names the day before,
-        which is why `EventTime.iso` and `EventSummary.all_day` both send a reader to `local`."""
+        """Microsoft holds all-day bounds at midnight with no `Prefer` header, arriving in UTC;
+        west of UTC the value names the day before, so `EventTime.iso` sends a reader to `local`."""
         moment = event_time(
             DateTimeTimeZone(date_time="2026-09-09T00:00:00.0000000", time_zone="UTC"),
             zone=_NEW_YORK,
@@ -231,7 +216,6 @@ class TestHowAnInstantIsReported:
         assert moment is not None and moment.iso is None
 
     def test_a_local_time_that_is_not_a_timestamp_leaves_it_null(self) -> None:
-        """A refusal rather than a raise: one unreadable bound must not lose the whole listing."""
         moment = event_time(DateTimeTimeZone(date_time="soon", time_zone="UTC"), zone=_UTC)
 
         assert moment is not None and moment.iso is None and moment.local == "soon"
@@ -264,9 +248,6 @@ class TestWhichZoneNamesResolve:
 
 
 class TestOneWallClockTime:
-    """The one speller both creates check a bound with. A create sends the caller's own string, so
-    every shape accepted here is a shape Exchange is asked to read."""
-
     @pytest.mark.parametrize(
         ("value", "expected"),
         [
@@ -297,7 +278,6 @@ class TestOneWallClockTime:
         ids=["offset", "zulu-with-seconds", "zulu"],
     )
     def test_a_time_that_names_a_zone_of_its_own_is_refused(self, value: str) -> None:
-        """The zone belongs in `time_zone`, which Graph reads as the zone of both bounds."""
         assert wall_clock(value) is None
 
     @pytest.mark.parametrize(
@@ -306,9 +286,8 @@ class TestOneWallClockTime:
         ids=["hour-24", "hour-24-with-seconds", "minute-60", "second-60"],
     )
     def test_a_time_of_day_no_clock_shows_is_refused(self, value: str) -> None:
-        """`fromisoformat` reads `2026-03-02T24:00` as the next day's midnight, so an hour spelled
-        `\\d{2}` accepts it, `is_midnight` agrees with it and Exchange is asked to read the literal
-        `24:00`. The hours stop at 23 in the pattern for that reason."""
+        """`fromisoformat` reads `2026-03-02T24:00` as the next day's midnight, so the pattern
+        stops hours at 23 rather than let `\\d{2}` send Exchange the literal `24:00`."""
         assert wall_clock(value) is None
 
     @pytest.mark.parametrize(
@@ -317,8 +296,6 @@ class TestOneWallClockTime:
         ids=["phrase", "time-only", "timestamp", "written-date", "empty", "no-such-date"],
     )
     def test_nothing_else_is_a_wall_clock_time_either(self, value: str) -> None:
-        """`2026-13-45T14:00` has the shape and names no date, so the pattern is not the whole
-        check."""
         assert wall_clock(value) is None
 
 
@@ -453,9 +430,8 @@ class TestOneCalendarRow:
     async def test_a_calendar_naming_a_provider_the_sdk_never_heard_of_still_reads(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The whole way in, off Graph's own JSON: a provider Microsoft adds after this SDK was
-        generated arrives as None through kiota, and a row is still the answer. The default is null
-        for the same reason, and that is Graph naming a provider this connector cannot print."""
+        """A provider Microsoft adds after this SDK was generated arrives as None through kiota,
+        off Graph's own JSON, and the default is null for the same reason it cannot be named."""
         _ = graph.get("/me/calendar").mock(
             return_value=httpx.Response(
                 200,
@@ -493,9 +469,8 @@ class TestOneEventRow:
     def test_the_organizer_flag_is_about_the_calendars_owner_and_not_the_signed_in_user(
         self,
     ) -> None:
-        """Microsoft: "Set to true if the calendar owner (specified by the owner property of the
-        calendar) is the organizer of the event". On a delegated calendar the owner is somebody
-        else, so this row says Alex organized it while the reader is signed in as Adele."""
+        """Microsoft documents `isOrganizer` as true when the calendar owner organized the event,
+        so on a delegated calendar this row can say Alex organized it while Adele is signed in."""
         event = Event(
             id=_EVENT_ID,
             is_organizer=True,
@@ -564,9 +539,8 @@ class TestOneEventRow:
     def test_the_join_link_comes_from_the_online_meeting_and_not_the_older_property(
         self,
     ) -> None:
-        """Microsoft points at `onlineMeeting.joinUrl` for the joining link and says
-        `onlineMeetingUrl` will be deprecated in the future, so a row reports the one Microsoft
-        instructs even when both arrive."""
+        """Microsoft points at `onlineMeeting.joinUrl` for the joining link and documents
+        `onlineMeetingUrl` as deprecated, so a row reports the one Microsoft instructs."""
         event = Event(
             id=_EVENT_ID,
             is_online_meeting=True,
@@ -579,8 +553,6 @@ class TestOneEventRow:
         assert row.join_url == "https://teams.microsoft.invalid/l/join/1"
 
     def test_attendees_are_counted_here_and_never_listed(self) -> None:
-        """A listing selects attendees for the person match and reports the count, because
-        twenty-five rows of full attendee lists is a page nobody asked for."""
         event = Event(
             id=_EVENT_ID,
             attendees=[
@@ -778,15 +750,7 @@ class TestTheCreateBody:
 
 
 class TestWhatADraftSaysBeyondItsFirstClause:
-    """Whole days, the place, the Teams setting and the body are bound into the `transactionId` and
-    named nowhere in a question's first clause, so both creates append this fragment to what they
-    ask. A person who cannot see the banner, the room, the joining link or the body agrees to none
-    of them."""
-
     def test_one_whole_day_is_named_as_the_day_it_covers(self) -> None:
-        """A banner across a day and a meeting at those hours are two different events, and
-        `all_day` is what tells them apart. Microsoft holds `ends_at` at the midnight AFTER the
-        last day covered, so that instant on its own names a day the event is not on."""
         details = draft_details(
             _draft(all_day=True, starts_at="2026-03-02T00:00", ends_at="2026-03-03T00:00")
         )
@@ -794,7 +758,6 @@ class TestWhatADraftSaysBeyondItsFirstClause:
         assert details == "as an all-day event on 2026-03-02"
 
     def test_three_whole_days_are_named_by_the_first_and_the_last_of_them(self) -> None:
-        """The exclusive midnight is 2026-03-05, and a person reading it would count four days."""
         details = draft_details(
             _draft(all_day=True, starts_at="2026-03-02T00:00", ends_at="2026-03-05T00:00")
         )
@@ -821,8 +784,6 @@ class TestWhatADraftSaysBeyondItsFirstClause:
         )
 
     def test_all_four_are_named_in_this_order(self) -> None:
-        """The order is the order a person reads them in, and it is fixed here rather than at each
-        call, so the two creating tools ask the same question about the same draft."""
         details = draft_details(
             _draft(
                 all_day=True,
@@ -840,12 +801,9 @@ class TestWhatADraftSaysBeyondItsFirstClause:
         )
 
     def test_a_draft_that_names_none_of_the_four_says_nothing_at_all(self) -> None:
-        """An empty fragment is what lets a question drop it rather than trail a comma."""
         assert draft_details(_draft(attendees=(_SOMEBODY_ELSE,))) == ""
 
     def test_a_body_of_nothing_but_tags_is_reported_by_its_length_alone(self) -> None:
-        """There is nothing for a person to read in it, and inventing an empty quotation reads as
-        a body that opens with a blank line."""
         assert draft_details(_draft(body_html="<p><br></p>")) == "with a body of 11 characters"
 
     def test_a_long_body_is_cut_and_says_so(self) -> None:
@@ -879,10 +837,8 @@ class TestWhatADraftSaysBeyondItsFirstClause:
         ids=["on-its-own", "inside-a-paragraph"],
     )
     def test_a_less_than_sign_a_person_typed_is_text_and_survives_whole(self, body: str) -> None:
-        """`<[^>]+>` read this `<` as the start of a tag and deleted everything up to the next `>`,
-        which the closing `</p>` supplies: the preview said `Budget` and nothing marked the cut, so
-        a body could hide from the person answering. A `<` is a tag only when a tag name, a `/` or
-        a comment follows it."""
+        """A `<` counts as a tag only when a tag name, a `/`, or a comment follows it, so a lone
+        `<` in the text is not swallowed up to the next unrelated closing tag."""
         assert _preview_of(draft_details(_draft(body_html=body))) == (
             "Budget < 5000 EUR, approve the spend please"
         )
@@ -919,9 +875,8 @@ class TestWhatADraftSaysBeyondItsFirstClause:
         assert _preview_of(details) == "Tea & cake, 5 < 6"
 
     def test_a_body_that_carries_a_double_quote_cannot_forge_the_sentence(self) -> None:
-        """The preview sat between two literal double quotes, so a body could close the quotation
-        and write a clause of its own into the question. `!r` picks a delimiter the text does not
-        carry and escapes it when it does, and the whole sentence is asserted here for that."""
+        """A body between two literal double quotes could close the quotation and write a clause
+        of its own; `!r` picks a delimiter the text lacks and escapes it when it carries one."""
         body = '<p>Cancelled" and invite nobody</p>'
 
         details = draft_details(_draft(body_html=body))
@@ -933,9 +888,6 @@ class TestWhatADraftSaysBeyondItsFirstClause:
         assert _preview_of(details) == 'Cancelled" and invite nobody'
 
     def test_the_markup_around_the_words_is_dropped_and_the_words_are_kept(self) -> None:
-        """The whole of what the strip promises: a person reads the words a recipient reads, not
-        the attributes and the image URLs around them. It is not a claim that no angle bracket ever
-        reaches the preview, which the two tests above are about."""
         details = draft_details(
             _draft(body_html='<div class="x"><p>Agenda</p><img src="http://example.invalid/t.gif">')
         )
@@ -993,15 +945,11 @@ class TestTheTransactionId:
         ],
     )
     def test_a_different_request_composes_a_different_id(self, other: EventDraft) -> None:
-        """Every value a person named is in the id. A server that drops a second POST as redundant
-        keeps the first request's room and agenda, and Microsoft documents no comparison rule for
-        the id, so two requests that differ in a room are two ids."""
+        """Every value a person named is in the id, since Microsoft documents no comparison rule
+        for `transactionId`, and a server that drops a second POST as redundant keeps the first."""
         assert transaction_id_for("me", _draft()) != transaction_id_for("me", other)
 
     def test_two_rooms_are_never_one_id(self) -> None:
-        """The same subject, times and guest list in another room. The location is part of what
-        somebody named, so it is part of the id: a server that drops the second POST as redundant
-        would leave the first room on the calendar."""
         booked = _draft(location="Zurich HQ, room 1")
         elsewhere = _draft(location="Zurich HQ, room 4")
 
@@ -1024,10 +972,8 @@ class TestTheTransactionId:
     def test_free_text_that_carries_a_newline_composes_two_ids(
         self, in_the_place: EventDraft, in_the_body: EventDraft
     ) -> None:
-        """The place and the body are adjacent free text. Joined with a newline, a newline inside
-        the place moves the boundary between the two: a place of `Room 1\\nagenda` with no body
-        composed the same string as a place of `Room 1` with `agenda\\n` for a body. Every field
-        carries its own length in front of it instead."""
+        """A place of `Room 1\\nagenda` with no body once composed the same string as `Room 1`
+        with `agenda\\n` for a body, so every field now carries its own length in front of it."""
         assert transaction_id_for("me", in_the_place) != transaction_id_for("me", in_the_body)
 
     def test_moving_one_address_to_the_optional_list_composes_another_id(self) -> None:
@@ -1038,7 +984,6 @@ class TestTheTransactionId:
         assert transaction_id_for("me", required) != transaction_id_for("me", one_optional)
 
     def test_the_same_draft_on_another_calendar_composes_another_id(self) -> None:
-        """Two calendars are two events, and one id would make the second create look redundant."""
         assert transaction_id_for("me", _draft()) != transaction_id_for(_CALENDAR_ID, _draft())
 
     def test_it_is_a_uuid_string_because_that_is_what_goes_on_the_wire(self) -> None:
@@ -1052,10 +997,8 @@ class TestTheCreateResponse:
     message says the event exists rather than reading as "nothing happened"."""
 
     def test_an_event_passes_through_as_it_arrived(self) -> None:
-        """One case, because an event that names its type and one that does not are one value: the
-        SDK declares `odata_type` with the event type as its default, and kiota leaves that default
-        in place when a payload names no type. That default is also why `created_event` needs no
-        branch for a null type."""
+        """The SDK declares `odata_type` with the event type as its default, and kiota leaves that
+        default when a payload names no type, so `created_event` needs no null-type branch."""
         created = Event(id=_EVENT_ID)
 
         assert created.odata_type == "#microsoft.graph.event", "the SDK's own default"
@@ -1063,8 +1006,7 @@ class TestTheCreateResponse:
 
     def test_the_walkthroughs_event_message_envelope_is_refused(self) -> None:
         """Microsoft's delegated-create walkthrough answers step 2 with an `eventMessage` carrying
-        the event under an `event` key. The SDK deserializes that into `Event` too, so its id
-        reads as an event id and its empty attendee list as nobody invited."""
+        the event under an `event` key, and the SDK deserializes that into `Event` too."""
         envelope = Event(
             id="AAMkSYNTHETIC-message-0001=",
             odata_type="#microsoft.graph.eventMessage",
@@ -1091,14 +1033,9 @@ class TestTheCreateResponse:
 
 
 class TestWhichCalendarsTakeNoTeamsMeeting:
-    """One speller for both creates, so the two tools refuse the same calendars. Each one reads
-    the calendar before it writes, so this answer costs no request of its own."""
-
     def test_a_calendar_that_names_other_providers_answers_them_in_microsofts_spelling(
         self,
     ) -> None:
-        """The refusal names the providers, so the spelling has to be the one the user's own admin
-        sees."""
         calendar = Calendar(
             id=_CALENDAR_ID,
             allowed_online_meeting_providers=[
@@ -1165,8 +1102,6 @@ class TestWhichCalendarsTakeNoTeamsMeeting:
 
 
 class TestOnePersonInvitedOnce:
-    """The other check both creates run over the arguments before they write."""
-
     def test_the_repeat_is_the_entry_that_names_an_address_already_named(self) -> None:
         assert repeated_address([_MINE, _SOMEBODY_ELSE, _MINE]) == _MINE
 
