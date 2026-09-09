@@ -17,6 +17,7 @@ from with_intelligence_mcp.dependencies import (
     get_database_config,
     get_engine,
     get_session_factory,
+    get_with_intelligence_client_factory,
     get_with_intelligence_config,
 )
 
@@ -33,6 +34,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_database_config,
     get_engine,
     get_session_factory,
+    get_with_intelligence_client_factory,
 )
 
 
@@ -52,5 +54,9 @@ async def _release_pools() -> None:
     hence the `cache_info()` check rather than an unconditional call. An undisposed pool bound
     to a dead event loop is what the next `create_app` (or the next test) trips over.
     """
-    if get_engine.cache_info().currsize:
-        await get_engine().dispose()
+    try:
+        if get_with_intelligence_client_factory.cache_info().currsize:
+            await get_with_intelligence_client_factory().aclose()
+    finally:
+        if get_engine.cache_info().currsize:
+            await get_engine().dispose()
