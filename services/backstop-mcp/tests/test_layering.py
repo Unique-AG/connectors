@@ -133,6 +133,7 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.features.party_resolver",
     "backstop_mcp.features.system_users",
     "backstop_mcp.features.tasks",
+    "backstop_mcp.features.time_zones",
     "backstop_mcp.server.tools",
 )
 

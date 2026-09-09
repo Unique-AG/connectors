@@ -28,6 +28,7 @@ from backstop_mcp.features.custom_fields import (
     get_custom_fields_service,
 )
 from backstop_mcp.features.system_users import SystemUsersService, get_system_users_service
+from backstop_mcp.features.time_zones import TimeZonesService, get_time_zones_service
 from tests.helpers import BASE_URL, client_factory, credential, resource
 
 
@@ -37,7 +38,11 @@ def _unused_client() -> BackstopClient:
 
 type ClientBuilder = Callable[[str], BackstopClient]
 type _WiredCatalog = (
-    ActivityTagsService | CustomFieldGroupsService | CustomFieldsService | SystemUsersService
+    ActivityTagsService
+    | CustomFieldGroupsService
+    | CustomFieldsService
+    | SystemUsersService
+    | TimeZonesService
 )
 
 
@@ -110,6 +115,15 @@ _CATALOGS: tuple[_CatalogUnderTest, ...] = (
         path="/system-users",
         resource_type="system-users",
         build=lambda client, caching: SystemUsersService.with_ttl_minutes(
+            client=client, ttl_minutes=60, caching_enabled=caching
+        ),
+    ),
+    _CatalogUnderTest(
+        slug="time-zones",
+        path="/time-zones",
+        resource_type="time-zones",
+        required_attributes={"shortName": "US/Eastern"},
+        build=lambda client, caching: TimeZonesService.with_ttl_minutes(
             client=client, ttl_minutes=60, caching_enabled=caching
         ),
     ),
@@ -202,12 +216,14 @@ class TestCachingFlagsComeFromTheEnvironment:
     _PROVIDERS: ClassVar[tuple[Callable[[BackstopClient], _WiredCatalog], ...]] = (
         get_activity_tags_service,
         get_system_users_service,
+        get_time_zones_service,
         get_custom_fields_service,
         get_custom_field_groups_service,
     )
     _FLAGS: ClassVar[tuple[str, ...]] = (
         "BACKSTOP_ACTIVITY_TAG_CACHE_ENABLED",
         "BACKSTOP_SYSTEM_USER_CACHE_ENABLED",
+        "BACKSTOP_TIME_ZONE_CACHE_ENABLED",
         "BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED",
     )
 
@@ -228,6 +244,7 @@ class TestCachingFlagsComeFromTheEnvironment:
         for provider in (
             get_activity_tags_service,
             get_system_users_service,
+            get_time_zones_service,
             get_custom_fields_service,
             get_custom_field_groups_service,
         ):
@@ -244,9 +261,10 @@ class TestCachingFlagsComeFromTheEnvironment:
             monkeypatch.delenv(flag, raising=False)
 
         unused = _unused_client()
-        tags, users, fields, groups = (provider(unused) for provider in self._PROVIDERS)
+        tags, users, zones, fields, groups = (provider(unused) for provider in self._PROVIDERS)
         assert self._enabled(tags) is False
         assert self._enabled(users) is False
+        assert self._enabled(zones) is False
         assert self._enabled(fields) is True
         assert self._enabled(groups) is True
 
@@ -258,10 +276,11 @@ class TestCachingFlagsComeFromTheEnvironment:
         monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED", "false")
 
         unused = _unused_client()
-        tags, users, fields, groups = (provider(unused) for provider in self._PROVIDERS)
+        tags, users, zones, fields, groups = (provider(unused) for provider in self._PROVIDERS)
 
         assert self._enabled(tags) is True
         assert self._enabled(users) is False
+        assert self._enabled(zones) is False
         assert self._enabled(fields) is False
         assert self._enabled(groups) is False
 

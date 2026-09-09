@@ -19,12 +19,13 @@ env:
   # BACKSTOP_BASE_URL defaults to https://api.backstopsolutions.com inside the app.
 
   # In-memory catalog caches, one flag per feature. A catalog is a small instance-wide
-  # `{id: dto}` map (custom-field definitions and groups, activity tags, system users) that
-  # many tool calls read and nothing writes; with a flag off, every read re-walks Backstop.
+  # `{id: dto}` map (custom-field definitions and groups, activity tags, system users,
+  # time zones) that many tool calls read and nothing writes; with a flag off, every
+  # read re-walks Backstop.
   #
   # Custom-field catalogs are on: the unfiltered walk is more than 1k definitions an average
   # of 2+ MiB which takes 5+ seconds to read, every party and product read joins against it.
-  # Activity tags and system users stay off until their histograms say otherwise:
+  # Activity tags, system users, and time zones stay off until their histograms say otherwise:
   #
   #   sum by (catalog) (rate(catalog_get_duration_seconds_count[5m]))       # demand
   #     - sum by (catalog) (rate(catalog_fetch_duration_seconds_count[5m])) # walks avoided already
@@ -35,12 +36,14 @@ env:
   #
   # How long an enabled cache holds is a separate knob per feature, defaulted in the app and
   # capped at 24h: BACKSTOP_CUSTOM_FIELD_SCHEMA_TTL_MINUTES (120),
-  # BACKSTOP_ACTIVITY_TAG_TTL_MINUTES (1440), BACKSTOP_SYSTEM_USER_TTL_MINUTES (1440).
+  # BACKSTOP_ACTIVITY_TAG_TTL_MINUTES (1440), BACKSTOP_SYSTEM_USER_TTL_MINUTES (1440),
+  # BACKSTOP_TIME_ZONE_TTL_MINUTES (1440).
   #
   # Covers both custom-field catalogs (definitions and groups), which share a TTL.
   BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED: "true"
   BACKSTOP_ACTIVITY_TAG_CACHE_ENABLED: "false"
   BACKSTOP_SYSTEM_USER_CACHE_ENABLED: "false"
+  BACKSTOP_TIME_ZONE_CACHE_ENABLED: "false"
 
   # Bounds how long a tool waits for the user to choose between ambiguous matches before
   # returning the candidate list instead. A property of the *client*, not of this server: it

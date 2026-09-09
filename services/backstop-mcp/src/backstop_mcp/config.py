@@ -293,6 +293,16 @@ class BackstopConfig(BaseSettings):
     # staleness. Set `BACKSTOP_SYSTEM_USER_CACHE_ENABLED=true` once its histograms say so.
     system_user_cache_enabled: bool = False
 
+    # How long a fetched time-zone catalog stays usable before it is re-fetched. Zones change
+    # rarely; the default is 24 hours. Capped at 24 hours so a stale catalog cannot sit for
+    # days after a CRM admin adds a zone.
+    time_zone_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
+
+    # Whether the time-zone catalog is held between calls. Off by default: unlike the
+    # custom-field walk, this one has not been measured as expensive enough to justify the
+    # staleness. Set `BACKSTOP_TIME_ZONE_CACHE_ENABLED=true` once its histograms say so.
+    time_zone_cache_enabled: bool = False
+
     # Which entity-relationship types mean employment, and which of those mean it has ended,
     # for departed-contact detection (UN-23678). Comma-separated env values. Ids match a type id
     # exactly; markers match case-insensitively as substrings of the type's name.

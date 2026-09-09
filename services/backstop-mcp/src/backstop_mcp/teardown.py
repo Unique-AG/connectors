@@ -64,6 +64,7 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.system_users import get_system_users_service
 from backstop_mcp.features.tasks import get_tasks_for_party_query_factory
+from backstop_mcp.features.time_zones import get_time_zones_service
 
 
 class CachedProvider(Protocol):
@@ -91,6 +92,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_search_activities_query_factory,
     get_activity_tags_service,
     get_system_users_service,
+    get_time_zones_service,
     get_custom_fields_service,
     get_custom_field_groups_service,
     get_employment_index_factory,

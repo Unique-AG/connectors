@@ -333,4 +333,5 @@ class TestConfigTranslation:
             "custom_field_schema_ttl_minutes",
             "opportunity_stage_ttl_minutes",
             "system_user_ttl_minutes",
+            "time_zone_ttl_minutes",
         }

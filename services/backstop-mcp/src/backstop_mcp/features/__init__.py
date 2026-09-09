@@ -4,9 +4,10 @@ Everything here is domain logic — Backstop credential bridging (`auth`), CRM c
 catalog fetch (`custom_fields`), name-to-record lookup (`party_resolver`), product index and
 match (`accounts`), people linked to an organization (`org_people`), read-response provenance
 and departed-contact detection (`data_hygiene`), a person's or organization's interaction
-record (`activity_history`), a party's pipeline (`opportunities`), the `?include=` allowlist
-and the shapes side-loads project onto (`includes`), the shared entity-type vocabulary
-(`entity_types`), and the resolution algebra party lookup uses (`resolution`).
+record (`activity_history`), a party's pipeline (`opportunities`), the time-zone catalog
+(`time_zones`), the `?include=` allowlist and the shapes side-loads project onto (`includes`),
+the shared entity-type vocabulary (`entity_types`), and the resolution algebra party lookup
+uses (`resolution`).
 
 MCP tools live under each feature's `tools/`: one `@tool` per file, named after the file.
 They declare collaborators as `Depends(...)` parameters, which stay out of the published
