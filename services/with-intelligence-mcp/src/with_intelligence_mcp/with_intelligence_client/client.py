@@ -33,20 +33,6 @@ type Gate = Callable[[str], AbstractAsyncContextManager[None]]
 _JSON = TypeAdapter(object)
 
 
-type Primitive = str | int | float | bool | None
-
-
-def _flatten(params: Mapping[str, QueryValue]) -> list[tuple[str, Primitive]]:
-    """Array filters repeat their key: `?id=1&id=2`. `None` values are dropped by the caller."""
-    flat: list[tuple[str, Primitive]] = []
-    for key, value in params.items():
-        if isinstance(value, (str, int, float, bool)):
-            flat.append((key, value))
-            continue
-        flat.extend((key, item) for item in value)
-    return flat
-
-
 class WithIntelligenceClient:
     """One caller's view of the API, over a pool and gates the factory owns."""
 
@@ -140,7 +126,7 @@ class WithIntelligenceClient:
                 response = await client.request(
                     method,
                     path,
-                    params=_flatten(params),
+                    params=params,
                     headers={"authorization": f"Bearer {token}"},
                 )
             except httpx.TimeoutException as exc:
