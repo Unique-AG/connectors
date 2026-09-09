@@ -41,9 +41,9 @@ def _flatten(params: Mapping[str, QueryValue]) -> list[tuple[str, Primitive]]:
     flat: list[tuple[str, Primitive]] = []
     for key, value in params.items():
         if isinstance(value, (str, int, float, bool)):
-            flat.append((key, str(value)))
+            flat.append((key, value))
             continue
-        flat.extend((key, str(item)) for item in value)
+        flat.extend((key, item) for item in value)
     return flat
 
 

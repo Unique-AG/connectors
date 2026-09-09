@@ -148,6 +148,15 @@ class TestRetries:
 
 class TestQueryEncoding:
     @respx.mock
+    async def test_a_boolean_filter_uses_lowercase(self) -> None:
+        route = respx.get(f"{BASE_URL}/v3/investors").mock(
+            return_value=httpx.Response(200, json=page_body([], total=0))
+        )
+        client, _ = build_client()
+        _ = await client.get_page("/v3/investors", {"active": True})
+        assert "active=true" in sent_query(route)
+
+    @respx.mock
     async def test_a_list_filter_repeats_its_key(self) -> None:
         route = respx.get(f"{BASE_URL}/v3/investors").mock(
             return_value=httpx.Response(200, json=page_body([], total=0))
