@@ -9,6 +9,7 @@ import { DirectoriesSync, directories, directoriesSync, SOURCES_ADDRESSED_BY_EMA
 import { DRIZZLE, DrizzleDatabase } from '~/db/drizzle.module';
 import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import {
+  type GraphClientResolveOptions,
   isNoDelegatesResult,
   MsGraphClientResolver,
 } from '~/msgraph/ms-graph-client-resolver.service';
@@ -29,7 +30,10 @@ export class SyncDirectoriesCommand {
   ) {}
 
   @NewTrace('sync-directories')
-  public async run(userProfileId: UserProfileTypeID): Promise<void> {
+  public async run(
+    userProfileId: UserProfileTypeID,
+    options?: GraphClientResolveOptions,
+  ): Promise<void> {
     traceAttrs({ userProfileId: userProfileId.toString() });
     this.logger.log({
       userProfileId: userProfileId.toString(),
@@ -99,6 +103,7 @@ export class SyncDirectoriesCommand {
       },
       sharedMailboxConfig: {
         preferredDelegateUserId: syncStats.synchronizedByUserProfileId ?? undefined,
+        allowDelegateFallback: options?.allowDelegateFallback,
       },
     });
 
@@ -141,7 +146,7 @@ export class SyncDirectoriesCommand {
     if (shouldSyncDirectories || shouldForceDirectoriesSync) {
       traceEvent(`Run directories sync`);
       this.logger.log({ ...logContext, msg: `Run directories sync` });
-      await this.syncDirectoriesForUserProfileCommand.run(userProfileId);
+      await this.syncDirectoriesForUserProfileCommand.run(userProfileId, options);
       traceEvent('directories sync completed');
       this.logger.log({ ...logContext, msg: `Directories sync completed` });
     } else {

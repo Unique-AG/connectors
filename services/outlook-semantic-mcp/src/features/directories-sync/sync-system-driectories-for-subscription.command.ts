@@ -14,6 +14,7 @@ import {
 } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import {
+  type GraphClientResolveOptions,
   isNoDelegatesResult,
   MsGraphClientResolver,
 } from '~/msgraph/ms-graph-client-resolver.service';
@@ -51,13 +52,17 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
   ) {}
 
   @Span()
-  public async run(userProfileId: UserProfileTypeID): Promise<void> {
+  public async run(
+    userProfileId: UserProfileTypeID,
+    options?: GraphClientResolveOptions,
+  ): Promise<void> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
 
     traceEvent('Start system folders sync');
     const microsoftGraphDirectories = await this.msGraphClientResolver.run({
       userProfile,
       fn: ({ client }) => this.fetchMicrosoftSystemFolders(client, userProfile),
+      sharedMailboxConfig: { allowDelegateFallback: options?.allowDelegateFallback },
     });
     traceEvent('Finished reading microsoft graph system directories');
 

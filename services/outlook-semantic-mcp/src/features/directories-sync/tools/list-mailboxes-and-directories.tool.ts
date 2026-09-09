@@ -108,7 +108,7 @@ export class ListMailboxesAndDirectoriesTool {
       userProfileId: userProfileTypeIdString,
       msg: 'Running directory sync before listing mailboxes and directories',
     });
-    await this.syncDirectoriesCommand.run(userProfileTypeId);
+    await this.syncDirectoriesCommand.run(userProfileTypeId, { allowDelegateFallback: false });
     const mailboxes = await this.listDirectoriesQuery.run(userProfileTypeIdString);
 
     return {

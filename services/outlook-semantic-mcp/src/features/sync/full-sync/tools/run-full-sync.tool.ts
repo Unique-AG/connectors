@@ -51,7 +51,7 @@ export class RunFullSyncTool {
     const userProfileId = userProfileTypeid.toString();
 
     this.logger.log({ userProfileId, msg: 'Starting full sync' });
-    const result = await this.fullSyncCommand.run(userProfileId);
+    const result = await this.fullSyncCommand.run(userProfileId, { allowDelegateFallback: false });
 
     if (result.status === 'skipped') {
       return { success: false, message: `Skipped running full sync: ${result.reason}` };

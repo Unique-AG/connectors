@@ -1,4 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
+import { UpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FullSyncCommand, START_FULL_SYNC_LINK } from '../full-sync.command';
 
@@ -135,6 +136,7 @@ function createCommand({
   updateByVersionCommand = createMockUpdateByVersionCommand(),
   db = createMockDb({ row: undefined }),
   syncDirectories = createSyncDirectoriesVersionCommand(),
+  graphClientResolver = createMockMsGraphClientResolver(graphApi),
 }: {
   graphApi?: ReturnType<typeof createMockGraphApi>;
   batchCommand?: ReturnType<typeof createMockProcessFullSyncBatchCommand>;
@@ -142,9 +144,10 @@ function createCommand({
   updateByVersionCommand?: ReturnType<typeof createMockUpdateByVersionCommand>;
   db?: ReturnType<typeof createMockDb>;
   syncDirectories?: ReturnType<typeof createSyncDirectoriesVersionCommand>;
+  graphClientResolver?: ReturnType<typeof createMockMsGraphClientResolver>;
 } = {}): FullSyncCommand {
   return new FullSyncCommand(
-    createMockMsGraphClientResolver(graphApi) as any,
+    graphClientResolver as any,
     batchCommand as any,
     statsQuery as any,
     updateByVersionCommand as any,
@@ -775,6 +778,76 @@ describe('FullSyncCommand', () => {
       expect(batchCommand.run).not.toHaveBeenCalledWith(
         expect.objectContaining({ graphBasePath: 'me' }),
       );
+    });
+
+    it('passes allowDelegateFallback through to resolver and directory sync', async () => {
+      const graphApi = createMockGraphApi();
+      const graphClientResolver = createMockMsGraphClientResolver(graphApi);
+      const syncDirectories = createSyncDirectoriesVersionCommand();
+      const updateByVersionCommand = createMockUpdateByVersionCommand(true);
+      const db = createMockDb({
+        row: makeRow({ fullSyncState: 'ready', fullSyncLastRunAt: null }),
+      });
+      const command = createCommand({
+        graphApi,
+        graphClientResolver,
+        syncDirectories,
+        updateByVersionCommand,
+        db,
+      });
+
+      await command.run(USER_PROFILE_ID, { allowDelegateFallback: false });
+
+      expect(graphClientResolver.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sharedMailboxConfig: expect.objectContaining({ allowDelegateFallback: false }),
+        }),
+      );
+      expect(syncDirectories.run).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ allowDelegateFallback: false }),
+      );
+    });
+
+    it('rethrows UpstreamCredentialRevokedError instead of converting it to a failed result', async () => {
+      const revoked = new UpstreamCredentialRevokedError('invalid_grant');
+      const graphClientResolver = { run: vi.fn().mockRejectedValue(revoked) };
+      const updateByVersionCommand = createMockUpdateByVersionCommand();
+      const db = createMockDb({
+        row: makeRow({ fullSyncState: 'ready', fullSyncLastRunAt: null }),
+      });
+      const command = createCommand({
+        graphClientResolver: graphClientResolver as any,
+        updateByVersionCommand,
+        db,
+      });
+
+      await expect(command.run(USER_PROFILE_ID, { allowDelegateFallback: false })).rejects.toBe(
+        revoked,
+      );
+      // The lock must be released before the throw, or the row keeps claiming to be running.
+      expect(updateByVersionCommand.run).toHaveBeenCalledWith(
+        USER_PROFILE_ID,
+        expect.any(String),
+        expect.objectContaining({ fullSyncState: 'failed' }),
+      );
+    });
+
+    it('keeps the failed result for background triggers, which have nobody to re-authenticate', async () => {
+      const revoked = new UpstreamCredentialRevokedError('invalid_grant');
+      const graphClientResolver = { run: vi.fn().mockRejectedValue(revoked) };
+      const db = createMockDb({
+        row: makeRow({ fullSyncState: 'ready', fullSyncLastRunAt: null }),
+      });
+      const command = createCommand({
+        graphClientResolver: graphClientResolver as any,
+        db,
+      });
+
+      await expect(command.run(USER_PROFILE_ID)).resolves.toEqual({
+        status: 'failed',
+        error: revoked,
+      });
     });
   });
 });

@@ -2,6 +2,7 @@ import type {
   AccessTokenMetadata,
   IOAuthStore,
   RefreshTokenMetadata,
+  RevokedTokens,
 } from '../interfaces/io-auth-store.interface';
 import type { AuthorizationCode, OAuthClient } from '../interfaces/oauth-client.interface';
 import type { OAuthSession, OAuthUserProfile } from '../interfaces/oauth-provider.interface';
@@ -100,6 +101,23 @@ export class MockOAuthStore implements IOAuthStore {
         this.refreshTokens.delete(token);
       }
     }
+  }
+
+  public async revokeAllTokensForUserProfile(userProfileId: string): Promise<RevokedTokens> {
+    const clientIds = new Set<string>();
+    let tokenCount = 0;
+
+    for (const tokenStore of [this.accessTokens, this.refreshTokens]) {
+      for (const [token, metadata] of [...tokenStore.entries()]) {
+        if (metadata.userProfileId === userProfileId) {
+          tokenStore.delete(token);
+          clientIds.add(metadata.clientId);
+          tokenCount += 1;
+        }
+      }
+    }
+
+    return { tokenCount, clientIds: [...clientIds] };
   }
 
   public async markRefreshTokenAsUsed(token: string): Promise<void> {

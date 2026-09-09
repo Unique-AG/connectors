@@ -145,6 +145,8 @@ export class TokenRefreshMiddleware implements Middleware {
         );
       }
     } catch (error) {
+      // `UpstreamCredentialRevokedError` arrives here as an `McpError`: TokenProvider has already
+      // logged it and revoked the MCP tokens, so propagate rather than keeping the original 401.
       if (error instanceof McpError) {
         throw error;
       }
@@ -157,8 +159,8 @@ export class TokenRefreshMiddleware implements Middleware {
         },
         'Failed to refresh token or retry Microsoft Graph request for user',
       );
-      // Keep the original 401 response if refresh fails
-      // The calling code will handle the authentication error appropriately
+      // Keep the original 401 response if a transient refresh fails.
+      // Permanent grant failures are rethrown above so the MCP session can be revoked.
     }
   }
 

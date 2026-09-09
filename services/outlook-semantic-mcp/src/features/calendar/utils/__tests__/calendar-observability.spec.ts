@@ -27,6 +27,14 @@ describe(classifyCalendarGraphError.name, () => {
     ).toEqual({ outcome: 'not_found', message: 'missing' });
   });
 
+  it('returns unhandled for Graph 401 so a dead grant is not masked as consent', () => {
+    expect(
+      classifyCalendarGraphError({
+        error: makeGraphError(401),
+      }),
+    ).toEqual({ outcome: 'unhandled' });
+  });
+
   it("maps 403 to consent, because every addressable calendar is the caller's own", () => {
     expect(
       classifyCalendarGraphError({

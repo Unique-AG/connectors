@@ -1,8 +1,8 @@
+import { UpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 import { classifyError, isUpstreamNetworkError, toAttributedError } from './classify-error';
-import { MicrosoftReauthRequiredException } from './microsoft-reauth.exception';
 
 function graphError(statusCode: number, code?: string, requestId?: string): GraphError {
   const error = new GraphError(statusCode, 'Error while processing response.');
@@ -125,8 +125,8 @@ describe('classifyError', () => {
 });
 
 describe('toAttributedError', () => {
-  it('returns an McpError unchanged (preserves reauth flow)', () => {
-    const reauth = new MicrosoftReauthRequiredException('invalid_grant');
+  it('returns an UpstreamCredentialRevokedError unchanged so the module emits a JSON-RPC error', () => {
+    const reauth = new UpstreamCredentialRevokedError('invalid_grant');
     expect(toAttributedError(reauth)).toBe(reauth);
 
     const mcpError = new McpError(ErrorCode.InternalError, 'boom');

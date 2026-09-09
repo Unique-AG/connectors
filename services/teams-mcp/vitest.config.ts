@@ -11,6 +11,7 @@ export default defineConfig({
       // then tests), so `main: dist/index.js` cannot resolve. A spec importing a
       // *.tool.ts file needs the `@Tool` decorator as a runtime value, so point
       // the import at the package source.
+      '@unique-ag/mcp-oauth': path.resolve(__dirname, '../../packages/mcp-oauth/src/index.ts'),
       '@unique-ag/mcp-server-module': path.resolve(
         __dirname,
         '../../packages/mcp-server-module/src/index.ts',

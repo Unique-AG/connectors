@@ -474,6 +474,47 @@ describe('McpOAuthStore', () => {
   });
 
   describe('Refresh Token Family management', () => {
+    it('revokes all tokens for a user profile and clears cache', async () => {
+      mockDrizzle.__nextSelectRows = [
+        { token: 'access-1', type: 'ACCESS', clientId: 'client-a' },
+        { token: 'refresh-1', type: 'REFRESH', clientId: 'client-a' },
+        { token: 'access-2', type: 'ACCESS', clientId: 'client-b' },
+      ];
+
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      await unit.revokeAllTokensForUserProfile('profile-123');
+
+      expect(mockDrizzle.delete).toHaveBeenCalled();
+      expect(mockCache.del).toHaveBeenCalledWith('access_token:access-1');
+      expect(mockCache.del).toHaveBeenCalledWith('refresh_token:refresh-1');
+      expect(mockCache.del).toHaveBeenCalledWith('access_token:access-2');
+    });
+
+    it('reports the blast radius so a shared profile logs every client it disconnected', async () => {
+      mockDrizzle.__nextSelectRows = [
+        { token: 'access-1', type: 'ACCESS', clientId: 'client-a' },
+        { token: 'refresh-1', type: 'REFRESH', clientId: 'client-a' },
+        { token: 'access-2', type: 'ACCESS', clientId: 'client-b' },
+      ];
+
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      const revoked = await unit.revokeAllTokensForUserProfile('profile-123');
+
+      expect(revoked).toEqual({ tokenCount: 3, clientIds: ['client-a', 'client-b'] });
+    });
+
     it('revokes token family', async () => {
       const unit = new McpOAuthStore(
         mockDrizzle as unknown as DrizzleDatabase,

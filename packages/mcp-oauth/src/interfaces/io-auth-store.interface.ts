@@ -23,6 +23,12 @@ export interface RefreshTokenMetadata {
   generation?: number | null;
 }
 
+/** What a profile-wide revocation swept away, so callers can log the blast radius. */
+export interface RevokedTokens {
+  tokenCount: number;
+  clientIds: string[];
+}
+
 export interface IOAuthStore {
   // Client management
   storeClient(client: OAuthClient): Promise<OAuthClient>;
@@ -53,6 +59,15 @@ export interface IOAuthStore {
   revokeTokenFamily?(familyId: string): Promise<void>;
   markRefreshTokenAsUsed?(token: string): Promise<void>;
   isRefreshTokenUsed?(token: string): Promise<boolean>;
+
+  /**
+   * Delete every MCP access/refresh token for a user profile.
+   * Used when the upstream credential (e.g. Microsoft refresh token) is permanently dead.
+   *
+   * One profile is normally shared by several registered clients, so this reports which ones
+   * it disconnected rather than returning nothing.
+   */
+  revokeAllTokensForUserProfile?(userProfileId: string): Promise<RevokedTokens>;
 
   // User profile management
   /**

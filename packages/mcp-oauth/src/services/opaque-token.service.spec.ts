@@ -201,6 +201,27 @@ describe('OpaqueTokenService', () => {
     });
   });
 
+  describe('revokeAllTokensForUserProfile', () => {
+    it('delegates to the store', async () => {
+      store.revokeAllTokensForUserProfile?.mockResolvedValue({
+        tokenCount: 4,
+        clientIds: ['client-a', 'client-b'],
+      });
+
+      await service.revokeAllTokensForUserProfile('profile-123');
+
+      expect(store.revokeAllTokensForUserProfile).toHaveBeenCalledWith('profile-123');
+    });
+
+    it('fails loudly when the store does not implement the optional method', async () => {
+      store.revokeAllTokensForUserProfile = undefined;
+
+      await expect(service.revokeAllTokensForUserProfile('profile-123')).rejects.toThrow(
+        'The configured OAuth store cannot revoke every token for a user profile',
+      );
+    });
+  });
+
   describe('revokeToken', () => {
     it('revokes access tokens', async () => {
       store.removeAccessToken.mockResolvedValue(undefined);

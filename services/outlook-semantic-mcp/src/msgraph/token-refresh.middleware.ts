@@ -1,3 +1,4 @@
+import { isUpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { TokenProvider } from './token.provider';
@@ -121,14 +122,19 @@ export class TokenRefreshMiddleware implements Middleware {
         });
       }
     } catch (err) {
+      // TokenProvider has already logged this and revoked the MCP tokens, so propagate rather
+      // than keeping the original 401 response.
+      if (isUpstreamCredentialRevokedError(err)) {
+        throw err;
+      }
       this.logger.error({
         msg: 'Failed to refresh token or retry Microsoft Graph request for user',
         userProfileId: this.userProfileId,
         tokenRefreshFailed: true,
         err,
       });
-      // Keep the original 401 response if refresh fails
-      // The calling code will handle the authentication error appropriately
+      // Keep the original 401 response if a transient refresh fails.
+      // Permanent grant failures are rethrown above so the MCP session can be revoked.
     }
   }
 
