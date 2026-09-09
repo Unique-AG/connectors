@@ -8,11 +8,7 @@ budget is spent.
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-
-from backstop_mcp.db import LoginAttempt, transaction
-from backstop_mcp.features.auth.throttle import (
+from mcp_credential_auth import (
     MAX_USERNAME_LENGTH,
     ThrottleConfig,
     clear_failures,
@@ -20,6 +16,10 @@ from backstop_mcp.features.auth.throttle import (
     is_throttled,
     record_failure,
 )
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+
+from backstop_mcp.db import LoginAttempt, transaction
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
