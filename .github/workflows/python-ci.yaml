@@ -1,5 +1,5 @@
-# Python CI — services under services/ that have pyproject.toml (ignored by pnpm/turbo).
-# Mirrors services-ci: trigger on services/**, matrix only dirs with pyproject.toml.
+# Python CI — uv-managed services and shared Python packages outside pnpm/turbo.
+# Service jobs run for changed services and consumers of changed shared packages.
 
 name: "Python CI"
 
@@ -55,9 +55,8 @@ jobs:
               - 'scripts/render-values-schema.sh'
 
       # Builds a JSON array of Python service names to fan out into parallel CI matrix jobs.
-      # Handles:
-      #   1. workflow_dispatch: user input (comma-separated or "all"), validated against pyproject.toml services
-      #   2. PR with service changes: unique service names from changed paths that have pyproject.toml
+      # It combines directly changed services with consumers of changed shared packages.
+      # Workflow changes validate every Python service; workflow_dispatch accepts a validated list.
       # Node/TS services (package.json only) are never included — they use services-ci.yaml.
       - name: Build package matrix
         id: build-matrix
@@ -71,6 +70,12 @@ jobs:
         run: |
           list_python_services() {
             find services -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/pyproject.toml' \; -print | xargs -n1 basename | sort
+          }
+
+          list_changed_python_services() {
+            echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | while read -r pkg; do
+              [ -f "services/$pkg/pyproject.toml" ] && echo "$pkg"
+            done | jq -R -s -c 'split("\n") | map(select(length > 0))'
           }
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
@@ -95,14 +100,14 @@ jobs:
             fi
           elif [ "$WORKFLOW_CHANGED" = "true" ]; then
             packages=$(list_python_services | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          elif [ "$SHARED_AUTH_CHANGED" = "true" ]; then
-            packages='["backstop-mcp"]'
-          elif [ "$SERVICES_CHANGED" = "true" ]; then
-            packages=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | while read -r pkg; do
-              [ -f "services/$pkg/pyproject.toml" ] && echo "$pkg"
-            done | jq -R -s -c 'split("\n") | map(select(length > 0))')
           else
             packages='[]'
+            if [ "$SERVICES_CHANGED" = "true" ]; then
+              packages=$(list_changed_python_services)
+            fi
+            if [ "$SHARED_AUTH_CHANGED" = "true" ]; then
+              packages=$(jq -c '. + ["backstop-mcp"] | unique' <<< "$packages")
+            fi
           fi
 
           echo "packages=$packages" >> "$GITHUB_OUTPUT"
