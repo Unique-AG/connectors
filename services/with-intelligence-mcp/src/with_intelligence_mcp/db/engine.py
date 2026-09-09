@@ -33,11 +33,7 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
 async def read_session(
     factory: async_sessionmaker[AsyncSession],
 ) -> AsyncGenerator[AsyncSession]:
-    """A session for reads only. Never commits, so a read costs one round trip.
-
-    Use `transaction()` for anything that writes — the split keeps the transaction boundary
-    visible at the call site instead of having every read open and commit one.
-    """
+    """Yield a read-only session."""
     async with factory() as session:
         yield session
 

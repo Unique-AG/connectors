@@ -17,10 +17,7 @@ _FEATURES_PREFIX = f"{_PACKAGE}.features"
 _CLIENT_PREFIX = f"{_PACKAGE}.with_intelligence_client"
 _CONFIG_MODULE = f"{_PACKAGE}.config"
 
-# Packages that publish a surface: outside code imports the package, never a module inside it.
-# A new package belongs here as soon as its `__init__` exports anything. `features/` and
-# `server/` are not among them: they are groupings whose `__init__` is documentation, so
-# `server.tools` is itself the unit being imported.
+# Packages that expose a public import surface.
 _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     f"{_PACKAGE}.db",
     f"{_PACKAGE}.with_intelligence_client",
@@ -287,11 +284,7 @@ class TestRule7EveryToolModuleIsRegistered:
 
 
 class TestTheDetectionItself:
-    """The rules are only worth having if they fail on the things they're meant to catch.
-
-    Every rule above is vacuous while `features/` is empty, so without these the suite would
-    report seven passing guards that have never inspected anything.
-    """
+    """Tests for the structural-rule detectors."""
 
     def test_catches_a_feature_importing_the_server(self) -> None:
         assert _imports_under(
