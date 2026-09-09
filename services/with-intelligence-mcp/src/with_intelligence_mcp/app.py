@@ -23,15 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_app() -> Starlette:
-    """Assemble the ASGI app.
-
-    Logging, metrics, FastMCP, TOOLS, setup_ops, /ready, middleware, lifespan
-    `close_singletons()`.
-
-    No authorization server yet: until the auth feature lands, `FastMCP` is built without an
-    auth provider and the login routes it will own do not exist. Every other piece of the
-    composition root is in place, so adding it is one wiring change rather than a new file.
-    """
+    """Create the WI MCP ASGI application."""
     config = get_app_config()
 
     configure_logging(config)
@@ -72,11 +64,7 @@ def create_app() -> Starlette:
 
 
 async def _ready_response(engine: AsyncEngine) -> JSONResponse:
-    """Readiness, reporting the checks it actually ran.
-
-    Postgres is a hard dependency — OAuth token validation will read it on every request — so an
-    unreachable database means not ready.
-    """
+    """Report database readiness."""
     database_ok = True
     try:
         async with engine.connect() as connection:
