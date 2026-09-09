@@ -314,6 +314,12 @@ mcpConfig:
     # cluster_local: communicates using in-cluster URLs with service headers
     # external: communicates using external URLs with app key authentication
     serviceAuthMode: cluster_local
+
+    # API key (`ukey_...`) for cluster_local mode, sent as `Authorization: Bearer`.
+    # Deliberately absent here: it is a secret, so supply UNIQUE_API_KEY via extraEnvSecrets.
+    # The Unique API only resolves the service user's roles for API-key callers, so without
+    # it every role-gated endpoint (e.g. users) answers 422.
+
     # -- Extra headers to send with requests to Unique API services (JSON string)
     # For cluster_local mode: '{"x-company-id": "...", "x-user-id": "..."}'
     serviceExtraHeaders: {}

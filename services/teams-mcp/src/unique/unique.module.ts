@@ -24,10 +24,15 @@ import { UniqueUserMappingService } from './unique-user-mapping.service';
       provide: UNIQUE_FETCH,
       inject: [KB_INTEGRATION_ENABLED_CONFIG],
       useFactory(uniqueConfig: EnabledUniqueConfig): FetchFn {
+        const apiKey =
+          uniqueConfig.serviceAuthMode === 'cluster_local' ? uniqueConfig.apiKey : undefined;
+
         return pipeline(
           withBaseUrl(uniqueConfig.apiBaseUrl),
           withHeaders({
             'x-api-version': uniqueConfig.apiVersion,
+            ...(apiKey ? { authorization: `Bearer ${apiKey.value}` } : {}),
+            // Listed last so an explicit `authorization` (external auth mode) still wins.
             ...uniqueConfig.serviceExtraHeaders,
           }),
           withResponseError(),

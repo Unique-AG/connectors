@@ -4,7 +4,7 @@ import {
   registerConfig,
 } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
-import { json, stringToURL } from '~/utils/zod';
+import { json, redacted, stringToURL } from '~/utils/zod';
 
 const baseConfig = z.object({
   integration: z
@@ -39,6 +39,22 @@ const clusterLocalConfig = baseConfig.extend({
   serviceAuthMode: z
     .literal('cluster_local')
     .describe('Authentication mode to use for accessing Unique API services'),
+  apiKey: redacted(
+    z
+      .string()
+      .min(1, 'apiKey cannot be empty')
+      // The Unique API tells an API key from a JWT by looking for a `.` in the bearer token. A key
+      // containing one is treated as a JWT, so the caller's roles are never resolved and every
+      // downstream resolver call is rejected.
+      .refine((key) => !key.includes('.'), {
+        message: 'apiKey must not contain "." or the Unique API will misread it as a JWT',
+      }),
+  )
+    .optional()
+    .describe(
+      'Unique API key (`ukey_…`) sent as `Authorization: Bearer`. Required for the Unique API to ' +
+        'resolve the service user\'s roles; without it role-gated endpoints such as `users` fail.',
+    ),
   serviceExtraHeaders: json(z.record(z.string(), z.string()))
     .refine(
       (headers) => {
