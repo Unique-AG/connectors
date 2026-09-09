@@ -1,0 +1,7 @@
+# CI-safe overrides — no external Postgres/secrets required for helm template.
+postgresql:
+  enabled: false
+
+hooks:
+  migration:
+    enabled: false
