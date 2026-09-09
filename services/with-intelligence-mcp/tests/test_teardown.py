@@ -1,9 +1,4 @@
-"""`close_singletons` releases and drops every cached provider.
-
-Adding a provider is two edits — the provider, and its entry in `PROVIDERS`. Forgetting the
-second leaks a stale singleton into the next `create_app` and, since the suite's autouse
-teardown is this same function, into the next test.
-"""
+"""Cached-provider teardown tests."""
 
 import importlib
 import pathlib
