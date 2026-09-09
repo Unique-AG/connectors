@@ -31,6 +31,8 @@ _JSON = TypeAdapter(object)
 
 
 class WithIntelligenceClient:
+    """Client for one caller's authenticated WI API requests."""
+
     def __init__(
         self,
         settings: TransportSettings,
