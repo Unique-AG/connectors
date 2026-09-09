@@ -1,4 +1,4 @@
-"""Config parsing, and the two failures it exists to turn into startup errors."""
+"""Config parsing, and the failures it turns into startup errors."""
 
 import pytest
 from pydantic import ValidationError
@@ -33,7 +33,6 @@ class TestAppConfig:
         assert config.issuer == "https://wi.example.com"
 
     def test_issuer_has_no_trailing_slash(self) -> None:
-        """`HttpUrl` renders a bare origin with one; joining a path onto it would double up."""
         config = AppConfig.model_validate(
             {"app_env": AppEnv.DEVELOPMENT, "public_base_url": "https://wi.example.com/"}
         )
@@ -42,7 +41,6 @@ class TestAppConfig:
 
 class TestWithIntelligenceConfig:
     def test_defaults_to_the_hedge_fund_package(self) -> None:
-        """v1 scope is With HFM; the wealth package is licensed but out of scope for now."""
         assert WithIntelligenceConfig().asset_class_groups == (AssetClassGroup.HFM,)
 
     def test_reads_packages_from_the_environment(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -75,7 +73,6 @@ class TestDatabaseConfig:
             DatabaseConfig.model_validate({"host": "db", "user": "u", "password": "p"})
 
     def test_accepts_database_url_as_an_alias(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """The base Helm chart injects DATABASE_URL, not DB_URL."""
         monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db:5432/wi")
         assert DatabaseConfig().connection_url == "postgresql+asyncpg://u:p@db:5432/wi"
 
@@ -87,7 +84,6 @@ class TestNormalizeAsyncpgUrl:
         assert connect_args == {}
 
     def test_strips_sslmode_into_a_connect_arg(self) -> None:
-        """asyncpg rejects libpq query params, so they become an SSL context instead."""
         url, connect_args = normalize_asyncpg_url("postgresql://u:p@db:5432/wi?sslmode=verify-full")
         assert "sslmode" not in url
         assert "ssl" in connect_args

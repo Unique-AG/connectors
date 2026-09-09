@@ -1,5 +1,3 @@
-"""Logging setup via `unique_mcp.logging` (pino-json on stderr)."""
-
 from unique_mcp.logging import configure_logging as configure_pino_logging
 
 from with_intelligence_mcp.config import AppConfig
