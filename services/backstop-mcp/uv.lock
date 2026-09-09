@@ -198,6 +198,7 @@ dependencies = [
     { name = "jinja2" },
     { name = "markdownify" },
     { name = "mcp" },
+    { name = "mcp-credential-auth" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-prometheus" },
     { name = "opentelemetry-instrumentation-asgi" },
@@ -233,6 +234,7 @@ requires-dist = [
     { name = "jinja2", specifier = "==3.1.6" },
     { name = "markdownify", specifier = "==1.2.3" },
     { name = "mcp", specifier = "==2.1.1" },
+    { name = "mcp-credential-auth", directory = "../../packages/mcp-credential-auth" },
     { name = "opentelemetry-api", specifier = "==1.44.0" },
     { name = "opentelemetry-exporter-prometheus", specifier = "==0.65b0" },
     { name = "opentelemetry-instrumentation-asgi", specifier = "==0.65b0" },
@@ -1273,6 +1275,30 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d4/6e/21fb8e5d579dbe21d96ea4d5034200d46d8bdf2261053b5bd041f3c2f612/mcp-2.1.1.tar.gz", hash = "sha256:50b7ba1ebbe117008ea7bdd288234043e69c20b403d6851d19661e6d431a75ef", size = 3984589, upload-time = "2026-08-25T16:14:02.376Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/50/af/8644cc5fa26a59afd2df2e98eeb19e72926887fa4b7441aba4ff661140db/mcp-2.1.1-py3-none-any.whl", hash = "sha256:1c6c31c5d6471c58db76af3af8af67f46d11d01f0a59077d0a308cbdb3d3e915", size = 357912, upload-time = "2026-08-25T16:13:59.024Z" },
+]
+
+[[package]]
+name = "mcp-credential-auth"
+version = "0.1.0"
+source = { directory = "../../packages/mcp-credential-auth" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "starlette" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.52,<3" },
+    { name = "starlette", specifier = ">=1.3.1,<2" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basedpyright", specifier = "==1.39.10" },
+    { name = "pytest", specifier = "==9.1.1" },
+    { name = "ruff", specifier = "==0.16.6" },
 ]
 
 [[package]]

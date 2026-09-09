@@ -1,0 +1,45 @@
+[project]
+name = "mcp-credential-auth"
+version = "0.1.0"
+description = "Shared credential-backed OAuth infrastructure for MCP servers"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.13,<3",
+    "sqlalchemy[asyncio]>=2.0.52,<3",
+    "starlette>=1.3.1,<2",
+]
+
+[build-system]
+requires = ["hatchling==1.32.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_credential_auth"]
+
+[dependency-groups]
+dev = [
+    "basedpyright==1.39.10",
+    "pytest==9.1.1",
+    "ruff==0.16.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+
+[tool.basedpyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+typeCheckingMode = "all"
+include = ["src", "tests"]
+reportUnusedCallResult = false
+reportMissingTypeStubs = false
