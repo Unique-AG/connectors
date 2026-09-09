@@ -7,6 +7,7 @@ from with_intelligence_mcp.dependencies import (
     get_database_config,
     get_engine,
     get_session_factory,
+    get_with_intelligence_client_factory,
     get_with_intelligence_config,
 )
 
@@ -23,6 +24,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_database_config,
     get_engine,
     get_session_factory,
+    get_with_intelligence_client_factory,
 )
 
 
@@ -36,6 +38,10 @@ async def close_singletons() -> None:
 
 
 async def _release_pools() -> None:
-    """Dispose the engine pool if it was created."""
-    if get_engine.cache_info().currsize:
-        await get_engine().dispose()
+    """Release initialized resource pools."""
+    try:
+        if get_with_intelligence_client_factory.cache_info().currsize:
+            await get_with_intelligence_client_factory().aclose()
+    finally:
+        if get_engine.cache_info().currsize:
+            await get_engine().dispose()
