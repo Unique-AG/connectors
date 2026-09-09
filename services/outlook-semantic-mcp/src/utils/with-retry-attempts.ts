@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { isUpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { isObjectType } from 'remeda';
 import { getRetryAfterMs } from './get-retry-after-ms';
 import { isRateLimitError } from './is-rate-limit-error';
@@ -64,13 +63,9 @@ export function makeDefaultOnErrorHandler<T>(
       return makeRetryResponse(getRetryAfterMs(error));
     }
     // 2. Rate limit errors on the last attempt are rethrown so the job moves to a failed/resumable state.
-    //    Token expired errors and a permanently revoked Microsoft grant are rethrown on any attempt —
-    //    there is no point retrying, and MCP tools need the error to reach the client's re-auth path.
-    if (
-      isRateLimitError(error) ||
-      isTokenExpiredError(error) ||
-      isUpstreamCredentialRevokedError(error)
-    ) {
+    //    Token expired errors are rethrown on any attempt — there is no point retrying with an expired token.
+    //    If you need different behaviour, pass a custom onError instead of using this helper.
+    if (isRateLimitError(error) || isTokenExpiredError(error)) {
       throw error;
     }
     // 3. If it's another kind of error we call the factory function to create the error response, it's the responsibility

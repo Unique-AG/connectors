@@ -408,6 +408,11 @@ export class FullSyncCommand {
 
       this.logger.debug({ userProfileId, expectedTotal: count, msg: 'Expected total fetched' });
     } catch (error) {
+      // $count is the first Graph call of a fresh sync, so swallowing a revoked grant here would
+      // hide it behind a generic missing-token failure further down.
+      if (isUpstreamCredentialRevokedError(error)) {
+        throw error;
+      }
       this.logger.warn({
         err: error,
         userProfileId,

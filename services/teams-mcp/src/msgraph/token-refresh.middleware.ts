@@ -1,3 +1,4 @@
+import { isUpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
@@ -145,9 +146,9 @@ export class TokenRefreshMiddleware implements Middleware {
         );
       }
     } catch (error) {
-      // `UpstreamCredentialRevokedError` arrives here as an `McpError`: TokenProvider has already
-      // logged it and revoked the MCP tokens, so propagate rather than keeping the original 401.
-      if (error instanceof McpError) {
+      // TokenProvider already logged and revoked the MCP tokens, so propagate rather than
+      // keeping the original 401.
+      if (isUpstreamCredentialRevokedError(error) || error instanceof McpError) {
         throw error;
       }
 

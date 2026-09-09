@@ -35,14 +35,9 @@ export class AllDelegatesFailedError extends Error {
 
 export interface GraphClientResolveOptions {
   /**
-   * When `false`, skip delegate rotation and use the signed-in user's own Graph token.
-   * Interactive MCP tool calls set this so a dead Microsoft grant forces re-auth instead
-   * of silently finishing as a colleague. Background jobs leave the default (`true`).
-   *
-   * `false` therefore marks a call that has a caller to answer to, and commands use it to
-   * decide whether a revoked grant propagates: an MCP client needs the error to reach its
-   * re-auth path, while a queue or webhook trigger has nobody to prompt and keeps recording
-   * a failed run instead.
+   * `false` marks an interactive MCP tool call: use the signed-in user's own Graph token, and let
+   * a revoked grant reach the caller so the client re-authenticates instead of the tool quietly
+   * finishing as a colleague. Background jobs default to `true` and record a failed run instead.
    */
   allowDelegateFallback?: boolean;
 }

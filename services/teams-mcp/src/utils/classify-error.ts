@@ -1,3 +1,4 @@
+import { isUpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 
@@ -153,14 +154,13 @@ export function classifyError(error: unknown): ClassifiedError {
  * Rewrite an upstream failure into a clearly-attributed `Error` so the MCP module
  * surfaces the attributed text to the consumer as an `isError` tool result.
  *
- * - `McpError` (which `UpstreamCredentialRevokedError` extends) is returned unchanged so the
- *   module re-throws it as a JSON-RPC error and the client's error path — the only path that
- *   triggers re-authentication — still sees it.
+ * - A revoked upstream credential and any other `McpError` are returned unchanged, so the module
+ *   re-throws them as a JSON-RPC error and the client's re-auth path still sees them.
  * - `unknown` faults return the original error unchanged so we never mask non-upstream bugs.
  * - Everything else returns a new `Error` carrying the attributed message.
  */
 export function toAttributedError(error: unknown): unknown {
-  if (error instanceof McpError) {
+  if (isUpstreamCredentialRevokedError(error) || error instanceof McpError) {
     return error;
   }
 
