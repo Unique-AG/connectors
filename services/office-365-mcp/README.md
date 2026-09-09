@@ -348,13 +348,19 @@ attendees mails invitations to all of them, that this keeps the organizer's and 
 views consistent, and that it *"can't be configured"*. `isDraft` on an event is an unsent-*updates*
 flag and not a state a client asks for. So the two creating tools are the only calendar tools that
 reach a person outside the mailbox, and this connector cannot recall what they sent. Each one reads
-the calendar first, then puts the subject, the time and every address to the user through MCP
-elicitation before anything is written, and a decline creates nothing. With an empty attendee list
-the event is a private appointment nobody is told about, so `outlook_create_event` asks nobody
-about one, and both answer `invitations_sent` off the attendees Graph stored rather than off the
-arguments. On a 2026-07-28 connection, which has no channel for a server to ask a person anything,
-the tool answers with the question instead and a client that can elicit calls it again with the
-answer, and nothing is written before an accept that is bound to the same request.
+the calendar first, then puts the event to the user through MCP elicitation before anything is
+written, and a decline creates nothing. The question names the subject, the start, the end, the
+zone, whether the event covers whole days, the place, whether it is a Teams meeting, how the body
+opens and every address: all of it is bound into the id the answer authorizes, and none of it is
+visible to the person anywhere else.
+`outlook_create_event` asks unless the event names nobody and no place. An empty attendee list is
+a private appointment nobody is told about, and a `location` reaches Graph as nothing but text:
+Microsoft books a room only as an attendee a caller adds, documents nothing about a display name
+that names one, and so leaves no way to rule out that a room's mailbox was reached. Both tools
+answer `invitations_sent` off the attendees Graph stored rather than off the arguments. On a
+2026-07-28 connection, which has no channel for a server to ask a person anything, the tool
+answers with the question instead and a client that can elicit calls it again with the answer,
+and nothing is written before an accept that is bound to the same request.
 
 **`outlook-calendar-delegate` is the tier to argue about, and one tool wide.** Microsoft's
 delegated route is `POST /me/calendars/{delegated-calendar-id}/events` under
@@ -535,8 +541,12 @@ exchange hands the caller's Graph token as a string; this package sends it.
 - **There is no draft state for an event, so a create sends.** Microsoft states that creating an
   event with attendees mails invitations to all of them and that this *"can't be configured"*, and
   that `isDraft` marks unsent *updates* rather than an unsent event. An event with an empty
-  attendee list notifies nobody. So the two creating tools ask a person first, through MCP
-  elicitation, and nothing here recalls an invitation.
+  attendee list notifies nobody, though a `location` can still name a room's mailbox and Microsoft
+  documents no way to rule that out. So the two creating tools ask a person first, through MCP
+  elicitation, showing both bounds, the zone, whether the event covers whole days, the place, the
+  Teams setting and the body beside the guest list, and nothing here recalls an invitation.
+  `outlook_create_event` asks unless the event names nobody and no place; the delegated create
+  asks either way.
 
 - **Every create carries a `transactionId` and is never retried.** Microsoft publishes the property
   as the way a client app stops the server from acting twice on one retried POST, and publishes no

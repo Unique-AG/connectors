@@ -345,8 +345,8 @@ class TestTheAttendeesItReports:
     async def test_a_room_exchange_added_is_reported_as_a_resource(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Exchange adds a resource attendee of its own when a location matches a bookable room,
-        so a room appears here that nobody typed."""
+        """A room is a `resource` attendee, so it can appear here although nobody typed it into
+        the location."""
         _ = _reads(
             graph,
             _payload(

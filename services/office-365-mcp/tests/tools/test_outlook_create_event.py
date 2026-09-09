@@ -3,14 +3,14 @@ and no address in it resolves anywhere."""
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import cast
+from typing import Annotated, cast
 from urllib.parse import quote
 
 import httpx
 import pytest
 import respx
 from fastmcp import Context, FastMCP
-from fastmcp.exceptions import ToolError
+from fastmcp.exceptions import ToolError, ValidationError
 from fastmcp.server.elicitation import (
     AcceptedElicitation,
     CancelledElicitation,
@@ -26,6 +26,7 @@ from mcp.types import (
 )
 from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
+from pydantic import Field, TypeAdapter
 from respx.models import Call
 
 from office_365_mcp.graph_client import (
@@ -37,8 +38,10 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.calendar import (
     MAX_ALL_DAY_EVENT_DAYS,
     MAX_ATTENDEES,
+    MAX_LOCATION_CHARACTERS,
     MAX_SUBJECT_CHARACTERS,
     MAX_TIMED_EVENT_HOURS,
+    MAX_ZONE_CHARACTERS,
     STEP_CALENDAR,
 )
 from office_365_mcp.shared.handles import CalendarHandle, event_handle
@@ -507,6 +510,17 @@ class TestWhatItSendsToGraph:
         assert "body" not in sent
         assert "location" not in sent
 
+    async def test_a_place_with_whitespace_around_it_is_trimmed_rather_than_refused(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The gate, the wire and the `transactionId` all key on the value this tool normalized,
+        so the trim happens once, in the draft, rather than at each of the three."""
+        create = _ready(graph)
+
+        _ = await _create(client, attendees=[], location="  Room 3  ", confirm=_agrees)
+
+        assert _object(_sent(create)["location"])["displayName"] == "Room 3"
+
     async def test_the_body_is_sent_as_html_exactly_as_written(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -584,11 +598,13 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         assert read.call_count == 1
         assert create.call_count == 1
 
-    async def test_the_question_names_the_subject_the_time_the_zone_and_everybody_invited(
+    async def test_the_question_names_the_subject_both_bounds_the_zone_and_everybody_invited(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """A person cannot answer "invite these people" without being told who they are, and the
-        optional list is mail too."""
+        optional list is mail too. Both bounds, because a start alone makes a 14:00-14:15 meeting
+        and a 14:00-22:00 one one question, and the end is bound into the id the answer
+        authorizes."""
         create = _ready(graph)
         asked: list[str] = []
         bound: list[str] = []
@@ -610,8 +626,7 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         assert len(asked) == 1
         question = asked[0]
         assert "Pricing review" in question
-        assert _STARTS in question
-        assert "Europe/Zurich" in question
+        assert f"from {_STARTS} to {_ENDS} Europe/Zurich" in question
         assert _ADA in question
         assert _GRACE in question
         assert f"{_PAM} (optional)" in question, "an optional attendee reads as a required one"
@@ -631,11 +646,12 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
 
         assert create.call_count == 0
 
-    async def test_an_event_with_nobody_on_it_is_never_put_to_a_person(
+    async def test_an_event_with_nobody_on_it_and_nowhere_to_be_is_never_put_to_a_person(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """An empty attendee list notifies nobody, so there is nobody to protect and no reason to
-        interrupt the user for a private appointment."""
+        interrupt the user for a private appointment. It holds only with no `location` either: a
+        place is a mailbox this tool cannot rule out, and the test below is the other half."""
         create = _ready(graph)
         asked: list[str] = []
 
@@ -644,11 +660,165 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
             asked.append(question)
             return None
 
-        answer = await _create(client, attendees=[], confirm=counting)
+        answer = await _create(client, attendees=[], location=None, confirm=counting)
 
         assert asked == [], "the user was interrupted for an appointment nobody is told about"
         assert create.call_count == 1
         assert answer.invitations_sent is False
+
+    async def test_a_place_with_nobody_invited_is_still_put_to_a_person(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Microsoft books a room only as a `resource` attendee that a caller adds, and documents
+        nothing about a display name that names one. This tool sends `location` as text, so it
+        cannot say the room was not reached, and an empty attendee list is not proof that nobody
+        was mailed. The question is what covers that, and the create waits for it."""
+        create = _ready(graph)
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, attendees=[], location="Room 3", confirm=counting)
+
+        assert len(asked) == 1, "a room was booked without asking anybody"
+        assert create.call_count == 1
+
+    async def test_a_place_of_nothing_but_whitespace_asks_nobody_and_names_no_place_on_the_wire(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """It passed the schema, was a location on the wire, was no location for the gate and
+        composed the id no location composes: three answers to one question. One normalization in
+        the draft is what makes it one value, and the id proves the three now agree."""
+        create = _ready(graph)
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, attendees=[], location="   ", confirm=counting)
+        _ = await _create(client, attendees=[], location=None, confirm=counting)
+
+        assert asked == [], "the user was interrupted for a place nobody can read"
+        whitespace, nowhere = _sent_at(create, 0), _sent_at(create, 1)
+        assert "location" not in whitespace
+        assert whitespace["transactionId"] == nowhere["transactionId"]
+
+    async def test_a_place_with_nobody_invited_that_the_person_declined_is_never_posted(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The other half of the same gate: asking and then writing anyway is not a gate."""
+        read = _reads(graph)
+        create = _creates(graph)
+
+        with pytest.raises(ToolError, match="No event was created"):
+            _ = await _create(client, attendees=[], location="Room 3", confirm=_refuses)
+
+        assert read.call_count == 1
+        assert create.call_count == 0, "a declined place reached the calendar anyway"
+
+    async def test_the_question_shows_the_place_the_teams_setting_and_how_the_body_opens(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Every one of these is bound into the `transactionId` the answer authorizes and named
+        nowhere else. A person who cannot see the room, the joining link or the HTML body that
+        recipients receive is agreeing to a subject line."""
+        create = _ready(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(
+            client,
+            attendees=[_ADA],
+            location="Room 3",
+            online_meeting=True,
+            body_html="<p>Agenda: pricing</p>",
+            confirm=capturing,
+        )
+
+        assert len(asked) == 1
+        question = asked[0]
+        assert "at 'Room 3'" in question
+        assert "as a Teams meeting" in question
+        assert "Agenda: pricing" in question, "the body a recipient reads is not in the question"
+        assert create.call_count == 1
+
+    async def test_the_question_says_an_all_day_event_covers_whole_days(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`all_day` is bound into the id the answer authorizes, and midnight to midnight reads as
+        a meeting that begins at midnight until the question says which of the two it is."""
+        _ = _ready(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(
+            client,
+            starts_at="2026-03-02T00:00",
+            ends_at="2026-03-04T00:00",
+            all_day=True,
+            attendees=[_ADA],
+            confirm=capturing,
+        )
+
+        question = asked[0]
+        assert "from 2026-03-02T00:00 to 2026-03-04T00:00 UTC" in question
+        assert "as an all-day event from 2026-03-02 to 2026-03-03" in question, (
+            "the exclusive midnight was shown as a day the event covers"
+        )
+
+    async def test_a_question_about_an_event_that_names_none_of_the_four_shows_none_of_them(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The fragment is dropped rather than shown empty, so a plain meeting is asked about in
+        one sentence and nothing in the question implies a room or a link that is not there."""
+        _ = _ready(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, attendees=[_ADA], confirm=capturing)
+
+        question = asked[0]
+        assert "as an all-day event" not in question
+        assert ", at " not in question, "a place nobody named is in the question"
+        assert "as a Teams meeting" not in question
+        assert "body of" not in question
+
+    async def test_the_question_for_a_place_with_nobody_invited_says_nobody_is_invited(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """This question has no guest list to name, so it says so outright rather than leaving the
+        person to infer it from a sentence that names a room and no people."""
+        _ = _ready(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, attendees=[], location="Room 3", confirm=capturing)
+
+        question = asked[0]
+        assert "at 'Room 3'" in question
+        assert "Nobody is invited" in question
+        assert "that room's mailbox" in question, "the reason a place is asked about is not given"
 
     @pytest.mark.parametrize(
         "answer",
@@ -1375,8 +1545,8 @@ class TestWhatItAnswers:
     async def test_the_attendees_are_read_off_the_response_and_never_echoed_from_the_arguments(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Exchange adds an attendee nobody named: a location that matches a bookable room becomes
-        a `resource` attendee on its own. An answer echoed from the arguments hides that."""
+        """A `resource` attendee is a room nobody typed into the arguments. An answer echoed from
+        the arguments hides it."""
         _ = _ready(
             graph,
             _created(
@@ -1517,7 +1687,8 @@ class TestWhatItAnswers:
     async def test_the_location_and_the_link_come_off_the_response(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft rewrites a location that names a room it books, so this is the stored one."""
+        """Both are read off the 201 and neither is echoed from the arguments, so what Microsoft
+        stored for the place is what the user is told, whatever text this call sent."""
         _ = _ready(graph, _created(location={"displayName": "Room 3 (Zurich)"}))
 
         answer = await _create(client, location="Room 3")
@@ -1614,6 +1785,47 @@ class TestTheSchemaItPublishes:
         assert "fixed list of IANA names" in described
         assert "Exchange refuses" in described
 
+    async def test_a_zone_that_writes_a_question_of_its_own_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        """The zone reaches the question a person answers verbatim, so a `?` in it closes the real
+        sentence and forges one that invites nobody. The shape is published, so the refusal costs
+        no request and nobody is asked."""
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError, match="match pattern"):
+            _ = await tool.run(
+                {**creator.GRAPH_CALL_EXAMPLE, "time_zone": "UTC? Microsoft mails nobody"}
+            )
+
+        assert len(graph.calls) == 0, "a zone the schema refuses reached Graph"
+
+    @pytest.mark.parametrize(
+        "zone",
+        ["UTC", "W. Europe Standard Time", "America/Argentina/Buenos_Aires", "Etc/GMT+2"],
+        ids=["utc", "windows", "three-part-iana", "iana-with-an-offset"],
+    )
+    async def test_a_zone_name_either_family_spells_satisfies_the_published_shape(
+        self, transport: httpx.AsyncClient, zone: str
+    ) -> None:
+        """A shape that refuses a forged question and a real zone together refuses the meeting.
+        Read off the published schema, so this asserts what a client is actually held to."""
+        parameters, _tool = await _registered(transport)
+
+        published = _object(_object(parameters["properties"])["time_zone"])
+        assert published["maxLength"] == MAX_ZONE_CHARACTERS
+        accepted: TypeAdapter[str] = TypeAdapter(
+            Annotated[
+                str,
+                Field(
+                    pattern=cast("str", published["pattern"]),
+                    max_length=cast("int", published["maxLength"]),
+                ),
+            ]
+        )
+
+        assert accepted.validate_python(zone) == zone
+
     async def test_it_requires_the_subject_the_two_times_the_zone_and_the_attendee_list(
         self, transport: httpx.AsyncClient
     ) -> None:
@@ -1681,6 +1893,36 @@ class TestTheSchemaItPublishes:
         optional = _object(properties["optional_attendees"])
         assert optional["maxItems"] == MAX_ATTENDEES
         assert optional["default"] == []
+
+    async def test_a_place_longer_than_the_ceiling_never_reaches_this_tool_at_all(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        """The bound is published rather than checked in the body, so a model reads it before it
+        writes and the refusal costs no request. It bounds what reaches the calendar; the question
+        a person answers quotes at most 120 characters of the place whatever this ceiling is."""
+        parameters, tool = await _registered(transport)
+
+        text = next(
+            branch
+            for branch in cast(
+                "Sequence[Mapping[str, object]]",
+                _object(_object(parameters["properties"])["location"])["anyOf"],
+            )
+            if branch.get("type") == "string"
+        )
+        assert text["minLength"] == 1
+        assert text["maxLength"] == MAX_LOCATION_CHARACTERS
+        with pytest.raises(ValidationError, match=f"at most {MAX_LOCATION_CHARACTERS} characters"):
+            _ = await tool.run(
+                {
+                    "subject": _SUBJECT,
+                    "starts_at": _STARTS,
+                    "ends_at": _ENDS,
+                    "time_zone": "UTC",
+                    "attendees": [],
+                    "location": "Z" * (MAX_LOCATION_CHARACTERS + 1),
+                }
+            )
 
     async def test_a_later_call_with_no_optional_attendees_invites_nobody(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1819,7 +2061,8 @@ class TestHowItDeclaresItself:
     async def test_the_description_says_the_stored_attendees_are_the_ones_to_read_back(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Exchange can add a room as a resource attendee, which is the reason to read them."""
+        """Microsoft books a room only as a `resource` attendee, so the stored list is the only
+        place an attendee nobody asked for can show up at all."""
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()

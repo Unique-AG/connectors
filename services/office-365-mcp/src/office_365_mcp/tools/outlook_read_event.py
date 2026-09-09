@@ -167,10 +167,10 @@ class CalendarEvent(EventSummary):
         description=(
             "Everyone Microsoft holds for this event, and what each of them answered. This is "
             + "where one named person's response is, and `owner_response` never is: that field is "
-            + "the answer of whoever owns the calendar this event was read from. Exchange adds a "
-            + "`resource` attendee of its own when a location matches a bookable room, so a room "
-            + "appears here that nobody typed. Empty when Graph listed none, which is what a "
-            + "private appointment looks like."
+            + "the answer of whoever owns the calendar this event was read from. A `resource` "
+            + "attendee is a room or equipment mailbox that was invited as an attendee, so a room "
+            + "can appear here that nobody typed into the location. Empty when Graph listed none, "
+            + "which is what a private appointment looks like."
         )
     )
     body: str | None = Field(

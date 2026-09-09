@@ -283,7 +283,7 @@ _CALENDAR_TOOLS: tuple[tuple[str, Mapping[str, object]], ...] = (
 )
 
 # One address, so an own-calendar create reaches the question at all: outlook_create_event asks
-# only when somebody would be mailed, and the example it publishes invites nobody on purpose.
+# when the event names anybody or any place, and the example it publishes names neither.
 _ONE_ATTENDEE = "grace@example.invalid"
 
 _INVITING: Mapping[str, object] = {

@@ -92,14 +92,20 @@ from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_
 from office_365_mcp.shared.calendar import (
     MAX_ALL_DAY_EVENT_DAYS,
     MAX_ATTENDEES,
+    MAX_LOCATION_CHARACTERS,
     MAX_SUBJECT_CHARACTERS,
     MAX_TIMED_EVENT_HOURS,
+    MAX_ZONE_CHARACTERS,
+    NOBODY_INVITED_BUT_A_PLACE,
+    ZONE_NAME,
     CalendarSummary,
     EventAttendee,
     EventDraft,
     EventTime,
     calendar_of,
     created_event,
+    cut_for_a_question,
+    draft_details,
     event_body,
     event_time,
     is_midnight,
@@ -161,6 +167,9 @@ _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 _AGREE = "create"
 _DECLINE = "do not create"
 _NOTHING_HAPPENED = "No event was created."
+
+# What a question calls the owner when Graph named neither a display name nor an address.
+_THE_OWNER = "the person who owns that calendar"
 
 _DESCRIPTION = f"""\
 Create an event on a calendar that another person delegated or shared with the signed-in user, AS \
@@ -335,11 +344,13 @@ class CreatedEventOnBehalf(BaseModel):
         description=(
             "The attendees as MICROSOFT STORED THEM, read off the response and NOT echoed from "
             + "the arguments. Exchange composes this list itself: it adds the calendar owner as "
-            + "an attendee of their own meeting, and it can add a room or equipment mailbox when "
-            + "the location matches a bookable resource. So this is the record of who was "
-            + "actually invited under the owner's name, and every one of them already has the "
-            + "invitation. Repeat it to the user in full. Empty when Microsoft stored none, "
-            + "which is what a private appointment looks like."
+            + "an attendee of their own meeting. Microsoft books a room only as an attendee of "
+            + "type `resource` that the caller adds, and this tool adds none and sends the "
+            + "location as text; whether Exchange books a room from that text alone is not "
+            + "documented, so this list is what says whether one is on the event. It is the "
+            + "record of who was actually invited under the owner's name, and every one of them "
+            + "already has the invitation. Repeat it to the user in full. Empty when Microsoft "
+            + "stored none, which is what a private appointment looks like."
         )
     )
     organizer: MailAddress | None = Field(
@@ -530,10 +541,21 @@ def _composed(
         attendees=required,
         optional_attendees=optional,
         body_html=body_html,
-        location=location,
+        location=_placed(location),
         all_day=all_day,
         online_meeting=online_meeting,
     )
+
+
+def _placed(location: str | None) -> str | None:
+    """One place, or none at all: a location of nothing but whitespace is not a place.
+
+    The gate that names it in the question, the `Location` on the wire and `transaction_id_for`
+    all read this one value, so a value only one of the three treats as empty splits the three.
+    """
+    if location is None:
+        return None
+    return location.strip() or None
 
 
 def _moment(argument: str, value: str) -> datetime:
@@ -598,29 +620,43 @@ def _no_teams_meeting(calendar: Calendar) -> str | None:
 def _question(calendar: Calendar, draft: EventDraft) -> str:
     """What the person at the other end is asked, before anything reaches the owner's calendar.
 
-    The owner is named twice on purpose. "On Alex Wilber's calendar" is where the event lands, and
-    "as Alex Wilber" is whose name goes out on it, and only the second one is the surprising half.
+    The owner is named twice on purpose. The calendar the event lands on is one fact, and whose
+    name goes out on it is the other, and only the second one is the surprising half. Both bounds
+    are named here, because a 14:00-14:15 and a 14:00-22:00 draft are one event in somebody's day
+    and another. `draft_details` adds whole days, the place, the Teams meeting and the body, and
+    the two together name everything the `transactionId` binds.
     """
     owner = _owner_named(calendar)
     invited = _everyone(draft)
-    invitations = (
-        f"Invitations go out under {owner}'s name now and cannot be recalled: "
-        + f"{', '.join(invited)}."
-        if invited
-        else "There are no invitations: nobody else is told about it."
-    )
+    if invited:
+        invitations = (
+            f"Invitations go out now under the name of {owner!r} and cannot be recalled: "
+            + f"{', '.join(invited)}."
+        )
+    elif draft.location:
+        invitations = NOBODY_INVITED_BUT_A_PLACE
+    else:
+        invitations = "There are no invitations: nobody else is told about it."
+    details = draft_details(draft)
     return (
-        f"Create {draft.subject!r} on {owner}'s calendar, as {owner}, at "
-        + f"{draft.starts_at} {draft.time_zone}? {invitations}"
+        f"Create {draft.subject!r} on the calendar of {owner!r}, as {owner!r}, from "
+        + f"{draft.starts_at} to {draft.ends_at} {draft.time_zone}"
+        + (f", {details}" if details else "")
+        + f"? {invitations}"
     )
 
 
 def _owner_named(calendar: Calendar) -> str:
-    """Microsoft names a calendar's owner with a display name, an address, or neither."""
+    """Microsoft names a calendar's owner with a display name, an address, or neither.
+
+    Whichever it is, it is text Graph holds rather than text this connector wrote, and it reaches
+    the question three times, so it is cut to the ceiling every quoted value in a question shares.
+    """
     owner = calendar.owner
     if owner is None:
-        return "the person who owns that calendar"
-    return owner.name or owner.address or "the person who owns that calendar"
+        return _THE_OWNER
+    named = owner.name or owner.address
+    return cut_for_a_question(named) if named else _THE_OWNER
 
 
 def _everyone(draft: EventDraft) -> list[str]:
@@ -760,6 +796,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
+                max_length=MAX_ZONE_CHARACTERS,
+                pattern=ZONE_NAME,
                 description=(
                     "The zone both `starts_at` and `ends_at` are read in. There is no default, "
                     + "because guessing one puts the meeting hours away from where the user wants "
@@ -769,7 +807,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "`Europe/Berlin`. A name outside both lists, or one the mailbox server is "
                     + "not configured for, is refused by Exchange after the person confirmed. A "
                     + "zone this connector cannot resolve costs only the converted timestamp in "
-                    + "the answer: the event itself is still created in the zone named here."
+                    + "the answer: the event itself is still created in the zone named here. A "
+                    + "zone name is letters, digits, spaces and `_ . / + -`, and one carrying any "
+                    + "other character is refused here before anything is read or asked."
                 ),
             ),
         ],
@@ -823,12 +863,15 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=1,
+                max_length=MAX_LOCATION_CHARACTERS,
                 description=(
                     "Where the event is, as one line of text: a room name, an address, a city, "
-                    + "or a note such as `Alex' office`. Microsoft matches this against the "
-                    + "rooms of the tenant, so a name that belongs to a bookable room can make "
-                    + "Exchange add that room as an attendee of its own accord. The `attendees` "
-                    + "this tool answers with is what says whether that happened."
+                    + "or a note such as `Alex' office`. Microsoft books a room only as an "
+                    + "attendee of type `resource` that the caller adds, and this tool adds none "
+                    + "and sends this as text; whether Exchange books a room from that text "
+                    + "alone is not documented, so the place is named in the confirmation like "
+                    + "an attendee, and the `attendees` this tool answers with is the record of "
+                    + "who and what is on the event."
                 ),
             ),
         ] = None,

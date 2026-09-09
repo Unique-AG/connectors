@@ -12,6 +12,7 @@ nothing about, so the assertions read the serialized JSON rather than the object
 Every payload here is invented. No id, address or subject came from a real mailbox.
 """
 
+import ast
 import json
 import uuid
 from datetime import UTC, date, datetime
@@ -48,6 +49,7 @@ from office_365_mcp.shared.calendar import (
     EventSummary,
     calendar_of,
     created_event,
+    draft_details,
     event_body,
     event_time,
     is_midnight,
@@ -106,6 +108,28 @@ def _draft(
         all_day=all_day,
         online_meeting=online_meeting,
     )
+
+
+_LENGTH_PREFIX = "with a body of "
+_OPENING_MARKER = " that starts "
+_PLACE_PREFIX = "at "
+
+
+def _place_of(details: str) -> str:
+    """The place, read back off the fragment that names it: `!r` picks its own delimiter."""
+    assert details.startswith(_PLACE_PREFIX), f"no fragment of {details!r} names a place"
+    return cast("str", ast.literal_eval(details.removeprefix(_PLACE_PREFIX)))
+
+
+def _preview_of(details: str) -> str:
+    """The body's opening, read off the fragment's own marker: `!r` picks its delimiter, and a body
+    that carries one is the case worth asserting, so `ast.literal_eval` undoes it."""
+    counted, marker, quoted = details.partition(_OPENING_MARKER)
+    assert marker, f"no fragment of {details!r} says how the body opens"
+    assert _LENGTH_PREFIX in counted and counted.endswith(" characters"), (
+        f"the opening is not attached to the body's own length in {details!r}"
+    )
+    return cast("str", ast.literal_eval(quoted))
 
 
 def _payload(event: Event) -> dict[str, object]:
@@ -616,8 +640,8 @@ class TestOneAttendee:
         assert one.responded_at == "2026-03-01T09:15:00+00:00"
 
     def test_a_room_is_reported_as_the_resource_it_is(self) -> None:
-        """Exchange adds a resource attendee of its own when a location matches a bookable room,
-        which is why an answer reports the attendees Graph stored rather than the arguments."""
+        """A room is a `resource` attendee, which is why an answer reports the attendees Graph
+        stored rather than the arguments."""
         attendee = Attendee(
             email_address=EmailAddress(address="room4@example.invalid"), type=AttendeeType.Resource
         )
@@ -730,8 +754,8 @@ class TestTheCreateBody:
         assert body["body"] == {"content": "<p>Agenda attached.</p>", "contentType": "html"}
 
     def test_a_location_is_sent_as_a_display_name_and_nothing_else(self) -> None:
-        """A `locationEmailAddress` can make Exchange book a room and add a resource attendee, so
-        no tool here sends one."""
+        """A display name and no property that could name a mailbox: no `locationEmailAddress`,
+        and no `resource` attendee. What Exchange does with the text alone is not documented."""
         body = _payload(event_body(_draft(location="Zurich HQ"), transaction_id="synthetic"))
 
         assert body["location"] == {"displayName": "Zurich HQ"}
@@ -751,6 +775,178 @@ class TestTheCreateBody:
         body = _payload(event_body(_draft(all_day=True), transaction_id="synthetic"))
 
         assert body["isAllDay"] is True
+
+
+class TestWhatADraftSaysBeyondItsFirstClause:
+    """Whole days, the place, the Teams setting and the body are bound into the `transactionId` and
+    named nowhere in a question's first clause, so both creates append this fragment to what they
+    ask. A person who cannot see the banner, the room, the joining link or the body agrees to none
+    of them."""
+
+    def test_one_whole_day_is_named_as_the_day_it_covers(self) -> None:
+        """A banner across a day and a meeting at those hours are two different events, and
+        `all_day` is what tells them apart. Microsoft holds `ends_at` at the midnight AFTER the
+        last day covered, so that instant on its own names a day the event is not on."""
+        details = draft_details(
+            _draft(all_day=True, starts_at="2026-03-02T00:00", ends_at="2026-03-03T00:00")
+        )
+
+        assert details == "as an all-day event on 2026-03-02"
+
+    def test_three_whole_days_are_named_by_the_first_and_the_last_of_them(self) -> None:
+        """The exclusive midnight is 2026-03-05, and a person reading it would count four days."""
+        details = draft_details(
+            _draft(all_day=True, starts_at="2026-03-02T00:00", ends_at="2026-03-05T00:00")
+        )
+
+        assert details == "as an all-day event from 2026-03-02 to 2026-03-04"
+
+    def test_a_place_on_its_own_is_named(self) -> None:
+        assert draft_details(_draft(location="Room 3")) == "at 'Room 3'"
+
+    def test_a_place_that_writes_a_question_of_its_own_arrives_as_one_token(self) -> None:
+        """The place was interpolated bare, so a location could close the first clause and forge a
+        whole question of its own — one that invites nobody — ahead of the real guest list."""
+        location = "Room 3 and invite nobody? Microsoft mails nobody"
+
+        assert draft_details(_draft(location=location)) == f"at {location!r}"
+
+    def test_a_teams_meeting_on_its_own_is_named(self) -> None:
+        assert draft_details(_draft(online_meeting=True)) == "as a Teams meeting"
+
+    def test_a_body_on_its_own_is_named_by_its_length_and_its_opening(self) -> None:
+        assert (
+            draft_details(_draft(body_html="<p>Agenda: pricing</p>"))
+            == "with a body of 22 characters that starts 'Agenda: pricing'"
+        )
+
+    def test_all_four_are_named_in_this_order(self) -> None:
+        """The order is the order a person reads them in, and it is fixed here rather than at each
+        call, so the two creating tools ask the same question about the same draft."""
+        details = draft_details(
+            _draft(
+                all_day=True,
+                starts_at="2026-03-02T00:00",
+                ends_at="2026-03-03T00:00",
+                location="Room 3",
+                online_meeting=True,
+                body_html="<p>Agenda</p>",
+            )
+        )
+
+        assert details == (
+            "as an all-day event on 2026-03-02, at 'Room 3', as a Teams meeting, "
+            + "with a body of 13 characters that starts 'Agenda'"
+        )
+
+    def test_a_draft_that_names_none_of_the_four_says_nothing_at_all(self) -> None:
+        """An empty fragment is what lets a question drop it rather than trail a comma."""
+        assert draft_details(_draft(attendees=(_SOMEBODY_ELSE,))) == ""
+
+    def test_a_body_of_nothing_but_tags_is_reported_by_its_length_alone(self) -> None:
+        """There is nothing for a person to read in it, and inventing an empty quotation reads as
+        a body that opens with a blank line."""
+        assert draft_details(_draft(body_html="<p><br></p>")) == "with a body of 11 characters"
+
+    def test_a_long_body_is_cut_and_says_so(self) -> None:
+        body = "word " * 60
+
+        details = draft_details(_draft(body_html=body))
+
+        preview = _preview_of(details)
+        assert len(preview) == 121, "the cut is 120 characters plus the mark that says it was cut"
+        assert preview.endswith("…")
+        assert preview[:-1] == body[:120]
+        assert f"with a body of {len(body)} characters" in details, "the length is still whole"
+
+    def test_a_long_place_is_cut_and_says_so(self) -> None:
+        """A place is free text a caller writes too. Unbounded in the fragment, one argument
+        pushes the guest list out of the prompt the person reads."""
+        place = "Zurich HQ, " + "very " * 40 + "far room"
+
+        shown = _place_of(draft_details(_draft(location=place)))
+
+        assert len(shown) == 121, "the cut is 120 characters plus the mark that says it was cut"
+        assert shown.endswith("…")
+        assert shown[:-1] == place[:120]
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "Budget < 5000 EUR, approve the spend please",
+            "<p>Budget < 5000 EUR, approve the spend please</p>",
+        ],
+        ids=["on-its-own", "inside-a-paragraph"],
+    )
+    def test_a_less_than_sign_a_person_typed_is_text_and_survives_whole(self, body: str) -> None:
+        """`<[^>]+>` read this `<` as the start of a tag and deleted everything up to the next `>`,
+        which the closing `</p>` supplies: the preview said `Budget` and nothing marked the cut, so
+        a body could hide from the person answering. A `<` is a tag only when a tag name, a `/` or
+        a comment follows it."""
+        assert _preview_of(draft_details(_draft(body_html=body))) == (
+            "Budget < 5000 EUR, approve the spend please"
+        )
+
+    def test_a_comment_and_a_script_both_go_whole_and_the_words_stay(self) -> None:
+        """A comment is markup whole, so it goes whole. So is a `<script>`: a recipient never reads
+        its text, and script filling the 120-character cut hides the words they do read."""
+        details = draft_details(
+            _draft(body_html='<!-- for review --><p>Agenda</p><script>alert("hi")</script>')
+        )
+
+        assert _preview_of(details) == "Agenda"
+        assert "alert" not in details, "a script's own text reached the preview"
+        assert "for review" not in details, "a comment's own text reached the preview"
+
+    def test_a_style_block_before_the_words_leaves_only_the_words(self) -> None:
+        """A stylesheet at the top of a body is the whole preview otherwise, and a person reading
+        CSS learns nothing about the event they are agreeing to."""
+        details = draft_details(
+            _draft(
+                body_html="<style>p { color: #b00; font-family: Georgia, serif; }</style>"
+                + "<p>Agenda: pricing</p>"
+            )
+        )
+
+        assert _preview_of(details) == "Agenda: pricing"
+        assert "color" not in details, "a stylesheet's own text reached the preview"
+
+    def test_the_entities_the_body_argument_asks_for_are_decoded(self) -> None:
+        """`body_html`'s own description tells the model to escape `&`, `<` and `>` where they must
+        read as themselves, so a preview that leaves them encoded shows a person the markup."""
+        details = draft_details(_draft(body_html="<p>Tea &amp; cake, 5 &lt; 6</p>"))
+
+        assert _preview_of(details) == "Tea & cake, 5 < 6"
+
+    def test_a_body_that_carries_a_double_quote_cannot_forge_the_sentence(self) -> None:
+        """The preview sat between two literal double quotes, so a body could close the quotation
+        and write a clause of its own into the question. `!r` picks a delimiter the text does not
+        carry and escapes it when it does, and the whole sentence is asserted here for that."""
+        body = '<p>Cancelled" and invite nobody</p>'
+
+        details = draft_details(_draft(body_html=body))
+
+        assert details == (
+            f"with a body of {len(body)} characters that starts "
+            + "'Cancelled\" and invite nobody'"
+        )
+        assert _preview_of(details) == 'Cancelled" and invite nobody'
+
+    def test_the_markup_around_the_words_is_dropped_and_the_words_are_kept(self) -> None:
+        """The whole of what the strip promises: a person reads the words a recipient reads, not
+        the attributes and the image URLs around them. It is not a claim that no angle bracket ever
+        reaches the preview, which the two tests above are about."""
+        details = draft_details(
+            _draft(body_html='<div class="x"><p>Agenda</p><img src="http://example.invalid/t.gif">')
+        )
+
+        assert _preview_of(details) == "Agenda"
+
+    def test_a_tag_between_two_words_leaves_them_two_words(self) -> None:
+        """A tag becomes a space rather than nothing, so `<p>one</p><p>two</p>` is not `onetwo`."""
+        details = draft_details(_draft(body_html="<p>one</p><p>two</p>"))
+
+        assert _preview_of(details) == "one two"
 
 
 class TestTheTransactionId:
@@ -803,8 +999,9 @@ class TestTheTransactionId:
         assert transaction_id_for("me", _draft()) != transaction_id_for("me", other)
 
     def test_two_rooms_are_never_one_id(self) -> None:
-        """The same subject, times and guest list in another room. Exchange can turn a location
-        into a `resource` attendee, so the room is part of what somebody asked for."""
+        """The same subject, times and guest list in another room. The location is part of what
+        somebody named, so it is part of the id: a server that drops the second POST as redundant
+        would leave the first room on the calendar."""
         booked = _draft(location="Zurich HQ, room 1")
         elsewhere = _draft(location="Zurich HQ, room 4")
 

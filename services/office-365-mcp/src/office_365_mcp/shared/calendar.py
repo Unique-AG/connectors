@@ -51,6 +51,7 @@ and records which arrived in `odata_type`, so `created_event` reads that discrim
 answer is composed. A message id in an event handle addresses nothing.
 """
 
+import html
 import re
 import uuid
 from collections.abc import Sequence
@@ -145,6 +146,17 @@ MAX_ATTENDEES = 20
 
 MAX_SUBJECT_CHARACTERS = 255
 
+# A location is free text that reaches both the wire and the question a person answers. This
+# ceiling bounds what reaches the calendar; a question shows at most `_PREVIEW_CHARACTERS` of it.
+MAX_LOCATION_CHARACTERS = 255
+
+# What a question says about a draft that invites nobody and names a place. Microsoft documents a
+# room as a mailbox that is invited rather than typed, and nothing about a display name that names
+# one, so neither create can promise the place reaches no mailbox. One spelling for both.
+NOBODY_INVITED_BUT_A_PLACE = (
+    "Nobody is invited, and a location that names a bookable room can reach that room's mailbox."
+)
+
 # What a single create can span. A timed event longer than a day, or an all-day event longer than
 # two weeks, is usually a wrong argument rather than a wrong intention.
 MAX_TIMED_EVENT_HOURS = 24
@@ -161,6 +173,28 @@ MAX_ALL_DAY_EVENT_DAYS = 14
 # literal `24:00` is what Exchange is asked to read. The hours stop at 23 here for that reason,
 # and the minutes and the seconds at 59.
 WALL_CLOCK = re.compile(r"\A\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\Z")
+
+# What a zone name may spell, published on both creates' `time_zone` so the refusal costs no
+# request. Every name either family Graph accepts uses these characters and no others — a Windows
+# id such as `W. Europe Standard Time`, an IANA name such as `America/Argentina/Buenos_Aires` or
+# `Etc/GMT+2` — and the name reaches verbatim the question a person answers, where a `?` or a
+# quote is a second sentence somebody else wrote. One speller for two tools.
+ZONE_NAME = r"^[A-Za-z0-9][A-Za-z0-9 _./+-]*$"
+
+# Longer than any name in either family, and short enough that a zone cannot fill a question.
+MAX_ZONE_CHARACTERS = 64
+
+# What a real tag looks like, so a "<" followed by a space, a digit or a symbol stays as the text
+# it is: `Budget < 5000 EUR` is a sentence and `<[^>]+>` deletes the rest of it without a marker.
+_A_TAG = re.compile(r"<(?:!--.*?--|/?[A-Za-z][^<>]*)>", re.DOTALL)
+
+# A `<script>` or `<style>` element holds text no recipient ever reads, and it goes with its
+# contents: CSS or script filling the cut hides the words the recipient does read.
+_A_HIDDEN_ELEMENT = re.compile(r"<(script|style)\b[^<>]*>.*?</\1\s*>", re.DOTALL | re.IGNORECASE)
+
+# The place and the body's opening are each cut to this many characters in a question, so one long
+# argument cannot push the guest list out of what the person reads.
+_PREVIEW_CHARACTERS = 120
 
 # Two routes reach one calendar, and the SDK generates a query-parameter class per route. These are
 # aliases of the classes rather than `type` statements, because each one is also constructed.
@@ -420,8 +454,8 @@ class EventAttendee(BaseModel):
     kind: str | None = Field(
         description=(
             "What kind of attendee this is, in Microsoft's own spelling: `required`, `optional` or "
-            + "`resource`. A `resource` is a room or equipment mailbox, which Exchange can add on "
-            + "its own when a location matches a bookable room. Null when Graph did not say."
+            + "`resource`. A `resource` is a room or equipment mailbox that was invited as an "
+            + "attendee rather than typed into the location. Null when Graph did not say."
         )
     )
     response: str | None = Field(
@@ -724,6 +758,67 @@ class EventDraft:
     location: str | None
     all_day: bool
     online_meeting: bool
+
+
+def draft_details(draft: EventDraft) -> str:
+    """Whole days, the place, the Teams setting and the body of a draft, joined with ", "; "" when
+    the draft names none of the four.
+
+    Each of the four is bound into the `transactionId` and named nowhere in a question's first
+    clause, which carries the subject, both bounds and the zone.
+    """
+    return ", ".join(
+        detail
+        for detail in (
+            _whole_days(draft) if draft.all_day else "",
+            f"at {cut_for_a_question(draft.location)!r}" if draft.location else "",
+            "as a Teams meeting" if draft.online_meeting else "",
+            _body_described(draft.body_html) if draft.body_html else "",
+        )
+        if detail
+    )
+
+
+def _whole_days(draft: EventDraft) -> str:
+    """Which days an all-day draft covers, named as days. `ends_at` is the midnight after the last
+    of them, and that instant on its own reads as a day the event does not cover."""
+    opens = wall_clock(draft.starts_at)
+    closes = wall_clock(draft.ends_at)
+    assert opens is not None and closes is not None, (
+        "an all-day draft carries a bound no create would have accepted"
+    )
+    first = opens.date()
+    last = closes.date() - timedelta(days=1)
+    assert last >= first, "an all-day draft ends before the day it starts on"
+    if last == first:
+        return f"as an all-day event on {first}"
+    return f"as an all-day event from {first} to {last}"
+
+
+def _body_described(body_html: str) -> str:
+    """The body's length, plus its first words when it has any: a tags-only body has none."""
+    preview = _previewed(body_html)
+    counted = f"with a body of {len(body_html)} characters"
+    return f"{counted} that starts {preview!r}" if preview else counted
+
+
+def _previewed(body_html: str) -> str:
+    """The body as words: script and style elements dropped whole, then real tags dropped, entities
+    decoded, whitespace collapsed and the rest cut.
+
+    `html.unescape` runs after the strip, so `&lt;p&gt;` reads as the text somebody escaped rather
+    than as a tag, and the `&` `<` `>` the body's own description asks for arrive as themselves.
+    """
+    read = _A_HIDDEN_ELEMENT.sub(" ", body_html)
+    return cut_for_a_question(" ".join(html.unescape(_A_TAG.sub(" ", read)).split()))
+
+
+def cut_for_a_question(text: str) -> str:
+    """`text` with a mark on the end when it was too long for a question. The mark is what says a
+    person read part of it, so a longer place, body or name is never quoted as the whole one."""
+    if len(text) <= _PREVIEW_CHARACTERS:
+        return text
+    return f"{text[:_PREVIEW_CHARACTERS]}…"
 
 
 def event_body(draft: EventDraft, *, transaction_id: str) -> Event:
