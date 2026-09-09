@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from testcontainers.community.postgres import PostgresContainer
 
 from office_365_mcp.config import (
+    ORGANIZATIONS,
     AppConfig,
     AppEnv,
     DatabaseConfig,
@@ -222,14 +223,30 @@ class TestEntraConfig:
         with pytest.raises(ValidationError, match=field):
             EntraConfig.model_validate(supplied)
 
-    @pytest.mark.parametrize("tenant_id", ["common", "organizations", "consumers", "Common"])
-    def test_rejects_a_multi_tenant_authority(self, tenant_id: str) -> None:
-        """The provider derives one expected issuer from this value and cannot be told not to, so
-        these reject every token rather than allow every tenant."""
+    @pytest.mark.parametrize("tenant_id", ["common", "consumers", "Common"])
+    def test_rejects_an_authority_that_admits_personal_accounts(self, tenant_id: str) -> None:
         with pytest.raises(ValidationError, match="ENTRA_TENANT_ID"):
             EntraConfig.model_validate(
                 {"tenant_id": tenant_id, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
             )
+
+    @pytest.mark.parametrize("tenant_id", ["organizations", "Organizations"])
+    def test_accepts_the_organizations_authority_however_it_is_spelled(
+        self, tenant_id: str
+    ) -> None:
+        config = EntraConfig.model_validate(
+            {"tenant_id": tenant_id, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
+        )
+
+        assert config.tenant_id == ORGANIZATIONS
+        assert config.multi_tenant is True
+
+    def test_one_tenant_is_not_multi_tenant(self) -> None:
+        config = EntraConfig.model_validate(
+            {"tenant_id": _TENANT_ID, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
+        )
+
+        assert config.multi_tenant is False
 
 
 class TestPublicBaseUrl:
