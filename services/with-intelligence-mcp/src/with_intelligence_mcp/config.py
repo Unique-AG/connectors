@@ -47,11 +47,7 @@ def _query_param(query: dict[str, str | tuple[str, ...]], key: str) -> str | Non
 
 
 def normalize_asyncpg_url(url: str) -> tuple[str, AsyncpgConnectArgs]:
-    """Rewrite a libpq Postgres URL for SQLAlchemy/asyncpg.
-
-    Helm injects `DATABASE_URL` with libpq query params (`sslmode=...`). asyncpg rejects
-    those params, so strip them and return equivalent `connect_args` instead.
-    """
+    """Rewrite a libpq PostgreSQL URL for asyncpg."""
     parsed = make_url(url)
     if parsed.drivername == "postgresql":
         parsed = parsed.set(drivername="postgresql+asyncpg")
@@ -75,9 +71,7 @@ class AppEnv(StrEnum):
     TEST = "test"
 
 
-# Hosts that can't be what an external MCP client reaches this service on. `0.0.0.0`/`::` are a
-# bind address rather than a destination, so they're just as wrong as loopback here.
-# `[::1]` is included because pydantic's `HttpUrl.host` keeps IPv6 brackets.
+# Hosts that cannot represent an externally reachable service.
 _NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0", "::"})
 
 
@@ -122,10 +116,7 @@ class AppConfig(BaseSettings):
         return str(self.public_base_url).rstrip("/")
 
 
-# Asset-class packages ("data solutions") the v3 API filters responses to, as accepted by the
-# `asset_class_group` query parameter on every core endpoint. Unique's agreement covers With HFM
-# (hedge funds) and With SFO (wealth / family office); the rest are listed so a deployment with a
-# broader subscription is a configuration change rather than a code change.
+# With Intelligence asset-class package identifiers.
 class AssetClassGroup(StrEnum):
     HFM = "hfm"
     PEFI = "pefi"
@@ -143,16 +134,10 @@ class WithIntelligenceConfig(BaseSettings):
 
     base_url: str = "https://api.withintelligence.com"
 
-    # Which packages tool calls ask for. Responses are auto-filtered to what the account is
-    # licensed for regardless, but asking narrowly keeps a hedge-fund question from paging
-    # through wealth records to find its answer.
     asset_class_groups: tuple[AssetClassGroup, ...] = (AssetClassGroup.HFM,)
 
     default_timeout_seconds: float = Field(default=30.0, gt=0)
 
-    # Every listing endpoint pages the same way (`page`, `page_size`, and a
-    # `{pagination:{page,page_size,count,total}, results:[…]}` envelope), so one page size
-    # serves all of them.
     default_page_size: int = Field(default=50, ge=1, le=500)
 
     # With Intelligence publishes no concurrency limit, so this remains a politeness bound

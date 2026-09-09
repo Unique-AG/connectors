@@ -1,8 +1,4 @@
-"""The MCP tools this server exposes.
-
-`registry.py` is the one list; this is how the rest of the process reads it. Individual tool
-modules are not part of the surface — a tool is reached by being registered, never by import.
-"""
+"""MCP tools public API."""
 
 from with_intelligence_mcp.server.tools.registry import TOOLS
 

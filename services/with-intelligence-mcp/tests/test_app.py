@@ -1,9 +1,4 @@
-"""The composition root, exercised as a real ASGI app.
-
-`create_app` is where the wiring lives that is easiest to get wrong — the lifespan, middleware
-registration, the route table — so it is driven here through Starlette's `TestClient`, which
-actually runs the lifespan.
-"""
+"""ASGI application tests."""
 
 from collections.abc import Iterator
 from typing import Protocol, cast
