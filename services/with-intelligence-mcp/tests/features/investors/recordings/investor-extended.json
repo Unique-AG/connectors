@@ -48,10 +48,7 @@
     { "id": 2145858758, "name": "Manager One" },
     { "id": -179975042, "name": "Manager Two" }
   ],
-  "asset_classes": [
-    { "id": 1, "name": "Hedge Funds" },
-    { "id": 18, "name": "Alternative" }
-  ],
+  "asset_classes": [{ "id": 1, "name": "Hedge Funds" }, { "id": 18, "name": "Alternative" }],
   "investment_strategies": [
     {
       "primary_strategy": { "id": 77, "name": "Equity" },
@@ -59,10 +56,7 @@
     },
     { "primary_strategy": { "id": 9, "name": "Multi-Strategy" } }
   ],
-  "primary_strategies": [
-    { "id": 9, "name": "Multi-Strategy" },
-    { "id": 77, "name": "Equity" }
-  ],
+  "primary_strategies": [{ "id": 9, "name": "Multi-Strategy" }, { "id": 77, "name": "Equity" }],
   "secondary_strategies": [{ "id": 78, "name": "Long/Short Equity" }],
   "investment_countries": [{ "id": 840, "name": "United States" }],
   "investment_regions": [{ "id": 3, "name": "Developed Markets" }],

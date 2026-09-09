@@ -188,11 +188,7 @@
           "type": "number"
         }
       },
-      "required": [
-        "lower",
-        "mid",
-        "upper"
-      ],
+      "required": ["lower", "mid", "upper"],
       "additionalProperties": false
     },
     "Auth": {
@@ -205,10 +201,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "accessToken",
-        "refreshToken"
-      ],
+      "required": ["accessToken", "refreshToken"],
       "additionalProperties": false
     },
     "Classification": {
@@ -221,10 +214,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "name"
-      ],
+      "required": ["id", "name"],
       "additionalProperties": false
     },
     "Entity": {
@@ -234,9 +224,7 @@
           "type": "number"
         }
       },
-      "required": [
-        "id"
-      ],
+      "required": ["id"],
       "additionalProperties": false
     },
     "Investment": {
@@ -249,10 +237,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "updated_at"
-      ],
+      "required": ["id", "updated_at"],
       "additionalProperties": false
     },
     "InvestmentAmount": {
@@ -268,11 +253,7 @@
           "$ref": "#/components/schemas/InvestmentAmountCurrency"
         }
       },
-      "required": [
-        "amount",
-        "date",
-        "currency"
-      ],
+      "required": ["amount", "date", "currency"],
       "additionalProperties": false
     },
     "InvestmentAmountCurrency": {
@@ -285,10 +266,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "short_name"
-      ],
+      "required": ["id", "short_name"],
       "additionalProperties": false
     },
     "InvestmentExtended": {
@@ -456,11 +434,7 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "id",
-        "name",
-        "unknown"
-      ],
+      "required": ["id", "name", "unknown"],
       "additionalProperties": false
     },
     "Investor": {
@@ -476,11 +450,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "name",
-        "updated_at"
-      ],
+      "required": ["id", "name", "updated_at"],
       "additionalProperties": false
     },
     "InvestorAddress": {
@@ -548,11 +518,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "abbreviation",
-        "id",
-        "name"
-      ],
+      "required": ["abbreviation", "id", "name"],
       "additionalProperties": false
     },
     "InvestorAllocationCalculations": {
@@ -638,10 +604,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "short_name"
-      ],
+      "required": ["id", "short_name"],
       "additionalProperties": false
     },
     "InvestorExtended": {
@@ -916,10 +879,7 @@
           }
         }
       },
-      "required": [
-        "primary_industry",
-        "secondary_industries"
-      ],
+      "required": ["primary_industry", "secondary_industries"],
       "additionalProperties": false
     },
     "InvestorInvestmentSector": {
@@ -932,10 +892,7 @@
           "$ref": "#/components/schemas/Entity"
         }
       },
-      "required": [
-        "primary_sector",
-        "secondary_sectors"
-      ],
+      "required": ["primary_sector", "secondary_sectors"],
       "additionalProperties": false
     },
     "InvestorInvestmentStrategies": {
@@ -948,10 +905,7 @@
           "$ref": "#/components/schemas/Classification"
         }
       },
-      "required": [
-        "primary_strategy",
-        "secondary_strategies"
-      ],
+      "required": ["primary_strategy", "secondary_strategies"],
       "additionalProperties": false
     },
     "InvestorLatestAum": {
@@ -1007,11 +961,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "label",
-        "middle",
-        "range"
-      ],
+      "required": ["label", "middle", "range"],
       "additionalProperties": false
     },
     "InvestorPreferenceAllocationAmount": {
@@ -1065,13 +1015,7 @@
           "$ref": "#/components/schemas/InvestorPreferenceTicketSize"
         }
       },
-      "required": [
-        "allocation_amount",
-        "fund_count",
-        "fund_size",
-        "intention_id",
-        "ticket_size"
-      ],
+      "required": ["allocation_amount", "fund_count", "fund_size", "intention_id", "ticket_size"],
       "additionalProperties": false
     },
     "InvestorPreferenceAssetClass": {
@@ -1084,10 +1028,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "name"
-      ],
+      "required": ["id", "name"],
       "additionalProperties": false
     },
     "InvestorPreferenceAttribute": {
@@ -1100,10 +1041,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "name"
-      ],
+      "required": ["id", "name"],
       "additionalProperties": false
     },
     "InvestorPreferenceAttributes": {
@@ -1119,11 +1057,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "attribute",
-        "intention_id",
-        "sentiment"
-      ],
+      "required": ["attribute", "intention_id", "sentiment"],
       "additionalProperties": false
     },
     "InvestorPreferenceCurrency": {
@@ -1136,10 +1070,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "short_name"
-      ],
+      "required": ["id", "short_name"],
       "additionalProperties": false
     },
     "InvestorPreferenceFundCount": {
@@ -1155,11 +1086,7 @@
           "type": "number"
         }
       },
-      "required": [
-        "intention_id",
-        "value_lower",
-        "value_upper"
-      ],
+      "required": ["intention_id", "value_lower", "value_upper"],
       "additionalProperties": false
     },
     "InvestorPreferenceFundSize": {
@@ -1204,10 +1131,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "name"
-      ],
+      "required": ["id", "name"],
       "additionalProperties": false
     },
     "InvestorPreferenceStructures": {
@@ -1223,11 +1147,7 @@
           "$ref": "#/components/schemas/InvestorPreferenceStructure"
         }
       },
-      "required": [
-        "intention_id",
-        "sentiment",
-        "structure"
-      ],
+      "required": ["intention_id", "sentiment", "structure"],
       "additionalProperties": false
     },
     "InvestorPreferenceTicketSize": {
@@ -1287,13 +1207,7 @@
           }
         }
       },
-      "required": [
-        "allocations",
-        "asset_class",
-        "attributes",
-        "preferences_count",
-        "structures"
-      ],
+      "required": ["allocations", "asset_class", "attributes", "preferences_count", "structures"],
       "additionalProperties": false
     },
     "Mandate": {
@@ -1306,10 +1220,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "updated_at"
-      ],
+      "required": ["id", "updated_at"],
       "additionalProperties": false
     },
     "MandateAmount": {
@@ -1322,10 +1233,7 @@
           "$ref": "#/components/schemas/MandateAmountCurrency"
         }
       },
-      "required": [
-        "amount",
-        "currency"
-      ],
+      "required": ["amount", "currency"],
       "additionalProperties": false
     },
     "MandateAmountCurrency": {
@@ -1338,10 +1246,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "short_name"
-      ],
+      "required": ["id", "short_name"],
       "additionalProperties": false
     },
     "MandateExtended": {
@@ -1508,10 +1413,7 @@
           }
         }
       },
-      "required": [
-        "primaryIndustry",
-        "secondaryIndustries"
-      ],
+      "required": ["primaryIndustry", "secondaryIndustries"],
       "additionalProperties": false
     },
     "MandateInstitutionalInvestor": {
@@ -1527,11 +1429,7 @@
           "$ref": "#/components/schemas/Classification"
         }
       },
-      "required": [
-        "id",
-        "aum",
-        "type"
-      ],
+      "required": ["id", "aum", "type"],
       "additionalProperties": false
     },
     "MandateLastReviewed": {
@@ -1541,9 +1439,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "date"
-      ],
+      "required": ["date"],
       "additionalProperties": false
     },
     "MandateManager": {
@@ -1556,10 +1452,7 @@
           "$ref": "#/components/schemas/Classification"
         }
       },
-      "required": [
-        "id",
-        "status"
-      ],
+      "required": ["id", "status"],
       "additionalProperties": false
     },
     "MandateNote": {
@@ -1575,11 +1468,7 @@
           "$ref": "#/components/schemas/MandateNoteStatus"
         }
       },
-      "required": [
-        "date",
-        "note",
-        "status"
-      ],
+      "required": ["date", "note", "status"],
       "additionalProperties": false
     },
     "MandateNoteStatus": {
@@ -1595,11 +1484,7 @@
           "$ref": "#/components/schemas/Classification"
         }
       },
-      "required": [
-        "id",
-        "name",
-        "sub_status"
-      ],
+      "required": ["id", "name", "sub_status"],
       "additionalProperties": false
     },
     "MandateSearchConsultant": {
@@ -1615,10 +1500,7 @@
           "$ref": "#/components/schemas/Classification"
         }
       },
-      "required": [
-        "contacts",
-        "firm"
-      ],
+      "required": ["contacts", "firm"],
       "additionalProperties": false
     },
     "MandateServiceExtended": {
@@ -1634,11 +1516,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "name",
-        "description"
-      ],
+      "required": ["id", "name", "description"],
       "additionalProperties": false
     },
     "MandateStatusExtended": {
@@ -1654,11 +1532,7 @@
           "$ref": "#/components/schemas/Classification"
         }
       },
-      "required": [
-        "id",
-        "name",
-        "sub_status"
-      ],
+      "required": ["id", "name", "sub_status"],
       "additionalProperties": false
     },
     "PaginatedInvestment": {
@@ -1674,10 +1548,7 @@
           }
         }
       },
-      "required": [
-        "pagination",
-        "results"
-      ],
+      "required": ["pagination", "results"],
       "additionalProperties": false
     },
     "PaginatedInvestor": {
@@ -1693,10 +1564,7 @@
           }
         }
       },
-      "required": [
-        "pagination",
-        "results"
-      ],
+      "required": ["pagination", "results"],
       "additionalProperties": false
     },
     "PaginatedMandate": {
@@ -1712,10 +1580,7 @@
           }
         }
       },
-      "required": [
-        "pagination",
-        "results"
-      ],
+      "required": ["pagination", "results"],
       "additionalProperties": false
     },
     "PaginatedPerson": {
@@ -1731,10 +1596,7 @@
           }
         }
       },
-      "required": [
-        "pagination",
-        "results"
-      ],
+      "required": ["pagination", "results"],
       "additionalProperties": false
     },
     "PaginatedResponsePagination": {
@@ -1753,12 +1615,7 @@
           "type": "number"
         }
       },
-      "required": [
-        "page",
-        "page_size",
-        "count",
-        "total"
-      ],
+      "required": ["page", "page_size", "count", "total"],
       "additionalProperties": false
     },
     "Person": {
@@ -1774,11 +1631,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "name",
-        "updated_at"
-      ],
+      "required": ["id", "name", "updated_at"],
       "additionalProperties": false
     },
     "PersonExtended": {
@@ -1916,15 +1769,7 @@
           }
         }
       },
-      "required": [
-        "id",
-        "name",
-        "org_entity_id",
-        "org_type",
-        "type",
-        "phone",
-        "locations"
-      ],
+      "required": ["id", "name", "org_entity_id", "org_type", "type", "phone", "locations"],
       "additionalProperties": false
     },
     "PersonPersonRolesOrganisationLocation": {
