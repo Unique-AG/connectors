@@ -163,7 +163,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check formatting of the files ruff does not own
-        run: pnpm exec biome check .
+        run: pnpm exec biome check . --no-errors-on-unmatched
 
       - name: Lint
         run: uv run ruff check .
