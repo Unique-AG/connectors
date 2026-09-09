@@ -4,6 +4,7 @@ packages:
   - "!services/kb-mcp"
   - "!services/backstop-mcp"
   - "!services/office-365-mcp"
+  - "!services/with-intelligence-mcp"
   - packages/*
 
 injectWorkspacePackages: true
