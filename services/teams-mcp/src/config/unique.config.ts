@@ -53,7 +53,7 @@ const clusterLocalConfig = baseConfig.extend({
     .optional()
     .describe(
       'Unique API key (`ukey_…`) sent as `Authorization: Bearer`. Required for the Unique API to ' +
-        'resolve the service user\'s roles; without it role-gated endpoints such as `users` fail.',
+        "resolve the service user's roles; without it role-gated endpoints such as `users` fail.",
     ),
   serviceExtraHeaders: json(z.record(z.string(), z.string()))
     .refine(
