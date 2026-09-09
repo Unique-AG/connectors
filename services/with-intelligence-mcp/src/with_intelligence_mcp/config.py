@@ -1,11 +1,4 @@
-"""One `BaseSettings` class per concern, read by the cached providers in `dependencies.py`.
-
-Nothing here is read at import time: a provider constructs its config, so a test can set the
-environment first and `teardown.close_singletons()` can drop what was read.
-
-Auth and encryption settings are deliberately absent — this service has no login flow yet. They
-arrive with `features/auth/`, together with the tables they configure.
-"""
+"""Service configuration."""
 
 import os
 import ssl
@@ -106,21 +99,11 @@ class AppConfig(BaseSettings):
     port: int = Field(default=9011, ge=0, le=65535)
     log_level: LogLevel = LogLevel.INFO
 
-    # The externally-reachable URL of this service. With Intelligence has no OAuth, so this
-    # service becomes the OAuth issuer for its MCP clients and this is the base every
-    # discovery, `/authorize`, `/token` and login-form URL hangs off. Kept as a validated
-    # `HttpUrl` rather than a string: both `host` and `scheme` are read downstream, and one
-    # parse serving all of them is why nothing else re-parses it.
     public_base_url: HttpUrl = HttpUrl("http://localhost:9011")
 
     @model_validator(mode="after")
     def _reject_local_base_url_in_production(self) -> Self:
-        """Fail fast when a production deploy never set `PUBLIC_BASE_URL`.
-
-        Left at the default, this service would advertise a loopback issuer and redirect
-        browsers to a login form on the client's own machine. Nothing errors server-side —
-        clients just fail to connect for a reason nothing here reports.
-        """
+        """Reject local public URLs in production."""
         if self.app_env != AppEnv.PRODUCTION:
             return self
         host = self.public_base_url.host
@@ -135,11 +118,7 @@ class AppConfig(BaseSettings):
 
     @property
     def issuer(self) -> str:
-        """`public_base_url` as a string with no trailing slash, for joining paths onto.
-
-        `HttpUrl` renders a bare origin with a trailing `/`, so interpolating a path straight
-        onto it yields `https://host//login`.
-        """
+        """Return `public_base_url` without a trailing slash."""
         return str(self.public_base_url).rstrip("/")
 
 
@@ -158,18 +137,7 @@ class AssetClassGroup(StrEnum):
 
 
 class WithIntelligenceConfig(BaseSettings):
-    """Where to reach the With Intelligence v3 REST API, and how hard to lean on it.
-
-    Credentials are NOT configured here. With Intelligence issues a 1-hour access token over a
-    30-day refresh token from `POST /v3/auth/sign-in` (username + password; the one-time
-    passcode in their onboarding mail belongs to `POST /v3/auth/set-password`, which a user
-    completes before ever reaching this service). Each connecting MCP client will complete this
-    service's own hosted login form, and the resulting session is stored encrypted per user
-    rather than shared across callers — see the auth feature, which lands next.
-
-    Docs: https://withapi.readme.io/docs/getting-started, spec at
-    https://api.withintelligence.com/v3/docs/json.
-    """
+    """With Intelligence v3 API transport settings."""
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="WITH_INTELLIGENCE_")
 
@@ -196,12 +164,7 @@ class WithIntelligenceConfig(BaseSettings):
 
 
 class DatabaseConfig(BaseSettings):
-    """Where this service stores OAuth clients/tokens and encrypted WI sessions.
-
-    Provide either `url` / `DB_URL` (or Helm's `DATABASE_URL` alias) **or** the discrete
-    `host`/`name`/`user`/`password` fields. The discrete fields may be `None` when a URL is
-    set — `_resolve_connection_url` only requires them when building a DSN from parts.
-    """
+    """Database connection settings."""
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="DB_")
 
