@@ -33,3 +33,12 @@ class RetryPolicy:
         if isinstance(error, RateLimited) and error.retry_after_seconds is not None:
             return min(error.retry_after_seconds, self.max_wait_seconds)
         return min(2.0 ** (attempt - 1), self.max_wait_seconds)
+
+
+def parse_retry_after(value: object) -> float | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None

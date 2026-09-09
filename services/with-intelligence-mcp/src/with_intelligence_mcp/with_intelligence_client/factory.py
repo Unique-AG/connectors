@@ -17,8 +17,12 @@ from with_intelligence_mcp.with_intelligence_client.credential import (
     CallerSession,
     WiCredential,
 )
-from with_intelligence_mcp.with_intelligence_client.errors import SignInFailed, Unreachable
-from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy
+from with_intelligence_mcp.with_intelligence_client.errors import (
+    RateLimited,
+    SignInFailed,
+    Unreachable,
+)
+from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy, parse_retry_after
 from with_intelligence_mcp.with_intelligence_client.session import WiSession
 from with_intelligence_mcp.with_intelligence_client.settings import RetrySettings, TransportSettings
 
@@ -124,14 +128,7 @@ class WithIntelligenceClientFactory:
     async def _auth_call(self, path: str, payload: dict[str, str]) -> WiSession:
         from datetime import UTC, datetime
 
-        async with self._borrow_http_client() as client:
-            try:
-                response = await client.post(path, json=payload)
-            except httpx.RequestError as exc:
-                raise Unreachable(f"could not reach {path}") from exc
-
-        if response.status_code != 200:
-            raise SignInFailed(f"{path} returned {response.status_code}")
+        response = await self._auth_response(path, payload)
 
         try:
             body = _JSON.validate_json(response.content)
@@ -147,6 +144,41 @@ class WithIntelligenceClientFactory:
         return WiSession.model_validate(
             {"access_token": access, "refresh_token": refresh, "issued_at": datetime.now(UTC)}
         )
+
+    async def _auth_response(self, path: str, payload: dict[str, str]) -> httpx.Response:
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                response = await self._post_auth(path, payload)
+                self._raise_for_auth_status(response, path)
+                return response
+            except (RateLimited, Unreachable) as error:
+                if not self._retry_policy.should_retry(error, attempt):
+                    raise
+                await asyncio.sleep(self._retry_policy.wait_seconds(error, attempt))
+
+    async def _post_auth(self, path: str, payload: dict[str, str]) -> httpx.Response:
+        async with self._borrow_http_client() as client:
+            try:
+                return await client.post(path, json=payload)
+            except httpx.RequestError as exc:
+                raise Unreachable(f"could not reach {path}") from exc
+
+    def _raise_for_auth_status(self, response: httpx.Response, path: str) -> None:
+        status = response.status_code
+        if status == 200:
+            return
+        if status == 429:
+            raise RateLimited(
+                f"{path} is rate-limited",
+                retry_after_seconds=parse_retry_after(
+                    cast("object", response.headers.get("retry-after"))
+                ),
+            )
+        if status >= 500:
+            raise Unreachable(f"{path} returned {status}")
+        raise SignInFailed(f"{path} returned {status}")
 
     async def aclose(self) -> None:
         async with self._http_client_lock:
