@@ -29,6 +29,9 @@ import { UniqueUserMappingService } from './unique-user-mapping.service';
           withHeaders({
             'x-api-version': uniqueConfig.apiVersion,
             ...uniqueConfig.serviceExtraHeaders,
+            ...(uniqueConfig.serviceAuthMode === 'cluster_local'
+              ? { 'x-service-id': 'teams-mcp' }
+              : {}),
           }),
           withResponseError(),
         )(fetch);
