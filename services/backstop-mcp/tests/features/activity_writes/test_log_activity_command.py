@@ -5,8 +5,9 @@ from collections.abc import AsyncGenerator
 import httpx
 import pytest
 import respx
+from fastmcp.exceptions import ToolError
 
-from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.activity_writes import (
     AuthorDto,
     CallActivityInput,
@@ -313,3 +314,62 @@ class TestLogActivityCommandDispatch:
             }
         ]
         assert object_dict(attributes["createdBy"])["resourceId"] == _AUTHOR.id
+
+
+class TestActivityWriteErrorMapping:
+    @respx.mock
+    async def test_unknown_tag_404_appends_list_activity_tags_pointer(
+        self, client: BackstopClient
+    ) -> None:
+        title = "Resource activity-tags not found by id 99999999"
+        respx.post(f"{BASE_URL}/people/{_PARTY_ID}/notes").mock(
+            return_value=httpx.Response(
+                404,
+                json={"errors": [{"code": "ResourceNotFoundException", "title": title}]},
+            )
+        )
+
+        with pytest.raises(ToolError, match="list_activity_tags") as raised:
+            await make_command(client).run(
+                activity=NoteActivityInput(
+                    kind="note",
+                    search_type="people",
+                    party_id=_PARTY_ID,
+                    title="Follow up",
+                    activity_tag_ids=("99999999",),
+                ),
+                party_id=_PARTY_ID,
+                author=_AUTHOR,
+            )
+
+        message = str(raised.value)
+        assert title in message
+        assert "never created automatically" in message
+
+    @respx.mock
+    async def test_validation_title_passes_through(self, client: BackstopClient) -> None:
+        title = "Field regarding is required"
+        respx.post(f"{BASE_URL}/meeting-or-calls").mock(
+            return_value=httpx.Response(
+                400,
+                json={"errors": [{"code": "InvalidParameterException", "title": title}]},
+            )
+        )
+        respx.get(f"{BASE_URL}/time-zones").mock(return_value=_eastern_catalog())
+
+        with pytest.raises(BackstopApiError, match=title) as raised:
+            await make_command(client).run(
+                activity=MeetingActivityInput(
+                    kind="meeting",
+                    search_type="people",
+                    party_id=_PARTY_ID,
+                    title="Q1 review",
+                    time_zone="US/Eastern",
+                ),
+                party_id=_PARTY_ID,
+                author=_AUTHOR,
+            )
+
+        assert raised.value.status_code == 400
+        assert raised.value.detail == title
+        assert "list_activity_tags" not in str(raised.value)

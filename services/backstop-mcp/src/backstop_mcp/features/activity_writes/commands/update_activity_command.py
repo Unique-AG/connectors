@@ -2,6 +2,10 @@
 
 from typing import assert_never
 
+from backstop_mcp.backstop_client import BackstopApiError
+from backstop_mcp.features.activity_writes.commands._write_errors import (
+    reraise_activity_write_error,
+)
 from backstop_mcp.features.activity_writes.commands.update_document_command import (
     UpdateDocumentCommand,
 )
@@ -40,16 +44,19 @@ class UpdateActivityCommand:
         self._update_document_command: UpdateDocumentCommand = update_document_command
 
     async def run(self, *, activity: UpdateActivityInput) -> UpdatedActivityResponse:
-        match activity.kind:
-            case "note":
-                return await self._update_note_command.run(activity=activity)
-            case "meeting" | "call":
-                return await self._update_meeting_or_call_command.run(activity=activity)
-            case "task":
-                return await self._update_task_command.run(activity=activity)
-            case "email":
-                return await self._update_email_command.run(activity=activity)
-            case "document":
-                return await self._update_document_command.run(activity=activity)
-            case _:
-                assert_never(activity.kind)
+        try:
+            match activity.kind:
+                case "note":
+                    return await self._update_note_command.run(activity=activity)
+                case "meeting" | "call":
+                    return await self._update_meeting_or_call_command.run(activity=activity)
+                case "task":
+                    return await self._update_task_command.run(activity=activity)
+                case "email":
+                    return await self._update_email_command.run(activity=activity)
+                case "document":
+                    return await self._update_document_command.run(activity=activity)
+                case _:
+                    assert_never(activity.kind)
+        except BackstopApiError as exc:
+            reraise_activity_write_error(exc)

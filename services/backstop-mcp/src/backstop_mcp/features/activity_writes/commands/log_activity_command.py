@@ -2,6 +2,10 @@
 
 from typing import assert_never
 
+from backstop_mcp.backstop_client import BackstopApiError
+from backstop_mcp.features.activity_writes.commands._write_errors import (
+    reraise_activity_write_error,
+)
 from backstop_mcp.features.activity_writes.commands.log_email_command import LogEmailCommand
 from backstop_mcp.features.activity_writes.commands.log_meeting_or_call_command import (
     LogMeetingOrCallCommand,
@@ -41,33 +45,36 @@ class LogActivityCommand:
         author: AuthorDto,
         secondary_party_id: str | None = None,
     ) -> LoggedActivityResponse:
-        match activity.kind:
-            case "note":
-                return await self._log_note_command.run(
-                    activity=activity,
-                    party_id=party_id,
-                    author=author,
-                    secondary_party_id=secondary_party_id,
-                )
-            case "meeting" | "call":
-                return await self._log_meeting_or_call_command.run(
-                    activity=activity,
-                    party_id=party_id,
-                    author=author,
-                    secondary_party_id=secondary_party_id,
-                )
-            case "task":
-                return await self._log_task_command.run(
-                    activity=activity,
-                    party_id=party_id,
-                    secondary_party_id=secondary_party_id,
-                )
-            case "email":
-                return await self._log_email_command.run(
-                    activity=activity,
-                    party_id=party_id,
-                    author=author,
-                    secondary_party_id=secondary_party_id,
-                )
-            case _:
-                assert_never(activity.kind)
+        try:
+            match activity.kind:
+                case "note":
+                    return await self._log_note_command.run(
+                        activity=activity,
+                        party_id=party_id,
+                        author=author,
+                        secondary_party_id=secondary_party_id,
+                    )
+                case "meeting" | "call":
+                    return await self._log_meeting_or_call_command.run(
+                        activity=activity,
+                        party_id=party_id,
+                        author=author,
+                        secondary_party_id=secondary_party_id,
+                    )
+                case "task":
+                    return await self._log_task_command.run(
+                        activity=activity,
+                        party_id=party_id,
+                        secondary_party_id=secondary_party_id,
+                    )
+                case "email":
+                    return await self._log_email_command.run(
+                        activity=activity,
+                        party_id=party_id,
+                        author=author,
+                        secondary_party_id=secondary_party_id,
+                    )
+                case _:
+                    assert_never(activity.kind)
+        except BackstopApiError as exc:
+            reraise_activity_write_error(exc)

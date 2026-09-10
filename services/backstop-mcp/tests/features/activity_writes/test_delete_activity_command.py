@@ -7,7 +7,7 @@ import pytest
 import respx
 from fastmcp.exceptions import ToolError
 
-from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.activity_writes import (
     DeleteActivityInput,
     DeletedActivityResponse,
@@ -68,3 +68,23 @@ class TestDeleteActivityCommand:
             )
 
         assert route.call_count == 0
+
+    @respx.mock
+    async def test_missing_activity_404_does_not_point_at_list_activity_tags(
+        self, client: BackstopClient
+    ) -> None:
+        title = f"Resource notes not found by id {_NOTE_ID}"
+        respx.delete(f"{BASE_URL}/notes/{_NOTE_ID}").mock(
+            return_value=httpx.Response(
+                404,
+                json={"errors": [{"code": "ResourceNotFoundException", "title": title}]},
+            )
+        )
+
+        with pytest.raises(BackstopApiError, match=title) as raised:
+            await get_delete_activity_command_factory(client).run(
+                activity=DeleteActivityInput(kind="note", activity_id=_NOTE_ID)
+            )
+
+        assert raised.value.status_code == 404
+        assert "list_activity_tags" not in str(raised.value)

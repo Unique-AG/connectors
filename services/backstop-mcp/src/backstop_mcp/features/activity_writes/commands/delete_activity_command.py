@@ -2,9 +2,16 @@
 
 import logging
 
-from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiError,
+    BackstopApiSingleResourceDocument,
+    BackstopClient,
+)
 from backstop_mcp.features.activity_writes.api_responses import NoteAttributes
 from backstop_mcp.features.activity_writes.commands._utils import activity_target
+from backstop_mcp.features.activity_writes.commands._write_errors import (
+    reraise_activity_write_error,
+)
 from backstop_mcp.features.activity_writes.delete_activity_input import DeleteActivityInput
 from backstop_mcp.features.activity_writes.responses import DeletedActivityResponse
 
@@ -23,7 +30,10 @@ class DeleteActivityCommand:
         path, resource_id, collection = activity_target(
             kind=activity.kind, activity_id=activity.activity_id
         )
-        await self._client.delete(path, schema=_Document)
+        try:
+            await self._client.delete(path, schema=_Document)
+        except BackstopApiError as exc:
+            reraise_activity_write_error(exc)
         logger.info(
             "activity_writes.activity.deleted",
             extra={"id": resource_id, "kind": activity.kind, "collection": collection},

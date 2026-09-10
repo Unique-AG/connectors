@@ -9,6 +9,9 @@ from backstop_mcp.features.activity_writes.attach_file_input import AttachFileIn
 from backstop_mcp.features.activity_writes.commands._attachment_utils import (
     backstop_payload_too_large_message,
 )
+from backstop_mcp.features.activity_writes.commands._write_errors import (
+    reraise_activity_write_error,
+)
 from backstop_mcp.features.activity_writes.commands.attach_document_command import (
     AttachDocumentCommand,
 )
@@ -61,4 +64,4 @@ class AttachFileCommand:
         except BackstopApiError as exc:
             if exc.status_code == 413:
                 raise ToolError(backstop_payload_too_large_message()) from exc
-            raise
+            reraise_activity_write_error(exc)
