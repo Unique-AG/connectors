@@ -21,3 +21,8 @@ class WiSession(BaseModel):
     def is_fresh(self) -> bool:
         age = datetime.now(UTC) - self.issued_at
         return age < ACCESS_TOKEN_LIFETIME - _EARLY_RENEWAL
+
+    def has_different_access_token(self, other: "WiSession | None") -> bool:
+        return other is None or (
+            self.access_token.get_secret_value() != other.access_token.get_secret_value()
+        )

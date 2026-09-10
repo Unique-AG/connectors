@@ -53,7 +53,11 @@ class WithIntelligenceAuthContext(BaseModel):
             raise self._not_connected()
         return stored
 
-    async def renew_session(self, renew: Callable[[WiSession], Awaitable[WiSession]]) -> WiSession:
+    async def renew_session(
+        self,
+        renew: Callable[[WiSession], Awaitable[WiSession]],
+        stale: WiSession | None = None,
+    ) -> WiSession:
         """Renew under a row lock, so one caller renews and the rest read the result.
 
         The lock is held across the WI refresh call on purpose (see `lock_session`), which the
@@ -67,8 +71,7 @@ class WithIntelligenceAuthContext(BaseModel):
             stored = await lock_session(session, subject, self.encryption_key)
             if stored is None:
                 raise self._not_connected()
-            if stored.is_fresh:
-                # Another caller renewed while this one waited for the lock.
+            if stored.is_fresh and stored.has_different_access_token(stale):
                 return stored
             try:
                 renewed = await renew(stored)

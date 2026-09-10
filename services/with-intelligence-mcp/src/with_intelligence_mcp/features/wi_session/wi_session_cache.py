@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 MAX_TRACKED_SUBJECTS = 512
 
 type SessionReader = Callable[[], Awaitable[WiSession]]
-type SessionRenewer = Callable[[Callable[[WiSession], Awaitable[WiSession]]], Awaitable[WiSession]]
+type SessionRenewer = Callable[
+    [Callable[[WiSession], Awaitable[WiSession]], WiSession | None], Awaitable[WiSession]
+]
 
 
 @dataclass
@@ -73,11 +75,11 @@ class WiSessionCache:
             # The stored session may already be fresher than this process knows — another
             # replica may have renewed it — so read before deciding to renew.
             stored = await read()
-            if stored.is_fresh and stored is not stale:
+            if stored.is_fresh and stored.has_different_access_token(stale):
                 holder.session = stored
                 return stored.access_token.get_secret_value()
 
-            holder.session = await renew(self._factory.refresh)
+            holder.session = await renew(self._factory.refresh, stale)
             logger.info("wi_session.renewed")
             return holder.session.access_token.get_secret_value()
 
