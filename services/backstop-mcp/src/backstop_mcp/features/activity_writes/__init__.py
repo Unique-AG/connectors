@@ -1,8 +1,7 @@
 """Create, update, and delete CRM activities (notes, meetings, calls, tasks, emails).
 
-This package currently publishes the write-side models only — wire attributes, internal
-DTOs, tool responses, and the discriminated `log_activity` input. HTTP, payloads, queries, and
-tools come later. `dependencies.py` is deferred until a query factory exists.
+`LogActivityCommand` switches on `kind`. Meeting and call share `LogMeetingOrCallCommand`
+(same Backstop collection). Tools and `dependencies.py` come later — no cached factory yet.
 """
 
 from backstop_mcp.features.activity_writes.api_responses import (
@@ -12,6 +11,13 @@ from backstop_mcp.features.activity_writes.api_responses import (
     NoteAttributes,
     ResourceLinkAttributes,
     TaskAttributes,
+)
+from backstop_mcp.features.activity_writes.commands import (
+    LogActivityCommand,
+    LogEmailCommand,
+    LogMeetingOrCallCommand,
+    LogNoteCommand,
+    LogTaskCommand,
 )
 from backstop_mcp.features.activity_writes.internal_dto import (
     AuthorDto,
@@ -47,14 +53,19 @@ __all__ = [
     "DocumentAttributes",
     "EmailActivityInput",
     "EmailAttributes",
+    "LogActivityCommand",
     "LogActivityInput",
     "LogActivityResponse",
+    "LogEmailCommand",
     "LoggedActivityResponse",
     "LoggedCallResponse",
     "LoggedEmailResponse",
     "LoggedMeetingResponse",
     "LoggedNoteResponse",
     "LoggedTaskResponse",
+    "LogMeetingOrCallCommand",
+    "LogNoteCommand",
+    "LogTaskCommand",
     "MeetingActivityInput",
     "MeetingOrCallAttributes",
     "NoteActivityInput",

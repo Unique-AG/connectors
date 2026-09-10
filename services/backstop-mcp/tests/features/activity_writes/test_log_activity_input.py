@@ -12,7 +12,7 @@ from backstop_mcp.features.activity_writes import (
     TaskActivityInput,
 )
 
-_ADAPTER = TypeAdapter(LogActivityInput)
+_ADAPTER: TypeAdapter[object] = TypeAdapter(LogActivityInput)
 _VARIANTS = (
     NoteActivityInput,
     MeetingActivityInput,

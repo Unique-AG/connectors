@@ -16,7 +16,7 @@ from backstop_mcp.features.activity_writes import (
 )
 from backstop_mcp.models import published_output_schema
 
-_ADAPTER = TypeAdapter(LoggedActivityResponse)
+_ADAPTER: TypeAdapter[object] = TypeAdapter(LoggedActivityResponse)
 _WRITE_RESPONSES = (
     LoggedActivityResponse
     | AttachedFileResponse
