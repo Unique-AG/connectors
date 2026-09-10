@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.8](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.7...teams-mcp@0.4.8) (2026-09-10)
+
+
+### Bug Fixes
+
+* **mcp-oauth,outlook-semantic-mcp,teams-mcp,deps:** re-auth MCP clients on revoked Microsoft grants ([#981](https://github.com/Unique-AG/connectors/issues/981)) ([2c2155b](https://github.com/Unique-AG/connectors/commit/2c2155b643af4b3c5b816c2f33ecf4552798164c))
+* **teams-mcp:** send service id header ([#992](https://github.com/Unique-AG/connectors/issues/992)) ([9bd1a3d](https://github.com/Unique-AG/connectors/commit/9bd1a3d33bca81e47890e04460a777821d6bab78))
+
 ## [0.4.7](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.6...teams-mcp@0.4.7) (2026-09-08)
 
 
