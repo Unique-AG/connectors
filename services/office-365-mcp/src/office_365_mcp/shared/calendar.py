@@ -47,6 +47,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle
 from office_365_mcp.shared.mail import MailAddress
+from office_365_mcp.shared.window import closes_at, opens_at
 
 STEP_CALENDAR = "calendar"
 
@@ -206,11 +207,28 @@ def _converted(local: str, named: str | None, zone: ZoneInfo) -> str | None:
     return naive.replace(tzinfo=stated).astimezone(zone).isoformat(timespec="seconds")
 
 
-def window_bounds(starts_on: date, ends_on: date, *, zone: ZoneInfo) -> tuple[str, str]:
-    """Graph reads these bounds by the offset in the value and not the `Prefer` header
-    (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview)."""
-    opens = datetime.combine(starts_on, time.min, tzinfo=zone)
-    closes = datetime.combine(ends_on + timedelta(days=1), time.min, tzinfo=zone)
+def window_bounds(
+    starts_on: date | datetime, ends_on: date | datetime, *, zone: ZoneInfo
+) -> tuple[str, str]:
+    """The two instants `calendarView` requires, rendered with the offset Graph reads them by.
+
+    Graph reads these bounds by the offset in the value and not the `Prefer` header
+    (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview), so the whole of the zone
+    handling is in the string.
+
+    What a bound MEANS is `shared/window.py`'s, and `zone` is handed to it: a bare date is that
+    local day, a wall clock with no offset is that local time, and an offset a caller wrote wins.
+    Only the closing form is this function's own. A bare `ends_on` closes at the first instant of
+    the day AFTER it, which is what covers that day whole; a moment closes at itself. Either way
+    the window is half-open at the top, so an event starting exactly on the closing instant
+    belongs to the next window.
+    """
+    opens = opens_at(starts_on, zone=zone)
+    closes = (
+        closes_at(ends_on, zone=zone)
+        if isinstance(ends_on, datetime)
+        else opens_at(ends_on + timedelta(days=1), zone=zone)
+    )
     return opens.isoformat(timespec="seconds"), closes.isoformat(timespec="seconds")
 
 
@@ -739,29 +757,6 @@ def created_event(created: Event | None) -> Event:
         "and any invitations went out."
     )
     return created
-
-
-def person_matches(event: Event, fragment: str) -> bool:
-    wanted = fragment.casefold()
-    return any(wanted in known.casefold() for known in _named_people(event))
-
-
-def subject_matches(event: Event, fragment: str) -> bool:
-    subject = event.subject
-    return subject is not None and fragment.casefold() in subject.casefold()
-
-
-def _named_people(event: Event) -> list[str]:
-    people = [
-        text
-        for one in [_recipient_name(event.organizer), _recipient_address(event.organizer)]
-        if (text := one) is not None
-    ]
-    for attendee in event.attendees or []:
-        people.extend(
-            text for one in [_name_of(attendee), _address_of(attendee)] if (text := one) is not None
-        )
-    return people
 
 
 def _invited(address: str, kind: AttendeeType) -> Attendee:

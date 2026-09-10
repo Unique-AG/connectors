@@ -22,7 +22,7 @@ sweep of fifty chats degrades every other user in the tenant.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, fields
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated, Self
 from uuid import UUID
 
@@ -47,6 +47,7 @@ from office_365_mcp.shared.handles import CHANNEL_PERMISSION, CHAT_PERMISSION, M
 from office_365_mcp.shared.kql import flag, free_text, quoted
 from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST, MessageSender
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_search_messages"
 
@@ -220,8 +221,8 @@ class SearchCriteria:
     sender: str | None = None
     recipient: str | None = None
     mentions: UUID | None = None
-    sent_after: date | None = None
-    sent_before: date | None = None
+    sent_after: date | datetime | None = None
+    sent_before: date | datetime | None = None
     has_attachment: bool | None = None
     is_read: bool | None = None
     mentions_me: bool | None = None
@@ -265,9 +266,9 @@ def _query_string(criteria: SearchCriteria) -> str:
         # parameter as a UUID is also what makes this the one term that needs no quoting.
         terms.append(f"mentions:{criteria.mentions.hex}")
     if criteria.sent_after is not None:
-        terms.append(f"sent>={criteria.sent_after.isoformat()}")
+        terms.append(f"sent>={_kql_moment(criteria.sent_after)}")
     if criteria.sent_before is not None:
-        terms.append(f"sent<={criteria.sent_before.isoformat()}")
+        terms.append(f"sent<={_kql_moment(criteria.sent_before)}")
     if criteria.has_attachment is not None:
         terms.append(f"hasAttachment:{flag(criteria.has_attachment)}")
     if criteria.is_read is not None:
@@ -275,6 +276,29 @@ def _query_string(criteria: SearchCriteria) -> str:
     if criteria.mentions_me is not None:
         terms.append(f"IsMentioned:{flag(criteria.mentions_me)}")
     return " ".join(terms)
+
+
+def _kql_moment(bound: date | datetime) -> str:
+    """One of KQL's documented datetime literal formats: a whole day, or a second.
+
+    KQL publishes four literal shapes for a comparison on a DateTime property — `YYYY-MM-DD`,
+    `YYYY-MM-DDThh:mm:ss`, the same with a trailing `Z`, and one with fractional seconds. A date
+    renders as the first, byte for byte as it always has. A datetime renders as the third, because
+    `isoformat()` would write an aware moment as `+00:00`, which is none of the four.
+
+    `datetime` is checked first, and must be: it is a subclass of `date`, so the other order
+    renders a moment as the day it falls on and silently discards the time the caller asked about.
+
+    Both halves of the zone handling are needed, and `as_utc` alone is not enough. It supplies the
+    zone a naive moment lacks — UTC, as `OccurrenceWindow` reads one, rather than whichever zone
+    the pod happens to run in — but it leaves an aware moment in the zone it arrived in. Since the
+    format below writes a literal `Z`, that would stamp UTC on a wall clock: `09:30+02:00` would
+    reach Graph as `09:30Z` and move the bound two hours. So the moment is converted, not
+    relabelled.
+    """
+    if isinstance(bound, datetime):
+        return f"{as_utc(bound).astimezone(UTC):%Y-%m-%dT%H:%M:%SZ}"
+    return bound.isoformat()
 
 
 async def teams_search_messages(
@@ -393,17 +417,27 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         sent_after: Annotated[
-            date | None,
+            date | datetime | None,
             Field(
                 description=(
-                    "Only messages sent on or after this date (YYYY-MM-DD), inclusive. Applied "
-                    + "by the index at no extra cost."
+                    "Only messages sent on or after this point, inclusive. Two shapes: a date, "
+                    + "`2026-03-04`, for a bound on the day; or a moment, "
+                    + '`2026-03-04T09:00:00Z`, to bound within one — a moment for "since this '
+                    + 'morning\'s stand-up", a date for "since Monday". A moment carrying no '
+                    + "zone is read as UTC. Applied by the index at no extra cost."
                 )
             ),
         ] = None,
         sent_before: Annotated[
-            date | None,
-            Field(description="Only messages sent on or before this date (YYYY-MM-DD), inclusive."),
+            date | datetime | None,
+            Field(
+                description=(
+                    "Only messages sent on or before this point, inclusive, in the same two "
+                    + "shapes `sent_after` takes. A moment bounds the second it names, so pass "
+                    + "one for the closing edge of part of a day; a date bounds the day it names. "
+                    + "A moment carrying no zone is read as UTC."
+                )
+            ),
         ] = None,
         has_attachment: Annotated[
             bool | None,

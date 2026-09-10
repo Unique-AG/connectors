@@ -3,17 +3,33 @@
 TRAP: Graph's `lastUpdatedDateTime` changes on a rename or a member change and is not recency. Only
 the last message sent decides `last_message_at` and the sort order, which needs `Chat.Read` rather
 than `Chat.ReadBasic`.
+
+**`chat_type` and `topic_contains` narrow the rows here, never in `$filter`.** Microsoft lists
+`$filter` among the supported query parameters for this collection and then enumerates no
+filterable property, and it documents that an unsupported parameter can be dropped in silence
+rather than refused (https://learn.microsoft.com/en-us/graph/query-parameters). So a
+`chatType eq 'meeting'` is the ideal shape for a 200 OK carrying every chat under an argument that
+named one kind. A predicate here cannot be dropped.
+
+**Which is why `capped` exists, and why it had to come first.** `collect_pages` stops on `limit`
+MATCHES rather than on `limit` rows, so a filtered walk really does reach a chat that has been
+quiet for months — but when `limit` fills, the rows are "the matches among the ones read", and
+that reads exactly like "the matches". Every other tool here that filters rows in process — both
+mail listers, both calendar listers, both meeting-artifact listers — publishes the cap for that
+reason. This one discarded it, so a full window of matches was indistinguishable from the end of
+the list, on the deep-history lookup that is `topic_contains`'s whole purpose.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import datetime
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 import httpx
 from fastmcp import FastMCP
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.aad_user_conversation_member import AadUserConversationMember
 from msgraph.generated.models.chat import Chat
+from msgraph.generated.models.chat_type import ChatType
 from msgraph.generated.models.conversation_member import ConversationMember
 from msgraph.generated.users.item.chats.chats_request_builder import ChatsRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
@@ -37,15 +53,23 @@ MEMBERS_PER_CHAT = 25
 
 _RECENCY = "lastMessagePreview/createdDateTime desc"
 
+# The three kinds Microsoft names for a chat. `unknownFutureValue` is the evolvable-enum sentinel
+# rather than a kind, so it is not offered here — the same reason rows report `unknown` for one
+# this code cannot name.
+type ChatKind = Literal["oneOnOne", "group", "meeting"]
+
 type _ChatsQuery = ChatsRequestBuilder.ChatsRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
 List the signed-in user's Teams chats — one-to-one, group, and meeting — ordered by last message \
 sent. Call it to see who is in a conversation, and when it was last active. Call it also for a \
-meeting's `meeting_uri` — the only route to its transcripts and recordings. No filter exists for \
-`meeting_uri`, so match it by subject in `topic` instead. This tool does not list channel \
-activity: teams_browse_channel walks one channel, teams_search_messages finds a message. Returns \
-id, type, topic, last-message time, and members for unnamed chats.\
+meeting's `meeting_uri` — the only route to its transcripts and recordings. For that, narrow with \
+`chat_type="meeting"` and, if the meeting's subject is known, `topic_contains`; there is no filter \
+on `meeting_uri` itself. Either one searches the chat list until it has `limit` matches, so it \
+reaches a conversation quiet for months — but read `capped` before reporting that no such chat \
+exists, because true means it stopped on a full window. This tool does not list channel activity: \
+teams_browse_channel walks one channel, teams_search_messages finds a message. Returns id, type, \
+topic, last-message time, and members for unnamed chats.\
 """
 
 
@@ -154,13 +178,31 @@ class ChatList(BaseModel):
             "The user's chats, most recent first. A full window can have more. A short one is "
             + f"all. Raise `limit` (up to {MAX_CHATS}) to see further back. The notes-to-self "
             + "chat is usually the oneOnOne chat whose only member is the user — call get_me to "
-            + "confirm."
+            + "confirm. When `chat_type` or `topic_contains` narrowed the answer, read `capped` "
+            + "before reading a short list as "
+            + '"there are no more".'
+        )
+    )
+    capped: bool = Field(
+        description=(
+            "True when this call stopped with more chats still on offer, so a short answer is not "
+            + "proof that nothing else matches. It is what tells a filtered answer apart from an "
+            + "exhausted one. With `chat_type` or `topic_contains` set, the walk runs on until it "
+            + "has `limit` matches, so true here means `limit` filled up and a higher one returns "
+            + "more. False means the chat list itself ran out: what came back is every chat that "
+            + 'matched, however few rows that is, and an empty answer then really is "there is '
+            + 'no such chat".'
         )
     )
 
 
 async def list_recent_chats(
-    client: GraphServiceClient, *, limit: int, include_member_emails: bool
+    client: GraphServiceClient,
+    *,
+    chat_type: ChatKind | None = None,
+    topic_contains: str | None = None,
+    limit: int,
+    include_member_emails: bool,
 ) -> ChatList:
     assert 1 <= limit <= MAX_CHATS, f"limit must be within 1..{MAX_CHATS}, got {limit}"
 
@@ -175,14 +217,57 @@ async def list_recent_chats(
     with graph_errors(TOOL_NAME, step=STEP):
         first_page = await client.me.chats.get(request_configuration=configuration)
         assert first_page is not None, "Graph answered GET /me/chats with no collection"
-        collected = await collect_pages(first_page, client, limit=limit)
+        collected = await collect_pages(
+            first_page, client, limit=limit, matches=_keeps(chat_type, topic_contains)
+        )
 
     return ChatList(
         chats=[
             ChatSummary.from_chat(chat, include_member_emails=include_member_emails)
             for chat in collected.items
-        ]
+        ],
+        capped=collected.capped,
     )
+
+
+def _keeps(chat_type: ChatKind | None, topic_contains: str | None) -> Callable[[Chat], bool] | None:
+    """What every returned chat must satisfy, or None when the caller asked for no narrowing."""
+    checks: list[Callable[[Chat], bool]] = []
+    if chat_type is not None:
+        checks.append(_is_kind(chat_type))
+    if topic_contains is not None:
+        checks.append(_topic_holds(topic_contains))
+    if not checks:
+        return None
+    return lambda chat: all(check(chat) for check in checks)
+
+
+def _is_kind(chat_type: ChatKind) -> Callable[[Chat], bool]:
+    """Whether the chat is of this kind, compared as enum members rather than as strings.
+
+    The argument is resolved to a `ChatType` once, here, and never re-spelled per row. Two traps
+    make that the shape worth having. `ChatType`'s generated members carry a trailing comma, so
+    every one of them is declared as a one-tuple and the `str` mixin is what resolves it back to
+    the wire value — which means a comparison against a string is correct at runtime and reads to
+    a type checker as impossible. And `str()` of a member is `ChatType.OneOnOne`, not `oneOnOne`,
+    so converting the other way is a bug that looks like the fix.
+
+    A kind Microsoft adds after this code deserializes to None and matches nothing, which is
+    right: it is not the kind that was asked for.
+    """
+    wanted = ChatType(chat_type)
+    return lambda chat: chat.chat_type is wanted
+
+
+def _topic_holds(fragment: str) -> Callable[[Chat], bool]:
+    """Whether the chat's topic carries this text, case-insensitively.
+
+    A chat with no topic is not a match. Microsoft documents `topic` as "Only available for group
+    chats", so this silently excludes every one-to-one chat — which is what somebody hunting a
+    named meeting wants, and is why the argument says so.
+    """
+    wanted = fragment.casefold()
+    return lambda chat: chat.topic is not None and wanted in chat.topic.casefold()
 
 
 def _members(chat: Chat, include_emails: bool) -> list[ChatMember]:
@@ -202,6 +287,39 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         annotations=READ_ONLY,
     )
     async def teams_list_chats(
+        chat_type: Annotated[
+            ChatKind | None,
+            Field(
+                description=(
+                    "Only chats of this kind: `meeting` for a meeting's own chat, `oneOnOne` for "
+                    + "a direct conversation, `group` for a named or ad-hoc group. `meeting` is "
+                    + "the one to reach for when the goal is a transcript or a recording, since "
+                    + "this tool is the only route to a `meeting_uri` and a meeting chat is the "
+                    + "only kind that carries one. Omit it for every kind. Applied to the chats "
+                    + "this call read rather than by Microsoft 365, which publishes no filterable "
+                    + "property here — so the walk keeps going until it has `limit` matches, "
+                    + "rather than stopping after `limit` chats. Read `capped` before concluding "
+                    + "there are no more."
+                )
+            ),
+        ] = None,
+        topic_contains: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Only chats whose topic carries this text, matched case-insensitively "
+                    + "anywhere in it. Use it to find a named conversation or a meeting by its "
+                    + "subject — the route this tool's answer otherwise leaves to reading every "
+                    + "`topic` by eye. Microsoft records a topic for group and meeting chats "
+                    + "only, so this silently excludes every one-to-one chat. The search runs "
+                    + "over the chat list itself, not just the newest `limit` of it, so it "
+                    + "reaches a conversation that has been quiet for months. `capped` false "
+                    + 'means it reached the end, and an empty answer then really is "no such '
+                    + 'chat".'
+                ),
+            ),
+        ] = None,
         limit: Annotated[
             int,
             Field(
@@ -226,6 +344,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     ) -> ChatList:
         return await list_recent_chats(
             client,
+            chat_type=chat_type,
+            topic_contains=topic_contains,
             limit=limit,
             include_member_emails=include_member_emails,
         )

@@ -604,6 +604,17 @@ def _optional_type(schema: object) -> dict[str, object]:
     return typed[0]
 
 
+# Every tool that bounds a search by time, and the pair of bounds it publishes. Two tests above
+# read this: one holds each bound to a date OR a moment, the other refuses a date-shaped argument
+# that is missing from here. Adding a windowed tool means adding a row.
+_WINDOWED_TOOLS: Mapping[str, tuple[str, str]] = {
+    "outlook_list_mail": ("received_after", "received_before"),
+    "outlook_list_events": ("starts_on", "ends_on"),
+    "outlook_search_mail": ("received_after", "received_before"),
+    "teams_search_messages": ("sent_after", "sent_before"),
+}
+
+
 _MESSAGE_TOOLS: tuple[str, ...] = (
     "teams_read_message",
     "teams_browse_channel",
@@ -703,6 +714,61 @@ class TestTheToolsThisServerAdvertises:
         assert limit["type"] == "integer", "not `number`: a fractional page size is meaningless"
         assert (limit["minimum"], limit["maximum"], limit["default"]) == (1, 50, 25)
 
+    async def test_every_window_on_the_surface_admits_the_same_two_shapes(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        """One window, spelled the same way on every tool that has one.
+
+        They reach three unrelated Graph surfaces — an OData `$filter`, `calendarView`'s required
+        query arguments, and a KQL comparison — and a caller should not have to know which. So
+        each bound admits a date OR a moment, and `shared/window.py` is the one place that says
+        what either means. A tool offering only one of the two shapes is the drift this
+        asserts against: it was `outlook_list_mail` until the day this test was written.
+        """
+        tools = _named(await every_tool.list_tools())
+        both_shapes = [
+            {"type": "string", "format": "date"},
+            {"type": "string", "format": "date-time"},
+        ]
+
+        for tool, bounds in _WINDOWED_TOOLS.items():
+            properties = _properties(tools[tool].input_schema)
+            for bound in bounds:
+                assert _optional_types(properties[bound]) == both_shapes, f"{tool}.{bound}"
+
+    async def test_no_tool_carries_a_date_argument_the_window_survey_does_not_know_about(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        """`_WINDOWED_TOOLS` is hand-written, so this is what stops it going stale: a new bound
+        added to any tool has to be recorded there and therefore has to admit both shapes.
+
+        The write tools are exempt by name and not by accident. `outlook_create_event` and its
+        delegate take `starts_at`/`ends_at`, and `outlook_set_automatic_reply` takes `start`/`end`
+        — those SET a time rather than bounding a search, and they are `str` on purpose, because
+        Graph reads a wall clock beside a separate zone name and reformatting the caller's string
+        would move the event.
+        """
+        tools = _named(await every_tool.list_tools())
+        recorded = {
+            f"{tool}.{bound}" for tool, bounds in _WINDOWED_TOOLS.items() for bound in bounds
+        }
+
+        found: set[str] = set()
+        for tool in tools.values():
+            for name, schema in _properties(tool.input_schema).items():
+                branches = _object(schema).get("anyOf", [schema])
+                formats = {
+                    _object(branch).get("format") for branch in cast("Sequence[object]", branches)
+                }
+                if formats & {"date", "date-time"}:
+                    found.add(f"{tool.name}.{name}")
+
+        assert found == recorded, (
+            "a date-shaped argument is either a search window — record it in `_WINDOWED_TOOLS`, "
+            + "where the test above holds it to both shapes — or it is not a window at all, in "
+            + f"which case say why here. Unaccounted for: {sorted(found - recorded)}"
+        )
+
     async def test_every_tool_declares_its_result_shape(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
@@ -715,7 +781,7 @@ class TestTheToolsThisServerAdvertises:
             "user_principal_name",
             "job_title",
         }
-        assert set(_properties(tools["teams_list_chats"].output_schema)) == {"chats"}
+        assert set(_properties(tools["teams_list_chats"].output_schema)) == {"chats", "capped"}
         assert set(_properties(tools["teams_list_my_teams"].output_schema)) == {"teams"}
         assert set(_properties(tools["teams_list_channels"].output_schema)) == {"channels"}
         assert set(_properties(tools["teams_browse_channel"].output_schema)) == {
@@ -852,8 +918,13 @@ class TestTheToolsThisServerAdvertises:
         properties = _properties(tools["teams_search_messages"].input_schema)
 
         assert _optional_type(properties["mentions"]) == {"type": "string", "format": "uuid"}
-        assert _optional_type(properties["sent_after"]) == {"type": "string", "format": "date"}
-        assert _optional_type(properties["sent_before"]) == {"type": "string", "format": "date"}
+        for bound in ("sent_after", "sent_before"):
+            # Two shapes on purpose: a date bounds the day, a moment bounds the second. KQL
+            # publishes a literal for each, and the day form is what every existing caller sends.
+            assert _optional_types(properties[bound]) == [
+                {"type": "string", "format": "date"},
+                {"type": "string", "format": "date-time"},
+            ], bound
 
     async def test_the_query_parameter_describes_the_matching_it_actually_does(
         self, mcp_client: Client[FastMCPTransport]
@@ -1034,11 +1105,11 @@ class TestTheToolsThisServerAdvertises:
         )
         assert "stop looking" in str(posts["description"])
 
-    async def test_teams_list_meeting_transcripts_names_its_five_answers_and_their_remedies(
+    async def test_teams_list_meeting_transcripts_names_its_four_answers_and_their_remedies(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """The negative has to sit on the `not_ready` bullet itself, not on the `scan_incomplete`
-        one two lines down, which is a different status."""
+        """The negative has to sit on the `not_ready` bullet itself, not on the
+        `not_transcribed` one two lines down, which is a different status."""
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_list_meeting_transcripts"].description
         status = _object(
@@ -1055,11 +1126,10 @@ class TestTheToolsThisServerAdvertises:
             "available",
             "not_ready",
             "not_transcribed",
-            "scan_incomplete",
             "meeting_not_found",
         ):
             assert f"`{value}`" in taught, value
-        for value in ("not_ready", "not_transcribed", "scan_incomplete"):
+        for value in ("not_ready", "not_transcribed"):
             assert f"`{value}`" in description, f"{value} decides whether to call this tool at all"
         assert "`not_ready` means wait" in description
         not_ready_bullet = (
@@ -1072,47 +1142,9 @@ class TestTheToolsThisServerAdvertises:
         assert "Retrying will not change this" in taught, "and the one that means stop says so"
         assert "no availability SLA" in rendered, "the inference has to be admitted as one"
         assert "recurring" in str(meeting_type["description"])
-        assert "started_after" in str(meeting_type["description"])
-        assert "Never report this as 'there is no transcript'" in taught
-        assert "is NOT known" in taught, "the fifth answer claims nothing, and has to say so"
-        assert "unknowable" in description
+        assert "started_at" in str(meeting_type["description"])
 
-    @pytest.mark.parametrize(
-        ("tool", "artifact", "finality"),
-        [
-            (
-                "teams_list_meeting_transcripts",
-                "transcripts",
-                "This status is final and cannot be retried",
-            ),
-            (
-                "teams_list_meeting_recordings",
-                "recordings",
-                "reads the same recordings and returns this same status",
-            ),
-        ],
-        ids=["transcripts", "recordings"],
-    )
-    async def test_neither_lister_offers_a_remedy_its_mechanism_cannot_keep(
-        self, mcp_client: Client[FastMCPTransport], tool: str, artifact: str, finality: str
-    ) -> None:
-        """The window is applied after Microsoft has answered, so no argument sends the next call
-        further into the collection: `scan_incomplete` is the one status with no remedy to offer."""
-        tools = _named(await mcp_client.list_tools())
-        description = tools[tool].description
-        status = str(_object(_properties(tools[tool].output_schema)["status"]))
-        assert description is not None
-
-        assert f"more {artifact} than one call reads" in status, "the cause, where the status is"
-        assert "There is nothing to try" in status
-        assert "Stop" in status
-        assert finality in status
-        assert (
-            "narrow `started_after`/`started_before` to the occurrence you mean and ask again"
-            not in (description + status).lower()
-        ), "the remedy that cannot work, in either place a model reads it"
-
-    async def test_teams_list_meeting_transcripts_takes_a_meeting_handle_and_an_occurrence_window(
+    async def test_teams_list_meeting_transcripts_takes_a_meeting_handle_and_a_pairing_id(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
@@ -1122,8 +1154,7 @@ class TestTheToolsThisServerAdvertises:
 
         assert set(properties) == {
             "meeting_uri",
-            "started_after",
-            "started_before",
+            "content_correlation_id",
             "limit",
             "include_scan_completeness",
         }
@@ -1138,32 +1169,7 @@ class TestTheToolsThisServerAdvertises:
             "the completeness of the scan is opt-in: a client that does not want it never sees it"
         )
 
-    @pytest.mark.parametrize("bound", ["started_after", "started_before"], ids=["after", "before"])
-    async def test_each_occurrence_bound_admits_a_bare_date_in_its_own_schema(
-        self, mcp_client: Client[FastMCPTransport], bound: str
-    ) -> None:
-        tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["teams_list_meeting_transcripts"].input_schema)
-
-        assert _optional_types(properties[bound]) == [
-            {"type": "string", "format": "date"},
-            {"type": "string", "format": "date-time"},
-        ]
-
-    async def test_the_occurrence_window_states_the_zone_it_resolves_against(
-        self, mcp_client: Client[FastMCPTransport]
-    ) -> None:
-        tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["teams_list_meeting_transcripts"].input_schema)
-        after = str(_object(properties["started_after"])["description"])
-        before = str(_object(properties["started_before"])["description"])
-
-        assert "READ AS UTC" in after, "the assumption a naive timestamp is resolved against"
-        assert "whole UTC day" in after and "first instant" in after
-        assert "END of that UTC day" in before, "the same date in both bounds must be that one day"
-        assert "07:00Z" in after, "a worked example beats the word 'timezone'"
-
-    async def test_teams_list_meeting_transcripts_says_the_verdict_is_about_the_window(
+    async def test_teams_list_meeting_transcripts_says_the_verdict_is_about_the_meeting(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """A recurring series' `endDateTime` can be years in the future, so a caller told to wait
@@ -1174,12 +1180,12 @@ class TestTheToolsThisServerAdvertises:
         )
         taught = str(status["description"])
 
-        assert "demonstrably passed is never reported this way" in taught
+        assert "demonstrably ended is never reported this way" in taught
         assert "however far in the future a recurring series runs" in taught, (
             "the series' own end date is what the verdict must not be read off"
         )
 
-    async def test_teams_list_meeting_recordings_takes_the_same_handle_and_window(
+    async def test_teams_list_meeting_recordings_takes_the_same_handle_and_nothing_more(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
@@ -1189,8 +1195,6 @@ class TestTheToolsThisServerAdvertises:
 
         assert set(properties) == {
             "meeting_uri",
-            "started_after",
-            "started_before",
             "limit",
             "include_scan_completeness",
         }
@@ -1202,11 +1206,6 @@ class TestTheToolsThisServerAdvertises:
             20,
         )
         assert _object(properties["include_scan_completeness"])["default"] is False
-        for bound in ("started_after", "started_before"):
-            assert _optional_types(properties[bound]) == [
-                {"type": "string", "format": "date"},
-                {"type": "string", "format": "date-time"},
-            ]
 
     async def test_the_two_meeting_listers_answer_in_the_same_shape(
         self, mcp_client: Client[FastMCPTransport]
@@ -1217,9 +1216,20 @@ class TestTheToolsThisServerAdvertises:
 
         assert transcripts_schema - recordings_schema == {"transcripts"}
         assert recordings_schema - transcripts_schema == {"recordings"}
-        assert set(_properties(tools["teams_list_meeting_transcripts"].input_schema)) == set(
-            _properties(tools["teams_list_meeting_recordings"].input_schema)
+
+        transcripts_input = set(_properties(tools["teams_list_meeting_transcripts"].input_schema))
+        recordings_input = set(_properties(tools["teams_list_meeting_recordings"].input_schema))
+        assert recordings_input - transcripts_input == set(), (
+            "a caller switching listers after a refusal must not have to drop an argument"
         )
+        # The one asymmetry, and it is documentation and not oversight: Microsoft publishes a
+        # `$filter` example for `contentcorrelationId` on the TRANSCRIPTS collection and on no
+        # other artifact collection. Mirroring it onto recordings would be a filter composed
+        # against undocumented support, which Graph is documented to drop in silence — so the
+        # answer would be every recording of the meeting under an argument naming one call. The
+        # pairing is also read recording-first in practice: a recording row carries the id, and
+        # this is the route to that call's words.
+        assert transcripts_input - recordings_input == {"content_correlation_id"}
 
     async def test_teams_list_meeting_recordings_promises_no_video_and_sends_content_elsewhere(
         self, mcp_client: Client[FastMCPTransport]
@@ -1257,7 +1267,7 @@ class TestTheToolsThisServerAdvertises:
             tools["teams_list_meeting_recordings"].output_schema
         ), "the constraint belongs where the result is read, not only in the tool's prose"
 
-    async def test_teams_list_meeting_recordings_names_its_five_answers_and_their_remedies(
+    async def test_teams_list_meeting_recordings_names_its_four_answers_and_their_remedies(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
@@ -1273,7 +1283,6 @@ class TestTheToolsThisServerAdvertises:
             "available",
             "not_ready",
             "not_recorded",
-            "scan_incomplete",
             "meeting_not_found",
         ):
             assert f"`{value}`" in taught, value
@@ -1283,16 +1292,14 @@ class TestTheToolsThisServerAdvertises:
         assert "NOT 'the call was not recorded'" in taught
         assert "Retrying will not help" in taught
         assert "no availability SLA" in taught, "the inference has to be admitted as one"
-        assert "recurring" in rendered and "started_after" in rendered
+        assert "recurring" in rendered and "started_at" in rendered
         assert "publishes no duration field" in rendered, "the duration is derived, and says so"
-        assert "Never report this as 'the call was not recorded'" in taught
-        assert "is NOT known" in taught, "the fifth answer claims nothing, and has to say so"
 
     async def test_both_meeting_listers_teach_the_same_status_vocabulary(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        shared = {"available", "not_ready", "scan_incomplete", "meeting_not_found"}
+        shared = {"available", "not_ready", "meeting_not_found"}
         statuses = {
             name: str(_object(_properties(tools[name].output_schema)["status"]).get("description"))
             for name in ("teams_list_meeting_transcripts", "teams_list_meeting_recordings")
@@ -1953,38 +1960,24 @@ class TestCallingThem:
                 {"meeting_uri": _MEETING_URI, "limit": 1, "include_scan_completeness": True},
             )
         )
-        wide = _structured(
-            await mcp_client.call_tool(
-                tool,
-                {
-                    "meeting_uri": _MEETING_URI,
-                    "started_after": _day(meetings.MAX_ARTIFACT_SCAN).date().isoformat(),
-                    "started_before": _day(_PAST_THE_CAP - 1).date().isoformat(),
-                },
-            )
-        )
-        narrow = _structured(
-            await mcp_client.call_tool(
-                tool,
-                {
-                    "meeting_uri": _MEETING_URI,
-                    "started_after": _day(250).date().isoformat(),
-                    "started_before": _day(250).date().isoformat(),
-                },
-            )
-        )
+        again = _structured(await mcp_client.call_tool(tool, {"meeting_uri": _MEETING_URI}))
 
         listed = cast("Sequence[Mapping[str, object]]", newest[collection])
-        assert len(obo.requested_scopes) == 3, "one delegated exchange per call, all three made"
+        repeated = cast("Sequence[Mapping[str, object]]", again[collection])
+        assert len(obo.requested_scopes) == 2, "one delegated exchange per call, both made"
         assert [item[identifier] for item in listed] == ["day-199"], "the newest of what was read"
         assert newest["scan_incomplete"] is True, (
             "the read stopped at the cap, and a caller that asked has to be told"
         )
-        assert wide["status"] == "scan_incomplete"
-        assert wide["scan_incomplete"] is None, "nothing asked about the scan on these two calls"
-        assert (narrow["status"], narrow[collection]) == (wide["status"], wide[collection]), (
-            "a narrower window is the same call over the same artifacts, so it is not a remedy"
+        assert again["status"] == "available", (
+            "a scan that stops at the cap still answers with rows; only an empty listing is a "
+            "different status"
         )
+        assert again["scan_incomplete"] is None, "nothing asked about the scan on this call"
+        assert [item[identifier] for item in repeated][:1] == ["day-199"], (
+            "no argument reaches past the cap, so a second call reads the same rows"
+        )
+        assert len(repeated) == 20, "and cuts a full default limit out of them"
 
     async def test_a_model_walks_from_a_meeting_chat_to_whether_the_call_was_recorded(
         self,
