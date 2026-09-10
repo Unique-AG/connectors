@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { randomBytes } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -239,6 +240,23 @@ export class OpaqueTokenService {
       metadata.familyId,
       (metadata.generation || 0) + 1,
     );
+  }
+
+  public async revokeAllTokensForUserProfile(userProfileId: string): Promise<void> {
+    const revokeAllTokens = this.store.revokeAllTokensForUserProfile?.bind(this.store);
+    assert.ok(
+      revokeAllTokens,
+      'The configured OAuth store cannot revoke every token for a user profile',
+    );
+
+    const revoked = await revokeAllTokens(userProfileId);
+    this.logger.warn({
+      msg: 'Revoked every MCP token for user profile; all of its clients must re-authenticate',
+      userProfileId,
+      revokedTokenCount: revoked.tokenCount,
+      disconnectedClientCount: revoked.clientIds.length,
+      disconnectedClientIds: revoked.clientIds,
+    });
   }
 
   public async revokeToken(

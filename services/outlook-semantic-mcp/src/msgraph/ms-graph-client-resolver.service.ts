@@ -1,3 +1,4 @@
+import { isUpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
@@ -32,6 +33,15 @@ export class AllDelegatesFailedError extends Error {
   }
 }
 
+export interface GraphClientResolveOptions {
+  /**
+   * `false` marks an interactive MCP tool call: use the signed-in user's own Graph token, and let
+   * a revoked grant reach the caller so the client re-authenticates instead of the tool quietly
+   * finishing as a colleague. Background jobs default to `true` and record a failed run instead.
+   */
+  allowDelegateFallback?: boolean;
+}
+
 function preferDelegate(
   delegates: { delegateUserId: string }[],
   preferredDelegateUserId: string | undefined,
@@ -64,6 +74,8 @@ export class MsGraphClientResolver {
    * - **shared-mailbox-with-login profiles** — same candidate loop, but the mailbox's own token is
    *   tried first. `preferredDelegateUserId` is swapped to the front of the *delegate* segment only,
    *   so a stale preferred delegate cannot outrank the mailbox's own credential.
+   *   When `allowDelegateFallback` is `false` (interactive tool calls), only the mailbox's own
+   *   token is used: a 401/403 or revoked grant propagates so the signed-in user re-authenticates.
    *
    * Graph paths inside `fn` should use the `userProfile` from the outer scope
    * (e.g. `users/${userProfile.email}/…`) whenever a delegate token might be selected.
@@ -102,6 +114,7 @@ export class MsGraphClientResolver {
       throwIfNoDelegates: true;
       maxDelegates?: number;
       preferredDelegateUserId?: string;
+      allowDelegateFallback?: boolean;
     };
   }): Promise<T>;
 
@@ -119,6 +132,7 @@ export class MsGraphClientResolver {
       throwIfNoDelegates?: false;
       maxDelegates?: number;
       preferredDelegateUserId?: string;
+      allowDelegateFallback?: boolean;
     };
   }): Promise<T | typeof NO_DELEGATES>;
 
@@ -136,14 +150,21 @@ export class MsGraphClientResolver {
       throwIfNoDelegates?: boolean;
       maxDelegates?: number;
       preferredDelegateUserId?: string;
+      allowDelegateFallback?: boolean;
     };
   }): Promise<T | typeof NO_DELEGATES> {
     const { userProfile, fn, sharedMailboxConfig } = input;
     const maxDelegates = sharedMailboxConfig?.maxDelegates ?? 3;
     const throwIfNoDelegates = sharedMailboxConfig?.throwIfNoDelegates ?? false;
     const preferredDelegateUserId = sharedMailboxConfig?.preferredDelegateUserId;
+    const allowDelegateFallback = sharedMailboxConfig?.allowDelegateFallback ?? true;
 
-    if (userProfile.source === 'oauth') {
+    if (
+      userProfile.source === 'oauth' ||
+      // Interactive tool calls: use the signed-in user's own token only. A dead Microsoft
+      // grant must reach the caller so they re-authenticate instead of finishing as a delegate.
+      (userProfile.source === 'shared-mailbox-with-login' && !allowDelegateFallback)
+    ) {
       const client = this.graphClientFactory.createClientForUser(userProfile.id);
       return fn({ client, clientUserProfileId: userProfile.id });
     }
@@ -186,10 +207,17 @@ export class MsGraphClientResolver {
       try {
         return await fn({ client, clientUserProfileId: delegate.delegateUserId });
       } catch (error) {
-        // 401 and 403 both cycle to the next candidate. This also covers failed token refreshes:
-        // TokenRefreshMiddleware catches any refreshAccessToken() failure, swallows it, and
-        // preserves the original 401 response — so a dead refresh token surfaces here as
-        // GraphError(401) and is handled by the same branch. No separate flag needed.
+        // 401/403 cycle to the next candidate. A permanent Microsoft grant failure
+        // (`invalid_grant`) already revoked that delegate's own MCP tokens — keep walking
+        // so one dead delegate does not fail the owner's request.
+        if (isUpstreamCredentialRevokedError(error)) {
+          this.logger.warn({
+            ownerUserId: userProfile.id,
+            delegateUserId: delegate.delegateUserId,
+            msg: "Delegate Microsoft grant is permanently invalid; revoked that delegate's own MCP sessions and continuing with the next candidate",
+          });
+          continue;
+        }
         if (error instanceof GraphError && (error.statusCode === 401 || error.statusCode === 403)) {
           continue;
         }

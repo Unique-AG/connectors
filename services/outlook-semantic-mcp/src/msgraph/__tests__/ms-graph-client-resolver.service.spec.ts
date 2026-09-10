@@ -1,4 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
+import { UpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -271,6 +272,26 @@ describe('MsGraphClientResolver', () => {
     expect(factory.createClientForUser).toHaveBeenNthCalledWith(2, DELEGATE_USER_ID_2);
   });
 
+  it('source=shared-mailbox, first delegate grant revoked, second succeeds → does not fail the owner', async () => {
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(new UpstreamCredentialRevokedError('invalid_grant'))
+      .mockResolvedValueOnce('from-second-after-revoked-grant');
+
+    const { resolver, factory } = createResolver([
+      { delegateUserId: DELEGATE_USER_ID_1 },
+      { delegateUserId: DELEGATE_USER_ID_2 },
+    ]);
+
+    const result = await resolver.run({
+      userProfile: makeManualProfile(),
+      fn,
+    });
+
+    expect(result).toBe('from-second-after-revoked-grant');
+    expect(factory.createClientForUser).toHaveBeenCalledTimes(2);
+  });
+
   it('source=shared-mailbox, preferredDelegateUserId specified → that delegate is tried first', async () => {
     const fn = vi.fn().mockResolvedValue('preferred-result');
     const { resolver, factory } = createResolver([
@@ -386,5 +407,71 @@ describe('MsGraphClientResolver', () => {
     expect(factory.createClientForUser).toHaveBeenCalledOnce();
     expect(factory.createClientForUser).toHaveBeenCalledWith(OWNER_USER_ID);
     expect(factory.createClientForUser).not.toHaveBeenCalledWith(DELEGATE_USER_ID_2);
+  });
+
+  it('dual allowDelegateFallback: false uses self only and does not query delegates', async () => {
+    const fn = vi.fn().mockResolvedValue('self-only');
+    const { resolver, factory, db } = createResolver([{ delegateUserId: DELEGATE_USER_ID_1 }]);
+
+    const result = await resolver.run({
+      userProfile: makeDualProfile(),
+      fn,
+      sharedMailboxConfig: { allowDelegateFallback: false },
+    });
+
+    expect(result).toBe('self-only');
+    expect(db.select).not.toHaveBeenCalled();
+    expect(factory.createClientForUser).toHaveBeenCalledOnce();
+    expect(factory.createClientForUser).toHaveBeenCalledWith(OWNER_USER_ID);
+  });
+
+  it('dual allowDelegateFallback: false propagates Graph 401 instead of rotating to a delegate', async () => {
+    const graph401 = makeGraphError(401);
+    const fn = vi.fn().mockRejectedValue(graph401);
+    const { resolver, factory } = createResolver([{ delegateUserId: DELEGATE_USER_ID_1 }]);
+
+    await expect(
+      resolver.run({
+        userProfile: makeDualProfile(),
+        fn,
+        sharedMailboxConfig: { allowDelegateFallback: false },
+      }),
+    ).rejects.toBe(graph401);
+
+    expect(factory.createClientForUser).toHaveBeenCalledOnce();
+    expect(factory.createClientForUser).toHaveBeenCalledWith(OWNER_USER_ID);
+    expect(fn).toHaveBeenCalledOnce();
+  });
+
+  it('dual allowDelegateFallback: false propagates UpstreamCredentialRevokedError instead of rotating', async () => {
+    const revoked = new UpstreamCredentialRevokedError('invalid_grant');
+    const fn = vi.fn().mockRejectedValue(revoked);
+    const { resolver, factory } = createResolver([{ delegateUserId: DELEGATE_USER_ID_1 }]);
+
+    await expect(
+      resolver.run({
+        userProfile: makeDualProfile(),
+        fn,
+        sharedMailboxConfig: { allowDelegateFallback: false },
+      }),
+    ).rejects.toBe(revoked);
+
+    expect(factory.createClientForUser).toHaveBeenCalledOnce();
+    expect(factory.createClientForUser).toHaveBeenCalledWith(OWNER_USER_ID);
+  });
+
+  it('shared-mailbox allowDelegateFallback: false still uses delegates — the mailbox has no own login', async () => {
+    const fn = vi.fn().mockResolvedValue('from-delegate');
+    const { resolver, factory } = createResolver([{ delegateUserId: DELEGATE_USER_ID_1 }]);
+
+    const result = await resolver.run({
+      userProfile: makeManualProfile(),
+      fn,
+      sharedMailboxConfig: { allowDelegateFallback: false },
+    });
+
+    expect(result).toBe('from-delegate');
+    expect(factory.createClientForUser).toHaveBeenCalledOnce();
+    expect(factory.createClientForUser).toHaveBeenCalledWith(DELEGATE_USER_ID_1);
   });
 });

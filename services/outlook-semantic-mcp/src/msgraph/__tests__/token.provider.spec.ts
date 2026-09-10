@@ -201,6 +201,38 @@ describe('TokenProvider', () => {
       );
     });
 
+    it('clears Graph tokens, revokes the MCP session, and throws on invalid_grant', async () => {
+      const mockUserProfile = {
+        id: 'user-profile-123',
+        refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+      };
+      const onPermanentAuthFailure = vi.fn().mockResolvedValue(undefined);
+
+      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        text: vi.fn().mockResolvedValue(
+          JSON.stringify({
+            error: 'invalid_grant',
+            error_description: 'AADSTS50173: The provided grant has expired',
+          }),
+        ),
+      } as never);
+
+      const unit = new TokenProvider(mockConfig, {
+        ...mockDependencies,
+        onPermanentAuthFailure,
+      } as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
+        'AADSTS50173: The provided grant has expired',
+      );
+      expect(mockDependencies.drizzle.update).toHaveBeenCalled();
+      expect(onPermanentAuthFailure).toHaveBeenCalledWith('user-profile-123');
+    });
+
     it('throws error when token refresh fails', async () => {
       const mockUserProfile = {
         id: 'user-profile-123',

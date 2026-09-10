@@ -9,6 +9,7 @@ import {
   OAuthUserProfile,
   PassportUser,
   RefreshTokenMetadata,
+  RevokedTokens,
 } from '@unique-ag/mcp-oauth';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Logger } from '@nestjs/common';
@@ -357,6 +358,28 @@ export class McpOAuthStore implements IOAuthStore {
     await this.drizzle.delete(tokens).where(eq(tokens.token, token));
 
     await this.removeCachedRefreshToken(token);
+  }
+
+  public async revokeAllTokensForUserProfile(userProfileId: string): Promise<RevokedTokens> {
+    const tokensForUser = await this.drizzle
+      .select({ token: tokens.token, type: tokens.type, clientId: tokens.clientId })
+      .from(tokens)
+      .where(eq(tokens.userProfileId, userProfileId));
+
+    await this.drizzle.delete(tokens).where(eq(tokens.userProfileId, userProfileId));
+
+    await Promise.all(
+      tokensForUser.map((tokenData) =>
+        tokenData.type === 'ACCESS'
+          ? this.removeCachedAccessToken(tokenData.token)
+          : this.removeCachedRefreshToken(tokenData.token),
+      ),
+    );
+
+    return {
+      tokenCount: tokensForUser.length,
+      clientIds: [...new Set(tokensForUser.map((tokenData) => tokenData.clientId))],
+    };
   }
 
   public async revokeTokenFamily(familyId: string): Promise<void> {

@@ -1,3 +1,4 @@
+import { UpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { describe, expect, it, type Mock, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { GraphBatchRequest } from '../build-ms-graph-kql-batch-requests.query';
@@ -341,6 +342,17 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
 
       expect(results).toHaveLength(0);
       expect(searchSummary).toBeUndefined();
+    });
+
+    it('propagates a revoked Microsoft grant instead of reporting an empty mailbox', async () => {
+      const revoked = new UpstreamCredentialRevokedError('invalid_grant');
+      const mockPost = vi.fn().mockRejectedValue(revoked);
+      const { instance } = createQuery({ mockPost });
+
+      await expect(instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG)).rejects.toBe(
+        revoked,
+      );
+      expect(mockPost).toHaveBeenCalledTimes(1);
     });
   });
 

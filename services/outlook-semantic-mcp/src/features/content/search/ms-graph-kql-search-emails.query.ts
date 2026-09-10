@@ -1,3 +1,4 @@
+import { isUpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { createSmeared } from '@unique-ag/utils';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
@@ -232,7 +233,12 @@ export class MsGraphKqlSearchEmailsQuery {
       try {
         const raw = await client.api('$batch').post({ requests: batchApiInput });
         batchResponse = batchResponseSchema.parse(raw);
-      } catch {
+      } catch (error) {
+        // A revoked Microsoft grant would otherwise be retried and then reported as an empty
+        // mailbox, which reads as a real answer. Let it reach the caller so they re-authenticate.
+        if (isUpstreamCredentialRevokedError(error)) {
+          throw error;
+        }
         retryRequests.push(...batch);
         continue;
       }

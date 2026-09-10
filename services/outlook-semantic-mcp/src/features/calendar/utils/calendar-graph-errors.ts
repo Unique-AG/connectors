@@ -10,7 +10,7 @@ export class CalendarConsentRequiredError extends Error {
 }
 
 export function isCalendarPermissionDeniedError(error: unknown): boolean {
-  return error instanceof GraphError && (error.statusCode === 401 || error.statusCode === 403);
+  return error instanceof GraphError && error.statusCode === 403;
 }
 
 export function isGraphBadRequestError(error: unknown): boolean {

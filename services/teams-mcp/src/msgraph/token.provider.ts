@@ -1,6 +1,11 @@
 import assert from 'node:assert';
 import { AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
 import {
+  isPermanentUpstreamOAuthError,
+  isUpstreamCredentialRevokedError,
+  UpstreamCredentialRevokedError,
+} from '@unique-ag/mcp-oauth';
+import {
   AuthenticationProvider,
   AuthenticationProviderOptions,
 } from '@microsoft/microsoft-graph-client';
@@ -11,7 +16,6 @@ import { z } from 'zod';
 import { microsoftOAuthTokenUrl } from '../auth/microsoft.provider';
 import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import { userProfiles } from '../drizzle/schema';
-import { MicrosoftReauthRequiredException } from '../utils/microsoft-reauth.exception';
 import { normalizeError } from '../utils/normalize-error';
 
 /** Microsoft OAuth2 token-refresh response — only the fields this provider consumes. */
@@ -29,6 +33,7 @@ export class TokenProvider implements AuthenticationProvider {
   private readonly scopes: string[];
   private readonly drizzle: DrizzleDatabase;
   private readonly encryptionService: AesGcmEncryptionService;
+  private readonly onPermanentAuthFailure?: (userProfileId: string) => Promise<void>;
 
   public constructor(
     {
@@ -47,9 +52,11 @@ export class TokenProvider implements AuthenticationProvider {
     {
       drizzle,
       encryptionService,
+      onPermanentAuthFailure,
     }: {
       drizzle: DrizzleDatabase;
       encryptionService: AesGcmEncryptionService;
+      onPermanentAuthFailure?: (userProfileId: string) => Promise<void>;
     },
   ) {
     this.userProfileId = userProfileId;
@@ -59,6 +66,7 @@ export class TokenProvider implements AuthenticationProvider {
     this.scopes = scopes;
     this.drizzle = drizzle;
     this.encryptionService = encryptionService;
+    this.onPermanentAuthFailure = onPermanentAuthFailure;
   }
 
   public async getAccessToken(
@@ -124,16 +132,14 @@ export class TokenProvider implements AuthenticationProvider {
           'Microsoft Graph API rejected token refresh request',
         );
 
-        if (parsedError.error === 'invalid_grant') {
-          // Permanently invalid — expired, revoked, device removed from tenant, CAP changed.
-          // Clear the dead tokens and surface a typed McpError so the tool handler
-          // propagates a JSON-RPC error instead of isError:true.
+        if (isPermanentUpstreamOAuthError(parsedError.error)) {
           await this.drizzle
             .update(userProfiles)
             .set({ accessToken: null, refreshToken: null })
             .where(eq(userProfiles.id, userProfileId));
 
-          throw new MicrosoftReauthRequiredException(parsedError.error_description);
+          await this.onPermanentAuthFailure?.(userProfileId);
+          throw new UpstreamCredentialRevokedError(parsedError.error_description);
         }
 
         assert.fail(`Token refresh failed: ${response.statusText}`);
@@ -166,7 +172,14 @@ export class TokenProvider implements AuthenticationProvider {
       );
       return tokenData.access_token;
     } catch (error) {
-      if (error instanceof MicrosoftReauthRequiredException) {
+      if (isUpstreamCredentialRevokedError(error)) {
+        this.logger.warn(
+          {
+            userProfileId,
+            error: serializeError(normalizeError(error)),
+          },
+          'Microsoft grant is permanently invalid; propagating after MCP token revoke',
+        );
         throw error;
       }
       this.logger.error(

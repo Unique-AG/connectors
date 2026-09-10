@@ -17,6 +17,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "catalog:",
     "@nestjs/schedule": "catalog:",
     "@nestjs/throttler": "6.5.0",
     "bcrypt": "6.0.0",

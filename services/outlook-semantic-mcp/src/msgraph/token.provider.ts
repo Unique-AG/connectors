@@ -1,6 +1,11 @@
 import assert from 'node:assert';
 import { AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
 import {
+  isPermanentUpstreamOAuthError,
+  isUpstreamCredentialRevokedError,
+  UpstreamCredentialRevokedError,
+} from '@unique-ag/mcp-oauth';
+import {
   AuthenticationProvider,
   AuthenticationProviderOptions,
 } from '@microsoft/microsoft-graph-client';
@@ -27,6 +32,7 @@ export class TokenProvider implements AuthenticationProvider {
   private readonly drizzle: DrizzleDatabase;
   private readonly encryptionService: AesGcmEncryptionService;
   private readonly dispatcher: Dispatcher;
+  private readonly onPermanentAuthFailure?: (userProfileId: string) => Promise<void>;
 
   public constructor(
     {
@@ -46,10 +52,12 @@ export class TokenProvider implements AuthenticationProvider {
       drizzle,
       encryptionService,
       dispatcher,
+      onPermanentAuthFailure,
     }: {
       drizzle: DrizzleDatabase;
       encryptionService: AesGcmEncryptionService;
       dispatcher: Dispatcher;
+      onPermanentAuthFailure?: (userProfileId: string) => Promise<void>;
     },
   ) {
     this.userProfileId = userProfileId;
@@ -60,6 +68,7 @@ export class TokenProvider implements AuthenticationProvider {
     this.drizzle = drizzle;
     this.encryptionService = encryptionService;
     this.dispatcher = dispatcher;
+    this.onPermanentAuthFailure = onPermanentAuthFailure;
   }
 
   public async getAccessToken(
@@ -108,6 +117,13 @@ export class TokenProvider implements AuthenticationProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
+        let parsedError: { error?: string; error_description?: string } = {};
+        try {
+          parsedError = JSON.parse(errorText);
+        } catch {
+          // not JSON
+        }
+
         this.logger.error({
           msg: 'Microsoft Graph API rejected token refresh request',
           status: response.status,
@@ -116,6 +132,13 @@ export class TokenProvider implements AuthenticationProvider {
           tokenRefreshFailed: true,
           errorSource: 'microsoft_graph_api',
         });
+
+        if (isPermanentUpstreamOAuthError(parsedError.error)) {
+          await this.clearGraphTokens(userProfileId);
+          await this.onPermanentAuthFailure?.(userProfileId);
+          throw new UpstreamCredentialRevokedError(parsedError.error_description);
+        }
+
         assert.fail(`Token refresh failed: ${response.statusText}`);
       }
 
@@ -144,6 +167,14 @@ export class TokenProvider implements AuthenticationProvider {
       });
       return tokenData.access_token;
     } catch (err) {
+      if (isUpstreamCredentialRevokedError(err)) {
+        this.logger.warn({
+          msg: 'Microsoft grant is permanently invalid; propagating after MCP token revoke',
+          userProfileId: this.userProfileId,
+          err,
+        });
+        throw err;
+      }
       this.logger.error({
         msg: 'Failed to refresh Microsoft Graph API access token for user',
         userProfileId: this.userProfileId,
@@ -156,5 +187,12 @@ export class TokenProvider implements AuthenticationProvider {
         { cause: err },
       );
     }
+  }
+
+  private async clearGraphTokens(userProfileId: string): Promise<void> {
+    await this.drizzle
+      .update(userProfiles)
+      .set({ accessToken: null, refreshToken: null })
+      .where(eq(userProfiles.id, userProfileId));
   }
 }

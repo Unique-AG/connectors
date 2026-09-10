@@ -17,6 +17,7 @@ import {
 } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import {
+  type GraphClientResolveOptions,
   isNoDelegatesResult,
   MsGraphClientResolver,
 } from '~/msgraph/ms-graph-client-resolver.service';
@@ -54,7 +55,10 @@ export class SyncDirectoriesForUserProfileCommand {
   ) {}
 
   @Span()
-  public async run(userProfileId: UserProfileTypeID): Promise<void> {
+  public async run(
+    userProfileId: UserProfileTypeID,
+    options?: GraphClientResolveOptions,
+  ): Promise<void> {
     traceAttrs({ userProfileId: userProfileId.toString() });
     this.logger.log({
       userProfileId: userProfileId.toString(),
@@ -72,7 +76,8 @@ export class SyncDirectoriesForUserProfileCommand {
 
     const result = await this.msGraphClientResolver.run({
       userProfile,
-      fn: ({ client }) => this.doSync(client, userProfile),
+      fn: ({ client }) => this.doSync(client, userProfile, options),
+      sharedMailboxConfig: { allowDelegateFallback: options?.allowDelegateFallback },
     });
 
     if (isNoDelegatesResult(result)) {
@@ -87,6 +92,7 @@ export class SyncDirectoriesForUserProfileCommand {
   private async doSync(
     client: Client,
     userProfile: NonNullishProps<UserProfile, 'email'>,
+    options?: GraphClientResolveOptions,
   ): Promise<void> {
     const userEmail = smearEmail(createSmeared(userProfile.email));
 
@@ -120,7 +126,10 @@ export class SyncDirectoriesForUserProfileCommand {
         userEmail,
         msg: `No existing directories found, syncing system directories`,
       });
-      await this.syncSystemDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
+      await this.syncSystemDirectoriesCommand.run(
+        convertUserProfileIdToTypeId(userProfile.id),
+        options,
+      );
     }
 
     const microsoftDirectories = await this.fetchAllDirectoriesFromOutlookQuery.run(

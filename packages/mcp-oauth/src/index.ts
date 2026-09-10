@@ -7,6 +7,11 @@ export { type IntrospectionResponse, IntrospectRequestDto } from './dtos/introsp
 export { RegisterClientDto } from './dtos/register-client.dto';
 export { RevokeRequestDto } from './dtos/revoke-request.dto';
 export { TokenRequestDto } from './dtos/token-request.dto';
+export {
+  isPermanentUpstreamOAuthError,
+  isUpstreamCredentialRevokedError,
+  UpstreamCredentialRevokedError,
+} from './errors/upstream-credential-revoked.error';
 export * from './filters/oauth-exception.filter';
 export * from './guards/mcp-auth-jwt.guard';
 export type { IEncryptionService } from './interfaces/encryption-service.interface';
@@ -14,6 +19,7 @@ export type {
   AccessTokenMetadata,
   IOAuthStore,
   RefreshTokenMetadata,
+  RevokedTokens,
 } from './interfaces/io-auth-store.interface';
 export type {
   AuthorizationCode,

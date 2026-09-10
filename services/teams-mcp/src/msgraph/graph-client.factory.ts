@@ -1,4 +1,5 @@
 import { AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
+import { OpaqueTokenService } from '@unique-ag/mcp-oauth';
 import {
   AuthenticationHandler,
   Client,
@@ -44,6 +45,7 @@ export class GraphClientFactory {
     @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
     private readonly encryptionService: AesGcmEncryptionService,
     private readonly metricService: MetricService,
+    private readonly opaqueTokenService: OpaqueTokenService,
   ) {
     this.clientId = this.configService.get('microsoft.clientId', { infer: true });
     this.clientSecret = this.configService.get('microsoft.clientSecret', { infer: true }).value;
@@ -66,6 +68,8 @@ export class GraphClientFactory {
       {
         drizzle: this.drizzle,
         encryptionService: this.encryptionService,
+        onPermanentAuthFailure: (profileId) =>
+          this.opaqueTokenService.revokeAllTokensForUserProfile(profileId),
       },
     );
 

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { isUpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
@@ -19,6 +20,7 @@ import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directo
 import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import {
+  type GraphClientResolveOptions,
   isNoDelegatesResult,
   MsGraphClientResolver,
 } from '~/msgraph/ms-graph-client-resolver.service';
@@ -56,10 +58,13 @@ export class FullSyncCommand {
   ) {}
 
   @Span()
-  public async run(userProfileId: string): Promise<FullSyncResult> {
+  public async run(
+    userProfileId: string,
+    options?: GraphClientResolveOptions,
+  ): Promise<FullSyncResult> {
     return await this.metrics.measureFullSyncRun(() =>
       withRetryAttempts<FullSyncResult>({
-        fn: () => this.runFullSync(userProfileId),
+        fn: () => this.runFullSync(userProfileId, options),
         onError: makeDefaultOnErrorHandler((error) => {
           this.logger.warn({
             msg: `Full sync unexpectedly failed with error`,
@@ -73,7 +78,10 @@ export class FullSyncCommand {
   }
 
   @Span()
-  public async runFullSync(userProfileId: string): Promise<FullSyncResult> {
+  public async runFullSync(
+    userProfileId: string,
+    options?: GraphClientResolveOptions,
+  ): Promise<FullSyncResult> {
     traceAttrs({ userProfileId });
     this.logger.debug({ userProfileId, msg: 'Full sync triggered' });
     if (await this.isInboxDeletingQuery.run(userProfileId)) {
@@ -149,7 +157,7 @@ export class FullSyncCommand {
           // This is intentional: directory sync is a separate process that manages its own delta
           // tokens and delegate identity, and self-heals on Graph 410 errors independently.
           await this.metrics.measureFullSyncDirectorySync(() =>
-            this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
+            this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id), options),
           );
 
           const batchResult = await this.metrics.measureFullSyncBatch(() =>
@@ -173,6 +181,7 @@ export class FullSyncCommand {
         },
         sharedMailboxConfig: {
           preferredDelegateUserId: lockResult.preferredDelegateUserProfileId ?? undefined,
+          allowDelegateFallback: options?.allowDelegateFallback,
         },
       });
 
@@ -243,7 +252,14 @@ export class FullSyncCommand {
       }
     } catch (error) {
       this.logger.error({ err: error, userProfileId, version, msg: 'Full sync failed' });
+      // Release the lock either way, so a revoked grant does not leave the row claiming to
+      // still be running until its heartbeat goes stale.
       await this.transitionState(userProfileId, version, 'failed');
+
+      // Only an interactive caller can act on a revoked grant, so only it gets the throw.
+      if (options?.allowDelegateFallback === false && isUpstreamCredentialRevokedError(error)) {
+        throw error;
+      }
       return { status: 'failed', error };
     }
   }
@@ -392,6 +408,11 @@ export class FullSyncCommand {
 
       this.logger.debug({ userProfileId, expectedTotal: count, msg: 'Expected total fetched' });
     } catch (error) {
+      // $count is the first Graph call of a fresh sync, so swallowing a revoked grant here would
+      // hide it behind a generic missing-token failure further down.
+      if (isUpstreamCredentialRevokedError(error)) {
+        throw error;
+      }
       this.logger.warn({
         err: error,
         userProfileId,

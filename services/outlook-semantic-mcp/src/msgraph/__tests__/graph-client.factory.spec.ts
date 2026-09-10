@@ -1,3 +1,4 @@
+import type { OpaqueTokenService } from '@unique-ag/mcp-oauth';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphClientFactory } from '../graph-client.factory';
@@ -51,6 +52,10 @@ describe('GraphClientFactory', () => {
     getHistogram: vi.fn().mockReturnValue({ record: vi.fn() }),
   };
 
+  const mockOpaqueTokenService: Pick<OpaqueTokenService, 'revokeAllTokensForUserProfile'> = {
+    revokeAllTokensForUserProfile: vi.fn().mockResolvedValue(undefined),
+  };
+
   let factory: GraphClientFactory;
 
   beforeEach(() => {
@@ -63,6 +68,20 @@ describe('GraphClientFactory', () => {
       {} as never,
       mockMetricService as never,
       mockProxyService as never,
+      mockOpaqueTokenService as never,
+    );
+  });
+
+  it('wires onPermanentAuthFailure to revoke every MCP token for the profile', async () => {
+    factory.createClientForUser('user-profile-123');
+
+    expect(TokenProvider).toHaveBeenCalledTimes(1);
+    // biome-ignore lint/style/noNonNullAssertion: tested for existence with expect
+    const [, dependencies] = vi.mocked(TokenProvider).mock.calls[0]!;
+    await dependencies.onPermanentAuthFailure?.('user-profile-123');
+
+    expect(mockOpaqueTokenService.revokeAllTokensForUserProfile).toHaveBeenCalledWith(
+      'user-profile-123',
     );
   });
 
