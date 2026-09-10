@@ -60,18 +60,8 @@ def _hash_token(token: str) -> str:
 
 
 def _source_ip(request: Request) -> str | None:
-    """The peer address, recorded on a failed attempt for diagnosis only.
-
-    Behind an ingress this is the ingress's address, which is exactly why `auth/throttle.py`
-    does not rate-limit on it. `X-Forwarded-For` is deliberately ignored: it's client-supplied,
-    so treating it as an identity would record whatever an attacker chose to send.
-    """
+    """Return the direct peer address."""
     return request.client.host if request.client is not None else None
-
-
-# `_rotate_refresh_token` returns one of these instead of raising, because `TokenError` cannot be
-# raised while the transaction is still open. Modelling the two results as types rather than a
-# set of booleans keeps every database branch a single `return`.
 
 
 class _RefreshRotated(BaseModel):
@@ -104,10 +94,6 @@ _INVALID_SCOPE = _RefreshRejected(
     error="invalid_scope", description="Requested scope exceeds originally granted scopes"
 )
 
-# Applied to every login-endpoint response. `Referrer-Policy` is the load-bearing one: the
-# `request_id` travels in the login URL's query string, and without this the browser would
-# forward it in the `Referer` of anything the page links to or loads. `no-store` keeps it out of
-# shared caches and the back/forward cache for the same reason.
 _LOGIN_SECURITY_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
@@ -121,13 +107,7 @@ _EXPIRED_LINK_MESSAGE = (
 
 
 class WithIntelligenceOAuthProvider(OAuthProvider):
-    """FastMCP OAuth 2.1 authorization server.
-
-    With Intelligence has no OAuth of its own — so instead of redirecting to a third-party
-    identity provider, `authorize()` redirects the browser to our own hosted login page
-    (`handle_login_get`/`handle_login_post`), which collects a username and password, verifies
-    them by signing in to With Intelligence, and only then mints an authorization code.
-    """
+    """OAuth provider backed by WI authentication."""
 
     ACCESS_TOKEN_TTL: ClassVar[timedelta] = timedelta(minutes=15)
     REFRESH_TOKEN_TTL: ClassVar[timedelta] = timedelta(days=30)
@@ -162,14 +142,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         self._wi_clients = wi_clients
         self._throttle = throttle
         self.login_path = login_path
-        # `base_url` arrives already validated and trailing-slash-free (`AppConfig.issuer`), so
-        # it is kept verbatim rather than read back off `self.base_url` — the SDK re-parses it
-        # into an `AnyHttpUrl`, which renders the slash straight back on.
         self._issuer: str = base_url
-        # Drives the CSRF cookie's `Secure` flag. Passed in rather than re-parsed here so the
-        # public URL is parsed exactly once, in `AppConfig`. A local http:// development deploy
-        # still gets a working form; every real deploy (https, enforced for production by
-        # `AppConfig`) gets the flag.
         self._secure_cookies: bool = secure_cookies
 
     @override
@@ -230,13 +203,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         username: str = "",
         error: str | None = None,
     ) -> Response:
-        """Render the login form with a freshly-issued CSRF token and matching cookie.
-
-        Every render goes through here, including the re-renders after a failed submission, so
-        the cookie and the hidden field can't drift apart. A fresh token per render (rather than
-        echoing the one just submitted) means an error page never reflects an attacker-supplied
-        value back into the form.
-        """
+        """Render the login form with fresh CSRF credentials."""
         csrf_token = issue_csrf_token()
         response = HTMLResponse(
             render_login_form(
@@ -285,11 +252,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         if pending is None:
             return self._expired_link_response()
 
-        # Before anything else, and in particular before the credential reaches With Intelligence: a
-        # submission that can't prove it came from the browser this form was served to is not a
-        # login attempt worth forwarding. Re-rendering (rather than a bare 400) issues a fresh
-        # token, so the legitimate case — a user whose cookie expired while the form sat open —
-        # recovers by simply submitting again.
         if not csrf_token_is_valid(request, request_id, csrf_token):
             logger.warning("auth.login.csrf_mismatch")
             return self._form_response(
@@ -306,10 +268,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
                 error="Username and password are both required.",
             )
 
-        # Rejected before any storage or upstream call: the submitted username is
-        # attacker-controlled and would otherwise reach a `text` column in `login_attempts`.
-        # Treated as an ordinary invalid credential, so the response is indistinguishable from
-        # any other bad submission.
         if len(username) > MAX_USERNAME_LENGTH:
             return self._form_response(request_id, error="Invalid username or password.")
 
@@ -326,9 +284,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
                 ),
             )
 
-        # The sign-in *is* the credential check, and its result is what gets stored: the
-        # password is used here and never persisted. From this point on the refresh token is
-        # the only way back — see `db/models.WithIntelligenceSession`.
         credential = WiCredential(username=username, password=SecretStr(password))
         try:
             wi_session = await self._wi_clients.sign_in(credential)
@@ -362,9 +317,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         already_claimed = False
 
         async with transaction(self._session_factory) as session:
-            # Pending authorizations are single-use. `DELETE ... WHERE request_id = ...`
-            # claims the row atomically — under concurrent submits for the same request,
-            # only one transaction's delete affects a row; the other must not mint a code.
             claim = await session.execute(
                 delete(PendingAuthorization).where(PendingAuthorization.request_id == request_id)
             )
@@ -446,10 +398,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         already_consumed = False
 
         async with transaction(self._session_factory) as session:
-            # Authorization codes are single-use. `DELETE ... WHERE code = ...` claims the
-            # row atomically — under concurrent exchanges of the same code, only one
-            # transaction's delete affects a row; the other sees `rowcount == 0` and must
-            # not mint a token pair.
             result = await session.execute(
                 delete(AuthorizationCodeRow).where(
                     AuthorizationCodeRow.code == authorization_code.code
@@ -500,12 +448,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         if row is None or row.client_id != client.client_id:
             return None
 
-        # Deliberately NOT gating on `row.revoked_at` here: an already-rotated-away row is
-        # exactly the "someone is replaying a stolen refresh token" case, and
-        # `exchange_refresh_token` below is what detects that and revokes the token family.
-        # Returning `None` for revoked rows would make the real token-exchange handler reject
-        # the request as "unknown" before `exchange_refresh_token` ever runs, leaving reuse
-        # detection dead code.
         return RefreshToken(
             token=refresh_token,
             client_id=row.client_id,
@@ -525,14 +467,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         refresh_token: RefreshToken,
         scopes: list[str],
     ) -> OAuthTokenResponse:
-        """Rotate a refresh token, detecting reuse.
-
-        Split in two because `TokenError` is a frozen dataclass exception, and raising one while
-        an `async with transaction(...)` block is open fails: the context manager's `__aexit__`
-        sets `__traceback__` on the exception, which a frozen dataclass rejects. So
-        `_rotate_refresh_token` does all the database work and *returns* an outcome, and this
-        method turns that outcome into a response or a raise once the session has closed.
-        """
+        """Rotate a refresh token."""
         outcome = await self._rotate_refresh_token(refresh_token, scopes)
 
         if isinstance(outcome, _RefreshRejected):
@@ -576,11 +511,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
             if scopes and not set(scopes).issubset(row.scopes):
                 return _INVALID_SCOPE
 
-            # Claim the row atomically before minting replacement tokens: an
-            # `UPDATE ... WHERE revoked_at IS NULL` only ever succeeds for one of two
-            # concurrent refreshes of the same token. Mutating `row.revoked_at` via the
-            # ORM instead (load-then-write) would let both concurrent requests believe
-            # they won, minting two valid descendants from one token.
             claim = await session.execute(
                 update(OAuthTokenRow)
                 .where(
@@ -666,11 +596,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
                 row.revoked_at = datetime.now(UTC)
 
     async def revoke_all_tokens_for_subject(self, subject: str) -> None:
-        """Revoke every non-revoked token belonging to `subject`.
-
-        Called when a WI session cannot be renewed (see `auth/context.py`). The password is not
-        stored, so the MCP-facing tokens are revoked to send the client through the login form.
-        """
+        """Revoke live tokens for a subject."""
         async with transaction(self._session_factory) as session:
             await session.execute(
                 update(OAuthTokenRow)
