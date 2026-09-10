@@ -44,11 +44,7 @@ class WithIntelligenceAuthContext(BaseModel):
             try:
                 stored = await get_session(session, subject, self.encryption_key)
             except InvalidSessionEnvelopeError as exc:
-                # A rotated encryption key makes every stored session unreadable. Nothing can
-                # recover it, so treat it as never having connected.
-                raise NotConnectedError(
-                    "Your stored With Intelligence session could not be read — please reconnect."
-                ) from exc
+                raise self._unreadable_session() from exc
         if stored is None:
             raise self._not_connected()
         return stored
@@ -68,7 +64,10 @@ class WithIntelligenceAuthContext(BaseModel):
         """
         subject = self.require_subject()
         async with transaction(self.session_factory) as session:
-            stored = await lock_session(session, subject, self.encryption_key)
+            try:
+                stored = await lock_session(session, subject, self.encryption_key)
+            except InvalidSessionEnvelopeError as exc:
+                raise self._unreadable_session() from exc
             if stored is None:
                 raise self._not_connected()
             if stored.is_fresh and stored.has_different_access_token(stale):
@@ -106,4 +105,10 @@ class WithIntelligenceAuthContext(BaseModel):
     def _not_connected() -> NotConnectedError:
         return NotConnectedError(
             "No With Intelligence session on file for this connection — please reconnect."
+        )
+
+    @staticmethod
+    def _unreadable_session() -> NotConnectedError:
+        return NotConnectedError(
+            "Your stored With Intelligence session could not be read — please reconnect."
         )

@@ -215,3 +215,21 @@ class TestAnUnreadableBlob:
         monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
         with pytest.raises(NotConnectedError, match="could not be read"):
             _ = await context.current_session()
+
+    async def test_a_rotated_encryption_key_during_renewal_is_not_connected(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _, factory = db
+        user_id = await _store(db, _session("orphaned"))
+        context = WithIntelligenceAuthContext(
+            session_factory=factory,
+            encryption_key=Fernet.generate_key(),
+            revoke_tokens_for_subject=Revocations(),
+        )
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+
+        async def renew(_stale: WiSession) -> WiSession:
+            return _session("unused")
+
+        with pytest.raises(NotConnectedError, match="could not be read"):
+            _ = await context.renew_session(renew)
