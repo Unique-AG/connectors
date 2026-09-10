@@ -9,7 +9,7 @@ a Backstop username + personal API token. That credential is verified against Ba
 never as a shared service account. Failed logins are rate-limited per username
 (`AUTH_LOGIN_MAX_ATTEMPTS`) so the form can't be used to test credentials against Backstop.
 
-Tools resolve parties by name rather than by ID: "Capstone" is looked up against the live
+Tools resolve parties by name rather than by ID: "Northwind" is looked up against the live
 instance, and an ambiguous match asks the user to pick one.
 
 ## Layout

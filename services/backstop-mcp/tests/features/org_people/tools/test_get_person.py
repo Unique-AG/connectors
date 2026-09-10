@@ -556,7 +556,7 @@ class TestGetPersonIncludes:
                             "attributes": {
                                 "name": "Margaret Lucas",
                                 "userName": "mlucas",
-                                "email": "margaret.lucas@capstoneco.com",
+                                "email": "margaret.lucas@example.com",
                                 "phoneNumber": "12122321462",
                             },
                         },

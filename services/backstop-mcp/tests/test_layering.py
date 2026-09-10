@@ -94,6 +94,8 @@
 Rules 1–6 are asserted by walking the AST rather than importing anything, so a violation is
 reported as a failing test with a file and line instead of an ImportError at collection time.
 Rule 7 uses AST for the `@tool` shape and imports `TOOLS` for the registry check.
+`src/backstop_mcp/` and `tests/` must not mention `agent-explore` — that folder is a
+developer utility, not a package dependency. This file is the exception that enforces it.
 """
 
 import ast
@@ -1088,4 +1090,86 @@ class TestToolModulesAreRegistered:
         assert not violations, (
             f"{source.relative_to(_SRC)} defines {source.stem} but it is not in TOOLS — "
             + "add it to server/tools/registry.py"
+        )
+
+
+_AGENT_EXPLORE_MARKER = "agent-explore"
+
+
+def _agent_explore_mentions(source: pathlib.Path) -> list[str]:
+    return [
+        f"{_display_path(source)}:{lineno} mentions {_AGENT_EXPLORE_MARKER!r}"
+        for lineno, line in enumerate(source.read_text().splitlines(), start=1)
+        if _AGENT_EXPLORE_MARKER in line
+    ]
+
+
+_CLIENT_TENANT_MARKERS = ("fb-rm-lg-26", "capstoneco", "capstone")
+
+
+def _client_tenant_mentions(source: pathlib.Path) -> list[str]:
+    return [
+        f"{_display_path(source)}:{lineno} mentions {marker!r}"
+        for lineno, line in enumerate(source.read_text().splitlines(), start=1)
+        for marker in _CLIENT_TENANT_MARKERS
+        if marker in line.lower()
+    ]
+
+
+def _client_tenant_scan_sources() -> list[pathlib.Path]:
+    layering = pathlib.Path(__file__)
+    service = _TESTS.parent
+    extras = (
+        service / "README.md",
+        service / "AGENT_README.md",
+        service / "agent-explore" / ".env.example",
+    )
+    python = (*_SRC.rglob("*.py"), *_TESTS.rglob("*.py"))
+    explore = (service / "agent-explore").glob("*.py")
+    return [
+        *sorted(source for source in python if source != layering),
+        *sorted(path for path in extras if path.is_file()),
+        *sorted(source for source in explore if source.is_file()),
+    ]
+
+
+class TestShippedCodeDoesNotNameAClientTenant:
+    def test_helper_fires_on_a_mention(self, tmp_path: pathlib.Path) -> None:
+        probe = tmp_path / "probe.py"
+        probe.write_text("# probed https://fb-rm-lg-26.backstopsolutions.com\n")
+        assert _client_tenant_mentions(probe) == ["probe.py:1 mentions 'fb-rm-lg-26'"]
+
+    def test_service_does_not_name_a_client_tenant(self) -> None:
+        violations = [
+            hit
+            for source in _client_tenant_scan_sources()
+            for hit in _client_tenant_mentions(source)
+        ]
+        assert not violations, (
+            "backstop-mcp must not name a client tenant or the client's firm; "
+            + "say 'a client-obtained tenant':\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestShippedCodeDoesNotReferenceAgentExplore:
+    def test_helper_fires_on_a_mention(self, tmp_path: pathlib.Path) -> None:
+        probe = tmp_path / "probe.py"
+        probe.write_text("# see agent-explore/.probe-cache\n")
+        assert _agent_explore_mentions(probe) == [
+            f"probe.py:1 mentions {_AGENT_EXPLORE_MARKER!r}"
+        ]
+
+    def test_src_and_tests_do_not_mention_the_developer_utility(self) -> None:
+        layering = pathlib.Path(__file__)
+        sources = (
+            source
+            for source in (*_SRC.rglob("*.py"), *_TESTS.rglob("*.py"))
+            if source != layering
+        )
+        violations = [hit for source in sources for hit in _agent_explore_mentions(source)]
+        assert not violations, (
+            "src/backstop_mcp/ and tests/ must not import or mention agent-explore/ "
+            + "(developer utility only):\n  "
+            + "\n  ".join(violations)
         )

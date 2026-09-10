@@ -40,13 +40,13 @@ _EXPECTED_FIELDS = {
 }
 
 
-def _cgup() -> dict[str, object]:
+def _ngup() -> dict[str, object]:
     return {
         "id": _PRODUCT_ID,
         "type": "products",
         "attributes": {
-            "name": "Capstone Global Unconstrained Portfolio",
-            "configuration": {"productShortName": "CGUP"},
+            "name": "Northwind Global Unconstrained Portfolio",
+            "configuration": {"productShortName": "NGUP"},
         },
     }
 
@@ -101,14 +101,14 @@ class TestGetProductInvestors:
     async def test_lists_owners_with_no_figures_in_two_requests(
         self, client: BackstopClient
     ) -> None:
-        by_id = respx.get(_PRODUCT_URL).mock(return_value=_product_document(_cgup()))
+        by_id = respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
         accounts = respx.get(_ACCOUNTS_URL).mock(
             return_value=_accounts_page(
                 _account(
                     _ACCOUNT_ID,
                     owner_id=_OWNER_ID,
                     investor_type_id="10",
-                    name="PSP CGUP",
+                    name="PSP NGUP",
                 ),
                 included=[
                     _owner(_OWNER_ID, name="PSP Investments"),
@@ -138,7 +138,7 @@ class TestGetProductInvestors:
         assert params["include"] == "owner,investorType"
         assert set(params["fields"].split(",")) == _EXPECTED_FIELDS
         assert result.product.id == _PRODUCT_ID
-        assert result.product.short_name == "CGUP"
+        assert result.product.short_name == "NGUP"
         assert [row.id for row in result.accounts] == [_ACCOUNT_ID]
         assert result.accounts[0].owner is not None
         assert result.accounts[0].owner.id == _OWNER_ID
@@ -153,15 +153,15 @@ class TestGetProductInvestors:
     @respx.mock
     @pytest.mark.parametrize(
         "kwargs",
-        [{"product": "CGUP"}, {"search": "CGUP"}],
+        [{"product": "NGUP"}, {"search": "NGUP"}],
     )
     async def test_short_name_resolves_through_the_catalog(
         self, client: BackstopClient, kwargs: dict[str, str]
     ) -> None:
-        by_id = respx.get(f"{_PRODUCTS_URL}/CGUP").mock(
+        by_id = respx.get(f"{_PRODUCTS_URL}/NGUP").mock(
             return_value=httpx.Response(400, json={"errors": [{"title": "Bad Request"}]})
         )
-        catalog = respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
+        catalog = respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_ngup()))
         accounts = respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
 
         result = tool_model(
@@ -185,16 +185,16 @@ class TestGetProductInvestors:
     async def test_short_name_in_product_id_goes_to_the_catalog(
         self, client: BackstopClient
     ) -> None:
-        by_id = respx.get(f"{_PRODUCTS_URL}/CGUP").mock(
+        by_id = respx.get(f"{_PRODUCTS_URL}/NGUP").mock(
             return_value=httpx.Response(400, json={"errors": [{"title": "Bad Request"}]})
         )
-        catalog = respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
+        catalog = respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_ngup()))
         respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
 
         result = tool_model(
             await get_product_investors(
                 ctx_never_elicit(),
-                product_id="CGUP",
+                product_id="NGUP",
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
             ),
@@ -210,7 +210,7 @@ class TestGetProductInvestors:
     async def test_defaults_to_open_and_hints_when_all_are_closed(
         self, client: BackstopClient
     ) -> None:
-        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_cgup()))
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_accounts_page(_account("closed", name="Gone", closedDate="2020-01-15"))
         )
@@ -233,7 +233,7 @@ class TestGetProductInvestors:
     @pytest.mark.asyncio
     @respx.mock
     async def test_include_closed_keeps_closed_rows(self, client: BackstopClient) -> None:
-        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_cgup()))
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_accounts_page(
                 _account("open", name="Live"),
@@ -316,7 +316,7 @@ class TestGetProductInvestors:
     @pytest.mark.asyncio
     @respx.mock
     async def test_accounts_listing_500_propagates(self, client: BackstopClient) -> None:
-        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_cgup()))
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
         respx.get(_ACCOUNTS_URL).mock(
             return_value=httpx.Response(
                 500, json={"errors": [{"title": "InternalServerException"}]}
@@ -350,14 +350,14 @@ class TestGetProductInvestors:
             await get_product_investors(
                 ctx_never_elicit(),
                 product_id=_PRODUCT_ID,
-                product="CGUP",
+                product="NGUP",
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
             )
         with pytest.raises(ValueError, match="Pass at most one of product or search"):
             await get_product_investors(
                 ctx_never_elicit(),
-                product="CGUP",
+                product="NGUP",
                 search="Keystone",
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),

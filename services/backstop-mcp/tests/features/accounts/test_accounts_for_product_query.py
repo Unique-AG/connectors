@@ -13,7 +13,7 @@ _ACCOUNTS_URL = f"{BASE_URL}/accounts"
 _NEXT_PAGE = "/accounts?page[offset]=100"
 _OWNER_ID = "341688185"
 _PRODUCT_ID = "1292283"
-_PRODUCT = ResolvedProductDto(id=_PRODUCT_ID, name="Capstone", short_name="CGUP")
+_PRODUCT = ResolvedProductDto(id=_PRODUCT_ID, name="Northwind", short_name="NGUP")
 
 
 def _account(

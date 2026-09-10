@@ -26,7 +26,7 @@ class _OptionalAttrs(BaseModel):
 _STAGE_REF = {
     "resourceType": "opportunity-stages",
     "resourceId": "42482",
-    "resourceLink": "https://fb-rm-lg-26.backstopsolutions.com/backstop/api/opportunity-stages/42482",
+    "resourceLink": "https://example.backstopsolutions.com/backstop/api/opportunity-stages/42482",
     "restricted": False,
 }
 
@@ -318,7 +318,7 @@ class TestResourceRef:
             "resource_id": "42482",
             "resource_type": "opportunity-stages",
             "resource_link": (
-                "https://fb-rm-lg-26.backstopsolutions.com/backstop/api/opportunity-stages/42482"
+                "https://example.backstopsolutions.com/backstop/api/opportunity-stages/42482"
             ),
         }
 

@@ -12,6 +12,28 @@ have been wrong every time so far — see "Write payloads" below.
 
 ---
 
+## agent-explore (developer utility)
+
+[`agent-explore/`](agent-explore/) is a local CLI for reading the live REST API and the
+Elevio help center. It is **not** part of the shipped MCP server. `src/backstop_mcp/`
+and `tests/` must not import it, load its caches, or mention its paths. Its own
+helpers are tested beside the scripts, not from the product suite. Feature tests pin
+wire behaviour with respx fixtures, not by reading those caches.
+
+Credentials live in `agent-explore/.env` (copy `.env.example`). Do not print them.
+Run the scripts from `services/backstop-mcp` so `uv run` picks up the service venv.
+
+| Script | What it does | Cache (gitignored) |
+|---|---|---|
+| `explore.py` | `GET` only against `BACKSTOP_BASE_URL` (API token). 2-minute timeout. | `.probe-cache/` |
+| `docs.py` | Elevio help via help-prod SSO (web username/password). Never POST to the CRM. | `.docs-cache/` |
+| `test_set.py` | Optional local question harness. Not CI. | `.test-set-runs/` |
+
+Reuse a cached probe instead of hitting the API again. Do not rewrite these scripts.
+The `backstop-api` skill is the workflow; this folder is the tooling.
+
+---
+
 ## Deprecated layout (do not copy)
 
 The catalog trio, `tasks`, `org_people`, `accounts`, `activity_history`, and
@@ -353,9 +375,9 @@ only when the set is no longer small.
 
 ## Write payloads
 
-Four rules, each learned from a 400 on the live instance, each recorded in `docs/json`
-(probes `016`-`035`). The swagger is wrong or silent about all four, so a create designed
-from it does not work.
+Four rules, each learned from a 400 on the live instance. Local copies of those probes
+live only under `agent-explore/.probe-cache` (developer utility, not shipped). The swagger
+is wrong or silent about all four, so a create designed from it does not work.
 
 **1. A parent link's `resourceType` is the plural resource name.** `attachedTo`,
 `regarding`, `resources`, `linkedResources` and `secondaryRegarding` carry
@@ -567,6 +589,10 @@ These are tests, not taste:
 5. A logic file is named after its symbol (rule 6).
 6. Every tool module is on `TOOLS` (rule 7).
 7. Every `@lru_cache` provider is in `teardown.PROVIDERS`.
+8. `src/backstop_mcp/` and `tests/` do not import or mention `agent-explore/`
+   (developer utility only).
+9. The service does not name a client tenant host or the client's firm.
+   Measurements say "a client-obtained tenant".
 
 Never mutate a function argument. Use `assert` for internal invariants; `raise` at the
 system boundary (user input, Backstop errors).

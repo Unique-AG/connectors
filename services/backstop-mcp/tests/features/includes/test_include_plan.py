@@ -272,7 +272,7 @@ class TestProjectToOne:
                     "attributes": {
                         "name": "Margaret Lucas",
                         "userName": "mlucas",
-                        "email": "margaret.lucas@capstoneco.com",
+                        "email": "margaret.lucas@example.com",
                         "phoneNumber": "12122321462",
                         "isBsgAdmin": False,
                     },
@@ -290,7 +290,7 @@ class TestProjectToOne:
             "id": "u1",
             "name": "Margaret Lucas",
             "user_name": "mlucas",
-            "email": "margaret.lucas@capstoneco.com",
+            "email": "margaret.lucas@example.com",
             "phone": "12122321462",
         }
 

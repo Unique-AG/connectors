@@ -240,7 +240,7 @@ class TableDataShareAttributes(BaseModel):
 class TableDataProductAttributes(BaseModel):
     """The `product` object on a table-data row: a `ResourceRef` plus `shortName` inline.
 
-    `shortName` is the tenant's own label (`CIO2`, `CGUP`, `Dispersion`) and is the only name on
+    `shortName` is the tenant's own label (`FUND2`, `NGUP`, `Dispersion`) and is the only name on
     the row — there is no full product name here, so a caller who needs one resolves the id.
     """
 

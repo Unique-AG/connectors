@@ -4,8 +4,7 @@ The mirror of `backstop_client/json_api.py`, which parses the documents Backstop
 this builds the ones we send. Routing (`kind` to collection path) is
 `_activity_resource_location`.
 
-Two wire rules cost the most to discover, both verified live against `fb-rm-lg-26` and
-recorded in `docs/json/016-035`:
+Two wire rules cost the most to discover, both verified live against a client-obtained tenant:
 
 1. A resource link's `resourceType` is the **plural API resource name** (`organizations`,
    `people`), not the `SystemUserBean`/`OrganizationBean` casing that

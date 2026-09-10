@@ -1,7 +1,7 @@
 """Per-kind log commands and the central `LogActivityCommand` switch.
 
-Wire assertions here are pinned to real Backstop responses recorded in `docs/json/016-035`,
-not to what the code happens to send. The two shapes that matter, both of which Backstop
+Wire assertions here are pinned to real Backstop responses, not to what the code happens
+to send. The two shapes that matter, both of which Backstop
 rejects if you get them wrong: a parent link's `resourceType` is the plural resource name
 (never Bean casing), and `author` / `assignedUser` are relationships (never attributes).
 """
@@ -400,7 +400,7 @@ class TestLogActivityCommandDispatch:
                     "data": {
                         "type": "organizations",
                         "id": _ORG_ID,
-                        "attributes": {"name": "Capstone"},
+                        "attributes": {"name": "Northwind"},
                     }
                 },
             )
@@ -429,7 +429,7 @@ class TestLogActivityCommandDispatch:
         history = await GetActivityHistoryQuery(client=client).run(
             segment="organizations",
             entity_id=_ORG_ID,
-            party=ResolvedPartyDto(id=_ORG_ID, search_type="organizations", name="Capstone"),
+            party=ResolvedPartyDto(id=_ORG_ID, search_type="organizations", name="Northwind"),
             continuations={"meeting": ActivityContinuationResponse(limit=10, offset=0)},
             gist_max_chars=300,
         )

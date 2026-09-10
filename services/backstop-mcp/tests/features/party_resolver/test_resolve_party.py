@@ -154,11 +154,11 @@ class TestEmailSearch:
     async def test_email_search_for_organizations_uses_only_email_filter(
         self, client: BackstopClient
     ) -> None:
-        email = "ops@capstone.com"
+        email = "ops@example.com"
         orgs = respx.get(f"{BASE_URL}/organizations", params={"filter[email][eq]": email}).mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource("o1", "organizations", name="Capstone")),
+                json=collection(resource("o1", "organizations", name="Northwind")),
             )
         )
         quick = respx.get(f"{BASE_URL}/quick-search").mock(
@@ -214,13 +214,13 @@ class TestEmailSearch:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource("p1", "people", name="Capstone Partners")),
+                json=collection(resource("p1", "people", name="Northwind Partners")),
             )
         )
 
         result = await make_resolve_party_query(client).run(
             search_type="people",
-            search="Capstone Partners",
+            search="Northwind Partners",
         )
 
         assert isinstance(result, Resolved)
@@ -250,11 +250,11 @@ class TestEmailSearch:
     @pytest.mark.asyncio
     @respx.mock
     async def test_malformed_email_hit_raises_schema_error(self, client: BackstopClient) -> None:
-        email = "ops@capstone.com"
+        email = "ops@example.com"
         respx.get(f"{BASE_URL}/organizations", params={"filter[email][eq]": email}).mock(
             return_value=httpx.Response(
                 200,
-                json={"data": [{"type": "organizations", "attributes": {"name": "Capstone"}}]},
+                json={"data": [{"type": "organizations", "attributes": {"name": "Northwind"}}]},
             )
         )
 
@@ -275,19 +275,19 @@ class TestQuickSearch:
         route = respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource("o1", "organizations", name="Capstone")),
+                json=collection(resource("o1", "organizations", name="Northwind")),
             )
         )
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
 
         assert isinstance(result, Resolved)
         assert result.value.id == "o1"
         params = route.calls.last.request.url.params
-        assert params["filter[searchText][eq]"] == "Capstone"
+        assert params["filter[searchText][eq]"] == "Northwind"
         assert params["filter[searchTypes][eq]"] == "ORGANIZATION"
         assert params["filter[limit][eq]"] == "10"
         assert params["filter[showAll][eq]"] == "false"
@@ -305,13 +305,13 @@ class TestQuickSearch:
         route = respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource("o1", "organizations", name="Capstone")),
+                json=collection(resource("o1", "organizations", name="Northwind")),
             )
         )
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
             quick_search_options=QuickSearchOptionsDto(
                 limit=5,
                 show_all=True,
@@ -433,14 +433,14 @@ class TestQuickSearch:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource("", "organizations", name="Capstone")),
+                json=collection(resource("", "organizations", name="Northwind")),
             )
         )
 
         with pytest.raises(BackstopResponseSchemaError) as exc_info:
             await make_resolve_party_query(client).run(
                 search_type="organizations",
-                search="Capstone",
+                search="Northwind",
             )
 
         assert exc_info.value.path == "/quick-search"
@@ -456,14 +456,14 @@ class TestQuickSearch:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
                 200,
-                json={"data": [{"type": "organizations", "attributes": {"name": "Capstone"}}]},
+                json={"data": [{"type": "organizations", "attributes": {"name": "Northwind"}}]},
             )
         )
 
         with pytest.raises(BackstopResponseSchemaError) as exc_info:
             await make_resolve_party_query(client).run(
                 search_type="organizations",
-                search="Capstone",
+                search="Northwind",
             )
 
         assert exc_info.value.path == "/quick-search"
@@ -545,7 +545,7 @@ class TestSearchTypeMapping:
 
         await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
 
         assert route.calls.last.request.url.params["filter[searchTypes][eq]"] == "ORGANIZATION"
@@ -620,7 +620,7 @@ class TestPartyIdFromResourceId:
                     resource(
                         "organizations_341208613",
                         "organizations",
-                        name="Capstone",
+                        name="Northwind",
                         resourceId="341208613",
                     )
                 ),
@@ -629,7 +629,7 @@ class TestPartyIdFromResourceId:
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
 
         assert isinstance(result, Resolved)
@@ -644,14 +644,14 @@ class TestPartyIdFromResourceId:
             return_value=httpx.Response(
                 200,
                 json=collection(
-                    resource("organizations_341208613", "organizations", name="Capstone")
+                    resource("organizations_341208613", "organizations", name="Northwind")
                 ),
             )
         )
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
 
         assert isinstance(result, Resolved)
@@ -665,13 +665,13 @@ class TestPartyIdFromResourceId:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource("o1", "organizations", name="Capstone")),
+                json=collection(resource("o1", "organizations", name="Northwind")),
             )
         )
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
 
         assert isinstance(result, Resolved)
@@ -689,7 +689,7 @@ class TestPartyIdFromResourceId:
                     resource(
                         "organizations_341208613",
                         "organizations",
-                        name="Capstone",
+                        name="Northwind",
                         resourceId="   ",
                     )
                 ),
@@ -698,7 +698,7 @@ class TestPartyIdFromResourceId:
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
 
         assert isinstance(result, Resolved)
@@ -731,18 +731,18 @@ class TestHitCounts:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource("o1", "organizations", name="Capstone")),
+                json=collection(resource("o1", "organizations", name="Northwind")),
             )
         )
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
 
         assert isinstance(result, Resolved)
         assert result.value.id == "o1"
-        assert result.value.name == "Capstone"
+        assert result.value.name == "Northwind"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -751,20 +751,20 @@ class TestHitCounts:
             return_value=httpx.Response(
                 200,
                 json=collection(
-                    resource("o1", "organizations", name="Capstone A"),
-                    resource("o2", "organizations", name="Capstone B"),
+                    resource("o1", "organizations", name="Northwind A"),
+                    resource("o2", "organizations", name="Northwind B"),
                 ),
             )
         )
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
 
         assert isinstance(result, Ambiguous)
         assert len(result.candidates) == 2
-        assert result.query == "Capstone"
+        assert result.query == "Northwind"
 
 
 class TestLikeFallback:
@@ -780,7 +780,7 @@ class TestLikeFallback:
             return_value=httpx.Response(
                 200,
                 json=collection(
-                    resource("o1", "organizations", name="Capstone Investment Advisors")
+                    resource("o1", "organizations", name="Northwind Investment Advisors")
                 ),
             )
         )
@@ -836,7 +836,7 @@ class TestLikeFallback:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource("o1", "organizations", name="Capstone")),
+                json=collection(resource("o1", "organizations", name="Northwind")),
             )
         )
         like = respx.get(f"{BASE_URL}/organizations").mock(
@@ -845,7 +845,7 @@ class TestLikeFallback:
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
 
         assert isinstance(result, Resolved)
@@ -1009,7 +1009,7 @@ class TestConfirmName:
     ) -> None:
         route = respx.get(f"{BASE_URL}/organizations/org-7").mock(
             return_value=httpx.Response(
-                200, json={"data": resource("org-7", "organizations", name="Capstone LP")}
+                200, json={"data": resource("org-7", "organizations", name="Northwind LP")}
             )
         )
 
@@ -1020,7 +1020,7 @@ class TestConfirmName:
         )
 
         assert isinstance(result, Resolved)
-        assert result.value.name == "Capstone LP"
+        assert result.value.name == "Northwind LP"
         assert route.call_count == 1
 
     @pytest.mark.asyncio
@@ -1044,7 +1044,7 @@ class TestConfirmName:
     async def test_confirm_name_fetches_when_name_is_blank(self, client: BackstopClient) -> None:
         route = respx.get(f"{BASE_URL}/organizations/org-7").mock(
             return_value=httpx.Response(
-                200, json={"data": resource("org-7", "organizations", name="Capstone LP")}
+                200, json={"data": resource("org-7", "organizations", name="Northwind LP")}
             )
         )
 
@@ -1056,7 +1056,7 @@ class TestConfirmName:
         )
 
         assert isinstance(result, Resolved)
-        assert result.value.name == "Capstone LP"
+        assert result.value.name == "Northwind LP"
         assert route.call_count == 1
 
     @pytest.mark.asyncio
@@ -1082,7 +1082,7 @@ class TestInvalidArgs:
             await make_resolve_party_query(client).run(
                 search_type="organizations",
                 party_id="o1",
-                search="Capstone",
+                search="Northwind",
             )
 
     @pytest.mark.asyncio
@@ -1105,16 +1105,16 @@ class TestInvalidArgs:
 
     def test_party_resolve_item_rejects_both(self) -> None:
         with pytest.raises(ValueError, match="Exactly one of party_id or search"):
-            PartyResolveItemDto(party_id="o1", search="Capstone")
+            PartyResolveItemDto(party_id="o1", search="Northwind")
 
     def test_party_resolve_item_rejects_neither(self) -> None:
         with pytest.raises(ValueError, match="Exactly one of party_id or search"):
             PartyResolveItemDto()
 
     def test_party_resolve_item_treats_blank_selectors_as_unset(self) -> None:
-        item = PartyResolveItemDto(party_id="  ", search="Capstone")
+        item = PartyResolveItemDto(party_id="  ", search="Northwind")
         assert item.party_id is None
-        assert item.search == "Capstone"
+        assert item.search == "Northwind"
 
         item = PartyResolveItemDto(party_id="o1", search="")
         assert item.party_id == "o1"
@@ -1125,14 +1125,14 @@ class TestInvalidArgs:
         assert item.name is None
         item = PartyResolveItemDto(party_id="o1", name="")
         assert item.name is None
-        item = PartyResolveItemDto(party_id="o1", name=" Capstone ")
-        assert item.name == "Capstone"
+        item = PartyResolveItemDto(party_id="o1", name=" Northwind ")
+        assert item.name == "Northwind"
 
 
 def _two_org_hits() -> dict[str, object]:
     return collection(
-        resource("o1", "organizations", name="Capstone A"),
-        resource("o2", "organizations", name="Capstone B"),
+        resource("o1", "organizations", name="Northwind A"),
+        resource("o2", "organizations", name="Northwind B"),
     )
 
 
@@ -1145,7 +1145,7 @@ def _candidate(party_id: str, label: str) -> Candidate[ResolvedPartyDto]:
 
 
 def _ambiguous(*candidates: Candidate[ResolvedPartyDto]) -> Ambiguous[ResolvedPartyDto]:
-    return Ambiguous(query="Capstone", scope="organizations", candidates=candidates)
+    return Ambiguous(query="Northwind", scope="organizations", candidates=candidates)
 
 
 class TestElicitChoice:
@@ -1160,13 +1160,13 @@ class TestElicitChoice:
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
-        result = await elicit_if_ambiguous(ctx_accept("Capstone B (organization)"), result)
+        result = await elicit_if_ambiguous(ctx_accept("Northwind B (organization)"), result)
 
         assert isinstance(result, Resolved)
         assert result.value.id == "o2"
-        assert result.value.name == "Capstone B"
+        assert result.value.name == "Northwind B"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -1177,7 +1177,7 @@ class TestElicitChoice:
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
         result = await elicit_if_ambiguous(ctx_decline(), result)
 
@@ -1193,7 +1193,7 @@ class TestElicitChoice:
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
         result = await elicit_if_ambiguous(ctx_cancel(), result)
 
@@ -1209,12 +1209,12 @@ class TestElicitChoice:
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Capstone",
+            search="Northwind",
         )
         result = await elicit_if_ambiguous(ctx_unsupported(), result)
 
         assert isinstance(result, Ambiguous)
-        assert result.query == "Capstone"
+        assert result.query == "Northwind"
         assert result.scope == "organizations"
 
     @pytest.mark.asyncio
@@ -1378,7 +1378,7 @@ class TestElicitTimeout:
 
         record = _log_record(caplog, "resolution.elicit.timed_out")
         assert record.levelno == logging.WARNING
-        assert record.__dict__["query"] == "Capstone"
+        assert record.__dict__["query"] == "Northwind"
         assert record.__dict__["scope"] == "organizations"
         assert record.__dict__["candidates"] == 2
         assert record.__dict__["timeout_seconds"] == 0.01

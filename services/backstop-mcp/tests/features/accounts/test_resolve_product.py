@@ -64,8 +64,8 @@ def _sample_index(*, next_url: str | None = None) -> httpx.Response:
     return _index(
         _product(
             "1292283",
-            name="Capstone Global Unconstrained Portfolio",
-            short_name="CGUP",
+            name="Northwind Global Unconstrained Portfolio",
+            short_name="NGUP",
         ),
         _product("100", name="Blue Capital I", short_name="BLUC"),
         _product("101", name="Blue Capital II", short_name="BLUC"),
@@ -81,13 +81,13 @@ class TestTheRequest:
     ) -> None:
         route = respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
 
-        result = await resolve_product(ctx_never_elicit(), client, product="CGUP")
+        result = await resolve_product(ctx_never_elicit(), client, product="NGUP")
 
         assert isinstance(result, Resolved)
         params = route.calls.last.request.url.params
         assert params["fields"] == "name,configuration"
         assert params["page[limit]"] == "200"
-        assert params["filter[name][like]"] == "CGUP"
+        assert params["filter[name][like]"] == "NGUP"
         assert route.call_count == 1
 
     @pytest.mark.asyncio
@@ -98,7 +98,7 @@ class TestTheRequest:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await resolve_product(ctx_never_elicit(), client, product="CGUP")
+        await resolve_product(ctx_never_elicit(), client, product="NGUP")
 
         assert quick.call_count == 0
 
@@ -131,8 +131,8 @@ class TestTheRequest:
             return_value=_document(
                 _product(
                     "1292283",
-                    name="Capstone Global Unconstrained Portfolio",
-                    short_name="CGUP",
+                    name="Northwind Global Unconstrained Portfolio",
+                    short_name="NGUP",
                 )
             )
         )
@@ -152,7 +152,7 @@ class TestTheRequest:
         respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
 
         with caplog.at_level(logging.WARNING):
-            await resolve_product(ctx_never_elicit(), client, product="CGUP")
+            await resolve_product(ctx_never_elicit(), client, product="NGUP")
 
         assert caplog.records == []
 
@@ -181,19 +181,19 @@ class TestTheRequest:
         self, client: BackstopClient
     ) -> None:
         def _respond(request: httpx.Request) -> httpx.Response:
-            if request.url.params.get("filter[name][like]") == "CGUP":
+            if request.url.params.get("filter[name][like]") == "NGUP":
                 return _index()
             return _sample_index()
 
         route = respx.get(_PRODUCTS_URL).mock(side_effect=_respond)
 
-        result = await resolve_product(ctx_never_elicit(), client, product="CGUP")
+        result = await resolve_product(ctx_never_elicit(), client, product="NGUP")
 
         assert isinstance(result, Resolved)
-        assert result.value.short_name == "CGUP"
+        assert result.value.short_name == "NGUP"
         assert route.call_count == 2
         calls = recorded_requests(route.calls)
-        assert calls[0].url.params["filter[name][like]"] == "CGUP"
+        assert calls[0].url.params["filter[name][like]"] == "NGUP"
         assert "filter[name][like]" not in calls[1].url.params
 
     @pytest.mark.asyncio
@@ -204,7 +204,7 @@ class TestTheRequest:
         def _respond(request: httpx.Request) -> httpx.Response:
             if request.url.params.get("filter[name][like]") == "Dispersion":
                 return _index(
-                    _product("1653647", name="Capstone Dispersion Fund", short_name="CDSP")
+                    _product("1653647", name="Northwind Dispersion Fund", short_name="NDSP")
                 )
             raise AssertionError("unfiltered catalog must not be walked after a LIKE hit")
 
@@ -223,12 +223,12 @@ class TestResolveSearch:
     async def test_search_by_short_name_resolves(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
 
-        result = await resolve_product(ctx_never_elicit(), client, product="CGUP")
+        result = await resolve_product(ctx_never_elicit(), client, product="NGUP")
 
         assert isinstance(result, Resolved)
         assert result.value.id == "1292283"
-        assert result.value.name == "Capstone Global Unconstrained Portfolio"
-        assert result.value.short_name == "CGUP"
+        assert result.value.name == "Northwind Global Unconstrained Portfolio"
+        assert result.value.short_name == "NGUP"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -263,7 +263,7 @@ class TestResolveSearch:
 
         assert isinstance(result, Resolved)
         assert result.value.id == "1292283"
-        assert result.value.short_name == "CGUP"
+        assert result.value.short_name == "NGUP"
         assert quick.call_count == 0
 
     @pytest.mark.asyncio
@@ -299,8 +299,8 @@ class TestResolveProductId:
             return_value=_document(
                 _product(
                     "1292283",
-                    name="Capstone Global Unconstrained Portfolio",
-                    short_name="CGUP",
+                    name="Northwind Global Unconstrained Portfolio",
+                    short_name="NGUP",
                 )
             )
         )
@@ -309,8 +309,8 @@ class TestResolveProductId:
 
         assert isinstance(result, Resolved)
         assert result.value.id == "1292283"
-        assert result.value.name == "Capstone Global Unconstrained Portfolio"
-        assert result.value.short_name == "CGUP"
+        assert result.value.name == "Northwind Global Unconstrained Portfolio"
+        assert result.value.short_name == "NGUP"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -396,7 +396,7 @@ class TestInvalidArgs:
                 ctx_never_elicit(),
                 client,
                 product_id="1292283",
-                product="CGUP",
+                product="NGUP",
             )
 
     @pytest.mark.asyncio
@@ -410,8 +410,8 @@ def _match_catalog() -> httpx.Response:
     return _index(
         _product(
             "1292283",
-            name="Capstone Global Unconstrained Portfolio",
-            short_name="CGUP",
+            name="Northwind Global Unconstrained Portfolio",
+            short_name="NGUP",
         ),
         _product("100", name="Blue Capital I", short_name="BLUC"),
         _product("101", name="Blue Capital II", short_name="BLUC"),
@@ -420,7 +420,7 @@ def _match_catalog() -> httpx.Response:
         _product("600", name="No Short Name Fund"),
         _product("700", short_name="NONM"),
         _product("AbC", name="Other", short_name="OTHR"),
-        _product("CGUP", name="Something Else", short_name="OTHER"),
+        _product("NGUP", name="Something Else", short_name="OTHER"),
         _product("801", name="Quiet Growth Vehicle"),
         _product("802", name="Quiet Value Vehicle"),
     )
@@ -436,7 +436,7 @@ class TestExactId:
 
         assert isinstance(result, Resolved)
         assert result.value.id == "1292283"
-        assert result.value.short_name == "CGUP"
+        assert result.value.short_name == "NGUP"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -452,10 +452,10 @@ class TestExactId:
     async def test_id_is_matched_before_short_name(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_match_catalog())
 
-        result = await resolve_product(ctx_never_elicit(), client, product="CGUP")
+        result = await resolve_product(ctx_never_elicit(), client, product="NGUP")
 
         assert isinstance(result, Resolved)
-        assert result.value.id == "CGUP"
+        assert result.value.id == "NGUP"
         assert result.value.name == "Something Else"
 
 
@@ -465,7 +465,7 @@ class TestExactShortName:
     async def test_short_name_match_is_case_insensitive(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
 
-        result = await resolve_product(ctx_never_elicit(), client, product="cgup")
+        result = await resolve_product(ctx_never_elicit(), client, product="ngup")
 
         assert isinstance(result, Resolved)
         assert result.value.id == "1292283"
@@ -492,7 +492,7 @@ class TestExactName:
         result = await resolve_product(
             ctx_never_elicit(),
             client,
-            product="Capstone Global Unconstrained Portfolio",
+            product="Northwind Global Unconstrained Portfolio",
         )
 
         assert isinstance(result, Resolved)
@@ -506,7 +506,7 @@ class TestExactName:
         result = await resolve_product(
             ctx_never_elicit(),
             client,
-            product="capstone global unconstrained portfolio",
+            product="northwind global unconstrained portfolio",
         )
 
         assert isinstance(result, Resolved)

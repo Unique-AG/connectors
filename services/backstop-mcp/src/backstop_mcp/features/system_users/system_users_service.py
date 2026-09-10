@@ -19,7 +19,7 @@ def system_user_relationship(user_id: str) -> dict[str, object]:
 
     Backstop takes identity pointers (`author`, `createdBy`, `assignedUser`) only as
     relationships — in `attributes` it answers `400 "author should not be in the
-    'attributes' but 'relationship."`. Verified live; see `docs/json/035`.
+    'attributes' but 'relationship."`. Verified live.
     """
     return {"data": {"type": _SYSTEM_USER_TYPE, "id": user_id}}
 
