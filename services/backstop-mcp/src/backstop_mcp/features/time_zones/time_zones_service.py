@@ -1,6 +1,6 @@
 import logging
 from datetime import timedelta
-from typing import Self
+from typing import Self, overload
 
 from fastmcp.exceptions import ToolError
 
@@ -16,8 +16,8 @@ class TimeZonesService:
     """Process-wide time-zone catalog.
 
     Zones come from a real Backstop fetch and live in one in-memory dict keyed by zone id.
-    A meeting's `timeZone` is a `/time-zones` `shortName`, so callers resolve a string here
-    and send `.short_name`. Until a fetch succeeds this service has nothing to serve.
+    A meeting's `timeZone` is a `/time-zones` `shortName`, so callers use `resolve_short_name`
+    and send that string. Until a fetch succeeds this service has nothing to serve.
     Constructed by `get_time_zones_service` in this feature's `dependencies.py`.
 
     The TTL, single-flight and serve-stale protocol behind `get` is the composed `CachedValue`.
@@ -45,6 +45,22 @@ class TimeZonesService:
 
     async def get(self, *, refresh: bool = False) -> tuple[dict[str, TimeZoneDto], CacheFreshness]:
         return await self._cache.get(self._fetch_time_zones, refresh=refresh)
+
+    @overload
+    async def resolve_short_name(self, short_name_id_or_name: None) -> None: ...
+
+    @overload
+    async def resolve_short_name(self, short_name_id_or_name: str) -> str: ...
+
+    @overload
+    async def resolve_short_name(self, short_name_id_or_name: str | None) -> str | None: ...
+
+    async def resolve_short_name(self, short_name_id_or_name: str | None) -> str | None:
+        """Canonical `/time-zones` shortName, or `None` when the caller omitted a zone."""
+        if short_name_id_or_name is None:
+            return None
+        zone = await self.resolve(short_name_id_or_name)
+        return zone.short_name
 
     async def resolve(self, short_name_id_or_name: str) -> TimeZoneDto:
         """Match `shortName` first, then `id`, then a unique display `name`."""

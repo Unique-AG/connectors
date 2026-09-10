@@ -16,7 +16,9 @@ from backstop_mcp.features.activity_history.tools.get_activity_history import ge
 from backstop_mcp.features.activity_history.tools.search_activities import search_activities
 from backstop_mcp.features.activity_tags.tools.list_activity_tags import list_activity_tags
 from backstop_mcp.features.activity_writes.tools.attach_file import attach_file
+from backstop_mcp.features.activity_writes.tools.delete_activity import delete_activity
 from backstop_mcp.features.activity_writes.tools.log_activity import log_activity
+from backstop_mcp.features.activity_writes.tools.update_activity import update_activity
 from backstop_mcp.features.custom_fields.tools.list_custom_field_groups import (
     list_custom_field_groups,
 )
@@ -56,4 +58,6 @@ TOOLS: tuple[ToolFunction, ...] = (
     get_tasks_for_party,
     log_activity,
     attach_file,
+    update_activity,
+    delete_activity,
 )

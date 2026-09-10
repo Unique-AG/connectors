@@ -16,13 +16,12 @@ from backstop_mcp.backstop_client import (
 )
 from backstop_mcp.features.activity_writes.api_responses import MeetingOrCallAttributes
 from backstop_mcp.features.activity_writes.commands._utils import (
-    compact_attributes,
     isoformat,
     json_api_create,
+    omit_none_values,
     party_resource_link,
     relationship_data,
     secondary_resource_link,
-    system_user_resource_link,
 )
 from backstop_mcp.features.activity_writes.internal_dto import AuthorDto
 from backstop_mcp.features.activity_writes.log_activity_input import (
@@ -33,6 +32,7 @@ from backstop_mcp.features.activity_writes.responses import (
     LoggedCallResponse,
     LoggedMeetingResponse,
 )
+from backstop_mcp.features.system_users import system_user_resource_link
 from backstop_mcp.features.time_zones import TimeZonesService
 
 logger = logging.getLogger(__name__)
@@ -59,13 +59,13 @@ class LogMeetingOrCallCommand:
         author: AuthorDto,
         secondary_party_id: str | None = None,
     ) -> LoggedMeetingResponse | LoggedCallResponse:
-        zone = await self._time_zones_service.resolve(activity.time_zone)
+        time_zone = await self._time_zones_service.resolve_short_name(activity.time_zone)
         resource = await self._create(
             activity=activity,
             meeting_type=self._meeting_type(activity),
             party_id=party_id,
             secondary_party_id=secondary_party_id,
-            time_zone_short_name=zone.short_name,
+            time_zone_short_name=time_zone,
             author=author,
         )
         logger.info(
@@ -74,7 +74,7 @@ class LogMeetingOrCallCommand:
                 "id": resource.id,
                 "kind": activity.kind,
                 "party_id": party_id,
-                "time_zone": zone.short_name,
+                "time_zone": time_zone,
             },
         )
         match activity.kind:
@@ -82,14 +82,14 @@ class LogMeetingOrCallCommand:
                 return LoggedMeetingResponse(
                     id=resource.id,
                     title=activity.title,
-                    time_zone=zone.short_name,
+                    time_zone=time_zone,
                 )
             case "call":
                 return LoggedCallResponse(
                     id=resource.id,
                     title=activity.title,
                     meeting_type=activity.direction,
-                    time_zone=zone.short_name,
+                    time_zone=time_zone,
                 )
             case _:
                 assert_never(activity.kind)
@@ -130,7 +130,7 @@ class LogMeetingOrCallCommand:
         )
         payload = json_api_create(
             resource_type="meeting-or-calls",
-            attributes=compact_attributes(
+            attributes=omit_none_values(
                 {
                     "title": activity.title,
                     "type": meeting_type,

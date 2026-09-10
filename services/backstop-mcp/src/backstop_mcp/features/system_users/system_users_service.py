@@ -1,6 +1,7 @@
 import logging
 from datetime import timedelta
-from typing import Self
+from typing import Self, overload
+from urllib.parse import quote
 
 from fastmcp.exceptions import ToolError
 
@@ -10,6 +11,16 @@ from backstop_mcp.features.system_users.api_responses import SystemUserAttribute
 from backstop_mcp.features.system_users.internal_dto import SystemUserDto
 
 logger = logging.getLogger(__name__)
+
+_SYSTEM_USER_BEAN = "SystemUserBean"
+
+
+def system_user_resource_link(user_id: str) -> dict[str, object]:
+    return {
+        "resourceId": user_id,
+        "resourceType": _SYSTEM_USER_BEAN,
+        "resourceLink": f"/system-users/{quote(user_id, safe='')}",
+    }
 
 
 async def _fetch_system_users(client: BackstopClient) -> dict[str, SystemUserDto]:
@@ -77,6 +88,22 @@ class SystemUsersService:
         self, *, refresh: bool = False
     ) -> tuple[dict[str, SystemUserDto], CacheFreshness]:
         return await self._cache.get(lambda: _fetch_system_users(self._client), refresh=refresh)
+
+    @overload
+    async def resolve_resource_link(self, username: None) -> None: ...
+
+    @overload
+    async def resolve_resource_link(self, username: str) -> dict[str, object]: ...
+
+    @overload
+    async def resolve_resource_link(self, username: str | None) -> dict[str, object] | None: ...
+
+    async def resolve_resource_link(self, username: str | None) -> dict[str, object] | None:
+        """`{resourceId, resourceType, resourceLink}` for a login, or `None` if omitted."""
+        if username is None:
+            return None
+        user = await self.resolve_by_user_name(username)
+        return system_user_resource_link(user.id)
 
     async def resolve_by_user_name(self, username: str) -> SystemUserDto:
         catalog, _freshness = await self.get()

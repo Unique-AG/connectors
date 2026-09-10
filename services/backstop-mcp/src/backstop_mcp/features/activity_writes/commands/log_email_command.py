@@ -5,15 +5,15 @@ import logging
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import EmailAttributes
 from backstop_mcp.features.activity_writes.commands._utils import (
-    compact_attributes,
     json_api_create,
+    omit_none_values,
     party_resource_link,
     relationship_data,
-    system_user_resource_link,
 )
 from backstop_mcp.features.activity_writes.internal_dto import AuthorDto
 from backstop_mcp.features.activity_writes.log_activity_input import EmailActivityInput
 from backstop_mcp.features.activity_writes.responses import LoggedEmailResponse
+from backstop_mcp.features.system_users import system_user_resource_link
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class LogEmailCommand:
         tags = relationship_data("activity-tags", activity.activity_tag_ids)
         payload = json_api_create(
             resource_type="emails",
-            attributes=compact_attributes(
+            attributes=omit_none_values(
                 {
                     "displaySubject": activity.display_subject,
                     "emailFormat": activity.email_format,

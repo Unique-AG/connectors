@@ -8,11 +8,18 @@ from backstop_mcp.features.activity_writes.commands import (
     AttachDocumentCommand,
     AttachEmailCommand,
     AttachFileCommand,
+    DeleteActivityCommand,
     LogActivityCommand,
     LogEmailCommand,
     LogMeetingOrCallCommand,
     LogNoteCommand,
     LogTaskCommand,
+    UpdateActivityCommand,
+    UpdateDocumentCommand,
+    UpdateEmailCommand,
+    UpdateMeetingOrCallCommand,
+    UpdateNoteCommand,
+    UpdateTaskCommand,
 )
 from backstop_mcp.features.system_users import SystemUsersService, get_system_users_service
 from backstop_mcp.features.time_zones import TimeZonesService, get_time_zones_service
@@ -88,3 +95,66 @@ def get_attach_file_command_factory(
         attach_document_command=attach_document_command,
         attach_email_command=attach_email_command,
     )
+
+
+@lru_cache(maxsize=1)
+def get_update_note_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+) -> UpdateNoteCommand:
+    return UpdateNoteCommand(client=client)
+
+
+@lru_cache(maxsize=1)
+def get_update_meeting_or_call_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    time_zones_service: TimeZonesService = Depends(get_time_zones_service),
+) -> UpdateMeetingOrCallCommand:
+    return UpdateMeetingOrCallCommand(client=client, time_zones_service=time_zones_service)
+
+
+@lru_cache(maxsize=1)
+def get_update_task_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    system_users_service: SystemUsersService = Depends(get_system_users_service),
+) -> UpdateTaskCommand:
+    return UpdateTaskCommand(client=client, system_users_service=system_users_service)
+
+
+@lru_cache(maxsize=1)
+def get_update_email_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+) -> UpdateEmailCommand:
+    return UpdateEmailCommand(client=client)
+
+
+@lru_cache(maxsize=1)
+def get_update_document_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+) -> UpdateDocumentCommand:
+    return UpdateDocumentCommand(client=client)
+
+
+@lru_cache(maxsize=1)
+def get_update_activity_command_factory(
+    update_note_command: UpdateNoteCommand = Depends(get_update_note_command_factory),
+    update_meeting_or_call_command: UpdateMeetingOrCallCommand = Depends(
+        get_update_meeting_or_call_command_factory
+    ),
+    update_task_command: UpdateTaskCommand = Depends(get_update_task_command_factory),
+    update_email_command: UpdateEmailCommand = Depends(get_update_email_command_factory),
+    update_document_command: UpdateDocumentCommand = Depends(get_update_document_command_factory),
+) -> UpdateActivityCommand:
+    return UpdateActivityCommand(
+        update_note_command=update_note_command,
+        update_meeting_or_call_command=update_meeting_or_call_command,
+        update_task_command=update_task_command,
+        update_email_command=update_email_command,
+        update_document_command=update_document_command,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_delete_activity_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+) -> DeleteActivityCommand:
+    return DeleteActivityCommand(client=client)

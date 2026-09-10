@@ -129,6 +129,33 @@ class TestResolveByUserName:
             with pytest.raises(ToolError, match="mlucas"):
                 await system_users_service(client).resolve_by_user_name("mlucas")
 
+    @respx.mock
+    async def test_resolve_resource_link_returns_the_system_user_pointer(self) -> None:
+        base_url = tenant("su-resolve-link")
+        respx.get(f"{base_url}/system-users").mock(return_value=_collection_page(_user("u1")))
+
+        async with tool_client(base_url) as client:
+            result = await system_users_service(client).resolve_resource_link("mlucas")
+
+        assert result == {
+            "resourceId": "u1",
+            "resourceType": "SystemUserBean",
+            "resourceLink": "/system-users/u1",
+        }
+
+    @respx.mock
+    async def test_resolve_resource_link_returns_none_without_fetching(self) -> None:
+        base_url = tenant("su-resolve-link-none")
+        route = respx.get(f"{base_url}/system-users").mock(
+            return_value=_collection_page(_user("u1"))
+        )
+
+        async with tool_client(base_url) as client:
+            result = await system_users_service(client).resolve_resource_link(None)
+
+        assert result is None
+        assert route.call_count == 0
+
 
 @respx.mock
 async def test_get_current_caller_system_user_returns_the_matching_dto() -> None:

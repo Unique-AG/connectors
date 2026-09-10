@@ -5,12 +5,11 @@ import logging
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import TaskAttributes
 from backstop_mcp.features.activity_writes.commands._utils import (
-    compact_attributes,
     isoformat,
     json_api_create,
+    omit_none_values,
     party_resource_link,
     secondary_resource_link,
-    system_user_resource_link,
 )
 from backstop_mcp.features.activity_writes.log_activity_input import TaskActivityInput
 from backstop_mcp.features.activity_writes.responses import LoggedTaskResponse
@@ -36,7 +35,6 @@ class LogTaskCommand:
         party_id: str,
         secondary_party_id: str | None = None,
     ) -> LoggedTaskResponse:
-        assignee = await self._system_users_service.resolve_by_user_name(activity.assigned_user)
         secondary = secondary_resource_link(
             party_id=party_id,
             secondary_party_id=secondary_party_id,
@@ -44,7 +42,7 @@ class LogTaskCommand:
         )
         payload = json_api_create(
             resource_type="tasks",
-            attributes=compact_attributes(
+            attributes=omit_none_values(
                 {
                     "name": activity.title,
                     "details": activity.description,
@@ -54,7 +52,9 @@ class LogTaskCommand:
                         party_id=party_id, search_type=activity.search_type
                     ),
                     "secondaryRegarding": secondary,
-                    "assignedUser": system_user_resource_link(assignee.id),
+                    "assignedUser": await self._system_users_service.resolve_resource_link(
+                        activity.assigned_user
+                    ),
                 }
             ),
         )

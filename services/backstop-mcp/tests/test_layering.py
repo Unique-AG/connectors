@@ -53,7 +53,7 @@
    import `server.tools.registry` or a private `_`-prefixed sibling such as `_page_input`,
    and cannot reach past a feature package's `__init__`. `registry.py` under `server/tools`
    may import `features.<feature>.tools.get_*` / `list_*` / `search_*` / `log_*` / `attach_*`
-   the same way.
+   / `update_*` / `delete_*` the same way.
 
    Applies to the packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are
    not among them: they are groupings whose `__init__` is documentation, so `features.resolution`
@@ -237,7 +237,8 @@ def _is_server_tools_directory(directory: pathlib.Path) -> bool:
 
 
 def _is_feature_tool_module_import(module: str) -> bool:
-    """A feature tool module (`get_*` / `list_*` / `search_*` / `log_*` / `attach_*`)."""
+    """A feature tool module (`get_*` / `list_*` / `search_*` / `log_*` / `attach_*` /
+    `update_*` / `delete_*`)."""
     prefix = f"{_FEATURES_PREFIX}."
     if not module.startswith(prefix):
         return False
@@ -245,7 +246,9 @@ def _is_feature_tool_module_import(module: str) -> bool:
     return (
         len(parts) >= 3
         and parts[1] == "tools"
-        and parts[2].startswith(("get_", "list_", "search_", "log_", "attach_"))
+        and parts[2].startswith(
+            ("get_", "list_", "search_", "log_", "attach_", "update_", "delete_")
+        )
     )
 
 
@@ -269,7 +272,7 @@ def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, i
     `backstop_client` through those packages' `__init__`.
 
     Tool tests may import the tool module under test (`features.<pkg>.tools.get_*` / `list_*` /
-    `search_*` / `log_*` / `attach_*`);
+    `search_*` / `log_*` / `attach_*` / `update_*` / `delete_*`);
     they still cannot import `server.tools.registry` or `_page_input`, and cannot reach past a
     feature package's `__init__`. `registry.py` under `server/tools` may import those feature
     tool modules.
@@ -684,7 +687,11 @@ class TestTheDetectionItself:
         assert not _internal_imports(
             "from backstop_mcp.features.org_people.tools.get_person import get_person\n"
             + "from backstop_mcp.features.activity_writes.tools.log_activity import log_activity\n"
-            + "from backstop_mcp.features.activity_writes.tools.attach_file import attach_file\n",
+            + "from backstop_mcp.features.activity_writes.tools.attach_file import attach_file\n"
+            + "from backstop_mcp.features.activity_writes.tools.update_activity"
+            + " import update_activity\n"
+            + "from backstop_mcp.features.activity_writes.tools.delete_activity"
+            + " import delete_activity\n",
             _SRC / "server" / "tools",
         )
 

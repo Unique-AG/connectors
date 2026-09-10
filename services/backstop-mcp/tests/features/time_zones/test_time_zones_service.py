@@ -145,6 +145,27 @@ class TestResolve:
                 await time_zones_service(client).resolve("US/Eastern")
 
     @respx.mock
+    async def test_resolve_short_name_returns_the_canonical_short_name(self) -> None:
+        base_url = tenant("tz-resolve-short-name")
+        respx.get(f"{base_url}/time-zones").mock(return_value=_collection_page(*_CATALOG))
+
+        async with tool_client(base_url) as client:
+            result = await time_zones_service(client).resolve_short_name("us/eastern")
+
+        assert result == "US/Eastern"
+
+    @respx.mock
+    async def test_resolve_short_name_returns_none_without_fetching(self) -> None:
+        base_url = tenant("tz-resolve-short-name-none")
+        route = respx.get(f"{base_url}/time-zones").mock(return_value=_collection_page(*_CATALOG))
+
+        async with tool_client(base_url) as client:
+            result = await time_zones_service(client).resolve_short_name(None)
+
+        assert result is None
+        assert route.call_count == 0
+
+    @respx.mock
     async def test_does_not_send_filter_query_params(self) -> None:
         base_url = tenant("tz-no-filter")
         zones_route = respx.get(f"{base_url}/time-zones").mock(
