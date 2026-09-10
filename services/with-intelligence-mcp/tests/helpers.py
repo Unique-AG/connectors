@@ -99,11 +99,11 @@ def sent_header(route: respx.Route, name: str, index: int = 0) -> str:
     return value if isinstance(value, str) else ""
 
 
-def wi_factory(base_url: str = BASE_URL) -> WithIntelligenceClientFactory:
+def wi_factory(base_url: str = BASE_URL, *, max_attempts: int = 1) -> WithIntelligenceClientFactory:
     """A real factory pointed at a respx-mocked host, for code that signs in."""
     return WithIntelligenceClientFactory(
         transport_settings(base_url=base_url),
-        RetrySettings(max_attempts=1, max_wait_ms=0),
+        RetrySettings(max_attempts=max_attempts, max_wait_ms=0),
     )
 
 

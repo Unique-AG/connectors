@@ -4,15 +4,55 @@ import httpx
 import pytest
 import respx
 
-from tests.helpers import BASE_URL, FakeSession, build_client, page_body, sent_header, sent_query
+from tests.helpers import (
+    BASE_URL,
+    FakeSession,
+    build_client,
+    page_body,
+    sent_header,
+    sent_query,
+    sign_in_ok,
+    wi_factory,
+)
 from with_intelligence_mcp.with_intelligence_client import (
     ApiError,
     AuthError,
     NotEntitled,
     NotFound,
     RateLimited,
+    SignInFailed,
     Unreachable,
+    WiCredential,
 )
+
+
+class TestAuthentication:
+    @pytest.mark.parametrize("status_code", [429, 503])
+    @respx.mock
+    async def test_transient_failures_are_retried(self, status_code: int) -> None:
+        route = respx.post(f"{BASE_URL}/v3/auth/sign-in").mock(
+            side_effect=[httpx.Response(status_code), sign_in_ok()]
+        )
+        factory = wi_factory(max_attempts=2)
+        credential = WiCredential.model_validate({"username": "user", "password": "password"})
+        try:
+            session = await factory.sign_in(credential)
+        finally:
+            await factory.aclose()
+        assert session.access_token.get_secret_value() == "access-1"
+        assert route.call_count == 2
+
+    @respx.mock
+    async def test_credential_rejection_is_not_retried(self) -> None:
+        route = respx.post(f"{BASE_URL}/v3/auth/sign-in").mock(return_value=httpx.Response(401))
+        factory = wi_factory(max_attempts=3)
+        credential = WiCredential.model_validate({"username": "user", "password": "wrong"})
+        try:
+            with pytest.raises(SignInFailed):
+                await factory.sign_in(credential)
+        finally:
+            await factory.aclose()
+        assert route.call_count == 1
 
 
 class TestStatusMapping:
@@ -107,6 +147,15 @@ class TestRetries:
 
 
 class TestQueryEncoding:
+    @respx.mock
+    async def test_a_boolean_filter_uses_lowercase(self) -> None:
+        route = respx.get(f"{BASE_URL}/v3/investors").mock(
+            return_value=httpx.Response(200, json=page_body([], total=0))
+        )
+        client, _ = build_client()
+        _ = await client.get_page("/v3/investors", {"active": True})
+        assert "active=true" in sent_query(route)
+
     @respx.mock
     async def test_a_list_filter_repeats_its_key(self) -> None:
         route = respx.get(f"{BASE_URL}/v3/investors").mock(

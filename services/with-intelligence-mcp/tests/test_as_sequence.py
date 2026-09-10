@@ -1,8 +1,4 @@
-"""The two coercions that absorb With Intelligence's inconsistent array encoding.
-
-Each has been wrong in production once, so both directions are pinned here rather than left to
-the feature tests that happen to exercise them.
-"""
+"""WI payload normalization tests."""
 
 from with_intelligence_mcp.with_intelligence_client import as_sequence, as_single
 
@@ -12,7 +8,6 @@ class TestAsSequence:
         assert as_sequence([{"id": 1}, {"id": 2}]) == [{"id": 1}, {"id": 2}]
 
     def test_an_index_keyed_object_flattens_in_key_order(self) -> None:
-        """How `consultants` actually arrives, despite being declared an array."""
         assert as_sequence({"1": {"id": 2}, "0": {"id": 1}}) == [{"id": 1}, {"id": 2}]
 
     def test_key_order_is_numeric_not_lexicographic(self) -> None:
@@ -20,7 +15,6 @@ class TestAsSequence:
         assert flattened == [{"id": index} for index in range(11)]
 
     def test_a_single_record_is_wrapped_not_shredded(self) -> None:
-        """Reading `.values()` off a single record turned it into `[4, 'Real Assets']`."""
         assert as_sequence({"id": 4, "name": "Real Assets"}) == [{"id": 4, "name": "Real Assets"}]
 
     def test_a_record_whose_keys_are_mixed_is_a_single_record(self) -> None:
@@ -42,8 +36,6 @@ class TestAsSingle:
         assert as_single([{"id": 4}]) == {"id": 4}
 
     def test_a_longer_list_keeps_the_first(self) -> None:
-        """Lossy, but only in the case the spec says cannot happen — the alternative is a
-        failed tool call."""
         assert as_single([{"id": 4}, {"id": 5}]) == {"id": 4}
 
     def test_an_empty_list_becomes_none(self) -> None:

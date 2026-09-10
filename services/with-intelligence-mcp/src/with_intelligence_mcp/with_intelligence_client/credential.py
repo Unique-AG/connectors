@@ -1,8 +1,4 @@
-"""What a request needs to authenticate, and who supplies it.
-
-Both live in the transport because that is what sends them. `features/wi_session` owns the
-other half — obtaining and refreshing a session — and depends on these types, not the reverse.
-"""
+"""WI authentication interfaces."""
 
 from typing import ClassVar, Protocol
 
@@ -10,10 +6,7 @@ from pydantic import BaseModel, ConfigDict, SecretStr
 
 
 class WiCredential(BaseModel):
-    """A username and password `POST /v3/auth/sign-in` accepts.
-
-    `password` is a `SecretStr` so an accidental log line prints `**********`.
-    """
+    """WI username and password."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
@@ -22,13 +15,7 @@ class WiCredential(BaseModel):
 
 
 class CallerSession(Protocol):
-    """Resolves "whose access token" for the in-flight request.
-
-    A Protocol, not the concrete class: the implementation needs configuration, and later the
-    database and the calling MCP subject, none of which the transport should know about. It is
-    also what makes the dev-only single-account implementation and the per-user one
-    interchangeable.
-    """
+    """Provides authentication for one caller."""
 
     async def access_token(self) -> str: ...
 

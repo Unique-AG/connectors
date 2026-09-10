@@ -1,9 +1,4 @@
-"""When to try an upstream request again.
-
-429 is documented on every path with no published budget, so it is retried with backoff and a
-`Retry-After` honoured when sent. 5xx and network errors are retried; 4xx other than 429 are
-not — a 403 will be a 403 next time too.
-"""
+"""Retry policy for transient WI API failures."""
 
 from dataclasses import dataclass
 
@@ -33,3 +28,12 @@ class RetryPolicy:
         if isinstance(error, RateLimited) and error.retry_after_seconds is not None:
             return min(error.retry_after_seconds, self.max_wait_seconds)
         return min(2.0 ** (attempt - 1), self.max_wait_seconds)
+
+
+def parse_retry_after(value: object) -> float | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None

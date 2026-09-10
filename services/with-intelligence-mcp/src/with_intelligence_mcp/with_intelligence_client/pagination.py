@@ -1,9 +1,4 @@
-"""The one paging shape every v3 listing returns.
-
-    {"pagination": {"page": 1, "page_size": 50, "count": 50, "total": 4321}, "results": [...]}
-
-`count` is this page, `total` the whole match. One helper serves all 143 paths.
-"""
+"""WI API pagination."""
 
 from typing import ClassVar, cast
 

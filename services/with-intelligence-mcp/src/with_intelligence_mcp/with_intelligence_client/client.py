@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from typing import cast
@@ -22,10 +21,8 @@ from with_intelligence_mcp.with_intelligence_client.errors import (
     Unreachable,
 )
 from with_intelligence_mcp.with_intelligence_client.pagination import Page, parse_page
-from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy
+from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy, parse_retry_after
 from with_intelligence_mcp.with_intelligence_client.settings import TransportSettings
-
-logger = logging.getLogger(__name__)
 
 type QueryValue = str | int | float | bool | Sequence[str | int]
 type Gate = Callable[[str], AbstractAsyncContextManager[None]]
@@ -33,22 +30,8 @@ type Gate = Callable[[str], AbstractAsyncContextManager[None]]
 _JSON = TypeAdapter(object)
 
 
-type Primitive = str | int | float | bool | None
-
-
-def _flatten(params: Mapping[str, QueryValue]) -> list[tuple[str, Primitive]]:
-    """Array filters repeat their key: `?id=1&id=2`. `None` values are dropped by the caller."""
-    flat: list[tuple[str, Primitive]] = []
-    for key, value in params.items():
-        if isinstance(value, (str, int, float, bool)):
-            flat.append((key, str(value)))
-            continue
-        flat.extend((key, str(item)) for item in value)
-    return flat
-
-
 class WithIntelligenceClient:
-    """One caller's view of the API, over a pool and gates the factory owns."""
+    """Client for one caller's authenticated WI API requests."""
 
     def __init__(
         self,
@@ -140,7 +123,7 @@ class WithIntelligenceClient:
                 response = await client.request(
                     method,
                     path,
-                    params=_flatten(params),
+                    params=params,
                     headers={"authorization": f"Bearer {token}"},
                 )
             except httpx.TimeoutException as exc:
@@ -171,21 +154,15 @@ class WithIntelligenceClient:
             raise NotFound(f"{path} does not exist", path=path)
         if status == 429:
             UPSTREAM_RATE_LIMITED.add(1, {"path": path})
-            raise RateLimited(f"{path} is rate-limited", retry_after_seconds=_retry_after(response))
+            raise RateLimited(
+                f"{path} is rate-limited",
+                retry_after_seconds=parse_retry_after(
+                    cast("object", response.headers.get("retry-after"))
+                ),
+            )
         if status >= 500:
             raise Unreachable(f"{path} returned {status}")
         raise ApiError(f"{path} returned {status}", status_code=status)
-
-
-def _retry_after(response: httpx.Response) -> float | None:
-    raw = cast("object", response.headers.get("retry-after"))
-    if not isinstance(raw, str):
-        return None
-    try:
-        return float(raw)
-    except ValueError:
-        # The header also allows an HTTP date; backoff covers us, so don't parse it.
-        return None
 
 
 def as_query(values: Mapping[str, QueryValue | None]) -> dict[str, QueryValue]:
