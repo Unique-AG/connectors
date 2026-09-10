@@ -13,7 +13,7 @@ from with_intelligence_mcp.features.auth.session_store import (
     lock_session,
     replace_session,
 )
-from with_intelligence_mcp.with_intelligence_client import WiSession
+from with_intelligence_mcp.with_intelligence_client import SignInFailed, WiSession
 
 
 class NotConnectedError(ToolError):
@@ -72,7 +72,7 @@ class WithIntelligenceAuthContext(BaseModel):
                 return stored
             try:
                 renewed = await renew(stored)
-            except Exception as exc:
+            except SignInFailed as exc:
                 await self.revoke_current_subject_tokens()
                 raise NotConnectedError(
                     "Your With Intelligence session has expired and could not be renewed — "

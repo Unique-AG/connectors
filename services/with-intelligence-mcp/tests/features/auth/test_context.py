@@ -12,7 +12,7 @@ from tests.conftest import DatabaseFixture
 from with_intelligence_mcp.db import read_session, transaction
 from with_intelligence_mcp.features.auth import NotConnectedError, WithIntelligenceAuthContext
 from with_intelligence_mcp.features.auth.session_store import get_session, save_session
-from with_intelligence_mcp.with_intelligence_client import WiSession
+from with_intelligence_mcp.with_intelligence_client import SignInFailed, Unreachable, WiSession
 
 KEY = Fernet.generate_key()
 
@@ -146,11 +146,29 @@ class TestRenewal:
         monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
 
         async def refuse(_stale: WiSession) -> WiSession:
-            raise RuntimeError("refresh token spent")
+            raise SignInFailed("refresh token spent")
 
         with pytest.raises(NotConnectedError, match="could not be renewed"):
             _ = await context.renew_session(refuse)
         assert revocations.subjects == [user_id]
+
+    async def test_an_outage_does_not_revoke_the_callers_mcp_tokens(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _, factory = db
+        user_id = await _store(db, _session("stale", age=timedelta(hours=2)))
+        context, revocations = _context(db)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+
+        async def unavailable(_stale: WiSession) -> WiSession:
+            raise Unreachable("WI is unavailable")
+
+        with pytest.raises(Unreachable):
+            _ = await context.renew_session(unavailable)
+        assert revocations.subjects == []
+        async with read_session(factory) as session:
+            stored = await get_session(session, user_id, KEY)
+        assert stored is not None
 
     async def test_renewing_without_a_stored_session_is_reported_not_retried(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
