@@ -16,7 +16,7 @@ meeting/call. A bare id fetches detail first, then the two meeting endpoints onl
 A stale or invented `activity_id` raises rather than returning a bespoke not-found response.
 An empty handle fails locally as a `ToolError`; one that is well-formed but unknown becomes
 a 404 `BackstopApiError` (`/entity-activity-details` answers 200 with null primary data for
-those, which `BackstopApiResourceDocument.require_data` converts).
+those, which the query maps to a 404).
 """
 
 import logging

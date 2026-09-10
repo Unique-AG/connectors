@@ -320,7 +320,7 @@ class TestGetOrganization:
     ) -> None:
 
         # `id` is entirely absent from the organization resource — fails
-        # `BackstopApiResourceDocument[OrganizationRecordResponse]` schema validation outright.
+        # `BackstopApiSingleResourceDocument[OrganizationAttributes]` schema validation outright.
         respx.get(f"{BASE_URL}/organizations/trusted-9").mock(
             return_value=httpx.Response(
                 200,
@@ -339,7 +339,9 @@ class TestGetOrganization:
             )
 
         assert exc_info.value.path == "/organizations/trusted-9"
-        assert exc_info.value.schema_name == ("BackstopApiResourceDocument[OrganizationAttributes]")
+        assert exc_info.value.schema_name == (
+            "BackstopApiSingleResourceDocument[OrganizationAttributes]"
+        )
 
     @pytest.mark.asyncio
     @respx.mock

@@ -314,8 +314,9 @@ class AccountTableDataEntry(BaseModel):
 class AccountTableDataDocument(BaseModel):
     """Whole `bsg-account-table-data` body.
 
-    Deliberately not `BackstopApiResourceDocument`: `data` is a **list** whose single element has
-    a `null` id, `links` is `null`, `included` is always `[]`, and `meta.totalResourceCount` is
+    Deliberately not `BackstopApiSingleResourceDocument` or `BackstopApiCollectionDocument`:
+    `data` is a **list** whose single element has a `null` id, `links` is `null`, `included`
+    is always `[]`, and `meta.totalResourceCount` is
     `0` regardless of how many rows came back. None of the JSON:API envelope means anything here.
 
     `data` is **required and non-empty** for the same reason `attributes` is. All four recorded

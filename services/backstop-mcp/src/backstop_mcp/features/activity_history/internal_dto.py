@@ -148,8 +148,7 @@ class ResourceIdentifierDto(BaseModel):
     The detail endpoints go the other way: `/entity-activity-details/{id}`,
     `/meeting-or-calls/{id}` and `/meeting-or-calls/{id}/attendees` all take the **bare**
     `resource_id`. Passing the composite to `/entity-activity-details` does not 404 — it answers
-    `200 {"data": null}`, so the mistake surfaces as a schema error rather than a not-found (see
-    `BackstopApiResourceDocument.require_data`).
+    `200 {"data": null}`, so the query maps that null primary data to a 404.
 
     `search_activities` rows use a different `id` (e.g. `1659094659`) that is already the bare
     id `/entity-activity-details/{id}` wants. A handle with no underscore is accepted as that

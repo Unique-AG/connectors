@@ -38,7 +38,7 @@ from fastmcp import Context
 from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopApiResource,
-    BackstopApiResourceDocument,
+    BackstopApiSingleResourceDocument,
     BackstopClient,
 )
 from backstop_mcp.features.accounts.api_responses import ProductAttributes
@@ -64,7 +64,7 @@ _SCOPE = "products"
 
 # Plain assignments — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 _ProductResource = BackstopApiResource[ProductAttributes]
-_ProductDocument = BackstopApiResourceDocument[ProductAttributes]
+_ProductDocument = BackstopApiSingleResourceDocument[ProductAttributes]
 
 
 def _product_label(product: ResolvedProductDto) -> str:
@@ -131,10 +131,8 @@ async def _fetch_product(client: BackstopClient, product_id: str) -> ProductReso
     """Read one product by trusted id, or `NotFound` when Backstop holds no such record.
 
     Only a missing record is an answer; every other error stays an error, so a permissions or
-    transport failure is never reported to the model as "no such product". `require_data` is
-    inside the `try` so that both shapes Backstop uses for a missing record reach the same
-    `NotFound` — a real 404, which is what `/products/{unknown}` sends, and the
-    `200 {"data": null}` some other by-id endpoints answer with instead.
+    transport failure is never reported to the model as "no such product". `/products/{unknown}`
+    404s, so a caught `NOT_FOUND` is the missing-record path.
     """
     product_id = product_id.strip()
     if not product_id:
@@ -145,7 +143,7 @@ async def _fetch_product(client: BackstopClient, product_id: str) -> ProductReso
         document = await client.get(
             path, params={"fields": _PRODUCT_FIELDS}, schema=_ProductDocument
         )
-        resource = document.require_data(path=path)
+        resource = document.data
     except BackstopApiError as exc:
         if exc.status_code != HTTPStatus.NOT_FOUND:
             raise

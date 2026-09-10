@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 from backstop_mcp.backstop_client import (
     BackstopApiResource,
-    BackstopApiResourceDocument,
+    BackstopApiSingleResourceDocument,
     BackstopClient,
 )
 from backstop_mcp.features.accounts.api_responses import ProductAttributes
@@ -23,7 +23,7 @@ _PRODUCTS_PATH = "/products"
 _PAGE_SIZE = 200
 
 _ProductResource = BackstopApiResource[ProductAttributes]
-_ProductDocument = BackstopApiResourceDocument[ProductAttributes]
+_ProductDocument = BackstopApiSingleResourceDocument[ProductAttributes]
 
 
 class GetProductQuery:
@@ -36,7 +36,7 @@ class GetProductQuery:
         """GET /products/{id} with the full attribute set, including custom-field values."""
         path = f"{_PRODUCTS_PATH}/{quote(product_id, safe='')}"
         document = await self._client.get(path, schema=_ProductDocument)
-        return ProductFetchDto.from_resource(document.require_data(path=path))
+        return ProductFetchDto.from_resource(document.data)
 
     async def catalog(self) -> ProductCatalogFetchDto:
         """Walk /products with no sparse fieldset so custom-field values arrive on each row."""

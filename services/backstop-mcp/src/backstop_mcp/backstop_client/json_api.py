@@ -1,5 +1,17 @@
+"""JSON:API envelopes for Backstop responses.
+
+Pick the document by the shape of `data`:
+
+- `BackstopApiSingleResourceDocument` — one resource, required. Default for by-id GET
+  (endpoints that 404) and for POST/PATCH that return the created or updated record.
+  Read `.data` directly.
+- `BackstopApiCollectionDocument` — `data` is always a list. List endpoints and pagination.
+- `OptionalBackstopApiResourceDocument` — one resource or null. Only
+  `/entity-activity-details/{id}` is known to answer `200 {"data": null}` for a missing
+  record. Handle `data is None` at that call site.
+"""
+
 from collections.abc import Mapping, Sequence
-from http import HTTPStatus
 from typing import Annotated, ClassVar, Self
 
 from pydantic import (
@@ -11,8 +23,6 @@ from pydantic import (
     TypeAdapter,
     ValidationError,
 )
-
-from backstop_mcp.backstop_client.errors import BackstopApiError
 
 # PEP 695 generic syntax (not typing.Generic/TypeVar) — pydantic 2.13 resolves
 # `BackstopApiResource[SomeModel]` to a concrete model at runtime either way, but this form
@@ -137,30 +147,40 @@ class _JsonApiDocument(BaseModel):
     included: list[dict[str, object]] = Field(default_factory=list)
 
 
-class BackstopApiResourceDocument[AttrT](_JsonApiDocument):
-    """A by-id JSON:API document: `data` is one resource, or null for a record Backstop has none.
+class BackstopApiSingleResourceDocument[AttrT](_JsonApiDocument):
+    """A JSON:API document whose `data` is one resource and is never null.
 
-    Most by-id endpoints answer a missing record with 404, which the client raises before
-    deserialization — but not all of them do. `/entity-activity-details/{unknown_id}` answers
-    `200 {"data": null, "included": []}` (verified live, for a malformed id and for a well-formed
-    one nobody owns alike), while `/meeting-or-calls/{unknown_id}` on the same instance 404s.
-    Modelling `data` as required turned that first case into a `BackstopResponseSchemaError`
-    ("Input should be an object") that reads like a broken schema rather than a missing record, so
-    it is optional here and `require_data` converts null primary data into the 404 a
-    better-behaved endpoint would have sent.
+    Default for a single record: by-id GET on endpoints that 404 for a missing id, and
+    POST/PATCH that return the created or updated resource. Access `data` directly.
+
+    Use `BackstopApiCollectionDocument` when `data` is a list. Use
+    `OptionalBackstopApiResourceDocument` only when Backstop answers `200 {"data": null}`
+    for a missing record (`/entity-activity-details/{id}`).
+    """
+
+    data: BackstopApiResource[AttrT]
+
+
+class OptionalBackstopApiResourceDocument[AttrT](_JsonApiDocument):
+    """A by-id JSON:API document whose `data` may be null.
+
+    Only `/entity-activity-details/{unknown_id}` is known to answer
+    `200 {"data": null, "included": []}` (verified live, for a malformed id and for a
+    well-formed one nobody owns alike). Other by-id GETs on this instance 404; those
+    belong on `BackstopApiSingleResourceDocument` so a missing record is a client 404
+    and a present record does not need a None-check.
+
+    Callers that pick this type handle `data is None` themselves.
     """
 
     data: BackstopApiResource[AttrT] | None = None
 
-    def require_data(self, *, path: str) -> BackstopApiResource[AttrT]:
-        """This document's primary resource, or a 404 `BackstopApiError` naming `path`."""
-        if self.data is None:
-            raise BackstopApiError(HTTPStatus.NOT_FOUND, f"Backstop holds no record at {path!r}.")
-        return self.data
-
 
 class BackstopApiCollectionDocument[AttrT](_JsonApiDocument):
-    """A list JSON:API document: `data` is always an array of resources."""
+    """A list JSON:API document: `data` is always an array of resources.
+
+    List endpoints and pagination. Never a single object and never null.
+    """
 
     data: list[BackstopApiResource[AttrT]]
 

@@ -25,7 +25,7 @@ class PartyAttributes(BaseModel):
     """Shape of a party resource's `attributes` in the party-search JSON:API responses.
 
     Deserialized straight off the wire via `BackstopApiCollectionDocument[PartyAttributes]` /
-    `BackstopApiResourceDocument[PartyAttributes]` — see `backstop_client.json_api`.
+    `BackstopApiSingleResourceDocument[PartyAttributes]` — see `backstop_client.json_api`.
     `extra="ignore"` since only `id`/`name`/`label` (derived here) ever leave the search modules.
     Names are stripped here so the display-name fallback can use plain truthiness
     checks instead of re-stripping at point of use.

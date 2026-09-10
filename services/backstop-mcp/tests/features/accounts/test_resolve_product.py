@@ -4,7 +4,11 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiError,
+    BackstopClient,
+    BackstopResponseSchemaError,
+)
 from backstop_mcp.features.accounts import resolve_product
 from backstop_mcp.features.resolution import Ambiguous, NotFound, Resolved
 from tests.features.party_resolver.helpers import ctx_accept, ctx_decline, ctx_never_elicit
@@ -346,14 +350,12 @@ class TestResolveProductId:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_null_data_document_is_also_not_found(self, client: BackstopClient) -> None:
-        """Some by-id endpoints answer a missing record `200 {"data": null}` instead of 404."""
+    async def test_a_null_data_document_is_a_schema_error(self, client: BackstopClient) -> None:
+        """`/products/{id}` 404s for a missing record; `200 {"data": null}` is not that shape."""
         respx.get(_PRODUCT_URL).mock(return_value=httpx.Response(200, json={"data": None}))
 
-        result = await resolve_product(ctx_never_elicit(), client, product_id="1292283")
-
-        assert isinstance(result, NotFound)
-        assert result.query == "1292283"
+        with pytest.raises(BackstopResponseSchemaError):
+            await resolve_product(ctx_never_elicit(), client, product_id="1292283")
 
 
 class TestElicit:
