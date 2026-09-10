@@ -52,7 +52,10 @@ class _FileBlobInput(BaseModel):
     )
     activity_tag_ids: tuple[str, ...] = Field(
         default=(),
-        description="Activity-tag ids from `list_activity_tags`. Empty when none apply.",
+        description=(
+            "Activity-tag ids from `list_activity_tags`. Empty when none apply. "
+            "Tags are never created automatically."
+        ),
     )
 
 

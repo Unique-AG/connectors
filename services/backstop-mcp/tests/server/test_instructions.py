@@ -48,3 +48,12 @@ class TestInstructions:
         assert "History email ids" in INSTRUCTIONS
         assert "/emails" in INSTRUCTIONS
         assert "falls back internally" in INSTRUCTIONS
+        assert "log_activity" in INSTRUCTIONS
+        assert "attach_file" in INSTRUCTIONS
+        assert INSTRUCTIONS.index("log_activity") < INSTRUCTIONS.index("attach_file")
+        assert "never put a file blob" in INSTRUCTIONS
+        assert "list_activity_tags" in INSTRUCTIONS
+        assert "tags are never created" in INSTRUCTIONS
+        assert "delete_activity" in INSTRUCTIONS
+        assert "no recycle bin" in INSTRUCTIONS
+        assert "update_activity" in INSTRUCTIONS

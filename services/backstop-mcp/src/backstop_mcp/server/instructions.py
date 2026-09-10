@@ -50,6 +50,12 @@ use search_activities for email body. Prefer search_activities with \
 include_description for note text while the primary answers. Do not look for those \
 on get_person / get_organization.
 
+Write-back: log_activity for a note, meeting, call, task, or email metadata stub. \
+attach_file for a document file or a real .msg/.eml import — never put a file blob \
+on log_activity. Activity-tag ids come from list_activity_tags; tags are never \
+created. delete_activity permanently hard-deletes (no recycle bin). \
+update_activity patches a known activity id.
+
 Firm-wide pipeline: look up a colleague's login with list_system_users, then \
 search_opportunities. filter[representative.name] takes that login, not a display name. \
 A disabled login returning empty is not "no coverage". One party's deals: \

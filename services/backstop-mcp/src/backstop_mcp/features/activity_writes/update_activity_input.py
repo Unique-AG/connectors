@@ -63,7 +63,7 @@ class UpdateNoteInput(_ActivityIdInput):
         default=None,
         description=(
             "Replacement activity-tag ids from `list_activity_tags`. Empty tuple clears tags. "
-            "Omit to leave tags unchanged."
+            "Omit to leave tags unchanged. Tags are never created automatically."
         ),
     )
 
@@ -102,7 +102,7 @@ class _UpdateMeetingOrCallFields(_ActivityIdInput):
         default=None,
         description=(
             "Replacement activity-tag ids from `list_activity_tags`. Empty tuple clears tags. "
-            "Omit to leave tags unchanged."
+            "Omit to leave tags unchanged. Tags are never created automatically."
         ),
     )
 
@@ -168,7 +168,7 @@ class UpdateEmailInput(_ActivityIdInput):
         default=None,
         description=(
             "Replacement activity-tag ids from `list_activity_tags`. Empty tuple clears tags. "
-            "Omit to leave tags unchanged."
+            "Omit to leave tags unchanged. Tags are never created automatically."
         ),
     )
 
@@ -190,7 +190,7 @@ class UpdateDocumentInput(_ActivityIdInput):
         default=None,
         description=(
             "Replacement activity-tag ids from `list_activity_tags`. Empty tuple clears tags. "
-            "Omit to leave tags unchanged."
+            "Omit to leave tags unchanged. Tags are never created automatically."
         ),
     )
 

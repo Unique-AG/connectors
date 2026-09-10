@@ -29,7 +29,8 @@ LOG_ACTIVITY_INPUT_DESCRIPTION = (
     "Required. The activity to create. Discriminated by `kind`: `note`, `meeting`, "
     "`call`, `task`, or `email` (metadata stub only). Every kind needs `search_type` "
     "and exactly one of `party_id` or `search` — `party_id` alone is rejected. Author "
-    "is the authenticated caller, not a field. For a file or a real `.msg`/`.eml` "
+    "is the authenticated caller, not a field. Activity-tag ids come from "
+    "`list_activity_tags` and are never created. For a file or a real `.msg`/`.eml` "
     "blob use `attach_file` after this create."
 )
 
@@ -73,7 +74,10 @@ class _MeetingOrCallFields(BaseModel):
     )
     activity_tag_ids: tuple[str, ...] = Field(
         default=(),
-        description="Activity-tag ids from `list_activity_tags`. Empty when none apply.",
+        description=(
+            "Activity-tag ids from `list_activity_tags`. Empty when none apply. "
+            "Tags are never created automatically."
+        ),
     )
 
 
@@ -91,7 +95,10 @@ class NoteActivityInput(PartyTargetInput, SecondaryPartyInput):
     )
     activity_tag_ids: tuple[str, ...] = Field(
         default=(),
-        description="Activity-tag ids from `list_activity_tags`. Empty when none apply.",
+        description=(
+            "Activity-tag ids from `list_activity_tags`. Empty when none apply. "
+            "Tags are never created automatically."
+        ),
     )
 
 
@@ -168,7 +175,10 @@ class EmailActivityInput(PartyTargetInput):
     )
     activity_tag_ids: tuple[str, ...] = Field(
         default=(),
-        description="Activity-tag ids from `list_activity_tags`. Empty when none apply.",
+        description=(
+            "Activity-tag ids from `list_activity_tags`. Empty when none apply. "
+            "Tags are never created automatically."
+        ),
     )
 
 

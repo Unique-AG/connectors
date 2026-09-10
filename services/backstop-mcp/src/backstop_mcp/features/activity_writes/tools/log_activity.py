@@ -49,8 +49,9 @@ async def log_activity(
 
     Required on `activity`: `kind`, `search_type`, and exactly one of `party_id` or `search`.
     A `party_id` without `search_type` is rejected. Author is the authenticated caller, not
-    a parameter. For the message body of an email or a file on a note, use `attach_file`
-    after this create — `kind=email` writes metadata only.
+    a parameter. Activity-tag ids must come from `list_activity_tags`; tags are never
+    created automatically. For the message body of an email or a file on a note, use
+    `attach_file` after this create — `kind=email` writes metadata only.
 
     Call like: {"activity": {"kind": "note", "search_type": "organizations",
     "party_id": "<id from prior resolve echo>", "title": "Follow up"}}
