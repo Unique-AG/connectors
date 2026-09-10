@@ -137,6 +137,20 @@ class TestRenewal:
         assert calls == []
         assert current.access_token.get_secret_value() == "fresh"
 
+    async def test_a_rejected_fresh_session_is_renewed(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        stale = _session("rejected")
+        user_id = await _store(db, stale)
+        context, _ = _context(db)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+
+        async def renew(_stale: WiSession) -> WiSession:
+            return _session("renewed")
+
+        current = await context.renew_session(renew, stale.model_copy())
+        assert current.access_token.get_secret_value() == "renewed"
+
     async def test_a_refused_renewal_revokes_the_callers_mcp_tokens(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:

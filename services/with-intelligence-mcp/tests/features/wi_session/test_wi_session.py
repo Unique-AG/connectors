@@ -54,11 +54,15 @@ class FakeStore:
         self.reads += 1
         if self._delay:
             await asyncio.sleep(self._delay)
-        return self.stored
+        return self.stored.model_copy()
 
-    async def renew(self, renew: Callable[[WiSession], Awaitable[WiSession]]) -> WiSession:
+    async def renew(
+        self,
+        renew: Callable[[WiSession], Awaitable[WiSession]],
+        stale: WiSession | None = None,
+    ) -> WiSession:
         async with self._lock:
-            if self.stored.is_fresh:
+            if self.stored.is_fresh and self.stored.has_different_access_token(stale):
                 return self.stored
             self.stored = await renew(self.stored)
             return self.stored
@@ -147,7 +151,6 @@ class TestRenewal:
         store = FakeStore(_session("stored"))
         wi = _cache(factory)
         _ = await wi.access_token("s1", store.read, store.renew)
-        store.stored = _session("stored", age=timedelta(hours=2))
         assert await wi.renewed_access_token("s1", store.read, store.renew) == "refreshed-1"
 
 
