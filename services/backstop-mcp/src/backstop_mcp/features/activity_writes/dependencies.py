@@ -5,6 +5,9 @@ from fastmcp.dependencies import Depends
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.activity_writes.commands import (
+    AttachDocumentCommand,
+    AttachEmailCommand,
+    AttachFileCommand,
     LogActivityCommand,
     LogEmailCommand,
     LogMeetingOrCallCommand,
@@ -59,4 +62,29 @@ def get_log_activity_command_factory(
         log_meeting_or_call_command=log_meeting_or_call_command,
         log_task_command=log_task_command,
         log_email_command=log_email_command,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_attach_document_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+) -> AttachDocumentCommand:
+    return AttachDocumentCommand(client=client)
+
+
+@lru_cache(maxsize=1)
+def get_attach_email_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+) -> AttachEmailCommand:
+    return AttachEmailCommand(client=client)
+
+
+@lru_cache(maxsize=1)
+def get_attach_file_command_factory(
+    attach_document_command: AttachDocumentCommand = Depends(get_attach_document_command_factory),
+    attach_email_command: AttachEmailCommand = Depends(get_attach_email_command_factory),
+) -> AttachFileCommand:
+    return AttachFileCommand(
+        attach_document_command=attach_document_command,
+        attach_email_command=attach_email_command,
     )

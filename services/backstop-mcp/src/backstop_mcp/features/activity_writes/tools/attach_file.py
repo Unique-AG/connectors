@@ -1,4 +1,4 @@
-"""`log_activity`: resolve the party, then create a note, meeting, call, task, or email stub."""
+"""`attach_file`: resolve the party, then upload a document or import an email file."""
 
 import logging
 from typing import Annotated
@@ -10,12 +10,13 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.activity_writes import (
-    LOG_ACTIVITY_INPUT_DESCRIPTION,
+    ATTACH_FILE_INPUT_DESCRIPTION,
+    AttachFileCommand,
+    AttachFileInput,
+    AttachFileResponse,
     AuthorDto,
-    LogActivityCommand,
-    LogActivityInput,
-    LogActivityResponse,
-    get_log_activity_command_factory,
+    DocumentFileInput,
+    get_attach_file_command_factory,
 )
 from backstop_mcp.features.party_resolver import (
     ResolvePartyQuery,
@@ -36,24 +37,28 @@ logger = logging.getLogger(__name__)
         idempotent_hint=False,
         open_world_hint=False,
     ),
-    output_schema=published_output_schema(LogActivityResponse),
+    output_schema=published_output_schema(AttachFileResponse),
 )
-async def log_activity(
+async def attach_file(
     ctx: Context,
-    activity: Annotated[LogActivityInput, Field(description=LOG_ACTIVITY_INPUT_DESCRIPTION)],
+    activity: Annotated[AttachFileInput, Field(description=ATTACH_FILE_INPUT_DESCRIPTION)],
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
-    log_activity_command: LogActivityCommand = Depends(get_log_activity_command_factory),
+    attach_file_command: AttachFileCommand = Depends(get_attach_file_command_factory),
     caller: SystemUserDto = Depends(get_current_caller_system_user),
-) -> LogActivityResponse:
-    """Log a CRM note, meeting, call, task, or email metadata stub.
+) -> AttachFileResponse:
+    """Attach a document or import a real `.msg`/`.eml` email against a party.
 
-    Required on `activity`: `kind`, `search_type`, and exactly one of `party_id` or `search`.
-    A `party_id` without `search_type` is rejected. Author is the authenticated caller, not
-    a parameter. For the message body of an email or a file on a note, use `attach_file`
-    after this create — `kind=email` writes metadata only.
+    Required on `activity`: `kind`, `search_type`, `file_name`, `content` (standard base64
+    of the raw file), and exactly one of `party_id` or `search`. A `party_id` without
+    `search_type` is rejected. Do not generate `content` yourself — always use a
+    file-encoding tool for the base64 when one is available.
+    Author is the authenticated caller, not a parameter. Files over 20 MB are rejected
+    before any Backstop request. `kind=email` here imports the message file;
+    `log_activity(kind=email)` writes metadata only.
 
-    Call like: {"activity": {"kind": "note", "search_type": "organizations",
-    "party_id": "<id from prior resolve echo>", "title": "Follow up"}}
+    Call like: {"activity": {"kind": "document", "search_type": "organizations",
+    "party_id": "<id from prior resolve echo>", "file_name": "memo.pdf",
+    "content": "<standard base64 from a file-encoding tool>"}}
     """
     result = await resolve_party_query.run(
         search_type=activity.search_type,
@@ -64,16 +69,18 @@ async def log_activity(
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value
-    secondary_party_id = getattr(activity, "secondary_party_id", None)
+    secondary_party_id = (
+        activity.secondary_party_id if isinstance(activity, DocumentFileInput) else None
+    )
     logger.info(
-        "activity_writes.log.start",
+        "activity_writes.attach.start",
         extra={
             "kind": activity.kind,
             "search_type": party.search_type,
             "party_id": party.id,
         },
     )
-    return await log_activity_command.run(
+    return await attach_file_command.run(
         activity=activity,
         party_id=party.id,
         author=AuthorDto(id=caller.id, user_name=caller.user_name, name=caller.name),

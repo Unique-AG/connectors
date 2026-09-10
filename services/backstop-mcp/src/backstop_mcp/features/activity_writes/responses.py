@@ -14,6 +14,7 @@ from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
 
 __all__ = [
+    "AttachFileResponse",
     "AttachedFileResponse",
     "DeletedActivityResponse",
     "LogActivityResponse",
@@ -143,3 +144,5 @@ class DeletedActivityResponse(OmitNoneModel):
 
 
 type LogActivityResponse = LoggedActivityResponse | PartyAmbiguousResponse | NotFoundResponse
+
+type AttachFileResponse = AttachedFileResponse | PartyAmbiguousResponse | NotFoundResponse

@@ -99,4 +99,5 @@ class DocumentAttributes(BaseModel):
     title: str | None = None
     description: str | None = None
     file_name: str | None = Field(default=None, alias="fileName")
+    document_name: str | None = Field(default=None, alias="documentName")
     attached_to: ResourceLinkAttributes | None = Field(default=None, alias="attachedTo")

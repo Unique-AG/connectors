@@ -41,6 +41,9 @@ from backstop_mcp.features.activity_history import (
 )
 from backstop_mcp.features.activity_tags import get_activity_tags_service
 from backstop_mcp.features.activity_writes import (
+    get_attach_document_command_factory,
+    get_attach_email_command_factory,
+    get_attach_file_command_factory,
     get_log_activity_command_factory,
     get_log_email_command_factory,
     get_log_meeting_or_call_command_factory,
@@ -102,6 +105,9 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_log_meeting_or_call_command_factory,
     get_log_task_command_factory,
     get_log_email_command_factory,
+    get_attach_file_command_factory,
+    get_attach_document_command_factory,
+    get_attach_email_command_factory,
     get_activity_tags_service,
     get_system_users_service,
     get_time_zones_service,
