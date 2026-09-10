@@ -11,12 +11,13 @@ from fastmcp.exceptions import ToolError
 
 from backstop_mcp.backstop_client import BackstopApiError
 
-_TAG_POINTER = "Look up valid ids with list_activity_tags. Tags are never created automatically."
-
 
 def reraise_activity_write_error(exc: BackstopApiError) -> Never:
     if _is_unknown_activity_tag(exc):
-        raise ToolError(f"{exc.detail} {_TAG_POINTER}") from exc
+        raise ToolError(
+            f"{exc.detail} Look up valid ids with list_activity_tags. Tags are never "
+            + "created automatically."
+        ) from exc
     raise exc
 
 

@@ -39,7 +39,7 @@ def _user(
 
 
 def _filter_params(params: httpx.QueryParams) -> list[str]:
-    return [name for name in params.keys() if name.startswith("filter[")]
+    return [name for name, _value in params.multi_items() if name.startswith("filter[")]
 
 
 class TestResolveByUserName:
@@ -130,31 +130,61 @@ class TestResolveByUserName:
                 await system_users_service(client).resolve_by_user_name("mlucas")
 
     @respx.mock
-    async def test_resolve_resource_link_returns_the_system_user_pointer(self) -> None:
+    async def test_resolve_relationship_returns_a_json_api_relationship(self) -> None:
+        """Backstop takes identity pointers only as relationships, never as attributes."""
         base_url = tenant("su-resolve-link")
         respx.get(f"{base_url}/system-users").mock(return_value=_collection_page(_user("u1")))
 
         async with tool_client(base_url) as client:
-            result = await system_users_service(client).resolve_resource_link("mlucas")
+            result = await system_users_service(client).resolve_relationship("mlucas")
 
-        assert result == {
-            "resourceId": "u1",
-            "resourceType": "SystemUserBean",
-            "resourceLink": "/system-users/u1",
-        }
+        assert result == {"data": {"type": "system-users", "id": "u1"}}
 
     @respx.mock
-    async def test_resolve_resource_link_returns_none_without_fetching(self) -> None:
+    async def test_resolve_relationship_returns_none_without_fetching(self) -> None:
         base_url = tenant("su-resolve-link-none")
         route = respx.get(f"{base_url}/system-users").mock(
             return_value=_collection_page(_user("u1"))
         )
 
         async with tool_client(base_url) as client:
-            result = await system_users_service(client).resolve_resource_link(None)
+            result = await system_users_service(client).resolve_relationship(None)
 
         assert result is None
         assert route.call_count == 0
+
+    @respx.mock
+    async def test_a_missing_login_does_not_blame_the_credential(self) -> None:
+        """This resolves task assignees too, so it must not read as an auth failure."""
+        base_url = tenant("su-resolve-neutral")
+        respx.get(f"{base_url}/system-users").mock(
+            return_value=_collection_page(_user("u1", user_name="jsmith"))
+        )
+
+        async with tool_client(base_url) as client:
+            with pytest.raises(ToolError) as raised:
+                await system_users_service(client).resolve_by_user_name("nobody")
+
+        message = str(raised.value)
+        assert "list_system_users" in message
+        assert "authenticated" not in message
+
+
+@respx.mock
+async def test_get_current_caller_system_user_frames_a_miss_as_a_credential_problem() -> None:
+    """Here the login *is* the credential, so nothing the agent passes can fix it."""
+    base_url = tenant("su-caller-miss")
+    respx.get(f"{base_url}/system-users").mock(
+        return_value=_collection_page(_user("u1", user_name="jsmith"))
+    )
+
+    async with tool_client(base_url) as client:
+        with pytest.raises(ToolError, match="authenticated") as raised:
+            await get_current_caller_system_user("nobody", system_users_service(client))
+
+    message = str(raised.value)
+    assert "nobody" in message
+    assert "cannot be authored" in message
 
 
 @respx.mock

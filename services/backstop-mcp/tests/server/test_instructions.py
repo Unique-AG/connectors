@@ -51,7 +51,8 @@ class TestInstructions:
         assert "log_activity" in INSTRUCTIONS
         assert "attach_file" in INSTRUCTIONS
         assert INSTRUCTIONS.index("log_activity") < INSTRUCTIONS.index("attach_file")
-        assert "never put a file blob" in INSTRUCTIONS
+        assert "a file blob never goes on it either" in INSTRUCTIONS
+        assert "no email kind on log_activity" in INSTRUCTIONS
         assert "list_activity_tags" in INSTRUCTIONS
         assert "tags are never created" in INSTRUCTIONS
         assert "delete_activity" in INSTRUCTIONS

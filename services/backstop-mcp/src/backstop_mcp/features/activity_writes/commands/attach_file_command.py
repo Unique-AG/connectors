@@ -6,10 +6,7 @@ from fastmcp.exceptions import ToolError
 
 from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.activity_writes.attach_file_input import AttachFileInput
-from backstop_mcp.features.activity_writes.commands._attachment_utils import (
-    backstop_payload_too_large_message,
-)
-from backstop_mcp.features.activity_writes.commands._write_errors import (
+from backstop_mcp.features.activity_writes.commands._write_error_utils import (
     reraise_activity_write_error,
 )
 from backstop_mcp.features.activity_writes.commands.attach_document_command import (
@@ -63,5 +60,11 @@ class AttachFileCommand:
                     assert_never(activity.kind)
         except BackstopApiError as exc:
             if exc.status_code == 413:
-                raise ToolError(backstop_payload_too_large_message()) from exc
+                # Distinct from the local cap's message: this file was small enough for us
+                # and the request went out, so the remedy is different.
+                raise ToolError(
+                    "Backstop rejected the upload as too large (HTTP 413). The file was "
+                    + "under our cap and the request was sent; reduce the payload or split "
+                    + "the file."
+                ) from exc
             reraise_activity_write_error(exc)

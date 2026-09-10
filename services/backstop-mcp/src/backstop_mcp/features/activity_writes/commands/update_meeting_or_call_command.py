@@ -1,12 +1,22 @@
-"""PATCH a meeting or call via `/meeting-or-calls/{id}`."""
+"""PATCH a meeting or call via `/meeting-or-calls/{id}`.
+
+`type` is only sent when the caller asked to change it (`kind=call` with an explicit
+`direction`). `kind` picks the collection, and meetings and calls share it, so a handle
+does not say which one it is: writing `type` unconditionally would silently convert a
+`PHONE_IN` call the agent guessed `kind=meeting` for into a face-to-face meeting — the
+exact field `get_activity_history` splits calls from meetings on. A PATCH that omits
+`type` leaves it untouched (verified live).
+"""
 
 import logging
 from typing import Literal, assert_never
 
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import MeetingOrCallAttributes
-from backstop_mcp.features.activity_writes.commands._utils import (
-    activity_target,
+from backstop_mcp.features.activity_writes.commands._activity_resource_location import (
+    ActivityResourceLocation,
+)
+from backstop_mcp.features.activity_writes.commands._json_api_utils import (
     isoformat,
     json_api_update,
     omit_none_values,
@@ -35,13 +45,13 @@ class UpdateMeetingOrCallCommand:
         self._time_zones_service: TimeZonesService = time_zones_service
 
     async def run(self, *, activity: _MeetingOrCallUpdate) -> UpdatedActivityResponse:
-        path, resource_id, collection = activity_target(
+        location = ActivityResourceLocation.from_activity_id(
             kind=activity.kind, activity_id=activity.activity_id
         )
         time_zone = await self._time_zones_service.resolve_short_name(activity.time_zone)
         payload = json_api_update(
-            resource_type=collection,
-            resource_id=resource_id,
+            resource_type=location.collection,
+            resource_id=location.resource_id,
             attributes=omit_none_values(
                 {
                     "title": activity.title,
@@ -55,7 +65,7 @@ class UpdateMeetingOrCallCommand:
             ),
             relationships=self._relationships(activity),
         )
-        document = await self._client.patch(path, schema=_Document, json=payload)
+        document = await self._client.patch(location.path, schema=_Document, json=payload)
         logger.info(
             "activity_writes.meeting_or_call.updated",
             extra={"id": document.data.id, "kind": activity.kind},
@@ -63,9 +73,10 @@ class UpdateMeetingOrCallCommand:
         return UpdatedActivityResponse(id=document.data.id, resource_type="meeting-or-calls")
 
     def _meeting_type(self, activity: _MeetingOrCallUpdate) -> _MeetingType | None:
+        """The replacement `type`, or `None` to leave the record's own type alone."""
         match activity.kind:
             case "meeting":
-                return "FACE_TO_FACE"
+                return None
             case "call":
                 return activity.direction
             case _:

@@ -3,6 +3,10 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
+from mcp.server.transport_security import (
+    DEFAULT_MAX_REQUEST_BODY_SIZE,
+    RequestBodyLimitMiddleware,
+)
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -23,10 +27,6 @@ from backstop_mcp.features.auth import cleanup_lifespan
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.instructions import INSTRUCTIONS
-from backstop_mcp.server.request_body_limit import (
-    REQUEST_BODY_MAX_BYTES,
-    RequestBodyLimitMiddleware,
-)
 from backstop_mcp.server.session_revoked import SessionRevokedToUnauthorizedMiddleware
 from backstop_mcp.server.tools import TOOLS
 from backstop_mcp.teardown import close_singletons
@@ -88,8 +88,14 @@ def create_app() -> Starlette:
 
     return mcp.http_app(
         middleware=[
-            # Outermost: reject before OTel / auth buffer a large attach_file POST.
-            Middleware(RequestBodyLimitMiddleware, max_body_size=REQUEST_BODY_MAX_BYTES),
+            # Bounds request bodies on *our own* routes — the login form POST reads
+            # `request.form()` with no limit of its own, and it is unauthenticated. The MCP
+            # endpoints do not need it: the SDK applies this same middleware at this same
+            # size inside `StreamableHTTPSessionManager`, and FastMCP exposes no way to
+            # change that, so the inner limit is what caps `attach_file` whatever is set
+            # here. Reusing the SDK's number leaves one cap to reason about instead of two
+            # that can drift apart.
+            Middleware(RequestBodyLimitMiddleware, max_body_size=DEFAULT_MAX_REQUEST_BODY_SIZE),
             Middleware(OpenTelemetryMiddleware),
             ops_middleware,
             # Innermost: Starlette wraps last-listed first, so the rewritten 401 is what

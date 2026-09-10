@@ -1,10 +1,16 @@
-"""POST a CRM task. Tasks have no author, activity tags, or effectiveDate."""
+"""POST a CRM task. Tasks have no author, no activity tags, and no effectiveDate.
+
+`assignedUser` is a JSON:API relationship, not an attribute. `name`, `dueDate` and
+`attachedTo` are all required by Backstop, so the input model requires the two the caller
+supplies. `sendNotification` is always sent explicitly: omitting it makes Backstop default
+it to `true`, which mails the assignee — verified live.
+"""
 
 import logging
 
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import TaskAttributes
-from backstop_mcp.features.activity_writes.commands._utils import (
+from backstop_mcp.features.activity_writes.commands._json_api_utils import (
     isoformat,
     json_api_create,
     omit_none_values,
@@ -17,7 +23,6 @@ from backstop_mcp.features.system_users import SystemUsersService
 
 logger = logging.getLogger(__name__)
 
-_PATH = "/tasks"
 _TaskDocument = BackstopApiSingleResourceDocument[TaskAttributes]
 
 
@@ -52,13 +57,15 @@ class LogTaskCommand:
                         party_id=party_id, search_type=activity.search_type
                     ),
                     "secondaryRegarding": secondary,
-                    "assignedUser": await self._system_users_service.resolve_resource_link(
-                        activity.assigned_user
-                    ),
                 }
             ),
+            relationships={
+                "assignedUser": await self._system_users_service.resolve_relationship(
+                    activity.assigned_user
+                )
+            },
         )
-        document = await self._client.post(_PATH, schema=_TaskDocument, json=payload)
+        document = await self._client.post("/tasks", schema=_TaskDocument, json=payload)
         logger.info(
             "activity_writes.task.created",
             extra={

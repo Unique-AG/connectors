@@ -4,8 +4,10 @@ import logging
 
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import NoteAttributes
-from backstop_mcp.features.activity_writes.commands._utils import (
-    activity_target,
+from backstop_mcp.features.activity_writes.commands._activity_resource_location import (
+    ActivityResourceLocation,
+)
+from backstop_mcp.features.activity_writes.commands._json_api_utils import (
     isoformat,
     json_api_update,
     omit_none_values,
@@ -26,13 +28,13 @@ class UpdateNoteCommand:
         self._client: BackstopClient = client
 
     async def run(self, *, activity: UpdateNoteInput) -> UpdatedActivityResponse:
-        path, resource_id, collection = activity_target(
+        location = ActivityResourceLocation.from_activity_id(
             kind=activity.kind, activity_id=activity.activity_id
         )
         tags = relationship_replace("activity-tags", activity.activity_tag_ids)
         payload = json_api_update(
-            resource_type=collection,
-            resource_id=resource_id,
+            resource_type=location.collection,
+            resource_id=location.resource_id,
             attributes=omit_none_values(
                 {
                     "title": activity.title,
@@ -42,6 +44,6 @@ class UpdateNoteCommand:
             ),
             relationships={"activityTags": tags} if tags is not None else None,
         )
-        document = await self._client.patch(path, schema=_Document, json=payload)
+        document = await self._client.patch(location.path, schema=_Document, json=payload)
         logger.info("activity_writes.note.updated", extra={"id": document.data.id})
         return UpdatedActivityResponse(id=document.data.id, resource_type="notes")

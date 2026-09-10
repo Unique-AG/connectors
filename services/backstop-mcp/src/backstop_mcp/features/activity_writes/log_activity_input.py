@@ -1,8 +1,14 @@
 """Discriminated `log_activity` input: each `kind` declares only its own required fields.
 
-Pydantic rejects a meeting or call without `time_zone` before any HTTP call. Author is not a
-parameter — the authenticated caller is the author. Party targeting matches
-`PartyResolveItemDto` in spirit (exactly one of `party_id` or `search`) without importing that DTO.
+Every field Backstop rejects a create without is required here, so the failure is a schema
+error the model sees rather than a 400 it has to interpret: `time_zone`, `start` and `stop`
+on a meeting or call, `due_date` on a task. Author is not a parameter — the authenticated
+caller is the author. Party targeting matches `PartyResolveItemDto` in spirit (exactly one
+of `party_id` or `search`) without importing that DTO.
+
+There is no `email` variant. `POST /emails` answers `400 "Field data is required in POST
+request."`, so a metadata-only email record cannot be created through the API; importing a
+real `.msg`/`.eml` is `attach_file(kind="email")`.
 """
 
 from datetime import date, datetime
@@ -17,7 +23,6 @@ from backstop_mcp.features.activity_writes._party_target_input import (
 
 __all__ = [
     "CallActivityInput",
-    "EmailActivityInput",
     "LOG_ACTIVITY_INPUT_DESCRIPTION",
     "LogActivityInput",
     "MeetingActivityInput",
@@ -27,16 +32,22 @@ __all__ = [
 
 LOG_ACTIVITY_INPUT_DESCRIPTION = (
     "Required. The activity to create. Discriminated by `kind`: `note`, `meeting`, "
-    "`call`, `task`, or `email` (metadata stub only). Every kind needs `search_type` "
-    "and exactly one of `party_id` or `search` — `party_id` alone is rejected. Author "
-    "is the authenticated caller, not a field. Activity-tag ids come from "
-    "`list_activity_tags` and are never created. For a file or a real `.msg`/`.eml` "
-    "blob use `attach_file` after this create."
+    "`call`, or `task`. Every kind needs `search_type` and exactly one of `party_id` or "
+    "`search` — `party_id` alone is rejected. Author is the authenticated caller, not a "
+    "field. Activity-tag ids come from `list_activity_tags` and are never created. For a "
+    "file, or for an email of any kind, use `attach_file` — email records require the "
+    "message blob and cannot be logged here."
 )
 
 
 class _MeetingOrCallFields(BaseModel):
-    """Shared meeting/call fields. `time_zone` is required — that is the discriminator's point."""
+    """Shared meeting/call fields.
+
+    `time_zone`, `start` and `stop` are required because Backstop requires them
+    (`400 "Field startTimestamp is required"`, and the same for `stopTimestamp` and
+    `timeZone`) even though its swagger's required list omits them. Requiring them here is
+    the discriminator's point: the model rejects an unloggable meeting before any HTTP call.
+    """
 
     title: str = Field(description="Required. Title written on the meeting or call.")
     time_zone: str = Field(
@@ -46,16 +57,11 @@ class _MeetingOrCallFields(BaseModel):
             "before calling."
         )
     )
-    start: datetime | None = Field(
-        default=None,
-        description=(
-            "Start timestamp (ISO-8601). Omit when Backstop should default. "
-            "Required in practice for a useful meeting or call."
-        ),
+    start: datetime = Field(
+        description="Required. Start timestamp (ISO-8601). Backstop rejects a create without it."
     )
-    stop: datetime | None = Field(
-        default=None,
-        description="Stop timestamp (ISO-8601). Omit when Backstop should default.",
+    stop: datetime = Field(
+        description="Required. Stop timestamp (ISO-8601). Backstop rejects a create without it."
     )
     location: str | None = Field(
         default=None,
@@ -141,52 +147,23 @@ class TaskActivityInput(PartyTargetInput, SecondaryPartyInput):
     description: str | None = Field(
         default=None, description="Task body, mapped to wire `details`. Omit when there is none."
     )
-    due_date: date | datetime | None = Field(
-        default=None, description="Due day or timestamp. Omit when the task has no due date."
+    due_date: date | datetime = Field(
+        description=(
+            "Required. Due day or timestamp. Backstop rejects a task create without it "
+            '(`400 "Field dueDate is required"`).'
+        )
     )
     send_notification: bool = Field(
         default=False,
         description=(
-            "Whether Backstop should notify the assignee. Defaults to false and is echoed "
-            "on the response."
-        ),
-    )
-
-
-class EmailActivityInput(PartyTargetInput):
-    """An email metadata stub. The body/blob is `attach_file`, not this tool."""
-
-    kind: Literal["email"] = Field(
-        description=(
-            "Log email metadata (displaySubject, format, tags). Subject/from/to parse from "
-            "a blob via `attach_file`, not here."
-        )
-    )
-    display_subject: str | None = Field(
-        default=None,
-        description="Display subject written on the email. Omit when Backstop should default.",
-    )
-    email_format: str | None = Field(
-        default=None,
-        description=(
-            "Optional. Backstop `emailFormat` when known (`eml` or `msg`). The message "
-            "blob is `attach_file`, not this field."
-        ),
-    )
-    activity_tag_ids: tuple[str, ...] = Field(
-        default=(),
-        description=(
-            "Activity-tag ids from `list_activity_tags`. Empty when none apply. "
-            "Tags are never created automatically."
+            "Whether Backstop should email the assignee. Defaults to false and is echoed "
+            "on the response. Always sent explicitly: Backstop defaults an omitted flag to "
+            "true, so the quiet default has to be written."
         ),
     )
 
 
 type LogActivityInput = Annotated[
-    NoteActivityInput
-    | MeetingActivityInput
-    | CallActivityInput
-    | TaskActivityInput
-    | EmailActivityInput,
+    NoteActivityInput | MeetingActivityInput | CallActivityInput | TaskActivityInput,
     Field(discriminator="kind", description=LOG_ACTIVITY_INPUT_DESCRIPTION),
 ]

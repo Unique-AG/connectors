@@ -1,4 +1,9 @@
-"""Decode the tool's standard-base64 file and encode Backstop's gzip+URL-safe `data`."""
+"""Decode the tool's standard-base64 file and encode Backstop's gzip+URL-safe `data`.
+
+The size cap itself lives in `attach_file_max_bytes.py` at the feature root, with the
+reasoning behind the number. Rejecting here rather than letting the transport 413 means the
+agent gets an actionable message instead of a bare HTTP error.
+"""
 
 import base64
 import binascii
@@ -6,17 +11,15 @@ import gzip
 
 from fastmcp.exceptions import ToolError
 
-ATTACH_FILE_MAX_BYTES = 20 * 1024 * 1024
-
-_OUR_CAP_REMEDY = "Shrink the file and retry. No request was sent to Backstop."
-_BACKSTOP_413_MESSAGE = (
-    "Backstop rejected the upload as too large (HTTP 413). The file was under our 20 MB "
-    "cap and the request was sent; reduce the payload or split the file."
-)
+from backstop_mcp.features.activity_writes.attach_file_max_bytes import ATTACH_FILE_MAX_BYTES
 
 
 def encode_file_data(content: str, *, max_bytes: int | None = None) -> str:
     """Return Backstop `data` (gzip then URL-safe base64, no padding) after the size cap.
+
+    Backstop is explicit about the encoding: plain base64 answers
+    `400 "You should Zip and encode dto data with Base64 schema"`. Verified live that this
+    form round-trips byte-for-byte when the document is read back from `documentUri`.
 
     Raises `ToolError` for invalid base64, an empty file, or a decoded size over the cap.
     That rejection happens before any HTTP call.
@@ -28,13 +31,10 @@ def encode_file_data(content: str, *, max_bytes: int | None = None) -> str:
     if len(raw) > limit:
         raise ToolError(
             f"File is {len(raw)} bytes; attach_file rejects files over {limit} bytes "
-            + f"before calling Backstop. {_OUR_CAP_REMEDY}"
+            + "before calling Backstop. Shrink or split the file and retry. No request "
+            + "was sent to Backstop."
         )
     return base64.urlsafe_b64encode(gzip.compress(raw)).decode("ascii").rstrip("=")
-
-
-def backstop_payload_too_large_message() -> str:
-    return _BACKSTOP_413_MESSAGE
 
 
 def _decode_standard_base64(content: str) -> bytes:

@@ -72,9 +72,12 @@
    per-feature and keeps its filename.
 
 6. **A logic module is named after the symbol it defines.** The filename stem, or the PascalCase
-   of it, must be a top-level function, class, or assignment in that file —
-   `raise_if_invalid_series.py` holds `raise_if_invalid_series`, `custom_fields_service.py`
-   holds `CustomFieldsService`. That is how the
+   of it, or the SCREAMING_SNAKE of it for a module whose subject is a constant, must be a
+   top-level function, class, or assignment in that file — `raise_if_invalid_series.py`
+   holds `raise_if_invalid_series`, `custom_fields_service.py` holds `CustomFieldsService`,
+   `attach_file_max_bytes.py` holds `ATTACH_FILE_MAX_BYTES`. All three are the same rule in
+   the casing Python uses for that kind of symbol; a module named after a *mechanism* still
+   fails, because no symbol carries that name. That is how the
    tree stays readable. Modules used to be named after a mechanism (`fetch.py`, `service.py`,
    `project.py`), so you had to open a file or grep for `def` to find anything. Vocabulary
    modules (`api_responses*`, `internal_dto*`, `responses*`, `entity_types.py`,
@@ -524,10 +527,14 @@ def _logic_module_name_violations(source: str, path: pathlib.Path) -> list[str]:
         return []
     stem = path.stem
     pascal = _pascal_case_stem(stem)
+    # A module whose subject is a constant spells it SCREAMING_SNAKE. Same convention, same
+    # readability; only the casing differs, and a mechanism-named file still matches nothing.
+    screaming = stem.upper()
     defined = _top_level_defined_names(ast.parse(source, filename=str(path)))
-    if stem in defined or pascal in defined:
+    candidates = {stem, pascal, screaming}
+    if candidates & defined:
         return []
-    matching = repr(stem) if pascal == stem else f"{stem!r} or {pascal!r}"
+    matching = " or ".join(repr(name) for name in sorted(candidates))
     return [f"{path.relative_to(_SRC)} defines no symbol matching {matching}"]
 
 
@@ -809,7 +816,14 @@ class TestTheDetectionItself:
         assert _logic_module_name_violations(
             "def something(): ...\n",
             _FEATURES / "accounts" / "fetch.py",
-        ) == ["features/accounts/fetch.py defines no symbol matching 'fetch' or 'Fetch'"]
+        ) == ["features/accounts/fetch.py defines no symbol matching 'FETCH' or 'Fetch' or 'fetch'"]
+
+    def test_accepts_a_logic_module_named_after_its_constant(self) -> None:
+        """A constants module spells its subject SCREAMING_SNAKE; same rule, Python's casing."""
+        assert not _logic_module_name_violations(
+            "ATTACH_FILE_MAX_BYTES = 1\n",
+            _FEATURES / "activity_writes" / "attach_file_max_bytes.py",
+        )
 
     def test_accepts_a_logic_module_named_after_its_function(self) -> None:
         assert not _logic_module_name_violations(

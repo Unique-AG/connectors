@@ -2,6 +2,9 @@
 
 `content` is standard base64 of the raw file. The command gzip+base64-encodes it for
 Backstop's `data` field. Author is the authenticated caller, not a parameter.
+
+This is the only path that creates an email record — `POST /emails` requires the message
+blob, so `log_activity` has no email kind.
 """
 
 from datetime import date
@@ -12,6 +15,9 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 from backstop_mcp.features.activity_writes._party_target_input import (
     PartyTargetInput,
     SecondaryPartyInput,
+)
+from backstop_mcp.features.activity_writes.attach_file_max_bytes import (
+    attach_file_max_bytes_message,
 )
 
 __all__ = [
@@ -25,7 +31,8 @@ ATTACH_FILE_INPUT_DESCRIPTION = (
     "Required. The file to attach. Discriminated by `kind`: `document` or `email` "
     "(real `.msg`/`.eml` import). Needs `search_type`, `file_name`, `content`, and "
     "exactly one of `party_id` or `search` — `party_id` alone is rejected. Do not "
-    "generate `content` yourself; always use a file-encoding tool when one is available."
+    "generate `content` yourself; always use a file-encoding tool when one is available. "
+    "Oversized files are rejected before any Backstop request."
 )
 
 _NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -46,8 +53,11 @@ class _FileBlobInput(BaseModel):
         description=(
             "Standard base64 of the raw file bytes. Do not generate this string yourself — "
             "always use a file-encoding tool when one is available. Do not gzip or "
-            "URL-safe-encode; this tool does that for Backstop. Practical ceiling for an "
-            "LLM-driven call is much smaller than the 20 MB hard cap."
+            "URL-safe-encode; this tool does that for Backstop. Hard cap on the decoded "
+            f"file is {attach_file_max_bytes_message()}, set by the MCP transport's "
+            "request-body limit and enforced before any Backstop call. The practical "
+            "ceiling for a call an LLM composes is far smaller, since the base64 passes "
+            "through its context."
         )
     )
     activity_tag_ids: tuple[str, ...] = Field(

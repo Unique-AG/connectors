@@ -18,4 +18,4 @@ class TimeZoneAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     name: StrippedStr | None = None
-    short_name: StrippedStr | None = Field(default=None, alias="shortName")
+    short_name: StrippedStr | None = Field(default=None, validation_alias="shortName")

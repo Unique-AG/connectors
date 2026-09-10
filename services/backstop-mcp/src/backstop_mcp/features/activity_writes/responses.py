@@ -2,7 +2,8 @@
 
 `LoggedActivityResponse` is a discriminated union on `kind`, matching the input: a note
 does not carry `time_zone` or `send_notification`. `LogActivityResponse` is the later
-`log_activity` return (success or unresolved party).
+`log_activity` return (success or unresolved party). There is no logged-email member —
+`POST /emails` requires the message blob, so email creates are `attach_file` only.
 """
 
 from typing import Annotated, Literal
@@ -20,7 +21,6 @@ __all__ = [
     "LogActivityResponse",
     "LoggedActivityResponse",
     "LoggedCallResponse",
-    "LoggedEmailResponse",
     "LoggedMeetingResponse",
     "LoggedNoteResponse",
     "LoggedTaskResponse",
@@ -92,22 +92,8 @@ class LoggedTaskResponse(_LoggedActivityBase):
     )
 
 
-class LoggedEmailResponse(_LoggedActivityBase):
-    """An email metadata stub after a successful create."""
-
-    kind: Literal["email"] = Field(default="email", description="An email metadata stub.")
-    resource_type: Literal["emails"] = Field(
-        default="emails",
-        description="Backstop collection this record lives in.",
-    )
-
-
 type LoggedActivityResponse = Annotated[
-    LoggedNoteResponse
-    | LoggedMeetingResponse
-    | LoggedCallResponse
-    | LoggedTaskResponse
-    | LoggedEmailResponse,
+    LoggedNoteResponse | LoggedMeetingResponse | LoggedCallResponse | LoggedTaskResponse,
     Field(discriminator="kind"),
 ]
 

@@ -3,10 +3,9 @@
 from typing import assert_never
 
 from backstop_mcp.backstop_client import BackstopApiError
-from backstop_mcp.features.activity_writes.commands._write_errors import (
+from backstop_mcp.features.activity_writes.commands._write_error_utils import (
     reraise_activity_write_error,
 )
-from backstop_mcp.features.activity_writes.commands.log_email_command import LogEmailCommand
 from backstop_mcp.features.activity_writes.commands.log_meeting_or_call_command import (
     LogMeetingOrCallCommand,
 )
@@ -30,12 +29,10 @@ class LogActivityCommand:
         log_note_command: LogNoteCommand,
         log_meeting_or_call_command: LogMeetingOrCallCommand,
         log_task_command: LogTaskCommand,
-        log_email_command: LogEmailCommand,
     ) -> None:
         self._log_note_command: LogNoteCommand = log_note_command
         self._log_meeting_or_call_command: LogMeetingOrCallCommand = log_meeting_or_call_command
         self._log_task_command: LogTaskCommand = log_task_command
-        self._log_email_command: LogEmailCommand = log_email_command
 
     async def run(
         self,
@@ -65,13 +62,6 @@ class LogActivityCommand:
                     return await self._log_task_command.run(
                         activity=activity,
                         party_id=party_id,
-                        secondary_party_id=secondary_party_id,
-                    )
-                case "email":
-                    return await self._log_email_command.run(
-                        activity=activity,
-                        party_id=party_id,
-                        author=author,
                         secondary_party_id=secondary_party_id,
                     )
                 case _:

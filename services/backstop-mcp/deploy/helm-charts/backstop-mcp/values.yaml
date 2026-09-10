@@ -132,9 +132,12 @@ internalServices:
       namespace: system
 
 # Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
-# attach_file accepts a 20 MB JSON-RPC body. This chart does not render an Ingress,
-# so the Unique overlay must raise the gateway body limit to match. For nginx Ingress
-# that is `nginx.ingress.kubernetes.io/proxy-body-size: "20m"`.
+# attach_file bodies are capped at 4 MiB by the MCP SDK's own request-body limit, which
+# FastMCP gives no way to raise (see features/activity_writes/attach_file_max_bytes.py). That
+# is below the usual 1-8 MiB gateway defaults, so no ingress annotation is needed today.
+# If FastMCP ever exposes `max_request_body_size`, raising it here also means raising the
+# gateway limit in the Unique overlay — for nginx Ingress that is
+# `nginx.ingress.kubernetes.io/proxy-body-size`.
 routes:
   hostname: ""
   auth:

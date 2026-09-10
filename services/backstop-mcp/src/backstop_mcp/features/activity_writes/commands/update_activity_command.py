@@ -3,7 +3,7 @@
 from typing import assert_never
 
 from backstop_mcp.backstop_client import BackstopApiError
-from backstop_mcp.features.activity_writes.commands._write_errors import (
+from backstop_mcp.features.activity_writes.commands._write_error_utils import (
     reraise_activity_write_error,
 )
 from backstop_mcp.features.activity_writes.commands.update_document_command import (

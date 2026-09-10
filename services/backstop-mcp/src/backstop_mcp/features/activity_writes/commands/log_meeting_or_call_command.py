@@ -4,6 +4,10 @@ Same collection, same fields. `kind=meeting` writes `type=FACE_TO_FACE`; `kind=c
 writes `PHONE_OUT` or `PHONE_IN`. The nested `/{segment}/{id}/meetingOrCalls` route 201s
 but never appears in the parent's `/activities` feed, so every record goes here with an
 explicit `regarding`.
+
+`title`, `type`, `timeZone`, `startTimestamp`, `stopTimestamp`, `regarding` and `author`
+are all required by Backstop even where the swagger's required list omits them; the input
+model requires the caller-supplied ones so the rejection is a schema error, not a 400.
 """
 
 import logging
@@ -15,7 +19,7 @@ from backstop_mcp.backstop_client import (
     BackstopClient,
 )
 from backstop_mcp.features.activity_writes.api_responses import MeetingOrCallAttributes
-from backstop_mcp.features.activity_writes.commands._utils import (
+from backstop_mcp.features.activity_writes.commands._json_api_utils import (
     isoformat,
     json_api_create,
     omit_none_values,
@@ -32,12 +36,11 @@ from backstop_mcp.features.activity_writes.responses import (
     LoggedCallResponse,
     LoggedMeetingResponse,
 )
-from backstop_mcp.features.system_users import system_user_resource_link
+from backstop_mcp.features.system_users import system_user_relationship
 from backstop_mcp.features.time_zones import TimeZonesService
 
 logger = logging.getLogger(__name__)
 
-_PATH = "/meeting-or-calls"
 _Document = BackstopApiSingleResourceDocument[MeetingOrCallAttributes]
 
 type _MeetingType = Literal["FACE_TO_FACE", "PHONE_OUT", "PHONE_IN"]
@@ -103,15 +106,17 @@ class LogMeetingOrCallCommand:
             case _:
                 assert_never(activity.kind)
 
-    def _relationships(self, activity: _MeetingOrCallInput) -> dict[str, object] | None:
+    def _relationships(
+        self, activity: _MeetingOrCallInput, *, author: AuthorDto
+    ) -> dict[str, object]:
         attendees = relationship_data("people", activity.attendee_party_ids)
         tags = relationship_data("activity-tags", activity.activity_tag_ids)
-        relationships: dict[str, object] = {}
+        relationships: dict[str, object] = {"author": system_user_relationship(author.id)}
         if attendees is not None:
             relationships["attendees"] = attendees
         if tags is not None:
             relationships["activityTags"] = tags
-        return relationships or None
+        return relationships
 
     async def _create(
         self,
@@ -143,10 +148,9 @@ class LogMeetingOrCallCommand:
                         party_id=party_id, search_type=activity.search_type
                     ),
                     "linkedResources": [secondary] if secondary is not None else None,
-                    "author": system_user_resource_link(author.id),
                 }
             ),
-            relationships=self._relationships(activity),
+            relationships=self._relationships(activity, author=author),
         )
-        document = await self._client.post(_PATH, schema=_Document, json=payload)
+        document = await self._client.post("/meeting-or-calls", schema=_Document, json=payload)
         return document.data

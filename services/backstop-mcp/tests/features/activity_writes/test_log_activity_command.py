@@ -1,7 +1,13 @@
-"""Per-kind log commands and the central `LogActivityCommand` switch."""
+"""Per-kind log commands and the central `LogActivityCommand` switch.
+
+Wire assertions here are pinned to real Backstop responses recorded in `docs/json/016-035`,
+not to what the code happens to send. The two shapes that matter, both of which Backstop
+rejects if you get them wrong: a parent link's `resourceType` is the plural resource name
+(never Bean casing), and `author` / `assignedUser` are relationships (never attributes).
+"""
 
 from collections.abc import AsyncGenerator
-from datetime import date
+from datetime import date, datetime
 
 import httpx
 import pytest
@@ -17,10 +23,8 @@ from backstop_mcp.features.activity_history import (
 from backstop_mcp.features.activity_writes import (
     AuthorDto,
     CallActivityInput,
-    EmailActivityInput,
     LogActivityCommand,
     LoggedCallResponse,
-    LoggedEmailResponse,
     LoggedMeetingResponse,
     LoggedNoteResponse,
     LoggedTaskResponse,
@@ -28,7 +32,6 @@ from backstop_mcp.features.activity_writes import (
     NoteActivityInput,
     TaskActivityInput,
     get_log_activity_command_factory,
-    get_log_email_command_factory,
     get_log_meeting_or_call_command_factory,
     get_log_note_command_factory,
     get_log_task_command_factory,
@@ -52,7 +55,10 @@ _ORG_ID = "341764767"
 _NOTE_ID = "76280387"
 _MEETING_ID = "88001122"
 _TASK_ID = "99001122"
-_EMAIL_ID = "77001122"
+
+_START = datetime(2026, 9, 10, 10, 0)
+_STOP = datetime(2026, 9, 10, 11, 0)
+_DUE = date(2026, 9, 20)
 
 
 @pytest.fixture
@@ -115,6 +121,66 @@ def _attributes(body: dict[str, object]) -> dict[str, object]:
     return object_dict(_data(body)["attributes"])
 
 
+def _relationships(body: dict[str, object]) -> dict[str, object]:
+    return object_dict(_data(body)["relationships"])
+
+
+def _note(**overrides: object) -> NoteActivityInput:
+    return NoteActivityInput.model_validate(
+        {
+            "kind": "note",
+            "search_type": "people",
+            "party_id": _PARTY_ID,
+            "title": "Follow up",
+        }
+        | overrides
+    )
+
+
+def _meeting(**overrides: object) -> MeetingActivityInput:
+    return MeetingActivityInput.model_validate(
+        {
+            "kind": "meeting",
+            "search_type": "organizations",
+            "party_id": _ORG_ID,
+            "title": "Q1 review",
+            "time_zone": "US/Eastern",
+            "start": _START,
+            "stop": _STOP,
+        }
+        | overrides
+    )
+
+
+def _call(**overrides: object) -> CallActivityInput:
+    return CallActivityInput.model_validate(
+        {
+            "kind": "call",
+            "search_type": "people",
+            "party_id": _PARTY_ID,
+            "title": "Check in",
+            "time_zone": "US/Eastern",
+            "start": _START,
+            "stop": _STOP,
+        }
+        | overrides
+    )
+
+
+def _task(**overrides: object) -> TaskActivityInput:
+    return TaskActivityInput.model_validate(
+        {
+            "kind": "task",
+            "search_type": "people",
+            "party_id": _PARTY_ID,
+            "title": "Send deck",
+            "assigned_user": "jdoe",
+            "due_date": _DUE,
+        }
+        | overrides
+    )
+
+
 def make_command(client: BackstopClient) -> LogActivityCommand:
     return get_log_activity_command_factory(
         log_note_command=get_log_note_command_factory(client),
@@ -124,33 +190,29 @@ def make_command(client: BackstopClient) -> LogActivityCommand:
         log_task_command=get_log_task_command_factory(
             client, system_users_service=system_users_service(client)
         ),
-        log_email_command=get_log_email_command_factory(client),
     )
 
 
 class TestLogActivityCommandDispatch:
     @respx.mock
-    async def test_note_posts_nested_notes_using_the_resolved_party_id(
+    async def test_note_posts_top_level_notes_using_the_resolved_party_id(
         self, client: BackstopClient
     ) -> None:
-        route = respx.post(f"{BASE_URL}/people/{_PARTY_ID}/notes").mock(
+        """Top-level `/notes`, not the nested route: `POST /contacts/{id}/notes` is 403."""
+        nested = respx.post(f"{BASE_URL}/people/{_PARTY_ID}/notes")
+        route = respx.post(f"{BASE_URL}/notes").mock(
             return_value=_created("notes", _NOTE_ID, title="Follow up")
-        )
-        activity = NoteActivityInput(
-            kind="note",
-            search_type="people",
-            party_id="stale-id",
-            title="Follow up",
         )
 
         result = await make_command(client).run(
-            activity=activity, party_id=_PARTY_ID, author=_AUTHOR
+            activity=_note(party_id="stale-id"), party_id=_PARTY_ID, author=_AUTHOR
         )
 
         assert isinstance(result, LoggedNoteResponse)
         assert result.id == _NOTE_ID
         assert result.kind == "note"
         assert result.resource_type == "notes"
+        assert nested.call_count == 0
         assert route.call_count == 1
         body = recorded_json_bodies(route)[0]
         attributes = _attributes(body)
@@ -158,30 +220,51 @@ class TestLogActivityCommandDispatch:
         assert attributes["title"] == "Follow up"
         assert attributes["attachedTo"] == {
             "resourceId": _PARTY_ID,
-            "resourceType": "PersonBean",
+            "resourceType": "people",
             "resourceLink": f"/people/{_PARTY_ID}",
         }
-        assert object_dict(attributes["author"])["resourceId"] == _AUTHOR.id
         assert "linkedResources" not in attributes
+
+    @respx.mock
+    async def test_note_sends_the_author_as_a_relationship_not_an_attribute(
+        self, client: BackstopClient
+    ) -> None:
+        """`author` in `attributes` is a 400: "should not be in the 'attributes'"."""
+        route = respx.post(f"{BASE_URL}/notes").mock(return_value=_created("notes", _NOTE_ID))
+
+        await make_command(client).run(activity=_note(), party_id=_PARTY_ID, author=_AUTHOR)
+
+        body = recorded_json_bodies(route)[0]
+        assert "author" not in _attributes(body)
+        assert _relationships(body)["author"] == {
+            "data": {"type": "system-users", "id": _AUTHOR.id}
+        }
+
+    @respx.mock
+    async def test_note_always_sends_an_effective_date(self, client: BackstopClient) -> None:
+        """Backstop rejects a note create without one, so an omitted backdate means today."""
+        route = respx.post(f"{BASE_URL}/notes").mock(return_value=_created("notes", _NOTE_ID))
+
+        await make_command(client).run(activity=_note(), party_id=_PARTY_ID, author=_AUTHOR)
+
+        assert _attributes(recorded_json_bodies(route)[0])["effectiveDate"] == (
+            date.today().isoformat()
+        )
 
     @respx.mock
     async def test_note_links_a_secondary_party_without_repeating_the_parent(
         self, client: BackstopClient
     ) -> None:
-        route = respx.post(f"{BASE_URL}/organizations/{_ORG_ID}/notes").mock(
-            return_value=_created("notes", _NOTE_ID)
-        )
-        activity = NoteActivityInput(
-            kind="note",
-            search_type="organizations",
-            party_id=_ORG_ID,
-            title="Visit",
-            secondary_party_id=_PARTY_ID,
-            secondary_search_type="people",
-        )
+        route = respx.post(f"{BASE_URL}/notes").mock(return_value=_created("notes", _NOTE_ID))
 
         await make_command(client).run(
-            activity=activity,
+            activity=_note(
+                search_type="organizations",
+                party_id=_ORG_ID,
+                title="Visit",
+                secondary_party_id=_PARTY_ID,
+                secondary_search_type="people",
+            ),
             party_id=_ORG_ID,
             author=_AUTHOR,
             secondary_party_id=_PARTY_ID,
@@ -191,7 +274,7 @@ class TestLogActivityCommandDispatch:
         assert attributes["linkedResources"] == [
             {
                 "resourceId": _PARTY_ID,
-                "resourceType": "PersonBean",
+                "resourceType": "people",
                 "resourceLink": f"/people/{_PARTY_ID}",
             }
         ]
@@ -201,20 +284,17 @@ class TestLogActivityCommandDispatch:
     async def test_note_drops_a_secondary_that_repeats_the_parent(
         self, client: BackstopClient
     ) -> None:
-        route = respx.post(f"{BASE_URL}/organizations/{_ORG_ID}/notes").mock(
-            return_value=_created("notes", _NOTE_ID)
-        )
-        activity = NoteActivityInput(
-            kind="note",
-            search_type="organizations",
-            party_id=_ORG_ID,
-            title="Visit",
-            secondary_party_id=_ORG_ID,
-            secondary_search_type="organizations",
-        )
+        """Backstop silently drops it, so sending it would report a link that isn't there."""
+        route = respx.post(f"{BASE_URL}/notes").mock(return_value=_created("notes", _NOTE_ID))
 
         await make_command(client).run(
-            activity=activity,
+            activity=_note(
+                search_type="organizations",
+                party_id=_ORG_ID,
+                title="Visit",
+                secondary_party_id=_ORG_ID,
+                secondary_search_type="organizations",
+            ),
             party_id=_ORG_ID,
             author=_AUTHOR,
             secondary_party_id=_ORG_ID,
@@ -224,23 +304,36 @@ class TestLogActivityCommandDispatch:
 
     @respx.mock
     async def test_note_backdates_via_effective_date(self, client: BackstopClient) -> None:
-        route = respx.post(f"{BASE_URL}/people/{_PARTY_ID}/notes").mock(
-            return_value=_created("notes", _NOTE_ID, title="Follow up")
-        )
+        route = respx.post(f"{BASE_URL}/notes").mock(return_value=_created("notes", _NOTE_ID))
 
         await make_command(client).run(
-            activity=NoteActivityInput(
-                kind="note",
-                search_type="people",
-                party_id=_PARTY_ID,
-                title="Follow up",
-                effective_date=date(2026, 1, 15),
-            ),
+            activity=_note(effective_date=date(2026, 1, 15)),
             party_id=_PARTY_ID,
             author=_AUTHOR,
         )
 
         assert _attributes(recorded_json_bodies(route)[0])["effectiveDate"] == "2026-01-15"
+
+    @respx.mock
+    async def test_note_for_a_contact_still_uses_the_writable_top_level_route(
+        self, client: BackstopClient
+    ) -> None:
+        """`POST /contacts/{id}/notes` answers `403 "contacts/notes is read only."`."""
+        nested = respx.post(f"{BASE_URL}/contacts/{_ORG_ID}/notes")
+        route = respx.post(f"{BASE_URL}/notes").mock(return_value=_created("notes", _NOTE_ID))
+
+        await make_command(client).run(
+            activity=_note(search_type="contacts", party_id=_ORG_ID),
+            party_id=_ORG_ID,
+            author=_AUTHOR,
+        )
+
+        assert nested.call_count == 0
+        assert _attributes(recorded_json_bodies(route)[0])["attachedTo"] == {
+            "resourceId": _ORG_ID,
+            "resourceType": "contacts",
+            "resourceLink": f"/contacts/{_ORG_ID}",
+        }
 
     @respx.mock
     async def test_meeting_posts_top_level_with_regarding_and_face_to_face(
@@ -251,15 +344,10 @@ class TestLogActivityCommandDispatch:
         route = respx.post(f"{BASE_URL}/meeting-or-calls").mock(
             return_value=_created("meeting-or-calls", _MEETING_ID, title="Q1 review")
         )
-        activity = MeetingActivityInput(
-            kind="meeting",
-            search_type="organizations",
-            party_id=_ORG_ID,
-            title="Q1 review",
-            time_zone="US/Eastern",
-        )
 
-        result = await make_command(client).run(activity=activity, party_id=_ORG_ID, author=_AUTHOR)
+        result = await make_command(client).run(
+            activity=_meeting(), party_id=_ORG_ID, author=_AUTHOR
+        )
 
         assert isinstance(result, LoggedMeetingResponse)
         assert result.meeting_type == "FACE_TO_FACE"
@@ -267,15 +355,34 @@ class TestLogActivityCommandDispatch:
         assert result.resource_type == "meeting-or-calls"
         assert nested.call_count == 0
         assert route.call_count == 1
-        attributes = _attributes(recorded_json_bodies(route)[0])
+        body = recorded_json_bodies(route)[0]
+        attributes = _attributes(body)
         assert attributes["type"] == "FACE_TO_FACE"
         assert attributes["timeZone"] == "US/Eastern"
         assert attributes["regarding"] == {
             "resourceId": _ORG_ID,
-            "resourceType": "OrganizationBean",
+            "resourceType": "organizations",
             "resourceLink": f"/organizations/{_ORG_ID}",
         }
         assert "attachedTo" not in attributes
+        assert "author" not in attributes
+        assert _relationships(body)["author"] == {
+            "data": {"type": "system-users", "id": _AUTHOR.id}
+        }
+
+    @respx.mock
+    async def test_meeting_sends_both_required_timestamps(self, client: BackstopClient) -> None:
+        """Backstop requires both; the input model requires them so this cannot regress."""
+        respx.get(f"{BASE_URL}/time-zones").mock(return_value=_eastern_catalog())
+        route = respx.post(f"{BASE_URL}/meeting-or-calls").mock(
+            return_value=_created("meeting-or-calls", _MEETING_ID)
+        )
+
+        await make_command(client).run(activity=_meeting(), party_id=_ORG_ID, author=_AUTHOR)
+
+        attributes = _attributes(recorded_json_bodies(route)[0])
+        assert attributes["startTimestamp"] == _START.isoformat()
+        assert attributes["stopTimestamp"] == _STOP.isoformat()
 
     @respx.mock
     async def test_meeting_appears_on_the_parent_activity_feed(
@@ -317,15 +424,7 @@ class TestLogActivityCommandDispatch:
         )
 
         created = await make_command(client).run(
-            activity=MeetingActivityInput(
-                kind="meeting",
-                search_type="organizations",
-                party_id=_ORG_ID,
-                title="Q1 review",
-                time_zone="US/Eastern",
-            ),
-            party_id=_ORG_ID,
-            author=_AUTHOR,
+            activity=_meeting(), party_id=_ORG_ID, author=_AUTHOR
         )
         history = await GetActivityHistoryQuery(client=client).run(
             segment="organizations",
@@ -351,12 +450,8 @@ class TestLogActivityCommandDispatch:
         )
 
         await make_command(client).run(
-            activity=MeetingActivityInput(
-                kind="meeting",
-                search_type="people",
-                party_id=_PARTY_ID,
-                title="Q1 review",
-                time_zone="america_new_york",
+            activity=_meeting(
+                search_type="people", party_id=_PARTY_ID, time_zone="america_new_york"
             ),
             party_id=_PARTY_ID,
             author=_AUTHOR,
@@ -373,13 +468,7 @@ class TestLogActivityCommandDispatch:
 
         with pytest.raises(ToolError, match="Hawaii Standard Time") as raised:
             await make_command(client).run(
-                activity=MeetingActivityInput(
-                    kind="meeting",
-                    search_type="people",
-                    party_id=_PARTY_ID,
-                    title="Q1 review",
-                    time_zone="Hawaii Standard Time",
-                ),
+                activity=_meeting(time_zone="Hawaii Standard Time"),
                 party_id=_PARTY_ID,
                 author=_AUTHOR,
             )
@@ -398,20 +487,12 @@ class TestLogActivityCommandDispatch:
         patch = respx.patch(url__regex=rf"{BASE_URL}/meeting-or-calls/.+")
 
         await make_command(client).run(
-            activity=MeetingActivityInput(
-                kind="meeting",
-                search_type="people",
-                party_id=_PARTY_ID,
-                title="Q1 review",
-                time_zone="US/Eastern",
-                attendee_party_ids=("111", "222"),
-            ),
+            activity=_meeting(attendee_party_ids=("111", "222")),
             party_id=_PARTY_ID,
             author=_AUTHOR,
         )
 
-        body = recorded_json_bodies(create)[0]
-        assert object_dict(_data(body)["relationships"])["attendees"] == {
+        assert _relationships(recorded_json_bodies(create)[0])["attendees"] == {
             "data": [{"type": "people", "id": "111"}, {"type": "people", "id": "222"}]
         }
         assert patch.call_count == 0
@@ -420,22 +501,13 @@ class TestLogActivityCommandDispatch:
     async def test_write_sends_json_api_accept_not_application_json(
         self, client: BackstopClient
     ) -> None:
+        """`Accept: application/json` gets an HTML 404 page from Backstop, not a JSON error."""
         respx.get(f"{BASE_URL}/time-zones").mock(return_value=_eastern_catalog())
         route = respx.post(f"{BASE_URL}/meeting-or-calls").mock(
             return_value=_created("meeting-or-calls", _MEETING_ID)
         )
 
-        await make_command(client).run(
-            activity=MeetingActivityInput(
-                kind="meeting",
-                search_type="people",
-                party_id=_PARTY_ID,
-                title="Q1 review",
-                time_zone="US/Eastern",
-            ),
-            party_id=_PARTY_ID,
-            author=_AUTHOR,
-        )
+        await make_command(client).run(activity=_meeting(), party_id=_PARTY_ID, author=_AUTHOR)
 
         headers = route.calls.last.request.headers
         assert headers["accept"] == "application/vnd.api+json"
@@ -447,16 +519,9 @@ class TestLogActivityCommandDispatch:
         route = respx.post(f"{BASE_URL}/meeting-or-calls").mock(
             return_value=_created("meeting-or-calls", _MEETING_ID)
         )
-        activity = CallActivityInput(
-            kind="call",
-            search_type="people",
-            party_id=_PARTY_ID,
-            title="Check in",
-            time_zone="US/Eastern",
-        )
 
         result = await make_command(client).run(
-            activity=activity, party_id=_PARTY_ID, author=_AUTHOR
+            activity=_call(), party_id=_PARTY_ID, author=_AUTHOR
         )
 
         assert isinstance(result, LoggedCallResponse)
@@ -469,17 +534,9 @@ class TestLogActivityCommandDispatch:
         route = respx.post(f"{BASE_URL}/meeting-or-calls").mock(
             return_value=_created("meeting-or-calls", _MEETING_ID)
         )
-        activity = CallActivityInput(
-            kind="call",
-            search_type="people",
-            party_id=_PARTY_ID,
-            title="Check in",
-            time_zone="US/Eastern",
-            direction="PHONE_IN",
-        )
 
         result = await make_command(client).run(
-            activity=activity, party_id=_PARTY_ID, author=_AUTHOR
+            activity=_call(direction="PHONE_IN"), party_id=_PARTY_ID, author=_AUTHOR
         )
 
         assert isinstance(result, LoggedCallResponse)
@@ -494,57 +551,64 @@ class TestLogActivityCommandDispatch:
         route = respx.post(f"{BASE_URL}/tasks").mock(
             return_value=_created("tasks", _TASK_ID, name="Send deck")
         )
-        activity = TaskActivityInput(
-            kind="task",
-            search_type="people",
-            party_id=_PARTY_ID,
-            title="Send deck",
-            assigned_user="jdoe",
-        )
 
         result = await make_command(client).run(
-            activity=activity, party_id=_PARTY_ID, author=_AUTHOR
+            activity=_task(), party_id=_PARTY_ID, author=_AUTHOR
         )
 
         assert isinstance(result, LoggedTaskResponse)
         assert result.send_notification is False
-        attributes = _attributes(recorded_json_bodies(route)[0])
+        body = recorded_json_bodies(route)[0]
+        attributes = _attributes(body)
         assert attributes["name"] == "Send deck"
-        assert attributes["sendNotification"] is False
-        assert object_dict(attributes["assignedUser"])["resourceId"] == "su-assignee"
+        assert attributes["dueDate"] == _DUE.isoformat()
         assert "author" not in attributes
         assert "effectiveDate" not in attributes
-        assert "activityTags" not in attributes
-        assert "relationships" not in _data(recorded_json_bodies(route)[0])
+        assert "activityTags" not in _relationships(body)
 
     @respx.mock
-    async def test_email_posts_metadata_stub(self, client: BackstopClient) -> None:
-        route = respx.post(f"{BASE_URL}/emails").mock(
-            return_value=_created("emails", _EMAIL_ID, displaySubject="Intro")
-        )
-        activity = EmailActivityInput(
-            kind="email",
-            search_type="people",
-            party_id=_PARTY_ID,
-            display_subject="Intro",
-        )
+    async def test_task_sends_the_assignee_as_a_relationship(self, client: BackstopClient) -> None:
+        """`assignedUser` in `attributes` is a 400; the resolved login becomes an id."""
+        respx.get(f"{BASE_URL}/system-users").mock(return_value=_assignee_catalog())
+        route = respx.post(f"{BASE_URL}/tasks").mock(return_value=_created("tasks", _TASK_ID))
 
-        result = await make_command(client).run(
-            activity=activity, party_id=_PARTY_ID, author=_AUTHOR
-        )
+        await make_command(client).run(activity=_task(), party_id=_PARTY_ID, author=_AUTHOR)
 
-        assert isinstance(result, LoggedEmailResponse)
-        assert result.title == "Intro"
-        attributes = _attributes(recorded_json_bodies(route)[0])
-        assert attributes["displaySubject"] == "Intro"
-        assert attributes["resources"] == [
-            {
-                "resourceId": _PARTY_ID,
-                "resourceType": "PersonBean",
-                "resourceLink": f"/people/{_PARTY_ID}",
-            }
-        ]
-        assert object_dict(attributes["createdBy"])["resourceId"] == _AUTHOR.id
+        body = recorded_json_bodies(route)[0]
+        assert "assignedUser" not in _attributes(body)
+        assert _relationships(body)["assignedUser"] == {
+            "data": {"type": "system-users", "id": "su-assignee"}
+        }
+
+    @respx.mock
+    async def test_task_always_writes_send_notification_because_backstop_defaults_it_true(
+        self, client: BackstopClient
+    ) -> None:
+        """An omitted flag makes Backstop mail the assignee, so the quiet default is explicit."""
+        respx.get(f"{BASE_URL}/system-users").mock(return_value=_assignee_catalog())
+        route = respx.post(f"{BASE_URL}/tasks").mock(return_value=_created("tasks", _TASK_ID))
+
+        await make_command(client).run(activity=_task(), party_id=_PARTY_ID, author=_AUTHOR)
+
+        assert _attributes(recorded_json_bodies(route)[0])["sendNotification"] is False
+
+    @respx.mock
+    async def test_an_unknown_assignee_login_does_not_blame_the_credential(
+        self, client: BackstopClient
+    ) -> None:
+        """The assignee is caller-supplied, so the message must not read as an auth failure."""
+        respx.get(f"{BASE_URL}/system-users").mock(return_value=_assignee_catalog())
+        route = respx.post(f"{BASE_URL}/tasks")
+
+        with pytest.raises(ToolError, match="nobody") as raised:
+            await make_command(client).run(
+                activity=_task(assigned_user="nobody"), party_id=_PARTY_ID, author=_AUTHOR
+            )
+
+        message = str(raised.value)
+        assert "list_system_users" in message
+        assert "authenticated" not in message
+        assert route.call_count == 0
 
 
 class TestActivityWriteErrorMapping:
@@ -554,7 +618,7 @@ class TestActivityWriteErrorMapping:
     ) -> None:
         title = "Resource activity-tags not found by id 99999999"
         create_tag = respx.post(f"{BASE_URL}/activity-tags")
-        respx.post(f"{BASE_URL}/people/{_PARTY_ID}/notes").mock(
+        respx.post(f"{BASE_URL}/notes").mock(
             return_value=httpx.Response(
                 404,
                 json={"errors": [{"code": "ResourceNotFoundException", "title": title}]},
@@ -563,13 +627,7 @@ class TestActivityWriteErrorMapping:
 
         with pytest.raises(ToolError, match="list_activity_tags") as raised:
             await make_command(client).run(
-                activity=NoteActivityInput(
-                    kind="note",
-                    search_type="people",
-                    party_id=_PARTY_ID,
-                    title="Follow up",
-                    activity_tag_ids=("99999999",),
-                ),
+                activity=_note(activity_tag_ids=("99999999",)),
                 party_id=_PARTY_ID,
                 author=_AUTHOR,
             )
@@ -591,17 +649,7 @@ class TestActivityWriteErrorMapping:
         respx.get(f"{BASE_URL}/time-zones").mock(return_value=_eastern_catalog())
 
         with pytest.raises(BackstopApiError, match=title) as raised:
-            await make_command(client).run(
-                activity=MeetingActivityInput(
-                    kind="meeting",
-                    search_type="people",
-                    party_id=_PARTY_ID,
-                    title="Q1 review",
-                    time_zone="US/Eastern",
-                ),
-                party_id=_PARTY_ID,
-                author=_AUTHOR,
-            )
+            await make_command(client).run(activity=_meeting(), party_id=_PARTY_ID, author=_AUTHOR)
 
         assert raised.value.status_code == 400
         assert raised.value.detail == title

@@ -1,4 +1,4 @@
-"""`log_activity`: resolve the party, then create a note, meeting, call, task, or email stub."""
+"""`log_activity`: resolve the party, then create a note, meeting, call, or task."""
 
 import logging
 from typing import Annotated
@@ -45,13 +45,17 @@ async def log_activity(
     log_activity_command: LogActivityCommand = Depends(get_log_activity_command_factory),
     caller: SystemUserDto = Depends(get_current_caller_system_user),
 ) -> LogActivityResponse:
-    """Log a CRM note, meeting, call, task, or email metadata stub.
+    """Log a CRM note, meeting, call, or task.
 
     Required on `activity`: `kind`, `search_type`, and exactly one of `party_id` or `search`.
-    A `party_id` without `search_type` is rejected. Author is the authenticated caller, not
-    a parameter. Activity-tag ids must come from `list_activity_tags`; tags are never
-    created automatically. For the message body of an email or a file on a note, use
-    `attach_file` after this create — `kind=email` writes metadata only.
+    A `party_id` without `search_type` is rejected. A meeting or call also needs
+    `time_zone`, `start` and `stop`; a task needs `assigned_user` and `due_date`. Author is
+    the authenticated caller, not a parameter. Activity-tag ids must come from
+    `list_activity_tags`; tags are never created automatically.
+
+    There is no email kind here. Backstop will not create an email record without the
+    message file, so use `attach_file(kind="email")` with the `.msg`/`.eml` blob. Any other
+    file is `attach_file(kind="document")`.
 
     Call like: {"activity": {"kind": "note", "search_type": "organizations",
     "party_id": "<id from prior resolve echo>", "title": "Follow up"}}
@@ -65,7 +69,9 @@ async def log_activity(
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value
-    secondary_party_id = getattr(activity, "secondary_party_id", None)
+    # Every `log_activity` variant carries the secondary-party pair, so this reads straight
+    # off the union rather than through a `getattr` the type checker cannot see.
+    secondary_party_id = activity.secondary_party_id
     logger.info(
         "activity_writes.log.start",
         extra={

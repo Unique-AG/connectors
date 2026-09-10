@@ -13,7 +13,6 @@ from backstop_mcp.features.activity_writes import (
     LoggedNoteResponse,
     NoteActivityInput,
     get_log_activity_command_factory,
-    get_log_email_command_factory,
     get_log_meeting_or_call_command_factory,
     get_log_note_command_factory,
     get_log_task_command_factory,
@@ -55,7 +54,6 @@ def make_command(client: BackstopClient) -> LogActivityCommand:
         log_task_command=get_log_task_command_factory(
             client, system_users_service=system_users_service(client)
         ),
-        log_email_command=get_log_email_command_factory(client),
     )
 
 
@@ -75,7 +73,7 @@ class TestLogActivity:
 
     @respx.mock
     async def test_resolves_the_party_then_posts_the_note(self, client: BackstopClient) -> None:
-        route = respx.post(f"{BASE_URL}/people/{_PARTY_ID}/notes").mock(
+        route = respx.post(f"{BASE_URL}/notes").mock(
             return_value=_created("notes", _NOTE_ID, title="Follow up")
         )
 
@@ -98,8 +96,10 @@ class TestLogActivity:
         assert result.id == _NOTE_ID
         assert result.kind == "note"
         assert route.call_count == 1
-        attributes = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
-        assert object_dict(attributes["author"])["resourceId"] == _CALLER.id
+        data = object_dict(recorded_json_bodies(route)[0]["data"])
+        attributes = object_dict(data["attributes"])
+        relationships = object_dict(data["relationships"])
+        assert relationships["author"] == {"data": {"type": "system-users", "id": _CALLER.id}}
         assert object_dict(attributes["attachedTo"])["resourceId"] == _PARTY_ID
 
     @respx.mock

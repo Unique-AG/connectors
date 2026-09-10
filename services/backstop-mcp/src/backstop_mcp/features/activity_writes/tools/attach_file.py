@@ -52,9 +52,15 @@ async def attach_file(
     of the raw file), and exactly one of `party_id` or `search`. A `party_id` without
     `search_type` is rejected. Do not generate `content` yourself — always use a
     file-encoding tool for the base64 when one is available.
-    Author is the authenticated caller, not a parameter. Files over 20 MB are rejected
-    before any Backstop request. `kind=email` here imports the message file;
-    `log_activity(kind=email)` writes metadata only.
+    Author is the authenticated caller, not a parameter.
+
+    Use `log_activity` for a note, meeting, call or task — anything with no file. Use this
+    tool for every file, and for every email: Backstop will not create an email record
+    without the message blob, so `log_activity` has no email kind.
+
+    Files are rejected before any Backstop request once they exceed the cap published in
+    the `content` description. The practical ceiling for a call an LLM composes is far
+    smaller, because the base64 has to pass through the model's context first.
 
     Call like: {"activity": {"kind": "document", "search_type": "organizations",
     "party_id": "<id from prior resolve echo>", "file_name": "memo.pdf",

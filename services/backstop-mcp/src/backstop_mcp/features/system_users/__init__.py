@@ -15,7 +15,7 @@ from backstop_mcp.features.system_users.internal_dto import SystemUserDto
 from backstop_mcp.features.system_users.responses import ListSystemUsersResponse
 from backstop_mcp.features.system_users.system_users_service import (
     SystemUsersService,
-    system_user_resource_link,
+    system_user_relationship,
 )
 
 __all__ = [
@@ -25,5 +25,5 @@ __all__ = [
     "SystemUsersService",
     "get_current_caller_system_user",
     "get_system_users_service",
-    "system_user_resource_link",
+    "system_user_relationship",
 ]

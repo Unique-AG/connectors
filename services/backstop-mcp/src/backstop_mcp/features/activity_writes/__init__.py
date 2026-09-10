@@ -3,9 +3,15 @@
 `LogActivityCommand`, `AttachFileCommand`, and `UpdateActivityCommand` switch on `kind`.
 Meeting and call share one command (same Backstop collection). `DeleteActivityCommand` is
 one path map. Commands are cached; author is a per-request argument to create `run`.
+
+`log_activity` covers note, meeting, call and task. Email creates live only on
+`attach_file`: `POST /emails` requires the message blob, so there is no metadata-only
+email record to write. `update_activity` and `delete_activity` still cover all six types,
+including the emails and documents `attach_file` creates.
 """
 
 from backstop_mcp.features.activity_writes.api_responses import (
+    DeletedResourceAttributes,
     DocumentAttributes,
     EmailAttributes,
     MeetingOrCallAttributes,
@@ -19,14 +25,16 @@ from backstop_mcp.features.activity_writes.attach_file_input import (
     DocumentFileInput,
     EmailFileInput,
 )
-from backstop_mcp.features.activity_writes.commands import (
+from backstop_mcp.features.activity_writes.attach_file_max_bytes import (
     ATTACH_FILE_MAX_BYTES,
+    attach_file_max_bytes_message,
+)
+from backstop_mcp.features.activity_writes.commands import (
     AttachDocumentCommand,
     AttachEmailCommand,
     AttachFileCommand,
     DeleteActivityCommand,
     LogActivityCommand,
-    LogEmailCommand,
     LogMeetingOrCallCommand,
     LogNoteCommand,
     LogTaskCommand,
@@ -48,7 +56,6 @@ from backstop_mcp.features.activity_writes.dependencies import (
     get_attach_file_command_factory,
     get_delete_activity_command_factory,
     get_log_activity_command_factory,
-    get_log_email_command_factory,
     get_log_meeting_or_call_command_factory,
     get_log_note_command_factory,
     get_log_task_command_factory,
@@ -59,15 +66,10 @@ from backstop_mcp.features.activity_writes.dependencies import (
     get_update_note_command_factory,
     get_update_task_command_factory,
 )
-from backstop_mcp.features.activity_writes.internal_dto import (
-    AuthorDto,
-    ResolvedTargetDto,
-    ResolvedTimeZoneDto,
-)
+from backstop_mcp.features.activity_writes.internal_dto import AuthorDto
 from backstop_mcp.features.activity_writes.log_activity_input import (
     LOG_ACTIVITY_INPUT_DESCRIPTION,
     CallActivityInput,
-    EmailActivityInput,
     LogActivityInput,
     MeetingActivityInput,
     NoteActivityInput,
@@ -80,7 +82,6 @@ from backstop_mcp.features.activity_writes.responses import (
     LogActivityResponse,
     LoggedActivityResponse,
     LoggedCallResponse,
-    LoggedEmailResponse,
     LoggedMeetingResponse,
     LoggedNoteResponse,
     LoggedTaskResponse,
@@ -113,19 +114,17 @@ __all__ = [
     "DeleteActivityCommand",
     "DeleteActivityInput",
     "DeletedActivityResponse",
+    "DeletedResourceAttributes",
     "DocumentAttributes",
     "DocumentFileInput",
-    "EmailActivityInput",
     "EmailAttributes",
     "EmailFileInput",
     "LOG_ACTIVITY_INPUT_DESCRIPTION",
     "LogActivityCommand",
     "LogActivityInput",
     "LogActivityResponse",
-    "LogEmailCommand",
     "LoggedActivityResponse",
     "LoggedCallResponse",
-    "LoggedEmailResponse",
     "LoggedMeetingResponse",
     "LoggedNoteResponse",
     "LoggedTaskResponse",
@@ -136,8 +135,6 @@ __all__ = [
     "MeetingOrCallAttributes",
     "NoteActivityInput",
     "NoteAttributes",
-    "ResolvedTargetDto",
-    "ResolvedTimeZoneDto",
     "ResourceLinkAttributes",
     "TaskActivityInput",
     "TaskAttributes",
@@ -155,13 +152,13 @@ __all__ = [
     "UpdateTaskCommand",
     "UpdateTaskInput",
     "UpdatedActivityResponse",
+    "attach_file_max_bytes_message",
     "encode_file_data",
     "get_attach_document_command_factory",
     "get_attach_email_command_factory",
     "get_attach_file_command_factory",
     "get_delete_activity_command_factory",
     "get_log_activity_command_factory",
-    "get_log_email_command_factory",
     "get_log_meeting_or_call_command_factory",
     "get_log_note_command_factory",
     "get_log_task_command_factory",

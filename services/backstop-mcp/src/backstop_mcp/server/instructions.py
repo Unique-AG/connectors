@@ -50,11 +50,13 @@ use search_activities for email body. Prefer search_activities with \
 include_description for note text while the primary answers. Do not look for those \
 on get_person / get_organization.
 
-Write-back: log_activity for a note, meeting, call, task, or email metadata stub. \
-attach_file for a document file or a real .msg/.eml import — never put a file blob \
-on log_activity. Activity-tag ids come from list_activity_tags; tags are never \
-created. delete_activity permanently hard-deletes (no recycle bin). \
-update_activity patches a known activity id.
+Write-back: log_activity for a note, meeting, call, or task. attach_file for a \
+document file or a real .msg/.eml email — Backstop will not create an email record \
+without the message file, so there is no email kind on log_activity, and a file blob \
+never goes on it either. A meeting or call needs time_zone, start and stop; a task \
+needs assigned_user and due_date. Activity-tag ids come from list_activity_tags; \
+tags are never created. update_activity patches a known activity id and replaces \
+what it sends. delete_activity permanently hard-deletes (no recycle bin).
 
 Firm-wide pipeline: look up a colleague's login with list_system_users, then \
 search_opportunities. filter[representative.name] takes that login, not a display name. \

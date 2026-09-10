@@ -1,7 +1,4 @@
-from backstop_mcp.features.activity_writes.commands._attachment_utils import (
-    ATTACH_FILE_MAX_BYTES,
-    encode_file_data,
-)
+from backstop_mcp.features.activity_writes.commands._file_data_utils import encode_file_data
 from backstop_mcp.features.activity_writes.commands.attach_document_command import (
     AttachDocumentCommand,
 )
@@ -11,7 +8,6 @@ from backstop_mcp.features.activity_writes.commands.delete_activity_command impo
     DeleteActivityCommand,
 )
 from backstop_mcp.features.activity_writes.commands.log_activity_command import LogActivityCommand
-from backstop_mcp.features.activity_writes.commands.log_email_command import LogEmailCommand
 from backstop_mcp.features.activity_writes.commands.log_meeting_or_call_command import (
     LogMeetingOrCallCommand,
 )
@@ -31,13 +27,11 @@ from backstop_mcp.features.activity_writes.commands.update_note_command import U
 from backstop_mcp.features.activity_writes.commands.update_task_command import UpdateTaskCommand
 
 __all__ = [
-    "ATTACH_FILE_MAX_BYTES",
     "AttachDocumentCommand",
     "AttachEmailCommand",
     "AttachFileCommand",
     "DeleteActivityCommand",
     "LogActivityCommand",
-    "LogEmailCommand",
     "LogMeetingOrCallCommand",
     "LogNoteCommand",
     "LogTaskCommand",

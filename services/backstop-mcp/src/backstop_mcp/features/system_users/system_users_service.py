@@ -1,7 +1,6 @@
 import logging
 from datetime import timedelta
 from typing import Self, overload
-from urllib.parse import quote
 
 from fastmcp.exceptions import ToolError
 
@@ -12,15 +11,17 @@ from backstop_mcp.features.system_users.internal_dto import SystemUserDto
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_USER_BEAN = "SystemUserBean"
+_SYSTEM_USER_TYPE = "system-users"
 
 
-def system_user_resource_link(user_id: str) -> dict[str, object]:
-    return {
-        "resourceId": user_id,
-        "resourceType": _SYSTEM_USER_BEAN,
-        "resourceLink": f"/system-users/{quote(user_id, safe='')}",
-    }
+def system_user_relationship(user_id: str) -> dict[str, object]:
+    """A JSON:API relationship pointing at a system user.
+
+    Backstop takes identity pointers (`author`, `createdBy`, `assignedUser`) only as
+    relationships — in `attributes` it answers `400 "author should not be in the
+    'attributes' but 'relationship."`. Verified live; see `docs/json/035`.
+    """
+    return {"data": {"type": _SYSTEM_USER_TYPE, "id": user_id}}
 
 
 async def _fetch_system_users(client: BackstopClient) -> dict[str, SystemUserDto]:
@@ -90,22 +91,29 @@ class SystemUsersService:
         return await self._cache.get(lambda: _fetch_system_users(self._client), refresh=refresh)
 
     @overload
-    async def resolve_resource_link(self, username: None) -> None: ...
+    async def resolve_relationship(self, username: None) -> None: ...
 
     @overload
-    async def resolve_resource_link(self, username: str) -> dict[str, object]: ...
+    async def resolve_relationship(self, username: str) -> dict[str, object]: ...
 
     @overload
-    async def resolve_resource_link(self, username: str | None) -> dict[str, object] | None: ...
+    async def resolve_relationship(self, username: str | None) -> dict[str, object] | None: ...
 
-    async def resolve_resource_link(self, username: str | None) -> dict[str, object] | None:
-        """`{resourceId, resourceType, resourceLink}` for a login, or `None` if omitted."""
+    async def resolve_relationship(self, username: str | None) -> dict[str, object] | None:
+        """A `{"data": {"type": "system-users", "id"}}` relationship, or `None` if omitted."""
         if username is None:
             return None
         user = await self.resolve_by_user_name(username)
-        return system_user_resource_link(user.id)
+        return system_user_relationship(user.id)
 
     async def resolve_by_user_name(self, username: str) -> SystemUserDto:
+        """The system user with this login.
+
+        The message names the login and nothing else: this resolves both the authenticated
+        caller and a caller-supplied assignee, and blaming the credential for a mistyped
+        assignee sends the reader to the wrong place. `get_current_caller_system_user` adds
+        the authenticated-caller framing where that is what failed.
+        """
         catalog, _freshness = await self.get()
         needle = username.casefold()
         matches = [
@@ -115,11 +123,9 @@ class SystemUsersService:
         ]
         if not matches:
             raise ToolError(
-                f"The authenticated Backstop login {username!r} has no matching system user."
+                f"No Backstop system user has the login {username!r}. Logins come from "
+                + "list_system_users; they are not display names or party ids."
             )
         if len(matches) > 1:
-            raise ToolError(
-                f"The authenticated Backstop login {username!r} matches more than one "
-                + "system user."
-            )
+            raise ToolError(f"The Backstop login {username!r} matches more than one system user.")
         return matches[0]

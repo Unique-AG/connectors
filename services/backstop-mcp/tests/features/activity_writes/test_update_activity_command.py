@@ -168,8 +168,34 @@ class TestUpdateActivityCommand:
 
         assert result.resource_type == "meeting-or-calls"
         attributes = _attributes(recorded_json_bodies(route)[0])
-        assert attributes == {"location": "Boardroom", "type": "FACE_TO_FACE"}
+        assert attributes == {"location": "Boardroom"}
         assert "timeZone" not in attributes
+
+    @respx.mock
+    async def test_a_patch_never_rewrites_the_meeting_type_on_its_own(
+        self, client: BackstopClient
+    ) -> None:
+        """A `meeting-or-calls_*` handle does not say meeting or call.
+
+        If `kind=meeting` wrote `type=FACE_TO_FACE`, fixing a `PHONE_IN` call's title under a
+        guessed `kind` would move it out of the calls bucket `get_activity_history` filters
+        on. Only an explicit `direction` changes `type`; Backstop leaves it alone otherwise.
+        """
+        route = respx.patch(f"{BASE_URL}/meeting-or-calls/{_MEETING_ID}").mock(
+            return_value=_updated("meeting-or-calls", _MEETING_ID)
+        )
+
+        await make_command(client).run(
+            activity=UpdateMeetingInput(
+                kind="meeting", activity_id=_MEETING_ID, title="Corrected title"
+            )
+        )
+        await make_command(client).run(
+            activity=UpdateCallInput(kind="call", activity_id=_MEETING_ID, title="Corrected title")
+        )
+
+        for body in recorded_json_bodies(route):
+            assert "type" not in _attributes(body)
 
     @respx.mock
     async def test_call_patches_direction_and_resolved_time_zone(
@@ -235,8 +261,12 @@ class TestUpdateActivityCommand:
             activity=UpdateTaskInput(kind="task", activity_id=_TASK_ID, assigned_user="jdoe")
         )
 
-        attributes = _attributes(recorded_json_bodies(route)[0])
-        assert object_dict(attributes["assignedUser"])["resourceId"] == "su-assignee"
+        body = recorded_json_bodies(route)[0]
+        attributes = _attributes(body)
+        assert "assignedUser" not in attributes
+        assert object_dict(_data(body)["relationships"])["assignedUser"] == {
+            "data": {"type": "system-users", "id": "su-assignee"}
+        }
         assert "name" not in attributes
 
     @respx.mock

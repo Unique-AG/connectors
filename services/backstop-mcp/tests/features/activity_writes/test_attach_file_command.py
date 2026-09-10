@@ -55,6 +55,10 @@ def _attributes(body: dict[str, object]) -> dict[str, object]:
     return object_dict(_data(body)["attributes"])
 
 
+def _relationships(body: dict[str, object]) -> dict[str, object]:
+    return object_dict(_data(body)["relationships"])
+
+
 def _decode_backstop_data(data: str) -> bytes:
     padded = data + "=" * (-len(data) % 4)
     return gzip.decompress(base64.urlsafe_b64decode(padded))
@@ -131,10 +135,13 @@ class TestAttachFileCommand:
         assert _decode_backstop_data(str(attributes["data"])) == _RAW
         assert attributes["attachedTo"] == {
             "resourceId": _PARTY_ID,
-            "resourceType": "PersonBean",
+            "resourceType": "people",
             "resourceLink": f"/people/{_PARTY_ID}",
         }
-        assert object_dict(attributes["author"])["resourceId"] == _AUTHOR.id
+        assert "author" not in attributes
+        assert _relationships(body)["author"] == {
+            "data": {"type": "system-users", "id": _AUTHOR.id}
+        }
         assert "effectiveDate" in attributes
 
     @respx.mock
@@ -161,7 +168,7 @@ class TestAttachFileCommand:
         assert attributes["linkedResources"] == [
             {
                 "resourceId": _PARTY_ID,
-                "resourceType": "PersonBean",
+                "resourceType": "people",
                 "resourceLink": f"/people/{_PARTY_ID}",
             }
         ]
@@ -177,14 +184,18 @@ class TestAttachFileCommand:
 
         assert result.id == _EMAIL_ID
         assert result.kind == "email"
-        attributes = _attributes(recorded_json_bodies(route)[0])
+        body = recorded_json_bodies(route)[0]
+        attributes = _attributes(body)
         assert attributes["emailFormat"] == "eml"
         assert _decode_backstop_data(str(attributes["data"])) == _RAW
-        assert object_dict(attributes["createdBy"])["resourceId"] == _AUTHOR.id
+        assert "createdBy" not in attributes
+        assert _relationships(body)["createdBy"] == {
+            "data": {"type": "system-users", "id": _AUTHOR.id}
+        }
         assert attributes["resources"] == [
             {
                 "resourceId": _PARTY_ID,
-                "resourceType": "PersonBean",
+                "resourceType": "people",
                 "resourceLink": f"/people/{_PARTY_ID}",
             }
         ]
@@ -194,7 +205,7 @@ class TestAttachFileCommand:
         self, client: BackstopClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            "backstop_mcp.features.activity_writes.commands._attachment_utils.ATTACH_FILE_MAX_BYTES",
+            "backstop_mcp.features.activity_writes.commands._file_data_utils.ATTACH_FILE_MAX_BYTES",
             3,
         )
         route = respx.post(f"{BASE_URL}/documents").mock(

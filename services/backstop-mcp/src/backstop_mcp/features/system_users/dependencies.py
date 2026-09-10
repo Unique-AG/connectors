@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 from fastmcp.dependencies import Depends
+from fastmcp.exceptions import ToolError
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import (
@@ -32,4 +33,16 @@ async def get_current_caller_system_user(
     username: str = Depends(get_current_caller_username),
     system_users: SystemUsersService = Depends(get_system_users_service),
 ) -> SystemUserDto:
-    return await system_users.resolve_by_user_name(username)
+    """The system user behind the in-flight credential, for `author` on a write.
+
+    `resolve_by_user_name` names only the login, because it also resolves a
+    caller-supplied task assignee. Here the login *is* the credential, so the failure is
+    re-framed: nothing the agent can pass will fix it.
+    """
+    try:
+        return await system_users.resolve_by_user_name(username)
+    except ToolError as exc:
+        raise ToolError(
+            f"The authenticated Backstop login {username!r} has no single matching system "
+            + f"user, so activities cannot be authored. {exc}"
+        ) from exc

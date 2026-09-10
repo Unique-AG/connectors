@@ -10,7 +10,6 @@ from backstop_mcp.features.activity_writes.commands import (
     AttachFileCommand,
     DeleteActivityCommand,
     LogActivityCommand,
-    LogEmailCommand,
     LogMeetingOrCallCommand,
     LogNoteCommand,
     LogTaskCommand,
@@ -49,26 +48,17 @@ def get_log_task_command_factory(
 
 
 @lru_cache(maxsize=1)
-def get_log_email_command_factory(
-    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
-) -> LogEmailCommand:
-    return LogEmailCommand(client=client)
-
-
-@lru_cache(maxsize=1)
 def get_log_activity_command_factory(
     log_note_command: LogNoteCommand = Depends(get_log_note_command_factory),
     log_meeting_or_call_command: LogMeetingOrCallCommand = Depends(
         get_log_meeting_or_call_command_factory
     ),
     log_task_command: LogTaskCommand = Depends(get_log_task_command_factory),
-    log_email_command: LogEmailCommand = Depends(get_log_email_command_factory),
 ) -> LogActivityCommand:
     return LogActivityCommand(
         log_note_command=log_note_command,
         log_meeting_or_call_command=log_meeting_or_call_command,
         log_task_command=log_task_command,
-        log_email_command=log_email_command,
     )
 
 
