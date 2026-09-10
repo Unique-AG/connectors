@@ -21,11 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 @tool(
-    # `destructive_hint=True`: a PATCH replaces what is there. A new title overwrites the
-    # old one and `activity_tag_ids: []` clears every tag, with no prior value returned to
-    # put back. Confirmation for these tools is the host's approval prompt, and that prompt
-    # is driven by these annotations — understating the risk here is the one thing that
-    # cannot be fixed later. Idempotent because re-sending the same patch is a no-op.
+    # PATCH overwrites or clears fields with no prior value returned; the host
+    # approval prompt is driven by these hints. Same patch is a no-op.
     annotations=ToolAnnotations(
         read_only_hint=False,
         destructive_hint=True,

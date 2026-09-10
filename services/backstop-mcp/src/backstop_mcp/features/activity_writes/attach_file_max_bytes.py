@@ -1,17 +1,6 @@
-"""The `attach_file` size cap, derived from the MCP transport's request-body limit.
+"""`attach_file` size cap: 3/4 of the MCP transport body limit minus envelope room.
 
-At the feature root rather than in `commands/` because both the input model (which
-publishes the number in `content`'s description) and the encoder (which enforces it) need
-it, and `commands/` already imports the input model.
-
-The number is not ours to choose. An `attach_file` call arrives as one JSON-RPC body, and
-the MCP SDK caps that body at `DEFAULT_MAX_REQUEST_BODY_SIZE` (4 MiB) inside
-`StreamableHTTPSessionManager`; FastMCP's subclass neither accepts nor forwards a
-`max_request_body_size`, so there is no knob and no outer middleware can widen it.
-`content` is standard base64, costing 4 bytes of body per 3 bytes of file, and the rest of
-the JSON-RPC envelope gets a fixed allowance. Raising the real ceiling needs a
-`max_request_body_size` passthrough on FastMCP's `http_app`, not a bigger number here —
-`tests/features/activity_writes/test_attach_file_max_bytes.py` fails if that changes.
+Raising it needs a FastMCP `max_request_body_size` passthrough.
 """
 
 from mcp.server.transport_security import DEFAULT_MAX_REQUEST_BODY_SIZE

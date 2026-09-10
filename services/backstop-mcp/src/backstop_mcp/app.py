@@ -88,13 +88,8 @@ def create_app() -> Starlette:
 
     return mcp.http_app(
         middleware=[
-            # Bounds request bodies on *our own* routes — the login form POST reads
-            # `request.form()` with no limit of its own, and it is unauthenticated. The MCP
-            # endpoints do not need it: the SDK applies this same middleware at this same
-            # size inside `StreamableHTTPSessionManager`, and FastMCP exposes no way to
-            # change that, so the inner limit is what caps `attach_file` whatever is set
-            # here. Reusing the SDK's number leaves one cap to reason about instead of two
-            # that can drift apart.
+            # Same cap as StreamableHTTPSessionManager; FastMCP has no knob, so matching
+            # avoids two limits that can drift. Also bounds the unauthenticated login POST.
             Middleware(RequestBodyLimitMiddleware, max_body_size=DEFAULT_MAX_REQUEST_BODY_SIZE),
             Middleware(OpenTelemetryMiddleware),
             ops_middleware,
