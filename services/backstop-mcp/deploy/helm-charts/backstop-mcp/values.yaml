@@ -132,6 +132,9 @@ internalServices:
       namespace: system
 
 # Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
+# attach_file accepts a 20 MB JSON-RPC body. This chart does not render an Ingress,
+# so the Unique overlay must raise the gateway body limit to match. For nginx Ingress
+# that is `nginx.ingress.kubernetes.io/proxy-body-size: "20m"`.
 routes:
   hostname: ""
   auth:

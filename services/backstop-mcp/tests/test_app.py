@@ -29,6 +29,7 @@ from backstop_mcp.features.auth import NotConnectedError
 from backstop_mcp.features.custom_fields import get_custom_fields_service
 from backstop_mcp.features.data_hygiene import get_employment_index_factory
 from backstop_mcp.features.opportunities import get_opportunity_stages_service_factory
+from backstop_mcp.server.request_body_limit import REQUEST_BODY_MAX_BYTES
 from backstop_mcp.server.tools import TOOLS
 
 _BASE_URL = "https://api.backstopsolutions.com"
@@ -229,6 +230,20 @@ class TestRoutes:
         response = _get(app_client, "/metrics")
 
         assert response.status_code == 200
+
+    def test_an_oversized_post_is_413_before_auth(self, app_client: TestClient) -> None:
+        """Starlette rejects an oversize POST before OAuth or the MCP session run."""
+        response = cast(
+            "_HttpResponse",
+            app_client.post(
+                "/mcp",
+                content=b"x",
+                headers={"content-length": str(REQUEST_BODY_MAX_BYTES + 1)},
+            ),
+        )
+
+        assert response.status_code == 413
+        assert "too large" in response.text.lower()
 
     def test_the_login_form_is_mounted_at_the_providers_path(self, app_client: TestClient) -> None:
         """The route is registered from `auth_provider.login_path`, so the two can't disagree."""
