@@ -52,7 +52,7 @@
    registered. `TOOLS` itself is imported from `server.tools`. Those files still cannot
    import `server.tools.registry` or a private `_`-prefixed sibling such as `_page_input`,
    and cannot reach past a feature package's `__init__`. `registry.py` under `server/tools`
-   may import `features.<feature>.tools.get_*` / `list_*` / `search_*` the same way.
+   may import `features.<feature>.tools.get_*` / `list_*` / `search_*` / `log_*` the same way.
 
    Applies to the packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are
    not among them: they are groupings whose `__init__` is documentation, so `features.resolution`
@@ -236,7 +236,7 @@ def _is_server_tools_directory(directory: pathlib.Path) -> bool:
 
 
 def _is_feature_tool_module_import(module: str) -> bool:
-    """`backstop_mcp.features.<pkg>.tools.get_*` / `list_*` / `search_*`, not `_page_input`."""
+    """A feature tool module (`get_*` / `list_*` / `search_*` / `log_*`), not `_page_input`."""
     prefix = f"{_FEATURES_PREFIX}."
     if not module.startswith(prefix):
         return False
@@ -244,7 +244,7 @@ def _is_feature_tool_module_import(module: str) -> bool:
     return (
         len(parts) >= 3
         and parts[1] == "tools"
-        and parts[2].startswith(("get_", "list_", "search_"))
+        and parts[2].startswith(("get_", "list_", "search_", "log_"))
     )
 
 
@@ -268,7 +268,7 @@ def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, i
     `backstop_client` through those packages' `__init__`.
 
     Tool tests may import the tool module under test (`features.<pkg>.tools.get_*` / `list_*` /
-    `search_*`);
+    `search_*` / `log_*`);
     they still cannot import `server.tools.registry` or `_page_input`, and cannot reach past a
     feature package's `__init__`. `registry.py` under `server/tools` may import those feature
     tool modules.
@@ -681,7 +681,8 @@ class TestTheDetectionItself:
 
     def test_registry_may_import_feature_tool_modules(self) -> None:
         assert not _internal_imports(
-            "from backstop_mcp.features.org_people.tools.get_person import get_person\n",
+            "from backstop_mcp.features.org_people.tools.get_person import get_person\n"
+            + "from backstop_mcp.features.activity_writes.tools.log_activity import log_activity\n",
             _SRC / "server" / "tools",
         )
 

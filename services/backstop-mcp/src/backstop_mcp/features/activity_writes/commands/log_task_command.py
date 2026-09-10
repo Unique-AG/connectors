@@ -25,9 +25,9 @@ _TaskDocument = BackstopApiSingleResourceDocument[TaskAttributes]
 class LogTaskCommand:
     """Create a task via `POST /tasks`."""
 
-    def __init__(self, *, client: BackstopClient, system_users: SystemUsersService) -> None:
+    def __init__(self, *, client: BackstopClient, system_users_service: SystemUsersService) -> None:
         self._client: BackstopClient = client
-        self._system_users: SystemUsersService = system_users
+        self._system_users_service: SystemUsersService = system_users_service
 
     async def run(
         self,
@@ -36,7 +36,7 @@ class LogTaskCommand:
         party_id: str,
         secondary_party_id: str | None = None,
     ) -> LoggedTaskResponse:
-        assignee = await self._system_users.resolve_by_user_name(activity.assigned_user)
+        assignee = await self._system_users_service.resolve_by_user_name(activity.assigned_user)
         secondary = secondary_resource_link(
             party_id=party_id,
             secondary_party_id=secondary_party_id,

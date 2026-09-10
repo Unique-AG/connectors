@@ -26,15 +26,15 @@ _NoteDocument = BackstopApiSingleResourceDocument[NoteAttributes]
 class LogNoteCommand:
     """Create a note via nested `POST /{segment}/{id}/notes`."""
 
-    def __init__(self, *, client: BackstopClient, author: AuthorDto) -> None:
+    def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
-        self._author: AuthorDto = author
 
     async def run(
         self,
         *,
         activity: NoteActivityInput,
         party_id: str,
+        author: AuthorDto,
         secondary_party_id: str | None = None,
     ) -> LoggedNoteResponse:
         path = f"/{activity.search_type}/{quote(party_id, safe='')}/notes"
@@ -55,7 +55,7 @@ class LogNoteCommand:
                         party_id=party_id, search_type=activity.search_type
                     ),
                     "linkedResources": [secondary] if secondary is not None else None,
-                    "author": system_user_resource_link(self._author.id),
+                    "author": system_user_resource_link(author.id),
                 }
             ),
             relationships={"activityTags": tags} if tags is not None else None,

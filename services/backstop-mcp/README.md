@@ -129,5 +129,5 @@ uv run pytest tests/features/auth -k refresh   # a subset
 ```bash
 uv run ruff check .          # lint
 uv run ruff format .         # format
-uv run basedpyright .        # type check
+uv run basedpyright          # type check (do not pass `.` — that typechecks `.venv`)
 ```

@@ -20,6 +20,11 @@ from backstop_mcp.features.activity_writes import (
     MeetingActivityInput,
     NoteActivityInput,
     TaskActivityInput,
+    get_log_activity_command_factory,
+    get_log_email_command_factory,
+    get_log_meeting_or_call_command_factory,
+    get_log_note_command_factory,
+    get_log_task_command_factory,
 )
 from tests.helpers import (
     BASE_URL,
@@ -85,11 +90,15 @@ def _attributes(body: dict[str, object]) -> dict[str, object]:
 
 
 def make_command(client: BackstopClient) -> LogActivityCommand:
-    return LogActivityCommand.from_collaborators(
-        client=client,
-        author=_AUTHOR,
-        time_zones=time_zones_service(client),
-        system_users=system_users_service(client),
+    return get_log_activity_command_factory(
+        log_note_command=get_log_note_command_factory(client),
+        log_meeting_or_call_command=get_log_meeting_or_call_command_factory(
+            client, time_zones_service=time_zones_service(client)
+        ),
+        log_task_command=get_log_task_command_factory(
+            client, system_users_service=system_users_service(client)
+        ),
+        log_email_command=get_log_email_command_factory(client),
     )
 
 
@@ -108,7 +117,9 @@ class TestLogActivityCommandDispatch:
             title="Follow up",
         )
 
-        result = await make_command(client).run(activity=activity, party_id=_PARTY_ID)
+        result = await make_command(client).run(
+            activity=activity, party_id=_PARTY_ID, author=_AUTHOR
+        )
 
         assert isinstance(result, LoggedNoteResponse)
         assert result.id == _NOTE_ID
@@ -146,6 +157,7 @@ class TestLogActivityCommandDispatch:
         await make_command(client).run(
             activity=activity,
             party_id=_ORG_ID,
+            author=_AUTHOR,
             secondary_party_id=_PARTY_ID,
         )
 
@@ -178,6 +190,7 @@ class TestLogActivityCommandDispatch:
         await make_command(client).run(
             activity=activity,
             party_id=_ORG_ID,
+            author=_AUTHOR,
             secondary_party_id=_ORG_ID,
         )
 
@@ -200,7 +213,7 @@ class TestLogActivityCommandDispatch:
             time_zone="US/Eastern",
         )
 
-        result = await make_command(client).run(activity=activity, party_id=_ORG_ID)
+        result = await make_command(client).run(activity=activity, party_id=_ORG_ID, author=_AUTHOR)
 
         assert isinstance(result, LoggedMeetingResponse)
         assert result.meeting_type == "FACE_TO_FACE"
@@ -233,7 +246,9 @@ class TestLogActivityCommandDispatch:
             direction="PHONE_IN",
         )
 
-        result = await make_command(client).run(activity=activity, party_id=_PARTY_ID)
+        result = await make_command(client).run(
+            activity=activity, party_id=_PARTY_ID, author=_AUTHOR
+        )
 
         assert isinstance(result, LoggedCallResponse)
         assert result.meeting_type == "PHONE_IN"
@@ -255,7 +270,9 @@ class TestLogActivityCommandDispatch:
             assigned_user="jdoe",
         )
 
-        result = await make_command(client).run(activity=activity, party_id=_PARTY_ID)
+        result = await make_command(client).run(
+            activity=activity, party_id=_PARTY_ID, author=_AUTHOR
+        )
 
         assert isinstance(result, LoggedTaskResponse)
         assert result.send_notification is False
@@ -280,7 +297,9 @@ class TestLogActivityCommandDispatch:
             display_subject="Intro",
         )
 
-        result = await make_command(client).run(activity=activity, party_id=_PARTY_ID)
+        result = await make_command(client).run(
+            activity=activity, party_id=_PARTY_ID, author=_AUTHOR
+        )
 
         assert isinstance(result, LoggedEmailResponse)
         assert result.title == "Intro"

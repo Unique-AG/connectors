@@ -24,15 +24,15 @@ _EmailDocument = BackstopApiSingleResourceDocument[EmailAttributes]
 class LogEmailCommand:
     """Create email metadata via `POST /emails`."""
 
-    def __init__(self, *, client: BackstopClient, author: AuthorDto) -> None:
+    def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
-        self._author: AuthorDto = author
 
     async def run(
         self,
         *,
         activity: EmailActivityInput,
         party_id: str,
+        author: AuthorDto,
         secondary_party_id: str | None = None,
     ) -> LoggedEmailResponse:
         _ = secondary_party_id
@@ -46,7 +46,7 @@ class LogEmailCommand:
                     "resources": [
                         party_resource_link(party_id=party_id, search_type=activity.search_type)
                     ],
-                    "createdBy": system_user_resource_link(self._author.id),
+                    "createdBy": system_user_resource_link(author.id),
                 }
             ),
             relationships={"activityTags": tags} if tags is not None else None,

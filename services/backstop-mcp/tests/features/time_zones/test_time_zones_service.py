@@ -38,7 +38,7 @@ _CATALOG = (
 
 
 def _filter_params(params: httpx.QueryParams) -> list[str]:
-    return [name for name in params if name.startswith("filter[")]
+    return [name for name in params.keys() if name.startswith("filter[")]
 
 
 class TestResolve:

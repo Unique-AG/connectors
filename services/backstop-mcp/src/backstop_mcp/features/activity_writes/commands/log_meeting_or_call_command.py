@@ -47,27 +47,26 @@ type _MeetingOrCallInput = MeetingActivityInput | CallActivityInput
 class LogMeetingOrCallCommand:
     """Create a meeting or call via top-level `POST /meeting-or-calls`."""
 
-    def __init__(
-        self, *, client: BackstopClient, author: AuthorDto, time_zones: TimeZonesService
-    ) -> None:
+    def __init__(self, *, client: BackstopClient, time_zones_service: TimeZonesService) -> None:
         self._client: BackstopClient = client
-        self._author: AuthorDto = author
-        self._time_zones: TimeZonesService = time_zones
+        self._time_zones_service: TimeZonesService = time_zones_service
 
     async def run(
         self,
         *,
         activity: _MeetingOrCallInput,
         party_id: str,
+        author: AuthorDto,
         secondary_party_id: str | None = None,
     ) -> LoggedMeetingResponse | LoggedCallResponse:
-        zone = await self._time_zones.resolve(activity.time_zone)
+        zone = await self._time_zones_service.resolve(activity.time_zone)
         resource = await self._create(
             activity=activity,
             meeting_type=self._meeting_type(activity),
             party_id=party_id,
             secondary_party_id=secondary_party_id,
             time_zone_short_name=zone.short_name,
+            author=author,
         )
         logger.info(
             "activity_writes.meeting_or_call.created",
@@ -122,6 +121,7 @@ class LogMeetingOrCallCommand:
         party_id: str,
         secondary_party_id: str | None,
         time_zone_short_name: str,
+        author: AuthorDto,
     ) -> BackstopApiResource[MeetingOrCallAttributes]:
         secondary = secondary_resource_link(
             party_id=party_id,
@@ -143,7 +143,7 @@ class LogMeetingOrCallCommand:
                         party_id=party_id, search_type=activity.search_type
                     ),
                     "linkedResources": [secondary] if secondary is not None else None,
-                    "author": system_user_resource_link(self._author.id),
+                    "author": system_user_resource_link(author.id),
                 }
             ),
             relationships=self._relationships(activity),

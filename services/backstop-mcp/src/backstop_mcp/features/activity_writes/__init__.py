@@ -1,7 +1,7 @@
 """Create, update, and delete CRM activities (notes, meetings, calls, tasks, emails).
 
 `LogActivityCommand` switches on `kind`. Meeting and call share `LogMeetingOrCallCommand`
-(same Backstop collection). Tools and `dependencies.py` come later — no cached factory yet.
+(same Backstop collection). The command is cached; author is a per-request argument to `run`.
 """
 
 from backstop_mcp.features.activity_writes.api_responses import (
@@ -18,6 +18,13 @@ from backstop_mcp.features.activity_writes.commands import (
     LogMeetingOrCallCommand,
     LogNoteCommand,
     LogTaskCommand,
+)
+from backstop_mcp.features.activity_writes.dependencies import (
+    get_log_activity_command_factory,
+    get_log_email_command_factory,
+    get_log_meeting_or_call_command_factory,
+    get_log_note_command_factory,
+    get_log_task_command_factory,
 )
 from backstop_mcp.features.activity_writes.internal_dto import (
     AuthorDto,
@@ -76,4 +83,9 @@ __all__ = [
     "TaskActivityInput",
     "TaskAttributes",
     "UpdatedActivityResponse",
+    "get_log_activity_command_factory",
+    "get_log_email_command_factory",
+    "get_log_meeting_or_call_command_factory",
+    "get_log_note_command_factory",
+    "get_log_task_command_factory",
 ]

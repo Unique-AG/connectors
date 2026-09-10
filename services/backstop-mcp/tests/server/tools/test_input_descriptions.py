@@ -33,6 +33,7 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "list_activity_tags",
         "list_custom_field_groups",
         "list_custom_fields",
+        "log_activity",
         "search_activities",
         "search_opportunities",
     }
@@ -48,6 +49,7 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
     "list_activity_tags": ('"search"',),
     "list_custom_field_groups": ("refresh",),
     "list_custom_fields": ("entity_types",),
+    "log_activity": ('"kind"', '"search_type"', '"party_id"', "attach_file"),
     "search_activities": ("meeting_call", "party_id", "search_type"),
     "search_opportunities": ("representative", "get_opportunities"),
 }

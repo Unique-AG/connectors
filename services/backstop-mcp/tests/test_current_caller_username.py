@@ -16,7 +16,7 @@ _TOKEN = "super-secret-token"
 
 class _FakeCallerAuth:
     def __init__(self, cred: BackstopCredentialSecret) -> None:
-        self._credential = cred
+        self._credential: BackstopCredentialSecret = cred
 
     async def current_credential(self) -> BackstopCredentialSecret:
         return self._credential
