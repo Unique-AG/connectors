@@ -1,6 +1,7 @@
 """`log_activity`: party resolve then the matching create command."""
 
 from collections.abc import AsyncGenerator
+from inspect import signature
 
 import httpx
 import pytest
@@ -68,6 +69,9 @@ def _created(resource_type: str, resource_id: str, **attrs: object) -> httpx.Res
 class TestLogActivity:
     def test_is_registered(self) -> None:
         assert log_activity in TOOLS
+
+    def test_author_is_not_a_tool_parameter(self) -> None:
+        assert "author" not in signature(log_activity).parameters
 
     @respx.mock
     async def test_resolves_the_party_then_posts_the_note(self, client: BackstopClient) -> None:
