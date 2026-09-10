@@ -466,7 +466,9 @@ class TestTokenLifecycle:
             _ = await provider.exchange_authorization_code(client, authorization_code)
 
     @respx.mock
-    async def test_a_refresh_rotates_and_detects_reuse(self, db: DatabaseFixture) -> None:
+    async def test_a_refresh_rotates_and_detects_reuse(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Replaying a rotated-away refresh token revokes the whole family."""
         respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
         provider = _make_provider(db)
@@ -481,6 +483,7 @@ class TestTokenLifecycle:
         second = await provider.exchange_refresh_token(client, stale, [])
         assert second.access_token != first.access_token
 
+        monkeypatch.setattr(type(provider), "REFRESH_TOKEN_REUSE_GRACE", timedelta(0))
         replayed = await provider.load_refresh_token(client, first.refresh_token)
         assert replayed is not None
         with pytest.raises(TokenError):
@@ -508,6 +511,7 @@ class TestTokenLifecycle:
         )
         succeeded = [r for r in results if not isinstance(r, BaseException)]
         assert len(succeeded) == 1
+        assert await provider.load_access_token(succeeded[0].access_token) is not None
 
     @respx.mock
     async def test_revoking_an_access_token_invalidates_it(self, db: DatabaseFixture) -> None:
