@@ -131,6 +131,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
 
     ACCESS_TOKEN_TTL: ClassVar[timedelta] = timedelta(minutes=15)
     REFRESH_TOKEN_TTL: ClassVar[timedelta] = timedelta(days=30)
+    REFRESH_TOKEN_REUSE_GRACE: ClassVar[timedelta] = timedelta(seconds=10)
     AUTHORIZATION_CODE_TTL: ClassVar[timedelta] = timedelta(minutes=5)
     PENDING_AUTHORIZATION_TTL: ClassVar[timedelta] = timedelta(minutes=10)
 
@@ -562,9 +563,8 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
                 return _UNKNOWN_TOKEN
 
             if row.revoked_at is not None:
-                # This refresh token was already rotated away once — someone is replaying a
-                # stolen/leaked token. Revoke every token descending from the same grant.
-                await self._revoke_family(session, family_id=row.family_id, now=now)
+                if now - row.revoked_at > self.REFRESH_TOKEN_REUSE_GRACE:
+                    await self._revoke_family(session, family_id=row.family_id, now=now)
                 return _REUSED_TOKEN
 
             if row.refresh_token_expires_at is not None and row.refresh_token_expires_at < now:
@@ -590,9 +590,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
                 .values(revoked_at=now)
             )
             if claim.rowcount == 0:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-                # Lost the race to another concurrent refresh of the same token — treat exactly
-                # like replaying an already-rotated token.
-                await self._revoke_family(session, family_id=row.family_id, now=now)
                 return _REUSED_TOKEN
 
             access_token = secrets.token_urlsafe(32)
