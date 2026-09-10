@@ -297,7 +297,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         except Unreachable as exc:
             # Not recorded as a failed attempt: nothing was learned about the credential, so
             # counting it would let a With Intelligence outage lock users out.
-            logger.warning("auth.login.wi_unreachable", extra={"error": str(exc)})
+            logger.warning("auth.login.wi_unreachable", exc_info=exc)
             return self._form_response(
                 request_id,
                 username=username,

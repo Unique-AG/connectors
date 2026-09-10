@@ -243,7 +243,9 @@ class TestLoginSubmission:
             assert result.scalar_one() == 1
 
     @respx.mock
-    async def test_a_wi_outage_does_not_burn_the_budget(self, db: DatabaseFixture) -> None:
+    async def test_a_wi_outage_does_not_burn_the_budget(
+        self, db: DatabaseFixture, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Nothing was learned about the credential, so counting it would lock users out."""
         respx.post(_SIGN_IN).mock(side_effect=httpx.ConnectError("down"))
         provider = _make_provider(db)
@@ -259,6 +261,11 @@ class TestLoginSubmission:
                 .where(LoginAttempt.username == username)
             )
             assert result.scalar_one() == 0
+        records = [
+            record for record in caplog.records if record.message == "auth.login.wi_unreachable"
+        ]
+        assert len(records) == 1
+        assert records[0].exc_info is not None
 
     @respx.mock
     async def test_a_pending_authorization_is_single_use(self, db: DatabaseFixture) -> None:
