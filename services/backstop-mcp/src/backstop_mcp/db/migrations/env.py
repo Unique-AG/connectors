@@ -3,6 +3,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from dotenv import load_dotenv
+from mcp_credential_auth import AuthBase
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
@@ -26,7 +27,7 @@ if config.config_file_name is not None:
 _db_config = DatabaseConfig()
 config.set_main_option("sqlalchemy.url", _db_config.connection_url)
 
-target_metadata = Base.metadata
+target_metadata = [AuthBase.metadata, Base.metadata]
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
