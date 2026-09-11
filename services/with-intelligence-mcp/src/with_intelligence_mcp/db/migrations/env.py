@@ -12,17 +12,12 @@ from with_intelligence_mcp.db.models import Base
 
 load_dotenv()
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# The connection comes from env vars (DB_URL or DB_HOST/DB_NAME/...), same as the running app —
-# not from the static `sqlalchemy.url` in alembic.ini.
+# From env vars (DB_URL or DB_HOST/DB_NAME/...), same as the app — not alembic.ini's static URL.
 _db_config = DatabaseConfig()
 config.set_main_option("sqlalchemy.url", _db_config.connection_url)
 
@@ -30,10 +25,8 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """Run migrations without a database connection."""
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
+        url=config.get_main_option("sqlalchemy.url"),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -51,7 +44,6 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    """Create an Engine and associate a connection with the context."""
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -66,7 +58,6 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
     asyncio.run(run_async_migrations())
 
 
