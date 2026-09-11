@@ -340,7 +340,7 @@ async def content_tree(
         parsed_llm_filter = None
         if metadata_filter is not None:
             try:
-                parsed_llm_filter = parse_uniqueql(dict(metadata_filter))
+                parsed_llm_filter = parse_uniqueql(metadata_filter)
             except ValueError, ValidationError:
                 return ToolResult(
                     is_error=True,
@@ -369,11 +369,8 @@ async def content_tree(
             tree_svc.invalidate_cache()
 
         resolved_metadata_filter = merge_request_metadata_filter(
-            admin_metadata_filter=(
-                config.metadata_filter
-                if config.metadata_filter is not None
-                else DEFAULT_METADATA_FILTER_STATEMENT
-            ),
+            admin_metadata_filter=config.metadata_filter
+            or DEFAULT_METADATA_FILTER_STATEMENT,
             llm_metadata_filter=parsed_llm_filter,
         )
         assert resolved_metadata_filter is not None

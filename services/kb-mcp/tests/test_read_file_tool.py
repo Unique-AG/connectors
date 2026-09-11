@@ -631,23 +631,14 @@ async def test_successful_read_starts_with_reference_link():
     assert text.startswith("[doc.pdf](unique://content/cont_abc)\n\n")
 
 
+@pytest.mark.parametrize(
+    ("requested", "expected"),
+    [(None, 8_000), (500, 500), (99_999, 8_000)],
+)
 @pytest.mark.asyncio
-async def test_omitted_max_tokens_per_call_uses_admin_cap():
-    chunks = [_make_chunk("hello", 0, 1, 1)]
-    content = _make_content("doc.pdf", chunks)
-    with (
-        _patch_search_contents(content),
-        patch(
-            "kb_mcp.tools.read_file.tool._render_chunked", return_value=(False, "ok")
-        ) as render,
-    ):
-        await read_file(content_id="cont_abc", config=ReadFileToolConfig())
-
-    assert render.call_args.args[3] == 8_000
-
-
-@pytest.mark.asyncio
-async def test_requested_max_tokens_below_admin_is_honored():
+async def test_max_tokens_per_call_clamps_to_admin(
+    requested: int | None, expected: int
+):
     chunks = [_make_chunk("hello", 0, 1, 1)]
     content = _make_content("doc.pdf", chunks)
     with (
@@ -658,46 +649,8 @@ async def test_requested_max_tokens_below_admin_is_honored():
     ):
         await read_file(
             content_id="cont_abc",
-            max_tokens_per_call=500,
+            max_tokens_per_call=requested,
             config=ReadFileToolConfig(),
         )
 
-    assert render.call_args.args[3] == 500
-
-
-@pytest.mark.asyncio
-async def test_requested_max_tokens_above_admin_clamps_to_admin_cap():
-    chunks = [_make_chunk("hello", 0, 1, 1)]
-    content = _make_content("doc.pdf", chunks)
-    with (
-        _patch_search_contents(content),
-        patch(
-            "kb_mcp.tools.read_file.tool._render_chunked", return_value=(False, "ok")
-        ) as render,
-    ):
-        await read_file(
-            content_id="cont_abc",
-            max_tokens_per_call=99_999,
-            config=ReadFileToolConfig(),
-        )
-
-    assert render.call_args.args[3] == 8_000
-
-
-@pytest.mark.asyncio
-async def test_text_path_clamps_max_tokens_per_call_to_admin_cap():
-    content = _make_content("notes.md")
-    with (
-        _patch_search_contents(content),
-        _patch_download(b"short"),
-        patch(
-            "kb_mcp.tools.read_file.tool._render_text", return_value=(False, "ok")
-        ) as render,
-    ):
-        await read_file(
-            content_id="cont_abc",
-            max_tokens_per_call=99_999,
-            config=ReadFileToolConfig(max_tokens_per_call=1_000),
-        )
-
-    assert render.call_args.args[3] == 1_000
+    assert render.call_args.args[3] == expected

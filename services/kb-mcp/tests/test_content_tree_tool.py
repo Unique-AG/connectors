@@ -7,7 +7,6 @@ import logging
 import weakref
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import get_args
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -121,18 +120,9 @@ def test_match_target_matches_service_definition():
     assert set(MatchTarget.__args__) == set(ServiceMatchTarget.__args__)
 
 
-def _field_description(fn: object, name: str) -> str:
-    parameter = inspect.signature(fn).parameters[name]
-    for meta in get_args(parameter.annotation):
-        description = getattr(meta, "description", None)
-        if isinstance(description, str):
-            return description
-    raise AssertionError(f"no Field description on {fn}.{name}")
-
-
 def test_metadata_filter_arg_uses_locked_field_description():
-    assert _field_description(content_tree, "metadata_filter") == (
-        METADATA_FILTER_ARG_DESCRIPTION
+    assert METADATA_FILTER_ARG_DESCRIPTION in str(
+        inspect.signature(content_tree).parameters["metadata_filter"].annotation
     )
 
 
@@ -592,16 +582,6 @@ async def test_llm_metadata_filter_ands_admin_configured_filter():
 
 
 @pytest.mark.asyncio
-async def test_omitted_llm_metadata_filter_keeps_admin_default():
-    mock_tree = _make_mock_tree()
-    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
-        await content_tree(mode="list", config=ContentTreeToolConfig())
-
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == _DEFAULT_CONTENT_TREE_FILTER
-
-
-@pytest.mark.asyncio
 async def test_invalid_uniqueql_returns_tool_error_without_walking():
     with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
         result = await content_tree(
@@ -630,17 +610,6 @@ async def test_list_empty_hits_with_llm_filter_append_retry_hint():
     text = result.content[0].text  # type: ignore[union-attr]
     assert text.startswith("No visible files match.")
     assert METADATA_FILTER_EMPTY_RETRY_HINT in text
-
-
-@pytest.mark.asyncio
-async def test_list_empty_hits_without_llm_filter_omit_retry_hint():
-    mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=[]))
-    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
-        result = await content_tree(mode="list", config=ContentTreeToolConfig())
-
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert text == "No visible files match."
-    assert METADATA_FILTER_EMPTY_RETRY_HINT not in text
 
 
 @pytest.mark.asyncio

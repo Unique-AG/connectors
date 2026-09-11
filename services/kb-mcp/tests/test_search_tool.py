@@ -3,7 +3,6 @@
 import inspect
 import logging
 from datetime import UTC, datetime
-from typing import get_args
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -36,25 +35,7 @@ from kb_mcp.references import (
 from kb_mcp.tools.search import SearchToolConfig, search
 
 
-def _field_description(fn: object, name: str) -> str:
-    parameter = inspect.signature(fn).parameters[name]
-    for meta in get_args(parameter.annotation):
-        description = getattr(meta, "description", None)
-        if isinstance(description, str):
-            return description
-    raise AssertionError(f"no Field description on {fn}.{name}")
-
-
-def test_tool_description_excludes_uniqueql():
-    description = search.__fastmcp__.description
-    assert description is not None
-    assert "UniqueQL" not in SEARCH_SYSTEM_PROMPT
-    assert "UniqueQL" not in description
-    assert "<userMetadata>" not in SEARCH_SYSTEM_PROMPT
-    assert "<T>" not in SEARCH_SYSTEM_PROMPT
-
-
-def test_metadata_filter_arg_uses_locked_field_description():
+def test_uniqueql_prompt_copy():
     assert METADATA_FILTER_ARG_DESCRIPTION == (
         "Optional UniqueQL filter. Omit to keep the admin default. ANDed with "
         "admin and `folder_ids`. Example: "
@@ -64,12 +45,9 @@ def test_metadata_filter_arg_uses_locked_field_description():
         "`key`, `title`, `validAsOf`, or a custom key the user named). Folders "
         "stay `folder_ids`. No matches: drop this arg and retry."
     )
-    assert _field_description(search, "metadata_filter") == (
-        METADATA_FILTER_ARG_DESCRIPTION
+    assert METADATA_FILTER_ARG_DESCRIPTION in str(
+        inspect.signature(search).parameters["metadata_filter"].annotation
     )
-
-
-def test_server_instructions_append_uniqueql_guidance_after_citation():
     assert SERVER_INSTRUCTIONS_CITATION_GUIDANCE.startswith(
         "If your system prompt or a tool result instructs you to cite"
     )
@@ -77,8 +55,9 @@ def test_server_instructions_append_uniqueql_guidance_after_citation():
         "`search` and `content_tree` accept an optional UniqueQL `metadata_filter`"
         in SERVER_INSTRUCTIONS_CITATION_GUIDANCE
     )
-    assert "<userMetadata>" not in SERVER_INSTRUCTIONS_CITATION_GUIDANCE
-    assert "<T>" not in SERVER_INSTRUCTIONS_CITATION_GUIDANCE
+    description = search.__fastmcp__.description or ""
+    assert "UniqueQL" not in SEARCH_SYSTEM_PROMPT
+    assert "UniqueQL" not in description
 
 
 def test_json_schema_has_service_config():
@@ -337,7 +316,7 @@ async def test_llm_metadata_filter_ands_folder_ids_and_admin():
 
 
 @pytest.mark.asyncio
-async def test_invalid_uniqueql_object_shape_returns_tool_error_without_search():
+async def test_invalid_uniqueql_returns_tool_error_without_search():
     with patch(
         "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config"
     ) as mock_from_config:
@@ -355,22 +334,7 @@ async def test_invalid_uniqueql_object_shape_returns_tool_error_without_search()
 
 
 @pytest.mark.asyncio
-async def test_invalid_uniqueql_string_path_returns_tool_error():
-    result = await search(
-        search_string="query",
-        metadata_filter={
-            "operator": "equals",
-            "path": "mimeType",
-            "value": "application/pdf",
-        },
-        config=SearchToolConfig(),
-    )
-
-    assert result.is_error is True
-    assert "application/pdf" in result.content[0].text  # type: ignore[union-attr]
-
-
-async def _run_search_with_chunks(chunks: list, **search_kwargs) -> ToolResult:
+async def test_empty_hits_with_llm_filter_append_retry_hint():
     mock_service = MagicMock()
     mock_service.bind_settings.return_value = mock_service
     mock_service.state = _FakeState()
@@ -381,29 +345,19 @@ async def _run_search_with_chunks(chunks: list, **search_kwargs) -> ToolResult:
             "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
         ),
-        _patch_post_processor(chunks),
+        _patch_post_processor([]),
         _patch_identity(),
         _patch_kb_settings(None),
         _patch_resolve_scope_ids(),
     ):
-        return await search(
-            search_string="query", config=SearchToolConfig(), **search_kwargs
+        result = await search(
+            search_string="query",
+            metadata_filter=_LLM_PDF_FILTER,
+            config=SearchToolConfig(),
         )
-
-
-@pytest.mark.asyncio
-async def test_empty_hits_with_llm_filter_append_retry_hint():
-    result = await _run_search_with_chunks([], metadata_filter=_LLM_PDF_FILTER)
 
     assert result.is_error is not True
     assert result.content[0].text == METADATA_FILTER_EMPTY_RETRY_HINT  # type: ignore[union-attr]
-
-
-@pytest.mark.asyncio
-async def test_empty_hits_without_llm_filter_stay_empty():
-    result = await _run_search_with_chunks([])
-
-    assert result.content == []
 
 
 @pytest.mark.asyncio

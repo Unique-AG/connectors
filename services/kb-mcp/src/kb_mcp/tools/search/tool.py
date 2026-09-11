@@ -44,10 +44,7 @@ from kb_mcp.references import (
 )
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.search.config import SearchToolConfig
-from kb_mcp.tools.search.metadata_filter import (
-    folder_ids_clause,
-    merge_request_metadata_filter,
-)
+from kb_mcp.tools.search.metadata_filter import merge_request_metadata_filter
 from kb_mcp.tools.search.scope_resolver import resolve_scope_ids
 
 _LOGGER = logging.getLogger(__name__)
@@ -131,7 +128,7 @@ async def search(
     try:
         if metadata_filter is not None:
             try:
-                parsed_llm_filter = parse_uniqueql(dict(metadata_filter))
+                parsed_llm_filter = parse_uniqueql(metadata_filter)
             except ValueError, ValidationError:
                 return ToolResult(
                     content=[
@@ -158,13 +155,8 @@ async def search(
             service.state.metadata_filter_override = (  # pyright: ignore[reportAttributeAccessIssue]
                 merge_request_metadata_filter(
                     admin_metadata_filter=config.service_config.metadata_filter,
-                    folder_clause=(
-                        folder_ids_clause(
-                            folder_ids, include_subfolders=include_subfolders
-                        )
-                        if folder_ids
-                        else None
-                    ),
+                    folder_ids=folder_ids,
+                    include_subfolders=include_subfolders,
                     llm_metadata_filter=parsed_llm_filter,
                 )
             )

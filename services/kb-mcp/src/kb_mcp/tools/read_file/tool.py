@@ -257,9 +257,8 @@ async def read_file(
         Field(
             gt=0,
             description=(
-                "Optional token cap for this call. Omit to keep the admin "
-                "default. Requests above the admin cap are clamped down; "
-                "they do not error."
+                "Optional token cap for this call. Omit for the admin default. "
+                "Never exceeds the admin cap."
             ),
         ),
     ] = None,
@@ -333,13 +332,11 @@ async def read_file(
                 is_error=True,
             )
 
-        admin_cap = config.max_tokens_per_call
         effective_max_tokens = (
-            admin_cap
+            config.max_tokens_per_call
             if max_tokens_per_call is None
-            else min(max_tokens_per_call, admin_cap)
+            else min(max_tokens_per_call, config.max_tokens_per_call)
         )
-        assert effective_max_tokens <= admin_cap
 
         if is_chunked:
             chunks = sort_content_chunks(list(content.chunks))

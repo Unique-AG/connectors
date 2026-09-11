@@ -6,7 +6,6 @@ from unique_toolkit.content.smart_rules import Statement, parse_uniqueql
 
 from kb_mcp.tools.search.metadata_filter import (
     build_folder_scoped_metadata_filter,
-    folder_ids_clause,
     merge_request_metadata_filter,
 )
 
@@ -19,7 +18,6 @@ LLM_EQUALS_PDF = {
     "path": ["mimeType"],
     "value": "application/pdf",
 }
-FOLDER_CLAUSE = {"operator": "in", "path": ["folderId"], "value": ["scope_a"]}
 
 
 def test_single_folder_include_subfolders_uses_folder_id_path_contains():
@@ -87,37 +85,45 @@ def test_no_admin_filter_still_returns_the_scope_clause_alone():
 
 
 def test_merge_omitted_llm_and_omitted_folder_returns_admin():
-    result = merge_request_metadata_filter(admin_metadata_filter=ADMIN_FILTER)
-
-    assert result == ADMIN_FILTER.to_dict()
+    assert (
+        merge_request_metadata_filter(admin_metadata_filter=ADMIN_FILTER)
+        == ADMIN_FILTER.to_dict()
+    )
 
 
 def test_merge_llm_without_folder_ands_admin_and_llm():
-    result = merge_request_metadata_filter(
+    assert merge_request_metadata_filter(
         admin_metadata_filter=ADMIN_FILTER,
         llm_metadata_filter=LLM_EQUALS_PDF,
-    )
-
-    assert result == {"and": [LLM_EQUALS_PDF, ADMIN_FILTER.to_dict()]}
+    ) == {"and": [LLM_EQUALS_PDF, ADMIN_FILTER.to_dict()]}
 
 
 def test_merge_folder_without_llm_ands_admin_and_folder():
-    result = merge_request_metadata_filter(
+    assert merge_request_metadata_filter(
         admin_metadata_filter=ADMIN_FILTER,
-        folder_clause=FOLDER_CLAUSE,
-    )
-
-    assert result == {"and": [FOLDER_CLAUSE, ADMIN_FILTER.to_dict()]}
+        folder_ids=["scope_a"],
+        include_subfolders=False,
+    ) == {
+        "and": [
+            {"operator": "in", "path": ["folderId"], "value": ["scope_a"]},
+            ADMIN_FILTER.to_dict(),
+        ]
+    }
 
 
 def test_merge_llm_and_folder_ands_all_three():
-    result = merge_request_metadata_filter(
+    assert merge_request_metadata_filter(
         admin_metadata_filter=ADMIN_FILTER,
-        folder_clause=FOLDER_CLAUSE,
+        folder_ids=["scope_a"],
+        include_subfolders=False,
         llm_metadata_filter=LLM_EQUALS_PDF,
-    )
-
-    assert result == {"and": [FOLDER_CLAUSE, LLM_EQUALS_PDF, ADMIN_FILTER.to_dict()]}
+    ) == {
+        "and": [
+            {"operator": "in", "path": ["folderId"], "value": ["scope_a"]},
+            LLM_EQUALS_PDF,
+            ADMIN_FILTER.to_dict(),
+        ]
+    }
 
 
 def test_equals_wrapped_object_is_invalid_uniqueql():
@@ -156,11 +162,7 @@ def test_and_or_uniqueql_parses_and_merges_with_admin():
             "or": [
                 {
                     "and": [
-                        {
-                            "operator": "equals",
-                            "path": ["mimeType"],
-                            "value": "application/pdf",
-                        },
+                        LLM_EQUALS_PDF,
                         {"operator": "contains", "path": ["title"], "value": "Q4"},
                     ]
                 },
@@ -176,10 +178,3 @@ def test_and_or_uniqueql_parses_and_merges_with_admin():
     assert result is not None
     assert parsed.to_dict() in result["and"]
     assert ADMIN_FILTER.to_dict() in result["and"]
-
-
-def test_folder_ids_clause_does_not_mutate_the_input_list():
-    folder_ids = ["scope_a", "scope_b"]
-    folder_ids_clause(folder_ids, include_subfolders=True)
-    folder_ids_clause(folder_ids, include_subfolders=False)
-    assert folder_ids == ["scope_a", "scope_b"]

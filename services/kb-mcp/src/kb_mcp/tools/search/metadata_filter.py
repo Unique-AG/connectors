@@ -18,10 +18,9 @@ from unique_toolkit.content.smart_rules import (
 )
 
 
-def folder_ids_clause(
+def _folder_ids_clause(
     folder_ids: list[str], *, include_subfolders: bool
 ) -> dict[str, Any]:
-    """UniqueQL clause that restricts hits to ``folder_ids``."""
     assert folder_ids, "folder_ids must be a non-empty list"
     if include_subfolders:
         return OrStatement(
@@ -36,18 +35,20 @@ def folder_ids_clause(
 def merge_request_metadata_filter(
     *,
     admin_metadata_filter: UniqueQL | Mapping[str, Any] | None,
-    folder_clause: Mapping[str, Any] | None = None,
+    folder_ids: list[str] | None = None,
+    include_subfolders: bool = True,
     llm_metadata_filter: UniqueQL | Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """AND admin UniqueQL with optional folder and LLM clauses. Omit both extras
-    to leave the admin filter unchanged (``None`` if admin is unset)."""
     result: UniqueQL | Mapping[str, Any] | None = admin_metadata_filter
     if llm_metadata_filter is not None:
         llm_dict = uniqueql_to_dict(llm_metadata_filter)
-        assert llm_dict is not None, "LLM UniqueQL must serialize to a dict"
+        assert llm_dict is not None
         result = merge_scope_clause_into_metadata_filter(llm_dict, result)
-    if folder_clause is not None:
-        result = merge_scope_clause_into_metadata_filter(folder_clause, result)
+    if folder_ids:
+        result = merge_scope_clause_into_metadata_filter(
+            _folder_ids_clause(folder_ids, include_subfolders=include_subfolders),
+            result,
+        )
     return uniqueql_to_dict(result)
 
 
@@ -61,9 +62,8 @@ def build_folder_scoped_metadata_filter(
     bypassing it — the result is never ``None`` when the admin filter isn't."""
     merged = merge_request_metadata_filter(
         admin_metadata_filter=admin_metadata_filter,
-        folder_clause=folder_ids_clause(
-            folder_ids, include_subfolders=include_subfolders
-        ),
+        folder_ids=folder_ids,
+        include_subfolders=include_subfolders,
     )
-    assert merged is not None, "folder-scoped merge always produces a UniqueQL dict"
+    assert merged is not None
     return merged
