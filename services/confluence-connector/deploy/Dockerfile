@@ -7,7 +7,7 @@ ARG APP_NAME=confluence-connector
 # Shared foundation for pruner, deps, and builder stages.
 # Using full trixie image (not slim) because we need build tools for native modules.
 # ------------------------------------------------------------------------------
-FROM node:26.8.1-trixie@sha256:f5d1cc40abc10c2843339a2134d07817cf33c405cb16bfd052b0ed790254c3a3 AS base
+FROM node:26.8.2-trixie@sha256:fb192b8ad31841aadc4bb79c44ae0f59d193a798ffbc9fdce37ba6ecb20c2236 AS base
 ENV CI=1 \
     PNPM_STORE_DIR=/root/.local/share/pnpm/store
 # Keep the version in sync with "packageManager" in the root and service package.json.
@@ -64,7 +64,7 @@ RUN --mount=type=cache,target=/root/.cache/turbo \
 # Stage 5: runner
 # Minimal production image. Only this stage is included in the final image.
 # ------------------------------------------------------------------------------
-FROM node:26.8.1-trixie-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146 AS runner
+FROM node:26.8.2-trixie-slim@sha256:f7bb8247fdb16250dbec7fd0e24f091c6f5f0a29d256f3aef5816a7a369166b2 AS runner
 ARG APP_NAME
 WORKDIR /app
 
