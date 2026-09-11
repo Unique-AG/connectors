@@ -228,8 +228,9 @@ class BackstopConfig(BaseSettings):
     page_offset_param: str = Field(default="page[offset]", min_length=1)
 
     # How long a fetched custom-field catalog stays usable before it is re-fetched. Measured
-    # against a client-obtained tenant: 3,274 definitions, 2.77 MiB, 6.15 s per unfiltered walk. Two hours
-    # bounds how long a CRM-admin-added field stays invisible; `list_custom_fields(refresh=true)`
+    # against a client-obtained tenant: 3,274 definitions, 2.77 MiB, 6.15 s per unfiltered walk.
+    # Two hours bounds how long a CRM-admin-added field stays invisible;
+    # `list_custom_fields(refresh=true)`
     # (and the groups list) force a refetch. Capped at 24 hours. Values above the cap (including
     # the previous documented example of 10080) are clamped so existing deploys still boot.
     custom_field_schema_ttl_minutes: Annotated[

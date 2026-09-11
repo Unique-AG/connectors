@@ -75,7 +75,7 @@ async def elicit_entity_deletion(
         return EntityDeletion.DECLINED
 
     if isinstance(result, AcceptedElicitation):
-        if isinstance(result.data, DeletionChoice) and result.data.choice == DELETE:
+        if result.data.choice == DELETE:
             return EntityDeletion.CONFIRMED
         logger.info("elicitation.entity_deletion.dismissed", extra={"action": "kept"})
         return EntityDeletion.DECLINED

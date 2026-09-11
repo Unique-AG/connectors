@@ -112,9 +112,10 @@ async def get_product(
 
     Pass a trusted `product_id`, or `search` / `product` (short name or display name) for one
     product. `search` is the same name lookup as on get_person. Omit all three to walk the
-    catalog in one request (a client-obtained tenant had ~72 products). That is how you answer "which of
-    our products are Convertible Arbitrage": walk with `custom_field_names=["Strategy"]` and
-    read the values. Do not iterate `get_product_investors` or `get_time_series` for this —
+    catalog in one request (a client-obtained tenant had ~72 products). That is how you answer
+    "which of our products are Convertible Arbitrage": walk with
+    `custom_field_names=["Strategy"]` and read the values. Do not iterate
+    `get_product_investors` or `get_time_series` for this —
     those tools do not publish product custom fields.
     """
     if product is not None and search is not None:
