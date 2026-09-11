@@ -213,3 +213,9 @@ jobs:
             terraform validate
             cd - > /dev/null
           done
+
+  containerize:
+    uses: ./.github/workflows/_template-containerize.yaml
+    with:
+      service-name: ${{ inputs.service-name }}
+      service-path: ${{ inputs.service-path }}

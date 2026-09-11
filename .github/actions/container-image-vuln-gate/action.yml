@@ -1,0 +1,92 @@
+name: Container image vulnerability gate
+description: >
+  Scan a built docker tar with Trivy and fail PRs on patchable CRITICAL findings
+  unless security-exception is set.
+
+inputs:
+  image_tar:
+    description: Path to the docker tar produced by build-push-action
+    required: true
+  severity:
+    description: Trivy severity filter
+    required: false
+    default: CRITICAL
+  trivy_timeout:
+    description: Trivy scan timeout
+    required: false
+    default: 20m
+  summary_template:
+    description: Path to the Trivy markdown summary template
+    required: false
+    default: .github/trivy-templates/image-summary-markdown.tpl
+  security_exception_label:
+    description: PR label that records an accepted exception and bypasses patchable-finding failures
+    required: false
+    default: security-exception
+
+runs:
+  using: composite
+  steps:
+    - name: Trivy vulnerability scan
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      env:
+        TRIVY_DISABLE_VEX_NOTICE: "true"
+      with:
+        scan-type: image
+        input: ${{ inputs.image_tar }}
+        format: json
+        output: trivy-results.json
+        severity: ${{ inputs.severity }}
+        scanners: vuln
+        ignore-unfixed: false
+        exit-code: "0"
+        timeout: ${{ inputs.trivy_timeout }}
+        cache: true
+    - name: Evaluate vulnerability gate
+      shell: bash
+      env:
+        SECURITY_EXCEPTION: ${{ contains(github.event.pull_request.labels.*.name, inputs.security_exception_label) }}
+        IS_PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
+        SUMMARY_TEMPLATE: ${{ inputs.summary_template }}
+      run: |
+        set -euo pipefail
+        SEVERITY="${{ inputs.severity }}"
+        if [ ! -s trivy-results.json ]; then
+          echo "No trivy results file — treating as clean."
+          echo "✅ No ${SEVERITY} vulnerabilities reported." >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        if command -v trivy >/dev/null 2>&1; then
+          trivy convert --format table trivy-results.json || true
+          if [ -f "$SUMMARY_TEMPLATE" ]; then
+            trivy convert --format template \
+              --template @"$SUMMARY_TEMPLATE" \
+              trivy-results.json > trivy-report.md || true
+            if [ -s trivy-report.md ]; then
+              cat trivy-report.md >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+        fi
+        fixable_json=$(jq -c '[.Results[]?.Vulnerabilities[]? | select(.FixedVersion != null and .FixedVersion != "")]' trivy-results.json)
+        unfixable_json=$(jq -c '[.Results[]?.Vulnerabilities[]? | select(.FixedVersion == null or .FixedVersion == "")]' trivy-results.json)
+        fixable_count=$(echo "$fixable_json" | jq 'length')
+        unfixable_count=$(echo "$unfixable_json" | jq 'length')
+        echo "Fixable ${SEVERITY}: ${fixable_count}; unfixable ${SEVERITY}: ${unfixable_count}"
+        if [ "$unfixable_count" -gt 0 ]; then
+          echo "$unfixable_json" | jq -r '.[] | "::warning title=Unpatched vulnerability::\(.PkgName) \(.VulnerabilityID) (\(.Severity)) — no patch available"'
+        fi
+        if [ "$fixable_count" -eq 0 ]; then
+          echo "✅ No patchable ${SEVERITY} vulnerabilities." >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        if [ "$IS_PULL_REQUEST" = "true" ] && [ "$SECURITY_EXCEPTION" != "true" ]; then
+          echo "$fixable_json" | jq -r '.[] | "::error title=Patchable vulnerability::\(.PkgName) \(.InstalledVersion) → \(.FixedVersion) \(.VulnerabilityID) (\(.Severity))"'
+          echo "::error::${fixable_count} patchable ${SEVERITY} finding(s). Apply the fix or add the security-exception label and re-run this job."
+          exit 1
+        fi
+        echo "$fixable_json" | jq -r '.[] | "::warning title=Patchable vulnerability::\(.PkgName) \(.InstalledVersion) → \(.FixedVersion) \(.VulnerabilityID) (\(.Severity))"'
+        if [ "$SECURITY_EXCEPTION" = "true" ]; then
+          echo "security-exception label set — patchable findings reported as warnings only." >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "Non-PR run — patchable findings reported as warnings only." >> "$GITHUB_STEP_SUMMARY"
+        fi

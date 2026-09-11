@@ -26,6 +26,8 @@ jobs:
     permissions:
       packages: write
       id-token: write
+    outputs:
+      digest: ${{ steps.build-and-push.outputs.digest }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -156,6 +158,90 @@ jobs:
           --registry oci://${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_CHART_REPO }} \
           --registry oci://${{ env.GHCR_REGISTRY }}/${{ env.GHCR_CHART_REPO }} \
           --registry oci://${{ env.GETUNIQUE_REGISTRY }}/${{ env.GETUNIQUE_CHART_REPO }}
+
+  security-trivy-image-scan:
+    needs: containerize
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GHCR_REGISTRY: ghcr.io
+      GHCR_REPO: unique-ag/connectors/services/${{ inputs.service-name }}
+      TRIVY_DISABLE_VEX_NOTICE: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/trivy-templates
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}@${{ needs.containerize.outputs.digest }}
+          format: json
+          output: trivy-results.json
+          severity: CRITICAL,HIGH
+          scanners: vuln,misconfig
+          ignore-unfixed: true
+          exit-code: "0"
+          timeout: 15m
+          cache: true
+
+      - name: Convert Trivy results to SARIF
+        if: always() && hashFiles('trivy-results.json') != ''
+        run: trivy convert --format sarif trivy-results.json -o trivy-image-scan-results.sarif
+
+      - uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        if: always() && hashFiles('trivy-image-scan-results.sarif') != ''
+        with:
+          sarif_file: trivy-image-scan-results.sarif
+          category: trivy-image/${{ inputs.service-name }}
+
+      - name: Write Trivy summary
+        if: always() && hashFiles('trivy-results.json') != ''
+        run: |
+          trivy convert --format template \
+            --template @.github/trivy-templates/image-summary-markdown.tpl \
+            trivy-results.json > trivy-report.md || true
+          if [ -s trivy-report.md ]; then
+            cat trivy-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  security-trivy-license-scan:
+    needs: containerize
+    permissions:
+      contents: read
+      packages: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GHCR_REGISTRY: ghcr.io
+      GHCR_REPO: unique-ag/connectors/services/${{ inputs.service-name }}
+      TRIVY_DISABLE_VEX_NOTICE: "true"
+    steps:
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}@${{ needs.containerize.outputs.digest }}
+          scanners: license
+          severity: UNKNOWN,HIGH,CRITICAL
+          exit-code: "0"
+          timeout: 15m
+          cache: true
 
   publish-docs:
     if: ${{ inputs.docs-path != '' }}

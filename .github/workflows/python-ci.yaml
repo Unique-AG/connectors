@@ -9,9 +9,12 @@ on:
   # PR in a stack except the base one. `paths` alone decides — the gate matters wherever the
   # files it guards change, whatever the PR merges into.
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "services/**"
       - ".github/workflows/python-ci.yaml"
+      - ".github/workflows/_template-containerize.yaml"
+      - ".github/actions/container-image-vuln-gate/**"
       - "scripts/render-values-schema.sh"
   workflow_dispatch:
     inputs:
@@ -26,6 +29,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write # required for docker GHA cache writes in _template-containerize.yaml
   packages: read # required for helm OCI chart dependency pulls from GHCR
 
 jobs:
@@ -47,6 +51,8 @@ jobs:
               - 'services/**'
             workflow:
               - '.github/workflows/python-ci.yaml'
+              - '.github/workflows/_template-containerize.yaml'
+              - '.github/actions/container-image-vuln-gate/**'
               - 'scripts/render-values-schema.sh'
 
       # Builds a JSON array of Python service names to fan out into parallel CI matrix jobs.
@@ -271,3 +277,16 @@ jobs:
             terraform test
             cd - > /dev/null
           done
+
+  containerize:
+    name: Containerize ${{ matrix.package }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.packages != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+    uses: ./.github/workflows/_template-containerize.yaml
+    with:
+      service-name: ${{ matrix.package }}
+      service-path: services/${{ matrix.package }}
