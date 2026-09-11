@@ -71,4 +71,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           timeout: "1200"
           interval: "60"
-          ignored: "Test $${{ '{{' }} matrix.package }},Helm $${{ '{{' }} matrix.package }},Terraform $${{ '{{' }} matrix.package }},matrix.service"
+          ignored: "Test $${{ '{{' }} matrix.package }},Helm $${{ '{{' }} matrix.package }},Terraform $${{ '{{' }} matrix.package }},Containerize $${{ '{{' }} matrix.package }},matrix.service"
