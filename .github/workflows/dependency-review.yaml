@@ -9,11 +9,6 @@ on:
     types: [opened, synchronize, labeled, unlabeled]
     branches:
       - main
-    paths:
-      - "pnpm-lock.yaml"
-      - "services/**/package.json"
-      - "packages/**"
-      - ".github/workflows/dependency-review.yaml"
 
 permissions:
   contents: read
@@ -33,3 +28,18 @@ jobs:
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
+
+  full-dependency-audit:
+    name: full-dependency-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'security-exception') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          run_install: false
+
+      - name: Audit all dependencies
+        run: pnpm audit --audit-level=high
