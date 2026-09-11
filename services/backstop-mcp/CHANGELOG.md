@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.0.5](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.4...backstop-mcp@0.0.5) (2026-09-11)
+
+
+### Bug Fixes
+
+* **backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** bump base chart dependency to 0.1.0-87990c ([#915](https://github.com/Unique-AG/connectors/issues/915)) ([1bc27a7](https://github.com/Unique-AG/connectors/commit/1bc27a713ab7e2a5bf36671fa1f1f294497c649e))
+
+
+### Dependencies
+
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** run the Python services on 3.14 ([#866](https://github.com/Unique-AG/connectors/issues/866)) ([7f2321a](https://github.com/Unique-AG/connectors/commit/7f2321afffb27bcd13e566eea12b0f4c6ceaecc1))
+* **backstop-mcp:** build and run on one interpreter ([#899](https://github.com/Unique-AG/connectors/issues/899)) ([9185ed6](https://github.com/Unique-AG/connectors/commit/9185ed6d8469cd977acf62585c669aa0b026cdf0))
+* bump pydantic[email] from 2.13.4 to 2.13.5 in /services/backstop-mcp ([#929](https://github.com/Unique-AG/connectors/issues/929)) ([d0b8dc0](https://github.com/Unique-AG/connectors/commit/d0b8dc04718b3a023aee8313627894621cdf3d89))
+* bump ruff from 0.16.4 to 0.16.5 in /services/backstop-mcp ([#930](https://github.com/Unique-AG/connectors/issues/930)) ([f5f71cc](https://github.com/Unique-AG/connectors/commit/f5f71cc296302354bb2ce4cb1c0618219d8a7766))
+* bump ruff in /services/backstop-mcp ([#953](https://github.com/Unique-AG/connectors/issues/953)) ([3222aa2](https://github.com/Unique-AG/connectors/commit/3222aa2cf86c70f960674f48771f610d13eaf425))
+* bump unique-mcp from 2026.34.3 to 2026.36.1 in /services/backstop-mcp ([#928](https://github.com/Unique-AG/connectors/issues/928)) ([cb85b77](https://github.com/Unique-AG/connectors/commit/cb85b77ef7b60c3933cdc7da6d038260d64d76d9))
+* put every dependency in the right group, name what was missing, and hold shared versions in the pnpm catalog ([#958](https://github.com/Unique-AG/connectors/issues/958)) ([794092f](https://github.com/Unique-AG/connectors/commit/794092faa348052eddf2be580ed61fc771684b6f))
+* upgrade backstop-mcp and kb-mcp to fastmcp 4.0.3 ([#971](https://github.com/Unique-AG/connectors/issues/971)) ([569f04c](https://github.com/Unique-AG/connectors/commit/569f04c1a6c3a1b046e36c5c70fb5319949c139b))
+* upgrade uv to 0.12.10 in the Python images ([#975](https://github.com/Unique-AG/connectors/issues/975)) ([8fe0852](https://github.com/Unique-AG/connectors/commit/8fe08523405ddcacfd3fd616758bb8a306855079))
+
 ## [0.0.4](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.3...backstop-mcp@0.0.4) (2026-08-28)
 
 
