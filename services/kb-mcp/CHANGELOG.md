@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.1.4](https://github.com/Unique-AG/connectors/compare/kb-mcp@0.1.3...kb-mcp@0.1.4) (2026-09-11)
+
+
+### Features
+
+* **kb-mcp:** send service id header ([#1011](https://github.com/Unique-AG/connectors/issues/1011)) ([0bc89c3](https://github.com/Unique-AG/connectors/commit/0bc89c35ed2826c27e19171d45d77da5ff8d1d18))
+
+
+### Bug Fixes
+
+* **backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** bump base chart dependency to 0.1.0-87990c ([#915](https://github.com/Unique-AG/connectors/issues/915)) ([1bc27a7](https://github.com/Unique-AG/connectors/commit/1bc27a713ab7e2a5bf36671fa1f1f294497c649e))
+
+
+### Dependencies
+
+* bump pydantic in /services/kb-mcp ([#954](https://github.com/Unique-AG/connectors/issues/954)) ([f7ea6fd](https://github.com/Unique-AG/connectors/commit/f7ea6fde3fb8d5c7e33df42494f8c369a238336a))
+* bump ruff from 0.16.4 to 0.16.5 in /services/kb-mcp ([#932](https://github.com/Unique-AG/connectors/issues/932)) ([45650b0](https://github.com/Unique-AG/connectors/commit/45650b0b1692c7603b26f5425918a2cd3e7a959b))
+* bump ruff in /services/backstop-mcp ([#953](https://github.com/Unique-AG/connectors/issues/953)) ([3222aa2](https://github.com/Unique-AG/connectors/commit/3222aa2cf86c70f960674f48771f610d13eaf425))
+* **kb-mcp:** bump python-dotenv to 1.2.3 ([#977](https://github.com/Unique-AG/connectors/issues/977)) ([f316877](https://github.com/Unique-AG/connectors/commit/f316877bb66ffedfa2a2188ba5b8dafe487308fc))
+* put every dependency in the right group, name what was missing, and hold shared versions in the pnpm catalog ([#958](https://github.com/Unique-AG/connectors/issues/958)) ([794092f](https://github.com/Unique-AG/connectors/commit/794092faa348052eddf2be580ed61fc771684b6f))
+* upgrade backstop-mcp and kb-mcp to fastmcp 4.0.3 ([#971](https://github.com/Unique-AG/connectors/issues/971)) ([569f04c](https://github.com/Unique-AG/connectors/commit/569f04c1a6c3a1b046e36c5c70fb5319949c139b))
+* upgrade uv to 0.12.10 in the Python images ([#975](https://github.com/Unique-AG/connectors/issues/975)) ([8fe0852](https://github.com/Unique-AG/connectors/commit/8fe08523405ddcacfd3fd616758bb8a306855079))
+
 ## [0.1.3](https://github.com/Unique-AG/connectors/compare/kb-mcp@0.1.2...kb-mcp@0.1.3) (2026-09-03)
 
 
