@@ -170,7 +170,31 @@ SERVER_INSTRUCTIONS_CITATION_GUIDANCE = (
     "answering using content from any of its tools, cite sources inline by "
     "pasting the exact markdown links [document name](url) provided in "
     "each result header. End with a Sources section listing the cited "
-    "documents as those same markdown links."
+    "documents as those same markdown links. "
+    "`search` and `content_tree` accept an optional UniqueQL "
+    "`metadata_filter`. Omit it unless the user names a metadata constraint "
+    "(mime type, title, date, or a custom field they named). Folder names "
+    "stay `folder_ids` from `content_tree` — UniqueQL is not for folders."
+)
+
+METADATA_FILTER_ARG_DESCRIPTION = (
+    "Optional UniqueQL filter. Omit to keep the admin default. ANDed with "
+    "admin and `folder_ids`. Example: "
+    '`{"operator":"equals","path":["mimeType"],"value":"application/pdf"}`. '
+    "`equals`/`contains` take a string; a list of values uses `in`. Combine "
+    'with `{"and":[…]}` or `{"or":[…]}`. `path` is a key array (`mimeType`, '
+    "`key`, `title`, `validAsOf`, or a custom key the user named). Folders "
+    "stay `folder_ids`. No matches: drop this arg and retry."
+)
+
+INVALID_METADATA_FILTER_MESSAGE = (
+    "Invalid UniqueQL metadata_filter; use operator, path as a string array, "
+    "and value. Example: "
+    '{"operator":"equals","path":["mimeType"],"value":"application/pdf"}.'
+)
+
+METADATA_FILTER_EMPTY_RETRY_HINT = (
+    "Drop metadata_filter and retry before telling the user there is no content."
 )
 
 

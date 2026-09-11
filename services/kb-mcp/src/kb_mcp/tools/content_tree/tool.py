@@ -8,12 +8,12 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import ToolResult, tool
 from mcp.types import TextContent, ToolAnnotations
-from pydantic import Field
+from pydantic import Field, ValidationError
 from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
@@ -23,10 +23,17 @@ from unique_mcp import (
     merge_tool_meta,
 )
 from unique_toolkit.content.schemas import ContentInfo
+from unique_toolkit.content.smart_rules import parse_uniqueql
 from unique_toolkit.experimental.components.content_tree import ContentTree, FuzzyMatch
 
 from kb_mcp.correlation import correlation_id
-from kb_mcp.references import file_reference_url, markdown_citation_link
+from kb_mcp.references import (
+    INVALID_METADATA_FILTER_MESSAGE,
+    METADATA_FILTER_ARG_DESCRIPTION,
+    METADATA_FILTER_EMPTY_RETRY_HINT,
+    file_reference_url,
+    markdown_citation_link,
+)
 from kb_mcp.settings import Settings, get_settings
 from kb_mcp.tools.content_tree.cache import get_tree_cache
 from kb_mcp.tools.content_tree.config import (
@@ -43,6 +50,7 @@ from kb_mcp.tools.content_tree.path_utils import (
     path_parts,
     render_tree_with_folder_ids,
 )
+from kb_mcp.tools.search.metadata_filter import merge_request_metadata_filter
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -263,6 +271,10 @@ async def content_tree(
             ),
         ),
     ] = None,
+    metadata_filter: Annotated[
+        dict[str, Any] | None,
+        Field(description=METADATA_FILTER_ARG_DESCRIPTION),
+    ] = None,
     config: ContentTreeToolConfig = Depends(get_tool_config(ContentTreeToolConfig)),
 ) -> ToolResult:
     """Browse the knowledge base's folder/file structure — use this only when
@@ -325,6 +337,18 @@ async def content_tree(
                 content=[TextContent(type="text", text=misuse_error)],
             )
 
+        parsed_llm_filter = None
+        if metadata_filter is not None:
+            try:
+                parsed_llm_filter = parse_uniqueql(dict(metadata_filter))
+            except ValueError, ValidationError:
+                return ToolResult(
+                    is_error=True,
+                    content=[
+                        TextContent(type="text", text=INVALID_METADATA_FILTER_MESSAGE)
+                    ],
+                )
+
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.
         settings = await get_unique_settings_async()
         company_id = settings.authcontext.get_confidential_company_id()
@@ -344,11 +368,15 @@ async def content_tree(
         if refresh:
             tree_svc.invalidate_cache()
 
-        metadata_filter = (
-            config.metadata_filter.to_dict()
-            if config.metadata_filter is not None
-            else DEFAULT_METADATA_FILTER_STATEMENT.to_dict()
+        resolved_metadata_filter = merge_request_metadata_filter(
+            admin_metadata_filter=(
+                config.metadata_filter
+                if config.metadata_filter is not None
+                else DEFAULT_METADATA_FILTER_STATEMENT
+            ),
+            llm_metadata_filter=parsed_llm_filter,
         )
+        assert resolved_metadata_filter is not None
         wait = clamped_content_tree_timeout(timeout, kb_settings)
         # Walk one level past max_depth — otherwise a folder exactly at the
         # cutoff never gets its own contents visited and stays id-less.
@@ -357,7 +385,7 @@ async def content_tree(
             walk_depth = max_depth if max_depth is None else max_depth + 1
 
         snapshot = await tree_svc.resolve_visible_file_paths_via_folders_async(
-            metadata_filter=metadata_filter,
+            metadata_filter=resolved_metadata_filter,
             max_depth=walk_depth,
             timeout=wait,
             max_concurrent_directory_listings=config.max_concurrent_scope_lookups,
@@ -398,6 +426,8 @@ async def content_tree(
                 for content_info, path in rows
             ]
             body = "\n".join(lines) if lines else "No visible files match."
+            if not lines and parsed_llm_filter is not None:
+                body = f"{body}\n{METADATA_FILTER_EMPTY_RETRY_HINT}"
             text = _with_incomplete_notice(snapshot.complete, body)
             _LOGGER.info(
                 "content_tree complete correlation_id=%s mode=%s result_count=%d",
@@ -427,7 +457,7 @@ async def content_tree(
                 min_score=effective_min_score,
                 match_on=effective_match_on,
                 case_sensitive=effective_case_sensitive,
-                metadata_filter=metadata_filter,
+                metadata_filter=resolved_metadata_filter,
                 max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
             )
         else:
@@ -446,6 +476,8 @@ async def content_tree(
             for m in matches
         ]
         body = "\n".join(lines) if lines else "No matching files found."
+        if not lines and parsed_llm_filter is not None:
+            body = f"{body}\n{METADATA_FILTER_EMPTY_RETRY_HINT}"
         text = _with_incomplete_notice(snapshot.complete, body)
         _LOGGER.info(
             "content_tree complete correlation_id=%s mode=%s result_count=%d",
