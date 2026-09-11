@@ -94,8 +94,8 @@ class EmailFileInput(PartyTargetInput, _FileBlobInput):
 
     kind: Literal["email"] = Field(
         description=(
-            "Import a real email file. Same `/emails` collection as `log_activity(kind=email)`, "
-            "but this path sends the message blob. Use `log_activity` for a metadata stub."
+            "Import a real `.msg`/`.eml` file. Emails only go through `attach_file`; "
+            "`log_activity` has no email kind."
         )
     )
     email_format: Literal["eml", "msg"] | None = Field(

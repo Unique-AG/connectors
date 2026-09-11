@@ -1,23 +1,7 @@
-"""Build the JSON:API request body for an activity write.
+"""Build JSON:API request bodies for activity writes.
 
-The mirror of `backstop_client/json_api.py`, which parses the documents Backstop sends;
-this builds the ones we send. Routing (`kind` to collection path) is
-`_activity_resource_location`.
-
-Two wire rules cost the most to discover, both verified live against a client-obtained tenant:
-
-1. A resource link's `resourceType` is the **plural API resource name** (`organizations`,
-   `people`), not the `SystemUserBean`/`OrganizationBean` casing that
-   `filter[entityType][eq]` takes on the read side. Bean casing is rejected outright:
-   `attachedTo` answers `400 "Can not find OrganizationBean with id ..."` and
-   `linkedResources` answers `400 "Invalid LinkResourceType EmployeeBean"`. A `SearchType`
-   is already the plural name, so it is sent verbatim.
-2. Identity pointers — `author`, `createdBy`, `assignedUser` — are JSON:API
-   **relationships**, never attributes. In `attributes` Backstop answers
-   `400 "author should not be in the 'attributes' but 'relationship."`. Parent pointers
-   (`attachedTo`, `regarding`, `resources`, `linkedResources`, `secondaryRegarding`) go the
-   other way: they are attributes carrying a `{resourceId, resourceType, resourceLink}`
-   object, not relationships.
+`resourceType` is the plural name, not Bean casing. Identity pointers are
+relationships; parent pointers are attributes.
 """
 
 from datetime import date, datetime
@@ -39,10 +23,8 @@ def isoformat(value: date | datetime | None) -> str | None:
 def party_resource_link(*, party_id: str, search_type: SearchType) -> dict[str, object]:
     """A parent pointer for `attachedTo` / `regarding` / `resources` / `linkedResources`.
 
-    `resourceType` is the plural resource name, not Bean casing (rule 1 in this module's
-    docstring). Backstop normalizes the aliasing collections itself — an `employees` link
-    comes back as `people`, a `contacts` link as `organizations` — so the caller's
-    `search_type` does not have to be mapped first.
+    `resourceType` is the plural resource name, not Bean casing. Backstop normalizes
+    aliasing collections itself — an `employees` link comes back as `people`.
     """
     return {
         "resourceId": party_id,

@@ -1,16 +1,6 @@
-"""Where an activity lives, resolved from a `kind` and a caller-supplied id.
+"""Resolve a `kind` + activity id to the PATCH/DELETE collection path.
 
-Routing, not body building — nothing here appears in a request payload, which is why it is
-separate from `_json_api_utils`. `update_activity` and `delete_activity` are the only
-callers; a create already knows its own collection.
-
-The id arrives in either of two spellings. `get_activity_history` hands out a composite
-`{resourceType}_{resourceId}` handle (`notes_26018215`, `meeting-or-calls_76537547`), while
-a create echo and a `search_activities` row are already bare. A composite whose type
-contradicts `kind` is rejected rather than stripped and sent to the wrong collection.
-`ResourceIdentifierDto.from_activity_id` in `features/activity_history` splits the same
-handle for the read path; this is the write-side counterpart, and it also has to know the
-collection because the target is `/{collection}/{id}` rather than one detail endpoint.
+Accepts a bare id or a `get_activity_history` `{type}_{id}` handle; mismatched types are rejected.
 """
 
 from typing import ClassVar, Literal, Self
