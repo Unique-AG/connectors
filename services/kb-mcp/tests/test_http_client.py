@@ -146,9 +146,7 @@ async def test_async_requests_include_service_id_header():
     client._client_async.request = request  # type: ignore[method-assign]
     headers = {"authorization": "Bearer token"}
 
-    await client.request_async(
-        "GET", "http://example.invalid/", headers=headers
-    )
+    await client.request_async("GET", "http://example.invalid/", headers=headers)
 
     assert captured["headers"] == {
         "authorization": "Bearer token",
