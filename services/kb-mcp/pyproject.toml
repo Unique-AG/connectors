@@ -17,7 +17,7 @@ dependencies = [
     "unique-sdk==2026.38.0.dev1",
     "httpx==0.28.1",
     "starlette==1.3.1",
-    "pydantic-settings==2.14.2",
+    "pydantic-settings==2.15.0",
     "python-dotenv==1.2.3",
     "mcp==2.1.1",
 ]
