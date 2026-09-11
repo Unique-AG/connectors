@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from pydantic.fields import FieldInfo
 
 from backstop_mcp.backstop_client import (
-    BackstopApiResourceDocument,
+    BackstopApiSingleResourceDocument,
     Included,
     IncludedResource,
 )
@@ -57,7 +57,7 @@ class IncludePlan[ResponseT: BaseModel]:
     into: type[ResponseT]
     planned: tuple[_PlannedInclude, ...]
 
-    def project[AttrT](self, *, document: BackstopApiResourceDocument[AttrT]) -> ResponseT:
+    def project[AttrT](self, *, document: BackstopApiSingleResourceDocument[AttrT]) -> ResponseT:
         """The document's side-loads for this plan, projected onto `into`.
 
         Three distinctions survive into the model, where an omitted key becomes a `None` field:
@@ -171,14 +171,14 @@ _IncludeResource = IncludedResource[_IncludeAttributes]
 
 
 def _include_resources[AttrT](
-    *, document: BackstopApiResourceDocument[AttrT], planned: _PlannedInclude
+    *, document: BackstopApiSingleResourceDocument[AttrT], planned: _PlannedInclude
 ) -> list[BaseModel]:
     """Every related resource for one include, projected, with the unusable ones dropped."""
     resource = document.data
     entries = Included(document.included).related(
         resource, planned.include.relationship, schema=_IncludeResource
     )
-    if not entries and resource is not None and resource.related_ids(planned.include.relationship):
+    if not entries and resource.related_ids(planned.include.relationship):
         logger.warning(
             "includes.side_load.unresolved",
             extra={"include": planned.name, "relationship": planned.include.relationship},

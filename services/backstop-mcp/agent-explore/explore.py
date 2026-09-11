@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""GET-only CLI for the live Backstop REST API. Loads .env from this directory."""
+"""GET-only CLI for the live Backstop REST API. Not part of the shipped MCP server.
+
+Loads `.env` from this directory. Writes each response to `.probe-cache/` (gitignored).
+"""
 
 from __future__ import annotations
 

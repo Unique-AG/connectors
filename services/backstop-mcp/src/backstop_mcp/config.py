@@ -228,8 +228,9 @@ class BackstopConfig(BaseSettings):
     page_offset_param: str = Field(default="page[offset]", min_length=1)
 
     # How long a fetched custom-field catalog stays usable before it is re-fetched. Measured
-    # against fb-rm-lg-26: 3,274 definitions, 2.77 MiB, 6.15 s per unfiltered walk. Two hours
-    # bounds how long a CRM-admin-added field stays invisible; `list_custom_fields(refresh=true)`
+    # against a client-obtained tenant: 3,274 definitions, 2.77 MiB, 6.15 s per unfiltered walk.
+    # Two hours bounds how long a CRM-admin-added field stays invisible;
+    # `list_custom_fields(refresh=true)`
     # (and the groups list) force a refetch. Capped at 24 hours. Values above the cap (including
     # the previous documented example of 10080) are clamped so existing deploys still boot.
     custom_field_schema_ttl_minutes: Annotated[
@@ -292,6 +293,16 @@ class BackstopConfig(BaseSettings):
     # custom-field walk, this one has not been measured as expensive enough to justify the
     # staleness. Set `BACKSTOP_SYSTEM_USER_CACHE_ENABLED=true` once its histograms say so.
     system_user_cache_enabled: bool = False
+
+    # How long a fetched time-zone catalog stays usable before it is re-fetched. Zones change
+    # rarely; the default is 24 hours. Capped at 24 hours so a stale catalog cannot sit for
+    # days after a CRM admin adds a zone.
+    time_zone_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
+
+    # Whether the time-zone catalog is held between calls. Off by default: unlike the
+    # custom-field walk, this one has not been measured as expensive enough to justify the
+    # staleness. Set `BACKSTOP_TIME_ZONE_CACHE_ENABLED=true` once its histograms say so.
+    time_zone_cache_enabled: bool = False
 
     # Which entity-relationship types mean employment, and which of those mean it has ended,
     # for departed-contact detection (UN-23678). Comma-separated env values. Ids match a type id

@@ -52,7 +52,8 @@
    registered. `TOOLS` itself is imported from `server.tools`. Those files still cannot
    import `server.tools.registry` or a private `_`-prefixed sibling such as `_page_input`,
    and cannot reach past a feature package's `__init__`. `registry.py` under `server/tools`
-   may import `features.<feature>.tools.get_*` / `list_*` / `search_*` the same way.
+   may import `features.<feature>.tools.get_*` / `list_*` / `search_*` / `log_*` / `attach_*`
+   / `update_*` / `delete_*` the same way.
 
    Applies to the packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are
    not among them: they are groupings whose `__init__` is documentation, so `features.resolution`
@@ -71,9 +72,12 @@
    per-feature and keeps its filename.
 
 6. **A logic module is named after the symbol it defines.** The filename stem, or the PascalCase
-   of it, must be a top-level function, class, or assignment in that file —
-   `raise_if_invalid_series.py` holds `raise_if_invalid_series`, `custom_fields_service.py`
-   holds `CustomFieldsService`. That is how the
+   of it, or the SCREAMING_SNAKE of it for a module whose subject is a constant, must be a
+   top-level function, class, or assignment in that file — `raise_if_invalid_series.py`
+   holds `raise_if_invalid_series`, `custom_fields_service.py` holds `CustomFieldsService`,
+   `attach_file_max_bytes.py` holds `ATTACH_FILE_MAX_BYTES`. All three are the same rule in
+   the casing Python uses for that kind of symbol; a module named after a *mechanism* still
+   fails, because no symbol carries that name. That is how the
    tree stays readable. Modules used to be named after a mechanism (`fetch.py`, `service.py`,
    `project.py`), so you had to open a file or grep for `def` to find anything. Vocabulary
    modules (`api_responses*`, `internal_dto*`, `responses*`, `entity_types.py`,
@@ -90,6 +94,8 @@
 Rules 1–6 are asserted by walking the AST rather than importing anything, so a violation is
 reported as a failing test with a file and line instead of an ImportError at collection time.
 Rule 7 uses AST for the `@tool` shape and imports `TOOLS` for the registry check.
+`src/backstop_mcp/` and `tests/` must not mention `agent-explore` — that folder is a
+developer utility, not a package dependency. This file is the exception that enforces it.
 """
 
 import ast
@@ -123,16 +129,19 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.features.accounts",
     "backstop_mcp.features.activity_history",
     "backstop_mcp.features.activity_tags",
+    "backstop_mcp.features.activity_writes",
     "backstop_mcp.features.auth",
     "backstop_mcp.features.collection_scan",
     "backstop_mcp.features.custom_fields",
     "backstop_mcp.features.data_hygiene",
+    "backstop_mcp.features.elicitation_utils",
     "backstop_mcp.features.includes",
     "backstop_mcp.features.opportunities",
     "backstop_mcp.features.org_people",
     "backstop_mcp.features.party_resolver",
     "backstop_mcp.features.system_users",
     "backstop_mcp.features.tasks",
+    "backstop_mcp.features.time_zones",
     "backstop_mcp.server.tools",
 )
 
@@ -234,7 +243,8 @@ def _is_server_tools_directory(directory: pathlib.Path) -> bool:
 
 
 def _is_feature_tool_module_import(module: str) -> bool:
-    """`backstop_mcp.features.<pkg>.tools.get_*` / `list_*` / `search_*`, not `_page_input`."""
+    """A feature tool module (`get_*` / `list_*` / `search_*` / `log_*` / `attach_*` /
+    `update_*` / `delete_*`)."""
     prefix = f"{_FEATURES_PREFIX}."
     if not module.startswith(prefix):
         return False
@@ -242,7 +252,9 @@ def _is_feature_tool_module_import(module: str) -> bool:
     return (
         len(parts) >= 3
         and parts[1] == "tools"
-        and parts[2].startswith(("get_", "list_", "search_"))
+        and parts[2].startswith(
+            ("get_", "list_", "search_", "log_", "attach_", "update_", "delete_")
+        )
     )
 
 
@@ -266,7 +278,7 @@ def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, i
     `backstop_client` through those packages' `__init__`.
 
     Tool tests may import the tool module under test (`features.<pkg>.tools.get_*` / `list_*` /
-    `search_*`);
+    `search_*` / `log_*` / `attach_*` / `update_*` / `delete_*`);
     they still cannot import `server.tools.registry` or `_page_input`, and cannot reach past a
     feature package's `__init__`. `registry.py` under `server/tools` may import those feature
     tool modules.
@@ -518,10 +530,14 @@ def _logic_module_name_violations(source: str, path: pathlib.Path) -> list[str]:
         return []
     stem = path.stem
     pascal = _pascal_case_stem(stem)
+    # A module whose subject is a constant spells it SCREAMING_SNAKE. Same convention, same
+    # readability; only the casing differs, and a mechanism-named file still matches nothing.
+    screaming = stem.upper()
     defined = _top_level_defined_names(ast.parse(source, filename=str(path)))
-    if stem in defined or pascal in defined:
+    candidates = {stem, pascal, screaming}
+    if candidates & defined:
         return []
-    matching = repr(stem) if pascal == stem else f"{stem!r} or {pascal!r}"
+    matching = " or ".join(repr(name) for name in sorted(candidates))
     return [f"{path.relative_to(_SRC)} defines no symbol matching {matching}"]
 
 
@@ -679,7 +695,13 @@ class TestTheDetectionItself:
 
     def test_registry_may_import_feature_tool_modules(self) -> None:
         assert not _internal_imports(
-            "from backstop_mcp.features.org_people.tools.get_person import get_person\n",
+            "from backstop_mcp.features.org_people.tools.get_person import get_person\n"
+            + "from backstop_mcp.features.activity_writes.tools.log_activity import log_activity\n"
+            + "from backstop_mcp.features.activity_writes.tools.attach_file import attach_file\n"
+            + "from backstop_mcp.features.activity_writes.tools.update_activity"
+            + " import update_activity\n"
+            + "from backstop_mcp.features.activity_writes.tools.delete_activity"
+            + " import delete_activity\n",
             _SRC / "server" / "tools",
         )
 
@@ -797,7 +819,14 @@ class TestTheDetectionItself:
         assert _logic_module_name_violations(
             "def something(): ...\n",
             _FEATURES / "accounts" / "fetch.py",
-        ) == ["features/accounts/fetch.py defines no symbol matching 'fetch' or 'Fetch'"]
+        ) == ["features/accounts/fetch.py defines no symbol matching 'FETCH' or 'Fetch' or 'fetch'"]
+
+    def test_accepts_a_logic_module_named_after_its_constant(self) -> None:
+        """A constants module spells its subject SCREAMING_SNAKE; same rule, Python's casing."""
+        assert not _logic_module_name_violations(
+            "ATTACH_FILE_MAX_BYTES = 1\n",
+            _FEATURES / "activity_writes" / "attach_file_max_bytes.py",
+        )
 
     def test_accepts_a_logic_module_named_after_its_function(self) -> None:
         assert not _logic_module_name_violations(
@@ -1062,4 +1091,82 @@ class TestToolModulesAreRegistered:
         assert not violations, (
             f"{source.relative_to(_SRC)} defines {source.stem} but it is not in TOOLS — "
             + "add it to server/tools/registry.py"
+        )
+
+
+_AGENT_EXPLORE_MARKER = "agent-explore"
+
+
+def _agent_explore_mentions(source: pathlib.Path) -> list[str]:
+    return [
+        f"{_display_path(source)}:{lineno} mentions {_AGENT_EXPLORE_MARKER!r}"
+        for lineno, line in enumerate(source.read_text().splitlines(), start=1)
+        if _AGENT_EXPLORE_MARKER in line
+    ]
+
+
+_CLIENT_TENANT_MARKERS = ("fb-rm-lg-26", "capstoneco", "capstone")
+
+
+def _client_tenant_mentions(source: pathlib.Path) -> list[str]:
+    return [
+        f"{_display_path(source)}:{lineno} mentions {marker!r}"
+        for lineno, line in enumerate(source.read_text().splitlines(), start=1)
+        for marker in _CLIENT_TENANT_MARKERS
+        if marker in line.lower()
+    ]
+
+
+def _client_tenant_scan_sources() -> list[pathlib.Path]:
+    layering = pathlib.Path(__file__)
+    service = _TESTS.parent
+    extras = (
+        service / "README.md",
+        service / "AGENT_README.md",
+        service / "agent-explore" / ".env.example",
+    )
+    python = (*_SRC.rglob("*.py"), *_TESTS.rglob("*.py"))
+    explore = (service / "agent-explore").glob("*.py")
+    return [
+        *sorted(source for source in python if source != layering),
+        *sorted(path for path in extras if path.is_file()),
+        *sorted(source for source in explore if source.is_file()),
+    ]
+
+
+class TestShippedCodeDoesNotNameAClientTenant:
+    def test_helper_fires_on_a_mention(self, tmp_path: pathlib.Path) -> None:
+        probe = tmp_path / "probe.py"
+        probe.write_text("# probed https://fb-rm-lg-26.backstopsolutions.com\n")
+        assert _client_tenant_mentions(probe) == ["probe.py:1 mentions 'fb-rm-lg-26'"]
+
+    def test_service_does_not_name_a_client_tenant(self) -> None:
+        violations = [
+            hit
+            for source in _client_tenant_scan_sources()
+            for hit in _client_tenant_mentions(source)
+        ]
+        assert not violations, (
+            "backstop-mcp must not name a client tenant or the client's firm; "
+            + "say 'a client-obtained tenant':\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestShippedCodeDoesNotReferenceAgentExplore:
+    def test_helper_fires_on_a_mention(self, tmp_path: pathlib.Path) -> None:
+        probe = tmp_path / "probe.py"
+        probe.write_text("# see agent-explore/.probe-cache\n")
+        assert _agent_explore_mentions(probe) == [f"probe.py:1 mentions {_AGENT_EXPLORE_MARKER!r}"]
+
+    def test_src_and_tests_do_not_mention_the_developer_utility(self) -> None:
+        layering = pathlib.Path(__file__)
+        sources = (
+            source for source in (*_SRC.rglob("*.py"), *_TESTS.rglob("*.py")) if source != layering
+        )
+        violations = [hit for source in sources for hit in _agent_explore_mentions(source)]
+        assert not violations, (
+            "src/backstop_mcp/ and tests/ must not import or mention agent-explore/ "
+            + "(developer utility only):\n  "
+            + "\n  ".join(violations)
         )

@@ -85,8 +85,8 @@ class TestGetProduct:
                     "data": [
                         _product(
                             _PRODUCT_ID,
-                            name="Capstone Dispersion Fund",
-                            short_name="CDSP",
+                            name="Northwind Dispersion Fund",
+                            short_name="NDSP",
                             values=_strategy_value(),
                         )
                     ],
@@ -115,7 +115,7 @@ class TestGetProduct:
         payload = tool_payload(result)
         rows = [object_dict(item) for item in object_list(payload["products"])]
         assert rows[0]["id"] == _PRODUCT_ID
-        assert rows[0]["short_name"] == "CDSP"
+        assert rows[0]["short_name"] == "NDSP"
         fields = [object_dict(item) for item in object_list(rows[0]["custom_field_values"])]
         assert fields[0]["name"] == "Strategy"
         assert fields[0]["value"] == "Convertible Arbitrage"
@@ -135,7 +135,7 @@ class TestGetProduct:
                 200,
                 json={
                     "data": [
-                        _product(_PRODUCT_ID, name="Capstone Dispersion Fund", short_name="CDSP")
+                        _product(_PRODUCT_ID, name="Northwind Dispersion Fund", short_name="NDSP")
                     ],
                     "links": {"next": None},
                 },
@@ -147,8 +147,8 @@ class TestGetProduct:
                 json={
                     "data": _product(
                         _PRODUCT_ID,
-                        name="Capstone Dispersion Fund",
-                        short_name="CDSP",
+                        name="Northwind Dispersion Fund",
+                        short_name="NDSP",
                         values=_strategy_value(),
                     )
                 },
@@ -192,8 +192,8 @@ class TestGetProduct:
                 json={
                     "data": _product(
                         _PRODUCT_ID,
-                        name="Capstone Dispersion Fund",
-                        short_name="CDSP",
+                        name="Northwind Dispersion Fund",
+                        short_name="NDSP",
                         values=_strategy_value(),
                     )
                 },

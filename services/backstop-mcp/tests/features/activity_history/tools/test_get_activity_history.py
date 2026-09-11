@@ -50,7 +50,7 @@ _SETTINGS = ActivityHistorySettings(page_size=10, gist_max_chars=300)
 
 
 def _org_document(
-    org_id: str = "o42", name: str = "Capstone", *, modified_by: str = "ops"
+    org_id: str = "o42", name: str = "Northwind", *, modified_by: str = "ops"
 ) -> dict[str, object]:
     return {
         "data": {
@@ -156,7 +156,7 @@ class TestFirstCallByTrustedPartyId:
         assert result.resolved == ResolvedPartyAsOfResponse(
             id="o42",
             search_type="organizations",
-            name="Capstone",
+            name="Northwind",
             as_of=AsOfResponse(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops"),
         )
         assert documents.call_count == 1
@@ -185,7 +185,7 @@ class TestFirstCallBySearch:
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
-                200, json=collection(resource("o7", "organizations", name="Capstone"))
+                200, json=collection(resource("o7", "organizations", name="Northwind"))
             )
         )
         respx.get(f"{BASE_URL}/organizations/o7").mock(
@@ -200,7 +200,7 @@ class TestFirstCallBySearch:
                 ctx_never_elicit(),
                 _first(
                     search_type="organizations",
-                    search="Capstone",
+                    search="Northwind",
                     activity_types=["meeting"],
                 ),
                 resolve_party_query=make_resolve_party_query(client),
@@ -228,8 +228,8 @@ class TestFirstCallBySearch:
             return_value=httpx.Response(
                 200,
                 json=collection(
-                    resource("o1", "organizations", name="Capstone A"),
-                    resource("o2", "organizations", name="Capstone B"),
+                    resource("o1", "organizations", name="Northwind A"),
+                    resource("o2", "organizations", name="Northwind B"),
                 ),
             )
         )
@@ -240,7 +240,7 @@ class TestFirstCallBySearch:
         result = tool_model(
             await get_activity_history(
                 ctx_decline(),
-                _first(search_type="organizations", search="Capstone"),
+                _first(search_type="organizations", search="Northwind"),
                 resolve_party_query=make_resolve_party_query(client),
                 activity_history=_SETTINGS,
                 get_activity_history_query=make_get_activity_history_query(client),
@@ -249,22 +249,22 @@ class TestFirstCallBySearch:
         )
 
         assert result == PartyAmbiguousResponse(
-            query="Capstone",
+            query="Northwind",
             scope="organizations",
             candidates=[
                 PartyCandidateResponse(
                     key="organizations:o1",
-                    label="Capstone A (organization)",
+                    label="Northwind A (organization)",
                     id="o1",
                     search_type="organizations",
-                    name="Capstone A",
+                    name="Northwind A",
                 ),
                 PartyCandidateResponse(
                     key="organizations:o2",
-                    label="Capstone B (organization)",
+                    label="Northwind B (organization)",
                     id="o2",
                     search_type="organizations",
-                    name="Capstone B",
+                    name="Northwind B",
                 ),
             ],
         )

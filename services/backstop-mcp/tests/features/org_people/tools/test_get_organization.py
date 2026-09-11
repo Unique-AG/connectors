@@ -115,7 +115,7 @@ class TestGetOrganization:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource("o42", "organizations", name="Capstone")),
+                json=collection(resource("o42", "organizations", name="Northwind")),
             )
         )
         respx.get(f"{BASE_URL}/organizations/o42").mock(
@@ -126,7 +126,7 @@ class TestGetOrganization:
                         "type": "organizations",
                         "id": "o42",
                         "attributes": {
-                            "name": "Capstone",
+                            "name": "Northwind",
                             "status": "active",
                             "modifiedTimestamp": "2025-03-01T10:00:00Z",
                             "modifiedBy": "ops",
@@ -139,7 +139,7 @@ class TestGetOrganization:
         result = tool_model(
             await get_organization(
                 ctx_never_elicit(),
-                search="Capstone",
+                search="Northwind",
                 resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
@@ -154,14 +154,14 @@ class TestGetOrganization:
         # provenance fields bind by alias, neither of which the synthesized `__init__` knows.
         assert result.organization == OrganizationRecordResponse.model_validate(
             {
-                "name": "Capstone",
+                "name": "Northwind",
                 "status": "active",
                 "modified_timestamp": "2025-03-01T10:00:00Z",
                 "modified_by": "ops",
             }
         )
         assert result.resolved == ResolvedPartyResponse(
-            id="o42", search_type="organizations", name="Capstone"
+            id="o42", search_type="organizations", name="Northwind"
         )
         assert result.as_of == AsOfResponse(
             modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops"
@@ -177,8 +177,8 @@ class TestGetOrganization:
             return_value=httpx.Response(
                 200,
                 json=collection(
-                    resource("o1", "organizations", name="Capstone A"),
-                    resource("o2", "organizations", name="Capstone B"),
+                    resource("o1", "organizations", name="Northwind A"),
+                    resource("o2", "organizations", name="Northwind B"),
                 ),
             )
         )
@@ -189,7 +189,7 @@ class TestGetOrganization:
         result = tool_model(
             await get_organization(
                 ctx_decline(),
-                search="Capstone",
+                search="Northwind",
                 resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
@@ -199,22 +199,22 @@ class TestGetOrganization:
         )
 
         assert result == PartyAmbiguousResponse(
-            query="Capstone",
+            query="Northwind",
             scope="organizations",
             candidates=[
                 PartyCandidateResponse(
                     key="organizations:o1",
-                    label="Capstone A (organization)",
+                    label="Northwind A (organization)",
                     id="o1",
                     search_type="organizations",
-                    name="Capstone A",
+                    name="Northwind A",
                 ),
                 PartyCandidateResponse(
                     key="organizations:o2",
-                    label="Capstone B (organization)",
+                    label="Northwind B (organization)",
                     id="o2",
                     search_type="organizations",
-                    name="Capstone B",
+                    name="Northwind B",
                 ),
             ],
         )
@@ -320,7 +320,7 @@ class TestGetOrganization:
     ) -> None:
 
         # `id` is entirely absent from the organization resource — fails
-        # `BackstopApiResourceDocument[OrganizationRecordResponse]` schema validation outright.
+        # `BackstopApiSingleResourceDocument[OrganizationAttributes]` schema validation outright.
         respx.get(f"{BASE_URL}/organizations/trusted-9").mock(
             return_value=httpx.Response(
                 200,
@@ -339,7 +339,9 @@ class TestGetOrganization:
             )
 
         assert exc_info.value.path == "/organizations/trusted-9"
-        assert exc_info.value.schema_name == ("BackstopApiResourceDocument[OrganizationAttributes]")
+        assert exc_info.value.schema_name == (
+            "BackstopApiSingleResourceDocument[OrganizationAttributes]"
+        )
 
     @pytest.mark.asyncio
     @respx.mock
@@ -377,7 +379,7 @@ class TestGetOrganization:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource("o42", "organizations", name="Capstone")),
+                json=collection(resource("o42", "organizations", name="Northwind")),
             )
         )
         respx.get(f"{BASE_URL}/organizations/o42").mock(
@@ -388,7 +390,7 @@ class TestGetOrganization:
                         "type": "organizations",
                         "id": "o42",
                         "attributes": {
-                            "name": "Capstone",
+                            "name": "Northwind",
                             "status": "active",
                             "modifiedTimestamp": "2025-03-01T10:00:00Z",
                             "modifiedBy": "ops",
@@ -401,7 +403,7 @@ class TestGetOrganization:
         result = tool_model(
             await get_organization(
                 ctx_never_elicit(),
-                search="Capstone",
+                search="Northwind",
                 resolve_party_query=make_resolve_party_query(client),
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
@@ -597,7 +599,7 @@ class TestGetOrganizationIncludes:
                                 "firstName": "Margaret",
                                 "lastName": "Lucas",
                                 "userName": "mlucas",
-                                "email": "margaret.lucas@capstoneco.com",
+                                "email": "margaret.lucas@example.com",
                                 "phoneNumber": "12122321462",
                                 "timeZone": "America/New_York",
                                 "dateFormat": "MM/dd/yyyy",
@@ -633,7 +635,7 @@ class TestGetOrganizationIncludes:
             "id": "u1",
             "name": "Margaret Lucas",
             "user_name": "mlucas",
-            "email": "margaret.lucas@capstoneco.com",
+            "email": "margaret.lucas@example.com",
             "phone": "12122321462",
             "disabled": False,
         }

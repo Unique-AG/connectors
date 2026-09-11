@@ -3,11 +3,11 @@ from pydantic import BaseModel, ValidationError
 
 from backstop_mcp.backstop_client import (
     BackstopApiCollectionDocument,
-    BackstopApiError,
     BackstopApiResource,
-    BackstopApiResourceDocument,
+    BackstopApiSingleResourceDocument,
     Included,
     IncludedResource,
+    OptionalBackstopApiResourceDocument,
     ResourceRef,
     included_resource,
 )
@@ -26,14 +26,14 @@ class _OptionalAttrs(BaseModel):
 _STAGE_REF = {
     "resourceType": "opportunity-stages",
     "resourceId": "42482",
-    "resourceLink": "https://fb-rm-lg-26.backstopsolutions.com/backstop/api/opportunity-stages/42482",
+    "resourceLink": "https://example.backstopsolutions.com/backstop/api/opportunity-stages/42482",
     "restricted": False,
 }
 
 
-class TestBackstopApiResourceDocument:
+class TestOptionalBackstopApiResourceDocument:
     def test_validates_typed_attributes(self) -> None:
-        doc = BackstopApiResourceDocument[_Attrs].model_validate(
+        doc = OptionalBackstopApiResourceDocument[_Attrs].model_validate(
             {"data": {"id": "1", "type": "party", "attributes": {"name": "Acme"}}}
         )
 
@@ -49,29 +49,13 @@ class TestBackstopApiResourceDocument:
         Modelling `data` as required turned that into a `BackstopResponseSchemaError` reading
         like a broken schema instead of a missing record.
         """
-        doc = BackstopApiResourceDocument[_Attrs].model_validate({"data": None})
+        doc = OptionalBackstopApiResourceDocument[_Attrs].model_validate({"data": None})
 
         assert doc.data is None
 
-    def test_require_data_turns_null_primary_data_into_a_404(self) -> None:
-        doc = BackstopApiResourceDocument[_Attrs].model_validate({"data": None})
-
-        with pytest.raises(BackstopApiError) as exc_info:
-            doc.require_data(path="/entity-activity-details/999")
-
-        assert exc_info.value.status_code == 404
-        assert "/entity-activity-details/999" in str(exc_info.value)
-
-    def test_require_data_returns_the_resource_when_present(self) -> None:
-        doc = BackstopApiResourceDocument[_Attrs].model_validate(
-            {"data": {"id": "1", "type": "party", "attributes": {"name": "Acme"}}}
-        )
-
-        assert doc.require_data(path="/party/1").id == "1"
-
     def test_rejects_a_collection(self) -> None:
         with pytest.raises(ValidationError):
-            BackstopApiResourceDocument[_Attrs].model_validate(
+            OptionalBackstopApiResourceDocument[_Attrs].model_validate(
                 {
                     "data": [
                         {"id": "1", "type": "party", "attributes": {"name": "Acme"}},
@@ -80,7 +64,7 @@ class TestBackstopApiResourceDocument:
             )
 
     def test_preserves_included_side_loads(self) -> None:
-        doc = BackstopApiResourceDocument[_Attrs].model_validate(
+        doc = OptionalBackstopApiResourceDocument[_Attrs].model_validate(
             {
                 "data": {
                     "id": "1",
@@ -104,6 +88,31 @@ class TestBackstopApiResourceDocument:
 
         assert len(doc.included) == 1
         assert doc.included[0]["id"] == "er1"
+
+
+class TestBackstopApiSingleResourceDocument:
+    def test_validates_typed_attributes(self) -> None:
+        doc = BackstopApiSingleResourceDocument[_Attrs].model_validate(
+            {"data": {"id": "1", "type": "emails", "attributes": {"name": "hello"}}}
+        )
+
+        assert isinstance(doc.data, BackstopApiResource)
+        assert doc.data.id == "1"
+        assert doc.data.attributes.name == "hello"
+
+    def test_rejects_null_data(self) -> None:
+        with pytest.raises(ValidationError):
+            BackstopApiSingleResourceDocument[_Attrs].model_validate({"data": None})
+
+    def test_rejects_a_collection(self) -> None:
+        with pytest.raises(ValidationError):
+            BackstopApiSingleResourceDocument[_Attrs].model_validate(
+                {
+                    "data": [
+                        {"id": "1", "type": "emails", "attributes": {"name": "hello"}},
+                    ]
+                }
+            )
 
 
 class TestBackstopApiCollectionDocument:
@@ -132,7 +141,7 @@ class TestBackstopApiCollectionDocument:
 
 class TestIncluded:
     def test_related_resolves_side_loaded_resources_in_linkage_order(self) -> None:
-        document = BackstopApiResourceDocument[_Attrs].model_validate(
+        document = BackstopApiSingleResourceDocument[_Attrs].model_validate(
             {
                 "data": {
                     "id": "1",
@@ -163,7 +172,7 @@ class TestIncluded:
 
     def test_related_matches_by_type_and_id_when_ids_collide_across_types(self) -> None:
         """Backstop reuses numeric ids across resource types in one `included` array."""
-        document = BackstopApiResourceDocument[_Attrs].model_validate(
+        document = BackstopApiSingleResourceDocument[_Attrs].model_validate(
             {
                 "data": {
                     "id": "1",
@@ -200,7 +209,7 @@ class TestIncluded:
         assert related[0].type == "entity-relationships"
 
     def test_first_parses_the_first_linked_side_load(self) -> None:
-        document = BackstopApiResourceDocument[_Attrs].model_validate(
+        document = BackstopApiSingleResourceDocument[_Attrs].model_validate(
             {
                 "data": {
                     "id": "1",
@@ -226,7 +235,7 @@ class TestIncluded:
         assert (chip.id, chip.attributes.name) == ("9", "Acme")
 
     def test_missing_linkage_is_none(self) -> None:
-        document = BackstopApiResourceDocument[_Attrs].model_validate(
+        document = BackstopApiSingleResourceDocument[_Attrs].model_validate(
             {
                 "data": {
                     "id": "1",
@@ -309,7 +318,7 @@ class TestResourceRef:
             "resource_id": "42482",
             "resource_type": "opportunity-stages",
             "resource_link": (
-                "https://fb-rm-lg-26.backstopsolutions.com/backstop/api/opportunity-stages/42482"
+                "https://example.backstopsolutions.com/backstop/api/opportunity-stages/42482"
             ),
         }
 

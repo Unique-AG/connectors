@@ -6,7 +6,7 @@ from typing import ClassVar, cast
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from backstop_mcp.backstop_client import BackstopApiResourceDocument
+from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument
 from backstop_mcp.features.includes import (
     ActivityIncludesResponse,
     ContactCardResponse,
@@ -27,8 +27,8 @@ def _organization(
     *,
     relationships: dict[str, object],
     included: list[dict[str, object]],
-) -> BackstopApiResourceDocument[_Attrs]:
-    return BackstopApiResourceDocument[_Attrs].model_validate(
+) -> BackstopApiSingleResourceDocument[_Attrs]:
+    return BackstopApiSingleResourceDocument[_Attrs].model_validate(
         {
             "data": {
                 "id": "341208613",
@@ -272,7 +272,7 @@ class TestProjectToOne:
                     "attributes": {
                         "name": "Margaret Lucas",
                         "userName": "mlucas",
-                        "email": "margaret.lucas@capstoneco.com",
+                        "email": "margaret.lucas@example.com",
                         "phoneNumber": "12122321462",
                         "isBsgAdmin": False,
                     },
@@ -290,7 +290,7 @@ class TestProjectToOne:
             "id": "u1",
             "name": "Margaret Lucas",
             "user_name": "mlucas",
-            "email": "margaret.lucas@capstoneco.com",
+            "email": "margaret.lucas@example.com",
             "phone": "12122321462",
         }
 

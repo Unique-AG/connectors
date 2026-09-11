@@ -18,12 +18,15 @@ record's `type` is `"meeting"` for a call as well (verified on a `PHONE_OUT` rec
 
 import asyncio
 import logging
+from http import HTTPStatus
 from urllib.parse import quote
 
 from backstop_mcp.backstop_client import (
+    BackstopApiError,
     BackstopApiResource,
-    BackstopApiResourceDocument,
+    BackstopApiSingleResourceDocument,
     BackstopClient,
+    OptionalBackstopApiResourceDocument,
 )
 from backstop_mcp.features.activity_history.api_responses import (
     ActivityDetailAttributes,
@@ -41,8 +44,8 @@ from backstop_mcp.features.activity_history.responses import ActivityDetailRespo
 
 logger = logging.getLogger(__name__)
 
-_ActivityDetailDocument = BackstopApiResourceDocument[ActivityDetailAttributes]
-_MeetingSpecificDocument = BackstopApiResourceDocument[MeetingSpecificAttributes]
+_ActivityDetailDocument = OptionalBackstopApiResourceDocument[ActivityDetailAttributes]
+_MeetingSpecificDocument = BackstopApiSingleResourceDocument[MeetingSpecificAttributes]
 
 
 class GetActivityDetailQuery:
@@ -93,7 +96,9 @@ class GetActivityDetailQuery:
         document = await self._client.get(path, schema=_ActivityDetailDocument)
         # Null primary data here means "no such activity" — this endpoint answers 200 rather than
         # 404 for an id it cannot resolve, including a composite handle passed through by mistake.
-        resource = document.require_data(path=path)
+        if document.data is None:
+            raise BackstopApiError(HTTPStatus.NOT_FOUND, f"Backstop holds no record at {path!r}.")
+        resource = document.data
         attributes = resource.attributes
         detail = ActivityDetailDto(
             resource_id=resource.id,
@@ -120,7 +125,7 @@ class GetActivityDetailQuery:
             params={"fields": "startTimestamp,stopTimestamp,location,timeZone"},
             schema=_MeetingSpecificDocument,
         )
-        attributes = document.require_data(path=path).attributes
+        attributes = document.data.attributes
         specifics = MeetingSpecificsDto(
             start=attributes.start,
             stop=attributes.stop,

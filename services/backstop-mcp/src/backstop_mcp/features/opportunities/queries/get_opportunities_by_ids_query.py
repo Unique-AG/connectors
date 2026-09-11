@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
-    BackstopApiResourceDocument,
+    BackstopApiSingleResourceDocument,
     BackstopClient,
     BackstopResponseSchemaError,
 )
@@ -132,10 +132,10 @@ class GetOpportunitiesByIdsQuery:
         try:
             document = await self._client.get(
                 path,
-                schema=BackstopApiResourceDocument[OpportunityResourceAttributes],
+                schema=BackstopApiSingleResourceDocument[OpportunityResourceAttributes],
                 params={"include": include_query_param},
             )
-            resource_raw = document.require_data(path=path)
+            resource_raw = document.data
             resource = await self._map_opportunity_to_response_util.run(
                 row=resource_raw,
                 api_include_resources=document.included,

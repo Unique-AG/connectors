@@ -58,8 +58,8 @@ async def get_product_investors(
         str | None,
         Field(
             description=(
-                "Product short name (`CGUP`) or display name. Same catalog resolve as "
-                "`product_id`. Duplicate short names (`BLUC`, `Dispersion`) are ambiguous — "
+                "Product short name (`NGUP`) or display name. Same catalog resolve as "
+                "`product_id`. Duplicate short names are ambiguous — "
                 "pick from the candidates rather than guessing. Same lookup as `search`. "
                 "Exactly one of `product_id` or `product`/`search` must be provided."
             ),
@@ -69,7 +69,7 @@ async def get_product_investors(
         str | None,
         Field(
             description=(
-                "Product short name (`CGUP`) or display name — same lookup as `product`. "
+                "Product short name (`NGUP`) or display name — same lookup as `product`. "
                 "Use this the way get_person uses `search`. Duplicate short names are "
                 "ambiguous — pick from the candidates rather than guessing. Exactly one of "
                 "`product_id` or `product`/`search` must be provided."

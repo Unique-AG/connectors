@@ -61,14 +61,14 @@ class PartyCandidateResponse(CandidateResponse):
     `search_type` is the candidate's own collection (which may differ from the requested
     scope when `enhance_search_types` returns a cross-type hit) — callers must pass it
     as `search_type` together with `id` as `party_id`, two separate arguments. `label`
-    already names that collection in readable form (`Capstone (organization)`,
+    already names that collection in readable form (`Northwind (organization)`,
     `Jane Doe (person)`), so elicitation and this payload both show what the user is
     looking at.
     """
 
     label: str = Field(
         description=(
-            "Display name and entity kind, e.g. 'Capstone (organization)' or "
+            "Display name and entity kind, e.g. 'Northwind (organization)' or "
             "'Jane Doe (person)'. The kind is organization, person, contact, or employee."
         )
     )

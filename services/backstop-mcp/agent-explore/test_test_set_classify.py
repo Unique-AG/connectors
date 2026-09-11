@@ -1,4 +1,4 @@
-"""Harness classification for `agent-explore/test_set.py`.
+"""Classification helpers for `test_set.py`.
 
 Cursor's local agent reports Backstop calls as the `mcp` gateway (`tools=["mcp"]`),
 not as `get_accounts_for_party`. Treating that name as leakage made every live
@@ -7,16 +7,8 @@ case fail even when the judge passed.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
-
-_EXPLORE = Path(__file__).resolve().parents[2] / "agent-explore"
-if str(_EXPLORE) not in sys.path:
-    sys.path.insert(0, str(_EXPLORE))
-
-from test_set_classify import (  # noqa: E402
+from test_set_classify import (
     JudgeScore,
     ToolCall,
     _is_mcp_tool,  # pyright: ignore[reportPrivateUsage]

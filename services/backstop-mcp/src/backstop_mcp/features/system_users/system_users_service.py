@@ -1,6 +1,8 @@
 import logging
 from datetime import timedelta
-from typing import Self
+from typing import Self, overload
+
+from fastmcp.exceptions import ToolError
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.caching import CachedValue, CacheFreshness
@@ -8,6 +10,29 @@ from backstop_mcp.features.system_users.api_responses import SystemUserAttribute
 from backstop_mcp.features.system_users.internal_dto import SystemUserDto
 
 logger = logging.getLogger(__name__)
+
+_SYSTEM_USER_TYPE = "system-users"
+
+
+def _users_matching_user_name(
+    catalog: dict[str, SystemUserDto], username: str
+) -> list[SystemUserDto]:
+    needle = username.casefold()
+    return [
+        user
+        for user in catalog.values()
+        if user.user_name is not None and user.user_name.casefold() == needle
+    ]
+
+
+def system_user_relationship(user_id: str) -> dict[str, object]:
+    """A JSON:API relationship pointing at a system user.
+
+    Backstop takes identity pointers (`author`, `createdBy`, `assignedUser`) only as
+    relationships — in `attributes` it answers `400 "author should not be in the
+    'attributes' but 'relationship."`. Verified live.
+    """
+    return {"data": {"type": _SYSTEM_USER_TYPE, "id": user_id}}
 
 
 async def _fetch_system_users(client: BackstopClient) -> dict[str, SystemUserDto]:
@@ -45,8 +70,8 @@ class SystemUsersService:
     Users come from a real Backstop fetch and live in one in-memory dict keyed by user id.
     `/system-users` has no search filter. A name or login lookup would otherwise dump the
     whole roster, so this service walks once, caches `{id: dto}`, and callers substring-filter
-    that map in memory. Until a fetch succeeds there is nothing to serve. Constructed by
-    `get_system_users_service` in this feature's `dependencies.py`.
+    that map in memory or resolve a login exactly. Until a fetch succeeds there is nothing to
+    serve. Constructed by `get_system_users_service` in this feature's `dependencies.py`.
 
     The TTL, single-flight and serve-stale protocol behind `get` is the composed `CachedValue`.
     """
@@ -75,3 +100,48 @@ class SystemUsersService:
         self, *, refresh: bool = False
     ) -> tuple[dict[str, SystemUserDto], CacheFreshness]:
         return await self._cache.get(lambda: _fetch_system_users(self._client), refresh=refresh)
+
+    @overload
+    async def resolve_relationship(self, username: None) -> None: ...
+
+    @overload
+    async def resolve_relationship(self, username: str) -> dict[str, object]: ...
+
+    @overload
+    async def resolve_relationship(self, username: str | None) -> dict[str, object] | None: ...
+
+    async def resolve_relationship(self, username: str | None) -> dict[str, object] | None:
+        """A `{"data": {"type": "system-users", "id"}}` relationship, or `None` if omitted."""
+        if username is None:
+            return None
+        user = await self.resolve_by_user_name(username)
+        return system_user_relationship(user.id)
+
+    async def resolve_by_user_name(self, username: str) -> SystemUserDto:
+        """The system user with this login.
+
+        The message names the login and nothing else: this resolves a caller-supplied
+        task assignee, and blaming the credential for a mistyped assignee sends the
+        reader to the wrong place.
+        """
+        catalog, _freshness = await self.get()
+        matches = _users_matching_user_name(catalog, username)
+        if not matches:
+            raise ToolError(
+                f"No Backstop system user has the login {username!r}. Logins come from "
+                + "list_system_users; they are not display names or party ids."
+            )
+        if len(matches) > 1:
+            raise ToolError(f"The Backstop login {username!r} matches more than one system user.")
+        return matches[0]
+
+
+async def find_system_user_by_user_name(
+    client: BackstopClient, username: str
+) -> SystemUserDto | None:
+    """One catalog walk for the login form. `None` when the login is missing or duplicated."""
+    catalog = await _fetch_system_users(client)
+    matches = _users_matching_user_name(catalog, username)
+    if len(matches) != 1:
+        return None
+    return matches[0]

@@ -33,6 +33,10 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "list_activity_tags",
         "list_custom_field_groups",
         "list_custom_fields",
+        "attach_file",
+        "delete_activity",
+        "log_activity",
+        "update_activity",
         "search_activities",
         "search_opportunities",
     }
@@ -48,6 +52,18 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
     "list_activity_tags": ('"search"',),
     "list_custom_field_groups": ("refresh",),
     "list_custom_fields": ("entity_types",),
+    "log_activity": ('"kind"', '"search_type"', '"party_id"', "attach_file"),
+    "update_activity": ('"kind"', '"activity_id"', "display_subject"),
+    "delete_activity": ('"kind"', '"activity_id"', "permanent"),
+    "attach_file": (
+        '"kind"',
+        '"search_type"',
+        '"party_id"',
+        '"file_name"',
+        "log_activity",
+        "Do not generate",
+        "rejected",
+    ),
     "search_activities": ("meeting_call", "party_id", "search_type"),
     "search_opportunities": ("representative", "get_opportunities"),
 }
@@ -157,6 +173,44 @@ def test_confused_tools_publish_a_call_like_sample() -> None:
         doc = fn.__doc__ or ""
         for needle in _USAGE_SAMPLE_NEEDLES[fn.__name__]:
             assert needle in doc, f"{fn.__name__} docstring missing {needle!r}"
+
+
+_ACTIVITY_WRITE_TOOLS = frozenset({"log_activity", "attach_file"})
+_ACTIVITY_MUTATION_TOOLS = frozenset({"update_activity", "delete_activity"})
+
+
+def test_activity_write_tools_describe_the_activity_argument() -> None:
+    for fn in TOOLS:
+        if fn.__name__ not in _ACTIVITY_WRITE_TOOLS:
+            continue
+        schema = _published_input_schema(fn)
+        props = object_dict(schema["properties"])
+        activity = object_dict(props["activity"])
+        desc = str(activity.get("description", ""))
+        assert desc, fn.__name__
+        assert "kind" in desc
+        assert "search_type" in desc
+        assert "rejected" in desc
+        doc = fn.__doc__ or ""
+        assert "search_type" in doc
+        assert "rejected" in doc
+
+
+def test_activity_mutation_tools_describe_the_activity_argument() -> None:
+    for fn in TOOLS:
+        if fn.__name__ not in _ACTIVITY_MUTATION_TOOLS:
+            continue
+        schema = _published_input_schema(fn)
+        props = object_dict(schema["properties"])
+        activity = object_dict(props["activity"])
+        desc = str(activity.get("description", ""))
+        assert desc, fn.__name__
+        assert "kind" in desc
+        assert "activity_id" in desc
+        doc = fn.__doc__ or ""
+        assert "activity_id" in doc
+        if fn.__name__ == "delete_activity":
+            assert "permanent" in desc or "permanent" in doc
 
 
 def test_search_activities_types_name_meeting_call() -> None:

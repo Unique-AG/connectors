@@ -294,7 +294,7 @@ class TestListCustomFieldGroupsInput:
         assert "layout groups" in doc.casefold() or "custom-field group" in doc
         assert "tenant" not in doc.casefold()
         for banned in (
-            "capstone",
+            "northwind",
             "events",
             "readers",
             "trip outreach",

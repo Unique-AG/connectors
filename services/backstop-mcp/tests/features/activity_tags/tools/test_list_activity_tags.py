@@ -349,7 +349,7 @@ class TestListActivityTagsInput:
         assert "activity-tag" in doc.casefold() or "activity tag" in doc.casefold()
         assert "tenant" not in doc.casefold()
         for banned in (
-            "capstone",
+            "northwind",
             "at: meeting",
             "at: dispersion",
             "cvm ddq",

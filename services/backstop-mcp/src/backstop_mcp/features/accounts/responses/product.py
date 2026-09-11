@@ -7,9 +7,9 @@ from pydantic import Field
 from backstop_mcp.features.custom_fields import ResolvedCustomFieldValueResponse
 from backstop_mcp.models import OmitNoneModel
 
-# Scan ceiling for the catalog walk. 72 products on this instance; `resolve_product` already
-# warns past 400 because re-reading the catalog per search stops paying for itself. This is the
-# hard stop above that warning, so a tenant with a pathological catalog gets a stated prefix
+# Scan ceiling for the catalog walk. ~72 products on a client-obtained tenant; `resolve_product`
+# already warns past 400 because re-reading the catalog per search stops paying for itself. This
+# is the hard stop above that warning, so a tenant with a pathological catalog gets a stated prefix
 # rather than an unbounded read.
 MAX_PRODUCT_SCAN_RECORDS = 2_000
 
@@ -26,7 +26,7 @@ class ProductRecordResponse(OmitNoneModel):
     name: str | None = Field(default=None, description="Product name as Backstop stores it.")
     short_name: str | None = Field(
         default=None,
-        description="`productShortName` (e.g. 'CGUP'). Tenants may call this a fund or vehicle.",
+        description="`productShortName` (e.g. 'NGUP'). Tenants may call this a fund or vehicle.",
     )
     custom_field_values: list[ResolvedCustomFieldValueResponse] = Field(
         default_factory=list,
@@ -48,8 +48,8 @@ class ProductResolvedResponse(OmitNoneModel):
     products: tuple[ProductRecordResponse, ...] = Field(
         description=(
             "Matching products. One item when a name (`search` / `product`) or id was passed; "
-            "the catalog when none was. The catalog is small (~72 on this instance) — this is "
-            "one walk, not a per-product fan-out."
+            "the catalog when none was. The catalog is small (~72 on a client-obtained tenant) — "
+            "this is one walk, not a per-product fan-out."
         )
     )
     scan_truncated: bool = Field(

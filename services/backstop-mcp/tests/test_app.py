@@ -13,6 +13,7 @@ from typing import Protocol, cast
 import pytest
 from cryptography.fernet import Fernet
 from mcp.server.auth.provider import AccessToken
+from mcp.server.transport_security import DEFAULT_MAX_REQUEST_BODY_SIZE
 from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
@@ -230,6 +231,27 @@ class TestRoutes:
 
         assert response.status_code == 200
 
+    def test_an_oversized_login_post_is_413_rather_than_parsed(
+        self, app_client: TestClient
+    ) -> None:
+        """The reason the body-limit middleware is mounted at all.
+
+        `handle_login_post` reads `request.form()` with no size limit of its own, on an
+        unauthenticated route. The MCP endpoints are covered by the SDK's own copy of this
+        middleware; this route is not.
+        """
+        response = cast(
+            "_HttpResponse",
+            app_client.post(
+                "/backstop/login",
+                content=b"x",
+                headers={"content-length": str(DEFAULT_MAX_REQUEST_BODY_SIZE + 1)},
+            ),
+        )
+
+        assert response.status_code == 413
+        assert "too large" in response.text.lower()
+
     def test_the_login_form_is_mounted_at_the_providers_path(self, app_client: TestClient) -> None:
         """The route is registered from `auth_provider.login_path`, so the two can't disagree."""
         response = _get(app_client, "/backstop/login?request_id=nonexistent")
@@ -333,4 +355,5 @@ class TestConfigTranslation:
             "custom_field_schema_ttl_minutes",
             "opportunity_stage_ttl_minutes",
             "system_user_ttl_minutes",
+            "time_zone_ttl_minutes",
         }

@@ -51,7 +51,7 @@ class ProductRefResponse(OmitNoneModel):
     short_name: str | None = Field(
         default=None,
         description=(
-            "`productShortName` (e.g. 'CGUP'). Tenants may call this a fund, vehicle, or "
+            "`productShortName` (e.g. 'NGUP'). Tenants may call this a fund, vehicle, or "
             "share class."
         ),
     )
@@ -298,7 +298,7 @@ class ProductCandidateResponse(CandidateResponse):
     label: str = Field(
         description=(
             "What to show the user when asking which product they meant, usually "
-            "'Name (SHORT)' — e.g. 'Capstone Global Unconstrained Portfolio (CGUP)'."
+            "'Name (SHORT)' — e.g. 'Northwind Global Unconstrained Portfolio (NGUP)'."
         )
     )
     id: str = Field(
@@ -313,7 +313,7 @@ class ProductCandidateResponse(CandidateResponse):
     )
     short_name: str | None = Field(
         default=None,
-        description="`productShortName` (e.g. 'CGUP'). Omitted when the product has none.",
+        description="`productShortName` (e.g. 'NGUP'). Omitted when the product has none.",
     )
 
     @classmethod

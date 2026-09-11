@@ -6,7 +6,31 @@ When this file and another feature disagree, opportunities wins.
 
 Backstop behaviour is a different question — use the `backstop-api` skill and live `GET`s
 before designing from swagger. The live instance is read-only: never `POST` / `PATCH` /
-`PUT` / `DELETE` against `BACKSTOP_BASE_URL`.
+`PUT` / `DELETE` against `BACKSTOP_BASE_URL` unless the user says so for that task, and
+then delete what you created and verify the `GET` 404s. Writes designed from swagger alone
+have been wrong every time so far — see "Write payloads" below.
+
+---
+
+## agent-explore (developer utility)
+
+[`agent-explore/`](agent-explore/) is a local CLI for reading the live REST API and the
+Elevio help center. It is **not** part of the shipped MCP server. `src/backstop_mcp/`
+and `tests/` must not import it, load its caches, or mention its paths. Its own
+helpers are tested beside the scripts, not from the product suite. Feature tests pin
+wire behaviour with respx fixtures, not by reading those caches.
+
+Credentials live in `agent-explore/.env` (copy `.env.example`). Do not print them.
+Run the scripts from `services/backstop-mcp` so `uv run` picks up the service venv.
+
+| Script | What it does | Cache (gitignored) |
+|---|---|---|
+| `explore.py` | `GET` only against `BACKSTOP_BASE_URL` (API token). 2-minute timeout. | `.probe-cache/` |
+| `docs.py` | Elevio help via help-prod SSO (web username/password). Never POST to the CRM. | `.docs-cache/` |
+| `test_set.py` | Optional local question harness. Not CI. | `.test-set-runs/` |
+
+Reuse a cached probe instead of hitting the API again. Do not rewrite these scripts.
+The `backstop-api` skill is the workflow; this folder is the tooling.
 
 ---
 
@@ -74,8 +98,10 @@ A feature that is only a couple of functions does not need empty `queries/` / `c
 `utils/` packages. Add a package when a second query, a command, or a shared helper
 appears — do not invent structure for one file.
 
-`commands/` is the write side. The live tenant in `agent-explore/.env` stays GET-only:
-never exercise a command against `BACKSTOP_BASE_URL` from a probe or a throwaway script.
+`commands/` is the write side. Do not exercise a command against the live tenant in
+`agent-explore/.env` unless the user asks for that task; when they do, delete every record
+you created and verify the follow-up `GET` 404s. See "Write payloads" for the wire shapes
+Backstop actually accepts.
 
 ---
 
@@ -90,11 +116,33 @@ or a file named after a mechanism.
 | `queries/` | `get_opportunities_query.py` | `GetOpportunitiesQuery` |
 | `commands/` | `close_opportunity_command.py` | `CloseOpportunityCommand` |
 | `utils/` | `map_opportunity_to_response_util.py` | `MapOpportunityToResponseUtil` |
+| `queries/` or `commands/` | `_json_api_utils.py` | several small private functions |
 | `tools/` | `get_opportunities.py` | `get_opportunities` |
 | feature root | `opportunity_stages_service.py` | `OpportunityStagesService` |
 | `responses` | `*Response` classes | published MCP models |
 | `api_responses` | `*Attributes` / resource types | wire shapes |
 | `internal_dto` | `*Dto` classes only | internal projections |
+
+**`_util` is one symbol; `_utils` is a private module of several.** A public helper in
+`utils/` is singular and named after the one thing it defines
+(`map_opportunity_to_response_util.py` → `MapOpportunityToResponseUtil`). A `_`-prefixed
+sibling inside `queries/` or `commands/` is plural — `_<subject>_utils.py` — because it
+holds a handful of small functions and no single symbol to name it after; rule 6 exempts it
+for exactly that reason. When the subject turns out to be a single class, drop the `_utils`
+and take the class's name (`_activity_resource_location.py` → `ActivityResourceLocation`).
+
+The subject still has to be in the name. `_file_data_utils.py` and `_json_api_utils.py` say
+what they hold; `_utils.py` and `_attachment_utils.py`, which those two replaced, did not.
+Reach for one of these modules only when a second caller inside the folder appears; until
+then the helper is a private method on the query or command.
+
+A name that has to cover two subjects is worth a second look, not an automatic split. A few
+small functions that the same callers use together stay together — the extra module and its
+import line cost more than the broad name does. Split when the **callers** diverge:
+`_activity_resource_location.py` came out of `_json_api_utils.py` because only
+`update_activity` and `delete_activity` resolve a path, while every log and attach command
+was importing routing code it never called. That is the signal — two groups of functions
+with two different sets of callers — not the word count in the filename.
 
 The class, the factory, the injected parameter, and the instance attribute should read as
 the same thing: `GetOpportunitiesQuery`, `get_opportunities_query_factory`,
@@ -325,6 +373,46 @@ only when the set is no longer small.
 
 ---
 
+## Write payloads
+
+Four rules, each learned from a 400 on the live instance. Local copies of those probes
+live only under `agent-explore/.probe-cache` (developer utility, not shipped). The swagger
+is wrong or silent about all four, so a create designed from it does not work.
+
+**1. A parent link's `resourceType` is the plural resource name.** `attachedTo`,
+`regarding`, `resources`, `linkedResources` and `secondaryRegarding` carry
+`{resourceId, resourceType, resourceLink}` where `resourceType` is `organizations` /
+`people` / `contacts` / `employees`. Bean casing is rejected —
+`400 "Can not find OrganizationBean with id ..."`, and `linkedResources` is blunter:
+`400 "Invalid LinkResourceType EmployeeBean"`. A `SearchType` is already the right string.
+`map_search_type_to_resource_type_bean` is for `filter[entityType][eq]` on the **read**
+side only; it has no business in a write payload.
+
+**2. Identity pointers are relationships, never attributes.** `author`, `createdBy` and
+`assignedUser` go in `relationships` as `{"data": {"type": "system-users", "id": ...}}`.
+In `attributes` Backstop answers
+`400 "author should not be in the 'attributes' but 'relationship."`. `attendees` and
+`activityTags` are relationships too, and both persist on the `POST` — no follow-up PATCH.
+
+**3. Required fields are not the swagger's required list.** Notes need `effectiveDate`;
+`meeting-or-calls` need `title`, `type`, `timeZone`, `startTimestamp`, `stopTimestamp`,
+`regarding` and `author`; tasks need `name`, `dueDate` and `attachedTo`; `emails` need
+`data` **and** `emailFormat`. Put each one on the pydantic input (or default it in the
+command) so the model rejects the call instead of the agent reading a 400.
+
+**4. Silent defaults bite.** `sendNotification` defaults to **true** when omitted, which
+mails the assignee — always write the flag explicitly. `isDraft` defaults to false. A
+`linkedResources` entry that repeats the parent is silently dropped, so filter it out
+rather than reporting a link that is not there.
+
+Also worth knowing before you route a write: nested collection routes are not uniformly
+writable (`POST /contacts/{id}/notes` is `403 "contacts/notes is read only."` while
+top-level `POST /notes` accepts every party type), and `Accept: application/json` gets an
+HTML 404 page instead of a JSON error, which is why `backstop_client/factory.py` pins
+`application/vnd.api+json`.
+
+---
+
 ## Overlapping other GETs (custom-field catalog)
 
 `CustomFieldsService` is a process-wide TTL cache with single-flight. `join_values` loads
@@ -501,6 +589,10 @@ These are tests, not taste:
 5. A logic file is named after its symbol (rule 6).
 6. Every tool module is on `TOOLS` (rule 7).
 7. Every `@lru_cache` provider is in `teardown.PROVIDERS`.
+8. `src/backstop_mcp/` and `tests/` do not import or mention `agent-explore/`
+   (developer utility only).
+9. The service does not name a client tenant host or the client's firm.
+   Measurements say "a client-obtained tenant".
 
 Never mutate a function argument. Use `assert` for internal invariants; `raise` at the
 system boundary (user input, Backstop errors).
