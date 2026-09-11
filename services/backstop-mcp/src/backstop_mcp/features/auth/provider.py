@@ -17,6 +17,13 @@ from mcp.server.auth.provider import (
 from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
 from mcp.shared.auth import OAuthClientInformationFull
 from mcp.shared.auth import OAuthToken as OAuthTokenResponse
+from mcp_credential_auth import (
+    MAX_USERNAME_LENGTH,
+    ThrottleConfig,
+    clear_failures,
+    is_throttled,
+    record_failure,
+)
 from pydantic import AnyUrl, BaseModel, ConfigDict, SecretStr
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -45,13 +52,6 @@ from backstop_mcp.features.auth.login_csrf import (
     set_csrf_cookie,
 )
 from backstop_mcp.features.auth.login_form import render_login_form
-from backstop_mcp.features.auth.throttle import (
-    MAX_USERNAME_LENGTH,
-    ThrottleConfig,
-    clear_failures,
-    is_throttled,
-    record_failure,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def _hash_token(token: str) -> str:
 def _source_ip(request: Request) -> str | None:
     """The peer address, recorded on a failed attempt for diagnosis only.
 
-    Behind an ingress this is the ingress's address, which is exactly why `auth/throttle.py`
+    Behind an ingress this is the ingress's address, which is exactly why the shared throttle
     does not rate-limit on it. `X-Forwarded-For` is deliberately ignored: it's client-supplied,
     so treating it as an identity would record whatever an attacker chose to send.
     """

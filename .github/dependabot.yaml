@@ -25,6 +25,7 @@ updates:
 
   - package-ecosystem: uv
     directories:
+      - packages/mcp-credential-auth
       - services/**/*
     schedule:
       interval: cron

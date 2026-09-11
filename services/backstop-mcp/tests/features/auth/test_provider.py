@@ -7,6 +7,11 @@ import pytest
 from cryptography.fernet import Fernet
 from mcp.server.auth.provider import AuthorizationParams, TokenError
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
+from mcp_credential_auth import (
+    MAX_USERNAME_LENGTH,
+    ThrottleConfig,
+    count_recent_failures,
+)
 from pydantic import AnyUrl
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -19,11 +24,6 @@ from backstop_mcp.db import LoginAttempt as LoginAttemptRow
 from backstop_mcp.db import OAuthToken as OAuthTokenRow
 from backstop_mcp.features.auth.login_csrf import csrf_cookie_name
 from backstop_mcp.features.auth.provider import BackstopOAuthProvider
-from backstop_mcp.features.auth.throttle import (
-    MAX_USERNAME_LENGTH,
-    ThrottleConfig,
-    count_recent_failures,
-)
 from tests.helpers import client_factory
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
