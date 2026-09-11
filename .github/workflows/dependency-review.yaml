@@ -24,7 +24,7 @@ jobs:
     name: dependency-review
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'allow-vulns') }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'security-exception') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
