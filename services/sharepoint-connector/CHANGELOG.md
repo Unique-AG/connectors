@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.1.2](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.1...sharepoint-connector@3.1.2) (2026-09-11)
+
+
+### Bug Fixes
+
+* **backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** bump base chart dependency to 0.1.0-87990c ([#915](https://github.com/Unique-AG/connectors/issues/915)) ([1bc27a7](https://github.com/Unique-AG/connectors/commit/1bc27a713ab7e2a5bf36671fa1f1f294497c649e))
+
+
+### Dependencies
+
+* bump node from 26.7.0-trixie-slim to 26.8.1-trixie-slim in /services/sharepoint-connector/deploy ([#924](https://github.com/Unique-AG/connectors/issues/924)) ([f06e01e](https://github.com/Unique-AG/connectors/commit/f06e01e95c4c400ba53719e4bb2f2658f2aa5db1))
+* put every dependency in the right group, name what was missing, and hold shared versions in the pnpm catalog ([#958](https://github.com/Unique-AG/connectors/issues/958)) ([794092f](https://github.com/Unique-AG/connectors/commit/794092faa348052eddf2be580ed61fc771684b6f))
+* stop shipping dev dependencies in the service images ([#978](https://github.com/Unique-AG/connectors/issues/978)) ([29c1613](https://github.com/Unique-AG/connectors/commit/29c1613b89b5dd0edb0cd2dd92bdf921bf26c18a))
+* upgrade @azure/msal-node to 6.0.0 ([#963](https://github.com/Unique-AG/connectors/issues/963)) ([3e02a48](https://github.com/Unique-AG/connectors/commit/3e02a481c4d53ebaddd42d62ffc0bb341991d11c))
+* upgrade biome to 2.5.12 and fix what its new rules flag ([#967](https://github.com/Unique-AG/connectors/issues/967)) ([02bb1dc](https://github.com/Unique-AG/connectors/commit/02bb1dc03307689255d8bbf647fd8b1c611dac67))
+* upgrade graphql to 17.0.2 and graphql-request to 7.4.0 ([#969](https://github.com/Unique-AG/connectors/issues/969)) ([76f8f17](https://github.com/Unique-AG/connectors/commit/76f8f17073ad385ff0ce7f9c9478bc4a9a856bfe))
+* upgrade js-yaml to 5.4.1 ([#961](https://github.com/Unique-AG/connectors/issues/961)) ([47d59cc](https://github.com/Unique-AG/connectors/commit/47d59cc29679027de2d02160b3fac5203780d779))
+* upgrade vitest to 5.0.0 and migrate the mocks it breaks ([#970](https://github.com/Unique-AG/connectors/issues/970)) ([9474b72](https://github.com/Unique-AG/connectors/commit/9474b72bc43b99f6e2bf996794145c0aad84f519))
+
 ## [3.1.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.0...sharepoint-connector@3.1.1) (2026-09-01)
 
 
