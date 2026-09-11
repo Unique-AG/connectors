@@ -7,8 +7,8 @@ and departed-contact detection (`data_hygiene`), a person's or organization's in
 record (`activity_history`), logging notes, meetings, calls, tasks, emails, and documents
 (`activity_writes`), a party's pipeline (`opportunities`), the time-zone catalog
 (`time_zones`), the `?include=` allowlist and the shapes side-loads project onto (`includes`),
-the shared entity-type vocabulary (`entity_types`), and the resolution algebra party lookup
-uses (`resolution`).
+the shared entity-type vocabulary (`entity_types`), the resolution algebra party lookup
+uses (`resolution`), and hard-delete confirmation (`elicitation_utils`).
 
 MCP tools live under each feature's `tools/`: one `@tool` per file, named after the file.
 They declare collaborators as `Depends(...)` parameters, which stay out of the published

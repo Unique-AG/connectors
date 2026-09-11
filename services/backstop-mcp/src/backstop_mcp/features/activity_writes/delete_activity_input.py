@@ -11,7 +11,9 @@ __all__ = [
 
 DELETE_ACTIVITY_INPUT_DESCRIPTION = (
     "Required. The activity to hard-delete. Needs `kind` and `activity_id` (create echo, "
-    "search row, or history handle). Never invent an id. Backstop has no recycle bin."
+    "search row, or history handle). Never invent an id. Deletion is permanent: Backstop "
+    "has no recycle bin. The tool reads the record and asks the user to confirm when the "
+    "client can elicit; otherwise it deletes immediately."
 )
 
 _NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]

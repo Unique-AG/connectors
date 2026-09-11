@@ -39,7 +39,7 @@ class DeleteActivityCommand:
             await self._client.delete(location.path, schema=_Document)
         except BackstopApiError as exc:
             reraise_activity_write_error(exc)
-        logger.info(
+        logger.warning(
             "activity_writes.activity.deleted",
             extra={
                 "id": location.resource_id,

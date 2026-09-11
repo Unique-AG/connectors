@@ -134,6 +134,7 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.features.collection_scan",
     "backstop_mcp.features.custom_fields",
     "backstop_mcp.features.data_hygiene",
+    "backstop_mcp.features.elicitation_utils",
     "backstop_mcp.features.includes",
     "backstop_mcp.features.opportunities",
     "backstop_mcp.features.org_people",
@@ -1156,16 +1157,12 @@ class TestShippedCodeDoesNotReferenceAgentExplore:
     def test_helper_fires_on_a_mention(self, tmp_path: pathlib.Path) -> None:
         probe = tmp_path / "probe.py"
         probe.write_text("# see agent-explore/.probe-cache\n")
-        assert _agent_explore_mentions(probe) == [
-            f"probe.py:1 mentions {_AGENT_EXPLORE_MARKER!r}"
-        ]
+        assert _agent_explore_mentions(probe) == [f"probe.py:1 mentions {_AGENT_EXPLORE_MARKER!r}"]
 
     def test_src_and_tests_do_not_mention_the_developer_utility(self) -> None:
         layering = pathlib.Path(__file__)
         sources = (
-            source
-            for source in (*_SRC.rglob("*.py"), *_TESTS.rglob("*.py"))
-            if source != layering
+            source for source in (*_SRC.rglob("*.py"), *_TESTS.rglob("*.py")) if source != layering
         )
         violations = [hit for source in sources for hit in _agent_explore_mentions(source)]
         assert not violations, (
