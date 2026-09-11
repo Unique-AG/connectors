@@ -11,7 +11,7 @@ class AuthBase(DeclarativeBase):
 
 
 class OAuthClient(AuthBase):
-    __tablename__: str = "oauth_clients"
+    __tablename__: str = "mcp_auth_oauth_clients"
 
     client_id: Mapped[str] = mapped_column(String, primary_key=True)
     client_metadata: Mapped[dict[str, object]] = mapped_column(JSONB)
@@ -19,10 +19,10 @@ class OAuthClient(AuthBase):
 
 
 class PendingAuthorization(AuthBase):
-    __tablename__: str = "pending_authorizations"
+    __tablename__: str = "mcp_auth_pending_authorizations"
 
     request_id: Mapped[str] = mapped_column(String, primary_key=True)
-    client_id: Mapped[str] = mapped_column(ForeignKey("oauth_clients.client_id"))
+    client_id: Mapped[str] = mapped_column(ForeignKey("mcp_auth_oauth_clients.client_id"))
     scopes: Mapped[list[str]] = mapped_column(JSON)
     code_challenge: Mapped[str] = mapped_column(String)
     redirect_uri: Mapped[str] = mapped_column(String)
@@ -34,10 +34,10 @@ class PendingAuthorization(AuthBase):
 
 
 class AuthorizationCode(AuthBase):
-    __tablename__: str = "authorization_codes"
+    __tablename__: str = "mcp_auth_authorization_codes"
 
     code: Mapped[str] = mapped_column(String, primary_key=True)
-    client_id: Mapped[str] = mapped_column(ForeignKey("oauth_clients.client_id"))
+    client_id: Mapped[str] = mapped_column(ForeignKey("mcp_auth_oauth_clients.client_id"))
     scopes: Mapped[list[str]] = mapped_column(JSON)
     code_challenge: Mapped[str] = mapped_column(String)
     redirect_uri: Mapped[str] = mapped_column(String)
@@ -49,7 +49,7 @@ class AuthorizationCode(AuthBase):
 
 
 class OAuthToken(AuthBase):
-    __tablename__: str = "oauth_tokens"
+    __tablename__: str = "mcp_auth_oauth_tokens"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     family_id: Mapped[uuid.UUID] = mapped_column(index=True)
@@ -57,7 +57,7 @@ class OAuthToken(AuthBase):
     refresh_token_hash: Mapped[str | None] = mapped_column(
         String, unique=True, index=True, nullable=True
     )
-    client_id: Mapped[str] = mapped_column(ForeignKey("oauth_clients.client_id"))
+    client_id: Mapped[str] = mapped_column(ForeignKey("mcp_auth_oauth_clients.client_id"))
     scopes: Mapped[list[str]] = mapped_column(JSON)
     resource: Mapped[str | None] = mapped_column(String, nullable=True)
     subject: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
@@ -66,17 +66,17 @@ class OAuthToken(AuthBase):
         DateTime(timezone=True), nullable=True
     )
     rotated_from: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("oauth_tokens.id"), nullable=True
+        ForeignKey("mcp_auth_oauth_tokens.id"), nullable=True
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class LoginAttempt(AuthBase):
-    __tablename__: str = "login_attempts"
+    __tablename__: str = "mcp_auth_login_attempts"
     __table_args__: tuple[Index, ...] = (
-        Index("ix_login_attempts_username_attempted_at", "username", "attempted_at"),
-        Index("ix_login_attempts_attempted_at", "attempted_at"),
+        Index("ix_mcp_auth_login_attempts_username_attempted_at", "username", "attempted_at"),
+        Index("ix_mcp_auth_login_attempts_attempted_at", "attempted_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
