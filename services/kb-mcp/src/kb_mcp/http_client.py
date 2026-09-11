@@ -15,6 +15,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # unique_sdk's own default; kept identical so only pool acquisition changes.
 _REQUEST_TIMEOUT_SECONDS = 600.0
+_SERVICE_ID = "kb-mcp"
 
 _CONNECTION_ERROR_MESSAGE = (
     "Unexpected error communicating with Unique. "
@@ -88,7 +89,7 @@ class PooledHTTPXClient(HTTPClient):
             response = await self._client_async.request(
                 method,
                 url,
-                headers=headers,
+                headers={**headers, "x-service-id": _SERVICE_ID},
                 content=json.dumps(post_data) if post_data is not None else None,
                 timeout=self._timeout,
             )

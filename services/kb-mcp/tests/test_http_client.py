@@ -134,6 +134,30 @@ async def test_cancelled_error_propagates_unwrapped():
         await client.request_async("GET", "http://example.invalid/", headers={})
 
 
+@pytest.mark.asyncio
+async def test_async_requests_include_service_id_header():
+    client = PooledHTTPXClient()
+    captured: dict[str, object] = {}
+
+    async def request(*args, **kwargs):
+        captured.update(kwargs)
+        return httpx.Response(200, content=b"ok")
+
+    client._client_async.request = request  # type: ignore[method-assign]
+    headers = {"authorization": "Bearer token"}
+
+    await client.request_async(
+        "GET", "http://example.invalid/", headers=headers
+    )
+
+    assert captured["headers"] == {
+        "authorization": "Bearer token",
+        "x-service-id": "kb-mcp",
+    }
+    assert headers == {"authorization": "Bearer token"}
+    await client.close_async()
+
+
 def test_sync_request_is_refused():
     """Guards against someone assigning this client as the primary."""
     client = PooledHTTPXClient()
