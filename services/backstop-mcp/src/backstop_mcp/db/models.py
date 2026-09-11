@@ -1,13 +1,16 @@
 from datetime import datetime
 
-from mcp_credential_auth import AuthBase as Base
 from sqlalchemy import (
     DateTime,
     LargeBinary,
     String,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 class BackstopCredential(Base):
