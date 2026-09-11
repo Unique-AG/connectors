@@ -3,24 +3,37 @@
 import asyncio
 import logging
 from enum import StrEnum
+from typing import Literal
 
 from fastmcp import Context
 from fastmcp.server.elicitation import AcceptedElicitation
-from mcp.server.elicitation import CancelledElicitation, DeclinedElicitation
+from mcp.server.elicitation import CancelledElicitation
+from pydantic import BaseModel, Field
 
 from backstop_mcp.dependencies import get_resolution_config
 from backstop_mcp.features.resolution import client_supports_elicitation
 
 logger = logging.getLogger(__name__)
 
-DELETE_PERMANENTLY = "Delete permanently"
-KEEP_THIS_RECORD = "Keep this record"
-
 
 class EntityDeletion(StrEnum):
     CONFIRMED = "CONFIRMED"
     NOT_AVAILABLE = "NOT_AVAILABLE"
     DECLINED = "DECLINED"
+
+
+DELETE = "Delete permanently"
+KEEP = "Keep it"
+
+
+class DeletionChoice(BaseModel):
+    """Single-select dropdown; the safe option is preselected so Enter keeps the record."""
+
+    choice: Literal["Keep it", "Delete permanently"] = Field(
+        default=KEEP,
+        title="Choice",
+        description="Pick 'Delete permanently' to delete. This cannot be undone.",
+    )
 
 
 async def elicit_entity_deletion(
@@ -31,7 +44,10 @@ async def elicit_entity_deletion(
 ) -> EntityDeletion:
     """Prompt for a hard delete. The tool formats `prompt`; this only classifies the answer.
 
-    * `CONFIRMED` — the user picked delete.
+    Shows a dropdown with "Keep it" preselected, so accepting the form without touching it
+    is a no-op rather than a delete.
+
+    * `CONFIRMED` — the user accepted.
     * `NOT_AVAILABLE` — the client never advertised elicitation; the tool may proceed.
     * `DECLINED` — the user said no, cancelled, timed out, or the prompt failed. Do not delete.
     """
@@ -47,9 +63,7 @@ async def elicit_entity_deletion(
 
     try:
         async with asyncio.timeout(timeout_seconds):
-            result = await ctx.elicit(
-                message=prompt, response_type=[DELETE_PERMANENTLY, KEEP_THIS_RECORD]
-            )
+            result = await ctx.elicit(message=prompt, response_type=DeletionChoice)
     except TimeoutError:
         logger.warning(
             "elicitation.entity_deletion.timed_out",
@@ -61,16 +75,15 @@ async def elicit_entity_deletion(
         return EntityDeletion.DECLINED
 
     if isinstance(result, AcceptedElicitation):
-        if result.data == DELETE_PERMANENTLY:
+        if isinstance(result.data, DeletionChoice) and result.data.choice == DELETE:
             return EntityDeletion.CONFIRMED
-        logger.info("elicitation.entity_deletion.dismissed", extra={"action": "declined"})
+        logger.info("elicitation.entity_deletion.dismissed", extra={"action": "kept"})
         return EntityDeletion.DECLINED
 
-    assert isinstance(result, (DeclinedElicitation, CancelledElicitation))
     logger.info(
         "elicitation.entity_deletion.dismissed",
         extra={
-            "action": "declined" if isinstance(result, DeclinedElicitation) else "cancelled",
+            "action": "cancelled" if isinstance(result, CancelledElicitation) else "declined",
         },
     )
     return EntityDeletion.DECLINED

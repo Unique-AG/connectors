@@ -17,7 +17,7 @@ from backstop_mcp.features.activity_writes import (
     get_delete_activity_command_factory,
 )
 from backstop_mcp.features.activity_writes.tools.delete_activity import delete_activity
-from backstop_mcp.features.elicitation_utils import DELETE_PERMANENTLY, KEEP_THIS_RECORD
+from backstop_mcp.features.elicitation_utils import DELETE, KEEP, DeletionChoice
 from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import (
     FakeContext,
@@ -112,10 +112,12 @@ class TestDeleteActivity:
         route = respx.delete(f"{BASE_URL}/notes/{_NOTE_ID}").mock(return_value=httpx.Response(204))
         prompts: list[str] = []
 
-        async def elicit(*, message: str, response_type: object) -> AcceptedElicitation[str]:
+        async def elicit(
+            *, message: str, response_type: object
+        ) -> AcceptedElicitation[DeletionChoice]:
             _ = response_type
             prompts.append(message)
-            return AcceptedElicitation(data=DELETE_PERMANENTLY)
+            return AcceptedElicitation(data=DeletionChoice(choice=DELETE))
 
         result = tool_model(
             await delete_activity(
@@ -176,7 +178,7 @@ class TestDeleteActivity:
         assert route.call_count == 0
 
     @respx.mock
-    async def test_picking_keep_does_not_delete(self, client: BackstopClient) -> None:
+    async def test_choosing_keep_does_not_delete(self, client: BackstopClient) -> None:
         respx.get(f"{BASE_URL}/entity-activity-details/{_NOTE_ID}").mock(
             return_value=httpx.Response(
                 200,
@@ -187,7 +189,7 @@ class TestDeleteActivity:
 
         with pytest.raises(ToolError, match="not confirmed"):
             await delete_activity(
-                ctx_accept(KEEP_THIS_RECORD),
+                ctx_accept(DeletionChoice(choice=KEEP)),
                 activity=DeleteActivityInput(kind="note", activity_id=_NOTE_ID),
                 get_activity_detail_query=GetActivityDetailQuery(client=client),
                 delete_activity_command=get_delete_activity_command_factory(client),
@@ -224,7 +226,7 @@ class TestDeleteActivity:
 
         with pytest.raises(BackstopApiError) as raised:
             await delete_activity(
-                ctx_accept(DELETE_PERMANENTLY),
+                ctx_accept(DeletionChoice(choice=DELETE)),
                 activity=DeleteActivityInput(kind="note", activity_id=_NOTE_ID),
                 get_activity_detail_query=GetActivityDetailQuery(client=client),
                 delete_activity_command=get_delete_activity_command_factory(client),
@@ -245,10 +247,12 @@ class TestDeleteActivity:
         )
         prompts: list[str] = []
 
-        async def elicit(*, message: str, response_type: object) -> AcceptedElicitation[str]:
+        async def elicit(
+            *, message: str, response_type: object
+        ) -> AcceptedElicitation[DeletionChoice]:
             _ = response_type
             prompts.append(message)
-            return AcceptedElicitation(data=DELETE_PERMANENTLY)
+            return AcceptedElicitation(data=DeletionChoice(choice=DELETE))
 
         result = tool_model(
             await delete_activity(
