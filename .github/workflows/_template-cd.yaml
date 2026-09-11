@@ -195,8 +195,6 @@ jobs:
           timeout: 15m
           cache: true
 
-      - uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514 # v0.2.6
-
       - name: Convert Trivy results to SARIF
         if: always() && hashFiles('trivy-results.json') != ''
         run: trivy convert --format sarif trivy-results.json -o trivy-image-scan-results.sarif
