@@ -629,3 +629,28 @@ async def test_successful_read_starts_with_reference_link():
 
     text = result.content[0].text  # type: ignore[union-attr]
     assert text.startswith("[doc.pdf](unique://content/cont_abc)\n\n")
+
+
+@pytest.mark.parametrize(
+    ("requested", "expected"),
+    [(None, 8_000), (500, 500), (99_999, 8_000)],
+)
+@pytest.mark.asyncio
+async def test_max_tokens_per_call_clamps_to_admin(
+    requested: int | None, expected: int
+):
+    chunks = [_make_chunk("hello", 0, 1, 1)]
+    content = _make_content("doc.pdf", chunks)
+    with (
+        _patch_search_contents(content),
+        patch(
+            "kb_mcp.tools.read_file.tool._render_chunked", return_value=(False, "ok")
+        ) as render,
+    ):
+        await read_file(
+            content_id="cont_abc",
+            max_tokens_per_call=requested,
+            config=ReadFileToolConfig(),
+        )
+
+    assert render.call_args.args[3] == expected

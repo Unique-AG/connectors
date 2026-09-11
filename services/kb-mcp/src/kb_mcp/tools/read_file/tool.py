@@ -252,6 +252,16 @@ async def read_file(
         int | None,
         Field(description="Last page to return (1-indexed), inclusive."),
     ] = None,
+    max_tokens_per_call: Annotated[
+        int | None,
+        Field(
+            gt=0,
+            description=(
+                "Optional token cap for this call. Omit for the admin default. "
+                "Never exceeds the admin cap."
+            ),
+        ),
+    ] = None,
     config: ReadFileToolConfig = Depends(get_tool_config(ReadFileToolConfig)),
 ) -> ToolResult:
     """Read a specific knowledge-base file's text content. Requires
@@ -322,10 +332,16 @@ async def read_file(
                 is_error=True,
             )
 
+        effective_max_tokens = (
+            config.max_tokens_per_call
+            if max_tokens_per_call is None
+            else min(max_tokens_per_call, config.max_tokens_per_call)
+        )
+
         if is_chunked:
             chunks = sort_content_chunks(list(content.chunks))
             is_error, text = _render_chunked(
-                chunks, start_page, end_page, config.max_tokens_per_call
+                chunks, start_page, end_page, effective_max_tokens
             )
         else:
             try:
@@ -343,7 +359,7 @@ async def read_file(
                 chunks = sort_content_chunks(list(content.chunks))
                 full_text = "\n".join(c.text for c in chunks)
             is_error, text = _render_text(
-                full_text, start_page, end_page, config.max_tokens_per_call
+                full_text, start_page, end_page, effective_max_tokens
             )
 
         _LOGGER.info(

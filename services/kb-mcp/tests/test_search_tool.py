@@ -1,5 +1,6 @@
 """Tests for the search tool — config schema, routing logic, and references."""
 
+import inspect
 import logging
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -8,14 +9,19 @@ import pytest
 from fastmcp.tools import ToolResult
 from unique_mcp.meta.rjsf import ConfigSchemaMeta
 from unique_toolkit.content.schemas import ContentChunk, ContentMetadata
+from unique_toolkit.content.smart_rules import parse_uniqueql
 from unique_toolkit.experimental.components.internal_search import (
     KnowledgeBaseInternalSearchConfig,
 )
 
 from kb_mcp.references import (
     GENERIC_RESULT_CITATION_INSTRUCTION,
+    INVALID_METADATA_FILTER_MESSAGE,
+    METADATA_FILTER_ARG_DESCRIPTION,
+    METADATA_FILTER_EMPTY_RETRY_HINT,
     REFERENCE_META_KEY,
     SEARCH_SYSTEM_PROMPT,
+    SERVER_INSTRUCTIONS_CITATION_GUIDANCE,
     TOOL_DESCRIPTION_CITATION_GUIDANCE,
     UNIQUE_AI_RESULT_CITATION_INSTRUCTION,
     UNIQUE_AI_TOOL_FORMAT_INFORMATION,
@@ -27,6 +33,31 @@ from kb_mcp.references import (
     scope_id_from_folder_id_path,
 )
 from kb_mcp.tools.search import SearchToolConfig, search
+
+
+def test_uniqueql_prompt_copy():
+    assert METADATA_FILTER_ARG_DESCRIPTION == (
+        "Optional UniqueQL filter. Omit to keep the admin default. ANDed with "
+        "admin and `folder_ids`. Example: "
+        '`{"operator":"equals","path":["mimeType"],"value":"application/pdf"}`. '
+        "`equals`/`contains` take a string; a list of values uses `in`. Combine "
+        'with `{"and":[…]}` or `{"or":[…]}`. `path` is a key array (`mimeType`, '
+        "`key`, `title`, `validAsOf`, or a custom key the user named). Folders "
+        "stay `folder_ids`. No matches: drop this arg and retry."
+    )
+    assert METADATA_FILTER_ARG_DESCRIPTION in str(
+        inspect.signature(search).parameters["metadata_filter"].annotation
+    )
+    assert SERVER_INSTRUCTIONS_CITATION_GUIDANCE.startswith(
+        "If your system prompt or a tool result instructs you to cite"
+    )
+    assert (
+        "`search` and `content_tree` accept an optional UniqueQL `metadata_filter`"
+        in SERVER_INSTRUCTIONS_CITATION_GUIDANCE
+    )
+    description = search.__fastmcp__.description or ""
+    assert "UniqueQL" not in SEARCH_SYSTEM_PROMPT
+    assert "UniqueQL" not in description
 
 
 def test_json_schema_has_service_config():
@@ -246,6 +277,87 @@ async def test_folder_ids_include_subfolders_false_uses_folder_id_in_clause():
         "value": ["scope_a"],
     }
     assert _DEFAULT_ADMIN_FILTER in state.metadata_filter_override["and"]
+
+
+_LLM_PDF_FILTER = {
+    "operator": "equals",
+    "path": ["mimeType"],
+    "value": "application/pdf",
+}
+
+
+@pytest.mark.asyncio
+async def test_llm_metadata_filter_without_folder_ids_ands_admin():
+    state = await _run_search_capturing_state(metadata_filter=_LLM_PDF_FILTER)
+
+    expected_llm = parse_uniqueql(_LLM_PDF_FILTER).to_dict()
+    assert state.metadata_filter_override == {
+        "and": [expected_llm, _DEFAULT_ADMIN_FILTER]
+    }
+
+
+@pytest.mark.asyncio
+async def test_llm_metadata_filter_ands_folder_ids_and_admin():
+    state = await _run_search_capturing_state(
+        folder_ids=["scope_a"],
+        include_subfolders=False,
+        metadata_filter=_LLM_PDF_FILTER,
+    )
+
+    expected_llm = parse_uniqueql(_LLM_PDF_FILTER).to_dict()
+    clauses = state.metadata_filter_override["and"]
+    assert {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_a"],
+    } in clauses
+    assert expected_llm in clauses
+    assert _DEFAULT_ADMIN_FILTER in clauses
+
+
+@pytest.mark.asyncio
+async def test_invalid_uniqueql_returns_tool_error_without_search():
+    with patch(
+        "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config"
+    ) as mock_from_config:
+        result = await search(
+            search_string="query",
+            metadata_filter={
+                "equals": {"path": ["mimeType"], "value": "application/pdf"}
+            },
+            config=SearchToolConfig(),
+        )
+
+    assert result.is_error is True
+    assert result.content[0].text == INVALID_METADATA_FILTER_MESSAGE  # type: ignore[union-attr]
+    mock_from_config.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_empty_hits_with_llm_filter_append_retry_hint():
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = _FakeState()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ),
+        _patch_post_processor([]),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+    ):
+        result = await search(
+            search_string="query",
+            metadata_filter=_LLM_PDF_FILTER,
+            config=SearchToolConfig(),
+        )
+
+    assert result.is_error is not True
+    assert result.content[0].text == METADATA_FILTER_EMPTY_RETRY_HINT  # type: ignore[union-attr]
 
 
 @pytest.mark.asyncio
