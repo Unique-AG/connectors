@@ -195,6 +195,14 @@ class BackstopClientFactory:
         session = await self._current_caller_session()
         return session.credential.username
 
+    def current_caller_subject(self) -> str | None:
+        """The MCP access-token subject — our `backstop_credentials.user_id`."""
+        assert self._auth is not None, (
+            "BackstopClientFactory was built without an auth context; "
+            "current_caller_subject() needs one to resolve the caller's credential"
+        )
+        return self._auth.current_subject()
+
     async def _current_caller_session(self) -> CallerSession:
         assert self._auth is not None
         auth = self._auth

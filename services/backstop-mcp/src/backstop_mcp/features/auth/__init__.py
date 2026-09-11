@@ -15,6 +15,7 @@ from backstop_mcp.features.auth.context import (
     BackstopAuthContext,
     NotConnectedError,
 )
+from backstop_mcp.features.auth.credential_store import get_system_user_cache
 from backstop_mcp.features.auth.crypto import load_key
 from backstop_mcp.features.auth.provider import BackstopOAuthProvider
 from backstop_mcp.features.auth.throttle import ThrottleConfig
@@ -25,5 +26,6 @@ __all__ = [
     "NotConnectedError",
     "ThrottleConfig",
     "cleanup_lifespan",
+    "get_system_user_cache",
     "load_key",
 ]

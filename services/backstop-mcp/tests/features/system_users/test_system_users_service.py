@@ -2,9 +2,17 @@ import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backstop_mcp.features.system_users import SystemUserDto, get_current_caller_system_user
+from backstop_mcp.db import BackstopCredential
+from backstop_mcp.features.system_users import (
+    SystemUserDto,
+    find_system_user_by_user_name,
+    get_current_caller_system_user,
+)
 from tests.helpers import BASE_URL, recorded_requests, resource, system_users_service, tool_client
+
+type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
 
 def tenant(name: str) -> str:
@@ -171,30 +179,67 @@ class TestResolveByUserName:
 
 
 @respx.mock
-async def test_get_current_caller_system_user_frames_a_miss_as_a_credential_problem() -> None:
-    """Here the login *is* the credential, so nothing the agent passes can fix it."""
-    base_url = tenant("su-caller-miss")
+async def test_find_system_user_by_user_name_returns_the_single_match() -> None:
+    base_url = tenant("su-find-one")
+    respx.get(f"{base_url}/system-users").mock(return_value=_collection_page(_user("u1")))
+
+    async with tool_client(base_url) as client:
+        result = await find_system_user_by_user_name(client, "mlucas")
+
+    assert result is not None
+    assert result.id == "u1"
+
+
+@respx.mock
+async def test_find_system_user_by_user_name_returns_none_when_missing() -> None:
+    base_url = tenant("su-find-none")
     respx.get(f"{base_url}/system-users").mock(
         return_value=_collection_page(_user("u1", user_name="jsmith"))
     )
 
     async with tool_client(base_url) as client:
-        with pytest.raises(ToolError, match="authenticated") as raised:
-            await get_current_caller_system_user("nobody", system_users_service(client))
-
-    message = str(raised.value)
-    assert "nobody" in message
-    assert "cannot be authored" in message
+        assert await find_system_user_by_user_name(client, "nobody") is None
 
 
-@respx.mock
-async def test_get_current_caller_system_user_returns_the_matching_dto() -> None:
-    base_url = tenant("su-resolve-provider")
-    respx.get(f"{base_url}/system-users").mock(return_value=_collection_page(_user("u1")))
+async def test_get_current_caller_system_user_returns_the_cached_dto(
+    db: DatabaseFixture,
+) -> None:
+    _, session_factory = db
+    raw = SystemUserDto(id="u1", user_name="mlucas", name="Margaret Lucas").model_dump(mode="json")
+    async with session_factory() as session:
+        session.add(
+            BackstopCredential(
+                user_id="su-caller-hit",
+                backstop_username="su-caller-hit-user",
+                encrypted_blob=b"unused",
+                external_user_id="u1",
+                raw=raw,
+            )
+        )
+        await session.commit()
 
-    async with tool_client(base_url) as client:
-        result = await get_current_caller_system_user("mlucas", system_users_service(client))
+    result = await get_current_caller_system_user("su-caller-hit", session_factory)
 
     assert type(result) is SystemUserDto
     assert result.id == "u1"
     assert result.user_name == "mlucas"
+
+
+async def test_get_current_caller_system_user_asks_to_reconnect_without_a_cache(
+    db: DatabaseFixture,
+) -> None:
+    _, session_factory = db
+
+    with pytest.raises(ToolError, match="Reconnect") as raised:
+        await get_current_caller_system_user("su-caller-miss", session_factory)
+
+    assert "cannot be authored" in str(raised.value)
+
+
+async def test_get_current_caller_system_user_asks_to_connect_without_a_subject(
+    db: DatabaseFixture,
+) -> None:
+    _, session_factory = db
+
+    with pytest.raises(ToolError, match="Not connected"):
+        await get_current_caller_system_user(None, session_factory)

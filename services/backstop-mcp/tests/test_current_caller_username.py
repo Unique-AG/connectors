@@ -7,7 +7,7 @@ from backstop_mcp.backstop_client import (
     BackstopClientFactory,
     BackstopCredentialSecret,
 )
-from backstop_mcp.dependencies import get_current_caller_username
+from backstop_mcp.dependencies import get_current_caller_subject, get_current_caller_username
 from tests.helpers import client_factory, credential
 
 _USERNAME = "alice.jones"
@@ -67,3 +67,13 @@ async def test_without_attach_auth_fails_like_for_current_caller(
 
     with pytest.raises(AssertionError):
         await factory.current_caller_username()
+
+    with pytest.raises(AssertionError):
+        factory.current_caller_subject()
+
+
+async def test_returns_the_attached_caller_subject(factory: BackstopClientFactory) -> None:
+    factory.attach_auth(_FakeCallerAuth(credential(username=_USERNAME, token=_TOKEN)))
+
+    assert factory.current_caller_subject() == "mcp-subject"
+    assert get_current_caller_subject(factory) == "mcp-subject"

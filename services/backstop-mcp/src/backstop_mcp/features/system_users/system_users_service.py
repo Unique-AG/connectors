@@ -14,6 +14,17 @@ logger = logging.getLogger(__name__)
 _SYSTEM_USER_TYPE = "system-users"
 
 
+def _users_matching_user_name(
+    catalog: dict[str, SystemUserDto], username: str
+) -> list[SystemUserDto]:
+    needle = username.casefold()
+    return [
+        user
+        for user in catalog.values()
+        if user.user_name is not None and user.user_name.casefold() == needle
+    ]
+
+
 def system_user_relationship(user_id: str) -> dict[str, object]:
     """A JSON:API relationship pointing at a system user.
 
@@ -109,18 +120,12 @@ class SystemUsersService:
     async def resolve_by_user_name(self, username: str) -> SystemUserDto:
         """The system user with this login.
 
-        The message names the login and nothing else: this resolves both the authenticated
-        caller and a caller-supplied assignee, and blaming the credential for a mistyped
-        assignee sends the reader to the wrong place. `get_current_caller_system_user` adds
-        the authenticated-caller framing where that is what failed.
+        The message names the login and nothing else: this resolves a caller-supplied
+        task assignee, and blaming the credential for a mistyped assignee sends the
+        reader to the wrong place.
         """
         catalog, _freshness = await self.get()
-        needle = username.casefold()
-        matches = [
-            user
-            for user in catalog.values()
-            if user.user_name is not None and user.user_name.casefold() == needle
-        ]
+        matches = _users_matching_user_name(catalog, username)
         if not matches:
             raise ToolError(
                 f"No Backstop system user has the login {username!r}. Logins come from "
@@ -129,3 +134,14 @@ class SystemUsersService:
         if len(matches) > 1:
             raise ToolError(f"The Backstop login {username!r} matches more than one system user.")
         return matches[0]
+
+
+async def find_system_user_by_user_name(
+    client: BackstopClient, username: str
+) -> SystemUserDto | None:
+    """One catalog walk for the login form. `None` when the login is missing or duplicated."""
+    catalog = await _fetch_system_users(client)
+    matches = _users_matching_user_name(catalog, username)
+    if len(matches) != 1:
+        return None
+    return matches[0]

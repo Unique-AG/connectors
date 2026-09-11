@@ -8,6 +8,7 @@ from mcp.server.transport_security import (
     RequestBodyLimitMiddleware,
 )
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
+from pydantic import SecretStr
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starlette.applications import Starlette
@@ -16,14 +17,17 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from unique_mcp.monitoring import setup_ops
 
+from backstop_mcp.backstop_client import BackstopCredentialSecret
 from backstop_mcp.dependencies import (
     get_app_config,
     get_auth_config,
     get_auth_provider,
+    get_backstop_client_factory,
     get_engine,
     get_session_factory,
 )
 from backstop_mcp.features.auth import cleanup_lifespan
+from backstop_mcp.features.system_users import find_system_user_by_user_name
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.instructions import INSTRUCTIONS
@@ -49,6 +53,7 @@ def create_app() -> Starlette:
     engine = get_engine()
     session_factory = get_session_factory()
     auth_provider = get_auth_provider()
+    auth_provider.attach_resolve_system_user(_resolve_system_user_for_login)
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None]:
@@ -99,6 +104,17 @@ def create_app() -> Starlette:
             Middleware(SessionRevokedToUnauthorizedMiddleware),
         ]
     )
+
+
+async def _resolve_system_user_for_login(
+    username: str, api_token: str
+) -> tuple[str, dict[str, object]] | None:
+    credential = BackstopCredentialSecret(username=username, api_token=SecretStr(api_token))
+    client = get_backstop_client_factory().for_credential(credential)
+    user = await find_system_user_by_user_name(client, username)
+    if user is None:
+        return None
+    return user.id, user.model_dump(mode="json")
 
 
 async def _ready_response(engine: AsyncEngine) -> JSONResponse:

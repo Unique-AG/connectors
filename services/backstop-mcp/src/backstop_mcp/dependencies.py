@@ -142,6 +142,17 @@ async def get_current_caller_username(
     return await factory.current_caller_username()
 
 
+def get_current_caller_subject(
+    factory: BackstopClientFactory = Depends(get_backstop_client_factory),
+) -> str | None:
+    """The in-flight caller's MCP subject — our `backstop_credentials.user_id`.
+
+    Already on the access token (`AccessToken.subject`). The opaque bearer string stays a
+    random secret; this id is the claim `load_access_token` attaches after the hash lookup.
+    """
+    return factory.current_caller_subject()
+
+
 def transport_settings(config: BackstopConfig) -> BackstopTransportSettings:
     """Translate the env-parsed Backstop config into the transport's own settings type.
 
