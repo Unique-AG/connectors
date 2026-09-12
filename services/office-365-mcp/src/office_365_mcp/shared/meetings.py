@@ -26,14 +26,15 @@ literal escape, which doubles single quotes inside a string literal. This escape
 correctness, and it stops a crafted URL from closing the literal and injecting predicates. The
 tests pin the exact bytes on the wire, because this is the failure that looks like success.
 
-A bare date bound is the whole UTC day, not its first instant. So the same date in both bounds
-brackets one occurrence. If both bounds use just the first instant instead, midnight to midnight
-brackets nothing.
+**No date window on an artifact listing.** Neither collection names a date Microsoft 365 will
+filter on, so this connector offers no bound to narrow by. It used to take one and apply it to the
+rows after the fetch, which read like a filter Graph evaluated and was not. `newest_of` therefore
+reads the meeting's artifacts, sorts them and cuts to `limit`, and every row carries its own
+`started_at` for a reader that wants one occurrence out of a series.
 """
 
-from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
-from typing import Protocol, Self
+from datetime import UTC, datetime, timedelta
+from typing import Protocol
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.online_meeting import OnlineMeeting
@@ -44,12 +45,14 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import CollectedItems, GraphCollection, collect_pages, graph_step
 from office_365_mcp.shared.handles import MeetingHandle
+from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.window import as_utc
 
 # This is the least-privileged permission for the resolve filter, and it needs no admin consent.
 MEETING_PERMISSION = "OnlineMeetings.Read"
 
 # Both meeting tools pay the resolve request. If each one names its own step, one request carries
-# two names, so they share `STEP_RESOLVE_MEETING` instead. `newest_in_window` declares no step: it
+# two names, so they share `STEP_RESOLVE_MEETING` instead. `newest_of` declares no step: it
 # walks a collection the *tool* already named.
 STEP_RESOLVE_MEETING = "resolve_meeting"
 
@@ -86,55 +89,17 @@ class MeetingArtifact(Protocol):
     def created_date_time(self) -> datetime | None: ...
 
 
-@dataclass(frozen=True, slots=True)
-class OccurrenceWindow:
-    """This class states which occurrence was asked about, as two timezone-aware instants. Build
-    it with `of`."""
+def settled(meeting: OnlineMeeting) -> bool:
+    """Whether an empty artifact listing means "there is none" rather than "not yet".
 
-    started_after: datetime | None
-    started_before: datetime | None
-
-    @classmethod
-    def of(
-        cls, started_after: date | datetime | None, started_before: date | datetime | None
-    ) -> Self:
-        """The window built from `started_after` and `started_before`. A naive datetime counts as
-        UTC. A bare date counts as a whole UTC day."""
-        return cls(_first_instant(started_after), _last_instant(started_before))
-
-    def holds(self, artifact: MeetingArtifact) -> bool:
-        """Whether the artifact began inside the window.
-
-        If no window was asked for, a missing `createdDateTime` still counts as inside it. If a
-        window was asked for, a missing `createdDateTime` counts as outside it.
-        """
-        if self.started_after is None and self.started_before is None:
-            return True
-        began = artifact.created_date_time
-        if began is None:
-            return False
-        # Aware even though Graph's own timestamps carry `Z`: this is the comparison that used to
-        # raise, and it must not depend on a payload's punctuation.
-        began = as_utc(began)
-        if self.started_after is not None and began < self.started_after:
-            return False
-        return not (self.started_before is not None and began > self.started_before)
-
-    def settled(self, meeting: OnlineMeeting) -> bool:
-        """Whether an empty answer means "there is none" rather than "not yet".
-
-        Trap: a series with a future `endDateTime` makes any empty window look "still
-        processing". That includes one bracketing an ended occurrence that was never
-        transcribed. So this method checks the window for settlement separately.
-        """
-        now = datetime.now(UTC)
-        return _settled_by(self.started_before, now) or _settled_by(meeting.end_date_time, now)
-
-
-def as_utc(moment: datetime) -> datetime:
-    """The moment as an aware datetime. A naive moment is read as UTC. This way, nothing
-    downstream compares a naive datetime with an aware one and raises `TypeError`."""
-    return moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment
+    Read off the meeting alone. This used to take a caller's window as a second signal: an upper
+    bound demonstrably in the past settled the question even while a recurring series ran on. That
+    bound is gone, so a still-running series now reports `not_ready` where it once could say
+    `not_transcribed`. That is the honest trade for asking Microsoft 365 only what it will answer
+    itself — an artifact listing carries no date Graph will filter on, so this connector no longer
+    offers a date to filter by.
+    """
+    return _settled_by(meeting.end_date_time, datetime.now(UTC))
 
 
 async def resolve_meeting(
@@ -142,7 +107,7 @@ async def resolve_meeting(
 ) -> OnlineMeeting | None:
     """The meeting whose `joinWebUrl` is the handle's, or None if Graph matched none. `200 OK` with
     an empty value is "no match", not a 404."""
-    escaped = handle.join_web_url.replace("'", "''")
+    escaped = odata_literal(handle.join_web_url)
     configuration = RequestConfiguration[_MeetingsQuery](
         query_parameters=OnlineMeetingsRequestBuilder.OnlineMeetingsRequestBuilderGetQueryParameters(
             filter=f"JoinWebUrl eq '{escaped}'"
@@ -155,26 +120,27 @@ async def resolve_meeting(
     return meetings[0] if meetings else None
 
 
-async def newest_in_window[T: MeetingArtifact](
+async def newest_of[T: MeetingArtifact](
     first_page: GraphCollection[T],
     client: GraphServiceClient,
     *,
-    window: OccurrenceWindow,
     limit: int,
 ) -> CollectedItems[T]:
-    """The newest `limit` artifacts of the meeting inside `window`, newest first.
+    """The newest `limit` artifacts of the meeting, newest first.
 
-    This function reads everything the window holds, then sorts it, then cuts it to `limit`.
-    Graph has no `$orderby`. Cutting to `limit` before the sort gives a wrong answer that nobody
-    can detect. `capped` means the scan hit `MAX_ARTIFACT_SCAN`, where the promise stops being
-    "newest of this meeting" and starts being "newest of the ones read". It does not mean the
-    window held more than `limit`.
+    This function reads the collection, then sorts it, then cuts it to `limit`. Graph has no
+    `$orderby` here. Cutting to `limit` before the sort gives a wrong answer that nobody can
+    detect. `capped` means the scan hit `MAX_ARTIFACT_SCAN`, where the promise stops being
+    "newest of this meeting" and starts being "newest of the ones read".
+
+    No predicate: every artifact of the meeting is kept. Microsoft 365 names no filterable date on
+    this collection, so this connector offers no date to narrow by rather than narrowing rows
+    itself and calling the result a filter.
     """
     collected = await collect_pages(
         first_page,
         client,
         limit=MAX_ARTIFACT_SCAN,
-        matches=window.holds,
         max_scanned=MAX_ARTIFACT_SCAN,
     )
     newest = sorted(_told_apart(collected.items), key=_began_at, reverse=True)
@@ -204,22 +170,6 @@ def _told_apart[T: MeetingArtifact](artifacts: list[T]) -> list[T]:
             seen.add(identifier)
         kept.append(artifact)
     return kept
-
-
-def _first_instant(bound: date | datetime | None) -> datetime | None:
-    if bound is None:
-        return None
-    if isinstance(bound, datetime):
-        return as_utc(bound)
-    return datetime.combine(bound, time.min, tzinfo=UTC)
-
-
-def _last_instant(bound: date | datetime | None) -> datetime | None:
-    if bound is None:
-        return None
-    if isinstance(bound, datetime):
-        return as_utc(bound)
-    return datetime.combine(bound, time.max, tzinfo=UTC)
 
 
 def _settled_by(moment: datetime | None, now: datetime) -> bool:

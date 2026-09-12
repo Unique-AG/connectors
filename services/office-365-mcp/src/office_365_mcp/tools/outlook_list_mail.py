@@ -16,15 +16,62 @@ the tool composed. So:
 
 * `$orderby=receivedDateTime desc`, always and unconditionally. Receipt order is what this tool
   promises, and a promise kept only for some arguments is worse than no promise.
-* `$filter=receivedDateTime ge {received_after}`, only when the caller gave a date, and
-  `receivedDateTime` is the only property that ever reaches `$filter`.
-* This tool applies `unread_only` here, through `collect_pages`'s `matches` predicate, and never
-  in `$filter`. `isRead` there, unordered, next to an `$orderby` on `receivedDateTime`, breaks
-  the third rule exactly.
+* `$filter` opens with the bounds on `receivedDateTime` that `received_after` and
+  `received_before` ask for. Microsoft publishes that two-sided range against this very
+  collection — `~/me/mailFolders/inbox/messages?$filter=ReceivedDateTime ge 2017-04-01 and
+  receivedDateTime lt 2017-05-01`
+  (https://learn.microsoft.com/en-us/graph/filter-query-parameter) — so the shape is documented,
+  and no literal is quoted, because that page also rules that DateTimeOffset values are not.
+* `isRead` and `from/emailAddress/address` may follow, and only ever follow. They are unordered,
+  which the third rule permits so long as every ordered property precedes them — and forbids
+  outright if `$filter` names no ordered property at all, which is the first rule. So they go on
+  when a date bound did, and are left off when none did. `_query_filter` is the one place that
+  decides this, and the tests pin the sequence, because a refactor that reorders those lines
+  composes an `InefficientFilter` out of arguments that are each individually fine.
 
-One property in `$orderby`, that same one property in `$filter`, and nothing else in either. So
-no combination of these arguments can break a rule. `InefficientFilter` is impossible by
-construction, not merely untriggered by the cases somebody thought to try.
+An ordered property first in `$filter`, the same one property in `$orderby`, and any unordered
+term strictly after it. So no combination of these arguments can break a rule.
+`InefficientFilter` is impossible by construction, not merely untriggered by the cases somebody
+thought to try.
+
+**The unordered terms are an optimization and never the filter.** `unread_only` and
+`from_address` are re-checked on every row by `_keeps`, whether or not their term reached the
+wire. Microsoft documents that an unsupported query parameter or combination can fail *silently*
+(https://learn.microsoft.com/en-us/graph/query-parameters), and a dropped `isRead eq false` would
+otherwise put read mail into an answer that asked for unread — a confident wrong answer, where
+re-checking degrades instead to the honest partial one `capped` already describes. Both
+properties are already in `SUMMARY_FIELDS`, so the check costs nothing. What the `$filter` term
+buys is Exchange doing the discarding, so a scan looking for four messages from one person does
+not run out against a folder of thousands.
+
+**One step of that is an inference, and it is the second rule.** Rules one and three hold by
+quotation: the only ordered property is in `$filter` whenever anything else is, and every
+unordered term is placed after it, which is what the third rule asks for in as many words. Rule
+two is about the *order* two properties appear in, and Microsoft
+publishes no example where one property appears twice in `$filter` beside an `$orderby` — so
+reading a repeated property as one property is this file's reading of the rule, not Microsoft's
+words. Two things carry it. The documented two-sided range above is the same construction minus
+the `$orderby`, and Microsoft's own `$orderby`-plus-`$filter` example on the query-parameters
+page (`$filter=Subject eq 'welcome' and importance eq 'normal'&$orderby=subject,importance,
+receivedDateTime desc`) orders a property `$filter` never names, which breaks rule one as
+written. So the service enforces something looser than the published text, and every direction
+that looseness runs is a direction this construction is already inside.
+
+**`received_before` exists because receipt order runs the wrong way for a past window.** The
+answer starts at the newest message and `limit` bounds it, so `received_after` alone reaches a
+window only by reading everything newer than it first. "The mail from March", asked in September,
+spends the whole of `limit` on the summer and reports `capped` — a slice of the wrong months that
+names no error. Closing the window at the newest end moves the read to the days that were asked
+about.
+
+**Both bounds take a date or a moment, and `shared/window.py` says which instant either means.**
+That module is the one place the whole surface agrees on it — the five tools that take a window
+reach three unrelated Graph surfaces and must not disagree about what a caller's bound MEANS. The
+rule is that the value named is inside the window, so a bare date is a whole UTC day at either
+end. Only the spelling is this file's: a date closes with `lt` at the start of the following day,
+which is the shape of Microsoft's own April-2017 example and needs no precision chosen, while a
+named moment closes with `le` at itself, being exact already. A `le` on a date's own last instant
+would have to pick a precision and would drop whatever arrived after it.
 
 **Two Graph calls, and this tool reads the folder first.** `totalItemCount` and `unreadItemCount`
 sit on the folder object, where Microsoft recommends reading them over counting a folder's
@@ -49,8 +96,8 @@ exceed the page size on page one. A caller that treats it as "how far I got" ski
 tool follows the link whole, and never parses it.
 """
 
-from collections.abc import Mapping
-from datetime import date
+from collections.abc import Callable, Mapping
+from datetime import date, datetime, timedelta
 from typing import Annotated
 
 import httpx
@@ -72,8 +119,15 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import mail_folder_handle
-from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailSummary, WellKnownFolder
+from office_365_mcp.shared.mail import (
+    ONE_ADDRESS,
+    SUMMARY_FIELDS,
+    MailSummary,
+    WellKnownFolder,
+)
+from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "outlook_list_mail"
 
@@ -116,7 +170,8 @@ _FOLDER_FIELDS: tuple[str, ...] = ("displayName", "totalItemCount", "unreadItemC
 # Unconditional, and the only `$orderby` this tool has. See the module docstring.
 _NEWEST_FIRST = "receivedDateTime desc"
 
-# The first instant of the day asked for, in UTC, so that day is inside the bound.
+# The first instant of a day, in UTC. Both bounds are built from it: `received_after` opens at the
+# start of its own day, and `received_before` closes at the start of the following one.
 _START_OF_DAY = "T00:00:00Z"
 
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
@@ -129,14 +184,19 @@ List the newest messages of ONE mail folder in the signed-in user's mailbox, new
 first. This is the exhaustive, ordered half of mail reading: it walks the folder itself, so "the \
 last ten mails", "what arrived since Monday" and "what is still unread" belong here. \
 outlook_search_mail is the other half: index-backed, in Microsoft's own order, which is not \
-receipt order and cannot be bounded by date. So use it for "find the mail where…", and this one \
-for anything about recency. Name a well-known folder with `folder` (`inbox`, `sentitems`, \
-`drafts`, `archive`, `deleteditems`, `junkemail`, `clutter`), or any other folder with \
-`folder_ref`, the `uri` of an outlook_browse_folders result. Pass one or the other, never both. \
-This tool lists only mail filed directly in that folder, never its subfolders. Rows carry \
-metadata and a short preview. Pass a row's `uri` to outlook_read_mail for what the message says. \
-The folder's own item and unread counts come back beside the rows. These counts show whether \
-"that is all of them" or "that is the first slice".\
+receipt order. It takes the same two date bounds, so a window is not what decides between them — \
+use it for "find the mail where…", and this one for anything about recency, for a window with \
+nothing to search for, and when unsent drafts matter, which its index does not reach. \
+`received_after` and `received_before` bound receipt date at either end, and both of those days \
+are covered whole, so "the mail from March" and "what came in on Tuesday" are each one call. Bound \
+a past window at BOTH ends: rows come newest first, so `received_after` alone spends `limit` on \
+everything newer than the window before reaching it. Name a well-known folder with `folder` \
+(`inbox`, `sentitems`, `drafts`, `archive`, `deleteditems`, `junkemail`, `clutter`), or any other \
+folder with `folder_ref`, the `uri` of an outlook_browse_folders result. Pass one or the other, \
+never both. This tool lists only mail filed directly in that folder, never its subfolders. Rows \
+carry metadata and a short preview. Pass a row's `uri` to outlook_read_mail for what the message \
+says. The folder's own item and unread counts come back beside the rows. These counts show whether \
+"that is all of them" or "that is the first slice". \
 """
 
 _BOTH_FOLDERS = (
@@ -144,6 +204,23 @@ _BOTH_FOLDERS = (
     + "pair. `folder` names a well-known folder, such as `inbox`. `folder_ref` addresses any "
     + "folder, by the handle outlook_browse_folders reported for it. Pass whichever one names "
     + "the folder the question is about. Omit the other entirely."
+)
+
+_WINDOW_RUNS_BACKWARDS = (
+    "outlook_list_mail read nothing, because `received_before` falls before `received_after` and "
+    + "no folder holds a window that runs backwards. Both arguments are dates and both days are "
+    + "covered whole, so one date in both lists that single day. Put the earlier date in "
+    + "`received_after` and the later one in `received_before`, then call again. Retrying with the "
+    + "same two dates will fail identically."
+)
+
+_NOT_ONE_ADDRESS = (
+    "outlook_list_mail matches `from_address` against the sender's SMTP address, so it takes one "
+    + "address and nothing else: `bob@vance.example`, not `Bob Vance` and not "
+    + "`Bob Vance <bob@vance.example>`. A name here matches no message, and Microsoft 365 answers "
+    + 'that with an empty page rather than an error, which reads as "no mail from Bob". Call '
+    + "outlook_find_recipient to turn a name into an address, then pass that. For mail merely "
+    + "mentioning somebody, or to search on a display name, use outlook_search_mail instead."
 )
 
 _NOT_A_FOLDER_HANDLE = (
@@ -196,10 +273,13 @@ class FolderMessages(BaseModel):
         description=(
             "True when this call stopped with more of the folder still on offer. Either `limit` "
             + "filled up, or the internal scan limit ran out while `unread_only` discarded read "
-            + "messages. A higher `limit`, or a narrower `received_after`, returns more. False "
-            + "means the folder, or the window `received_after` opened, ran out on its own. So "
-            + "what came back is all of it, however few rows that is. Read it against "
-            + "`unread_items` and `total_items`, which say how much was there to begin with."
+            + "messages. A higher `limit`, or a narrower window, returns more. Narrow it at the "
+            + "NEWEST end: rows arrive newest first, so `received_before` is what drops mail this "
+            + "answer already spent `limit` on, where raising `received_after` only drops the rows "
+            + "that were never reached. False means the folder, or the window the two bounds "
+            + "opened, ran out on its own. So what came back is all of it, however few rows that "
+            + "is. Read it against `unread_items` and `total_items`, which say how much was there "
+            + "to begin with."
         )
     )
 
@@ -210,11 +290,15 @@ async def list_mail(
     folder: WellKnownFolder = DEFAULT_FOLDER,
     folder_ref: str | None = None,
     unread_only: bool = False,
-    received_after: date | None = None,
+    received_after: date | datetime | None = None,
+    received_before: date | datetime | None = None,
+    from_address: str | None = None,
     limit: int,
 ) -> FolderMessages:
     """The newest `limit` messages of one folder, and that folder's own counts."""
     assert 1 <= limit <= MAX_RESULTS, f"limit must be within 1..{MAX_RESULTS}, got {limit}"
+    _refuse_a_backwards_window(received_after, received_before)
+    sender = _one_address(from_address)
     address = _folder_address(folder, folder_ref)
 
     with graph_errors(TOOL_NAME):
@@ -233,7 +317,9 @@ async def list_mail(
                         select=list(SUMMARY_FIELDS),
                         top=limit,
                         orderby=[_NEWEST_FIRST],
-                        filter=_received_from(received_after),
+                        filter=_query_filter(
+                            received_after, received_before, unread_only=unread_only, sender=sender
+                        ),
                     ),
                     headers=headers,
                 )
@@ -243,7 +329,7 @@ async def list_mail(
                 first_page,
                 client,
                 limit=limit,
-                matches=_is_unread if unread_only else None,
+                matches=_keeps(unread_only=unread_only, sender=sender),
                 headers=headers,
             )
 
@@ -274,21 +360,164 @@ def _folder_address(folder: WellKnownFolder, folder_ref: str | None) -> str:
     return handle.folder_id
 
 
-def _received_from(received_after: date | None) -> str | None:
-    """The only `$filter` this tool can produce, or None when the caller gave no date.
+def _refuse_a_backwards_window(
+    received_after: date | datetime | None, received_before: date | datetime | None
+) -> None:
+    """A window that runs backwards matches nothing, and Graph answers it with an empty page.
 
-    Formatted rather than `isoformat()`d, so a `datetime` that reaches here still renders the day
-    it falls on. The bound this argument promises is a day in UTC, not an instant.
+    So the refusal happens here. Left to Graph, "no mail in that window" and "those two bounds are
+    the wrong way round" are the same answer, and only one of them is worth reporting to anybody.
+
+    `runs_backwards` compares the two as instants, which is the only way to order them once one
+    can be a date and the other a moment — Python refuses that comparison outright.
     """
-    if received_after is None:
+    if runs_backwards(received_after, received_before):
+        raise ToolError(_WINDOW_RUNS_BACKWARDS)
+
+
+def _query_filter(
+    received_after: date | datetime | None,
+    received_before: date | datetime | None,
+    *,
+    unread_only: bool,
+    sender: str | None,
+) -> str | None:
+    """The `$filter` this tool sends, or None when it would send none.
+
+    Two kinds of term live here and the difference is the whole design. The `receivedDateTime`
+    bounds are the property `$orderby` takes, so they are ordered. `isRead` and
+    `from/emailAddress/address` are not, and Microsoft's third rule puts every ordered property in
+    `$filter` before any unordered one. So the date terms are built first and the rest appended
+    after, and the tests assert that sequence over every combination of these arguments: a
+    refactor that reorders these lines composes an `InefficientFilter` out of arguments that are
+    individually fine.
+
+    The unordered terms go on ONLY when a date term did. Alone beside `$orderby=receivedDateTime`
+    they break the first rule — the ordered property would not appear in `$filter` at all — and
+    that request is a published 400. This is why they are an optimization and never the filter:
+    `_keeps` re-checks both of them on the rows regardless, so the answer is the same whether the
+    term went on the wire, was honoured, or was silently dropped. What the term buys is Exchange
+    doing the discarding, so a scan looking for four messages from one person does not run out
+    against a folder of thousands.
+    """
+    dated = _received_within(received_after, received_before)
+    if dated is None:
         return None
-    return f"receivedDateTime ge {received_after:%Y-%m-%d}{_START_OF_DAY}"
+    terms = [dated]
+    if unread_only:
+        terms.append("isRead eq false")
+    if sender is not None:
+        terms.append(f"from/emailAddress/address eq '{odata_literal(sender)}'")
+    return " and ".join(terms)
+
+
+def _received_within(
+    received_after: date | datetime | None, received_before: date | datetime | None
+) -> str | None:
+    """The ordered half of the `$filter`, or None when the caller bounded neither end.
+
+    Two terms at most and both of them on `receivedDateTime`, the very property `$orderby` takes.
+    Microsoft publishes this exact two-sided range against this exact collection; see the module
+    docstring.
+
+    `shared/window.py` owns what a bound MEANS — the value a caller names is inside the window —
+    and this function owns only how OData spells it, which is the half that cannot be shared: a
+    date closes with `lt` at the start of the following day, and a moment closes with `le` at
+    itself. Both are the same promise. `lt` on the next day is Microsoft's own convention for a
+    date window and needs no precision chosen; `le` on a named second is exact already.
+
+    No literal is quoted, because Microsoft rules that a DateTimeOffset in a `$filter` is not.
+    """
+    terms: list[str] = []
+    if received_after is not None:
+        terms.append(f"receivedDateTime ge {_wire(opens_at(received_after))}")
+    if received_before is not None:
+        terms.append(f"receivedDateTime {_closing_term(received_before)}")
+    if not terms:
+        return None
+    return " and ".join(terms)
+
+
+def _closing_term(received_before: date | datetime) -> str:
+    """`lt` the day after a date, `le` a named moment. See `_received_within`."""
+    if isinstance(received_before, datetime):
+        return f"le {_wire(closes_at(received_before))}"
+    return f"lt {_wire(opens_at(received_before + timedelta(days=1)))}"
+
+
+def _wire(instant: datetime) -> str:
+    """An instant as the ISO-8601 UTC literal Graph documents, keeping whatever precision it has.
+
+    TRAP, and it is silent in BOTH directions. Truncating to whole seconds moves the bound the
+    caller named. On the lower bound it moves it earlier, so mail the caller excluded is let in.
+    On the upper bound it moves it earlier too, so mail the caller included is shut out — and a
+    row lost at the boundary is invisible: the answer is well formed, `capped` is false, and
+    nothing says a message was dropped. Graph states `receivedDateTime` in ISO 8601 and its own
+    sample timestamps carry seven fractional digits, so the precision is Graph's to keep, not
+    this function's to round.
+
+    A bare date resolves to midnight and renders unchanged, so a date-bounded query still sends
+    the same bytes it always did.
+    """
+    if instant.microsecond:
+        return f"{instant:%Y-%m-%dT%H:%M:%S.%f}Z"
+    return f"{instant:%Y-%m-%dT%H:%M:%SZ}"
+
+
+def _keeps(*, unread_only: bool, sender: str | None) -> Callable[[Message], bool] | None:
+    """What every returned row must satisfy, or None when the caller asked for no narrowing.
+
+    This runs always, never only when `_query_filter` left a term off. Microsoft documents that an
+    unsupported query parameter or combination can fail *silently*, and a dropped `isRead eq false`
+    would otherwise put read mail in an answer that asked for unread — a confident wrong answer,
+    where this instead degrades to the honest partial one `capped` already describes. Both
+    properties are in `SUMMARY_FIELDS`, so the check costs nothing on the wire.
+    """
+    checks: list[Callable[[Message], bool]] = []
+    if unread_only:
+        checks.append(_is_unread)
+    if sender is not None:
+        checks.append(_sent_by(sender))
+    if not checks:
+        return None
+    return lambda message: all(check(message) for check in checks)
 
 
 def _is_unread(message: Message) -> bool:
     """`isRead` false, and not merely absent: a message Graph said nothing about is not evidence
     of an unread one. `unread_only` is a claim about the rows it keeps."""
     return message.is_read is False
+
+
+def _sent_by(sender: str) -> Callable[[Message], bool]:
+    """Whether the message came from this address, compared case-insensitively.
+
+    An SMTP address is case-insensitive, and the casing on a message is whatever the sender's own
+    server wrote, not the casing the caller filtered with. Comparing exactly would drop a row
+    Exchange itself considers a match. A message Graph recorded no sender for is not a match: like
+    `_is_unread`, this is a claim about the rows kept, not a benefit of the doubt.
+    """
+    wanted = sender.casefold()
+
+    def sent_by(message: Message) -> bool:
+        recorded = message.from_.email_address if message.from_ is not None else None
+        return recorded is not None and (recorded.address or "").casefold() == wanted
+
+    return sent_by
+
+
+def _one_address(from_address: str | None) -> str | None:
+    """The argument as one SMTP address, or a refusal.
+
+    A display name reaches Graph as an address that matches nothing, and `eq` answers that with an
+    empty page rather than an error — "no mail from Bob" for a caller who spelled Bob's name.
+    """
+    if from_address is None:
+        return None
+    candidate = from_address.strip()
+    if ONE_ADDRESS.match(candidate) is None:
+        raise ToolError(_NOT_ONE_ADDRESS)
+    return candidate
 
 
 def _summary(message: Message) -> MailSummary:
@@ -346,25 +575,64 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool,
             Field(
                 description=(
-                    "Keep only the messages Microsoft reports as unread. Applied to the messages "
-                    + "this call read, rather than by Exchange, deliberately: Graph cannot filter "
-                    + "on read state alongside receipt order without refusing the query. So a "
-                    + "folder holding few unread messages among many can exhaust this call's "
-                    + "internal scan before it fills `limit`. `capped` says when that happened. "
-                    + "Compare what comes back with `unread_items`, for how much this call reached."
+                    "Keep only the messages Microsoft reports as unread. Every returned row is "
+                    + "checked here, so no read message reaches the answer. Whether Exchange also "
+                    + "does the discarding depends on the dates: with a date bound it can, and a "
+                    + "folder of thousands still fills `limit`; without one, this call reads the "
+                    + "newest mail and discards as it goes, so a folder holding few unread among "
+                    + "many can exhaust its internal scan first. `capped` says when that "
+                    + "happened. Compare what comes back with `unread_items`, for how much this "
+                    + "call reached."
                 )
             ),
         ] = False,
         received_after: Annotated[
-            date | None,
+            date | datetime | None,
             Field(
                 description=(
-                    "Only messages received on or after this date, as YYYY-MM-DD, for example "
-                    + "2026-03-04. The bound is the first instant of that day in UTC and the day "
-                    + "itself is included, so a user's early morning or late evening can fall on "
-                    + "the neighbouring UTC day. There is no upper bound and none is needed: the "
-                    + "answer starts at the newest, so a window is read from the top."
+                    "Only messages received on or after this point, inclusive. Two shapes: a "
+                    + "date, `2026-03-04`, which opens at the first instant of that whole UTC "
+                    + "day; or a moment, `2026-03-04T09:00:00Z`, which opens at the second it "
+                    + "names. A moment carrying no zone is read as UTC, so a user's early morning "
+                    + "or late evening can fall on the neighbouring UTC day either way. Alone, it "
+                    + 'leaves the window open at the newest end, which is what "since Monday" '
+                    + "asks for. For a window that has already closed, pair it with "
+                    + "`received_before`."
                 )
+            ),
+        ] = None,
+        received_before: Annotated[
+            date | datetime | None,
+            Field(
+                description=(
+                    "Only messages received on or before this point, inclusive, in the same two "
+                    + "shapes `received_after` takes. A date closes at the END of that UTC day, "
+                    + "so the whole of it is inside the bound and the same date in both bounds "
+                    + "lists that one day; a moment closes at the second it names. Pass it for "
+                    + 'any window that has already closed — "the mail from March", "what came in '
+                    + 'last week", "everything older than five days" — because the rows arrive '
+                    + "newest first: `received_after` alone reaches such a window only after "
+                    + "spending `limit` on everything newer than it, and reports that as `capped` "
+                    + "rather than as an error."
+                )
+            ),
+        ] = None,
+        from_address: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Only messages from this sender, by SMTP address — one address, never a "
+                    + "display name and never a list. `bob@vance.example` works; `Bob Vance` is "
+                    + 'refused, because it would match nothing and read as "no mail from Bob". '
+                    + "Call outlook_find_recipient to turn a name into an address. Matching is "
+                    + "case-insensitive, as SMTP addresses are. Pair it with a date bound when "
+                    + "the question has one: with a date, Microsoft 365 does the discarding, so a "
+                    + "quiet sender is found in a busy folder; without one, this call reads the "
+                    + "newest mail and discards as it goes, so it can stop early and say `capped`. "
+                    + "For the sender's name, mail merely mentioning them, or mail they only "
+                    + "received, use outlook_search_mail."
+                ),
             ),
         ] = None,
         limit: Annotated[
@@ -374,7 +642,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_RESULTS,
                 description=(
                     f"How many messages to return, at most {MAX_RESULTS}. They are the newest "
-                    + "that many of the folder, or of the window `received_after` opens. Paging "
+                    + "that many of the folder, or of the window the two date bounds open. Paging "
                     + "happens inside the call, so this is the whole answer rather than a first "
                     + "page: raise it rather than calling again with the same arguments."
                 ),
@@ -388,6 +656,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             folder_ref=folder_ref,
             unread_only=unread_only,
             received_after=received_after,
+            received_before=received_before,
+            from_address=from_address,
             limit=limit,
         )
 

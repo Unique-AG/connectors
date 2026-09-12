@@ -1,7 +1,7 @@
 """`teams_search_messages`: the query Graph is sent, and the traps in what comes back."""
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime, timedelta, timezone
 from typing import cast
 from uuid import UUID
 
@@ -165,6 +165,85 @@ class TestTheQueryItSends:
         )
 
         assert _query_string(route) == "sent>=2026-01-01 sent<=2026-01-31"
+
+    async def test_a_moment_bounds_the_second_rather_than_the_day(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """KQL publishes `YYYY-MM-DDThh:mm:ssZ` as a literal for a DateTime comparison. An
+        `isoformat()` of an aware moment writes `+00:00`, which is none of the four shapes it
+        publishes."""
+        route = graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([]))
+        )
+
+        _ = await teams_search_messages.teams_search_messages(
+            client,
+            criteria=SearchCriteria(
+                sent_after=datetime(2026, 1, 1, 9, 30, tzinfo=UTC),
+                sent_before=datetime(2026, 1, 1, 17, 0, tzinfo=UTC),
+            ),
+            offset=0,
+            size=25,
+        )
+
+        assert _query_string(route) == "sent>=2026-01-01T09:30:00Z sent<=2026-01-01T17:00:00Z"
+
+    async def test_a_moment_with_no_zone_is_read_as_utc_and_not_as_the_servers_own(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The zone a naive moment picks up would otherwise be whichever one the pod runs in — a
+        zone no caller chose and no answer names."""
+        route = graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([]))
+        )
+
+        _ = await teams_search_messages.teams_search_messages(
+            client,
+            criteria=SearchCriteria(sent_after=datetime(2026, 1, 1, 9, 30)),
+            offset=0,
+            size=25,
+        )
+
+        assert _query_string(route) == "sent>=2026-01-01T09:30:00Z"
+
+    async def test_a_moment_east_of_utc_is_converted_rather_than_relabelled(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """An offset the caller wrote is honoured, not dropped: 09:30+02:00 is 07:30 UTC, and
+        stamping `Z` on the wall clock would move the bound two hours."""
+        route = graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([]))
+        )
+
+        _ = await teams_search_messages.teams_search_messages(
+            client,
+            criteria=SearchCriteria(
+                sent_after=datetime(2026, 1, 1, 9, 30, tzinfo=timezone(timedelta(hours=2)))
+            ),
+            offset=0,
+            size=25,
+        )
+
+        assert _query_string(route) == "sent>=2026-01-01T07:30:00Z"
+
+    async def test_a_date_renders_exactly_as_it_always_has(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`datetime` subclasses `date`, so a check in the wrong order renders every moment as the
+        day it falls on. This pins the other half: widening the type left the date form as it was.
+        """
+        route = graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([]))
+        )
+
+        _ = await teams_search_messages.teams_search_messages(
+            client,
+            criteria=SearchCriteria(sent_after=date(2026, 1, 1)),
+            offset=0,
+            size=25,
+        )
+
+        assert _query_string(route) == "sent>=2026-01-01"
 
     async def test_a_multi_word_query_reaches_graph_as_words_and_not_as_a_phrase(
         self, client: GraphServiceClient, graph: respx.MockRouter

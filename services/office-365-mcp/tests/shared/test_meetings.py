@@ -5,7 +5,7 @@ rest on this, so it
 is tested here once rather than once per lister. Every payload is synthesised.
 """
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import timedelta
 
 import httpx
 import pytest
@@ -97,30 +97,10 @@ class TestTheFilterOnTheWire:
         assert await meetings.resolve_meeting(client, _handle()) is None
 
 
-class TestTheWindowShapesAModelActuallySends:
+class TestHowLongAnAbsenceStaysUnsettled:
     """`2026-02-10` and `2026-02-10T14:00:00` both used to reach a comparison between a naive
     datetime and Graph's aware one and raise `TypeError` at the caller. Resolving happens once,
     here, so nothing downstream can meet a naive datetime."""
-
-    def test_a_bound_that_named_no_zone_is_resolved_against_utc_and_not_the_host(self) -> None:
-        """Asserted on the resolved instant and not through a filter: a machine whose local zone
-        happens to be UTC cannot tell the two readings apart."""
-        window = meetings.OccurrenceWindow.of(
-            datetime(2026, 2, 10, 9, 0), datetime(2026, 2, 10, 17, 0)
-        )
-
-        assert window.started_after == datetime(2026, 2, 10, 9, 0, tzinfo=UTC)
-        assert window.started_before == datetime(2026, 2, 10, 17, 0, tzinfo=UTC)
-
-    def test_a_bare_date_is_a_whole_utc_day_and_not_an_empty_span(self) -> None:
-        """The same date in both bounds is how one occurrence gets bracketed; resolving both to
-        midnight makes it the empty span between one instant and itself."""
-        window = meetings.OccurrenceWindow.of(date(2026, 2, 10), date(2026, 2, 10))
-
-        assert window.started_after == datetime(2026, 2, 10, tzinfo=UTC)
-        assert window.started_before is not None
-        assert datetime(2026, 2, 10, 23, 59, 59, tzinfo=UTC) < window.started_before
-        assert window.started_before < datetime(2026, 2, 11, tzinfo=UTC)
 
     def test_the_allowance_is_generous_enough_to_be_the_safe_side(self) -> None:
         """Microsoft publishes no availability SLA, and a tight window reports a still-processing

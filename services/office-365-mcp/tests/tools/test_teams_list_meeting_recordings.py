@@ -1,7 +1,7 @@
 """`teams_list_meeting_recordings`: what exists, how long it ran, and who may download it."""
 
 from collections.abc import Mapping
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
 import httpx
@@ -119,16 +119,12 @@ def _weekly_series(graph: respx.MockRouter, *, end: str | None = "2026-02-17T15:
 async def _listing(
     client: GraphServiceClient,
     *,
-    started_after: date | datetime | None = None,
-    started_before: date | datetime | None = None,
     limit: int = 20,
     include_scan_completeness: bool = False,
 ) -> lister.MeetingRecordings:
     return await lister.teams_list_meeting_recordings(
         client,
         handle=_handle(),
-        started_after=started_after,
-        started_before=started_before,
         limit=limit,
         include_scan_completeness=include_scan_completeness,
     )
@@ -359,18 +355,6 @@ class TestTheKindsOfAbsence:
 
         assert found.status == "not_ready"
 
-    async def test_a_long_past_occurrence_of_a_running_series_was_not_recorded(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        """A series' own end time says nothing about an occurrence that ended a month ago."""
-        past = (datetime.now(UTC) - timedelta(days=30)).date()
-        _weekly_series(graph, end=(datetime.now(UTC) + timedelta(days=180)).isoformat())
-
-        found = await _listing(client, started_after=past, started_before=past)
-
-        assert found.recordings == []
-        assert found.status == "not_recorded"
-
     async def test_a_404_is_still_a_failure(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -381,8 +365,8 @@ class TestTheKindsOfAbsence:
         with pytest.raises(GraphNotFound):
             _ = await _listing(client)
 
-    def test_the_five_answers_reach_the_schema_as_an_enum_and_not_only_as_prose(self) -> None:
-        """These five words are this connector's invention, not Microsoft's, so a model can only
+    def test_the_four_answers_reach_the_schema_as_an_enum_and_not_only_as_prose(self) -> None:
+        """These four words are this connector's invention, not Microsoft's, so a model can only
         learn them from what this tool publishes. Typed `str` they would arrive as
         `{"type": "string"}` and exist only inside the description. Asserted inline on the property
         rather than anywhere in the document: a `$ref` into `$defs` — what a PEP 695 `type` alias
@@ -393,7 +377,6 @@ class TestTheKindsOfAbsence:
             "available",
             "not_ready",
             "not_recorded",
-            "scan_incomplete",
             "meeting_not_found",
         ]
         assert status["type"] == "string"
@@ -404,50 +387,6 @@ class TestTheKindsOfAbsence:
 
 
 class TestScopingToOneOccurrence:
-    async def test_the_shared_window_picks_one_occurrence_out_of_the_series(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        """The window is the transcript lister's own `OccurrenceWindow` from `shared/meetings.py`:
-        a series bracketed one way for transcripts and another for recordings would pair the wrong
-        occurrence with the wrong call."""
-        _weekly_series(graph)
-        _me(graph)
-
-        found = await _listing(
-            client,
-            started_after=datetime(2026, 2, 10, tzinfo=UTC),
-            started_before=datetime(2026, 2, 11, tzinfo=UTC),
-        )
-
-        assert found.meeting_type == "recurring"
-        assert [item.recording_id for item in found.recordings] == ["week-2"]
-
-    @pytest.mark.parametrize(
-        ("started_after", "started_before", "expected"),
-        [
-            (date(2026, 2, 10), date(2026, 2, 10), ["week-2"]),
-            (datetime(2026, 2, 10, 14, 0), datetime(2026, 2, 10, 14, 2), ["week-2"]),
-            (datetime(2026, 2, 10, 14, 0, tzinfo=UTC), None, ["week-3", "week-2"]),
-            (None, date(2026, 2, 10), ["week-2", "week-1"]),
-        ],
-        ids=["bare-dates", "no-offset", "open-at-the-top", "open-at-the-bottom"],
-    )
-    async def test_every_window_shape_a_model_writes_is_answered(
-        self,
-        client: GraphServiceClient,
-        graph: respx.MockRouter,
-        started_after: date | datetime | None,
-        started_before: date | datetime | None,
-        expected: list[str],
-    ) -> None:
-        _weekly_series(graph)
-        _me(graph)
-
-        found = await _listing(client, started_after=started_after, started_before=started_before)
-
-        assert found.status == "available"
-        assert [item.recording_id for item in found.recordings] == expected
-
     async def test_recordings_come_back_newest_first(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -517,74 +456,25 @@ class TestScopingToOneOccurrence:
 
         assert [item.recording_id for item in found.recordings] == ["newest"]
 
-    async def test_a_scan_that_stopped_short_asserts_no_absence(
+    async def test_a_capped_scan_never_reports_an_absence(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """`not_recorded` ("retrying will not help") alongside "there is more" cannot both be
-        true, so `scan_incomplete` claims nothing about absence and reaches `status` whether or not
-        the caller asked about the scan."""
+        true. Nothing has to reconcile them: with no window to filter rows out, a scan that stops
+        at the cap has collected the cap's worth of rows, so it always answers `available`. This is
+        why there is no partial-scan status."""
         ended = datetime.now(UTC) - timedelta(days=30)
         _resolved(graph, meeting_type="recurring", end=ended.isoformat())
-        _listed(
-            graph,
-            *(
-                recording_payload(
-                    recording_id=f"occurrence-{index}", created_at="2026-02-03T14:00:00Z"
-                )
-                for index in range(meetings.MAX_ARTIFACT_SCAN + 50)
-            ),
-        )
+        _daily_series(graph)
         _me(graph)
 
-        found = await _listing(
-            client,
-            started_after=datetime(2026, 3, 1, tzinfo=UTC),
-            started_before=datetime(2026, 3, 2, tzinfo=UTC),
+        found = await _listing(client, limit=20, include_scan_completeness=True)
+
+        assert found.scan_incomplete is True, "the read stopped at the cap"
+        assert found.status == "available", (
+            "and the rows it stopped on are the answer, so no absence is claimed over a prefix"
         )
-
-        assert found.recordings == []
-        assert found.status == "scan_incomplete"
-        assert found.scan_incomplete is None, "and still only `status` says it, unless asked"
-        assert found.status not in ("not_recorded", "not_ready"), (
-            "a window whose collection was not read to the end settles nothing either way"
-        )
-
-    async def test_narrowing_the_window_cannot_reach_past_the_scan_cap(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        """Graph documents `contentCorrelationId` as this collection's one filterable property and
-        never a date, so the request goes out bare and a narrower window reads the same recordings.
-        The narrow window here brackets `day-250`, which genuinely exists and is never seen."""
-        _resolved(graph, meeting_type="recurring")
-        listing = _daily_series(graph)
-        _me(graph)
-
-        wide = await _listing(
-            client,
-            started_after=_day(meetings.MAX_ARTIFACT_SCAN).date(),
-            started_before=_day(_PAST_THE_CAP - 1).date(),
-        )
-        wide_request = listing.calls.last.request.url
-        narrow = await _listing(
-            client, started_after=_day(250).date(), started_before=_day(250).date()
-        )
-        narrow_request = listing.calls.last.request.url
-
-        assert (wide.status, wide.recordings) == ("scan_incomplete", [])
-        assert (narrow.status, narrow.recordings) == (wide.status, [])
-        assert str(wide_request) == str(narrow_request), "two windows, one request"
-        for asked in (wide_request, narrow_request):
-            assert not {"$filter", "$orderby", "$top"} & set(asked.params), (
-                f"the window is applied here, not by Graph: {asked}"
-            )
-
-    async def test_the_unreadable_answer_tells_a_caller_to_stop_rather_than_to_retry(self) -> None:
-        described = str(lister.MeetingRecordings.model_fields["status"].description)
-
-        assert "There is nothing to try" in described
-        assert "Stop, and report" in described
-        assert "returns this same status" in described
-        assert "Narrow `started_after`/`started_before` to the occurrence you mean" not in described
+        assert len(found.recordings) == 20, "a capped scan is never short of the asked-for limit"
 
     async def test_past_the_cap_the_newest_returned_is_the_newest_of_what_was_read(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -605,35 +495,32 @@ class TestScopingToOneOccurrence:
             "the meeting's genuinely newest recording was never read, which is the whole point"
         )
 
-    async def test_a_short_list_is_not_a_complete_window_when_the_scan_stopped_short(
+    async def test_a_short_list_means_the_collection_was_read_to_its_end(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """ "Fewer than `limit` means the whole window" holds wherever a walk reaches the end of its
-        collection, and this walk stops at `MAX_ARTIFACT_SCAN` instead, so a short list can mean the
-        opposite of what the convention says."""
+        """ "Fewer than `limit` means there are no more" is trustworthy here only because the
+        largest `limit` a caller may ask for sits below the scan cap. A read that stops at the cap
+        therefore always has more rows in hand than it was asked for, and can never hand back a
+        short list that a caller would misread as the end of the collection."""
+        assert lister.MAX_RECORDINGS < meetings.MAX_ARTIFACT_SCAN, (
+            "the ceiling that makes a short list mean what the field says it means"
+        )
         _resolved(graph, meeting_type="recurring")
         _daily_series(graph)
         _me(graph)
 
         found = await _listing(
             client,
-            started_after=_day(10).date(),
-            started_before=_day(11).date(),
-            limit=20,
+            limit=lister.MAX_RECORDINGS,
             include_scan_completeness=True,
         )
 
-        assert found.status == "available"
-        assert 0 < len(found.recordings) < 20, "a window shorter than the limit that was asked for"
-        assert found.scan_incomplete is True, (
-            "and yet the collection was not read to its end, so this short list is NOT the whole "
-            "window — the claim a caller would otherwise read off its length"
+        assert found.scan_incomplete is True, "the collection was not read to its end"
+        assert len(found.recordings) == lister.MAX_RECORDINGS, (
+            "and even the largest limit is answered in full, so nothing here reads as an end"
         )
         described = str(lister.MeetingRecordings.model_fields["recordings"].description)
-        assert "the window holds no more than was read" in described
-        assert "these are the whole window." not in described, (
-            "the unqualified claim, which this meeting is the counter-example to"
-        )
+        assert "Fewer means it holds no more than was read." in described
 
     async def test_the_order_is_promised_over_what_was_read_and_not_over_the_meeting(self) -> None:
         described = str(lister.MeetingRecordings.model_fields["recordings"].description)

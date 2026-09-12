@@ -46,10 +46,8 @@ from office_365_mcp.shared.calendar import (
     event_body,
     event_time,
     is_midnight,
-    person_matches,
     providers_without_teams,
     repeated_address,
-    subject_matches,
     transaction_id_for,
     wall_clock,
     window_bounds,
@@ -1117,56 +1115,6 @@ class TestOnePersonInvitedOnce:
     )
     def test_a_list_that_names_everybody_once_has_no_repeat(self, addresses: list[str]) -> None:
         assert repeated_address(addresses) is None
-
-
-class TestTheTwoPredicatesGraphCannotAnswer:
-    """Graph documents no `$filter` over attendees, so both of these run over the rows a page
-    already carries."""
-
-    @pytest.mark.parametrize(
-        "fragment", ["alex", "ALEX", "wilber", "alex@example.invalid", "example.invalid"]
-    )
-    def test_a_person_is_matched_by_name_or_by_address_in_either_case(self, fragment: str) -> None:
-        event = Event(
-            id=_EVENT_ID,
-            organizer=Recipient(
-                email_address=EmailAddress(name="Alex Wilber", address=_SOMEBODY_ELSE)
-            ),
-        )
-
-        assert person_matches(event, fragment)
-
-    def test_an_attendee_counts_as_much_as_the_organizer(self) -> None:
-        event = Event(
-            id=_EVENT_ID,
-            organizer=Recipient(email_address=EmailAddress(name="Ada Lovelace", address=_MINE)),
-            attendees=[
-                Attendee(email_address=EmailAddress(name="Alex Wilber", address=_SOMEBODY_ELSE))
-            ],
-        )
-
-        assert person_matches(event, "wilber")
-
-    def test_nobody_by_that_name_does_not_match(self) -> None:
-        event = Event(
-            id=_EVENT_ID,
-            organizer=Recipient(email_address=EmailAddress(name="Ada Lovelace", address=_MINE)),
-        )
-
-        assert not person_matches(event, "wilber")
-
-    def test_an_event_with_no_people_on_it_matches_nobody(self) -> None:
-        assert not person_matches(Event(id=_EVENT_ID), "wilber")
-
-    @pytest.mark.parametrize("fragment", ["pricing", "PRICING", "review"])
-    def test_a_subject_is_matched_in_either_case(self, fragment: str) -> None:
-        assert subject_matches(Event(id=_EVENT_ID, subject="Pricing review"), fragment)
-
-    def test_another_subject_does_not_match(self) -> None:
-        assert not subject_matches(Event(id=_EVENT_ID, subject="Pricing review"), "invoice")
-
-    def test_an_event_sent_without_a_subject_matches_nothing(self) -> None:
-        assert not subject_matches(Event(id=_EVENT_ID), "pricing")
 
 
 class TestReadingOneCalendar:

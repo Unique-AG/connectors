@@ -52,6 +52,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailSummary
+from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_read_thread"
@@ -219,21 +220,12 @@ def _thread_request(conversation: str) -> RequestConfiguration[_ThreadQuery]:
     """No `$orderby`. See the module docstring."""
     return RequestConfiguration[_ThreadQuery](
         query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
-            filter=f"conversationId eq '{_escaped(conversation)}'",
+            filter=f"conversationId eq '{odata_literal(conversation)}'",
             select=list(_THREAD_FIELDS),
             top=MAX_MESSAGES,
         ),
         headers=_immutable_ids(),
     )
-
-
-def _escaped(value: str) -> str:
-    """Doubling escapes a single quote inside an OData string literal.
-
-    Graph's ids do not carry one, so this closes a hole rather than serving a case. If an id
-    ever carries one, it ends the literal.
-    """
-    return value.replace("'", "''")
 
 
 def _immutable_ids() -> HeadersCollection:

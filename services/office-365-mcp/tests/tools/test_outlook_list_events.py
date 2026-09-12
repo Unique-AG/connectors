@@ -45,7 +45,6 @@ _MARCH_SUNDAY = date(2026, 3, 8)
 
 _ADA = {"name": "Ada Lovelace", "address": "ada@example.invalid"}
 _DANA = {"name": "Dana Swope", "address": "dana@example.invalid"}
-_BOB = {"name": "Bob Vance", "address": "bob@vance.invalid"}
 
 
 def _calendar_payload(
@@ -79,11 +78,11 @@ def _event_payload(
     end: str = "2026-07-06T14:00:00.0000000",
     time_zone: str | None = "UTC",
     organizer: dict[str, str] | None = None,
-    attendees: tuple[dict[str, str], ...] = (),
     is_cancelled: bool | None = False,
     sensitivity: str | None = "normal",
     event_type: str | None = "occurrence",
     series_master_id: str | None = "AAMkAGI2SYNTHETIC-series-0001=",
+    owner_response: str | None = "organizer",
 ) -> dict[str, object]:
     """`timeZone` is `UTC` because this tool sends no `Prefer: outlook.timezone`, and Microsoft
     documents UTC as what a calendar view answers in without it."""
@@ -94,7 +93,7 @@ def _event_payload(
         "start": {"dateTime": start, "timeZone": time_zone},
         "end": {"dateTime": end, "timeZone": time_zone},
         "isAllDay": False,
-        "isCancelled": is_cancelled,
+        **({} if is_cancelled is None else {"isCancelled": is_cancelled}),
         "type": event_type,
         "seriesMasterId": series_master_id,
         "sensitivity": sensitivity,
@@ -104,15 +103,12 @@ def _event_payload(
         "onlineMeeting": {"joinUrl": "https://teams.microsoft.invalid/l/meetup-join/synthetic"},
         "organizer": {"emailAddress": dict(organizer if organizer is not None else _ADA)},
         "isOrganizer": True,
-        "responseStatus": {"response": "organizer", "time": "0001-01-01T00:00:00Z"},
-        "attendees": [
-            {
-                "type": "required",
-                "status": {"response": "none", "time": "0001-01-01T00:00:00Z"},
-                "emailAddress": dict(attendee),
-            }
-            for attendee in attendees
-        ],
+        **(
+            {}
+            if owner_response is None
+            else {"responseStatus": {"response": owner_response, "time": "0001-01-01T00:00:00Z"}}
+        ),
+        "attendees": [],
         "webLink": "https://outlook.office365.invalid/owa/?itemid=synthetic",
     }
 
@@ -242,31 +238,205 @@ class TestTheQueryItComposes:
         assert my_view.calls.last.request.url.params["$orderby"] == "start/dateTime"
 
     @pytest.mark.usefixtures("my_calendar")
-    @pytest.mark.parametrize(
-        ("with_person", "subject_contains"),
-        [(None, None), ("dana", None), (None, "pricing"), ("dana", "pricing")],
-    )
-    async def test_no_argument_ever_reaches_the_query_as_a_filter(
-        self,
-        client: GraphServiceClient,
-        my_view: respx.Route,
-        with_person: str | None,
-        subject_contains: str | None,
+    async def test_a_call_that_narrows_nothing_sends_no_filter_at_all(
+        self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """Microsoft documents no `$filter` over `attendees`, and a filter composed against
-        undocumented support answers `200 OK` and the wrong rows."""
+        """The plain window is what almost every call asks for, and an empty `$filter=` is not the
+        same request as no `$filter`."""
+        _ = await lister.list_events(
+            client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=25
+        )
+
+        params = my_view.calls.last.request.url.params
+        assert "$filter" not in params, "no narrowing argument was given, so none was composed"
+        assert "$search" not in params, "a calendar view narrows by `$filter`, never by KQL"
+
+    @pytest.mark.usefixtures("my_calendar")
+    @pytest.mark.parametrize(
+        ("cancelled", "expected"),
+        [(False, "isCancelled eq false"), (True, "isCancelled eq true")],
+    )
+    async def test_cancelled_is_narrowed_by_microsoft_rather_than_over_the_rows(
+        self, client: GraphServiceClient, my_view: respx.Route, cancelled: bool, expected: str
+    ) -> None:
+        """Against a live tenant `eq false` answered a whole 23-row window and `eq true` answered
+        none of it, which partitions the window and so proves Graph evaluated the term."""
         _ = await lister.list_events(
             client,
             starts_on=_MARCH_MONDAY,
             ends_on=_MARCH_SUNDAY,
-            with_person=with_person,
+            cancelled=cancelled,
+            limit=25,
+        )
+
+        assert my_view.calls.last.request.url.params["$filter"] == expected, (
+            "a narrowing this tool applies in process spends `limit` on rows it then discards"
+        )
+
+    @pytest.mark.usefixtures("my_calendar")
+    @pytest.mark.parametrize(
+        "owner_response", ["accepted", "tentativelyAccepted", "declined", "notResponded"]
+    )
+    async def test_an_owner_response_never_reaches_the_wire_at_all(
+        self,
+        client: GraphServiceClient,
+        my_view: respx.Route,
+        owner_response: lister.OwnerResponse,
+    ) -> None:
+        """`responseStatus/response` IS filterable on `calendarView` on its own, which is the trap:
+        a live probe on 2026-09-10 found a nested path returns 500 as soon as it is conjoined with
+        any other property, in both orders and parenthesised. So the one argument that could be
+        pushed down alone is the one that must never be, because `cancelled=false` beside
+        `owner_response="accepted"` is the combination a caller most wants and would crash."""
+        _ = await lister.list_events(
+            client,
+            starts_on=_MARCH_MONDAY,
+            ends_on=_MARCH_SUNDAY,
+            owner_response=owner_response,
+            limit=25,
+        )
+
+        assert "$filter" not in my_view.calls.last.request.url.params, (
+            "the owner's answer is compared over the rows; a conjoined nested path is a 500"
+        )
+
+    @pytest.mark.usefixtures("my_calendar")
+    async def test_a_subject_fragment_is_narrowed_by_microsoft_rather_than_over_the_rows(
+        self, client: GraphServiceClient, my_view: respx.Route
+    ) -> None:
+        _ = await lister.list_events(
+            client,
+            starts_on=_MARCH_MONDAY,
+            ends_on=_MARCH_SUNDAY,
+            subject_contains="pricing",
+            limit=25,
+        )
+
+        assert my_view.calls.last.request.url.params["$filter"] == "contains(subject,'pricing')"
+
+    @pytest.mark.usefixtures("my_calendar")
+    async def test_an_apostrophe_in_a_subject_fragment_cannot_end_the_odata_literal(
+        self, client: GraphServiceClient, my_view: respx.Route
+    ) -> None:
+        """A quote left as it came closes the literal early and leaves the rest of the caller's own
+        text standing as predicate syntax, which Graph answers instead of the question asked."""
+        _ = await lister.list_events(
+            client,
+            starts_on=_MARCH_MONDAY,
+            ends_on=_MARCH_SUNDAY,
+            subject_contains="o'brien retro",
+            limit=25,
+        )
+
+        assert my_view.calls.last.request.url.params["$filter"] == (
+            "contains(subject,'o''brien retro')"
+        )
+
+    @pytest.mark.usefixtures("my_calendar")
+    async def test_the_owner_response_it_cannot_send_it_applies_to_the_rows_instead(
+        self, client: GraphServiceClient, my_view: respx.Route
+    ) -> None:
+        """The argument contributes nothing to the wire, so this is the only thing that makes it
+        mean anything. Without this the tool would accept `owner_response` and silently ignore it.
+        """
+        _ = my_view.mock(
+            return_value=_page(
+                _event_payload("AAMkAGI2accepted==", owner_response="accepted"),
+                _event_payload("AAMkAGI2declined==", owner_response="declined"),
+                _event_payload("AAMkAGI2nothing==", owner_response=None),
+            )
+        )
+
+        answer = await lister.list_events(
+            client,
+            starts_on=_MARCH_MONDAY,
+            ends_on=_MARCH_SUNDAY,
+            owner_response="accepted",
+            limit=25,
+        )
+
+        assert [row.owner_response for row in answer.events] == ["accepted"], (
+            "the other answer and the row Graph recorded no answer on are both discarded here"
+        )
+
+    @pytest.mark.usefixtures("my_calendar")
+    async def test_a_row_graph_recorded_no_answer_on_is_not_a_notresponded(
+        self, client: GraphServiceClient, my_view: respx.Route
+    ) -> None:
+        """`notResponded` is an answer Microsoft states. A missing `responseStatus` is the absence
+        of one, and reading it as `notResponded` would invent an invitation nobody was sent."""
+        _ = my_view.mock(
+            return_value=_page(_event_payload("AAMkAGI2nothing==", owner_response=None))
+        )
+
+        answer = await lister.list_events(
+            client,
+            starts_on=_MARCH_MONDAY,
+            ends_on=_MARCH_SUNDAY,
+            owner_response="notResponded",
+            limit=25,
+        )
+
+        assert answer.events == []
+
+    @pytest.mark.usefixtures("my_calendar")
+    @pytest.mark.parametrize(
+        ("cancelled", "owner_response", "subject_contains", "expected"),
+        [
+            (False, "accepted", None, "isCancelled eq false"),
+            (True, None, "pricing", "isCancelled eq true and contains(subject,'pricing')"),
+            (None, "declined", "pricing", "contains(subject,'pricing')"),
+            (
+                False,
+                "accepted",
+                "pricing",
+                "isCancelled eq false and contains(subject,'pricing')",
+            ),
+        ],
+    )
+    async def test_the_narrowing_arguments_that_were_given_are_anded_into_one_filter(
+        self,
+        client: GraphServiceClient,
+        my_view: respx.Route,
+        cancelled: bool | None,
+        owner_response: lister.OwnerResponse | None,
+        subject_contains: str | None,
+        expected: str,
+    ) -> None:
+        """A live tenant honoured the two flat conjuncts joined this way, and a term this tool
+        composed but Graph ignored would widen the answer without widening what the tool reports.
+        `owner_response` is passed in every case here and contributes to none of them: it is the
+        nested path that 500s the moment it is conjoined."""
+        _ = await lister.list_events(
+            client,
+            starts_on=_MARCH_MONDAY,
+            ends_on=_MARCH_SUNDAY,
+            cancelled=cancelled,
+            owner_response=owner_response,
             subject_contains=subject_contains,
             limit=25,
         )
 
+        assert my_view.calls.last.request.url.params["$filter"] == expected
+
+    @pytest.mark.usefixtures("my_calendar")
+    async def test_a_filter_does_not_displace_the_order_the_rows_are_promised_in(
+        self, client: GraphServiceClient, my_view: respx.Route
+    ) -> None:
+        """`$filter` beside `$orderby=start/dateTime` returned the full row set against a live
+        tenant, so neither parameter has to give way to the other."""
+        _ = await lister.list_events(
+            client,
+            starts_on=_MARCH_MONDAY,
+            ends_on=_MARCH_SUNDAY,
+            subject_contains="pricing",
+            limit=7,
+        )
+
         params = my_view.calls.last.request.url.params
-        assert "$filter" not in params, "both fragments are predicates over the rows"
-        assert "$search" not in params
+        assert params["$orderby"] == "start/dateTime"
+        assert params["$select"].split(",") == list(SUMMARY_FIELDS)
+        assert params["$top"] == "7"
 
     @pytest.mark.usefixtures("my_calendar")
     async def test_the_listing_asks_for_ids_that_outlive_the_event_being_filed(
@@ -557,130 +727,26 @@ class TestWhatItAnswers:
         ]
 
     @pytest.mark.usefixtures("my_calendar")
-    async def test_with_person_keeps_the_row_that_person_organized(
+    async def test_omitting_cancelled_lists_the_called_off_rows_as_well(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
+        """A cancelled event stays in the calendar until somebody removes it, so hiding it by
+        default would answer "nothing is on" for a day that had a meeting until this morning."""
         my_view.mock(
             return_value=_page(
-                _event_payload(_FIRST_ID, organizer=_DANA, attendees=(_BOB,)),
-                _event_payload(_SECOND_ID, organizer=_ADA, attendees=(_BOB,)),
+                _event_payload(_FIRST_ID, is_cancelled=True),
+                _event_payload(_SECOND_ID, is_cancelled=False),
             )
         )
 
         answer = await lister.list_events(
-            client,
-            starts_on=_MARCH_MONDAY,
-            ends_on=_MARCH_SUNDAY,
-            with_person="dana@example.invalid",
-            limit=25,
+            client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=25
         )
 
-        assert [event.uri for event in answer.events] == [
-            EventHandle(_MY_CALENDAR_ID, _FIRST_ID).uri
-        ]
-
-    @pytest.mark.usefixtures("my_calendar")
-    async def test_with_person_keeps_the_row_that_person_was_only_invited_to(
-        self, client: GraphServiceClient, my_view: respx.Route
-    ) -> None:
-        my_view.mock(
-            return_value=_page(
-                _event_payload(_FIRST_ID, organizer=_ADA, attendees=(_BOB,)),
-                _event_payload(_SECOND_ID, organizer=_ADA, attendees=(_DANA,)),
-            )
+        assert [event.cancelled for event in answer.events] == [True, False]
+        assert "$filter" not in my_view.calls.last.request.url.params, (
+            "an `isCancelled` term nobody asked for would hide a meeting called off this morning"
         )
-
-        answer = await lister.list_events(
-            client,
-            starts_on=_MARCH_MONDAY,
-            ends_on=_MARCH_SUNDAY,
-            with_person="dana@example.invalid",
-            limit=25,
-        )
-
-        assert [event.uri for event in answer.events] == [
-            EventHandle(_MY_CALENDAR_ID, _SECOND_ID).uri
-        ]
-
-    @pytest.mark.usefixtures("my_calendar")
-    async def test_with_person_drops_a_row_naming_nobody_who_was_asked_for(
-        self, client: GraphServiceClient, my_view: respx.Route
-    ) -> None:
-        my_view.mock(
-            return_value=_page(_event_payload(_FIRST_ID, organizer=_ADA, attendees=(_BOB,)))
-        )
-
-        answer = await lister.list_events(
-            client,
-            starts_on=_MARCH_MONDAY,
-            ends_on=_MARCH_SUNDAY,
-            with_person="dana@example.invalid",
-            limit=25,
-        )
-
-        assert answer.events == []
-
-    @pytest.mark.usefixtures("my_calendar")
-    async def test_a_person_fragment_matches_a_display_name_without_regard_to_case(
-        self, client: GraphServiceClient, my_view: respx.Route
-    ) -> None:
-        my_view.mock(return_value=_page(_event_payload(_FIRST_ID, attendees=(_DANA,))))
-
-        answer = await lister.list_events(
-            client,
-            starts_on=_MARCH_MONDAY,
-            ends_on=_MARCH_SUNDAY,
-            with_person="dana swope",
-            limit=25,
-        )
-
-        assert len(answer.events) == 1
-
-    @pytest.mark.usefixtures("my_calendar")
-    async def test_subject_contains_keeps_the_rows_whose_subject_holds_it(
-        self, client: GraphServiceClient, my_view: respx.Route
-    ) -> None:
-        my_view.mock(
-            return_value=_page(
-                _event_payload(_FIRST_ID, subject="Quarterly pricing review"),
-                _event_payload(_SECOND_ID, subject="Team lunch"),
-            )
-        )
-
-        answer = await lister.list_events(
-            client,
-            starts_on=_MARCH_MONDAY,
-            ends_on=_MARCH_SUNDAY,
-            subject_contains="PRICING",
-            limit=25,
-        )
-
-        assert [event.subject for event in answer.events] == ["Quarterly pricing review"]
-
-    @pytest.mark.usefixtures("my_calendar")
-    async def test_both_fragments_together_narrow_rather_than_widen(
-        self, client: GraphServiceClient, my_view: respx.Route
-    ) -> None:
-        my_view.mock(
-            return_value=_page(
-                _event_payload(_FIRST_ID, subject="Pricing review", attendees=(_DANA,)),
-                _event_payload(_SECOND_ID, subject="Pricing review", attendees=(_BOB,)),
-                _event_payload(_THIRD_ID, subject="Team lunch", attendees=(_DANA,)),
-            )
-        )
-
-        answer = await lister.list_events(
-            client,
-            starts_on=_MARCH_MONDAY,
-            ends_on=_MARCH_SUNDAY,
-            with_person="dana@example.invalid",
-            subject_contains="pricing",
-            limit=25,
-        )
-
-        assert [event.uri for event in answer.events] == [
-            EventHandle(_MY_CALENDAR_ID, _FIRST_ID).uri
-        ]
 
     @pytest.mark.usefixtures("my_calendar")
     async def test_the_pages_of_a_window_are_followed_rather_than_read_once(
@@ -739,38 +805,35 @@ class TestWhatItAnswers:
         assert answer.capped is False
 
     @pytest.mark.usefixtures("my_calendar")
-    async def test_a_predicate_that_discarded_every_row_of_a_finished_window_is_not_capped(
+    async def test_a_narrowed_window_microsoft_answered_with_nothing_is_not_capped(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
         """This is the difference between "nobody has such a meeting" and "this call did not reach
         it", and a model widens the window only for the second."""
-        my_view.mock(
-            return_value=_page(
-                _event_payload(_FIRST_ID, attendees=(_BOB,)),
-                _event_payload(_SECOND_ID, attendees=(_BOB,)),
-            )
-        )
+        my_view.mock(return_value=_page())
 
         answer = await lister.list_events(
             client,
             starts_on=_MARCH_MONDAY,
             ends_on=_MARCH_SUNDAY,
-            with_person="dana@example.invalid",
+            subject_contains="pricing",
             limit=25,
         )
 
         assert answer.events == []
-        assert answer.capped is False, "the window ran out on its own, so nothing matched in it"
+        assert answer.capped is False, "Microsoft finished the narrowed window, so nothing matched"
 
     @pytest.mark.usefixtures("my_calendar")
-    async def test_a_predicate_that_filled_the_limit_with_rows_still_on_offer_says_capped(
+    async def test_a_narrowed_call_that_filled_the_limit_still_says_capped(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
+        """Narrowing runs inside the query, so every row that arrives already matched: `limit` is
+        the only thing left that can stop the walk short."""
         my_view.mock(
             return_value=_page(
-                _event_payload(_FIRST_ID, attendees=(_DANA,)),
-                _event_payload(_SECOND_ID, attendees=(_DANA,)),
-                _event_payload(_THIRD_ID, attendees=(_DANA,)),
+                _event_payload(_FIRST_ID),
+                _event_payload(_SECOND_ID),
+                _event_payload(_THIRD_ID),
             )
         )
 
@@ -778,7 +841,7 @@ class TestWhatItAnswers:
             client,
             starts_on=_MARCH_MONDAY,
             ends_on=_MARCH_SUNDAY,
-            with_person="dana@example.invalid",
+            subject_contains="pricing",
             limit=2,
         )
 
@@ -988,11 +1051,26 @@ class TestTheSchemaItPublishes:
         tool = await mcp.get_tool(lister.TOOL_NAME)
 
         assert tool is not None, "register left the tool off the server"
-        for argument in ("with_person", "subject_contains"):
-            assert (
-                tool.parameters["properties"][argument]["anyOf"][0]["minLength"]
-                == lister.MIN_FRAGMENT_CHARACTERS
-            ), argument
+        assert (
+            tool.parameters["properties"]["subject_contains"]["anyOf"][0]["minLength"]
+            == lister.MIN_FRAGMENT_CHARACTERS
+        )
+
+    async def test_no_argument_is_published_that_microsoft_cannot_narrow_on(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        """Every spelling of `attendees/any(...)` is a 400 on a calendar view, and an
+        `organizer/emailAddress/address` term answers 200 with no rows for an organizer that
+        demonstrably has them — so this tool offers no way to ask for one person's meetings."""
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        lister.register(mcp, transport)
+
+        tool = await mcp.get_tool(lister.TOOL_NAME)
+
+        assert tool is not None, "register left the tool off the server"
+        assert "with_person" not in tool.parameters["properties"], (
+            "an argument with no server-side route silently under-returns, which is unrecoverable"
+        )
 
     async def test_the_description_sends_a_model_to_local_for_an_all_day_row(
         self, transport: httpx.AsyncClient
