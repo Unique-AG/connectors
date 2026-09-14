@@ -28,7 +28,7 @@ from backstop_mcp.features.opportunity_writes.responses import (
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
 
-_LandedKey = tuple[str, str]
+_OpportunityAndStage = tuple[str, str]
 
 
 class BackfillOpportunityStageHistoryCommand:
@@ -50,25 +50,27 @@ class BackfillOpportunityStageHistoryCommand:
             span
         ):
             span.set_attribute("record_count", len(backfill.records))
-            resolved: list[str] = []
-            for record in backfill.records:
-                stage = await self._opportunity_stages_service.find_by_stage_name(name=record.stage)
-                resolved.append(stage.id)
+            stage_ids: list[str] = []
+            for requested_row in backfill.records:
+                stage = await self._opportunity_stages_service.find_by_stage_name(
+                    name=requested_row.stage
+                )
+                stage_ids.append(stage.id)
             payload = json_api_create(
                 resource_type="bulk-opportunity-stage-history",
                 attributes={
                     "records": [
                         {
-                            "effectiveDate": isoformat(record.effective_date),
+                            "effectiveDate": isoformat(requested_row.effective_date),
                             "opportunity": resource_pointer(
-                                resource_id=record.opportunity_id,
+                                resource_id=requested_row.opportunity_id,
                                 resource_type="opportunities",
                             ),
                             "stage": resource_pointer(
                                 resource_id=stage_id, resource_type="opportunity-stages"
                             ),
                         }
-                        for record, stage_id in zip(backfill.records, resolved, strict=True)
+                        for requested_row, stage_id in zip(backfill.records, stage_ids, strict=True)
                     ]
                 },
             )
@@ -77,35 +79,35 @@ class BackfillOpportunityStageHistoryCommand:
                 schema=BulkOpportunityStageHistoryDocument,
                 json=payload,
             )
-            records = self._outcomes(backfill.records, tuple(resolved), document.data.attributes)
-            applied = sum(1 for record in records if record.status == "applied")
+            outcomes = self._outcomes(backfill.records, tuple(stage_ids), document.data.attributes)
+            applied_count = sum(1 for outcome in outcomes if outcome.status == "applied")
             logger.info(
                 "opportunity_writes.stage_history.backfilled",
                 extra={
-                    "total_count": len(records),
-                    "applied_count": applied,
-                    "failed_count": len(records) - applied,
+                    "total_count": len(outcomes),
+                    "applied_count": applied_count,
+                    "failed_count": len(outcomes) - applied_count,
                 },
             )
             return BackfillOpportunityStageHistoryResponse(
-                total_count=len(records),
-                applied_count=applied,
-                records=records,
+                total_count=len(outcomes),
+                applied_count=applied_count,
+                records=outcomes,
             )
 
     def _outcomes(
         self,
-        records: tuple[OpportunityStageHistoryRecordInput, ...],
+        requested_rows: tuple[OpportunityStageHistoryRecordInput, ...],
         stage_ids: tuple[str, ...],
         attributes: BulkOpportunityStageHistoryAttributes,
     ) -> tuple[RecordOutcomeResponse, ...]:
         summary = attributes.summary()
-        errors = {
+        error_by_index = {
             message.index: message.message
             for message in summary.error_messages
             if message.index is not None
         }
-        unindexed = next(
+        batch_error = next(
             (
                 message.message
                 for message in summary.error_messages
@@ -113,60 +115,71 @@ class BackfillOpportunityStageHistoryCommand:
             ),
             None,
         )
-        leftover = _landed_keys(attributes.records)
-        nothing_written = summary.success_count == 0
-        missing_row = unindexed or ("Backstop did not return this row among the written records.")
-        fallback = unindexed or "Backstop reported successCount 0 for this batch."
+        unmatched_written = self._written_opportunity_and_stage(attributes.records)
+        batch_failed = summary.success_count == 0
+        unreturned_error = batch_error or (
+            "Backstop did not return this row among the written records."
+        )
+        batch_failed_error = batch_error or "Backstop reported successCount 0 for this batch."
         outcomes: list[RecordOutcomeResponse] = []
-        for index, (record, stage_id) in enumerate(zip(records, stage_ids, strict=True)):
-            if index in errors or nothing_written:
+        for index, (requested_row, stage_id) in enumerate(
+            zip(requested_rows, stage_ids, strict=True)
+        ):
+            if index in error_by_index or batch_failed:
                 outcomes.append(
                     RecordOutcomeResponse(
                         index=index,
-                        record_id=record.opportunity_id,
+                        record_id=requested_row.opportunity_id,
                         status="failed",
-                        error=errors.get(index) or fallback,
+                        error=error_by_index.get(index) or batch_failed_error,
                     )
                 )
                 continue
-            consumed = _without_first(leftover, (record.opportunity_id, stage_id))
-            if consumed is None:
+            remaining_written = self._without_matching_row(
+                unmatched_written, (requested_row.opportunity_id, stage_id)
+            )
+            if remaining_written is None:
                 outcomes.append(
                     RecordOutcomeResponse(
                         index=index,
-                        record_id=record.opportunity_id,
+                        record_id=requested_row.opportunity_id,
                         status="failed",
-                        error=missing_row,
+                        error=unreturned_error,
                     )
                 )
                 continue
-            leftover = consumed
+            unmatched_written = remaining_written
             outcomes.append(
                 RecordOutcomeResponse(
                     index=index,
-                    record_id=record.opportunity_id,
+                    record_id=requested_row.opportunity_id,
                     status="applied",
                     error=None,
                 )
             )
         return tuple(outcomes)
 
+    def _written_opportunity_and_stage(
+        self,
+        written_rows: list[BulkOpportunityStageHistoryRecordAttributes],
+    ) -> tuple[_OpportunityAndStage, ...]:
+        pairs: list[_OpportunityAndStage] = []
+        for written_row in written_rows:
+            opportunity_id = (
+                written_row.opportunity.resource_id if written_row.opportunity else None
+            )
+            stage_id = written_row.stage.resource_id if written_row.stage else None
+            if opportunity_id is None or stage_id is None:
+                continue
+            pairs.append((opportunity_id, stage_id))
+        return tuple(pairs)
 
-def _landed_keys(
-    records: list[BulkOpportunityStageHistoryRecordAttributes],
-) -> tuple[_LandedKey, ...]:
-    keys: list[_LandedKey] = []
-    for record in records:
-        opportunity_id = record.opportunity.resource_id if record.opportunity else None
-        stage_id = record.stage.resource_id if record.stage else None
-        if opportunity_id is None or stage_id is None:
-            continue
-        keys.append((opportunity_id, stage_id))
-    return tuple(keys)
-
-
-def _without_first(keys: tuple[_LandedKey, ...], key: _LandedKey) -> tuple[_LandedKey, ...] | None:
-    for index, item in enumerate(keys):
-        if item == key:
-            return keys[:index] + keys[index + 1 :]
-    return None
+    def _without_matching_row(
+        self,
+        written_pairs: tuple[_OpportunityAndStage, ...],
+        requested_pair: _OpportunityAndStage,
+    ) -> tuple[_OpportunityAndStage, ...] | None:
+        for index, written_pair in enumerate(written_pairs):
+            if written_pair == requested_pair:
+                return written_pairs[:index] + written_pairs[index + 1 :]
+        return None
