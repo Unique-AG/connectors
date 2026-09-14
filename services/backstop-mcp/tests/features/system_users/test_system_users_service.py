@@ -113,6 +113,18 @@ class TestResolveByUserName:
                 await system_users_service(client).resolve_by_user_name("mlucas")
 
     @respx.mock
+    async def test_find_by_user_name_returns_none_when_missing(self) -> None:
+        base_url = tenant("su-find-missing")
+        respx.get(f"{base_url}/system-users").mock(
+            return_value=_collection_page(_user("u1", user_name="jsmith"))
+        )
+
+        async with tool_client(base_url) as client:
+            result = await system_users_service(client).find_by_user_name("nobody")
+
+        assert result is None
+
+    @respx.mock
     async def test_missing_login_raises_naming_the_username(self) -> None:
         base_url = tenant("su-resolve-missing")
         respx.get(f"{base_url}/system-users").mock(

@@ -13,16 +13,19 @@ model requires the caller-supplied ones so the rejection is a schema error, not 
 import logging
 from typing import Literal, assert_never
 
-from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiSingleResourceDocument,
+    BackstopClient,
+    isoformat,
+    json_api_create,
+    omit_none_values,
+    relationship_data,
+)
 from backstop_mcp.features.activity_writes.api_responses import MeetingOrCallAttributes
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
     activity_base_attributes,
     activity_tag_relationship,
-    isoformat,
-    json_api_create,
-    omit_none_values,
     party_resource_link,
-    relationship_data,
     secondary_resource_link,
 )
 from backstop_mcp.features.activity_writes.internal_dto import AuthorDto

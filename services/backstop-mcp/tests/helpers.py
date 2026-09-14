@@ -29,6 +29,7 @@ from backstop_mcp.features.data_hygiene import (
     EmploymentRulesDto,
     TypeVocabularyDto,
 )
+from backstop_mcp.features.opportunities import OpportunityStagesService
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.time_zones import TimeZonesService
 
@@ -123,6 +124,12 @@ def system_users_service(client: BackstopClient, *, ttl_minutes: int = 60) -> Sy
 
 def time_zones_service(client: BackstopClient, *, ttl_minutes: int = 60) -> TimeZonesService:
     return TimeZonesService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
+
+
+def opportunity_stages_service(
+    client: BackstopClient, *, ttl_minutes: int = 60
+) -> OpportunityStagesService:
+    return OpportunityStagesService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
 
 
 def custom_fields_service(

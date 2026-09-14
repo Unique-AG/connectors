@@ -8,13 +8,16 @@ it to `true`, which mails the assignee — verified live.
 
 import logging
 
-from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
-from backstop_mcp.features.activity_writes.api_responses import TaskAttributes
-from backstop_mcp.features.activity_writes.commands._json_api_utils import (
-    activity_base_attributes,
+from backstop_mcp.backstop_client import (
+    BackstopApiSingleResourceDocument,
+    BackstopClient,
     isoformat,
     json_api_create,
     omit_none_values,
+)
+from backstop_mcp.features.activity_writes.api_responses import TaskAttributes
+from backstop_mcp.features.activity_writes.commands._json_api_utils import (
+    activity_base_attributes,
     party_resource_link,
     secondary_resource_link,
 )

@@ -53,7 +53,7 @@
    import `server.tools.registry` or a private `_`-prefixed sibling such as `_page_input`,
    and cannot reach past a feature package's `__init__`. `registry.py` under `server/tools`
    may import `features.<feature>.tools.get_*` / `list_*` / `search_*` / `log_*` / `attach_*`
-   / `update_*` / `delete_*` the same way.
+   / `update_*` / `delete_*` / `backfill_*` the same way.
 
    Applies to the packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are
    not among them: they are groupings whose `__init__` is documentation, so `features.resolution`
@@ -137,6 +137,7 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.features.elicitation_utils",
     "backstop_mcp.features.includes",
     "backstop_mcp.features.opportunities",
+    "backstop_mcp.features.opportunity_writes",
     "backstop_mcp.features.org_people",
     "backstop_mcp.features.party_resolver",
     "backstop_mcp.features.system_users",
@@ -244,7 +245,7 @@ def _is_server_tools_directory(directory: pathlib.Path) -> bool:
 
 def _is_feature_tool_module_import(module: str) -> bool:
     """A feature tool module (`get_*` / `list_*` / `search_*` / `log_*` / `attach_*` /
-    `update_*` / `delete_*`)."""
+    `update_*` / `delete_*` / `backfill_*`)."""
     prefix = f"{_FEATURES_PREFIX}."
     if not module.startswith(prefix):
         return False
@@ -253,7 +254,16 @@ def _is_feature_tool_module_import(module: str) -> bool:
         len(parts) >= 3
         and parts[1] == "tools"
         and parts[2].startswith(
-            ("get_", "list_", "search_", "log_", "attach_", "update_", "delete_")
+            (
+                "get_",
+                "list_",
+                "search_",
+                "log_",
+                "attach_",
+                "update_",
+                "delete_",
+                "backfill_",
+            )
         )
     )
 
@@ -278,7 +288,7 @@ def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, i
     `backstop_client` through those packages' `__init__`.
 
     Tool tests may import the tool module under test (`features.<pkg>.tools.get_*` / `list_*` /
-    `search_*` / `log_*` / `attach_*` / `update_*` / `delete_*`);
+    `search_*` / `log_*` / `attach_*` / `update_*` / `delete_*` / `backfill_*`);
     they still cannot import `server.tools.registry` or `_page_input`, and cannot reach past a
     feature package's `__init__`. `registry.py` under `server/tools` may import those feature
     tool modules.

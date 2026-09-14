@@ -37,6 +37,8 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "delete_activity",
         "log_activity",
         "update_activity",
+        "update_opportunity",
+        "backfill_opportunity_stage_history",
         "search_activities",
         "search_opportunities",
     }
@@ -54,6 +56,19 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
     "list_custom_fields": ("entity_types",),
     "log_activity": ('"kind"', '"search_type"', '"party_id"', "attach_file"),
     "update_activity": ('"kind"', '"activity_id"', "display_subject"),
+    "update_opportunity": (
+        '"opportunity_id"',
+        '"stage"',
+        "update_custom_field_values",
+        "backfill_opportunity_stage_history",
+        "probability",
+    ),
+    "backfill_opportunity_stage_history": (
+        '"records"',
+        '"opportunity_id"',
+        "update_opportunity",
+        "does not move",
+    ),
     "delete_activity": ('"kind"', '"activity_id"', "permanent"),
     "attach_file": (
         '"kind"',

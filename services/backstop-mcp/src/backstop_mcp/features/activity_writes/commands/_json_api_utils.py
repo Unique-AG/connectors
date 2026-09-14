@@ -1,7 +1,6 @@
-"""Build JSON:API request bodies for activity writes.
+"""Activity-specific write payload helpers.
 
-`resourceType` is the plural name, not Bean casing. Identity pointers are
-relationships; parent pointers are attributes.
+JSON:API envelopes (`json_api_create`, `relationship_data`, …) live on `backstop_client`.
 """
 
 from datetime import date, datetime
@@ -10,20 +9,11 @@ from urllib.parse import quote
 
 from pydantic import BaseModel
 
+from backstop_mcp.backstop_client import isoformat, relationship_data
 from backstop_mcp.features.entity_types import SearchType
 
 _TitleKey = Literal["title", "name"]
 _DescriptionKey = Literal["description", "details"]
-
-
-def omit_none_values(values: dict[str, object | None]) -> dict[str, object]:
-    return {key: value for key, value in values.items() if value is not None}
-
-
-def isoformat(value: date | datetime | None) -> str | None:
-    if value is None:
-        return None
-    return value.isoformat()
 
 
 def activity_base_attributes(
@@ -99,41 +89,3 @@ def secondary_resource_link(
     if secondary_party_id == party_id:
         return None
     return party_resource_link(party_id=secondary_party_id, search_type=secondary_search_type)
-
-
-def relationship_data(resource_type: str, ids: tuple[str, ...] | None) -> dict[str, object] | None:
-    """JSON:API relationship payload. `None` omits the key; `()` is an empty replace."""
-    if ids is None:
-        return None
-    return {"data": [{"type": resource_type, "id": item_id} for item_id in ids]}
-
-
-def json_api_create(
-    *,
-    resource_type: str,
-    attributes: dict[str, object],
-    relationships: dict[str, object] | None = None,
-    resource_id: str | None = None,
-) -> dict[str, object]:
-    data: dict[str, object] = {"type": resource_type}
-    if resource_id is not None:
-        data["id"] = resource_id
-    data["attributes"] = attributes
-    if relationships:
-        data["relationships"] = relationships
-    return {"data": data}
-
-
-def json_api_update(
-    *,
-    resource_type: str,
-    resource_id: str,
-    attributes: dict[str, object],
-    relationships: dict[str, object] | None = None,
-) -> dict[str, object]:
-    return json_api_create(
-        resource_type=resource_type,
-        resource_id=resource_id,
-        attributes=attributes,
-        relationships=relationships,
-    )

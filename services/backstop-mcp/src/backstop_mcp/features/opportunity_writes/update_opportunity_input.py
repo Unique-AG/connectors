@@ -1,0 +1,163 @@
+"""PATCH fields for `update_opportunity`.
+
+`opportunity_id` is required. Every other field is optional — omit to leave it unchanged.
+At least one change field must be set.
+
+Excluded (derived or read-only; Backstop computes them): `weightedValue`,
+`weightedAllocatedValue`, `isOpen`, `previousStage`, `daysOpen`, `daysInCurrentStage`,
+`dateEnteredCurrentStage`, `closedDate`, `effectiveDate`, `landingPageUrl`,
+`associationType`. `regularCustomFieldValues` goes through `update_custom_field_values`,
+which validates against the catalog. `permissionBucket` is out of scope.
+"""
+
+from datetime import date
+from typing import Self
+
+from pydantic import BaseModel, Field, model_validator
+
+from backstop_mcp.models import NonEmptyStr
+
+__all__ = [
+    "UPDATE_OPPORTUNITY_INPUT_DESCRIPTION",
+    "UpdateOpportunityInput",
+]
+
+UPDATE_OPPORTUNITY_INPUT_DESCRIPTION = (
+    "Required. The opportunity to patch. Needs `opportunity_id` and at least one field to "
+    "change. `stage` is a stage name from this instance's vocabulary, not an id. "
+    "`probability` is a fraction (0.3 is 30%) and is not changed by setting a stage. "
+    "Omit a field to leave it unchanged. Never invent an id."
+)
+
+_IDENTITY_FIELDS = frozenset({"opportunity_id"})
+
+
+class UpdateOpportunityInput(BaseModel):
+    """PATCH an opportunity. Only supplied fields are sent; PATCH is merge."""
+
+    opportunity_id: NonEmptyStr = Field(
+        description=(
+            "Required. Backstop opportunity id from `get_opportunities` or "
+            "`get_opportunities_by_ids`. Never invent or guess."
+        )
+    )
+    name: NonEmptyStr | None = Field(default=None, description="Replacement deal name.")
+    description: NonEmptyStr | None = Field(
+        default=None, description="Replacement deal description."
+    )
+    aliases: NonEmptyStr | None = Field(default=None, description="Replacement aliases string.")
+    other_id: NonEmptyStr | None = Field(default=None, description="Replacement external/other id.")
+    classification: NonEmptyStr | None = Field(
+        default=None,
+        description=(
+            "Replacement deal classification (wire `type`) — not the JSON:API resource type."
+        ),
+    )
+    currency_code: NonEmptyStr | None = Field(
+        default=None, description="Replacement ISO currency code, e.g. USD."
+    )
+    is_erisa: bool | None = Field(default=None, description="Whether the deal is ERISA.")
+    requested_amount: float | None = Field(
+        default=None, description="Replacement requested amount, in `currency_code`."
+    )
+    allocated_amount: float | None = Field(
+        default=None, description="Replacement allocated amount, in `currency_code`."
+    )
+    probability: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description=(
+            "Replacement likelihood as a fraction: 0.3 is 30%. Setting `stage` does not "
+            "change this — pass it explicitly if the deal's probability should move."
+        ),
+    )
+    expected_investment_date: date | None = Field(
+        default=None, description="Replacement expected investment day."
+    )
+    stage_effective_date: date | None = Field(
+        default=None,
+        description=(
+            "Day the stage move should be dated. Requires `stage`. A date earlier than the "
+            "deal's `dateEnteredCurrentStage` is rejected: Backstop would write history "
+            "without moving the deal. Omit to move the deal today."
+        ),
+    )
+    waitlist_id: int | None = Field(default=None, description="Replacement waitlist id.")
+    stage: NonEmptyStr | None = Field(
+        default=None,
+        description=(
+            "Replacement stage **name** (e.g. IDD), resolved against this instance's "
+            "vocabulary. This is the only way to move a deal's stage. A `closed` stage "
+            "closes the deal automatically."
+        ),
+    )
+    investor_id: NonEmptyStr | None = Field(
+        default=None,
+        description="Replacement investor contact id (`contacts`). Never invent or guess.",
+    )
+    product_id: NonEmptyStr | None = Field(
+        default=None, description="Replacement product id. Never invent or guess."
+    )
+    primary_contact_id: NonEmptyStr | None = Field(
+        default=None,
+        description="Replacement primary contact people id. Never invent or guess.",
+    )
+    referral_source_id: NonEmptyStr | None = Field(
+        default=None,
+        description="Replacement referral-source contact id (`contacts`). Never invent or guess.",
+    )
+    owner_login: NonEmptyStr | None = Field(
+        default=None,
+        description=(
+            "Replacement owner of this deal: the colleague at our own firm. A "
+            "`list_system_users` login (`userName`), not a system-user id. Same role as "
+            "`representative` on `search_opportunities`."
+        ),
+    )
+    investor_type_id: NonEmptyStr | None = Field(
+        default=None, description="Replacement investor-type id. Never invent or guess."
+    )
+    add_users_to_notify: tuple[str, ...] | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "System-user logins to append to the notify list (Backstop CC). One PATCH; "
+            "Backstop appends to-many relationships. At least one login. Unknown logins "
+            "are skipped and listed in `warnings`. Cannot be combined with "
+            "`replace_users_to_notify`. To clear the list, use "
+            "`replace_users_to_notify=[]`."
+        ),
+    )
+    replace_users_to_notify: tuple[str, ...] | None = Field(
+        default=None,
+        description=(
+            "Set the notify list (Backstop CC) to exactly these `list_system_users` logins. "
+            "Two PATCHes (clear, then add) because a to-many PATCH appends and `data: []` "
+            "is the only clear. If the second PATCH fails, the list is left empty. An empty "
+            "tuple clears the list. Unknown logins are skipped and listed in `warnings`; "
+            "if none resolve, the list is left unchanged. Cannot be combined with "
+            "`add_users_to_notify`. There is no way to remove a single member."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _at_least_one_change(self) -> Self:
+        for name in type(self).model_fields:
+            if name in _IDENTITY_FIELDS:
+                continue
+            if getattr(self, name) is not None:
+                return self
+        raise ValueError("Pass at least one field to change")
+
+    @model_validator(mode="after")
+    def _stage_effective_date_requires_stage(self) -> Self:
+        if self.stage_effective_date is not None and self.stage is None:
+            raise ValueError("stage_effective_date requires stage")
+        return self
+
+    @model_validator(mode="after")
+    def _notify_fields_are_exclusive(self) -> Self:
+        if self.add_users_to_notify is not None and self.replace_users_to_notify is not None:
+            raise ValueError("Set add_users_to_notify or replace_users_to_notify, not both")
+        return self
