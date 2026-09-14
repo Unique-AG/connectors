@@ -53,9 +53,7 @@ class TestIdentifiableValue:
 
 
 class TestIdentifiableValueFactory:
-    def test_conceals_when_the_policy_is_unset(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_conceals_when_the_policy_is_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("LOGS_DIAGNOSTICS_DATA_POLICY", raising=False)
 
         wrapped = identifiable_value("mlucas")
@@ -64,24 +62,16 @@ class TestIdentifiableValueFactory:
         assert wrapped.conceal is True
         assert str(wrapped) == _digest("mlucas")
 
-    def test_conceals_when_the_policy_is_conceal(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv(
-            "LOGS_DIAGNOSTICS_DATA_POLICY", LogsDiagnosticDataPolicy.CONCEAL
-        )
+    def test_conceals_when_the_policy_is_conceal(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LOGS_DIAGNOSTICS_DATA_POLICY", LogsDiagnosticDataPolicy.CONCEAL)
 
         wrapped = identifiable_value("mlucas")
 
         assert wrapped.conceal is True
         assert str(wrapped) == _digest("mlucas")
 
-    def test_discloses_when_the_policy_is_disclose(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv(
-            "LOGS_DIAGNOSTICS_DATA_POLICY", LogsDiagnosticDataPolicy.DISCLOSE
-        )
+    def test_discloses_when_the_policy_is_disclose(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LOGS_DIAGNOSTICS_DATA_POLICY", LogsDiagnosticDataPolicy.DISCLOSE)
 
         wrapped = identifiable_value("mlucas")
 
