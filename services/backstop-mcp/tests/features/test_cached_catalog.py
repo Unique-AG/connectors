@@ -114,6 +114,7 @@ _CATALOGS: tuple[_CatalogUnderTest, ...] = (
         slug="system-users",
         path="/system-users",
         resource_type="system-users",
+        required_attributes={"userName": "7"},
         build=lambda client, caching: SystemUsersService.with_ttl_minutes(
             client=client, ttl_minutes=60, caching_enabled=caching
         ),
