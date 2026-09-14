@@ -13,10 +13,10 @@ from backstop_mcp.features.activity_writes.api_responses import EmailAttributes
 from backstop_mcp.features.activity_writes.attach_file_input import EmailFileInput
 from backstop_mcp.features.activity_writes.commands._file_data_utils import encode_file_data
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
+    activity_tag_relationship,
     json_api_create,
     omit_none_values,
     party_resource_link,
-    relationship_data,
 )
 from backstop_mcp.features.activity_writes.internal_dto import AuthorDto
 from backstop_mcp.features.activity_writes.responses import AttachedFileResponse
@@ -40,10 +40,6 @@ class AttachEmailCommand:
         party_id: str,
         author: AuthorDto,
     ) -> AttachedFileResponse:
-        tags = relationship_data("activity-tags", activity.activity_tag_ids or None)
-        relationships: dict[str, object] = {"createdBy": system_user_relationship(author.id)}
-        if tags is not None:
-            relationships["activityTags"] = tags
         payload = json_api_create(
             resource_type="emails",
             attributes=omit_none_values(
@@ -56,7 +52,12 @@ class AttachEmailCommand:
                     ],
                 }
             ),
-            relationships=relationships,
+            relationships=omit_none_values(
+                {
+                    "createdBy": system_user_relationship(author.id),
+                    "activityTags": activity_tag_relationship(activity, omit_empty=True),
+                }
+            ),
         )
         document = await self._client.post("/emails", schema=_EmailDocument, json=payload)
         logger.info(

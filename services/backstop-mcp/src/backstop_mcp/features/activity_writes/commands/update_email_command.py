@@ -6,9 +6,9 @@ from urllib.parse import quote
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import EmailAttributes
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
+    activity_tag_relationship,
     json_api_update,
     omit_none_values,
-    relationship_data,
 )
 from backstop_mcp.features.activity_writes.commands.extract_collection import extract_collection
 from backstop_mcp.features.activity_writes.responses import UpdatedActivityResponse
@@ -34,12 +34,12 @@ class UpdateEmailCommand:
         handle = parse_activity_handle(activity.activity_id)
         collection, resource_id = extract_collection(handle, kind=activity.kind)
         path = f"/{collection}/{quote(resource_id, safe='')}"
-        tags = relationship_data("activity-tags", activity.activity_tag_ids)
         payload = json_api_update(
             resource_type=collection,
             resource_id=resource_id,
             attributes=omit_none_values({"displaySubject": activity.display_subject}),
-            relationships={"activityTags": tags} if tags is not None else None,
+            relationships=omit_none_values({"activityTags": activity_tag_relationship(activity)})
+            or None,
         )
         document = await self._client.patch(path, schema=_Document, json=payload)
         logger.info("activity_writes.email.updated", extra={"id": document.data.id})

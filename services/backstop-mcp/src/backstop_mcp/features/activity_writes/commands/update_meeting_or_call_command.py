@@ -15,6 +15,8 @@ from urllib.parse import quote
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import MeetingOrCallAttributes
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
+    activity_base_attributes,
+    activity_tag_relationship,
     isoformat,
     json_api_update,
     omit_none_values,
@@ -54,13 +56,12 @@ class UpdateMeetingOrCallCommand:
             resource_id=resource_id,
             attributes=omit_none_values(
                 {
-                    "title": activity.title,
+                    **activity_base_attributes(activity),
                     "type": self._meeting_type(activity),
                     "location": activity.location,
                     "startTimestamp": isoformat(activity.start),
                     "stopTimestamp": isoformat(activity.stop),
                     "timeZone": time_zone,
-                    "effectiveDate": isoformat(activity.effective_date),
                 }
             ),
             relationships=self._relationships(activity),
@@ -84,10 +85,12 @@ class UpdateMeetingOrCallCommand:
 
     def _relationships(self, activity: _MeetingOrCallUpdate) -> dict[str, object] | None:
         attendees = relationship_data("people", activity.attendee_party_ids)
-        tags = relationship_data("activity-tags", activity.activity_tag_ids)
-        relationships: dict[str, object] = {}
-        if attendees is not None:
-            relationships["attendees"] = attendees
-        if tags is not None:
-            relationships["activityTags"] = tags
-        return relationships or None
+        return (
+            omit_none_values(
+                {
+                    "attendees": attendees,
+                    "activityTags": activity_tag_relationship(activity),
+                }
+            )
+            or None
+        )

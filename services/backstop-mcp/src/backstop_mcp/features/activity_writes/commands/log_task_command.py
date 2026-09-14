@@ -11,6 +11,7 @@ import logging
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import TaskAttributes
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
+    activity_base_attributes,
     isoformat,
     json_api_create,
     omit_none_values,
@@ -49,8 +50,9 @@ class LogTaskCommand:
             resource_type="tasks",
             attributes=omit_none_values(
                 {
-                    "name": activity.title,
-                    "details": activity.description,
+                    **activity_base_attributes(
+                        activity, title_key="name", description_key="details"
+                    ),
                     "dueDate": isoformat(activity.due_date),
                     "sendNotification": activity.send_notification,
                     "attachedTo": party_resource_link(

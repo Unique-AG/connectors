@@ -16,6 +16,8 @@ from typing import Literal, assert_never
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import MeetingOrCallAttributes
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
+    activity_base_attributes,
+    activity_tag_relationship,
     isoformat,
     json_api_create,
     omit_none_values,
@@ -68,13 +70,12 @@ class LogMeetingOrCallCommand:
             resource_type="meeting-or-calls",
             attributes=omit_none_values(
                 {
-                    "title": activity.title,
+                    **activity_base_attributes(activity),
                     "type": self._meeting_type(activity),
                     "location": activity.location,
                     "startTimestamp": isoformat(activity.start),
                     "stopTimestamp": isoformat(activity.stop),
                     "timeZone": time_zone,
-                    "effectiveDate": isoformat(activity.effective_date),
                     "regarding": party_resource_link(
                         party_id=party_id, search_type=activity.search_type
                     ),
@@ -124,10 +125,10 @@ class LogMeetingOrCallCommand:
         self, activity: _MeetingOrCallInput, *, author: AuthorDto
     ) -> dict[str, object]:
         attendees = relationship_data("people", activity.attendee_party_ids or None)
-        tags = relationship_data("activity-tags", activity.activity_tag_ids or None)
-        relationships: dict[str, object] = {"author": system_user_relationship(author.id)}
-        if attendees is not None:
-            relationships["attendees"] = attendees
-        if tags is not None:
-            relationships["activityTags"] = tags
-        return relationships
+        return omit_none_values(
+            {
+                "author": system_user_relationship(author.id),
+                "attendees": attendees,
+                "activityTags": activity_tag_relationship(activity, omit_empty=True),
+            }
+        )

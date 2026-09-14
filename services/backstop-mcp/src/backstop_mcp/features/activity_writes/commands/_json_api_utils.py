@@ -5,9 +5,15 @@ relationships; parent pointers are attributes.
 """
 
 from datetime import date, datetime
+from typing import Literal, cast
 from urllib.parse import quote
 
+from pydantic import BaseModel
+
 from backstop_mcp.features.entity_types import SearchType
+
+_TitleKey = Literal["title", "name"]
+_DescriptionKey = Literal["description", "details"]
 
 
 def omit_none_values(values: dict[str, object | None]) -> dict[str, object]:
@@ -18,6 +24,49 @@ def isoformat(value: date | datetime | None) -> str | None:
     if value is None:
         return None
     return value.isoformat()
+
+
+def activity_base_attributes(
+    activity: BaseModel,
+    *,
+    title_key: _TitleKey = "title",
+    description_key: _DescriptionKey = "description",
+    default_effective_today: bool = False,
+) -> dict[str, object | None]:
+    """Wire attributes every activity kind shares: title, description, effectiveDate.
+
+    Callers spread this and add kind-specific keys. Tasks pass `title_key="name"` and
+    `description_key="details"`. Notes and documents that require a date pass
+    `default_effective_today=True`.
+    """
+    dumped = activity.model_dump()
+    fields = type(activity).model_fields
+    attributes: dict[str, object | None] = {}
+    if "title" in fields:
+        attributes[title_key] = cast("str | None", dumped["title"])
+    if "description" in fields:
+        attributes[description_key] = cast("str | None", dumped["description"])
+    if "effective_date" in fields:
+        effective_date = cast("date | datetime | None", dumped["effective_date"])
+        if effective_date is None and default_effective_today:
+            effective_date = date.today()
+        attributes["effectiveDate"] = isoformat(effective_date)
+    return attributes
+
+
+def activity_tag_relationship(
+    activity: BaseModel, *, omit_empty: bool = False
+) -> dict[str, object] | None:
+    """`activityTags` payload, or `None` to omit the relationship key.
+
+    Creates pass `omit_empty=True` so `()` is not sent. Updates leave `()` as a clear.
+    """
+    if "activity_tag_ids" not in type(activity).model_fields:
+        return None
+    ids = cast("tuple[str, ...] | None", activity.model_dump()["activity_tag_ids"])
+    if omit_empty:
+        ids = ids or None
+    return relationship_data("activity-tags", ids)
 
 
 def party_resource_link(*, party_id: str, search_type: SearchType) -> dict[str, object]:
