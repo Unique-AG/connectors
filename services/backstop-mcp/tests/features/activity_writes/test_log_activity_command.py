@@ -13,6 +13,7 @@ import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
+from pydantic import TypeAdapter
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.activity_history import (
@@ -22,15 +23,8 @@ from backstop_mcp.features.activity_history import (
 )
 from backstop_mcp.features.activity_writes import (
     AuthorDto,
-    CallActivityInput,
     LogActivityCommand,
-    LoggedCallResponse,
-    LoggedMeetingResponse,
-    LoggedNoteResponse,
-    LoggedTaskResponse,
-    MeetingActivityInput,
-    NoteActivityInput,
-    TaskActivityInput,
+    LogActivityInput,
     get_log_activity_command_factory,
     get_log_meeting_or_call_command_factory,
     get_log_note_command_factory,
@@ -125,8 +119,11 @@ def _relationships(body: dict[str, object]) -> dict[str, object]:
     return object_dict(_data(body)["relationships"])
 
 
-def _note(**overrides: object) -> NoteActivityInput:
-    return NoteActivityInput.model_validate(
+_ACTIVITY: TypeAdapter[LogActivityInput] = TypeAdapter(LogActivityInput)
+
+
+def _note(**overrides: object) -> LogActivityInput:
+    return _ACTIVITY.validate_python(
         {
             "kind": "note",
             "search_type": "people",
@@ -137,8 +134,8 @@ def _note(**overrides: object) -> NoteActivityInput:
     )
 
 
-def _meeting(**overrides: object) -> MeetingActivityInput:
-    return MeetingActivityInput.model_validate(
+def _meeting(**overrides: object) -> LogActivityInput:
+    return _ACTIVITY.validate_python(
         {
             "kind": "meeting",
             "search_type": "organizations",
@@ -152,8 +149,8 @@ def _meeting(**overrides: object) -> MeetingActivityInput:
     )
 
 
-def _call(**overrides: object) -> CallActivityInput:
-    return CallActivityInput.model_validate(
+def _call(**overrides: object) -> LogActivityInput:
+    return _ACTIVITY.validate_python(
         {
             "kind": "call",
             "search_type": "people",
@@ -167,8 +164,8 @@ def _call(**overrides: object) -> CallActivityInput:
     )
 
 
-def _task(**overrides: object) -> TaskActivityInput:
-    return TaskActivityInput.model_validate(
+def _task(**overrides: object) -> LogActivityInput:
+    return _ACTIVITY.validate_python(
         {
             "kind": "task",
             "search_type": "people",
@@ -208,9 +205,8 @@ class TestLogActivityCommandDispatch:
             activity=_note(party_id="stale-id"), party_id=_PARTY_ID, author=_AUTHOR
         )
 
-        assert isinstance(result, LoggedNoteResponse)
-        assert result.id == _NOTE_ID
         assert result.kind == "note"
+        assert result.id == _NOTE_ID
         assert result.resource_type == "notes"
         assert nested.call_count == 0
         assert route.call_count == 1
@@ -349,9 +345,9 @@ class TestLogActivityCommandDispatch:
             activity=_meeting(), party_id=_ORG_ID, author=_AUTHOR
         )
 
-        assert isinstance(result, LoggedMeetingResponse)
-        assert result.meeting_type == "FACE_TO_FACE"
-        assert result.time_zone == "US/Eastern"
+        assert result.kind == "meeting"
+        assert result.model_dump()["meeting_type"] == "FACE_TO_FACE"
+        assert result.model_dump()["time_zone"] == "US/Eastern"
         assert result.resource_type == "meeting-or-calls"
         assert nested.call_count == 0
         assert route.call_count == 1
@@ -524,8 +520,8 @@ class TestLogActivityCommandDispatch:
             activity=_call(), party_id=_PARTY_ID, author=_AUTHOR
         )
 
-        assert isinstance(result, LoggedCallResponse)
-        assert result.meeting_type == "PHONE_OUT"
+        assert result.kind == "call"
+        assert result.model_dump()["meeting_type"] == "PHONE_OUT"
         assert _attributes(recorded_json_bodies(route)[0])["type"] == "PHONE_OUT"
 
     @respx.mock
@@ -539,8 +535,8 @@ class TestLogActivityCommandDispatch:
             activity=_call(direction="PHONE_IN"), party_id=_PARTY_ID, author=_AUTHOR
         )
 
-        assert isinstance(result, LoggedCallResponse)
-        assert result.meeting_type == "PHONE_IN"
+        assert result.kind == "call"
+        assert result.model_dump()["meeting_type"] == "PHONE_IN"
         assert _attributes(recorded_json_bodies(route)[0])["type"] == "PHONE_IN"
 
     @respx.mock
@@ -556,8 +552,8 @@ class TestLogActivityCommandDispatch:
             activity=_task(), party_id=_PARTY_ID, author=_AUTHOR
         )
 
-        assert isinstance(result, LoggedTaskResponse)
-        assert result.send_notification is False
+        assert result.kind == "task"
+        assert result.model_dump()["send_notification"] is False
         body = recorded_json_bodies(route)[0]
         attributes = _attributes(body)
         assert attributes["name"] == "Send deck"

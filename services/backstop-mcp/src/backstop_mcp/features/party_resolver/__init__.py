@@ -13,6 +13,11 @@ from backstop_mcp.features.party_resolver.internal_dto import (
     ResolvedPartyDto,
 )
 from backstop_mcp.features.party_resolver.queries import GetPartyNameQuery, ResolvePartyQuery
+from backstop_mcp.features.party_resolver.require_exactly_one_party_selector import (
+    blank_to_none,
+    require_exactly_one_party_selector,
+    require_path_segment,
+)
 from backstop_mcp.features.party_resolver.responses import (
     PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     REQUIRED_SEARCH_TYPE_DESCRIPTION,
@@ -43,8 +48,11 @@ __all__ = [
     "ResolvedPartyResponse",
     "SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION",
     "SearchType",
+    "blank_to_none",
     "get_party_name_query_factory",
     "get_resolve_party_query_factory",
+    "require_exactly_one_party_selector",
+    "require_path_segment",
     "unresolved_parties_response",
     "unresolved_party_response",
 ]

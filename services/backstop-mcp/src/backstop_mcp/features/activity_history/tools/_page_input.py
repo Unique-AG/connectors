@@ -28,6 +28,9 @@ from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyDto,
     ResolvePartyQuery,
+    blank_to_none,
+    require_exactly_one_party_selector,
+    require_path_segment,
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
@@ -121,16 +124,11 @@ class ActivityHistoryFirstPageInput(BaseModel):
     @field_validator("party_id", "search", mode="before")
     @classmethod
     def _blank_to_none(cls, value: object) -> object:
-        if isinstance(value, str) and not value.strip():
-            return None
-        return value
+        return blank_to_none(value)
 
     @model_validator(mode="after")
     def _exactly_one_selector(self) -> Self:
-        if (self.party_id is None) == (self.search is None):
-            raise ValueError("Exactly one of party_id or search must be provided")
-        if self.party_id is not None and "/" in self.party_id:
-            raise ValueError(f"party_id {self.party_id!r} must not contain '/'")
+        require_exactly_one_party_selector(party_id=self.party_id, search=self.search)
         return self
 
     @model_validator(mode="after")
@@ -198,8 +196,7 @@ class ActivityHistoryNextPageInput(BaseModel):
 
     @model_validator(mode="after")
     def _entity_id_is_a_path_segment(self) -> Self:
-        if "/" in self.entity_id:
-            raise ValueError(f"entity_id {self.entity_id!r} must not contain '/'")
+        require_path_segment(self.entity_id, field_name="entity_id")
         return self
 
 

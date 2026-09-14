@@ -5,12 +5,13 @@ from collections.abc import AsyncGenerator
 import httpx
 import pytest
 import respx
+from pydantic import TypeAdapter
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_writes import (
     UpdateActivityCommand,
+    UpdateActivityInput,
     UpdatedActivityResponse,
-    UpdateNoteInput,
     get_update_activity_command_factory,
     get_update_document_command_factory,
     get_update_email_command_factory,
@@ -30,6 +31,7 @@ from tests.helpers import (
 )
 from tests.server.tools.helpers import object_dict, tool_model
 
+_ACTIVITY: TypeAdapter[UpdateActivityInput] = TypeAdapter(UpdateActivityInput)
 _NOTE_ID = "76280387"
 
 
@@ -75,7 +77,9 @@ class TestUpdateActivity:
 
         result = tool_model(
             await update_activity(
-                activity=UpdateNoteInput(kind="note", activity_id=_NOTE_ID, title="Corrected"),
+                activity=_ACTIVITY.validate_python(
+                    {"kind": "note", "activity_id": _NOTE_ID, "title": "Corrected"}
+                ),
                 update_activity_command=make_command(client),
             ),
             UpdatedActivityResponse,

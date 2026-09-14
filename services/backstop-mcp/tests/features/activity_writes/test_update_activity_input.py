@@ -3,17 +3,9 @@
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from backstop_mcp.features.activity_writes import (
-    UpdateActivityInput,
-    UpdateCallInput,
-    UpdateDocumentInput,
-    UpdateEmailInput,
-    UpdateMeetingInput,
-    UpdateNoteInput,
-    UpdateTaskInput,
-)
+from backstop_mcp.features.activity_writes import UpdateActivityInput
 
-_ADAPTER: TypeAdapter[object] = TypeAdapter(UpdateActivityInput)
+_ADAPTER: TypeAdapter[UpdateActivityInput] = TypeAdapter(UpdateActivityInput)
 
 
 def test_accepts_a_note_title_patch() -> None:
@@ -21,9 +13,9 @@ def test_accepts_a_note_title_patch() -> None:
         {"kind": "note", "activity_id": "76280387", "title": "Corrected"}
     )
 
-    assert isinstance(parsed, UpdateNoteInput)
+    assert parsed.kind == "note"
     assert parsed.activity_id == "76280387"
-    assert parsed.title == "Corrected"
+    assert parsed.model_dump()["title"] == "Corrected"
 
 
 def test_rejects_an_update_with_no_change_fields() -> None:
@@ -36,8 +28,8 @@ def test_empty_tag_tuple_counts_as_a_change() -> None:
         {"kind": "email", "activity_id": "77001122", "activity_tag_ids": []}
     )
 
-    assert isinstance(parsed, UpdateEmailInput)
-    assert parsed.activity_tag_ids == ()
+    assert parsed.kind == "email"
+    assert parsed.model_dump()["activity_tag_ids"] == ()
 
 
 def test_meeting_and_call_share_optional_schedule_fields() -> None:
@@ -48,9 +40,9 @@ def test_meeting_and_call_share_optional_schedule_fields() -> None:
         {"kind": "call", "activity_id": "88001122", "direction": "PHONE_IN"}
     )
 
-    assert isinstance(meeting, UpdateMeetingInput)
-    assert isinstance(call, UpdateCallInput)
-    assert call.direction == "PHONE_IN"
+    assert meeting.kind == "meeting"
+    assert call.kind == "call"
+    assert call.model_dump()["direction"] == "PHONE_IN"
 
 
 def test_task_and_document_variants_parse() -> None:
@@ -59,5 +51,5 @@ def test_task_and_document_variants_parse() -> None:
         {"kind": "document", "activity_id": "88002233", "description": "Updated memo"}
     )
 
-    assert isinstance(task, UpdateTaskInput)
-    assert isinstance(document, UpdateDocumentInput)
+    assert task.kind == "task"
+    assert document.kind == "document"

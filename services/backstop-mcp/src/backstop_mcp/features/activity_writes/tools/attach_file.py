@@ -15,9 +15,9 @@ from backstop_mcp.features.activity_writes import (
     AttachFileInput,
     AttachFileResponse,
     AuthorDto,
-    DocumentFileInput,
     get_attach_file_command_factory,
 )
+from backstop_mcp.features.activity_writes.attach_file_input import DocumentFileInput
 from backstop_mcp.features.party_resolver import (
     ResolvePartyQuery,
     get_resolve_party_query_factory,

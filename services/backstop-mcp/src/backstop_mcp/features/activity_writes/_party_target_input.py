@@ -9,6 +9,9 @@ from backstop_mcp.features.party_resolver import (
     PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     REQUIRED_SEARCH_TYPE_DESCRIPTION,
     SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    blank_to_none,
+    require_exactly_one_party_selector,
+    require_path_segment,
 )
 
 _NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -39,16 +42,11 @@ class PartyTargetInput(BaseModel):
     @field_validator("party_id", "search", mode="before")
     @classmethod
     def _blank_to_none(cls, value: object) -> object:
-        if isinstance(value, str) and not value.strip():
-            return None
-        return value
+        return blank_to_none(value)
 
     @model_validator(mode="after")
     def _exactly_one_selector(self) -> Self:
-        if (self.party_id is None) == (self.search is None):
-            raise ValueError("Exactly one of party_id or search must be provided")
-        if self.party_id is not None and "/" in self.party_id:
-            raise ValueError(f"party_id {self.party_id!r} must not contain '/'")
+        require_exactly_one_party_selector(party_id=self.party_id, search=self.search)
         return self
 
 
@@ -65,14 +63,12 @@ class SecondaryPartyInput(BaseModel):
     @field_validator("secondary_party_id", mode="before")
     @classmethod
     def _blank_secondary_to_none(cls, value: object) -> object:
-        if isinstance(value, str) and not value.strip():
-            return None
-        return value
+        return blank_to_none(value)
 
     @model_validator(mode="after")
     def _secondary_pairing(self) -> Self:
         if (self.secondary_party_id is None) != (self.secondary_search_type is None):
             raise ValueError("secondary_party_id and secondary_search_type must be passed together")
-        if self.secondary_party_id is not None and "/" in self.secondary_party_id:
-            raise ValueError(f"secondary_party_id {self.secondary_party_id!r} must not contain '/'")
+        if self.secondary_party_id is not None:
+            require_path_segment(self.secondary_party_id, field_name="secondary_party_id")
         return self

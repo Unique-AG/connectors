@@ -59,6 +59,22 @@ def relationship_data(resource_type: str, ids: tuple[str, ...] | None) -> dict[s
     return {"data": [{"type": resource_type, "id": item_id} for item_id in ids]}
 
 
+def json_api_create(
+    *,
+    resource_type: str,
+    attributes: dict[str, object],
+    relationships: dict[str, object] | None = None,
+    resource_id: str | None = None,
+) -> dict[str, object]:
+    data: dict[str, object] = {"type": resource_type}
+    if resource_id is not None:
+        data["id"] = resource_id
+    data["attributes"] = attributes
+    if relationships:
+        data["relationships"] = relationships
+    return {"data": data}
+
+
 def json_api_update(
     *,
     resource_type: str,
@@ -66,23 +82,9 @@ def json_api_update(
     attributes: dict[str, object],
     relationships: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    data: dict[str, object] = {
-        "type": resource_type,
-        "id": resource_id,
-        "attributes": attributes,
-    }
-    if relationships:
-        data["relationships"] = relationships
-    return {"data": data}
-
-
-def json_api_create(
-    *,
-    resource_type: str,
-    attributes: dict[str, object],
-    relationships: dict[str, object] | None = None,
-) -> dict[str, object]:
-    data: dict[str, object] = {"type": resource_type, "attributes": attributes}
-    if relationships:
-        data["relationships"] = relationships
-    return {"data": data}
+    return json_api_create(
+        resource_type=resource_type,
+        resource_id=resource_id,
+        attributes=attributes,
+        relationships=relationships,
+    )

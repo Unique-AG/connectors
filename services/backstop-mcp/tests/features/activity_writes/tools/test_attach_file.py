@@ -6,12 +6,13 @@ from collections.abc import AsyncGenerator
 import httpx
 import pytest
 import respx
+from pydantic import TypeAdapter
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_writes import (
     AttachedFileResponse,
     AttachFileCommand,
-    DocumentFileInput,
+    AttachFileInput,
     get_attach_document_command_factory,
     get_attach_email_command_factory,
     get_attach_file_command_factory,
@@ -24,6 +25,7 @@ from tests.features.party_resolver.helpers import ctx_never_elicit, make_resolve
 from tests.helpers import BASE_URL, client_factory, collection, credential
 from tests.server.tools.helpers import tool_model, tool_model_union
 
+_ACTIVITY: TypeAdapter[AttachFileInput] = TypeAdapter(AttachFileInput)
 _PARTY_ID = "27871657"
 _DOC_ID = "88002233"
 _CALLER = SystemUserDto(id="su-author", user_name="bob.smith", name="Bob Smith")
@@ -64,12 +66,14 @@ class TestAttachFile:
         result = tool_model(
             await attach_file(
                 ctx_never_elicit(),
-                activity=DocumentFileInput(
-                    kind="document",
-                    search_type="people",
-                    party_id=_PARTY_ID,
-                    file_name="memo.pdf",
-                    content=_CONTENT,
+                activity=_ACTIVITY.validate_python(
+                    {
+                        "kind": "document",
+                        "search_type": "people",
+                        "party_id": _PARTY_ID,
+                        "file_name": "memo.pdf",
+                        "content": _CONTENT,
+                    }
                 ),
                 resolve_party_query=make_resolve_party_query(client),
                 attach_file_command=make_command(client),
@@ -95,12 +99,14 @@ class TestAttachFile:
         result = tool_model_union(
             await attach_file(
                 ctx_never_elicit(),
-                activity=DocumentFileInput(
-                    kind="document",
-                    search_type="people",
-                    search="Nobody",
-                    file_name="memo.pdf",
-                    content=_CONTENT,
+                activity=_ACTIVITY.validate_python(
+                    {
+                        "kind": "document",
+                        "search_type": "people",
+                        "search": "Nobody",
+                        "file_name": "memo.pdf",
+                        "content": _CONTENT,
+                    }
                 ),
                 resolve_party_query=make_resolve_party_query(client),
                 attach_file_command=make_command(client),

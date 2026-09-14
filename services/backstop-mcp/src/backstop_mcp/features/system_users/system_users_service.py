@@ -8,6 +8,7 @@ from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.caching import CachedValue, CacheFreshness
 from backstop_mcp.features.system_users.api_responses import SystemUserAttributes
 from backstop_mcp.features.system_users.internal_dto import SystemUserDto
+from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,8 @@ async def _fetch_system_users(client: BackstopClient) -> dict[str, SystemUserDto
             users_by_login[login] = user
         elif existing != user:
             logger.warning(
-                "Conflicting system users for duplicate login %r; retaining first user", login
+                "Conflicting system users for duplicate login %s; retaining first user",
+                identifiable_value(login),
             )
     return users_by_login
 

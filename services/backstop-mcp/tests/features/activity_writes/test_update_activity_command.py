@@ -6,17 +6,13 @@ import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
+from pydantic import TypeAdapter
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_writes import (
     UpdateActivityCommand,
-    UpdateCallInput,
+    UpdateActivityInput,
     UpdatedActivityResponse,
-    UpdateDocumentInput,
-    UpdateEmailInput,
-    UpdateMeetingInput,
-    UpdateNoteInput,
-    UpdateTaskInput,
     get_update_activity_command_factory,
     get_update_document_command_factory,
     get_update_email_command_factory,
@@ -34,6 +30,13 @@ from tests.helpers import (
     time_zones_service,
 )
 from tests.server.tools.helpers import object_dict
+
+_ACTIVITY: TypeAdapter[UpdateActivityInput] = TypeAdapter(UpdateActivityInput)
+
+
+def _update(**payload: object) -> UpdateActivityInput:
+    return _ACTIVITY.validate_python(payload)
+
 
 _NOTE_ID = "76280387"
 _MEETING_ID = "88001122"
@@ -109,7 +112,7 @@ class TestUpdateActivityCommand:
         )
 
         result = await make_command(client).run(
-            activity=UpdateNoteInput(kind="note", activity_id=_NOTE_ID, title="Corrected")
+            activity=_update(kind="note", activity_id=_NOTE_ID, title="Corrected")
         )
 
         assert isinstance(result, UpdatedActivityResponse)
@@ -128,9 +131,7 @@ class TestUpdateActivityCommand:
         )
 
         await make_command(client).run(
-            activity=UpdateNoteInput(
-                kind="note", activity_id=f"notes_{_NOTE_ID}", title="Corrected"
-            )
+            activity=_update(kind="note", activity_id=f"notes_{_NOTE_ID}", title="Corrected")
         )
 
         assert route.call_count == 1
@@ -143,7 +144,7 @@ class TestUpdateActivityCommand:
 
         with pytest.raises(ToolError, match="meeting-or-calls"):
             await make_command(client).run(
-                activity=UpdateNoteInput(
+                activity=_update(
                     kind="note",
                     activity_id=f"meeting-or-calls_{_MEETING_ID}",
                     title="Corrected",
@@ -161,9 +162,7 @@ class TestUpdateActivityCommand:
         )
 
         result = await make_command(client).run(
-            activity=UpdateMeetingInput(
-                kind="meeting", activity_id=_MEETING_ID, location="Boardroom"
-            )
+            activity=_update(kind="meeting", activity_id=_MEETING_ID, location="Boardroom")
         )
 
         assert result.resource_type == "meeting-or-calls"
@@ -186,12 +185,10 @@ class TestUpdateActivityCommand:
         )
 
         await make_command(client).run(
-            activity=UpdateMeetingInput(
-                kind="meeting", activity_id=_MEETING_ID, title="Corrected title"
-            )
+            activity=_update(kind="meeting", activity_id=_MEETING_ID, title="Corrected title")
         )
         await make_command(client).run(
-            activity=UpdateCallInput(kind="call", activity_id=_MEETING_ID, title="Corrected title")
+            activity=_update(kind="call", activity_id=_MEETING_ID, title="Corrected title")
         )
 
         for body in recorded_json_bodies(route):
@@ -207,7 +204,7 @@ class TestUpdateActivityCommand:
         )
 
         await make_command(client).run(
-            activity=UpdateCallInput(
+            activity=_update(
                 kind="call",
                 activity_id=_MEETING_ID,
                 direction="PHONE_IN",
@@ -226,7 +223,7 @@ class TestUpdateActivityCommand:
         )
 
         await make_command(client).run(
-            activity=UpdateEmailInput(kind="email", activity_id=_EMAIL_ID, activity_tag_ids=())
+            activity=_update(kind="email", activity_id=_EMAIL_ID, activity_tag_ids=())
         )
 
         body = recorded_json_bodies(route)[0]
@@ -241,9 +238,7 @@ class TestUpdateActivityCommand:
         )
 
         await make_command(client).run(
-            activity=UpdateEmailInput(
-                kind="email", activity_id=_EMAIL_ID, display_subject="Revised"
-            )
+            activity=_update(kind="email", activity_id=_EMAIL_ID, display_subject="Revised")
         )
 
         attributes = _attributes(recorded_json_bodies(route)[0])
@@ -258,7 +253,7 @@ class TestUpdateActivityCommand:
         )
 
         await make_command(client).run(
-            activity=UpdateTaskInput(kind="task", activity_id=_TASK_ID, assigned_user="jdoe")
+            activity=_update(kind="task", activity_id=_TASK_ID, assigned_user="jdoe")
         )
 
         body = recorded_json_bodies(route)[0]
@@ -276,7 +271,7 @@ class TestUpdateActivityCommand:
         )
 
         result = await make_command(client).run(
-            activity=UpdateDocumentInput(kind="document", activity_id=_DOC_ID, title="Revised memo")
+            activity=_update(kind="document", activity_id=_DOC_ID, title="Revised memo")
         )
 
         assert result.resource_type == "documents"

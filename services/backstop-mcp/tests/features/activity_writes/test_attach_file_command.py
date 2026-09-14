@@ -8,14 +8,13 @@ import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_writes import (
     AttachFileCommand,
+    AttachFileInput,
     AuthorDto,
-    DocumentFileInput,
-    EmailFileInput,
     encode_file_data,
     get_attach_document_command_factory,
     get_attach_email_command_factory,
@@ -71,7 +70,10 @@ def make_command(client: BackstopClient) -> AttachFileCommand:
     )
 
 
-def _document(**overrides: object) -> DocumentFileInput:
+_ACTIVITY: TypeAdapter[AttachFileInput] = TypeAdapter(AttachFileInput)
+
+
+def _document(**overrides: object) -> AttachFileInput:
     values: dict[str, object] = {
         "kind": "document",
         "search_type": "people",
@@ -79,10 +81,10 @@ def _document(**overrides: object) -> DocumentFileInput:
         "file_name": "memo.pdf",
         "content": _CONTENT,
     }
-    return DocumentFileInput.model_validate({**values, **overrides})
+    return _ACTIVITY.validate_python({**values, **overrides})
 
 
-def _email(**overrides: object) -> EmailFileInput:
+def _email(**overrides: object) -> AttachFileInput:
     values: dict[str, object] = {
         "kind": "email",
         "search_type": "people",
@@ -90,7 +92,7 @@ def _email(**overrides: object) -> EmailFileInput:
         "file_name": "reply.eml",
         "content": _CONTENT,
     }
-    return EmailFileInput.model_validate({**values, **overrides})
+    return _ACTIVITY.validate_python({**values, **overrides})
 
 
 class TestEncodeFileData:
@@ -239,7 +241,7 @@ class TestAttachFileCommand:
 
     def test_email_without_format_or_known_extension_is_rejected(self) -> None:
         with pytest.raises(ValidationError, match="email_format"):
-            EmailFileInput.model_validate(
+            _ACTIVITY.validate_python(
                 {
                     "kind": "email",
                     "search_type": "people",

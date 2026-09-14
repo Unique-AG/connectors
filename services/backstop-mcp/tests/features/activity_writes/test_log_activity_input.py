@@ -6,25 +6,14 @@ message blob, which is `attach_file`.
 """
 
 from datetime import date, datetime
+from typing import Annotated, cast, get_args, get_origin
 
 import pytest
-from pydantic import TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from backstop_mcp.features.activity_writes import (
-    CallActivityInput,
-    LogActivityInput,
-    MeetingActivityInput,
-    NoteActivityInput,
-    TaskActivityInput,
-)
+from backstop_mcp.features.activity_writes import LogActivityInput
 
-_ADAPTER: TypeAdapter[object] = TypeAdapter(LogActivityInput)
-_VARIANTS = (
-    NoteActivityInput,
-    MeetingActivityInput,
-    CallActivityInput,
-    TaskActivityInput,
-)
+_ADAPTER: TypeAdapter[LogActivityInput] = TypeAdapter(LogActivityInput)
 
 _TARGET = {"search_type": "people", "party_id": "27871657"}
 _SCHEDULE = {
@@ -37,7 +26,6 @@ _SCHEDULE = {
 def test_accepts_a_note_with_search_type_and_party_id_and_no_time_zone() -> None:
     parsed = _ADAPTER.validate_python({"kind": "note", "title": "Follow up"} | _TARGET)
 
-    assert isinstance(parsed, NoteActivityInput)
     assert parsed.kind == "note"
     assert parsed.title == "Follow up"
     assert parsed.search_type == "people"
@@ -47,8 +35,8 @@ def test_accepts_a_note_with_search_type_and_party_id_and_no_time_zone() -> None
 def test_a_note_needs_no_effective_date_because_the_command_defaults_it() -> None:
     parsed = _ADAPTER.validate_python({"kind": "note", "title": "Follow up"} | _TARGET)
 
-    assert isinstance(parsed, NoteActivityInput)
-    assert parsed.effective_date is None
+    assert parsed.kind == "note"
+    assert parsed.model_dump().get("effective_date") is None
 
 
 @pytest.mark.parametrize("kind", ["meeting", "call"])
@@ -66,8 +54,8 @@ def test_rejects_a_meeting_or_call_missing_a_field_backstop_requires(
 def test_call_defaults_direction_phone_out() -> None:
     parsed = _ADAPTER.validate_python({"kind": "call", "title": "Check in"} | _TARGET | _SCHEDULE)
 
-    assert isinstance(parsed, CallActivityInput)
-    assert parsed.direction == "PHONE_OUT"
+    assert parsed.kind == "call"
+    assert parsed.model_dump()["direction"] == "PHONE_OUT"
 
 
 def test_task_send_notification_defaults_false() -> None:
@@ -81,8 +69,8 @@ def test_task_send_notification_defaults_false() -> None:
         | _TARGET
     )
 
-    assert isinstance(parsed, TaskActivityInput)
-    assert parsed.send_notification is False
+    assert parsed.kind == "task"
+    assert parsed.model_dump()["send_notification"] is False
 
 
 @pytest.mark.parametrize("missing", ["assigned_user", "due_date"])
@@ -106,5 +94,11 @@ def test_there_is_no_email_kind_to_log() -> None:
 
 
 def test_author_is_not_a_field_on_any_variant() -> None:
-    for variant in _VARIANTS:
+    origin = (
+        get_args(LogActivityInput)[0]
+        if get_origin(LogActivityInput) is Annotated
+        else LogActivityInput
+    )
+    variants = cast(tuple[type[BaseModel], ...], get_args(origin))
+    for variant in variants:
         assert "author" not in variant.model_fields

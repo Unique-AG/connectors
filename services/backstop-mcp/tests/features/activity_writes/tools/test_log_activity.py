@@ -6,12 +6,13 @@ from inspect import signature
 import httpx
 import pytest
 import respx
+from pydantic import TypeAdapter
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_writes import (
     LogActivityCommand,
-    LoggedNoteResponse,
-    NoteActivityInput,
+    LogActivityInput,
+    LoggedActivityResponse,
     get_log_activity_command_factory,
     get_log_meeting_or_call_command_factory,
     get_log_note_command_factory,
@@ -31,8 +32,9 @@ from tests.helpers import (
     system_users_service,
     time_zones_service,
 )
-from tests.server.tools.helpers import object_dict, tool_model, tool_model_union
+from tests.server.tools.helpers import object_dict, tool_model_union
 
+_ACTIVITY: TypeAdapter[LogActivityInput] = TypeAdapter(LogActivityInput)
 _PARTY_ID = "27871657"
 _NOTE_ID = "76280387"
 _CALLER = SystemUserDto(id="su-author", user_name="bob.smith", name="Bob Smith")
@@ -77,24 +79,27 @@ class TestLogActivity:
             return_value=_created("notes", _NOTE_ID, title="Follow up")
         )
 
-        result = tool_model(
+        result = tool_model_union(
             await log_activity(
                 ctx_never_elicit(),
-                activity=NoteActivityInput(
-                    kind="note",
-                    search_type="people",
-                    party_id=_PARTY_ID,
-                    title="Follow up",
+                activity=_ACTIVITY.validate_python(
+                    {
+                        "kind": "note",
+                        "search_type": "people",
+                        "party_id": _PARTY_ID,
+                        "title": "Follow up",
+                    }
                 ),
                 resolve_party_query=make_resolve_party_query(client),
                 log_activity_command=make_command(client),
                 caller=_CALLER,
             ),
-            LoggedNoteResponse,
+            LoggedActivityResponse,
         )
 
-        assert result.id == _NOTE_ID
-        assert result.kind == "note"
+        dumped = result.model_dump()
+        assert dumped["id"] == _NOTE_ID
+        assert dumped["kind"] == "note"
         assert route.call_count == 1
         data = object_dict(recorded_json_bodies(route)[0]["data"])
         attributes = object_dict(data["attributes"])
@@ -112,17 +117,19 @@ class TestLogActivity:
         result = tool_model_union(
             await log_activity(
                 ctx_never_elicit(),
-                activity=NoteActivityInput(
-                    kind="note",
-                    search_type="people",
-                    search="Nobody",
-                    title="Follow up",
+                activity=_ACTIVITY.validate_python(
+                    {
+                        "kind": "note",
+                        "search_type": "people",
+                        "search": "Nobody",
+                        "title": "Follow up",
+                    }
                 ),
                 resolve_party_query=make_resolve_party_query(client),
                 log_activity_command=make_command(client),
                 caller=_CALLER,
             ),
-            LoggedNoteResponse | NotFoundResponse,
+            LoggedActivityResponse | NotFoundResponse,
         )
 
         assert isinstance(result, NotFoundResponse)

@@ -14,6 +14,9 @@ podLabels:
 env:
   APP_ENV: production
   LOG_LEVEL: info
+  # conceal (default): identifying strings in logs become sha256:<hex> so they can
+  # be correlated without leaking. disclose: print the original (local debugging).
+  LOGS_DIAGNOSTICS_DATA_POLICY: conceal
   PORT: "8000"
   # PUBLIC_BASE_URL must be the externally-reachable OAuth issuer URL (set in overlay).
   # BACKSTOP_BASE_URL defaults to https://api.backstopsolutions.com inside the app.

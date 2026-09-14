@@ -1,3 +1,6 @@
+import hashlib
+import logging
+
 import httpx
 import pytest
 import respx
@@ -124,7 +127,9 @@ class TestResolveByUserName:
         assert "token" not in str(raised.value).casefold()
 
     @respx.mock
-    async def test_duplicate_user_name_retains_the_first(self) -> None:
+    async def test_duplicate_user_name_retains_the_first(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         base_url = tenant("su-resolve-dup")
         respx.get(f"{base_url}/system-users").mock(
             return_value=_collection_page(
@@ -133,10 +138,20 @@ class TestResolveByUserName:
             )
         )
 
-        async with tool_client(base_url) as client:
-            result = await system_users_service(client).resolve_by_user_name("mlucas")
+        with caplog.at_level(
+            logging.WARNING,
+            logger="backstop_mcp.features.system_users.system_users_service",
+        ):
+            async with tool_client(base_url) as client:
+                result = await system_users_service(client).resolve_by_user_name("mlucas")
 
         assert result.id == "u1"
+        messages = [record.getMessage() for record in caplog.records]
+        assert any("duplicate login" in message for message in messages)
+        joined = "\n".join(messages)
+        assert "mlucas" not in joined
+        digest = hashlib.sha256(b"mlucas").hexdigest()
+        assert f"sha256:{digest}" in joined
 
     @respx.mock
     async def test_resolve_relationship_returns_a_json_api_relationship(self) -> None:
