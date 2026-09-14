@@ -14,7 +14,7 @@ real `.msg`/`.eml` is `attach_file(kind="email")`.
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from backstop_mcp.features.activity_writes._party_target_input import (
     PartyTargetInput,
@@ -40,7 +40,34 @@ LOG_ACTIVITY_INPUT_DESCRIPTION = (
 )
 
 
-class _MeetingOrCallFields(BaseModel):
+class ActivityBaseInput(PartyTargetInput, SecondaryPartyInput):
+    """Party targeting plus the title every `log_activity` kind writes."""
+
+    title: str = Field(
+        description=(
+            "Required. Title written on the activity. On a task this is mapped to Backstop "
+            "`name` on create."
+        )
+    )
+
+
+class _DatedTaggedActivityInput(ActivityBaseInput):
+    """Notes, meetings, and calls accept a backdate and activity tags."""
+
+    effective_date: date | None = Field(
+        default=None,
+        description="Calendar day on the activity, for backdating. Omit to use today.",
+    )
+    activity_tag_ids: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Activity-tag ids from `list_activity_tags`. Empty when none apply. "
+            "Tags are never created automatically."
+        ),
+    )
+
+
+class _MeetingOrCallFields(_DatedTaggedActivityInput):
     """Shared meeting/call fields.
 
     `time_zone`, `start` and `stop` are required because Backstop requires them
@@ -49,7 +76,6 @@ class _MeetingOrCallFields(BaseModel):
     the discriminator's point: the model rejects an unloggable meeting before any HTTP call.
     """
 
-    title: str = Field(description="Required. Title written on the meeting or call.")
     time_zone: str = Field(
         description=(
             "Required. A `/time-zones` shortName (e.g. US/Eastern), not the catalog id and "
@@ -67,10 +93,6 @@ class _MeetingOrCallFields(BaseModel):
         default=None,
         description="Where the meeting or call took place. Omit when there is none.",
     )
-    effective_date: date | None = Field(
-        default=None,
-        description="Calendar day on the activity, for backdating. Omit to use today.",
-    )
     attendee_party_ids: tuple[str, ...] = Field(
         default=(),
         description=(
@@ -78,37 +100,18 @@ class _MeetingOrCallFields(BaseModel):
             "Never invent or guess — echo ids from a prior resolve."
         ),
     )
-    activity_tag_ids: tuple[str, ...] = Field(
-        default=(),
-        description=(
-            "Activity-tag ids from `list_activity_tags`. Empty when none apply. "
-            "Tags are never created automatically."
-        ),
-    )
 
 
-class NoteActivityInput(PartyTargetInput, SecondaryPartyInput):
+class NoteActivityInput(_DatedTaggedActivityInput):
     """A CRM note. Notes have no attendees and no time zone."""
 
     kind: Literal["note"] = Field(
         description="Log a CRM note. Notes have no attendees or time zone."
     )
-    title: str = Field(description="Required. Title written on the note.")
     description: str | None = Field(default=None, description="Note body. Omit when there is none.")
-    effective_date: date | None = Field(
-        default=None,
-        description="Calendar day on the note, for backdating. Omit to use today.",
-    )
-    activity_tag_ids: tuple[str, ...] = Field(
-        default=(),
-        description=(
-            "Activity-tag ids from `list_activity_tags`. Empty when none apply. "
-            "Tags are never created automatically."
-        ),
-    )
 
 
-class MeetingActivityInput(PartyTargetInput, SecondaryPartyInput, _MeetingOrCallFields):
+class MeetingActivityInput(_MeetingOrCallFields):
     """A face-to-face meeting. Maps to meeting-or-calls `type=FACE_TO_FACE` later."""
 
     kind: Literal["meeting"] = Field(
@@ -116,7 +119,7 @@ class MeetingActivityInput(PartyTargetInput, SecondaryPartyInput, _MeetingOrCall
     )
 
 
-class CallActivityInput(PartyTargetInput, SecondaryPartyInput, _MeetingOrCallFields):
+class CallActivityInput(_MeetingOrCallFields):
     """A phone call. Maps to meeting-or-calls `PHONE_OUT` / `PHONE_IN` later."""
 
     kind: Literal["call"] = Field(
@@ -131,13 +134,12 @@ class CallActivityInput(PartyTargetInput, SecondaryPartyInput, _MeetingOrCallFie
     )
 
 
-class TaskActivityInput(PartyTargetInput, SecondaryPartyInput):
+class TaskActivityInput(ActivityBaseInput):
     """A CRM task. Tasks have no activity tags, no effective date, and no author field."""
 
     kind: Literal["task"] = Field(
         description="Log a CRM task. Requires `assigned_user`; tasks have no activity tags."
     )
-    title: str = Field(description="Required. Task title. Mapped to Backstop `name` on create.")
     assigned_user: str = Field(
         description=(
             "Required. A `list_system_users` login (`userName`), not the caller and not a "

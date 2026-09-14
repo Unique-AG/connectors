@@ -8,7 +8,9 @@ At least one change field must be set. Author is not a parameter. Parsed email f
 from datetime import date, datetime
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, Field, StringConstraints, model_validator
+from pydantic import BaseModel, Field, model_validator
+
+from backstop_mcp.models import NonEmptyStr
 
 __all__ = [
     "UPDATE_ACTIVITY_INPUT_DESCRIPTION",
@@ -28,7 +30,6 @@ UPDATE_ACTIVITY_INPUT_DESCRIPTION = (
     "accepts only `display_subject` and `activity_tag_ids`."
 )
 
-_NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 _IDENTITY_FIELDS = frozenset({"kind", "activity_id"})
 
 _ACTIVITY_ID_DESCRIPTION = (
@@ -38,7 +39,7 @@ _ACTIVITY_ID_DESCRIPTION = (
 
 
 class _ActivityIdInput(BaseModel):
-    activity_id: _NonEmptyStr = Field(description=_ACTIVITY_ID_DESCRIPTION)
+    activity_id: NonEmptyStr = Field(description=_ACTIVITY_ID_DESCRIPTION)
 
     @model_validator(mode="after")
     def _at_least_one_change(self) -> Self:
@@ -54,8 +55,8 @@ class UpdateNoteInput(_ActivityIdInput):
     """PATCH a CRM note."""
 
     kind: Literal["note"] = Field(description="Update a CRM note.")
-    title: _NonEmptyStr | None = Field(default=None, description="Replacement note title.")
-    description: _NonEmptyStr | None = Field(default=None, description="Replacement note body.")
+    title: NonEmptyStr | None = Field(default=None, description="Replacement note title.")
+    description: NonEmptyStr | None = Field(default=None, description="Replacement note body.")
     effective_date: date | None = Field(
         default=None, description="Replacement calendar day on the note."
     )
@@ -69,10 +70,10 @@ class UpdateNoteInput(_ActivityIdInput):
 
 
 class _UpdateMeetingOrCallFields(_ActivityIdInput):
-    title: _NonEmptyStr | None = Field(
+    title: NonEmptyStr | None = Field(
         default=None, description="Replacement title written on the meeting or call."
     )
-    time_zone: _NonEmptyStr | None = Field(
+    time_zone: NonEmptyStr | None = Field(
         default=None,
         description=(
             "Replacement `/time-zones` shortName (e.g. US/Eastern), not the catalog id and "
@@ -85,7 +86,7 @@ class _UpdateMeetingOrCallFields(_ActivityIdInput):
     stop: datetime | None = Field(
         default=None, description="Replacement stop timestamp (ISO-8601)."
     )
-    location: _NonEmptyStr | None = Field(
+    location: NonEmptyStr | None = Field(
         default=None, description="Replacement location. Omit to leave it unchanged."
     )
     effective_date: date | None = Field(
@@ -130,17 +131,17 @@ class UpdateTaskInput(_ActivityIdInput):
     """PATCH a CRM task."""
 
     kind: Literal["task"] = Field(description="Update a CRM task.")
-    title: _NonEmptyStr | None = Field(
+    title: NonEmptyStr | None = Field(
         default=None, description="Replacement task title. Mapped to Backstop `name`."
     )
-    assigned_user: _NonEmptyStr | None = Field(
+    assigned_user: NonEmptyStr | None = Field(
         default=None,
         description=(
             "Replacement `list_system_users` login (`userName`), not a party id. Omit to "
             "leave the assignee unchanged."
         ),
     )
-    description: _NonEmptyStr | None = Field(
+    description: NonEmptyStr | None = Field(
         default=None, description="Replacement task body, mapped to wire `details`."
     )
     due_date: date | datetime | None = Field(
@@ -161,7 +162,7 @@ class UpdateEmailInput(_ActivityIdInput):
             "writable; parsed fields are not."
         )
     )
-    display_subject: _NonEmptyStr | None = Field(
+    display_subject: NonEmptyStr | None = Field(
         default=None, description="Replacement display subject written on the email."
     )
     activity_tag_ids: tuple[str, ...] | None = Field(
@@ -179,8 +180,8 @@ class UpdateDocumentInput(_ActivityIdInput):
     kind: Literal["document"] = Field(
         description="Update document metadata. The file blob is not replaced — use a new attach."
     )
-    title: _NonEmptyStr | None = Field(default=None, description="Replacement document title.")
-    description: _NonEmptyStr | None = Field(
+    title: NonEmptyStr | None = Field(default=None, description="Replacement document title.")
+    description: NonEmptyStr | None = Field(
         default=None, description="Replacement document description."
     )
     effective_date: date | None = Field(

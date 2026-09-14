@@ -15,6 +15,7 @@ from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
 
 __all__ = [
+    "ActivityBaseResponse",
     "AttachFileResponse",
     "AttachedFileResponse",
     "DeletedActivityResponse",
@@ -27,65 +28,68 @@ __all__ = [
     "UpdatedActivityResponse",
 ]
 
-_ID_DESCRIPTION = "Backstop id of the created activity. Echo it; never invent one."
+_ID_DESCRIPTION = "Backstop id of the activity. Echo it; never invent one."
 _TITLE_DESCRIPTION = "Title (or task name) as written. Omitted when the create did not send one."
+_COLLECTION_DESCRIPTION = "Backstop collection this record lives in."
+_RESOURCE_TYPE = Literal["notes", "meeting-or-calls", "tasks", "emails", "documents"]
 
 
-class _LoggedActivityBase(OmitNoneModel):
+class ActivityBaseResponse(OmitNoneModel):
+    """Id every activity-write success response echoes."""
+
     id: str = Field(description=_ID_DESCRIPTION)
+
+
+class _LoggedActivityResponse(ActivityBaseResponse):
     title: str | None = Field(default=None, description=_TITLE_DESCRIPTION)
 
 
-class LoggedNoteResponse(_LoggedActivityBase):
+class _LoggedMeetingOrCallResponse(_LoggedActivityResponse):
+    resource_type: Literal["meeting-or-calls"] = Field(
+        default="meeting-or-calls",
+        description=_COLLECTION_DESCRIPTION,
+    )
+    time_zone: str = Field(
+        description="The `/time-zones` shortName written on the meeting or call (e.g. US/Eastern)."
+    )
+
+
+class LoggedNoteResponse(_LoggedActivityResponse):
     """A note after a successful create."""
 
     kind: Literal["note"] = Field(default="note", description="A CRM note.")
     resource_type: Literal["notes"] = Field(
         default="notes",
-        description="Backstop collection this record lives in.",
+        description=_COLLECTION_DESCRIPTION,
     )
 
 
-class LoggedMeetingResponse(_LoggedActivityBase):
+class LoggedMeetingResponse(_LoggedMeetingOrCallResponse):
     """A face-to-face meeting after a successful create."""
 
     kind: Literal["meeting"] = Field(default="meeting", description="A face-to-face meeting.")
-    resource_type: Literal["meeting-or-calls"] = Field(
-        default="meeting-or-calls",
-        description="Backstop collection this record lives in.",
-    )
     meeting_type: Literal["FACE_TO_FACE"] = Field(
         default="FACE_TO_FACE",
         description="Always FACE_TO_FACE for `kind=meeting`.",
     )
-    time_zone: str = Field(
-        description="The `/time-zones` shortName written on the meeting (e.g. US/Eastern)."
-    )
 
 
-class LoggedCallResponse(_LoggedActivityBase):
+class LoggedCallResponse(_LoggedMeetingOrCallResponse):
     """A phone call after a successful create."""
 
     kind: Literal["call"] = Field(default="call", description="A phone call.")
-    resource_type: Literal["meeting-or-calls"] = Field(
-        default="meeting-or-calls",
-        description="Backstop collection this record lives in.",
-    )
     meeting_type: Literal["PHONE_OUT", "PHONE_IN"] = Field(
         description="PHONE_OUT when we called them; PHONE_IN when they called us."
     )
-    time_zone: str = Field(
-        description="The `/time-zones` shortName written on the call (e.g. US/Eastern)."
-    )
 
 
-class LoggedTaskResponse(_LoggedActivityBase):
+class LoggedTaskResponse(_LoggedActivityResponse):
     """A task after a successful create."""
 
     kind: Literal["task"] = Field(default="task", description="A CRM task.")
     resource_type: Literal["tasks"] = Field(
         default="tasks",
-        description="Backstop collection this record lives in.",
+        description=_COLLECTION_DESCRIPTION,
     )
     send_notification: bool = Field(
         description="Echo of the task `send_notification` flag. False unless the caller set it."
@@ -98,29 +102,24 @@ type LoggedActivityResponse = Annotated[
 ]
 
 
-class AttachedFileResponse(OmitNoneModel):
+class AttachedFileResponse(ActivityBaseResponse):
     """A document or email after a successful file attach."""
 
-    id: str = Field(description="Backstop id of the created document or email. Echo it.")
     kind: Literal["document", "email"] = Field(
         description="Which collection the file was created in: document or email."
     )
 
 
-class UpdatedActivityResponse(OmitNoneModel):
+class UpdatedActivityResponse(ActivityBaseResponse):
     """An activity after a successful PATCH."""
 
-    id: str = Field(description="Backstop id of the updated activity. Echo it; never invent one.")
-    resource_type: Literal["notes", "meeting-or-calls", "tasks", "emails", "documents"] = Field(
-        description="Backstop collection this record lives in."
-    )
+    resource_type: _RESOURCE_TYPE = Field(description=_COLLECTION_DESCRIPTION)
 
 
-class DeletedActivityResponse(OmitNoneModel):
+class DeletedActivityResponse(ActivityBaseResponse):
     """A hard delete: Backstop has no recycle bin, so `permanent` is always true."""
 
-    id: str = Field(description="Backstop id of the deleted activity.")
-    resource_type: Literal["notes", "meeting-or-calls", "tasks", "emails", "documents"] = Field(
+    resource_type: _RESOURCE_TYPE = Field(
         description="Backstop collection the deleted record lived in."
     )
     permanent: Literal[True] = Field(

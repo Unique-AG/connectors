@@ -1,8 +1,10 @@
 """`delete_activity` input: `kind` plus the activity id. Delete is permanent."""
 
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field
+
+from backstop_mcp.models import NonEmptyStr
 
 __all__ = [
     "DELETE_ACTIVITY_INPUT_DESCRIPTION",
@@ -16,8 +18,6 @@ DELETE_ACTIVITY_INPUT_DESCRIPTION = (
     "client can elicit; otherwise it deletes immediately."
 )
 
-_NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-
 
 class DeleteActivityInput(BaseModel):
     """Hard-delete a note, meeting, call, task, email, or document."""
@@ -27,7 +27,7 @@ class DeleteActivityInput(BaseModel):
             "Which collection the record lives in. `meeting` and `call` share `meeting-or-calls`."
         )
     )
-    activity_id: _NonEmptyStr = Field(
+    activity_id: NonEmptyStr = Field(
         description=(
             "Required. Backstop id from a create echo, a `search_activities` row, or a "
             "`get_activity_history` handle (`notes_123`, `meeting-or-calls_123`). Never "

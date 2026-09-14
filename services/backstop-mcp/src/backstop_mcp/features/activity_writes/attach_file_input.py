@@ -10,7 +10,7 @@ blob, so `log_activity` has no email kind.
 from datetime import date
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, Field, StringConstraints, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from backstop_mcp.features.activity_writes._party_target_input import (
     PartyTargetInput,
@@ -19,6 +19,7 @@ from backstop_mcp.features.activity_writes._party_target_input import (
 from backstop_mcp.features.activity_writes.attach_file_max_bytes import (
     attach_file_max_bytes_message,
 )
+from backstop_mcp.models import NonEmptyStr
 
 __all__ = [
     "ATTACH_FILE_INPUT_DESCRIPTION",
@@ -35,21 +36,19 @@ ATTACH_FILE_INPUT_DESCRIPTION = (
     "Oversized files are rejected before any Backstop request."
 )
 
-_NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-
 _EMAIL_FORMATS: dict[str, Literal["eml", "msg"]] = {".eml": "eml", ".msg": "msg"}
 
 
 class _FileBlobInput(BaseModel):
     """The file blob every attach_file variant carries."""
 
-    file_name: _NonEmptyStr = Field(
+    file_name: NonEmptyStr = Field(
         description=(
             "Required. Original file name including extension (e.g. memo.pdf or reply.eml). "
             "For `kind=email`, a `.eml` or `.msg` suffix supplies `email_format` when omitted."
         )
     )
-    content: _NonEmptyStr = Field(
+    content: NonEmptyStr = Field(
         description=(
             "Standard base64 of the raw file bytes. Do not generate this string yourself — "
             "always use a file-encoding tool when one is available. Do not gzip or "
@@ -75,11 +74,11 @@ class DocumentFileInput(PartyTargetInput, SecondaryPartyInput, _FileBlobInput):
     kind: Literal["document"] = Field(
         description="Upload a document. Creates a documents record attached to the party."
     )
-    title: _NonEmptyStr | None = Field(
+    title: NonEmptyStr | None = Field(
         default=None,
         description="Title written on the document. Defaults to `file_name` when omitted.",
     )
-    description: _NonEmptyStr | None = Field(
+    description: NonEmptyStr | None = Field(
         default=None,
         description="Optional document description. Omit when there is none.",
     )
@@ -105,7 +104,7 @@ class EmailFileInput(PartyTargetInput, _FileBlobInput):
             "Required when the extension is neither .eml nor .msg."
         ),
     )
-    display_subject: _NonEmptyStr | None = Field(
+    display_subject: NonEmptyStr | None = Field(
         default=None,
         description=(
             "Display subject written on the email. Omit when Backstop should parse it "

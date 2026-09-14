@@ -1,24 +1,12 @@
-from typing import Annotated, ClassVar
+from typing import ClassVar
 
-from pydantic import (
-    AliasChoices,
-    BaseModel,
-    ConfigDict,
-    Field,
-    StringConstraints,
-    field_validator,
-)
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
-from backstop_mcp.models import StrippedStr
+from backstop_mcp.models import NonEmptyStr, StrippedStr
 
 __all__ = [
     "PartyAttributes",
 ]
-
-
-# Blank/whitespace inputs become `None` via `field_validator` on `PartyResolveItemDto` — putting
-# a BeforeValidator that returns `None` on `Annotated[str, ...]` alone fails union matching.
-_NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class PartyAttributes(BaseModel):
@@ -43,11 +31,11 @@ class PartyAttributes(BaseModel):
     # Quick-search's `id` comes back prefixed (`organizations_341208613`), unusable against
     # `/organizations/{id}`; `resourceId` is the real id. Other party endpoints don't send this
     # attribute, so it's optional and `_party_id` falls back to stripping the `id` prefix.
-    # `_NonEmptyStr` (not `StrippedStr`) so a blank/whitespace-only value can't bind to `""` and
+    # `NonEmptyStr` (not `StrippedStr`) so a blank/whitespace-only value can't bind to `""` and
     # slip past `_party_id`'s `is not None` check — that would return `""` as the id instead of
     # falling through to the prefix-strip fallback. Needs the same blank→None coercion as
-    # `PartyResolveItemDto` since `_NonEmptyStr` alone rejects (rather than coerces) blank input.
-    resource_id: _NonEmptyStr | None = Field(
+    # `PartyResolveItemDto` since `NonEmptyStr` alone rejects (rather than coerces) blank input.
+    resource_id: NonEmptyStr | None = Field(
         default=None, validation_alias=AliasChoices("resourceId", "resource_id")
     )
 

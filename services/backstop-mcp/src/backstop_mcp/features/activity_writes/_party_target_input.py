@@ -1,8 +1,8 @@
 """Party targeting shared by `log_activity` and `attach_file` inputs."""
 
-from typing import Annotated, Self
+from typing import Self
 
-from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
@@ -13,8 +13,7 @@ from backstop_mcp.features.party_resolver import (
     require_exactly_one_party_selector,
     require_path_segment,
 )
-
-_NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+from backstop_mcp.models import NonEmptyStr
 
 _SECONDARY_SEARCH_TYPE_DESCRIPTION = (
     "Collection for `secondary_party_id` when linking a second party (a person at an "
@@ -32,10 +31,10 @@ class PartyTargetInput(BaseModel):
     """Exactly one of `party_id` or `search`, the way `get_tasks_for_party` does."""
 
     search_type: SearchType = Field(description=REQUIRED_SEARCH_TYPE_DESCRIPTION)
-    party_id: _NonEmptyStr | None = Field(
+    party_id: NonEmptyStr | None = Field(
         default=None, description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION
     )
-    search: _NonEmptyStr | None = Field(
+    search: NonEmptyStr | None = Field(
         default=None, description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION
     )
 
@@ -56,7 +55,7 @@ class SecondaryPartyInput(BaseModel):
     secondary_search_type: SearchType | None = Field(
         default=None, description=_SECONDARY_SEARCH_TYPE_DESCRIPTION
     )
-    secondary_party_id: _NonEmptyStr | None = Field(
+    secondary_party_id: NonEmptyStr | None = Field(
         default=None, description=_SECONDARY_PARTY_ID_DESCRIPTION
     )
 

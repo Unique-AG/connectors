@@ -1,13 +1,6 @@
-from typing import Annotated, ClassVar, Self
+from typing import ClassVar, Self
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    StringConstraints,
-    field_validator,
-    model_validator,
-)
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver.require_exactly_one_party_selector import (
@@ -15,6 +8,7 @@ from backstop_mcp.features.party_resolver.require_exactly_one_party_selector imp
     require_exactly_one_party_selector,
 )
 from backstop_mcp.features.resolution import BatchResolution, Candidate, Resolution
+from backstop_mcp.models import NonEmptyStr
 
 __all__ = [
     "BatchPartyResolution",
@@ -24,11 +18,6 @@ __all__ = [
     "QuickSearchOptionsDto",
     "ResolvedPartyDto",
 ]
-
-
-# Blank/whitespace inputs become `None` via `field_validator` on `PartyResolveItemDto` — putting
-# a BeforeValidator that returns `None` on `Annotated[str, ...]` alone fails union matching.
-_NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class ResolvedPartyDto(BaseModel):
@@ -61,11 +50,11 @@ class PartyResolveItemDto(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    party_id: _NonEmptyStr | None = None
-    search: _NonEmptyStr | None = None
+    party_id: NonEmptyStr | None = None
+    search: NonEmptyStr | None = None
     # Same blank→None coercion as the selectors: whitespace-only must not count as "known"
     # and skip `confirm_name` / attribute backfill.
-    name: _NonEmptyStr | None = None
+    name: NonEmptyStr | None = None
 
     @field_validator("party_id", "search", "name", mode="before")
     @classmethod

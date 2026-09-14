@@ -15,6 +15,7 @@ from backstop_mcp.dates import LenientDate, LenientDatetime
 from backstop_mcp.lenient import LenientBool
 
 __all__ = [
+    "ActivityBaseAttributes",
     "DocumentAttributes",
     "EmailAttributes",
     "MeetingOrCallAttributes",
@@ -23,8 +24,8 @@ __all__ = [
 ]
 
 
-class NoteAttributes(BaseModel):
-    """Wire shape for `notes` attributes (subset we read back after create/update)."""
+class ActivityBaseAttributes(BaseModel):
+    """Fields several activity collections share on the write-side wire."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
@@ -37,22 +38,23 @@ class NoteAttributes(BaseModel):
     )
 
 
-class MeetingOrCallAttributes(BaseModel):
+class NoteAttributes(ActivityBaseAttributes):
+    """Wire shape for `notes` attributes (subset we read back after create/update)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+
+class MeetingOrCallAttributes(ActivityBaseAttributes):
     """Wire shape for `meeting-or-calls` attributes (subset we read back after create/update)."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    title: str | None = None
     type: str | None = None
     location: str | None = None
     start_timestamp: LenientDatetime = Field(default=None, validation_alias="startTimestamp")
     stop_timestamp: LenientDatetime = Field(default=None, validation_alias="stopTimestamp")
     time_zone: str | None = Field(default=None, validation_alias="timeZone")
-    effective_date: LenientDate = Field(default=None, validation_alias="effectiveDate")
     regarding: ResourceRef | None = None
-    linked_resources: tuple[ResourceRef, ...] | None = Field(
-        default=None, validation_alias="linkedResources"
-    )
 
 
 class TaskAttributes(BaseModel):
@@ -78,12 +80,9 @@ class EmailAttributes(BaseModel):
     resources: tuple[ResourceRef, ...] | None = None
 
 
-class DocumentAttributes(BaseModel):
+class DocumentAttributes(ActivityBaseAttributes):
     """Wire shape for `documents` attributes (subset we read back after attach)."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    title: str | None = None
-    description: str | None = None
     document_name: str | None = Field(default=None, validation_alias="documentName")
-    attached_to: ResourceRef | None = Field(default=None, validation_alias="attachedTo")

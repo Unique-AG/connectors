@@ -290,8 +290,9 @@ Three layers, one direction:
    a docstring; every field has a `Field(description=...)`. A number with no unit or a stage
    name with no direction is where a reader guesses wrong.
 
-Shared project types (`OmitNoneModel`, `CoercedId`, `published_output_schema`) live in
-`models.py`. Lenient scalars live in `lenient.py`. Do not re-declare them per feature.
+Shared project types (`OmitNoneModel`, `StrippedStr`, `NonEmptyStr`, `CoercedId`,
+`published_output_schema`) live in `models.py`. Lenient scalars live in `lenient.py`.
+Do not re-declare them per feature.
 
 Backstop camelCase arrives as `validation_alias`, not `alias`, so the schema and
 `model_dump` stay snake_case. `populate_by_name` is what still accepts either spelling.
