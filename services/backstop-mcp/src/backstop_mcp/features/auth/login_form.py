@@ -23,9 +23,9 @@ def render_login_form(
 
     `request_id` identifies the pending `PendingAuthorization` row (see `db/models.py`) this
     submission belongs to; it's carried as a hidden field and round-tripped by the POST handler
-    in `auth/provider.py`. `csrf_token` is the other half of the double-submit check in
-    `auth/login_csrf.py` — required, not optional, so a new render path can't quietly ship a
-    form the POST handler will reject. `username` is re-filled on a failed attempt so the user
+    in `auth/provider.py`. `csrf_token` is the other half of the double-submit check —
+    required, not optional, so a new render path can't quietly ship a form the POST handler
+    will reject. `username` is re-filled on a failed attempt so the user
     doesn't have to retype it — the API token never is. Values are autoescaped by Jinja2 since
     `client_name` comes from a dynamically-registered (and therefore untrusted) OAuth client.
     """

@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from mcp_credential_auth import (
     MAX_USERNAME_LENGTH,
     CredentialOAuthProvider,
+    LoginCsrf,
     ThrottleConfig,
     clear_failures,
     is_throttled,
@@ -27,12 +28,6 @@ from backstop_mcp.features.auth.credential_store import (
     save_credential,
 )
 from backstop_mcp.features.auth.crypto import InvalidCredentialEnvelopeError
-from backstop_mcp.features.auth.login_csrf import (
-    clear_csrf_cookie,
-    csrf_token_is_valid,
-    issue_csrf_token,
-    set_csrf_cookie,
-)
 from backstop_mcp.features.auth.login_form import render_login_form
 
 logger = logging.getLogger(__name__)
@@ -64,6 +59,8 @@ _LOGIN_SECURITY_HEADERS = {
 _EXPIRED_LINK_MESSAGE = (
     "This login link is invalid or has expired. Please reconnect from your MCP client."
 )
+
+_LOGIN_CSRF = LoginCsrf("backstop_login_csrf_")
 
 
 class BackstopOAuthProvider(CredentialOAuthProvider):
@@ -136,7 +133,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         echoing the one just submitted) means an error page never reflects an attacker-supplied
         value back into the form.
         """
-        csrf_token = issue_csrf_token()
+        csrf_token = _LOGIN_CSRF.issue_token()
         response = HTMLResponse(
             render_login_form(
                 request_id,
@@ -148,7 +145,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
             status_code=status_code,
             headers=_LOGIN_SECURITY_HEADERS,
         )
-        set_csrf_cookie(
+        _LOGIN_CSRF.set_cookie(
             response,
             request_id,
             csrf_token,
@@ -185,7 +182,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         # login attempt worth forwarding. Re-rendering (rather than a bare 400) issues a fresh
         # token, so the legitimate case — a user whose cookie expired while the form sat open —
         # recovers by simply submitting again.
-        if not csrf_token_is_valid(request, request_id, csrf_token):
+        if not _LOGIN_CSRF.token_is_valid(request, request_id, csrf_token):
             logger.warning("auth.login.csrf_mismatch")
             return self._form_response(
                 request_id,
@@ -307,5 +304,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
 
         response = RedirectResponse(redirect_url, status_code=302, headers=_LOGIN_SECURITY_HEADERS)
         # The pending authorization is gone, so its CSRF cookie has nothing left to protect.
-        clear_csrf_cookie(response, request_id, path=self.login_path, secure=self._secure_cookies)
+        _LOGIN_CSRF.clear_cookie(
+            response, request_id, path=self.login_path, secure=self._secure_cookies
+        )
         return response
