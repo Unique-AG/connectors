@@ -2,15 +2,18 @@
 
 import logging
 
-from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiSingleResourceDocument,
+    BackstopClient,
+    json_api_create,
+    omit_none_values,
+)
 from backstop_mcp.features.activity_writes.api_responses import DocumentAttributes
 from backstop_mcp.features.activity_writes.attach_file_input import DocumentFileInput
 from backstop_mcp.features.activity_writes.commands._file_data_utils import encode_file_data
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
     activity_base_attributes,
     activity_tag_relationship,
-    json_api_create,
-    omit_none_values,
     party_resource_link,
     secondary_resource_link,
 )

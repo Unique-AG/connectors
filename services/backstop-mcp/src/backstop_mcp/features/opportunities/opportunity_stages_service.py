@@ -3,6 +3,8 @@ from collections.abc import Mapping
 from datetime import timedelta
 from typing import Self
 
+from fastmcp.exceptions import ToolError
+
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.caching import CachedValue
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
@@ -72,6 +74,38 @@ class OpportunityStagesService:
         stage = await self.get_stage(stage_id=stage_id)
         return stage.name if stage else None
 
+    async def find_by_stage_name(
+        self, *, name: str, entity_type_id: str | None = None
+    ) -> OpportunityStageResponse:
+        """The unique stage with this name, optionally scoped to an entity type.
+
+        Matching is casefold. An unknown name, a name that is not valid for
+        `entity_type_id`, or a name that matches more than one stage is a `ToolError`.
+        """
+        catalog = await self.get_catalog()
+        wanted = name.casefold()
+        named = [stage for stage in catalog.values() if stage.name.casefold() == wanted]
+        if entity_type_id is not None:
+            matches = [
+                stage
+                for stage in named
+                if not stage.opportunity_type_ids or entity_type_id in stage.opportunity_type_ids
+            ]
+        else:
+            matches = named
+        if not matches:
+            if named:
+                raise ToolError(
+                    f"Stage {name!r} is not valid for this opportunity's entity type "
+                    + f"{entity_type_id}."
+                )
+            available = _available_stage_names(catalog, entity_type_id=entity_type_id)
+            raise ToolError(f"Unknown opportunity stage {name!r}. Available stages: {available}.")
+        if len(matches) > 1:
+            ids = ", ".join(stage.id for stage in matches)
+            raise ToolError(f"Opportunity stage {name!r} matches more than one stage ({ids}).")
+        return matches[0]
+
     async def get_catalog(self) -> dict[str, OpportunityStageResponse]:
         failure = self._failure
         if failure is not None and self._cooldown.within():
@@ -93,12 +127,29 @@ class OpportunityStagesService:
         page = await self._client.paginate(
             "/opportunity-stages",
             schema=BackstopApiResource[OpportunityStageAttributes],
+            params={"include": "opportunityTypes"},
             max_records=None,
             page_size=100,
         )
         stages: dict[str, OpportunityStageResponse] = {}
         for resource in page.items:
-            stage = OpportunityStageResponse.from_resource(resource)
+            stage = OpportunityStageResponse.from_resource(
+                resource,
+                opportunity_type_ids=resource.related_ids("opportunityTypes"),
+            )
             if stage is not None:
                 stages[stage.id] = stage
         return stages
+
+
+def _available_stage_names(
+    catalog: dict[str, OpportunityStageResponse], *, entity_type_id: str | None
+) -> str:
+    names = {
+        stage.name
+        for stage in catalog.values()
+        if entity_type_id is None
+        or not stage.opportunity_type_ids
+        or entity_type_id in stage.opportunity_type_ids
+    }
+    return ", ".join(sorted(names))

@@ -4,7 +4,7 @@ from typing import Self, overload
 
 from fastmcp.exceptions import ToolError
 
-from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
+from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, relationship_to_one
 from backstop_mcp.caching import CachedValue, CacheFreshness
 from backstop_mcp.features.system_users.api_responses import SystemUserAttributes
 from backstop_mcp.features.system_users.internal_dto import SystemUserDto
@@ -22,7 +22,7 @@ def system_user_relationship(user_id: str) -> dict[str, object]:
     relationships — in `attributes` it answers `400 "author should not be in the
     'attributes' but 'relationship."`. Verified live.
     """
-    return {"data": {"type": _SYSTEM_USER_TYPE, "id": user_id}}
+    return relationship_to_one(_SYSTEM_USER_TYPE, user_id)
 
 
 async def _fetch_system_users(client: BackstopClient) -> dict[str, SystemUserDto]:
@@ -113,6 +113,11 @@ class SystemUsersService:
         user = await self.resolve_by_user_name(username)
         return system_user_relationship(user.id)
 
+    async def find_by_user_name(self, username: str) -> SystemUserDto | None:
+        """The system user with this login, or `None` when the catalog has no match."""
+        catalog, _freshness = await self.get()
+        return catalog.get(username.strip().casefold())
+
     async def resolve_by_user_name(self, username: str) -> SystemUserDto:
         """The system user with this login.
 
@@ -120,8 +125,7 @@ class SystemUsersService:
         task assignee, and blaming the credential for a mistyped assignee sends the
         reader to the wrong place.
         """
-        catalog, _freshness = await self.get()
-        user = catalog.get(username.strip().casefold())
+        user = await self.find_by_user_name(username)
         if user is None:
             raise ToolError(
                 f"No Backstop system user has the login {username!r}. Logins come from "

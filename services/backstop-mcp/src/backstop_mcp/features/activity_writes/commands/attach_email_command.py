@@ -8,14 +8,17 @@ metadata-only email create. Plain base64 is rejected with
 
 import logging
 
-from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiSingleResourceDocument,
+    BackstopClient,
+    json_api_create,
+    omit_none_values,
+)
 from backstop_mcp.features.activity_writes.api_responses import EmailAttributes
 from backstop_mcp.features.activity_writes.attach_file_input import EmailFileInput
 from backstop_mcp.features.activity_writes.commands._file_data_utils import encode_file_data
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
     activity_tag_relationship,
-    json_api_create,
-    omit_none_values,
     party_resource_link,
 )
 from backstop_mcp.features.activity_writes.internal_dto import AuthorDto

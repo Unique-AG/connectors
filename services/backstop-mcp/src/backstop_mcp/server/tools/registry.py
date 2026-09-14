@@ -28,6 +28,10 @@ from backstop_mcp.features.opportunities.tools.get_opportunities_by_ids import (
     get_opportunities_by_ids,
 )
 from backstop_mcp.features.opportunities.tools.search_opportunities import search_opportunities
+from backstop_mcp.features.opportunity_writes.tools.backfill_opportunity_stage_history import (
+    backfill_opportunity_stage_history,
+)
+from backstop_mcp.features.opportunity_writes.tools.update_opportunity import update_opportunity
 from backstop_mcp.features.org_people.tools.get_organization import get_organization
 from backstop_mcp.features.org_people.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.features.org_people.tools.get_person import get_person
@@ -60,4 +64,6 @@ TOOLS: tuple[ToolFunction, ...] = (
     attach_file,
     update_activity,
     delete_activity,
+    update_opportunity,
+    backfill_opportunity_stage_history,
 )
