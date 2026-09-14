@@ -4,6 +4,7 @@ from fastmcp.dependencies import Depends
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller, get_backstop_config
+from backstop_mcp.features.custom_fields.commands import UpdateCustomFieldValuesCommand
 from backstop_mcp.features.custom_fields.custom_field_groups_service import CustomFieldGroupsService
 from backstop_mcp.features.custom_fields.custom_fields_service import CustomFieldsService
 
@@ -38,4 +39,14 @@ def get_custom_field_groups_service(
         client=client,
         ttl_minutes=config.custom_field_schema_ttl_minutes,
         caching_enabled=config.custom_field_schema_cache_enabled,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_update_custom_field_values_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
+) -> UpdateCustomFieldValuesCommand:
+    return UpdateCustomFieldValuesCommand(
+        client=client, custom_fields_service=custom_fields_service
     )

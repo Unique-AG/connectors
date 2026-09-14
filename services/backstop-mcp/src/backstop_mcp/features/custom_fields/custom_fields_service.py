@@ -175,10 +175,18 @@ class CustomFieldsService:
         return ResolvedCustomFieldValueDto.from_definition(
             definition,
             value=self._as_published_value(stored.value, definition.field_type),
-            outside_current_options=self._not_in_current_options(
+            outside_current_options=self.is_outside_current_options(
                 stored.value, definition.select_options
             ),
         )
+
+    def is_outside_current_options(self, value: object, select_options: Sequence[object]) -> bool:
+        """True when `value` is not among the definition's current picklist texts."""
+        return self._not_in_current_options(value, select_options)
+
+    def current_option_texts(self, select_options: Sequence[object]) -> tuple[str, ...]:
+        """The picklist texts a write must match, in stable order."""
+        return tuple(sorted(self._current_option_texts(select_options)))
 
     def _as_published_value(self, value: object, field_type: str | None) -> object:
         if field_type is None or field_type.casefold() != self._ENTITY_FIELD_TYPE:

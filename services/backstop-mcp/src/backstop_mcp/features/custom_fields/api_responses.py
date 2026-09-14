@@ -10,10 +10,15 @@ from pydantic import (
     ValidationError,
 )
 
-from backstop_mcp.lenient import LenientBool, LenientInt
+from backstop_mcp.lenient import LenientBool, LenientInt, LenientStr
 from backstop_mcp.models import StrippedStr
 
 __all__ = [
+    "BulkCustomFieldValuesAttributes",
+    "BulkCustomFieldValuesDocument",
+    "BulkCustomFieldValueRecordAttributes",
+    "BulkLoadErrorMessageAttributes",
+    "BulkLoadSummaryAttributes",
     "CustomFieldDefinitionAttributes",
     "CustomFieldGroupAttributes",
     "CustomFieldGroupParentAttributes",
@@ -74,6 +79,7 @@ class CustomFieldDefinitionAttributes(BaseModel):
     required: LenientBool = None
     client_required: LenientBool = Field(default=None, alias="clientRequired")
     system_defined: LenientBool = Field(default=None, alias="systemDefined")
+    max_length: LenientInt = Field(default=None, alias="maxLength")
 
 
 class CustomFieldValueAttributes(BaseModel):
@@ -158,3 +164,66 @@ class CustomFieldGroupAttributes(BaseModel):
     parent: Annotated[
         CustomFieldGroupParentAttributes | None, BeforeValidator(_mapping_or_none)
     ] = None
+
+
+class BulkLoadErrorMessageAttributes(BaseModel):
+    """One per-record error from a bulk write. `index` is 0-based."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    index: LenientInt = None
+    message: LenientStr = None
+
+
+class BulkLoadSummaryAttributes(BaseModel):
+    """`bulkLoadSummary` on a bulk POST. A `201` with `successCount: 0` is a total failure."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    total_count: LenientInt = Field(default=None, validation_alias="totalCount")
+    success_count: LenientInt = Field(default=None, validation_alias="successCount")
+    error_messages: list[BulkLoadErrorMessageAttributes] = Field(
+        default_factory=list, validation_alias="errorMessages"
+    )
+
+
+class BulkCustomFieldValueRecordAttributes(BaseModel):
+    """One row Backstop actually wrote. Failed request rows are omitted."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    definition_id: _IdStr = Field(default=None, validation_alias="definitionId")
+    value: object = None
+
+
+class BulkCustomFieldValuesAttributes(BaseModel):
+    """Attributes on `POST /bulk-custom-field-values`. Summary is nested."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    records: list[BulkCustomFieldValueRecordAttributes] = Field(default_factory=list)
+    bulk_load_summary: BulkLoadSummaryAttributes | None = Field(
+        default=None, validation_alias="bulkLoadSummary"
+    )
+
+    def summary(self) -> BulkLoadSummaryAttributes:
+        return self.bulk_load_summary or BulkLoadSummaryAttributes()
+
+
+class BulkCustomFieldValuesResource(BaseModel):
+    """Primary resource of a bulk `201`. `id` is `null` on this instance."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    id: str | None = None
+    type: str
+    attributes: BulkCustomFieldValuesAttributes
+
+
+class BulkCustomFieldValuesDocument(BaseModel):
+    """The `201` envelope. Not `BackstopApiSingleResourceDocument` — that requires an id."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    data: BulkCustomFieldValuesResource
+    included: list[dict[str, object]] = Field(default_factory=list)

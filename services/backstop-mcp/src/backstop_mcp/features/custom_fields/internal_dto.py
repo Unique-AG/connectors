@@ -79,6 +79,10 @@ class CustomFieldDefinitionDto(BaseModel):
         default=None,
         description="True when Backstop marks this field as system-defined.",
     )
+    max_length: int | None = Field(
+        default=None,
+        description="Maximum stored string length, when Backstop publishes one.",
+    )
     description: str | None = Field(
         default=None, description="Help text on the definition, when Backstop publishes one."
     )
@@ -117,6 +121,7 @@ class CustomFieldDefinitionDto(BaseModel):
             required=attrs.required,
             client_required=attrs.client_required,
             system_defined=attrs.system_defined,
+            max_length=attrs.max_length,
             description=attrs.description,
         )
 

@@ -59,6 +59,7 @@ from backstop_mcp.features.activity_writes import (
 from backstop_mcp.features.custom_fields import (
     get_custom_field_groups_service,
     get_custom_fields_service,
+    get_update_custom_field_values_command_factory,
 )
 from backstop_mcp.features.data_hygiene import get_employment_index_factory
 from backstop_mcp.features.opportunities import (
@@ -129,6 +130,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_time_zones_service,
     get_custom_fields_service,
     get_custom_field_groups_service,
+    get_update_custom_field_values_command_factory,
     get_employment_index_factory,
     get_opportunity_stages_service_factory,
     get_update_opportunity_command_factory,
