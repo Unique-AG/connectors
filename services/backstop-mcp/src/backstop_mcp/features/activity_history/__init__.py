@@ -14,11 +14,10 @@ history row, mapped from attributes. `ActivityHistoryResolvedResponse`/
 
 `GetActivityDetailQuery`: the `get_activity_detail` fetch — one activity's full
 `entity-activity-details` record plus, for a meeting-or-calls handle, timings and attendees.
-`ResourceIdentifierDto.from_activity_id` accepts a history composite
-`{resource_type}_{resource_id}` or a search_activities row id and rejects a history email
-handle (`email_*` / `emails_*` — those are `/emails` ids);
-`ResourceIdentifierDto.is_meeting_or_call` gates the two `/meeting-or-calls` fetches for a
-composite. A search id waits on the detail record's `type`. See
+`parse_activity_detail_handle` accepts a history composite `{resource_type}_{resource_id}`
+or a search_activities row id and rejects a history email handle (`email_*` / `emails_*`
+— those are `/emails` ids). A `meeting-or-calls` type gates the two `/meeting-or-calls`
+fetches for a composite. A search id waits on the detail record's `type`. See
 `queries/get_activity_detail_query.py`. `ActivityDetailResponse`/`AttendeeResponse`: that
 tool's wire shape and the pure conversion into it. See `responses.py`.
 
@@ -68,7 +67,9 @@ from backstop_mcp.features.activity_history.internal_dto import (
     EntityActivitiesFetchDto,
     EntityActivityDto,
     MeetingSpecificsDto,
-    ResourceIdentifierDto,
+)
+from backstop_mcp.features.activity_history.parse_activity_detail_handle import (
+    parse_activity_detail_handle,
 )
 from backstop_mcp.features.activity_history.queries import (
     MAX_RETRIEVABLE,
@@ -100,6 +101,7 @@ from backstop_mcp.features.collection_scan import (
     AggregateBucketDto,
     ScanCoverageResponse,
 )
+from backstop_mcp.utils import ParsedActivityHandle
 
 __all__ = [
     "ActivityAggregateBy",
@@ -135,8 +137,8 @@ __all__ = [
     "Gist",
     "MAX_RETRIEVABLE",
     "MeetingSpecificsDto",
+    "ParsedActivityHandle",
     "ResolvedPartyAsOfResponse",
-    "ResourceIdentifierDto",
     "ScanCoverageResponse",
     "SearchActivitiesQuery",
     "SearchActivitiesResolvedResponse",
@@ -150,4 +152,5 @@ __all__ = [
     "get_activity_history_query_factory",
     "get_activity_history_settings",
     "get_search_activities_query_factory",
+    "parse_activity_detail_handle",
 ]

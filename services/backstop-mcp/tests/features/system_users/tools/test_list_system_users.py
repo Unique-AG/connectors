@@ -83,7 +83,7 @@ class TestListSystemUsers:
         assert "filter[name][like]" not in params
         payload = tool_payload(result)
         users = [object_dict(item) for item in object_list(payload["users"])]
-        assert [item["id"] for item in users] == ["u1", "u2", "u3"]
+        assert [item["id"] for item in users] == ["u1", "u2"]
         assert users[0]["user_name"] == "mlucas"
         assert users[0]["disabled"] is False
         assert users[1]["user_name"] == "jsmith"

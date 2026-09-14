@@ -3,6 +3,7 @@ import logging
 import secrets
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar, Literal, override
 
@@ -54,6 +55,8 @@ from backstop_mcp.features.auth.throttle import (
 )
 
 logger = logging.getLogger(__name__)
+
+type ResolveSystemUser = Callable[[str, str], Awaitable[tuple[str, dict[str, object]] | None]]
 
 
 def _hash_token(token: str) -> str:
@@ -140,6 +143,7 @@ class BackstopOAuthProvider(OAuthProvider):
     _session_factory: async_sessionmaker[AsyncSession]
     _encryption_key: bytes
     _backstop_clients: BackstopClientFactory
+    _resolve_system_user: ResolveSystemUser | None
     _throttle: ThrottleConfig
     login_path: str
 
@@ -152,6 +156,7 @@ class BackstopOAuthProvider(OAuthProvider):
         encryption_key: bytes,
         backstop_clients: BackstopClientFactory,
         throttle: ThrottleConfig,
+        resolve_system_user: ResolveSystemUser | None = None,
         login_path: str = "/backstop/login",
     ) -> None:
         super().__init__(
@@ -164,6 +169,7 @@ class BackstopOAuthProvider(OAuthProvider):
         # Credential verification goes through the shared factory so the login form reuses the
         # same connection pool, base URL and timeout profile as every tool call.
         self._backstop_clients = backstop_clients
+        self._resolve_system_user = resolve_system_user
         self._throttle = throttle
         self.login_path = login_path
         # `base_url` arrives already validated and trailing-slash-free (`AppConfig.issuer`), so
@@ -175,6 +181,11 @@ class BackstopOAuthProvider(OAuthProvider):
         # still gets a working form; every real deploy (https, enforced for production by
         # `AppConfig`) gets the flag.
         self._secure_cookies: bool = secure_cookies
+
+    def attach_resolve_system_user(self, resolve: ResolveSystemUser) -> None:
+        if self._resolve_system_user is not None:
+            return
+        self._resolve_system_user = resolve
 
     # -- Dynamic client registration -----------------------------------------------------
 
@@ -356,6 +367,30 @@ class BackstopOAuthProvider(OAuthProvider):
                 error="Invalid username or API token.",
             )
 
+        assert self._resolve_system_user is not None, (
+            "resolve_system_user must be provided or attached before login"
+        )
+        try:
+            system_user = await self._resolve_system_user(username, api_token)
+        except BackstopUnreachableError as exc:
+            logger.warning("auth.login.backstop_unreachable", extra={"error": str(exc)})
+            return self._form_response(
+                request_id,
+                username=username,
+                error="Backstop is unreachable right now — please try again shortly.",
+            )
+
+        if system_user is None:
+            return self._form_response(
+                request_id,
+                username=username,
+                error=(
+                    "This Backstop login has no matching system user, so it cannot be "
+                    + "used to author activities."
+                ),
+            )
+        external_user_id, system_user_raw = system_user
+
         # Authenticated, so the guessing budget is irrelevant for this username.
         await clear_failures(self._session_factory, username)
 
@@ -406,6 +441,8 @@ class BackstopOAuthProvider(OAuthProvider):
                     str(uuid.uuid4()),
                     BackstopCredentialSecret(username=username, api_token=SecretStr(api_token)),
                     self._encryption_key,
+                    external_user_id=external_user_id,
+                    raw=system_user_raw,
                 )
                 session.add(
                     AuthorizationCodeRow(

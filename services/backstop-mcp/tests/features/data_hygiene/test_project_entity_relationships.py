@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 
-from backstop_mcp.backstop_client import BackstopApiResourceDocument
+from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument
 from backstop_mcp.features.data_hygiene import project_entity_relationships
 
 
@@ -12,7 +12,7 @@ class _Attrs(BaseModel):
 
 class TestEntityRelationships:
     def test_follows_relationships_and_selects_types_by_resource_type(self) -> None:
-        document = BackstopApiResourceDocument[_Attrs].model_validate(
+        document = BackstopApiSingleResourceDocument[_Attrs].model_validate(
             {
                 "data": {
                     "id": "1",

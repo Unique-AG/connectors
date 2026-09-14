@@ -18,7 +18,7 @@ from backstop_mcp.db import BackstopCredential, PendingAuthorization
 from backstop_mcp.db import LoginAttempt as LoginAttemptRow
 from backstop_mcp.db import OAuthToken as OAuthTokenRow
 from backstop_mcp.features.auth.login_csrf import csrf_cookie_name
-from backstop_mcp.features.auth.provider import BackstopOAuthProvider
+from backstop_mcp.features.auth.provider import BackstopOAuthProvider, ResolveSystemUser
 from backstop_mcp.features.auth.throttle import (
     MAX_USERNAME_LENGTH,
     ThrottleConfig,
@@ -31,8 +31,18 @@ type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 _REDIRECT_URI = "https://client.example/callback"
 
 
+async def _stub_system_user(username: str, _api_token: str) -> tuple[str, dict[str, object]] | None:
+    return (
+        "su-stub",
+        {"id": "su-stub", "user_name": username, "name": "Stub User", "disabled": False},
+    )
+
+
 def _make_provider(
-    db: DatabaseFixture, *, throttle: ThrottleConfig | None = None
+    db: DatabaseFixture,
+    *,
+    throttle: ThrottleConfig | None = None,
+    resolve_system_user: ResolveSystemUser | None = None,
 ) -> BackstopOAuthProvider:
     _, factory = db
     # The provider verifies submitted credentials through the shared client factory, so it
@@ -43,6 +53,7 @@ def _make_provider(
         session_factory=factory,
         encryption_key=Fernet.generate_key(),
         backstop_clients=client_factory("https://api.backstopsolutions.com"),
+        resolve_system_user=resolve_system_user or _stub_system_user,
         # Effectively off by default: the throttle has its own tests below, and every other test
         # here would otherwise depend on how many failed logins its neighbours happened to make.
         throttle=throttle
@@ -188,6 +199,69 @@ class TestLoginFormSubmission:
         query = parse_qs(parsed.query)
         assert "code" in query
         assert query["state"] == ["state-1"]
+
+    @pytest.mark.asyncio
+    async def test_valid_credentials_cache_the_system_user(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
+        provider = _make_provider(db)
+        client_info = await _register_client(provider, "provider-client-cache")
+        redirect_url = await provider.authorize(client_info, _authorization_params())
+        request_id = parse_qs(urlparse(redirect_url).query)["request_id"][0]
+
+        response = await provider.handle_login_post(
+            _login_post_request(request_id, "pv-cache.user", "token-cache")
+        )
+
+        assert response.status_code == 302
+        _, session_factory = db
+        async with session_factory() as session:
+            row = (
+                await session.execute(
+                    select(BackstopCredential).where(
+                        BackstopCredential.backstop_username == "pv-cache.user"
+                    )
+                )
+            ).scalar_one()
+        assert row.external_user_id == "su-stub"
+        assert row.raw == {
+            "id": "su-stub",
+            "user_name": "pv-cache.user",
+            "name": "Stub User",
+            "disabled": False,
+        }
+
+    @pytest.mark.asyncio
+    async def test_missing_system_user_does_not_mint_a_code(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def missing(_username: str, _api_token: str) -> tuple[str, dict[str, object]] | None:
+            return None
+
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
+        provider = _make_provider(db, resolve_system_user=missing)
+        client_info = await _register_client(provider, "provider-client-no-su")
+        redirect_url = await provider.authorize(client_info, _authorization_params())
+        request_id = parse_qs(urlparse(redirect_url).query)["request_id"][0]
+
+        response = await provider.handle_login_post(
+            _login_post_request(request_id, "pv-no.system", "token-no-su")
+        )
+
+        assert response.status_code == 200
+        assert b"no matching system user" in response.body
+        _, session_factory = db
+        async with session_factory() as session:
+            count = await session.scalar(
+                select(func.count())
+                .select_from(BackstopCredential)
+                .where(BackstopCredential.backstop_username == "pv-no.system")
+            )
+        assert count == 0
+        async with session_factory() as session:
+            pending = await session.get(PendingAuthorization, request_id)
+        assert pending is not None
 
     @pytest.mark.asyncio
     async def test_first_login_logs_that_the_credential_is_new(

@@ -127,7 +127,7 @@ _SYSTEM_USER: dict[str, object] = {
     "phoneNumber": "12122321462",
     "name": "Margaret Lucas",
     "disabled": False,
-    "email": "margaret.lucas@capstoneco.com",
+    "email": "margaret.lucas@example.com",
     "isBsgAdmin": False,
 }
 
@@ -284,7 +284,7 @@ class TestInternalOwner:
         assert owner.model_dump() == {
             "name": "Margaret Lucas",
             "user_name": "mlucas",
-            "email": "margaret.lucas@capstoneco.com",
+            "email": "margaret.lucas@example.com",
             "phone": "12122321462",
             "disabled": False,
         }

@@ -2,11 +2,11 @@
 
 from urllib.parse import quote
 
-from backstop_mcp.backstop_client import BackstopApiResourceDocument, BackstopClient
+from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver.api_responses import PartyAttributes
 
-_PartyResourceDocument = BackstopApiResourceDocument[PartyAttributes]
+_PartyResourceDocument = BackstopApiSingleResourceDocument[PartyAttributes]
 
 
 class GetPartyNameQuery:
@@ -26,4 +26,4 @@ class GetPartyNameQuery:
             params={"fields": "name,firstName,lastName"},
             schema=_PartyResourceDocument,
         )
-        return document.require_data(path=path).attributes.display_name()
+        return document.data.attributes.display_name()

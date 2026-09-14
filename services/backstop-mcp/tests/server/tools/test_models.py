@@ -8,7 +8,13 @@ from fastmcp.tools import tool
 from fastmcp.tools.function_tool import FunctionTool, ToolMeta
 from pydantic import Field, TypeAdapter, ValidationError
 
-from backstop_mcp.models import CoercedId, OmitNoneModel, coerce_ids, published_output_schema
+from backstop_mcp.models import (
+    CoercedId,
+    NonEmptyStr,
+    OmitNoneModel,
+    coerce_ids,
+    published_output_schema,
+)
 
 
 class _Payload(OmitNoneModel):
@@ -57,6 +63,16 @@ async def test_structured_content_omits_the_null_key() -> None:
     result = await function_tool.run({})
 
     assert result.structured_content == {"kept": "value"}
+
+
+def test_non_empty_str_strips_surrounding_whitespace() -> None:
+    assert TypeAdapter(NonEmptyStr).validate_python("  hello  ") == "hello"
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_non_empty_str_rejects_a_blank_value(blank: str) -> None:
+    with pytest.raises(ValidationError):
+        TypeAdapter(NonEmptyStr).validate_python(blank)
 
 
 def test_coerced_id_accepts_a_json_number() -> None:

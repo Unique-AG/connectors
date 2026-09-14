@@ -1,0 +1,88 @@
+"""Write-side Backstop wire shapes for activity POST/PATCH responses.
+
+Subset we read back after a create or update. Every field is optional so one renamed key
+costs that field, not the parse. `extra="ignore"` drops permission flags and the rest of the
+wire we do not publish. Do not import read-side `EmailAttributes` or `TaskAttributes` —
+those are different subsets for different features.
+"""
+
+from typing import ClassVar
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from backstop_mcp.backstop_client import ResourceRef
+from backstop_mcp.dates import LenientDate, LenientDatetime
+from backstop_mcp.lenient import LenientBool
+
+__all__ = [
+    "ActivityBaseAttributes",
+    "DocumentAttributes",
+    "EmailAttributes",
+    "MeetingOrCallAttributes",
+    "NoteAttributes",
+    "TaskAttributes",
+]
+
+
+class ActivityBaseAttributes(BaseModel):
+    """Fields several activity collections share on the write-side wire."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    title: str | None = None
+    description: str | None = None
+    effective_date: LenientDate = Field(default=None, validation_alias="effectiveDate")
+    attached_to: ResourceRef | None = Field(default=None, validation_alias="attachedTo")
+    linked_resources: tuple[ResourceRef, ...] | None = Field(
+        default=None, validation_alias="linkedResources"
+    )
+
+
+class NoteAttributes(ActivityBaseAttributes):
+    """Wire shape for `notes` attributes (subset we read back after create/update)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+
+class MeetingOrCallAttributes(ActivityBaseAttributes):
+    """Wire shape for `meeting-or-calls` attributes (subset we read back after create/update)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    type: str | None = None
+    location: str | None = None
+    start_timestamp: LenientDatetime = Field(default=None, validation_alias="startTimestamp")
+    stop_timestamp: LenientDatetime = Field(default=None, validation_alias="stopTimestamp")
+    time_zone: str | None = Field(default=None, validation_alias="timeZone")
+    regarding: ResourceRef | None = None
+
+
+class TaskAttributes(BaseModel):
+    """Write-side wire shape for `tasks` attributes (name/details, not title/description)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    name: str | None = None
+    details: str | None = None
+    status: str | None = None
+    due_date: LenientDate = Field(default=None, validation_alias="dueDate")
+    send_notification: LenientBool = Field(default=None, validation_alias="sendNotification")
+    attached_to: ResourceRef | None = Field(default=None, validation_alias="attachedTo")
+
+
+class EmailAttributes(BaseModel):
+    """Wire shape for creatable `emails` attributes (displaySubject, not subject/from/to)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    display_subject: str | None = Field(default=None, validation_alias="displaySubject")
+    email_format: str | None = Field(default=None, validation_alias="emailFormat")
+    resources: tuple[ResourceRef, ...] | None = None
+
+
+class DocumentAttributes(ActivityBaseAttributes):
+    """Wire shape for `documents` attributes (subset we read back after attach)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    document_name: str | None = Field(default=None, validation_alias="documentName")

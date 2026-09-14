@@ -11,6 +11,7 @@ from backstop_mcp.db import BackstopCredential, transaction
 from backstop_mcp.features.auth.credential_store import (
     find_user_id_by_username,
     get_credential,
+    get_system_user_cache,
     save_credential,
 )
 
@@ -114,6 +115,51 @@ class TestSaveAndGetCredential:
             recovered = await get_credential(session, durable_ids[0], key)
         assert recovered is not None
         assert recovered.username == username
+
+
+class TestSystemUserCache:
+    @pytest.mark.asyncio
+    async def test_round_trips_the_login_snapshot(self, db: DatabaseFixture) -> None:
+        _, factory = db
+        key = _random_key()
+        raw: dict[str, object] = {
+            "id": "3717625",
+            "user_name": "cs-cache.user",
+            "name": "Cache User",
+        }
+
+        async with factory() as session:
+            await save_credential(
+                session,
+                "user-cache-1",
+                BackstopCredentialSecret(username="cs-cache.user", api_token=SecretStr("token")),
+                key,
+                external_user_id="3717625",
+                raw=raw,
+            )
+            await session.commit()
+
+        async with factory() as session:
+            cached = await get_system_user_cache(session, "user-cache-1")
+
+        assert cached == ("3717625", raw)
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_the_snapshot_was_never_written(
+        self, db: DatabaseFixture
+    ) -> None:
+        _, factory = db
+        async with factory() as session:
+            await save_credential(
+                session,
+                "user-cache-2",
+                BackstopCredentialSecret(username="cs-cache.none", api_token=SecretStr("token")),
+                _random_key(),
+            )
+            await session.commit()
+
+        async with factory() as session:
+            assert await get_system_user_cache(session, "user-cache-2") is None
 
 
 class TestFindUserIdByUsername:

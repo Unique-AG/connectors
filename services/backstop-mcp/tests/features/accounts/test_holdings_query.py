@@ -5,7 +5,7 @@ dead credential must not trigger it — the first because it is a real answer, t
 the documented walk would fail identically but slower. A 401 that re-verified still authenticates
 is the opposite: this unsupported endpoint refused us, so use the documented one.
 
-Table fixtures below are shaped from recorded responses (`docs/json/023`, `026`, `037`, `046`):
+Table fixtures below are shaped from recorded live responses:
 rows under `data[0].attributes.accounts`, a `null` element id, `meta.totalResourceCount` of `0`,
 and `included` empty.
 """
@@ -39,7 +39,7 @@ def _table_row(account_id: str) -> dict[str, object]:
     return {
         "investor": ref(_ORG, "organizations"),
         "account": ref(account_id, "hedge-fund-accounts"),
-        "product": ref("1653647", "hedge-fund-products", shortName="CIO2"),
+        "product": ref("1653647", "hedge-fund-products", shortName="FUND2"),
         "closed": False,
         "balance": {"amount": 42.0, "currency": "USD", "formattedValue": "$42.00"},
     }
@@ -489,7 +489,7 @@ def _row(
     account_id: str,
     *,
     product_id: str = "1653647",
-    short_name: str = "CIO2",
+    short_name: str = "FUND2",
     closed: bool = False,
     balance: object = _UNSET,
     **overrides: object,
@@ -502,7 +502,7 @@ def _row(
         "product": _ref(product_id, "hedge-fund-products", shortName=short_name),
         "accountTerm": _ref("497339", "account-terms"),
         "associationType": "0",
-        "otherId": "90007828_CIO2_00000",
+        "otherId": "90007828_FUND2_00000",
         "fundedDate": "2017-01-01T00:00:00.000-0500",
         "closedDate": "2022-02-01T00:00:00.000-0500" if closed else None,
         "closed": closed,
@@ -592,7 +592,7 @@ class TestProjection:
         assert row.investor_id == _ORG
         assert row.investor_resource_type == "organizations"
         assert row.account_term_id == "497339"
-        assert row.other_id == "90007828_CIO2_00000"
+        assert row.other_id == "90007828_FUND2_00000"
         assert row.funded_date == date(2017, 1, 1)
         assert row.balance is not None
         assert row.balance.amount == 3619868606.0
@@ -977,15 +977,15 @@ class TestDocumentedWalk:
                     "1",
                     owner_id=_OWNER_ID,
                     product_id=_PRODUCT_ID,
-                    name="PSP CGUP",
+                    name="PSP NGUP",
                 ),
                 included=[
                     _owner(_OWNER_ID, name="PSP Investments"),
                     resource(
                         _PRODUCT_ID,
                         "products",
-                        name="Capstone Global Unconstrained Portfolio",
-                        configuration={"productShortName": "CGUP"},
+                        name="Northwind Global Unconstrained Portfolio",
+                        configuration={"productShortName": "NGUP"},
                     ),
                 ],
             )
@@ -999,7 +999,7 @@ class TestDocumentedWalk:
         assert "filter[owner][eq]" not in params
         assert params["include"] == "owner,investorType,product"
         assert set(params["fields"].split(",")) == _EXPECTED_FIELDS
-        assert listing.rows[0].product_short_name == "CGUP"
+        assert listing.rows[0].product_short_name == "NGUP"
 
     @pytest.mark.asyncio
     @respx.mock

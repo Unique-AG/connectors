@@ -1,19 +1,48 @@
 # Agent coding guide for backstop-mcp
 
-Read this before adding, changing, or refactoring a feature. The reference implementation is
-[`src/backstop_mcp/features/opportunities/`](src/backstop_mcp/features/opportunities/).
-When this file and another feature disagree, opportunities wins.
+Read this before adding, changing, or refactoring a feature. Two references:
+
+- Reads: [`src/backstop_mcp/features/opportunities/`](src/backstop_mcp/features/opportunities/)
+- Writes: [`src/backstop_mcp/features/activity_writes/`](src/backstop_mcp/features/activity_writes/)
+
+When this file and a read feature disagree, opportunities wins. When this file and a write
+feature disagree, activity_writes wins. Do not invent a third shape.
 
 Backstop behaviour is a different question — use the `backstop-api` skill and live `GET`s
 before designing from swagger. The live instance is read-only: never `POST` / `PATCH` /
-`PUT` / `DELETE` against `BACKSTOP_BASE_URL`.
+`PUT` / `DELETE` against `BACKSTOP_BASE_URL` unless the user says so for that task, and
+then delete what you created and verify the `GET` 404s. Writes designed from swagger alone
+have been wrong every time so far — see "Write tools and commands" and "Write payloads"
+below.
+
+---
+
+## agent-explore (developer utility)
+
+[`agent-explore/`](agent-explore/) is a local CLI for reading the live REST API and the
+Elevio help center. It is **not** part of the shipped MCP server. `src/backstop_mcp/`
+and `tests/` must not import it, load its caches, or mention its paths. Its own
+helpers are tested beside the scripts, not from the product suite. Feature tests pin
+wire behaviour with respx fixtures, not by reading those caches.
+
+Credentials live in `agent-explore/.env` (copy `.env.example`). Do not print them.
+Run the scripts from `services/backstop-mcp` so `uv run` picks up the service venv.
+
+| Script | What it does | Cache (gitignored) |
+|---|---|---|
+| `explore.py` | `GET` only against `BACKSTOP_BASE_URL` (API token). 2-minute timeout. | `.probe-cache/` |
+| `docs.py` | Elevio help via help-prod SSO (web username/password). Never POST to the CRM. | `.docs-cache/` |
+| `test_set.py` | Optional local question harness. Not CI. | `.test-set-runs/` |
+
+Reuse a cached probe instead of hitting the API again. Do not rewrite these scripts.
+The `backstop-api` skill is the workflow; this folder is the tooling.
 
 ---
 
 ## Deprecated layout (do not copy)
 
-The catalog trio, `tasks`, `org_people`, `accounts`, `activity_history`, and
-`party_resolver` already follow the opportunities layout. Do not copy leftover `fetch_*` files into new work
+The catalog trio, `tasks`, `org_people`, `accounts`, `activity_history`,
+`party_resolver`, and `activity_writes` already follow the opportunities layout. Do not copy leftover `fetch_*` files into new work
 (`accounts/utils/fetch_series.py`). That name stays only because it still has callers; it
 is not the template. Do not add a `fetch_*` filename ban while it exists.
 
@@ -74,8 +103,10 @@ A feature that is only a couple of functions does not need empty `queries/` / `c
 `utils/` packages. Add a package when a second query, a command, or a shared helper
 appears — do not invent structure for one file.
 
-`commands/` is the write side. The live tenant in `agent-explore/.env` stays GET-only:
-never exercise a command against `BACKSTOP_BASE_URL` from a probe or a throwaway script.
+`commands/` is the write side. Do not exercise a command against the live tenant in
+`agent-explore/.env` unless the user asks for that task; when they do, delete every record
+you created and verify the follow-up `GET` 404s. See "Write payloads" for the wire shapes
+Backstop actually accepts.
 
 ---
 
@@ -90,11 +121,33 @@ or a file named after a mechanism.
 | `queries/` | `get_opportunities_query.py` | `GetOpportunitiesQuery` |
 | `commands/` | `close_opportunity_command.py` | `CloseOpportunityCommand` |
 | `utils/` | `map_opportunity_to_response_util.py` | `MapOpportunityToResponseUtil` |
+| `queries/` or `commands/` | `_json_api_utils.py` | several small private functions |
 | `tools/` | `get_opportunities.py` | `get_opportunities` |
 | feature root | `opportunity_stages_service.py` | `OpportunityStagesService` |
 | `responses` | `*Response` classes | published MCP models |
 | `api_responses` | `*Attributes` / resource types | wire shapes |
 | `internal_dto` | `*Dto` classes only | internal projections |
+
+**`_util` is one symbol; `_utils` is a private module of several.** A public helper in
+`utils/` is singular and named after the one thing it defines
+(`map_opportunity_to_response_util.py` → `MapOpportunityToResponseUtil`). A `_`-prefixed
+sibling inside `queries/` or `commands/` is plural — `_<subject>_utils.py` — because it
+holds a handful of small functions and no single symbol to name it after; rule 6 exempts it
+for exactly that reason. When the subject turns out to be a single symbol, drop the `_utils`
+and take its name (`extract_collection.py` → `extract_collection`).
+
+The subject still has to be in the name. `_file_data_utils.py` and `_json_api_utils.py` say
+what they hold; `_utils.py` and `_attachment_utils.py`, which those two replaced, did not.
+Reach for one of these modules only when a second caller inside the folder appears; until
+then the helper is a private method on the query or command.
+
+A name that has to cover two subjects is worth a second look, not an automatic split. A few
+small functions that the same callers use together stay together — the extra module and its
+import line cost more than the broad name does. Split when the **callers** diverge:
+`extract_collection.py` came out of `_json_api_utils.py` because only
+`update_activity` and `delete_activity` resolve a path, while every log and attach command
+was importing routing code it never called. That is the signal — two groups of functions
+with two different sets of callers — not the word count in the filename.
 
 The class, the factory, the injected parameter, and the instance attribute should read as
 the same thing: `GetOpportunitiesQuery`, `get_opportunities_query_factory`,
@@ -242,8 +295,9 @@ Three layers, one direction:
    a docstring; every field has a `Field(description=...)`. A number with no unit or a stage
    name with no direction is where a reader guesses wrong.
 
-Shared project types (`OmitNoneModel`, `CoercedId`, `published_output_schema`) live in
-`models.py`. Lenient scalars live in `lenient.py`. Do not re-declare them per feature.
+Shared project types (`OmitNoneModel`, `StrippedStr`, `NonEmptyStr`, `CoercedId`,
+`published_output_schema`) live in `models.py`. Lenient scalars live in `lenient.py`.
+Do not re-declare them per feature.
 
 Backstop camelCase arrives as `validation_alias`, not `alias`, so the schema and
 `model_dump` stay snake_case. `populate_by_name` is what still accepts either spelling.
@@ -325,6 +379,130 @@ only when the set is no longer small.
 
 ---
 
+## Write tools and commands
+
+Reads copy `features/opportunities/`. Writes copy `features/activity_writes/`. The first
+draft of UN-23684 designed payloads from swagger, then every live create returned `400`.
+The patterns below are what that review settled on — do not re-litigate them into one
+write service or a `mode=` flag.
+
+**Split tools when the annotations cannot tell the truth.** One `ToolAnnotations` set
+cannot honestly cover an additive create, a replacing PATCH, and a permanent hard delete.
+`log_activity` is `destructive_hint=False`; `update_activity` and `delete_activity` are
+separate tools with `destructive_hint=True` so the host approval prompt is the
+confirmation. A `mode=` flag on one tool is how that honesty is lost.
+
+**Put a multi-megabyte field on its own tool.** `attach_file` is separate so the everyday
+note-taking schema never carries a base64 blob. FastMCP's `RequestBodyLimitMiddleware` is
+4 MiB (`DEFAULT_MAX_REQUEST_BODY_SIZE`) and does not accept an override — derive the
+published cap from that constant (`attach_file_max_bytes.py`) rather than inventing 20 MB.
+Our over-cap rejection is reported distinctly from Backstop's own `413`.
+
+**Discriminated unions for variants.** `LogActivityInput` is a union on `kind`. Each
+variant's required fields (`time_zone` / `start` / `stop` on a meeting, `due_date` on a
+task) live on that variant so pydantic rejects the call instead of Backstop. Shared
+fields that several variants need (`activity_tag_ids`, party targeting) live once on a
+base class; tasks still omit tags because they do not accept them. There is no `email`
+kind on `log_activity`: `POST /emails` needs the message blob
+(`400 "Field data is required"`), so email creates live only on `attach_file`.
+
+**Facade command, child commands, public door.** `LogActivityCommand` switches on `kind`
+and calls `LogNoteCommand` / `LogMeetingOrCallCommand` / `LogTaskCommand`. Each child
+does one POST. Meeting and call share one command — they are the same Backstop
+collection. The outside interface does not look inside. `__all__` exports the four public
+commands (`LogActivityCommand`, `AttachFileCommand`, `UpdateActivityCommand`,
+`DeleteActivityCommand`) and the published inputs/responses — child commands and union
+members stay inside the feature. Factories stay on the door for teardown. FastMCP's
+Depends system needs a factory per injectable command; do not collapse fourteen commands
+into one "write service" to shorten `dependencies.py`.
+
+**Author is derived, never a parameter.** `get_current_caller_system_user` resolves the
+login-cached `external_user_id` (`filter[userName][eq]` is rejected). The tool passes
+`AuthorDto.from_system_user(caller)` into create `run`. `AuthorDto` is the three fields
+the write needs, not a pass-through of `SystemUserDto`. Tasks have no author — do not
+walk `/system-users` for a field the payload will not send. `assigned_user` is a
+caller-supplied login and still goes through `SystemUsersService`.
+
+**Share the thing that would drift; leave the rest at the call site.**
+`activity_base_attributes` / `activity_tag_relationship` are shared because create and
+PATCH map `title` → `name` (tasks) the same way. Party links stay at the caller — they
+need the resolved `party_id`, which is not on the activity. A util that takes five
+arguments to hide those links obfuscates more than it saves. `json_api_update` is
+`json_api_create` plus `id`. `relationship_data` is one function: `None` omits the key,
+`()` is an empty replace. Creates pass `omit_empty=True` on tags so `()` is not sent;
+updates leave `()` as a clear.
+
+**Reuse, do not redeclare.** Parent links are `ResourceRef` from `json_api.py`.
+`NonEmptyStr` lives in `models.py`. `blank_to_none` / `require_exactly_one_party_selector`
+live on the party-resolver door. `parse_activity_handle` is one parser; writes pass
+`kind` into `extract_collection` so a bare create-echo id still lands on the right
+collection. `api_responses` model the real attribute subset the API returns — do not
+invent an empty model "just to take `.id`", and do not put `author` / `attendees` /
+`createdBy` on `*Attributes` (those are relationships; `extra="ignore"` still accepts
+them if they ever show up).
+
+**DELETE has no body.** `client.delete(path)` — no dummy `*Attributes`, no `schema=` on a
+204. Pass `schema=` only when Backstop returns a body.
+
+**Elicitation is a capability, then a fetch.** `elicit_entity_deletion` takes a callback
+and runs it only after the client is known to support elicitation. Do not GET a preview
+for a prompt that will never be shown. Id spaces differ (`/entity-activity-details` is
+not `/emails` or `/tasks`) — use one parser that knows `kind`, and do not treat a 200
+from the wrong collection as the target record.
+
+**Do not premature-optimize a small catalog.** A linear scan of ~200 time zones is fine.
+Cache TTL stays off until a metric says otherwise. Index a roster by casefolded login
+when every write would otherwise walk it; drop users without a login, keep the first
+duplicate, warn.
+
+---
+
+## Write payloads
+
+Four rules, each learned from a 400 on the live instance. Local copies of those probes
+live only under `agent-explore/.probe-cache` (developer utility, not shipped). The swagger
+is wrong or silent about all four, so a create designed from it does not work.
+
+**1. A parent link's `resourceType` is the plural resource name.** `attachedTo`,
+`regarding`, `resources`, `linkedResources` and `secondaryRegarding` carry
+`{resourceId, resourceType, resourceLink}` where `resourceType` is `organizations` /
+`people` / `contacts` / `employees`. Bean casing is rejected —
+`400 "Can not find OrganizationBean with id ..."`, and `linkedResources` is blunter:
+`400 "Invalid LinkResourceType EmployeeBean"`. A `SearchType` is already the right string.
+`map_search_type_to_resource_type_bean` is for `filter[entityType][eq]` on the **read**
+side only; it has no business in a write payload.
+
+**2. Identity pointers are relationships, never attributes.** `author`, `createdBy` and
+`assignedUser` go in `relationships` as `{"data": {"type": "system-users", "id": ...}}`.
+In `attributes` Backstop answers
+`400 "author should not be in the 'attributes' but 'relationship."`. `attendees` and
+`activityTags` are relationships too, and both persist on the `POST` — no follow-up PATCH.
+
+**3. Required fields are not the swagger's required list.** Notes need `effectiveDate`;
+`meeting-or-calls` need `title`, `type`, `timeZone`, `startTimestamp`, `stopTimestamp`,
+`regarding` and `author`; tasks need `name`, `dueDate` and `attachedTo`; `emails` need
+`data` **and** `emailFormat`. Put each one on the pydantic input (or default it in the
+command) so the model rejects the call instead of the agent reading a 400.
+
+**4. Silent defaults bite.** `sendNotification` defaults to **true** when omitted, which
+mails the assignee — always write the flag explicitly. `isDraft` defaults to false. A
+`linkedResources` entry that repeats the parent is silently dropped, so filter it out
+rather than reporting a link that is not there.
+
+Also worth knowing before you route a write: nested collection routes are not uniformly
+writable (`POST /contacts/{id}/notes` is `403 "contacts/notes is read only."` while
+top-level `POST /notes` accepts every party type), nested `POST /{segment}/{id}/meeting-or-calls`
+returns `201` but silently orphans the record from the parent's activity feed (route
+meetings and calls through top-level `POST /meeting-or-calls` with an explicit `regarding`),
+and `Accept: application/json` gets an HTML 404 page instead of a JSON error, which is why
+`backstop_client/factory.py` pins `application/vnd.api+json`.
+
+A metadata-only email cannot be created. `POST /emails` answers
+`400 "Field data is required in POST request."` — the blob goes on `attach_file(kind="email")`.
+The UI can log an email without a file; the REST API cannot.
+
+---
+
 ## Overlapping other GETs (custom-field catalog)
 
 `CustomFieldsService` is a process-wide TTL cache with single-flight. `join_values` loads
@@ -401,7 +579,9 @@ logger.warning(
 Log at the start of a tool call and when a query finishes (what was asked, what came
 back). Warn when a record is dropped, a catalog miss is flagged, or a per-id GET fails.
 Do not log every mapped row. Do not put secrets, tokens, or raw Backstop bodies in
-`extra`.
+`extra`. A username or login is `IdentifiableValue(login)` from `utils/` — it prints
+`sha256:<hex>` unless `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Never interpolate the raw
+login into the line.
 
 **Metrics.** Add an instrument in `metrics.py` only when a number will change a decision
 you can name: catalog TTL vs walk cost (`CUSTOM_FIELD_SCHEMA_LOADS`, the catalog
@@ -452,6 +632,13 @@ out. They do not assert on which private method ran, which local was assigned, o
 exact helper call graph. Those assertions lock an implementation in place and break on
 the next rename.
 
+Write tests pin the **wire** to recorded live shapes, not to what the first draft sent.
+The originals in `activity_writes` asserted `PersonBean` and an attribute `author` — they
+passed against a mock of a contract Backstop rejects, which is how the wrong payload
+survived a green suite. Assert `resourceType: "organizations"` and
+`relationships.author`, and keep a fixture that replays the live `400` when those are
+wrong. `recorded_json_bodies` is the helper.
+
 Assert on internals only when there is no other way to know the feature worked (for
 example `definitions.call_count == 1` when the *contract* is "one catalog load covers the
 batch"). Prefer an output flag (`custom_fields_unavailable`) or a missing field over
@@ -480,9 +667,13 @@ tests/features/<name>/
 ## New feature / tool checklist
 
 1. Read the `backstop-api` skill. Confirm the endpoint, includes, and filters with a live
-   `GET` (write the probe to `agent-explore/.probe-cache/`). Never write to the CRM.
-2. Look at `features/opportunities/` — not `org_people`, not `accounts`.
-3. Add model layers, query and/or command, utils, tool, `__all__` exports.
+   `GET` (write the probe to `agent-explore/.probe-cache/`). Never write to the CRM unless
+   the user says so for that task; when they do, delete every record you created and
+   verify the follow-up `GET` 404s. Pin write tests to those recorded `400`/`201` bodies.
+2. Look at `features/opportunities/` for reads, `features/activity_writes/` for writes —
+   not `org_people`, not `accounts`.
+3. Add model layers, query and/or command, utils, tool, `__all__` exports. A write tool
+   that cannot share one honest `ToolAnnotations` set is more than one tool.
 4. Register the tool on `TOOLS`.
 5. Add cached providers to `teardown.PROVIDERS` if and only if they are `@lru_cache`.
 6. `uv run pytest tests/features/<name> tests/test_layering.py tests/test_teardown.py tests/server/tools/test_output_descriptions.py`
@@ -501,6 +692,10 @@ These are tests, not taste:
 5. A logic file is named after its symbol (rule 6).
 6. Every tool module is on `TOOLS` (rule 7).
 7. Every `@lru_cache` provider is in `teardown.PROVIDERS`.
+8. `src/backstop_mcp/` and `tests/` do not import or mention `agent-explore/`
+   (developer utility only).
+9. The service does not name a client tenant host or the client's firm.
+   Measurements say "a client-obtained tenant".
 
 Never mutate a function argument. Use `assert` for internal invariants; `raise` at the
 system boundary (user input, Backstop errors).

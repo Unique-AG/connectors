@@ -1,6 +1,6 @@
 """One activity's detail record, and meeting specifics plus attendees when they apply.
 
-Three endpoints, all keyed by the bare `ResourceIdentifierDto.resource_id` — never the
+Three endpoints, all keyed by the bare `ParsedActivityHandle.resource_id` — never the
 composite `{resourceType}_{resourceId}` handle. Every field name below was byte-verified
 against a live instance:
 
@@ -18,12 +18,15 @@ record's `type` is `"meeting"` for a call as well (verified on a `PHONE_OUT` rec
 
 import asyncio
 import logging
+from http import HTTPStatus
 from urllib.parse import quote
 
 from backstop_mcp.backstop_client import (
+    BackstopApiError,
     BackstopApiResource,
-    BackstopApiResourceDocument,
+    BackstopApiSingleResourceDocument,
     BackstopClient,
+    OptionalBackstopApiResourceDocument,
 )
 from backstop_mcp.features.activity_history.api_responses import (
     ActivityDetailAttributes,
@@ -34,15 +37,15 @@ from backstop_mcp.features.activity_history.internal_dto import (
     ActivityDetailDto,
     AttendeeDto,
     MeetingSpecificsDto,
-    ResourceIdentifierDto,
     attachments_from_stored,
 )
 from backstop_mcp.features.activity_history.responses import ActivityDetailResponse
+from backstop_mcp.utils import ParsedActivityHandle
 
 logger = logging.getLogger(__name__)
 
-_ActivityDetailDocument = BackstopApiResourceDocument[ActivityDetailAttributes]
-_MeetingSpecificDocument = BackstopApiResourceDocument[MeetingSpecificAttributes]
+_ActivityDetailDocument = OptionalBackstopApiResourceDocument[ActivityDetailAttributes]
+_MeetingSpecificDocument = BackstopApiSingleResourceDocument[MeetingSpecificAttributes]
 
 
 class GetActivityDetailQuery:
@@ -52,11 +55,11 @@ class GetActivityDetailQuery:
         self._client: BackstopClient = client
 
     async def run(
-        self, *, activity_id: str, handle: ResourceIdentifierDto
+        self, *, activity_id: str, handle: ParsedActivityHandle
     ) -> ActivityDetailResponse:
         """`activity_id` is echoed; `handle` is the already-parsed resource type and id."""
         resource_id = handle.resource_id
-        if handle.is_meeting_or_call:
+        if handle.resource_type == "meeting-or-calls":
             detail, specifics, attendees = await asyncio.gather(
                 self._fetch_activity_detail(resource_id),
                 self._fetch_meeting_specifics(resource_id),
@@ -93,7 +96,9 @@ class GetActivityDetailQuery:
         document = await self._client.get(path, schema=_ActivityDetailDocument)
         # Null primary data here means "no such activity" — this endpoint answers 200 rather than
         # 404 for an id it cannot resolve, including a composite handle passed through by mistake.
-        resource = document.require_data(path=path)
+        if document.data is None:
+            raise BackstopApiError(HTTPStatus.NOT_FOUND, f"Backstop holds no record at {path!r}.")
+        resource = document.data
         attributes = resource.attributes
         detail = ActivityDetailDto(
             resource_id=resource.id,
@@ -120,7 +125,7 @@ class GetActivityDetailQuery:
             params={"fields": "startTimestamp,stopTimestamp,location,timeZone"},
             schema=_MeetingSpecificDocument,
         )
-        attributes = document.require_data(path=path).attributes
+        attributes = document.data.attributes
         specifics = MeetingSpecificsDto(
             start=attributes.start,
             stop=attributes.stop,

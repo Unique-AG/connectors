@@ -39,9 +39,10 @@ from backstop_mcp.backstop_client.factory import (
 from backstop_mcp.backstop_client.json_api import (
     BackstopApiCollectionDocument,
     BackstopApiResource,
-    BackstopApiResourceDocument,
+    BackstopApiSingleResourceDocument,
     Included,
     IncludedResource,
+    OptionalBackstopApiResourceDocument,
     ResourceRef,
     included_resource,
 )
@@ -59,7 +60,7 @@ __all__ = [
     "BackstopApiCollectionDocument",
     "BackstopApiError",
     "BackstopApiResource",
-    "BackstopApiResourceDocument",
+    "BackstopApiSingleResourceDocument",
     "BackstopAuthError",
     "BackstopClient",
     "BackstopClientFactory",
@@ -77,6 +78,7 @@ __all__ = [
     "CallerSessionProvider",
     "Included",
     "IncludedResource",
+    "OptionalBackstopApiResourceDocument",
     "PageResult",
     "ResourceRef",
     "RetryPolicy",

@@ -25,7 +25,7 @@ from urllib.parse import quote
 from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopApiResource,
-    BackstopApiResourceDocument,
+    BackstopApiSingleResourceDocument,
     BackstopClient,
 )
 from backstop_mcp.features.activity_history.activity_type import (
@@ -93,7 +93,7 @@ class GetActivityHistoryQuery:
         party_path = f"/{segment}/{quote(entity_id, safe='')}"
         document = await self._client.get(
             party_path,
-            schema=BackstopApiResourceDocument[PartyRecordResponse],
+            schema=BackstopApiSingleResourceDocument[PartyRecordResponse],
         )
         page_calls: dict[ActivityType, Coroutine[None, None, _FetchedPage]] = {
             activity_type: self._fetch_page(
@@ -145,7 +145,7 @@ class GetActivityHistoryQuery:
                 activity_tag_ids=continuation.activity_tag_ids,
             )
 
-        attributes = document.require_data(path=party_path).attributes
+        attributes = document.data.attributes
         return ActivityHistoryResolvedResponse(
             resolved=ResolvedPartyAsOfResponse.from_party(party, attributes=attributes),
             groups=groups,
@@ -375,7 +375,7 @@ class GetActivityHistoryQuery:
         gist_max_chars: int,
     ) -> ActivityRecordResponse:
         projected = _ACTIVITY_SIDE_LOADS.project(
-            document=BackstopApiResourceDocument[ActivityAttributes].model_construct(
+            document=BackstopApiSingleResourceDocument[ActivityAttributes].model_construct(
                 data=resource,
                 included=included,
             )

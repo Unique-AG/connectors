@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Sequence
 from urllib.parse import quote
 
-from backstop_mcp.backstop_client import BackstopApiResourceDocument, BackstopClient
+from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters, CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
@@ -57,11 +57,11 @@ class GetPersonQuery:
             self._client.get(
                 person_path,
                 params={"include": include_param} if include_param else None,
-                schema=BackstopApiResourceDocument[PersonAttributes],
+                schema=BackstopApiSingleResourceDocument[PersonAttributes],
             ),
             self._custom_fields_service.load_catalog(),
         )
-        person_attributes = person_document.require_data(path=person_path).attributes
+        person_attributes = person_document.data.attributes
         entity_relationships = project_entity_relationships(person_document)
         employment_index = self._employment_index_factory.index(
             relationships=entity_relationships.relationships,

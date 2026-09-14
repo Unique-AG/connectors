@@ -30,6 +30,7 @@ from backstop_mcp.features.data_hygiene import (
     TypeVocabularyDto,
 )
 from backstop_mcp.features.system_users import SystemUsersService
+from backstop_mcp.features.time_zones import TimeZonesService
 
 BASE_URL = "https://example.backstopsolutions.com"
 
@@ -118,6 +119,10 @@ def activity_tags_service(client: BackstopClient, *, ttl_minutes: int = 60) -> A
 
 def system_users_service(client: BackstopClient, *, ttl_minutes: int = 60) -> SystemUsersService:
     return SystemUsersService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
+
+
+def time_zones_service(client: BackstopClient, *, ttl_minutes: int = 60) -> TimeZonesService:
+    return TimeZonesService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
 
 
 def custom_fields_service(

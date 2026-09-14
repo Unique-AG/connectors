@@ -80,10 +80,10 @@ def as_context(fake: FakeContext) -> Context:
     return cast("Context", cast("object", fake))
 
 
-def ctx_accept(label: str) -> Context:
-    async def elicit(*, message: str, response_type: object) -> AcceptedElicitation[str]:
+def ctx_accept(value: object) -> Context:
+    async def elicit(*, message: str, response_type: object) -> AcceptedElicitation[object]:
         _ = message, response_type
-        return AcceptedElicitation(data=label)
+        return AcceptedElicitation(data=value)
 
     return as_context(FakeContext(elicit))
 

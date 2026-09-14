@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Sequence
 from urllib.parse import quote
 
-from backstop_mcp.backstop_client import BackstopApiResourceDocument, BackstopClient
+from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters, CustomFieldsService
 from backstop_mcp.features.includes import (
     OrganizationInclude,
@@ -48,11 +48,11 @@ class GetOrganizationQuery:
             self._client.get(
                 path,
                 params={"include": plan.param} if plan.param else None,
-                schema=BackstopApiResourceDocument[OrganizationAttributes],
+                schema=BackstopApiSingleResourceDocument[OrganizationAttributes],
             ),
             self._custom_fields_service.load_catalog(),
         )
-        attributes = document.require_data(path=path).attributes
+        attributes = document.data.attributes
         custom_field_values = await self._custom_fields_service.join_values(
             attributes.regular_custom_field_values,
             filters=custom_fields_filters,

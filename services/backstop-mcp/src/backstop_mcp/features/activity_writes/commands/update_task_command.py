@@ -1,0 +1,59 @@
+"""PATCH a CRM task via `/tasks/{id}`. `assignedUser` is a relationship, not an attribute."""
+
+import logging
+from urllib.parse import quote
+
+from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
+from backstop_mcp.features.activity_writes.api_responses import TaskAttributes
+from backstop_mcp.features.activity_writes.commands._json_api_utils import (
+    activity_base_attributes,
+    isoformat,
+    json_api_update,
+    omit_none_values,
+)
+from backstop_mcp.features.activity_writes.commands.extract_collection import extract_collection
+from backstop_mcp.features.activity_writes.responses import UpdatedActivityResponse
+from backstop_mcp.features.activity_writes.update_activity_input import UpdateTaskInput
+from backstop_mcp.features.system_users import SystemUsersService
+from backstop_mcp.utils import parse_activity_handle
+
+logger = logging.getLogger(__name__)
+
+_Document = BackstopApiSingleResourceDocument[TaskAttributes]
+
+
+class UpdateTaskCommand:
+    """Update a task via `PATCH /tasks/{id}`."""
+
+    def __init__(self, *, client: BackstopClient, system_users_service: SystemUsersService) -> None:
+        self._client: BackstopClient = client
+        self._system_users_service: SystemUsersService = system_users_service
+
+    async def run(self, *, activity: UpdateTaskInput) -> UpdatedActivityResponse:
+        handle = parse_activity_handle(activity.activity_id)
+        collection, resource_id = extract_collection(handle, kind=activity.kind)
+        path = f"/{collection}/{quote(resource_id, safe='')}"
+        payload = json_api_update(
+            resource_type=collection,
+            resource_id=resource_id,
+            attributes=omit_none_values(
+                {
+                    **activity_base_attributes(
+                        activity, title_key="name", description_key="details"
+                    ),
+                    "dueDate": isoformat(activity.due_date),
+                    "sendNotification": activity.send_notification,
+                }
+            ),
+            relationships=omit_none_values(
+                {
+                    "assignedUser": await self._system_users_service.resolve_relationship(
+                        activity.assigned_user
+                    )
+                }
+            )
+            or None,
+        )
+        document = await self._client.patch(path, schema=_Document, json=payload)
+        logger.info("activity_writes.task.updated", extra={"id": document.data.id})
+        return UpdatedActivityResponse(id=document.data.id, resource_type="tasks")

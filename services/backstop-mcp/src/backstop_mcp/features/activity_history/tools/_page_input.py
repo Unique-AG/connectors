@@ -6,14 +6,7 @@ from datetime import date
 from typing import Annotated, ClassVar, Literal, Self
 
 from fastmcp import Context
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    StringConstraints,
-    field_validator,
-    model_validator,
-)
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from backstop_mcp.features.activity_history import (
     ActivityContinuationResponse,
@@ -28,9 +21,13 @@ from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyDto,
     ResolvePartyQuery,
+    blank_to_none,
+    require_exactly_one_party_selector,
+    require_path_segment,
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
+from backstop_mcp.models import NonEmptyStr
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +38,6 @@ _DEFAULT_ACTIVITY_TYPES: tuple[ActivityType, ...] = (
     "email",
     "document",
 )
-_NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class ActivityHistoryFirstPageInput(BaseModel):
@@ -58,11 +54,11 @@ class ActivityHistoryFirstPageInput(BaseModel):
         Field(description=REQUIRED_SEARCH_TYPE_DESCRIPTION),
     ]
     party_id: Annotated[
-        _NonEmptyStr | None,
+        NonEmptyStr | None,
         Field(description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None
     search: Annotated[
-        _NonEmptyStr | None,
+        NonEmptyStr | None,
         Field(description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None
     activity_types: Annotated[
@@ -121,16 +117,11 @@ class ActivityHistoryFirstPageInput(BaseModel):
     @field_validator("party_id", "search", mode="before")
     @classmethod
     def _blank_to_none(cls, value: object) -> object:
-        if isinstance(value, str) and not value.strip():
-            return None
-        return value
+        return blank_to_none(value)
 
     @model_validator(mode="after")
     def _exactly_one_selector(self) -> Self:
-        if (self.party_id is None) == (self.search is None):
-            raise ValueError("Exactly one of party_id or search must be provided")
-        if self.party_id is not None and "/" in self.party_id:
-            raise ValueError(f"party_id {self.party_id!r} must not contain '/'")
+        require_exactly_one_party_selector(party_id=self.party_id, search=self.search)
         return self
 
     @model_validator(mode="after")
@@ -173,7 +164,7 @@ class ActivityHistoryNextPageInput(BaseModel):
         ),
     ]
     entity_id: Annotated[
-        _NonEmptyStr,
+        NonEmptyStr,
         Field(
             description=(
                 "Trusted Backstop entity id copied from a prior `get_activity_history` "
@@ -198,8 +189,7 @@ class ActivityHistoryNextPageInput(BaseModel):
 
     @model_validator(mode="after")
     def _entity_id_is_a_path_segment(self) -> Self:
-        if "/" in self.entity_id:
-            raise ValueError(f"entity_id {self.entity_id!r} must not contain '/'")
+        require_path_segment(self.entity_id, field_name="entity_id")
         return self
 
 

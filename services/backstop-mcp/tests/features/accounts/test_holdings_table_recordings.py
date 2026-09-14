@@ -7,8 +7,8 @@ the projection is checked against Backstop's real field names and nesting.
 
 `recordings/` holds those responses with tenant data scrubbed — ids remapped, investor names and
 account numbers replaced, amounts flattened, the host rewritten. Only the *shape* is under test, so
-scrubbing costs nothing, and it means these run in CI: the unredacted originals live in the repo's
-gitignored `docs/json/`, so a test that depended on them would silently skip everywhere it matters.
+scrubbing costs nothing, and it means these run in CI. Unredacted live recordings stay
+local and gitignored — a test that loaded them would silently skip everywhere it matters.
 
 Driven through `respx` at the feature boundary — no private helpers — so a refactor inside the
 module cannot quietly stop this from testing anything.

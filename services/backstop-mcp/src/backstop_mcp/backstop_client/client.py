@@ -3,9 +3,10 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
-from typing import NoReturn, cast
+from typing import NoReturn, cast, overload
 
 import httpx
+from fastmcp.exceptions import ToolError
 
 from backstop_mcp.backstop_client.auth_recheck import (
     TRANSIENT_AUTH_MESSAGE,
@@ -84,7 +85,8 @@ class BackstopClient:
     call rather than once per HTTP request on purpose — a `paginate()` walking twenty pages
     must not cost twenty credential lookups.
 
-    Typed verbs always take a response `schema`. Prefer those for tool/feature code. Use
+    Typed verbs take a response `schema` and deserialize into it. `delete` may omit `schema`
+    when the body is empty (Backstop's 204). Prefer those for tool/feature code. Use
     `raw_request` only when the body is intentionally ignored (e.g. credential verification) —
     it is not a type-safe substitute for `.get`/`.post`/….
     """
@@ -120,10 +122,20 @@ class BackstopClient:
         response = await self._request(await self._session(), "PATCH", path, json=json)
         return self._deserialize(response.content, schema, path=path)
 
-    async def delete(self, path: str, *, schema: type[T]) -> T | None:
+    @overload
+    async def delete(self, path: str) -> None: ...
+
+    @overload
+    async def delete(self, path: str, *, schema: type[T]) -> T | None: ...
+
+    async def delete(self, path: str, *, schema: type[T] | None = None) -> T | None:
         response = await self._request(await self._session(), "DELETE", path)
         if not response.content:
             return None
+        if schema is None:
+            raise ToolError(
+                f"Backstop DELETE {path!r} returned a body; pass schema= to deserialize it."
+            )
         return self._deserialize(response.content, schema, path=path)
 
     async def paginate(
@@ -243,9 +255,10 @@ class BackstopClient:
         """Issue a request without deserializing the body.
 
         Same transport stack as the typed verbs (auth, gate, timeouts, retries, error mapping),
-        but returns the raw `httpx.Response`. Do **not** use this for tool/feature code that
-        should be type-safe — pass a `schema` to `.get`/`.post`/`.patch`/`.delete`/`.paginate`
-        instead. Intended for status-only checks such as credential verification.
+        but returns the raw `httpx.Response`.         Do **not** use this for tool/feature code that
+        should be type-safe — pass a `schema` to `.get`/`.post`/`.patch`/`.paginate`, or call
+        `.delete` without one when the body is empty. Intended for status-only checks such as
+        credential verification.
         """
         return await self._request(await self._session(), method, path, json=json, params=params)
 

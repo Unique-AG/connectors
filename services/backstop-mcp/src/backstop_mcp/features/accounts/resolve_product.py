@@ -1,9 +1,9 @@
 """Resolve a Backstop product from a trusted id, a short name, or a name.
 
 Do not route this through `ResolvePartyQuery`. That primitive is trusted id or `/quick-search` of a
-display name. Product callers also type `productShortName` (`CGUP`), and that path is not covered:
+display name. Product callers also type `productShortName` (`NGUP`), and that path is not covered:
 
-- `GET /quick-search?filter[searchTypes][eq]=PRODUCT` for `CGUP` is empty.
+- `GET /quick-search?filter[searchTypes][eq]=PRODUCT` for `NGUP` is empty.
 - `GET /products?filter[shortName][eq]=…` is `400`.
 - Searching the same string as `ORGANIZATION` can hit a CRM company whose id no account
   `filter[product.id]` accepts.
@@ -15,14 +15,14 @@ which is what an echoed id needs — from a prior resolve, or handed back by
 
 A name or short name has no by-id equivalent. `/products` accepts `filter[name][like]`, but
 `shortName` is not a filter field (`filter[shortName][eq]` is 400), so a LIKE on a short name
-like `CGUP` returns empty. Name search therefore tries `filter[name][like]` first (one request
+like `NGUP` returns empty. Name search therefore tries `filter[name][like]` first (one request
 for "Dispersion"), and only walks the unfiltered catalog when that misses — which is what
-`productShortName` needs. Duplicate short names (`BLUC`) elicit once. The
+`productShortName` needs. Duplicate short names elicit once. The
 same response hydrates `short_name`.
 
 Walking the catalog to the end is what lets `not_found` mean *absent* instead of *not on this
-page*. The catalog is small enough for that: this instance returns 72 in one page, all with a
-`productShortName`, three of them duplicated (`PKAP`, `BLUC`, `CPOL`). Past `_LARGE_CATALOG` the
+page*. The catalog is small enough for that: a client-obtained tenant returned 72 in one
+page, all with a `productShortName`, a few of them duplicated. Past `_LARGE_CATALOG` the
 assumption is no longer safe — re-reading the whole catalog per search starts costing real
 requests, and a TTL cache like the opportunity-stage vocabulary would be the answer. So that
 case warns rather than passing silently.
@@ -38,7 +38,7 @@ from fastmcp import Context
 from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopApiResource,
-    BackstopApiResourceDocument,
+    BackstopApiSingleResourceDocument,
     BackstopClient,
 )
 from backstop_mcp.features.accounts.api_responses import ProductAttributes
@@ -64,7 +64,7 @@ _SCOPE = "products"
 
 # Plain assignments — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 _ProductResource = BackstopApiResource[ProductAttributes]
-_ProductDocument = BackstopApiResourceDocument[ProductAttributes]
+_ProductDocument = BackstopApiSingleResourceDocument[ProductAttributes]
 
 
 def _product_label(product: ResolvedProductDto) -> str:
@@ -131,10 +131,8 @@ async def _fetch_product(client: BackstopClient, product_id: str) -> ProductReso
     """Read one product by trusted id, or `NotFound` when Backstop holds no such record.
 
     Only a missing record is an answer; every other error stays an error, so a permissions or
-    transport failure is never reported to the model as "no such product". `require_data` is
-    inside the `try` so that both shapes Backstop uses for a missing record reach the same
-    `NotFound` — a real 404, which is what `/products/{unknown}` sends, and the
-    `200 {"data": null}` some other by-id endpoints answer with instead.
+    transport failure is never reported to the model as "no such product". `/products/{unknown}`
+    404s, so a caught `NOT_FOUND` is the missing-record path.
     """
     product_id = product_id.strip()
     if not product_id:
@@ -145,7 +143,7 @@ async def _fetch_product(client: BackstopClient, product_id: str) -> ProductReso
         document = await client.get(
             path, params={"fields": _PRODUCT_FIELDS}, schema=_ProductDocument
         )
-        resource = document.require_data(path=path)
+        resource = document.data
     except BackstopApiError as exc:
         if exc.status_code != HTTPStatus.NOT_FOUND:
             raise

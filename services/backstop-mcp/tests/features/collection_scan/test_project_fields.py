@@ -42,7 +42,7 @@ def _row() -> _RowDto:
         id="7",
         title="Quarterly Review",
         body="<p>raw</p>",
-        chip=_ChipDto(id="c1", name="Capstone"),
+        chip=_ChipDto(id="c1", name="Northwind"),
         labels=("a", "b"),
     )
 
@@ -62,7 +62,7 @@ class TestProjectFields:
 
         assert projected.chip is not None
         assert projected.chip.id == "c1"
-        assert projected.chip.name == "Capstone"
+        assert projected.chip.name == "Northwind"
 
     def test_a_tuple_field_survives_as_a_tuple(self) -> None:
         projected = project_fields(_row(), fields={"labels"}, into=_RowResponse)

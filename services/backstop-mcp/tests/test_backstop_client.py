@@ -9,6 +9,7 @@ from typing import cast
 import httpx
 import pytest
 import respx
+from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, ValidationError
 
 from backstop_mcp.backstop_client import (
@@ -1338,9 +1339,19 @@ class TestDeleteEmptyBody:
     async def test_returns_none_for_204_with_no_body(self, factory: BackstopClientFactory) -> None:
         respx.delete(f"{_BASE_URL}/records/1").mock(return_value=httpx.Response(204))
 
-        result = await factory.for_credential(_credential()).delete("/records/1", schema=_Record)
+        result = await factory.for_credential(_credential()).delete("/records/1")
 
         assert result is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_body_without_schema_is_rejected(self, factory: BackstopClientFactory) -> None:
+        respx.delete(f"{_BASE_URL}/records/1").mock(
+            return_value=httpx.Response(200, json={"id": "1"})
+        )
+
+        with pytest.raises(ToolError, match="pass schema="):
+            await factory.for_credential(_credential()).delete("/records/1")
 
 
 class TestVerifyCredential:

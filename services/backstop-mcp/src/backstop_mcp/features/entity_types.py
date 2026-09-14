@@ -25,6 +25,19 @@ class EntityType(StrEnum):
 # make sense for these four.
 type SearchType = Literal["organizations", "contacts", "people", "employees"]
 
+_SEARCH_TYPE_BEANS: Final[dict[SearchType, str]] = {
+    "organizations": "OrganizationBean",
+    "people": "PersonBean",
+    "contacts": "ContactBean",
+    "employees": "EmployeeBean",
+}
+
+
+def map_search_type_to_resource_type_bean(search_type: SearchType) -> str:
+    """Backstop Bean casing for a party search type (`OrganizationBean`, not `organizations`)."""
+    return _SEARCH_TYPE_BEANS[search_type]
+
+
 PARTY_SEARCH_TYPES: Final[frozenset[EntityType]] = frozenset(
     {
         EntityType.ORGANIZATIONS,

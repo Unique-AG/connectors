@@ -44,13 +44,13 @@ def _product_by_id_rejected(product_key: str, *, status: int) -> respx.Route:
     )
 
 
-def _cgup() -> dict[str, object]:
+def _ngup() -> dict[str, object]:
     return {
         "id": _PRODUCT_ID,
         "type": "products",
         "attributes": {
-            "name": "Capstone Global Unconstrained Portfolio",
-            "configuration": {"productShortName": "CGUP"},
+            "name": "Northwind Global Unconstrained Portfolio",
+            "configuration": {"productShortName": "NGUP"},
         },
     }
 
@@ -125,8 +125,8 @@ class TestGetTimeSeries:
     async def test_product_short_name_resolves_then_fetches_aums(
         self, client: BackstopClient
     ) -> None:
-        by_id = _product_by_id_rejected("CGUP", status=400)
-        catalog = respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
+        by_id = _product_by_id_rejected("NGUP", status=400)
+        catalog = respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_ngup()))
         aums = respx.get(_AUMS_URL).mock(
             return_value=_series_page(
                 _point("1", date="2026-08-31", value=4.5e9, source="AUM from Accounts")
@@ -137,7 +137,7 @@ class TestGetTimeSeries:
             await get_time_series(
                 ctx_never_elicit(),
                 entity_type="products",
-                entity_id="CGUP",
+                entity_id="NGUP",
                 series="aums",
                 client=client,
                 get_time_series_query=make_get_time_series_query(client),
@@ -159,7 +159,7 @@ class TestGetTimeSeries:
     async def test_numeric_product_id_is_a_by_id_get_not_a_catalog_walk(
         self, client: BackstopClient
     ) -> None:
-        by_id = respx.get(_PRODUCT_URL).mock(return_value=_product_document(_cgup()))
+        by_id = respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
         catalog = respx.get(_PRODUCTS_URL).mock(return_value=_product_page())
         respx.get(_AUMS_URL).mock(return_value=_series_page())
 
@@ -227,7 +227,7 @@ class TestGetTimeSeries:
     async def test_product_series_404_after_resolve_is_not_unknown_product(
         self, client: BackstopClient
     ) -> None:
-        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_cgup()))
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
         respx.get(_AUMS_URL).mock(
             return_value=httpx.Response(404, json={"errors": [{"title": "Not Found"}]})
         )

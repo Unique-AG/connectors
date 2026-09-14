@@ -44,8 +44,8 @@ def _table_row(
     row: dict[str, object] = {
         "investor": _ref(_ORG_ID, "organizations"),
         "account": _ref(account_id, "hedge-fund-accounts"),
-        "product": _ref(_PRODUCT_ID, "hedge-fund-products", shortName="CGUP"),
-        "otherId": "90007828_CGUP",
+        "product": _ref(_PRODUCT_ID, "hedge-fund-products", shortName="NGUP"),
+        "otherId": "90007828_NGUP",
         "fundedDate": "2017-01-01T00:00:00.000-0500",
         "closed": closed,
         "balance": {
@@ -112,8 +112,8 @@ def _accounts_page(*, closed: bool = False) -> httpx.Response:
                 resource(
                     _PRODUCT_ID,
                     "products",
-                    name="Capstone Global Unconstrained Portfolio",
-                    configuration={"productShortName": "CGUP"},
+                    name="Northwind Global Unconstrained Portfolio",
+                    configuration={"productShortName": "NGUP"},
                 ),
             ],
         },
@@ -193,7 +193,7 @@ class TestFigures:
         assert not walk.called
         row = result.holdings[0]
         assert row.account_id == _ACCOUNT_ID
-        assert row.product_short_name == "CGUP"
+        assert row.product_short_name == "NGUP"
         assert row.balance is not None
         assert row.balance.amount == 1000.0
         assert row.percentage_of_product is not None

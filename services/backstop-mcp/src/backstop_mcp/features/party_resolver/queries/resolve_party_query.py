@@ -178,7 +178,7 @@ class ResolvePartyQuery:
     ) -> tuple[PartyCandidate, ...]:
         """Fuzzy/name lookup via `GET /quick-search`, pinned to a single `search_type`.
 
-        Prefix-anchored: `Dispersion` misses `Capstone Dispersion`; `Capstone Disp` hits.
+        Prefix-anchored: `Dispersion` misses `Northwind Dispersion`; `Northwind Disp` hits.
         Never sends Backstop's `EMAIL_ADDRESS` search type: email-looking input is routed
         to `_search_by_email` before reaching here.
         """

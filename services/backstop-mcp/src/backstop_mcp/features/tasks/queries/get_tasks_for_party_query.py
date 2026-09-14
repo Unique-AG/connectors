@@ -9,7 +9,7 @@ import logging
 from typing import Literal
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
-from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.features.entity_types import SearchType, map_search_type_to_resource_type_bean
 from backstop_mcp.features.tasks.api_responses import TaskAttributes
 from backstop_mcp.features.tasks.responses import PartyTasksResponse, TaskRowResponse
 
@@ -21,12 +21,6 @@ type TaskFilter = Literal["open", "completed", "all"]
 # 540 tasks exist across the *whole* instance, so this is a wide margin for one party and still
 # a stated limit rather than "however many there are".
 MAX_TASK_SCAN_RECORDS = 5_000
-_ENTITY_TYPE: dict[SearchType, str] = {
-    "organizations": "OrganizationBean",
-    "people": "PersonBean",
-    "contacts": "ContactBean",
-    "employees": "EmployeeBean",
-}
 
 
 class GetTasksForPartyQuery:
@@ -46,7 +40,7 @@ class GetTasksForPartyQuery:
             "/tasks",
             schema=BackstopApiResource[TaskAttributes],
             params={
-                "filter[entityType][eq]": _ENTITY_TYPE[search_type],
+                "filter[entityType][eq]": map_search_type_to_resource_type_bean(search_type),
                 "filter[entityId][eq]": entity_id,
             },
             max_records=MAX_TASK_SCAN_RECORDS,

@@ -6,8 +6,8 @@ see the design doc's "Token budget" section. This module carries no prose `notes
 
 Neither `resource_type` nor `resource_id` is surfaced on its own on history rows:
 `activity_id` is already the composite `{resourceType}_{resourceId}` (see
-`ResourceIdentifierDto`), so the two halves are always delivered together. `search_activities`
-rows publish the same `activity_id` field with the search-row id, which
+`parse_activity_detail_handle`), so the two halves are always delivered together.
+`search_activities` rows publish the same `activity_id` field with the search-row id, which
 `get_activity_detail` also accepts. History email ids are `/emails` collection ids, not that
 handle — `EmailRecordResponse` must not send them to `get_activity_detail`. `type` already
 says which stream a record came from.

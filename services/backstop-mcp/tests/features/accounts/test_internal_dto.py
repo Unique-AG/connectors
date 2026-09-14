@@ -168,8 +168,8 @@ class TestProjectAccount:
             resource(
                 "1292283",
                 "products",
-                name="Capstone Global Unconstrained Portfolio",
-                configuration={"productShortName": "CGUP"},
+                name="Northwind Global Unconstrained Portfolio",
+                configuration={"productShortName": "NGUP"},
             ),
         ]
         record = _from_resource(
@@ -178,7 +178,7 @@ class TestProjectAccount:
                 owner_id="341688185",
                 investor_type_id="10",
                 product_id="1292283",
-                name="PSP CGUP",
+                name="PSP NGUP",
                 currency="USD",
                 accountStartDate="2019-03-01",
                 ownershipType="Direct",
@@ -193,7 +193,7 @@ class TestProjectAccount:
         )
 
         assert record.id == "27871657"
-        assert record.name == "PSP CGUP"
+        assert record.name == "PSP NGUP"
         assert record.owner == AccountOwnerDto(
             id="341688185",
             name="PSP Investments",
@@ -202,7 +202,7 @@ class TestProjectAccount:
         assert record.investor_type is not None
         assert record.investor_type.name == "Fund of Funds"
         assert record.product is not None
-        assert record.product.short_name == "CGUP"
+        assert record.product.short_name == "NGUP"
         assert record.currency == "USD"
         assert record.account_start_date == date(2019, 3, 1)
         assert record.is_open is True
@@ -226,8 +226,8 @@ class TestProjectAccount:
                 "id": "1292283",
                 "type": "products",
                 "attributes": {
-                    "name": "Capstone Global Unconstrained Portfolio",
-                    "configuration": {"productShortName": "CGUP"},
+                    "name": "Northwind Global Unconstrained Portfolio",
+                    "configuration": {"productShortName": "NGUP"},
                 },
                 "relationships": None,
             }
@@ -238,7 +238,7 @@ class TestProjectAccount:
         )
 
         assert record.product is not None
-        assert record.product.short_name == "CGUP"
+        assert record.product.short_name == "NGUP"
 
 
 class TestProductFromIncluded:
@@ -247,15 +247,15 @@ class TestProductFromIncluded:
             resource(
                 "1292283",
                 "products",
-                name="Capstone Global Unconstrained Portfolio",
-                configuration={"productShortName": "CGUP"},
+                name="Northwind Global Unconstrained Portfolio",
+                configuration={"productShortName": "NGUP"},
             )
         )
 
         assert product == ResolvedProductDto(
             id="1292283",
-            name="Capstone Global Unconstrained Portfolio",
-            short_name="CGUP",
+            name="Northwind Global Unconstrained Portfolio",
+            short_name="NGUP",
         )
 
     def test_missing_configuration_leaves_short_name_unset(self) -> None:

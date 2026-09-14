@@ -41,8 +41,8 @@ class TestGetProductQuery:
                 json={
                     "data": _product(
                         _PRODUCT_ID,
-                        name="Capstone Dispersion Fund",
-                        short_name="CDSP",
+                        name="Northwind Dispersion Fund",
+                        short_name="NDSP",
                         values=[{"definitionId": "501", "value": "Convertible Arbitrage"}],
                     )
                 },
@@ -52,7 +52,7 @@ class TestGetProductQuery:
         fetched = await make_get_product_query(client).run(product_id=_PRODUCT_ID)
 
         assert fetched.product.id == _PRODUCT_ID
-        assert fetched.product.short_name == "CDSP"
+        assert fetched.product.short_name == "NDSP"
         assert fetched.stored_custom_field_values[0].value == "Convertible Arbitrage"
         assert "fields" not in recorded_requests(respx.calls)[0].url.params
 
@@ -76,7 +76,7 @@ class TestGetProductQuery:
                 200,
                 json={
                     "data": [
-                        _product(_PRODUCT_ID, name="Capstone Dispersion Fund", short_name="CDSP")
+                        _product(_PRODUCT_ID, name="Northwind Dispersion Fund", short_name="NDSP")
                     ],
                     "links": {"next": None},
                 },

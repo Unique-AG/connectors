@@ -13,6 +13,7 @@ from pydantic import (
 )
 
 StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
+NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 def _coerce_id(value: object) -> object:

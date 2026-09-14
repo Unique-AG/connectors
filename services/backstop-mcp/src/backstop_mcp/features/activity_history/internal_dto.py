@@ -1,9 +1,7 @@
-import logging
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from typing import ClassVar, Self, cast
 
-from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from backstop_mcp.backstop_client import ResourceRef
@@ -11,8 +9,6 @@ from backstop_mcp.features.activity_history.api_responses import (
     EntityActivityAttributes,
 )
 from backstop_mcp.features.entity_types import SearchType, party_search_type
-
-logger = logging.getLogger(__name__)
 
 __all__ = [
     "ActivityAttachmentDto",
@@ -24,11 +20,7 @@ __all__ = [
     "EntityActivitiesFetchDto",
     "EntityActivityDto",
     "MeetingSpecificsDto",
-    "ResourceIdentifierDto",
 ]
-
-_MEETING_OR_CALL_RESOURCE_TYPE = "meeting-or-calls"
-_EMAIL_RESOURCE_TYPES = frozenset({"email", "emails"})
 
 
 class ActivityRegardingDto(BaseModel):
@@ -133,74 +125,6 @@ class AttendeeDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     name: str | None = None
-
-
-class ResourceIdentifierDto(BaseModel):
-    """The `{resourceType}_{resourceId}` handle a timeline record carries as its `activity_id`.
-
-    Confirmed live across all four activity streams: every record `/{segment}/{id}/activities`
-    returns has an id of exactly `f"{specificResource.resourceType}_{specificResource.resourceId}"`
-    — `meeting-or-calls_76537547` (both meetings and calls), `notes_26018215`,
-    `documents_127746731`. That composite is the only id `get_activity_history` hands out, so the
-    model always holds a resource type alongside a resource id and never has to guess which
-    collection an id belongs to.
-
-    The detail endpoints go the other way: `/entity-activity-details/{id}`,
-    `/meeting-or-calls/{id}` and `/meeting-or-calls/{id}/attendees` all take the **bare**
-    `resource_id`. Passing the composite to `/entity-activity-details` does not 404 — it answers
-    `200 {"data": null}`, so the mistake surfaces as a schema error rather than a not-found (see
-    `BackstopApiResourceDocument.require_data`).
-
-    `search_activities` rows use a different `id` (e.g. `1659094659`) that is already the bare
-    id `/entity-activity-details/{id}` wants. A handle with no underscore is accepted as that
-    form; meeting extras are gated on the detail record's `type`, not on this DTO.
-
-    History email ids are a third space: `/{segment}/{id}/emails` (body via `contentUrl`), not
-    `/entity-activity-details`. A composite `email_*` / `emails_*` handle is rejected rather
-    than stripped and sent to the wrong collection. Bare numeric ids cannot be told apart from
-    search-row ids here; `EmailRecordResponse` must not advertise them as detail handles.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    resource_type: str | None
-    resource_id: str
-
-    @classmethod
-    def from_activity_id(cls, activity_id: str) -> Self:
-        """Split a timeline `activity_id`, or accept a search_activities bare id.
-
-        Composite handles split on the LAST underscore: resource ids are numeric, while a
-        resource type can carry hyphens (`meeting-or-calls`), so the final separator is the
-        unambiguous one. A value with no underscore is the search-row / detail-record id.
-        A history email composite (`email_*` / `emails_*`) is rejected: those ids are `/emails`.
-        """
-        handle = activity_id.strip()
-        resource_type, separator, resource_id = handle.rpartition("_")
-        if separator and resource_type and resource_id:
-            if resource_type in _EMAIL_RESOURCE_TYPES:
-                logger.info("activity_history.handle.email_id", extra={"activity_id": handle})
-                raise ToolError(
-                    f"{activity_id!r} is a get_activity_history email handle, not an "
-                    + "activity_id `get_activity_detail` can fetch. History emails come from "
-                    + "`/emails` (body via contentUrl), not `/entity-activity-details`. Use "
-                    + "`search_activities` for the body and attachment list."
-                )
-            return cls(resource_type=resource_type, resource_id=resource_id)
-        if handle:
-            logger.info("activity_history.handle.bare_id", extra={"activity_id": handle})
-            return cls(resource_type=None, resource_id=handle)
-        logger.info("activity_history.handle.malformed", extra={"activity_id": activity_id})
-        raise ToolError(
-            f"{activity_id!r} is not a valid activity_id. Expected "
-            + "'{resource_type}_{resource_id}' from get_activity_history "
-            + "(e.g. 'meeting-or-calls_76537547') or a search_activities row `id` "
-            + "(e.g. '1659094659')."
-        )
-
-    @property
-    def is_meeting_or_call(self) -> bool:
-        return self.resource_type == _MEETING_OR_CALL_RESOURCE_TYPE
 
 
 class EntityActivityDto(BaseModel):
