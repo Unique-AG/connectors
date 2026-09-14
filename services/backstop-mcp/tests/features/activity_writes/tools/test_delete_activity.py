@@ -84,7 +84,7 @@ class TestDeleteActivity:
         assert result.id == _NOTE_ID
         assert result.resource_type == "notes"
         assert result.permanent is True
-        assert details.call_count == 1
+        assert details.call_count == 0
         assert route.call_count == 1
         record = next(
             item

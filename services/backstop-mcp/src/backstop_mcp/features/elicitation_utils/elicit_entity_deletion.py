@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from enum import StrEnum
 from typing import Literal
 
@@ -14,6 +15,8 @@ from backstop_mcp.dependencies import get_resolution_config
 from backstop_mcp.features.resolution import client_supports_elicitation
 
 logger = logging.getLogger(__name__)
+
+type DeletionPromptCallback = Callable[[], Awaitable[str]]
 
 
 class EntityDeletion(StrEnum):
@@ -38,11 +41,16 @@ class DeletionChoice(BaseModel):
 
 async def elicit_entity_deletion(
     ctx: Context,
-    prompt: str,
+    prompt: str | None = None,
     *,
+    callback: DeletionPromptCallback | None = None,
     timeout_seconds: float | None = None,
 ) -> EntityDeletion:
-    """Prompt for a hard delete. The tool formats `prompt`; this only classifies the answer.
+    """Prompt for a hard delete. The tool formats the message; this only classifies the answer.
+
+    Pass either `prompt` or `callback`, not both. `callback` runs only after the client is
+    known to support elicitation, so a tool can skip a preview fetch when the prompt will
+    never be shown.
 
     Shows a dropdown with "Keep it" preselected, so accepting the form without touching it
     is a no-op rather than a delete.
@@ -51,6 +59,8 @@ async def elicit_entity_deletion(
     * `NOT_AVAILABLE` — the client never advertised elicitation; the tool may proceed.
     * `DECLINED` — the user said no, cancelled, timed out, or the prompt failed. Do not delete.
     """
+    assert (prompt is None) != (callback is None), "pass prompt or callback, not both"
+
     if timeout_seconds is None:
         timeout_seconds = get_resolution_config().elicit_timeout_seconds
 
@@ -61,9 +71,15 @@ async def elicit_entity_deletion(
         )
         return EntityDeletion.NOT_AVAILABLE
 
+    if callback is not None:
+        message = await callback()
+    else:
+        assert prompt is not None
+        message = prompt
+
     try:
         async with asyncio.timeout(timeout_seconds):
-            result = await ctx.elicit(message=prompt, response_type=DeletionChoice)
+            result = await ctx.elicit(message=message, response_type=DeletionChoice)
     except TimeoutError:
         logger.warning(
             "elicitation.entity_deletion.timed_out",

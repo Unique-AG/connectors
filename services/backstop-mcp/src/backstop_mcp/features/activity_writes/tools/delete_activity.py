@@ -69,10 +69,13 @@ async def delete_activity(
         "activity_writes.delete.start",
         extra={"kind": activity.kind, "activity_id": activity.activity_id},
     )
-    prompt = await _deletion_prompt(
-        activity=activity, get_activity_detail_query=get_activity_detail_query
-    )
-    outcome = await elicit_entity_deletion(ctx, prompt)
+
+    async def prompt() -> str:
+        return await _deletion_prompt(
+            activity=activity, get_activity_detail_query=get_activity_detail_query
+        )
+
+    outcome = await elicit_entity_deletion(ctx, callback=prompt)
     if outcome is EntityDeletion.DECLINED:
         logger.info(
             "activity_writes.delete.not_confirmed",
