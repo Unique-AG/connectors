@@ -9,6 +9,7 @@ from mcp_credential_auth.models import (
     OAuthToken,
     PendingAuthorization,
 )
+from mcp_credential_auth.provider import CredentialOAuthProvider, SubjectFactory
 from mcp_credential_auth.throttle import (
     MAX_USERNAME_LENGTH,
     ThrottleConfig,
@@ -22,11 +23,13 @@ __all__ = [
     "MAX_USERNAME_LENGTH",
     "AuthBase",
     "AuthorizationCode",
+    "CredentialOAuthProvider",
     "LoginAttempt",
     "LoginCsrf",
     "OAuthClient",
     "OAuthToken",
     "PendingAuthorization",
+    "SubjectFactory",
     "ThrottleConfig",
     "cleanup_lifespan",
     "clear_failures",
