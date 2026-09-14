@@ -23,6 +23,9 @@ from backstop_mcp.features.custom_fields.tools.list_custom_field_groups import (
     list_custom_field_groups,
 )
 from backstop_mcp.features.custom_fields.tools.list_custom_fields import list_custom_fields
+from backstop_mcp.features.custom_fields.tools.update_custom_field_values import (
+    update_custom_field_values,
+)
 from backstop_mcp.features.opportunities.tools.get_opportunities import get_opportunities
 from backstop_mcp.features.opportunities.tools.get_opportunities_by_ids import (
     get_opportunities_by_ids,
@@ -66,4 +69,5 @@ TOOLS: tuple[ToolFunction, ...] = (
     delete_activity,
     update_opportunity,
     backfill_opportunity_stage_history,
+    update_custom_field_values,
 )

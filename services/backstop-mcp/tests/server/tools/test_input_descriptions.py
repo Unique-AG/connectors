@@ -39,6 +39,7 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "update_activity",
         "update_opportunity",
         "backfill_opportunity_stage_history",
+        "update_custom_field_values",
         "search_activities",
         "search_opportunities",
     }
@@ -68,6 +69,12 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         '"opportunity_id"',
         "update_opportunity",
         "does not move",
+    ),
+    "update_custom_field_values": (
+        '"definition_id"',
+        '"entity_type"',
+        "list_custom_fields",
+        "Probability",
     ),
     "delete_activity": ('"kind"', '"activity_id"', "permanent"),
     "attach_file": (

@@ -23,7 +23,9 @@ __all__ = [
     "CustomFieldGroupResponse",
     "ListCustomFieldGroupsResponse",
     "ListCustomFieldsResponse",
+    "RecordOutcomeResponse",
     "ResolvedCustomFieldValueResponse",
+    "UpdateCustomFieldValuesResponse",
 ]
 
 
@@ -347,4 +349,36 @@ class ListCustomFieldGroupsResponse(BaseModel):
             "membership is the definitions whose group_id matches this group. Groups with no "
             "matching definitions are still present with an empty membership list."
         )
+    )
+
+
+class RecordOutcomeResponse(OmitNoneModel):
+    """One row of a multi-record write: applied or failed, never preview."""
+
+    index: int = Field(description="0-based position of this record in the request.")
+    record_id: str | None = Field(
+        default=None,
+        description="Definition id this row targeted, when the request supplied one.",
+    )
+    status: Literal["applied", "failed"] = Field(
+        description="Whether Backstop wrote this row. There is no preview status."
+    )
+    error: str | None = Field(
+        default=None,
+        description="Backstop's per-record message when `status` is `failed`.",
+    )
+
+
+class UpdateCustomFieldValuesResponse(OmitNoneModel):
+    """Per-record outcomes of a custom-field bulk write. A `201` is not success."""
+
+    total_count: int = Field(description="How many values were sent.")
+    applied_count: int = Field(
+        description=(
+            "How many request rows Backstop returned among the written records. "
+            "A `201` is not success."
+        )
+    )
+    records: tuple[RecordOutcomeResponse, ...] = Field(
+        description="One outcome per request value, in request order."
     )
