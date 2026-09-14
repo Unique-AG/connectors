@@ -124,7 +124,7 @@ class TestResolveByUserName:
         assert "token" not in str(raised.value).casefold()
 
     @respx.mock
-    async def test_duplicate_user_name_raises(self) -> None:
+    async def test_duplicate_user_name_retains_the_first(self) -> None:
         base_url = tenant("su-resolve-dup")
         respx.get(f"{base_url}/system-users").mock(
             return_value=_collection_page(
@@ -134,8 +134,9 @@ class TestResolveByUserName:
         )
 
         async with tool_client(base_url) as client:
-            with pytest.raises(ToolError, match="mlucas"):
-                await system_users_service(client).resolve_by_user_name("mlucas")
+            result = await system_users_service(client).resolve_by_user_name("mlucas")
+
+        assert result.id == "u1"
 
     @respx.mock
     async def test_resolve_relationship_returns_a_json_api_relationship(self) -> None:

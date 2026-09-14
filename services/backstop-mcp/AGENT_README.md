@@ -128,8 +128,8 @@ or a file named after a mechanism.
 (`map_opportunity_to_response_util.py` → `MapOpportunityToResponseUtil`). A `_`-prefixed
 sibling inside `queries/` or `commands/` is plural — `_<subject>_utils.py` — because it
 holds a handful of small functions and no single symbol to name it after; rule 6 exempts it
-for exactly that reason. When the subject turns out to be a single class, drop the `_utils`
-and take the class's name (`_activity_resource_location.py` → `ActivityResourceLocation`).
+for exactly that reason. When the subject turns out to be a single symbol, drop the `_utils`
+and take its name (`extract_collection.py` → `extract_collection`).
 
 The subject still has to be in the name. `_file_data_utils.py` and `_json_api_utils.py` say
 what they hold; `_utils.py` and `_attachment_utils.py`, which those two replaced, did not.
@@ -139,7 +139,7 @@ then the helper is a private method on the query or command.
 A name that has to cover two subjects is worth a second look, not an automatic split. A few
 small functions that the same callers use together stay together — the extra module and its
 import line cost more than the broad name does. Split when the **callers** diverge:
-`_activity_resource_location.py` came out of `_json_api_utils.py` because only
+`extract_collection.py` came out of `_json_api_utils.py` because only
 `update_activity` and `delete_activity` resolve a path, while every log and attach command
 was importing routing code it never called. That is the signal — two groups of functions
 with two different sets of callers — not the word count in the filename.

@@ -7,6 +7,7 @@ from backstop_mcp.features.activity_writes.commands.attach_file_command import A
 from backstop_mcp.features.activity_writes.commands.delete_activity_command import (
     DeleteActivityCommand,
 )
+from backstop_mcp.features.activity_writes.commands.extract_collection import extract_collection
 from backstop_mcp.features.activity_writes.commands.log_activity_command import LogActivityCommand
 from backstop_mcp.features.activity_writes.commands.log_meeting_or_call_command import (
     LogMeetingOrCallCommand,
@@ -42,4 +43,5 @@ __all__ = [
     "UpdateNoteCommand",
     "UpdateTaskCommand",
     "encode_file_data",
+    "extract_collection",
 ]

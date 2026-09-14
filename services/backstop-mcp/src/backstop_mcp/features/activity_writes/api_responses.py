@@ -10,34 +10,17 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from backstop_mcp.backstop_client import ResourceRef
 from backstop_mcp.dates import LenientDate, LenientDatetime
 from backstop_mcp.lenient import LenientBool
 
 __all__ = [
-    "DeletedResourceAttributes",
     "DocumentAttributes",
     "EmailAttributes",
     "MeetingOrCallAttributes",
     "NoteAttributes",
-    "ResourceLinkAttributes",
     "TaskAttributes",
 ]
-
-
-class DeletedResourceAttributes(BaseModel):
-    """No fields: `DELETE` answers `204` with an empty body, so nothing is read back."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-
-class ResourceLinkAttributes(BaseModel):
-    """A Backstop `{resourceId, resourceType, resourceLink}` pointer (attachedTo, regarding)."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    resource_id: str | None = Field(default=None, validation_alias="resourceId")
-    resource_type: str | None = Field(default=None, validation_alias="resourceType")
-    resource_link: str | None = Field(default=None, validation_alias="resourceLink")
 
 
 class NoteAttributes(BaseModel):
@@ -48,8 +31,8 @@ class NoteAttributes(BaseModel):
     title: str | None = None
     description: str | None = None
     effective_date: LenientDate = Field(default=None, validation_alias="effectiveDate")
-    attached_to: ResourceLinkAttributes | None = Field(default=None, validation_alias="attachedTo")
-    linked_resources: tuple[ResourceLinkAttributes, ...] | None = Field(
+    attached_to: ResourceRef | None = Field(default=None, validation_alias="attachedTo")
+    linked_resources: tuple[ResourceRef, ...] | None = Field(
         default=None, validation_alias="linkedResources"
     )
 
@@ -66,8 +49,8 @@ class MeetingOrCallAttributes(BaseModel):
     stop_timestamp: LenientDatetime = Field(default=None, validation_alias="stopTimestamp")
     time_zone: str | None = Field(default=None, validation_alias="timeZone")
     effective_date: LenientDate = Field(default=None, validation_alias="effectiveDate")
-    regarding: ResourceLinkAttributes | None = None
-    linked_resources: tuple[ResourceLinkAttributes, ...] | None = Field(
+    regarding: ResourceRef | None = None
+    linked_resources: tuple[ResourceRef, ...] | None = Field(
         default=None, validation_alias="linkedResources"
     )
     attendees: object | None = None
@@ -83,7 +66,7 @@ class TaskAttributes(BaseModel):
     status: str | None = None
     due_date: LenientDate = Field(default=None, validation_alias="dueDate")
     send_notification: LenientBool = Field(default=None, validation_alias="sendNotification")
-    attached_to: ResourceLinkAttributes | None = Field(default=None, validation_alias="attachedTo")
+    attached_to: ResourceRef | None = Field(default=None, validation_alias="attachedTo")
 
 
 class EmailAttributes(BaseModel):
@@ -93,7 +76,7 @@ class EmailAttributes(BaseModel):
 
     display_subject: str | None = Field(default=None, validation_alias="displaySubject")
     email_format: str | None = Field(default=None, validation_alias="emailFormat")
-    resources: tuple[ResourceLinkAttributes, ...] | None = None
+    resources: tuple[ResourceRef, ...] | None = None
     created_by: object | None = Field(default=None, validation_alias="createdBy")
 
 
@@ -107,4 +90,4 @@ class DocumentAttributes(BaseModel):
     description: str | None = None
     file_name: str | None = Field(default=None, validation_alias="fileName")
     document_name: str | None = Field(default=None, validation_alias="documentName")
-    attached_to: ResourceLinkAttributes | None = Field(default=None, validation_alias="attachedTo")
+    attached_to: ResourceRef | None = Field(default=None, validation_alias="attachedTo")

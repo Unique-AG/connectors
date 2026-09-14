@@ -1,6 +1,6 @@
 """One activity's detail record, and meeting specifics plus attendees when they apply.
 
-Three endpoints, all keyed by the bare `ResourceIdentifierDto.resource_id` — never the
+Three endpoints, all keyed by the bare `ParsedActivityHandle.resource_id` — never the
 composite `{resourceType}_{resourceId}` handle. Every field name below was byte-verified
 against a live instance:
 
@@ -37,10 +37,10 @@ from backstop_mcp.features.activity_history.internal_dto import (
     ActivityDetailDto,
     AttendeeDto,
     MeetingSpecificsDto,
-    ResourceIdentifierDto,
     attachments_from_stored,
 )
 from backstop_mcp.features.activity_history.responses import ActivityDetailResponse
+from backstop_mcp.utils import ParsedActivityHandle
 
 logger = logging.getLogger(__name__)
 
@@ -55,11 +55,11 @@ class GetActivityDetailQuery:
         self._client: BackstopClient = client
 
     async def run(
-        self, *, activity_id: str, handle: ResourceIdentifierDto
+        self, *, activity_id: str, handle: ParsedActivityHandle
     ) -> ActivityDetailResponse:
         """`activity_id` is echoed; `handle` is the already-parsed resource type and id."""
         resource_id = handle.resource_id
-        if handle.is_meeting_or_call:
+        if handle.resource_type == "meeting-or-calls":
             detail, specifics, attendees = await asyncio.gather(
                 self._fetch_activity_detail(resource_id),
                 self._fetch_meeting_specifics(resource_id),

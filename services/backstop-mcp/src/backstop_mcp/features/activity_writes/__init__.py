@@ -11,12 +11,10 @@ including the emails and documents `attach_file` creates.
 """
 
 from backstop_mcp.features.activity_writes.api_responses import (
-    DeletedResourceAttributes,
     DocumentAttributes,
     EmailAttributes,
     MeetingOrCallAttributes,
     NoteAttributes,
-    ResourceLinkAttributes,
     TaskAttributes,
 )
 from backstop_mcp.features.activity_writes.attach_file_input import (
@@ -45,6 +43,7 @@ from backstop_mcp.features.activity_writes.commands import (
     UpdateNoteCommand,
     UpdateTaskCommand,
     encode_file_data,
+    extract_collection,
 )
 from backstop_mcp.features.activity_writes.delete_activity_input import (
     DELETE_ACTIVITY_INPUT_DESCRIPTION,
@@ -114,7 +113,6 @@ __all__ = [
     "DeleteActivityCommand",
     "DeleteActivityInput",
     "DeletedActivityResponse",
-    "DeletedResourceAttributes",
     "DocumentAttributes",
     "DocumentFileInput",
     "EmailAttributes",
@@ -135,7 +133,6 @@ __all__ = [
     "MeetingOrCallAttributes",
     "NoteActivityInput",
     "NoteAttributes",
-    "ResourceLinkAttributes",
     "TaskActivityInput",
     "TaskAttributes",
     "UpdateActivityCommand",
@@ -154,6 +151,7 @@ __all__ = [
     "UpdatedActivityResponse",
     "attach_file_max_bytes_message",
     "encode_file_data",
+    "extract_collection",
     "get_attach_document_command_factory",
     "get_attach_email_command_factory",
     "get_attach_file_command_factory",

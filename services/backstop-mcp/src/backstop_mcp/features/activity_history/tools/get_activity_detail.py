@@ -3,7 +3,7 @@
 `activity_id` is a complete, self-sufficient handle — no party resolution needed. A
 `get_activity_history` composite `{resourceType}_{resourceId}` yields both the bare resource
 id every detail endpoint wants and the resource type that says which endpoints apply (see
-`ResourceIdentifierDto`). A `search_activities` row `activity_id` (same value as `id`) is
+`parse_activity_detail_handle`). A `search_activities` row `activity_id` (same value as `id`) is
 already that bare id (`/entity-activity-details/{id}` answers it live); meeting extras then
 follow the detail record's `type`, because a search id has no resource type. A history
 email handle is rejected: `/emails` ids (body via `contentUrl`) are not this id space.
@@ -31,7 +31,7 @@ from pydantic import Field
 from backstop_mcp.features.activity_history import (
     ActivityDetailResponse,
     GetActivityDetailQuery,
-    ResourceIdentifierDto,
+    parse_activity_detail_handle,
 )
 from backstop_mcp.features.activity_history.dependencies import get_activity_detail_query_factory
 from backstop_mcp.models import published_output_schema
@@ -82,14 +82,14 @@ async def get_activity_detail(
     Call like: {"activity_id": "meeting-or-calls_<id from a history or search row>"}
     """
     _ = ctx
-    handle = ResourceIdentifierDto.from_activity_id(activity_id)
+    handle = parse_activity_detail_handle(activity_id)
     logger.info(
         "activity_history.detail.get.start",
         extra={
             "activity_id": activity_id,
             "resource_type": handle.resource_type,
             "resource_id": handle.resource_id,
-            "meeting_or_call": handle.is_meeting_or_call,
+            "meeting_or_call": handle.resource_type == "meeting-or-calls",
         },
     )
     result = await get_activity_detail_query.run(activity_id=activity_id, handle=handle)

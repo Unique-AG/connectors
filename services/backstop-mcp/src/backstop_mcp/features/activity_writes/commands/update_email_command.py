@@ -1,19 +1,19 @@
 """PATCH email metadata via `/emails/{id}`. Parsed subject/from/to are not writable."""
 
 import logging
+from urllib.parse import quote
 
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import EmailAttributes
-from backstop_mcp.features.activity_writes.commands._activity_resource_location import (
-    ActivityResourceLocation,
-)
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
     json_api_update,
     omit_none_values,
-    relationship_replace,
+    relationship_data,
 )
+from backstop_mcp.features.activity_writes.commands.extract_collection import extract_collection
 from backstop_mcp.features.activity_writes.responses import UpdatedActivityResponse
 from backstop_mcp.features.activity_writes.update_activity_input import UpdateEmailInput
+from backstop_mcp.utils import parse_activity_handle
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +31,16 @@ class UpdateEmailCommand:
         self._client: BackstopClient = client
 
     async def run(self, *, activity: UpdateEmailInput) -> UpdatedActivityResponse:
-        location = ActivityResourceLocation.from_activity_id(
-            kind=activity.kind, activity_id=activity.activity_id
-        )
-        tags = relationship_replace("activity-tags", activity.activity_tag_ids)
+        handle = parse_activity_handle(activity.activity_id)
+        collection, resource_id = extract_collection(handle, kind=activity.kind)
+        path = f"/{collection}/{quote(resource_id, safe='')}"
+        tags = relationship_data("activity-tags", activity.activity_tag_ids)
         payload = json_api_update(
-            resource_type=location.collection,
-            resource_id=location.resource_id,
+            resource_type=collection,
+            resource_id=resource_id,
             attributes=omit_none_values({"displaySubject": activity.display_subject}),
             relationships={"activityTags": tags} if tags is not None else None,
         )
-        document = await self._client.patch(location.path, schema=_Document, json=payload)
+        document = await self._client.patch(path, schema=_Document, json=payload)
         logger.info("activity_writes.email.updated", extra={"id": document.data.id})
         return UpdatedActivityResponse(id=document.data.id, resource_type="emails")

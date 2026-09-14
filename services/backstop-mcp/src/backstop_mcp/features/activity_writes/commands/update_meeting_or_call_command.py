@@ -10,24 +10,24 @@ exact field `get_activity_history` splits calls from meetings on. A PATCH that o
 
 import logging
 from typing import Literal, assert_never
+from urllib.parse import quote
 
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import MeetingOrCallAttributes
-from backstop_mcp.features.activity_writes.commands._activity_resource_location import (
-    ActivityResourceLocation,
-)
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
     isoformat,
     json_api_update,
     omit_none_values,
-    relationship_replace,
+    relationship_data,
 )
+from backstop_mcp.features.activity_writes.commands.extract_collection import extract_collection
 from backstop_mcp.features.activity_writes.responses import UpdatedActivityResponse
 from backstop_mcp.features.activity_writes.update_activity_input import (
     UpdateCallInput,
     UpdateMeetingInput,
 )
 from backstop_mcp.features.time_zones import TimeZonesService
+from backstop_mcp.utils import parse_activity_handle
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +45,13 @@ class UpdateMeetingOrCallCommand:
         self._time_zones_service: TimeZonesService = time_zones_service
 
     async def run(self, *, activity: _MeetingOrCallUpdate) -> UpdatedActivityResponse:
-        location = ActivityResourceLocation.from_activity_id(
-            kind=activity.kind, activity_id=activity.activity_id
-        )
+        handle = parse_activity_handle(activity.activity_id)
+        collection, resource_id = extract_collection(handle, kind=activity.kind)
+        path = f"/{collection}/{quote(resource_id, safe='')}"
         time_zone = await self._time_zones_service.resolve_short_name(activity.time_zone)
         payload = json_api_update(
-            resource_type=location.collection,
-            resource_id=location.resource_id,
+            resource_type=collection,
+            resource_id=resource_id,
             attributes=omit_none_values(
                 {
                     "title": activity.title,
@@ -65,7 +65,7 @@ class UpdateMeetingOrCallCommand:
             ),
             relationships=self._relationships(activity),
         )
-        document = await self._client.patch(location.path, schema=_Document, json=payload)
+        document = await self._client.patch(path, schema=_Document, json=payload)
         logger.info(
             "activity_writes.meeting_or_call.updated",
             extra={"id": document.data.id, "kind": activity.kind},
@@ -83,8 +83,8 @@ class UpdateMeetingOrCallCommand:
                 assert_never(activity.kind)
 
     def _relationships(self, activity: _MeetingOrCallUpdate) -> dict[str, object] | None:
-        attendees = relationship_replace("people", activity.attendee_party_ids)
-        tags = relationship_replace("activity-tags", activity.activity_tag_ids)
+        attendees = relationship_data("people", activity.attendee_party_ids)
+        tags = relationship_data("activity-tags", activity.activity_tag_ids)
         relationships: dict[str, object] = {}
         if attendees is not None:
             relationships["attendees"] = attendees

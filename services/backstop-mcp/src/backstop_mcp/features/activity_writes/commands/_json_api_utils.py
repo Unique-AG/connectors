@@ -52,16 +52,8 @@ def secondary_resource_link(
     return party_resource_link(party_id=secondary_party_id, search_type=secondary_search_type)
 
 
-def relationship_data(resource_type: str, ids: tuple[str, ...]) -> dict[str, object] | None:
-    if not ids:
-        return None
-    return {"data": [{"type": resource_type, "id": item_id} for item_id in ids]}
-
-
-def relationship_replace(
-    resource_type: str, ids: tuple[str, ...] | None
-) -> dict[str, object] | None:
-    """JSON:API relationship replace. `None` omits the key; `()` clears it."""
+def relationship_data(resource_type: str, ids: tuple[str, ...] | None) -> dict[str, object] | None:
+    """JSON:API relationship payload. `None` omits the key; `()` is an empty replace."""
     if ids is None:
         return None
     return {"data": [{"type": resource_type, "id": item_id} for item_id in ids]}

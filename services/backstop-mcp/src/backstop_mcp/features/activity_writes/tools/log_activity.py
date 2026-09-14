@@ -83,6 +83,6 @@ async def log_activity(
     return await log_activity_command.run(
         activity=activity,
         party_id=party.id,
-        author=AuthorDto(id=caller.id, user_name=caller.user_name, name=caller.name),
+        author=AuthorDto.from_system_user(caller),
         secondary_party_id=secondary_party_id,
     )

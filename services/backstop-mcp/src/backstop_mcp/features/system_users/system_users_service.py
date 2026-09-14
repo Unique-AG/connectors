@@ -14,17 +14,6 @@ logger = logging.getLogger(__name__)
 _SYSTEM_USER_TYPE = "system-users"
 
 
-def _users_matching_user_name(
-    catalog: dict[str, SystemUserDto], username: str
-) -> list[SystemUserDto]:
-    needle = username.casefold()
-    return [
-        user
-        for user in catalog.values()
-        if user.user_name is not None and user.user_name.casefold() == needle
-    ]
-
-
 def system_user_relationship(user_id: str) -> dict[str, object]:
     """A JSON:API relationship pointing at a system user.
 
@@ -36,11 +25,12 @@ def system_user_relationship(user_id: str) -> dict[str, object]:
 
 
 async def _fetch_system_users(client: BackstopClient) -> dict[str, SystemUserDto]:
-    """Fetch Backstop's system-user catalog in one paginated walk, keyed by user id.
+    """Fetch Backstop's system-user catalog in one paginated walk, keyed by casefolded login.
 
     The collection does not accept a search or `filter[name][like]`. This walk is the whole
     roster so `SystemUsersService` can cache it and tools can filter users in memory instead
-    of returning every colleague on each lookup.
+    of returning every colleague on each lookup. A resource with no login is dropped: it
+    cannot be resolved as an author or assignee.
     """
     page = await client.paginate(
         "/system-users",
@@ -49,29 +39,33 @@ async def _fetch_system_users(client: BackstopClient) -> dict[str, SystemUserDto
         page_size=200,
     )
 
-    users_by_id: dict[str, SystemUserDto] = {}
+    users_by_login: dict[str, SystemUserDto] = {}
     for resource in page.items:
         user = SystemUserDto.from_resource(resource)
-        if user is None:
+        if user is None or user.user_name is None:
             continue
-        existing = users_by_id.get(user.id)
+        login = user.user_name.strip().casefold()
+        if not login:
+            continue
+        existing = users_by_login.get(login)
         if existing is None:
-            users_by_id[user.id] = user
+            users_by_login[login] = user
         elif existing != user:
             logger.warning(
-                "Conflicting system users for duplicate id %r; retaining first user", user.id
+                "Conflicting system users for duplicate login %r; retaining first user", login
             )
-    return users_by_id
+    return users_by_login
 
 
 class SystemUsersService:
     """Process-wide system-user catalog.
 
-    Users come from a real Backstop fetch and live in one in-memory dict keyed by user id.
-    `/system-users` has no search filter. A name or login lookup would otherwise dump the
-    whole roster, so this service walks once, caches `{id: dto}`, and callers substring-filter
-    that map in memory or resolve a login exactly. Until a fetch succeeds there is nothing to
-    serve. Constructed by `get_system_users_service` in this feature's `dependencies.py`.
+    Users come from a real Backstop fetch and live in one in-memory dict keyed by
+    casefolded login. `/system-users` has no search filter. A name or login lookup would
+    otherwise dump the whole roster, so this service walks once, caches `{login: dto}`, and
+    callers substring-filter that map in memory or resolve a login exactly. Until a fetch
+    succeeds there is nothing to serve. Constructed by `get_system_users_service` in this
+    feature's `dependencies.py`.
 
     The TTL, single-flight and serve-stale protocol behind `get` is the composed `CachedValue`.
     """
@@ -125,23 +119,18 @@ class SystemUsersService:
         reader to the wrong place.
         """
         catalog, _freshness = await self.get()
-        matches = _users_matching_user_name(catalog, username)
-        if not matches:
+        user = catalog.get(username.strip().casefold())
+        if user is None:
             raise ToolError(
                 f"No Backstop system user has the login {username!r}. Logins come from "
                 + "list_system_users; they are not display names or party ids."
             )
-        if len(matches) > 1:
-            raise ToolError(f"The Backstop login {username!r} matches more than one system user.")
-        return matches[0]
+        return user
 
 
 async def find_system_user_by_user_name(
     client: BackstopClient, username: str
 ) -> SystemUserDto | None:
-    """One catalog walk for the login form. `None` when the login is missing or duplicated."""
+    """One catalog walk for the login form. `None` when the login is missing."""
     catalog = await _fetch_system_users(client)
-    matches = _users_matching_user_name(catalog, username)
-    if len(matches) != 1:
-        return None
-    return matches[0]
+    return catalog.get(username.strip().casefold())

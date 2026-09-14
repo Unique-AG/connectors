@@ -13,11 +13,7 @@ model requires the caller-supplied ones so the rejection is a schema error, not 
 import logging
 from typing import Literal, assert_never
 
-from backstop_mcp.backstop_client import (
-    BackstopApiResource,
-    BackstopApiSingleResourceDocument,
-    BackstopClient,
-)
+from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.activity_writes.api_responses import MeetingOrCallAttributes
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
     isoformat,
@@ -63,14 +59,32 @@ class LogMeetingOrCallCommand:
         secondary_party_id: str | None = None,
     ) -> LoggedMeetingResponse | LoggedCallResponse:
         time_zone = await self._time_zones_service.resolve_short_name(activity.time_zone)
-        resource = await self._create(
-            activity=activity,
-            meeting_type=self._meeting_type(activity),
+        secondary = secondary_resource_link(
             party_id=party_id,
             secondary_party_id=secondary_party_id,
-            time_zone_short_name=time_zone,
-            author=author,
+            secondary_search_type=activity.secondary_search_type,
         )
+        payload = json_api_create(
+            resource_type="meeting-or-calls",
+            attributes=omit_none_values(
+                {
+                    "title": activity.title,
+                    "type": self._meeting_type(activity),
+                    "location": activity.location,
+                    "startTimestamp": isoformat(activity.start),
+                    "stopTimestamp": isoformat(activity.stop),
+                    "timeZone": time_zone,
+                    "effectiveDate": isoformat(activity.effective_date),
+                    "regarding": party_resource_link(
+                        party_id=party_id, search_type=activity.search_type
+                    ),
+                    "linkedResources": [secondary] if secondary is not None else None,
+                }
+            ),
+            relationships=self._relationships(activity, author=author),
+        )
+        document = await self._client.post("/meeting-or-calls", schema=_Document, json=payload)
+        resource = document.data
         logger.info(
             "activity_writes.meeting_or_call.created",
             extra={
@@ -109,48 +123,11 @@ class LogMeetingOrCallCommand:
     def _relationships(
         self, activity: _MeetingOrCallInput, *, author: AuthorDto
     ) -> dict[str, object]:
-        attendees = relationship_data("people", activity.attendee_party_ids)
-        tags = relationship_data("activity-tags", activity.activity_tag_ids)
+        attendees = relationship_data("people", activity.attendee_party_ids or None)
+        tags = relationship_data("activity-tags", activity.activity_tag_ids or None)
         relationships: dict[str, object] = {"author": system_user_relationship(author.id)}
         if attendees is not None:
             relationships["attendees"] = attendees
         if tags is not None:
             relationships["activityTags"] = tags
         return relationships
-
-    async def _create(
-        self,
-        *,
-        activity: _MeetingOrCallInput,
-        meeting_type: _MeetingType,
-        party_id: str,
-        secondary_party_id: str | None,
-        time_zone_short_name: str,
-        author: AuthorDto,
-    ) -> BackstopApiResource[MeetingOrCallAttributes]:
-        secondary = secondary_resource_link(
-            party_id=party_id,
-            secondary_party_id=secondary_party_id,
-            secondary_search_type=activity.secondary_search_type,
-        )
-        payload = json_api_create(
-            resource_type="meeting-or-calls",
-            attributes=omit_none_values(
-                {
-                    "title": activity.title,
-                    "type": meeting_type,
-                    "location": activity.location,
-                    "startTimestamp": isoformat(activity.start),
-                    "stopTimestamp": isoformat(activity.stop),
-                    "timeZone": time_zone_short_name,
-                    "effectiveDate": isoformat(activity.effective_date),
-                    "regarding": party_resource_link(
-                        party_id=party_id, search_type=activity.search_type
-                    ),
-                    "linkedResources": [secondary] if secondary is not None else None,
-                }
-            ),
-            relationships=self._relationships(activity, author=author),
-        )
-        document = await self._client.post("/meeting-or-calls", schema=_Document, json=payload)
-        return document.data

@@ -34,7 +34,7 @@ def _detail_document(
 
 
 # Every detail endpoint is keyed by the BARE `resource_id` — the part after the last underscore
-# of an `activity_id` handle — never the composite handle itself. See `ResourceIdentifierDto`.
+# of an `activity_id` handle — never the composite. See `parse_activity_detail_handle`.
 def _details_route(resource_id: str) -> respx.Route:
     return respx.get(f"{BASE_URL}/entity-activity-details/{resource_id}")
 

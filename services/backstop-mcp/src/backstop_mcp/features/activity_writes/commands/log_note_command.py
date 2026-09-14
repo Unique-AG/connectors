@@ -49,7 +49,7 @@ class LogNoteCommand:
             secondary_party_id=secondary_party_id,
             secondary_search_type=activity.secondary_search_type,
         )
-        tags = relationship_data("activity-tags", activity.activity_tag_ids)
+        tags = relationship_data("activity-tags", activity.activity_tag_ids or None)
         relationships: dict[str, object] = {"author": system_user_relationship(author.id)}
         if tags is not None:
             relationships["activityTags"] = tags

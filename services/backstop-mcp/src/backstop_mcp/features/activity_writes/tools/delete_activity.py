@@ -15,8 +15,8 @@ from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.activity_history import (
     ActivityDetailResponse,
     GetActivityDetailQuery,
-    ResourceIdentifierDto,
     get_activity_detail_query_factory,
+    parse_activity_detail_handle,
 )
 from backstop_mcp.features.activity_writes import (
     DELETE_ACTIVITY_INPUT_DESCRIPTION,
@@ -92,7 +92,7 @@ async def _deletion_prompt(
 ) -> str:
     """Show the user the record they are about to hard-delete."""
     try:
-        handle = ResourceIdentifierDto.from_activity_id(activity.activity_id)
+        handle = parse_activity_detail_handle(activity.activity_id)
     except ToolError:
         logger.info(
             "activity_writes.delete.detail.skipped",

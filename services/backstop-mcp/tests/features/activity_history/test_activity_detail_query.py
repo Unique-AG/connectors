@@ -5,7 +5,10 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
-from backstop_mcp.features.activity_history import ActivityDetailResponse, ResourceIdentifierDto
+from backstop_mcp.features.activity_history import (
+    ActivityDetailResponse,
+    parse_activity_detail_handle,
+)
 from tests.features.activity_history.conftest import make_get_activity_detail_query
 from tests.features.party_resolver.helpers import BASE_URL, collection
 from tests.helpers import resource
@@ -22,7 +25,7 @@ def _specifics_document(resource_id: str, **attributes: object) -> dict[str, obj
 
 
 async def _run(client: BackstopClient, activity_id: str) -> ActivityDetailResponse:
-    handle = ResourceIdentifierDto.from_activity_id(activity_id)
+    handle = parse_activity_detail_handle(activity_id)
     return await make_get_activity_detail_query(client).run(activity_id=activity_id, handle=handle)
 
 
