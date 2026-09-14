@@ -1,14 +1,19 @@
 # Agent coding guide for backstop-mcp
 
-Read this before adding, changing, or refactoring a feature. The reference implementation is
-[`src/backstop_mcp/features/opportunities/`](src/backstop_mcp/features/opportunities/).
-When this file and another feature disagree, opportunities wins.
+Read this before adding, changing, or refactoring a feature. Two references:
+
+- Reads: [`src/backstop_mcp/features/opportunities/`](src/backstop_mcp/features/opportunities/)
+- Writes: [`src/backstop_mcp/features/activity_writes/`](src/backstop_mcp/features/activity_writes/)
+
+When this file and a read feature disagree, opportunities wins. When this file and a write
+feature disagree, activity_writes wins. Do not invent a third shape.
 
 Backstop behaviour is a different question — use the `backstop-api` skill and live `GET`s
 before designing from swagger. The live instance is read-only: never `POST` / `PATCH` /
 `PUT` / `DELETE` against `BACKSTOP_BASE_URL` unless the user says so for that task, and
 then delete what you created and verify the `GET` 404s. Writes designed from swagger alone
-have been wrong every time so far — see "Write payloads" below.
+have been wrong every time so far — see "Write tools and commands" and "Write payloads"
+below.
 
 ---
 
@@ -36,8 +41,8 @@ The `backstop-api` skill is the workflow; this folder is the tooling.
 
 ## Deprecated layout (do not copy)
 
-The catalog trio, `tasks`, `org_people`, `accounts`, `activity_history`, and
-`party_resolver` already follow the opportunities layout. Do not copy leftover `fetch_*` files into new work
+The catalog trio, `tasks`, `org_people`, `accounts`, `activity_history`,
+`party_resolver`, and `activity_writes` already follow the opportunities layout. Do not copy leftover `fetch_*` files into new work
 (`accounts/utils/fetch_series.py`). That name stays only because it still has callers; it
 is not the template. Do not add a `fetch_*` filename ban while it exists.
 
@@ -374,6 +379,84 @@ only when the set is no longer small.
 
 ---
 
+## Write tools and commands
+
+Reads copy `features/opportunities/`. Writes copy `features/activity_writes/`. The first
+draft of UN-23684 designed payloads from swagger, then every live create returned `400`.
+The patterns below are what that review settled on — do not re-litigate them into one
+write service or a `mode=` flag.
+
+**Split tools when the annotations cannot tell the truth.** One `ToolAnnotations` set
+cannot honestly cover an additive create, a replacing PATCH, and a permanent hard delete.
+`log_activity` is `destructive_hint=False`; `update_activity` and `delete_activity` are
+separate tools with `destructive_hint=True` so the host approval prompt is the
+confirmation. A `mode=` flag on one tool is how that honesty is lost.
+
+**Put a multi-megabyte field on its own tool.** `attach_file` is separate so the everyday
+note-taking schema never carries a base64 blob. FastMCP's `RequestBodyLimitMiddleware` is
+4 MiB (`DEFAULT_MAX_REQUEST_BODY_SIZE`) and does not accept an override — derive the
+published cap from that constant (`attach_file_max_bytes.py`) rather than inventing 20 MB.
+Our over-cap rejection is reported distinctly from Backstop's own `413`.
+
+**Discriminated unions for variants.** `LogActivityInput` is a union on `kind`. Each
+variant's required fields (`time_zone` / `start` / `stop` on a meeting, `due_date` on a
+task) live on that variant so pydantic rejects the call instead of Backstop. Shared
+fields that several variants need (`activity_tag_ids`, party targeting) live once on a
+base class; tasks still omit tags because they do not accept them. There is no `email`
+kind on `log_activity`: `POST /emails` needs the message blob
+(`400 "Field data is required"`), so email creates live only on `attach_file`.
+
+**Facade command, child commands, public door.** `LogActivityCommand` switches on `kind`
+and calls `LogNoteCommand` / `LogMeetingOrCallCommand` / `LogTaskCommand`. Each child
+does one POST. Meeting and call share one command — they are the same Backstop
+collection. The outside interface does not look inside. `__all__` exports the four public
+commands (`LogActivityCommand`, `AttachFileCommand`, `UpdateActivityCommand`,
+`DeleteActivityCommand`) and the published inputs/responses — child commands and union
+members stay inside the feature. Factories stay on the door for teardown. FastMCP's
+Depends system needs a factory per injectable command; do not collapse fourteen commands
+into one "write service" to shorten `dependencies.py`.
+
+**Author is derived, never a parameter.** `get_current_caller_system_user` resolves the
+login-cached `external_user_id` (`filter[userName][eq]` is rejected). The tool passes
+`AuthorDto.from_system_user(caller)` into create `run`. `AuthorDto` is the three fields
+the write needs, not a pass-through of `SystemUserDto`. Tasks have no author — do not
+walk `/system-users` for a field the payload will not send. `assigned_user` is a
+caller-supplied login and still goes through `SystemUsersService`.
+
+**Share the thing that would drift; leave the rest at the call site.**
+`activity_base_attributes` / `activity_tag_relationship` are shared because create and
+PATCH map `title` → `name` (tasks) the same way. Party links stay at the caller — they
+need the resolved `party_id`, which is not on the activity. A util that takes five
+arguments to hide those links obfuscates more than it saves. `json_api_update` is
+`json_api_create` plus `id`. `relationship_data` is one function: `None` omits the key,
+`()` is an empty replace. Creates pass `omit_empty=True` on tags so `()` is not sent;
+updates leave `()` as a clear.
+
+**Reuse, do not redeclare.** Parent links are `ResourceRef` from `json_api.py`.
+`NonEmptyStr` lives in `models.py`. `blank_to_none` / `require_exactly_one_party_selector`
+live on the party-resolver door. `parse_activity_handle` is one parser; writes pass
+`kind` into `extract_collection` so a bare create-echo id still lands on the right
+collection. `api_responses` model the real attribute subset the API returns — do not
+invent an empty model "just to take `.id`", and do not put `author` / `attendees` /
+`createdBy` on `*Attributes` (those are relationships; `extra="ignore"` still accepts
+them if they ever show up).
+
+**DELETE has no body.** `client.delete(path)` — no dummy `*Attributes`, no `schema=` on a
+204. Pass `schema=` only when Backstop returns a body.
+
+**Elicitation is a capability, then a fetch.** `elicit_entity_deletion` takes a callback
+and runs it only after the client is known to support elicitation. Do not GET a preview
+for a prompt that will never be shown. Id spaces differ (`/entity-activity-details` is
+not `/emails` or `/tasks`) — use one parser that knows `kind`, and do not treat a 200
+from the wrong collection as the target record.
+
+**Do not premature-optimize a small catalog.** A linear scan of ~200 time zones is fine.
+Cache TTL stays off until a metric says otherwise. Index a roster by casefolded login
+when every write would otherwise walk it; drop users without a login, keep the first
+duplicate, warn.
+
+---
+
 ## Write payloads
 
 Four rules, each learned from a 400 on the live instance. Local copies of those probes
@@ -408,9 +491,15 @@ rather than reporting a link that is not there.
 
 Also worth knowing before you route a write: nested collection routes are not uniformly
 writable (`POST /contacts/{id}/notes` is `403 "contacts/notes is read only."` while
-top-level `POST /notes` accepts every party type), and `Accept: application/json` gets an
-HTML 404 page instead of a JSON error, which is why `backstop_client/factory.py` pins
-`application/vnd.api+json`.
+top-level `POST /notes` accepts every party type), nested `POST /{segment}/{id}/meeting-or-calls`
+returns `201` but silently orphans the record from the parent's activity feed (route
+meetings and calls through top-level `POST /meeting-or-calls` with an explicit `regarding`),
+and `Accept: application/json` gets an HTML 404 page instead of a JSON error, which is why
+`backstop_client/factory.py` pins `application/vnd.api+json`.
+
+A metadata-only email cannot be created. `POST /emails` answers
+`400 "Field data is required in POST request."` — the blob goes on `attach_file(kind="email")`.
+The UI can log an email without a file; the REST API cannot.
 
 ---
 
@@ -490,7 +579,9 @@ logger.warning(
 Log at the start of a tool call and when a query finishes (what was asked, what came
 back). Warn when a record is dropped, a catalog miss is flagged, or a per-id GET fails.
 Do not log every mapped row. Do not put secrets, tokens, or raw Backstop bodies in
-`extra`.
+`extra`. A username or login is `IdentifiableValue(login)` from `utils/` — it prints
+`sha256:<hex>` unless `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Never interpolate the raw
+login into the line.
 
 **Metrics.** Add an instrument in `metrics.py` only when a number will change a decision
 you can name: catalog TTL vs walk cost (`CUSTOM_FIELD_SCHEMA_LOADS`, the catalog
@@ -541,6 +632,13 @@ out. They do not assert on which private method ran, which local was assigned, o
 exact helper call graph. Those assertions lock an implementation in place and break on
 the next rename.
 
+Write tests pin the **wire** to recorded live shapes, not to what the first draft sent.
+The originals in `activity_writes` asserted `PersonBean` and an attribute `author` — they
+passed against a mock of a contract Backstop rejects, which is how the wrong payload
+survived a green suite. Assert `resourceType: "organizations"` and
+`relationships.author`, and keep a fixture that replays the live `400` when those are
+wrong. `recorded_json_bodies` is the helper.
+
 Assert on internals only when there is no other way to know the feature worked (for
 example `definitions.call_count == 1` when the *contract* is "one catalog load covers the
 batch"). Prefer an output flag (`custom_fields_unavailable`) or a missing field over
@@ -569,9 +667,13 @@ tests/features/<name>/
 ## New feature / tool checklist
 
 1. Read the `backstop-api` skill. Confirm the endpoint, includes, and filters with a live
-   `GET` (write the probe to `agent-explore/.probe-cache/`). Never write to the CRM.
-2. Look at `features/opportunities/` — not `org_people`, not `accounts`.
-3. Add model layers, query and/or command, utils, tool, `__all__` exports.
+   `GET` (write the probe to `agent-explore/.probe-cache/`). Never write to the CRM unless
+   the user says so for that task; when they do, delete every record you created and
+   verify the follow-up `GET` 404s. Pin write tests to those recorded `400`/`201` bodies.
+2. Look at `features/opportunities/` for reads, `features/activity_writes/` for writes —
+   not `org_people`, not `accounts`.
+3. Add model layers, query and/or command, utils, tool, `__all__` exports. A write tool
+   that cannot share one honest `ToolAnnotations` set is more than one tool.
 4. Register the tool on `TOOLS`.
 5. Add cached providers to `teardown.PROVIDERS` if and only if they are `@lru_cache`.
 6. `uv run pytest tests/features/<name> tests/test_layering.py tests/test_teardown.py tests/server/tools/test_output_descriptions.py`
