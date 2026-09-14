@@ -53,7 +53,6 @@ class MeetingOrCallAttributes(BaseModel):
     linked_resources: tuple[ResourceRef, ...] | None = Field(
         default=None, validation_alias="linkedResources"
     )
-    attendees: object | None = None
 
 
 class TaskAttributes(BaseModel):
@@ -77,7 +76,6 @@ class EmailAttributes(BaseModel):
     display_subject: str | None = Field(default=None, validation_alias="displaySubject")
     email_format: str | None = Field(default=None, validation_alias="emailFormat")
     resources: tuple[ResourceRef, ...] | None = None
-    created_by: object | None = Field(default=None, validation_alias="createdBy")
 
 
 class DocumentAttributes(BaseModel):
@@ -85,9 +83,7 @@ class DocumentAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    name: str | None = None
     title: str | None = None
     description: str | None = None
-    file_name: str | None = Field(default=None, validation_alias="fileName")
     document_name: str | None = Field(default=None, validation_alias="documentName")
     attached_to: ResourceRef | None = Field(default=None, validation_alias="attachedTo")
