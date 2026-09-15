@@ -1,21 +1,29 @@
-"""Write-back for people and organizations: PATCH the party and edit its locations."""
+"""Write-back for people and organizations: PATCH the party, locations, and employment."""
 
 from backstop_mcp.features.org_people_writes.commands import (
+    EndEmploymentCommand,
     ModifyContactLocationCommand,
     UpdateOrganizationCommand,
     UpdatePersonCommand,
 )
 from backstop_mcp.features.org_people_writes.contact_location_input import ContactLocationInput
 from backstop_mcp.features.org_people_writes.dependencies import (
+    get_end_employment_command_factory,
     get_modify_contact_location_command_factory,
     get_update_organization_command_factory,
     get_update_person_command_factory,
 )
+from backstop_mcp.features.org_people_writes.end_employment_input import (
+    END_EMPLOYMENT_INPUT_DESCRIPTION,
+    EndEmploymentInput,
+)
 from backstop_mcp.features.org_people_writes.responses import (
-    UpdateOrganizationResponse,
-    UpdatePersonResponse,
+    EndedEmploymentResponse,
+    EndEmploymentResponse,
     UpdatedOrganizationResponse,
     UpdatedPersonResponse,
+    UpdateOrganizationResponse,
+    UpdatePersonResponse,
 )
 from backstop_mcp.features.org_people_writes.update_organization_input import (
     UPDATE_ORGANIZATION_INPUT_DESCRIPTION,
@@ -27,9 +35,14 @@ from backstop_mcp.features.org_people_writes.update_person_input import (
 )
 
 __all__ = [
+    "END_EMPLOYMENT_INPUT_DESCRIPTION",
     "UPDATE_ORGANIZATION_INPUT_DESCRIPTION",
     "UPDATE_PERSON_INPUT_DESCRIPTION",
     "ContactLocationInput",
+    "EndEmploymentCommand",
+    "EndEmploymentInput",
+    "EndEmploymentResponse",
+    "EndedEmploymentResponse",
     "ModifyContactLocationCommand",
     "UpdateOrganizationCommand",
     "UpdateOrganizationInput",
@@ -39,6 +52,7 @@ __all__ = [
     "UpdatePersonResponse",
     "UpdatedOrganizationResponse",
     "UpdatedPersonResponse",
+    "get_end_employment_command_factory",
     "get_modify_contact_location_command_factory",
     "get_update_organization_command_factory",
     "get_update_person_command_factory",

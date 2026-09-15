@@ -42,6 +42,7 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "update_custom_field_values",
         "update_person",
         "update_organization",
+        "end_employment",
         "search_activities",
         "search_opportunities",
     }
@@ -91,6 +92,13 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         "contactLocations",
         "update_custom_field_values",
         "destructive_hint",
+    ),
+    "end_employment": (
+        '"party_id"',
+        '"search_type"',
+        '"organization_id"',
+        "current contact",
+        "entityRelationshipType",
     ),
     "delete_activity": ('"kind"', '"activity_id"', "permanent"),
     "attach_file": (

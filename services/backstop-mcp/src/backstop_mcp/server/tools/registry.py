@@ -38,6 +38,7 @@ from backstop_mcp.features.opportunity_writes.tools.update_opportunity import up
 from backstop_mcp.features.org_people.tools.get_organization import get_organization
 from backstop_mcp.features.org_people.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.features.org_people.tools.get_person import get_person
+from backstop_mcp.features.org_people_writes.tools.end_employment import end_employment
 from backstop_mcp.features.org_people_writes.tools.update_organization import update_organization
 from backstop_mcp.features.org_people_writes.tools.update_person import update_person
 from backstop_mcp.features.system_users.tools.list_system_users import list_system_users
@@ -74,4 +75,5 @@ TOOLS: tuple[ToolFunction, ...] = (
     update_custom_field_values,
     update_person,
     update_organization,
+    end_employment,
 )
