@@ -65,7 +65,7 @@ class TestRenderLoginForm:
         assert "https://backstopsolutions.elevio.help/en/articles/236" in html
 
     def test_includes_csrf_token_as_hidden_field(self) -> None:
-        """The other half of the double-submit check in `login_csrf.py`."""
+        """The other half of the double-submit check on the login POST."""
         html = render_login_form("req-123", "csrf-abc")
 
         assert 'name="csrf_token" value="csrf-abc"' in html

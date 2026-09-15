@@ -7,6 +7,12 @@ import pytest
 from cryptography.fernet import Fernet
 from mcp.server.auth.provider import AuthorizationParams, TokenError
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
+from mcp_credential_auth import (
+    MAX_USERNAME_LENGTH,
+    LoginCsrf,
+    ThrottleConfig,
+    count_recent_failures,
+)
 from pydantic import AnyUrl
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -17,13 +23,7 @@ from backstop_mcp.db import AuthorizationCode as AuthorizationCodeRow
 from backstop_mcp.db import BackstopCredential, PendingAuthorization
 from backstop_mcp.db import LoginAttempt as LoginAttemptRow
 from backstop_mcp.db import OAuthToken as OAuthTokenRow
-from backstop_mcp.features.auth.login_csrf import csrf_cookie_name
 from backstop_mcp.features.auth.provider import BackstopOAuthProvider, ResolveSystemUser
-from backstop_mcp.features.auth.throttle import (
-    MAX_USERNAME_LENGTH,
-    ThrottleConfig,
-    count_recent_failures,
-)
 from tests.helpers import client_factory
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
@@ -87,6 +87,7 @@ def _authorization_params(
 
 
 _CSRF_TOKEN = "provider-test-csrf-token"
+_LOGIN_CSRF = LoginCsrf("backstop_login_csrf_")
 
 
 def _login_post_request(
@@ -99,9 +100,9 @@ def _login_post_request(
 ) -> Request:
     """A form POST carrying a matching CSRF cookie/field pair by default.
 
-    Every real submission has both halves — the form is only ever rendered with a cookie set,
-    see `auth/login_csrf.py` — so the happy path is the default here. The two overrides exist
-    for `TestLoginCsrf`, which drops or corrupts one half.
+    Every real submission has both halves — the form is only ever rendered with a cookie set —
+    so the happy path is the default here. The two overrides exist for `TestLoginCsrf`, which
+    drops or corrupts one half.
     """
     body = (
         f"request_id={request_id}&username={username}"
@@ -109,7 +110,9 @@ def _login_post_request(
     ).encode()
     headers = [(b"content-type", b"application/x-www-form-urlencoded")]
     if cookie_csrf_token is not None:
-        headers.append((b"cookie", f"{csrf_cookie_name(request_id)}={cookie_csrf_token}".encode()))
+        headers.append(
+            (b"cookie", f"{_LOGIN_CSRF.cookie_name(request_id)}={cookie_csrf_token}".encode())
+        )
     scope = {"type": "http", "method": "POST", "headers": headers}
 
     async def receive() -> dict[str, object]:
@@ -440,7 +443,7 @@ class TestLoginFormSubmission:
 
 
 class TestLoginCsrf:
-    """Double-submit CSRF protection on the login POST — see `auth/login_csrf.py`.
+    """Double-submit CSRF protection on the login POST.
 
     The endpoint takes a Backstop credential and, on success, mints an authorization code, so a
     cross-site POST a victim could be tricked into submitting has to be refused.
@@ -465,7 +468,7 @@ class TestLoginCsrf:
         response = await provider.handle_login_get(request)
 
         set_cookie = response.headers["set-cookie"]
-        assert csrf_cookie_name(request_id) in set_cookie
+        assert _LOGIN_CSRF.cookie_name(request_id) in set_cookie
         # The three attributes the protection actually rests on: SameSite is what keeps the
         # cookie off a cross-site POST, HttpOnly keeps script from reading it, and Secure
         # follows from the https base URL this provider was built with.
@@ -543,7 +546,7 @@ class TestLoginCsrf:
         )
 
         assert b'name="csrf_token"' in response.body
-        assert csrf_cookie_name(request_id) in response.headers["set-cookie"]
+        assert _LOGIN_CSRF.cookie_name(request_id) in response.headers["set-cookie"]
 
     @pytest.mark.asyncio
     async def test_a_successful_login_clears_the_cookie(
@@ -559,7 +562,7 @@ class TestLoginCsrf:
 
         assert response.status_code == 302
         set_cookie = response.headers["set-cookie"]
-        assert csrf_cookie_name(request_id) in set_cookie
+        assert _LOGIN_CSRF.cookie_name(request_id) in set_cookie
         # Starlette expresses deletion as an immediate expiry.
         assert "Max-Age=0" in set_cookie or "1970" in set_cookie
         # Flags must match the set cookie or browsers leave the Secure original in place.
