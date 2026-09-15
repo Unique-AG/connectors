@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.1-alpha](https://github.com/Unique-AG/connectors/compare/kyckr-mcp@0.1.0...kyckr-mcp@0.1.1-alpha) (2026-09-15)
+
+
+### Dependencies
+
+* bump node from 26.7.0-trixie-slim to 26.8.1-trixie-slim in /services/kyckr-mcp/deploy ([#922](https://github.com/Unique-AG/connectors/issues/922)) ([437546a](https://github.com/Unique-AG/connectors/commit/437546a0f53688b49cc9df15971c762885e3b33d))
+* bump node in /services/confluence-connector/deploy ([#996](https://github.com/Unique-AG/connectors/issues/996)) ([0b051f4](https://github.com/Unique-AG/connectors/commit/0b051f4a54096b2b91e9e5f2bea8e41d52444855))
+* **deps,ci,main:** update 67 pnpm dependencies within their current majors ([#862](https://github.com/Unique-AG/connectors/issues/862)) ([bef205f](https://github.com/Unique-AG/connectors/commit/bef205f33962020c7a94879c98858fe847aa53a6))
+* **deps:** align Node engines, CI, and types with Docker Node 26 ([#849](https://github.com/Unique-AG/connectors/issues/849)) ([0b053a9](https://github.com/Unique-AG/connectors/commit/0b053a99f4540463d5385665c4fe1320ca3ff647))
+* **deps:** bump the service-base-images group across 8 directories with 3 updates ([#788](https://github.com/Unique-AG/connectors/issues/788)) ([7187ed7](https://github.com/Unique-AG/connectors/commit/7187ed758f2a1d4114a01e8dd2e414936ea3b5e4))
+* put every dependency in the right group, name what was missing, and hold shared versions in the pnpm catalog ([#958](https://github.com/Unique-AG/connectors/issues/958)) ([794092f](https://github.com/Unique-AG/connectors/commit/794092faa348052eddf2be580ed61fc771684b6f))
+* remove pnpm from the Node runtime images ([#1035](https://github.com/Unique-AG/connectors/issues/1035)) ([5ad580a](https://github.com/Unique-AG/connectors/commit/5ad580abb79f72f60d4e68a461c301c816692fcd))
+* stop shipping dev dependencies in the service images ([#978](https://github.com/Unique-AG/connectors/issues/978)) ([29c1613](https://github.com/Unique-AG/connectors/commit/29c1613b89b5dd0edb0cd2dd92bdf921bf26c18a))
+* **teams-mcp,outlook-semantic-mcp,sharepoint-connector,confluence-connector,kyckr-mcp,temenos-mcp,ir-demo-mcp,ci,deps:** dockerfiles and dependabot harmonized and updated ([#720](https://github.com/Unique-AG/connectors/issues/720)) ([a079984](https://github.com/Unique-AG/connectors/commit/a079984c612f5dc24e5bf1bdf61fe553015a6597))
+* upgrade vitest to 5.0.0 and migrate the mocks it breaks ([#970](https://github.com/Unique-AG/connectors/issues/970)) ([9474b72](https://github.com/Unique-AG/connectors/commit/9474b72bc43b99f6e2bf996794145c0aad84f519))
+
 ## 0.1.0 (2026-07-10)
 
 
