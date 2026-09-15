@@ -26,6 +26,14 @@ from with_intelligence_mcp.with_intelligence_client import (
 )
 
 
+class _RecordingMetric:
+    def __init__(self) -> None:
+        self.values: list[int] = []
+
+    def add(self, value: int) -> None:
+        self.values.append(value)
+
+
 class TestAuthentication:
     @pytest.mark.parametrize("status_code", [429, 503])
     @respx.mock
@@ -128,6 +136,21 @@ class TestTokenRenewal:
 
 
 class TestRetries:
+    @respx.mock
+    async def test_rate_limit_metric_has_no_path_attribute(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        metric = _RecordingMetric()
+        monkeypatch.setattr(
+            "with_intelligence_mcp.with_intelligence_client.client.UPSTREAM_RATE_LIMITED",
+            metric,
+        )
+        respx.get(f"{BASE_URL}/v3/investors/123").mock(return_value=httpx.Response(429))
+        client, _ = build_client(max_attempts=1)
+        with pytest.raises(RateLimited):
+            await client.get_json("/v3/investors/123")
+        assert metric.values == [1]
+
     @respx.mock
     async def test_a_429_is_retried(self) -> None:
         route = respx.get(f"{BASE_URL}/v3/investors").mock(

@@ -153,7 +153,7 @@ class WithIntelligenceClient:
         if status == 404:
             raise NotFound(f"{path} does not exist", path=path)
         if status == 429:
-            UPSTREAM_RATE_LIMITED.add(1, {"path": path})
+            UPSTREAM_RATE_LIMITED.add(1)
             raise RateLimited(
                 f"{path} is rate-limited",
                 retry_after_seconds=parse_retry_after(
