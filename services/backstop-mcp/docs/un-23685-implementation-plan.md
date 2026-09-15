@@ -11,7 +11,8 @@ Read these, in this order:
 
 1. `docs/un-23685-write-semantics.md` — what the Backstop API actually does. **Every payload
    shape here comes from there.** Do not "correct" a payload against the swagger; the swagger
-   is wrong or silent about most of it.
+   is wrong or silent about most of it. Create/delete tools built on those measurements:
+   `docs/un-23685-create-delete-semantics.md`.
 2. `AGENT_README.md` — repo conventions. Especially "Feature shape", "Names and suffixes",
    "Write tools and commands", "Write payloads", "Tests".
 3. `src/backstop_mcp/features/activity_writes/` — the reference write feature.

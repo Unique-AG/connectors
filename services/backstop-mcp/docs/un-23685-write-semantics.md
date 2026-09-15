@@ -1,5 +1,8 @@
 # UN-23685 write semantics, measured against a live instance
 
+Create and delete tools built on these measurements are recorded in
+`un-23685-create-delete-semantics.md`.
+
 Everything below was measured on the **fb-rm-lg-26 sandbox**
 (`https://fb-rm-lg-26.backstopsolutions.com/backstop/api`), not on Capstone production, and
 not read off the swagger. Where a live response and the swagger disagree, this file records
