@@ -422,6 +422,29 @@ class TestLoginThrottling:
         assert route.call_count == 2
 
     @respx.mock
+    async def test_concurrent_failures_cannot_exceed_the_budget(self, db: DatabaseFixture) -> None:
+        async def refuse(_request: httpx.Request) -> httpx.Response:
+            await asyncio.sleep(0.05)
+            return httpx.Response(401)
+
+        route = respx.post(_SIGN_IN).mock(side_effect=refuse)
+        provider = _make_provider(
+            db, throttle=ThrottleConfig(max_attempts=2, window=timedelta(minutes=15))
+        )
+        username = _unique("concurrent")
+        request_ids = [await _pending_request_id(provider, _unique("client")) for _ in range(5)]
+
+        responses = await asyncio.gather(
+            *(
+                provider.handle_login_post(_login_post(request_id, username, "pw"))
+                for request_id in request_ids
+            )
+        )
+
+        assert route.call_count == 2
+        assert [response.status_code for response in responses].count(429) == 3
+
+    @respx.mock
     async def test_a_success_resets_the_budget(self, db: DatabaseFixture) -> None:
         provider = _make_provider(
             db, throttle=ThrottleConfig(max_attempts=2, window=timedelta(minutes=15))

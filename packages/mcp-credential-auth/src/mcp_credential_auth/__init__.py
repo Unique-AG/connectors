@@ -15,8 +15,10 @@ from mcp_credential_auth.throttle import (
     ThrottleConfig,
     clear_failures,
     count_recent_failures,
+    discard_login_attempt,
     is_throttled,
     record_failure,
+    reserve_login_attempt,
 )
 
 __all__ = [
@@ -34,9 +36,11 @@ __all__ = [
     "cleanup_lifespan",
     "clear_failures",
     "count_recent_failures",
+    "discard_login_attempt",
     "is_throttled",
     "purge_expired_auth_rows",
     "read_session",
     "record_failure",
+    "reserve_login_attempt",
     "transaction",
 ]

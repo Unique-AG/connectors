@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -9,8 +10,10 @@ from mcp_credential_auth import (
     ThrottleConfig,
     clear_failures,
     count_recent_failures,
+    discard_login_attempt,
     is_throttled,
     record_failure,
+    reserve_login_attempt,
     transaction,
 )
 
@@ -65,6 +68,49 @@ async def test_allows_up_to_the_limit_then_blocks(
 
     await record_failure(session_factory, username, source_ip="10.0.0.1")
     assert await is_throttled(session_factory, username, config=config)
+
+
+async def test_concurrent_reservations_cannot_exceed_the_limit(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    reservations = await asyncio.gather(
+        *(
+            reserve_login_attempt(
+                session_factory,
+                "throttle-concurrent-user",
+                source_ip=None,
+                config=_config(max_attempts=2),
+            )
+            for _ in range(5)
+        )
+    )
+
+    assert sum(reservation is not None for reservation in reservations) == 2
+
+
+async def test_discarding_a_reservation_restores_the_budget(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    username = "throttle-discard-user"
+    reservation = await reserve_login_attempt(
+        session_factory, username, source_ip=None, config=_config(max_attempts=1)
+    )
+    assert reservation is not None
+    assert (
+        await reserve_login_attempt(
+            session_factory, username, source_ip=None, config=_config(max_attempts=1)
+        )
+        is None
+    )
+
+    await discard_login_attempt(session_factory, reservation)
+
+    assert (
+        await reserve_login_attempt(
+            session_factory, username, source_ip=None, config=_config(max_attempts=1)
+        )
+        is not None
+    )
 
 
 async def test_a_successful_login_clears_the_budget(
