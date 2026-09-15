@@ -74,8 +74,6 @@ WORKDIR /app
 #   - procps/dumb-init/openssl/ca-certificates: signal forwarding, TLS, trust store
 #   - apt-get upgrade: pull newest OS security patches at build time
 #   - perl-base: 5.40.1-6+deb13u1 closes CVE-2026-13221 / CVE-2026-42496 / CVE-2026-8376
-# pnpm is kept in every runtime for homogeneity. npm and npx are removed afterwards
-# to shrink the runtime attack surface.
 RUN --mount=type=cache,target=/var/cache/apt \
     apt-get update \
  && apt-get upgrade -y \
@@ -86,7 +84,6 @@ RUN --mount=type=cache,target=/var/cache/apt \
       ca-certificates \
       perl-base \
  && rm -rf /var/lib/apt/lists/* \
- && npm install -g pnpm@10.34.5 \
  && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 ENV NODE_ENV=production
