@@ -82,6 +82,7 @@ class TestBackstopConfigDefaults:
         assert config.report_page_size == 500
         assert config.custom_field_schema_ttl_minutes == 120
         assert config.opportunity_stage_ttl_minutes == 60
+        assert config.entity_relationship_type_ttl_minutes == 60
         assert config.activity_tag_ttl_minutes == 24 * 60
         assert config.system_user_ttl_minutes == 24 * 60
         assert config.time_zone_ttl_minutes == 24 * 60
@@ -124,6 +125,7 @@ class TestBackstopConfigDefaults:
         monkeypatch.setenv("BACKSTOP_REPORT_PAGE_SIZE", "250")
         monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_TTL_MINUTES", "60")
         monkeypatch.setenv("BACKSTOP_OPPORTUNITY_STAGE_TTL_MINUTES", "30")
+        monkeypatch.setenv("BACKSTOP_ENTITY_RELATIONSHIP_TYPE_TTL_MINUTES", "15")
         monkeypatch.setenv("BACKSTOP_ACTIVITY_TAG_TTL_MINUTES", "90")
         monkeypatch.setenv("BACKSTOP_SYSTEM_USER_TTL_MINUTES", "45")
         monkeypatch.setenv("BACKSTOP_TIME_ZONE_TTL_MINUTES", "30")
@@ -143,6 +145,7 @@ class TestBackstopConfigDefaults:
         assert config.report_page_size == 250
         assert config.custom_field_schema_ttl_minutes == 60
         assert config.opportunity_stage_ttl_minutes == 30
+        assert config.entity_relationship_type_ttl_minutes == 15
         assert config.activity_tag_ttl_minutes == 90
         assert config.system_user_ttl_minutes == 45
         assert config.time_zone_ttl_minutes == 30

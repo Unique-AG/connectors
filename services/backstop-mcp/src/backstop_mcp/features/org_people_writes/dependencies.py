@@ -3,10 +3,11 @@ from functools import lru_cache
 from fastmcp.dependencies import Depends
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client_for_current_caller
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller, get_backstop_config
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
     get_employment_index_factory,
+    get_employment_rules,
 )
 from backstop_mcp.features.org_people_writes.commands import (
     CreateOrganizationCommand,
@@ -15,6 +16,9 @@ from backstop_mcp.features.org_people_writes.commands import (
     ModifyContactLocationCommand,
     UpdateOrganizationCommand,
     UpdatePersonCommand,
+)
+from backstop_mcp.features.org_people_writes.entity_relationship_types_service import (
+    EntityRelationshipTypesService,
 )
 from backstop_mcp.features.system_users import SystemUsersService, get_system_users_service
 
@@ -69,6 +73,19 @@ def get_update_organization_command_factory(
         client=client,
         system_users_service=system_users_service,
         modify_contact_location_command=modify_contact_location_command,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_entity_relationship_types_service_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+) -> EntityRelationshipTypesService:
+    # Config / employment vocabulary are read here, not injected: `@lru_cache` cannot hash them.
+    config = get_backstop_config()
+    return EntityRelationshipTypesService.with_ttl_minutes(
+        client=client,
+        ttl_minutes=config.entity_relationship_type_ttl_minutes,
+        rules=get_employment_rules(),
     )
 
 

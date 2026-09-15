@@ -12,6 +12,7 @@ from backstop_mcp.backstop_client import BackstopApiResource, Included
 from backstop_mcp.features.data_hygiene import (
     DepartureSignal,
     EmploymentIndexFactory,
+    EmploymentRulesDto,
     EntityRelationshipAttributes,
     RelationshipTypeAttributes,
 )
@@ -78,6 +79,17 @@ class TestCreateEmploymentIndexFactory:
         factory = _factory(former_type_ids=("x",))
 
         assert factory.rules.former.type_ids == frozenset({"x"})
+
+    def test_from_vocabulary_is_the_rules_constructor(self) -> None:
+        factory = _factory(employment_type_ids=("a",), former_type_ids=("b",))
+        rules = EmploymentRulesDto.from_vocabulary(
+            employment_type_ids=("a",),
+            employment_type_markers=("employ",),
+            former_type_ids=("b",),
+            former_type_markers=("former",),
+        )
+
+        assert factory.rules == rules
 
 
 class TestIndex:

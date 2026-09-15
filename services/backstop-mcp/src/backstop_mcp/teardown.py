@@ -61,7 +61,7 @@ from backstop_mcp.features.custom_fields import (
     get_custom_fields_service,
     get_update_custom_field_values_command_factory,
 )
-from backstop_mcp.features.data_hygiene import get_employment_index_factory
+from backstop_mcp.features.data_hygiene import get_employment_index_factory, get_employment_rules
 from backstop_mcp.features.opportunities import (
     get_map_opportunity_to_response_util_factory,
     get_opportunities_by_ids_query_factory,
@@ -83,6 +83,7 @@ from backstop_mcp.features.org_people_writes import (
     get_create_organization_command_factory,
     get_create_person_command_factory,
     get_end_employment_command_factory,
+    get_entity_relationship_types_service_factory,
     get_modify_contact_location_command_factory,
     get_update_organization_command_factory,
     get_update_person_command_factory,
@@ -140,6 +141,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_custom_field_groups_service,
     get_update_custom_field_values_command_factory,
     get_employment_index_factory,
+    get_employment_rules,
     get_opportunity_stages_service_factory,
     get_update_opportunity_command_factory,
     get_backfill_opportunity_stage_history_command_factory,
@@ -160,6 +162,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_update_person_command_factory,
     get_update_organization_command_factory,
     get_end_employment_command_factory,
+    get_entity_relationship_types_service_factory,
     get_accounts_for_product_query_factory,
     get_capital_flows_query_factory,
     get_holdings_query_factory,
