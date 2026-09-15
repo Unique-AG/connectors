@@ -16,7 +16,7 @@
   "dependencies": {
     "@proventuslabs/nestjs-zod": "catalog:",
     "@unique-ag/utils": "workspace:*",
-    "https-proxy-agent": "7.0.6",
+    "https-proxy-agent": "9.1.0",
     "remeda": "catalog:",
     "undici": "catalog:"
   },
