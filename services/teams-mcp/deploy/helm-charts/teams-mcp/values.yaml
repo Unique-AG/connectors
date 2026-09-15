@@ -212,7 +212,7 @@ hooks:
   migration:
     enabled: true
     command: |
-      pnpm run db:migrate
+      cd /app && ./node_modules/.bin/drizzle-kit migrate
 
 # ── Grafana dashboard configuration ───────────────────────────────────────────
 grafana:

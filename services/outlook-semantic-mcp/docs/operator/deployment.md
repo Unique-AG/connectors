@@ -171,13 +171,13 @@ server:
     migration:
       enabled: true
       command: |
-        pnpm run db:migrate
+        cd /app && ./node_modules/.bin/drizzle-kit migrate
 ```
 
 To run migrations manually:
 
 ```bash
-kubectl exec -it deploy/outlook-semantic-mcp -n outlook-semantic-mcp -- pnpm run db:migrate
+kubectl exec -it deploy/outlook-semantic-mcp -n outlook-semantic-mcp -- sh -c 'cd /app && ./node_modules/.bin/drizzle-kit migrate'
 ```
 
 ## Health Checks

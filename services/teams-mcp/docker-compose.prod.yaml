@@ -7,7 +7,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teams_mcp?schema=public
-    command: ["pnpm", "run", "db:migrate"]
+    command: ["sh", "-c", "cd /app && ./node_modules/.bin/drizzle-kit migrate"]
     depends_on:
       postgres:
         condition: service_healthy

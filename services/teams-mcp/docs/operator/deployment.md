@@ -106,13 +106,13 @@ server:
     migration:
       enabled: true
       command: |
-        pnpm run db:migrate
+        cd /app && ./node_modules/.bin/drizzle-kit migrate
 ```
 
 To run migrations manually:
 
 ```bash
-kubectl exec -it deploy/teams-mcp -- pnpm run db:migrate
+kubectl exec -it deploy/teams-mcp -- sh -c 'cd /app && ./node_modules/.bin/drizzle-kit migrate'
 ```
 
 ## Health Checks
