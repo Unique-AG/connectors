@@ -37,6 +37,7 @@ from kb_mcp.references import (
     scope_id_from_folder_id_path,
 )
 from kb_mcp.tools.search import SearchToolConfig, search
+from kb_mcp.tools.search.tool import _effective_service_config
 
 
 def test_uniqueql_prompt_copy():
@@ -216,6 +217,96 @@ async def _run_search_capturing_state(**search_kwargs) -> _FakeState:
         await search(search_string="query", config=config, **search_kwargs)
 
     return mock_service.state
+
+
+async def _run_search_capturing_service_config(
+    **search_kwargs,
+) -> KnowledgeBaseInternalSearchConfig:
+    chunks = [_make_chunk("result A")]
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = _FakeState()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+    config = search_kwargs.pop("config", SearchToolConfig())
+
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ) as mock_from_config,
+        _patch_post_processor(chunks),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+    ):
+        await search(search_string="query", config=config, **search_kwargs)
+
+    return mock_from_config.call_args.args[0]
+
+
+def test_effective_service_config_omits_both_returns_same_object():
+    config = KnowledgeBaseInternalSearchConfig()
+
+    result = _effective_service_config(config, limit=None, score_threshold=None)
+
+    assert result is config
+
+
+def test_effective_service_config_overrides_limit_only():
+    config = KnowledgeBaseInternalSearchConfig()
+
+    result = _effective_service_config(config, limit=50, score_threshold=None)
+
+    assert result is not config
+    assert result.filtering.limit == 50
+    assert result.filtering.score_threshold == config.filtering.score_threshold
+
+
+def test_effective_service_config_overrides_score_threshold_only():
+    config = KnowledgeBaseInternalSearchConfig()
+
+    result = _effective_service_config(config, limit=None, score_threshold=0.8)
+
+    assert result.filtering.score_threshold == 0.8
+    assert result.filtering.limit == config.filtering.limit
+
+
+def test_effective_service_config_overrides_both():
+    config = KnowledgeBaseInternalSearchConfig()
+
+    result = _effective_service_config(config, limit=10, score_threshold=0.5)
+
+    assert result.filtering.limit == 10
+    assert result.filtering.score_threshold == 0.5
+
+
+def test_effective_service_config_leaves_other_fields_untouched():
+    config = KnowledgeBaseInternalSearchConfig()
+
+    result = _effective_service_config(config, limit=10, score_threshold=None)
+
+    assert result.metadata_filter == config.metadata_filter
+    assert result.scope_ids == config.scope_ids
+    assert result.search == config.search
+
+
+@pytest.mark.asyncio
+async def test_search_omits_limit_and_score_threshold_by_default():
+    service_config = await _run_search_capturing_service_config()
+
+    default_filtering = SearchToolConfig().service_config.filtering
+    assert service_config.filtering.limit == default_filtering.limit
+    assert service_config.filtering.score_threshold == default_filtering.score_threshold
+
+
+@pytest.mark.asyncio
+async def test_search_wires_limit_and_score_threshold_through():
+    service_config = await _run_search_capturing_service_config(
+        limit=25, score_threshold=0.9
+    )
+
+    assert service_config.filtering.limit == 25
+    assert service_config.filtering.score_threshold == 0.9
 
 
 @pytest.mark.asyncio

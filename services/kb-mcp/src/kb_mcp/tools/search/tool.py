@@ -26,6 +26,7 @@ from unique_mcp import (
 )
 from unique_toolkit.experimental.components.internal_search import (
     InternalSearchPostProcessor,
+    KnowledgeBaseInternalSearchConfig,
     KnowledgeBaseInternalSearchService,
 )
 
@@ -49,6 +50,26 @@ from kb_mcp.tools.search.metadata_filter import (
 from kb_mcp.tools.search.scope_resolver import resolve_scope_ids
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _effective_service_config(
+    config: KnowledgeBaseInternalSearchConfig,
+    *,
+    limit: int | None,
+    score_threshold: float | None,
+) -> KnowledgeBaseInternalSearchConfig:
+    """Non-mutating override of filtering.limit/score_threshold."""
+    overrides = {
+        k: v
+        for k, v in {"limit": limit, "score_threshold": score_threshold}.items()
+        if v is not None
+    }
+    if not overrides:
+        return config
+    return config.model_copy(
+        update={"filtering": config.filtering.model_copy(update=overrides)}
+    )
+
 
 _META = merge_tool_meta(
     {
@@ -116,6 +137,30 @@ async def search(
         ),
     ] = True,
     metadata_filter: MetadataFilterArgument = None,
+    limit: Annotated[
+        int | None,
+        Field(
+            gt=0,
+            description=(
+                "Maximum chunks to return before post-processing. Admin "
+                "default is 200 — the conservative baseline; raise it for "
+                "higher recall. Omit unless you have a specific reason to "
+                "change it."
+            ),
+        ),
+    ] = None,
+    score_threshold: Annotated[
+        float | None,
+        Field(
+            ge=0.0,
+            le=1.0,
+            description=(
+                "Minimum relevance score in [0.0, 1.0]; higher is stricter. "
+                "Admin default is 0.0. Leave unset unless you have a "
+                "specific reason to change it."
+            ),
+        ),
+    ] = None,
     config: SearchToolConfig = Depends(get_tool_config(SearchToolConfig)),
 ) -> ToolResult:
     """Search the knowledge base using ``SearchToolConfig`` from the config meta key."""
@@ -134,8 +179,11 @@ async def search(
         )
         _LOGGER.info("search start correlation_id=%s", cid)
 
+        service_config = _effective_service_config(
+            config.service_config, limit=limit, score_threshold=score_threshold
+        )
         service = KnowledgeBaseInternalSearchService.from_config(
-            config.service_config
+            service_config
         ).bind_settings(settings)
         service.state.search_queries = [search_string]
         if folder_ids or parsed_llm_filter is not None:
