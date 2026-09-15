@@ -10,6 +10,7 @@ from typing import cast
 import httpx
 from pydantic import TypeAdapter
 
+from with_intelligence_mcp.metrics import UPSTREAM_CONCURRENCY_WAIT
 from with_intelligence_mcp.with_intelligence_client.credential import (
     CallerSession,
     WiCredential,
@@ -55,10 +56,16 @@ class _GateRegistry:
     async def hold(self, subject: str) -> AsyncGenerator[None]:
         gate = await self._gate_for(subject)
         gate.in_flight += 1
+        acquired = False
         try:
-            async with gate.semaphore:
-                yield
+            start = asyncio.get_running_loop().time()
+            await gate.semaphore.acquire()
+            acquired = True
+            UPSTREAM_CONCURRENCY_WAIT.record(asyncio.get_running_loop().time() - start)
+            yield
         finally:
+            if acquired:
+                gate.semaphore.release()
             gate.in_flight -= 1
 
     async def _gate_for(self, subject: str) -> _Gate:

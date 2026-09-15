@@ -143,7 +143,10 @@ class WithIntelligenceClient:
                 renewed = True
                 _ = await self._session.renewed_access_token()
             except (RateLimited, Unreachable) as error:
-                if not self._retry.should_retry(error, attempt):
+                retry = self._retry.should_retry(error, attempt)
+                if isinstance(error, RateLimited):
+                    UPSTREAM_RATE_LIMITED.add(1, {"retried": retry})
+                if not retry:
                     raise
                 await asyncio.sleep(self._retry.wait_seconds(error, attempt))
 
@@ -200,7 +203,6 @@ class WithIntelligenceClient:
         if status == 404:
             raise NotFound(_error_message(response, f"{path} does not exist"), path=path)
         if status == 429:
-            UPSTREAM_RATE_LIMITED.add(1)
             raise RateLimited(
                 _error_message(response, f"{path} is rate-limited"),
                 retry_after_seconds=self._retry.parse_retry_after(

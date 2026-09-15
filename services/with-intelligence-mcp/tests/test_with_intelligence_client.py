@@ -47,10 +47,10 @@ _TYPED_PAGE = TypeAdapter(Page[_PageResult])
 
 class _RecordingMetric:
     def __init__(self) -> None:
-        self.values: list[int] = []
+        self.records: list[tuple[int, dict[str, bool]]] = []
 
-    def add(self, value: int) -> None:
-        self.values.append(value)
+    def add(self, value: int, attributes: dict[str, bool]) -> None:
+        self.records.append((value, attributes))
 
 
 class _RecordingHistogram:
@@ -250,16 +250,22 @@ class TestRetries:
         client, _ = build_client(max_attempts=1)
         with pytest.raises(RateLimited):
             await client.get_json("/v3/investors/123", _JSON)
-        assert metric.values == [1]
+        assert metric.records == [(1, {"retried": False})]
 
     @respx.mock
-    async def test_a_429_is_retried(self) -> None:
+    async def test_a_429_is_retried(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        metric = _RecordingMetric()
+        monkeypatch.setattr(
+            "with_intelligence_mcp.with_intelligence_client.client.UPSTREAM_RATE_LIMITED",
+            metric,
+        )
         route = respx.get(f"{BASE_URL}/v3/investors").mock(
             side_effect=[httpx.Response(429), httpx.Response(200, json={"ok": 1})]
         )
         client, _ = build_client()
         assert await client.get_json("/v3/investors", _JSON) == {"ok": 1}
         assert route.call_count == 2
+        assert metric.records == [(1, {"retried": True})]
 
     @respx.mock
     async def test_the_retry_budget_is_finite(self) -> None:
