@@ -38,15 +38,21 @@ class ModifyContactLocationCommand:
     ) -> str | None:
         with _tracer.start_as_current_span("org_people_writes.command.modify_contact_location"):
             location_id: str | None = None
-            try:
-                if location is not None and location.location_id is None:
+            if location is not None and location.location_id is None:
+                try:
                     location_id = await self._create(party_id=party_id, location=location)
-                elif location is not None:
+                except BackstopApiError as exc:
+                    self._reraise_write_error(exc, operation="created")
+            elif location is not None:
+                try:
                     location_id = await self._update(location=location)
-                if delete_location_id is not None:
+                except BackstopApiError as exc:
+                    self._reraise_write_error(exc, operation="updated")
+            if delete_location_id is not None:
+                try:
                     await self._delete(delete_location_id)
-            except BackstopApiError as exc:
-                self._reraise_write_error(exc)
+                except BackstopApiError as exc:
+                    self._reraise_write_error(exc, operation="deleted")
             return location_id
 
     async def _create(self, *, party_id: str, location: ContactLocationInput) -> str:
@@ -78,7 +84,7 @@ class ModifyContactLocationCommand:
     async def _delete(self, location_id: str) -> None:
         await self._client.delete(f"/{_RESOURCE_TYPE}/{quote(location_id, safe='')}")
 
-    def _reraise_write_error(self, exc: BackstopApiError) -> Never:
+    def _reraise_write_error(self, exc: BackstopApiError, *, operation: str) -> Never:
         detail = exc.detail.casefold()
         code = (exc.code or "").casefold()
         if "location names for a party must be unique" in detail:
@@ -89,7 +95,7 @@ class ModifyContactLocationCommand:
         if exc.status_code == 404 and "partynotfound" in f"{code} {detail}":
             raise ToolError(
                 "The parent party for this location is gone, so the location cannot be "
-                + "deleted. This is not a missing location."
+                + f"{operation}. This is not a missing location."
             ) from exc
         raise exc
 

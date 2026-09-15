@@ -25,6 +25,7 @@ from tests.features.data_hygiene.helpers import (
 )
 from tests.helpers import (
     BASE_URL,
+    FIXED_TODAY,
     build_employment_index_factory,
     client_factory,
     credential,
@@ -37,7 +38,7 @@ _PERSON_ID = "p1"
 _ORG_ID = "o1"
 _REL_ID = "127921399"
 _OTHER_REL_ID = "127921400"
-_PAST = date.today() - timedelta(days=1)
+_PAST = FIXED_TODAY - timedelta(days=1)
 
 
 @pytest.fixture
@@ -204,7 +205,7 @@ class TestEndEmploymentCommand:
     async def test_end_date_of_today_warns_that_it_is_not_yet_former(
         self, client: BackstopClient
     ) -> None:
-        today = date.today()
+        today = FIXED_TODAY
         respx.get(f"{BASE_URL}/people/{_PERSON_ID}/entityRelationships").mock(
             return_value=_collection(_open_employment())
         )
@@ -265,7 +266,7 @@ class TestEndEmploymentCommand:
         await _run(client)
         person = await GetPersonQuery(
             client=client,
-            employment_index_factory=build_employment_index_factory(today=date.today()),
+            employment_index_factory=build_employment_index_factory(),
             custom_fields_service=custom_fields_service(client),
         ).run(
             search_type="people",
@@ -286,3 +287,23 @@ class TestEndEmploymentCommand:
                 relationship_type_name="is employee of",
             )
         ]
+
+    @respx.mock
+    async def test_a_patch_that_did_not_land_is_not_reported_as_success(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/people/{_PERSON_ID}/entityRelationships").mock(
+            return_value=_collection(_open_employment())
+        )
+        respx.patch(f"{BASE_URL}/entity-relationships/{_REL_ID}").mock(
+            return_value=_relationship_document(end_date=None)
+        )
+        respx.get(f"{BASE_URL}/entity-relationships/{_REL_ID}").mock(
+            return_value=_relationship_document(end_date=None)
+        )
+
+        result = await _run(client)
+
+        assert result.end_date is None
+        assert result.warnings
+        assert "not ended as asked" in result.warnings[0]

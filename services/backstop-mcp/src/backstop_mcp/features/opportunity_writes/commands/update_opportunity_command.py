@@ -83,8 +83,8 @@ class UpdateOpportunityCommand:
                 add_notify=add_notify,
                 replace_notify=replace_notify,
             )
-            old_opportunity = await self._read(new_opportunity.opportunity_id)
-            stage_name, stage_id = self._stage_from_document(old_opportunity, catalog)
+            written = await self._read(new_opportunity.opportunity_id)
+            stage_name, stage_id = self._stage_from_document(written, catalog)
             warnings = self._stage_warnings(
                 requested=requested_stage, landed_name=stage_name, landed_id=stage_id
             ) + self._skipped_login_warnings((*add_skipped, *replace_skipped))
@@ -154,6 +154,9 @@ class UpdateOpportunityCommand:
         # replacement is non-empty, a second PATCH that appends the new members.
         if replace_notify is not None:
             relationships["ccedUsers"] = relationship_data("system-users", ())
+
+        if not attributes and not relationships:
+            return
 
         await self._client.patch(
             path,

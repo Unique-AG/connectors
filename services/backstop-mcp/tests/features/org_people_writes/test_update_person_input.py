@@ -30,6 +30,11 @@ def test_clearing_a_required_attribute_is_rejected_by_the_input_model() -> None:
         _ADAPTER.validate_python({"party_id": "27871657", "last_name": "   "})
 
 
+def test_an_explicit_null_last_name_is_rejected_rather_than_ignored() -> None:
+    with pytest.raises(ValidationError, match="last_name cannot be cleared"):
+        _ADAPTER.validate_python({"party_id": "27871657", "last_name": None})
+
+
 def test_empty_replace_category_ids_counts_as_a_change() -> None:
     parsed = _ADAPTER.validate_python({"party_id": "27871657", "replace_category_ids": []})
 

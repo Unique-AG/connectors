@@ -75,7 +75,16 @@ class EndEmploymentCommand:
                 ),
             )
             reread = await self._client.get(path, schema=_Document)
-            warnings = () if end_date < date.today() else (_NOT_YET_FORMER,)
+            stored_end_date = reread.data.attributes.end_date
+            warnings: tuple[str, ...] = ()
+            if stored_end_date != end_date:
+                warnings += (
+                    f"Backstop stored an end date of {stored_end_date or 'nothing'} rather "
+                    + f"than the requested {isoformat(end_date)}. The employment was not "
+                    + "ended as asked.",
+                )
+            elif not end_date < self._employment_index_factory.today():
+                warnings += (_NOT_YET_FORMER,)
             logger.info(
                 "org_people_writes.employment.ended",
                 extra={
@@ -87,7 +96,7 @@ class EndEmploymentCommand:
             return EndedEmploymentResponse(
                 id=relationship_id,
                 resource_type=_RESOURCE_TYPE,
-                end_date=reread.data.attributes.end_date,
+                end_date=stored_end_date,
                 warnings=warnings,
             )
 

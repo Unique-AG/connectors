@@ -47,8 +47,9 @@ async def end_employment(
     Person identity is the same as `get_person`. Organization identity is exactly one of
     `organization_id` or `organization_search`. There is no relationship-id parameter.
     One PATCH is enough — end-dating either direction propagates to the reverse. Never
-    send `entityRelationshipType`; it cannot be modified. An `end_date` of today is
-    stored, but the person still reads as a current contact until that date has passed.
+    send `entityRelationshipType`; it cannot be modified. An `end_date` that is not
+    strictly before today is stored, but the person still reads as a current contact
+    until that date has passed.
 
     Call like: {"employment": {"search_type": "people", "party_id": "<id from get_person>",
     "organization_id": "<id from get_organization>", "end_date": "2026-01-15"}}

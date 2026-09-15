@@ -273,3 +273,116 @@ class TestUpdateCustomFieldValuesCommand:
         assert result.applied_count == 0
         assert result.records[0].status == "failed"
         assert result.records[0].error == "batch rejected"
+
+    @respx.mock
+    async def test_total_failure_carries_the_indexed_message_backstop_actually_sends(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=_catalog(_definition(_DROPDOWN, name="Source", select_options=["Direct"]))
+        )
+        respx.post(f"{BASE_URL}/bulk-custom-field-values").mock(
+            return_value=_bulk_document(
+                total=1,
+                success=0,
+                errors=[{"index": 0, "message": "Error load record #0, Invalid value"}],
+                records=[],
+            )
+        )
+
+        result = await make_command(client).run(update=_update(_value(_DROPDOWN, "Direct")))
+
+        assert result.applied_count == 0
+        assert result.records[0].status == "failed"
+        assert result.records[0].error == "Error load record #0, Invalid value"
+        assert result.warnings == ()
+
+    @respx.mock
+    async def test_an_indexed_error_without_a_message_still_fails_the_record(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=_catalog(_definition(_TEXT, name="Notes"))
+        )
+        respx.post(f"{BASE_URL}/bulk-custom-field-values").mock(
+            return_value=_bulk_document(
+                total=1,
+                success=1,
+                errors=[{"index": 0}],
+                records=[_written(_TEXT, "hello")],
+            )
+        )
+
+        result = await make_command(client).run(update=_update(_value(_TEXT, "hello")))
+
+        assert result.records[0].status == "failed"
+        assert result.applied_count == 0
+
+    @respx.mock
+    async def test_an_unattributable_message_is_surfaced_as_a_warning(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=_catalog(_definition(_TEXT, name="Notes"))
+        )
+        respx.post(f"{BASE_URL}/bulk-custom-field-values").mock(
+            return_value=_bulk_document(
+                total=1,
+                success=1,
+                errors=[{"message": "partial commit warning"}],
+                records=[_written(_TEXT, "hello")],
+            )
+        )
+
+        result = await make_command(client).run(update=_update(_value(_TEXT, "hello")))
+
+        assert result.records[0].status == "applied"
+        assert result.warnings == ("partial commit warning",)
+
+    @respx.mock
+    async def test_a_required_field_cannot_be_written_blank(self, client: BackstopClient) -> None:
+        route = respx.post(f"{BASE_URL}/bulk-custom-field-values")
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=_catalog(_definition(_TEXT, name="Notes", required=True))
+        )
+
+        with pytest.raises(ToolError, match="required"):
+            await make_command(client).run(update=_update(_value(_TEXT, "   ")))
+
+        assert route.call_count == 0
+
+    @respx.mock
+    async def test_an_over_length_value_is_rejected_before_writing(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.post(f"{BASE_URL}/bulk-custom-field-values")
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=_catalog(_definition(_TEXT, name="Notes", max_length=5))
+        )
+
+        with pytest.raises(ToolError, match="maxLength 5"):
+            await make_command(client).run(update=_update(_value(_TEXT, "far too long")))
+
+        assert route.call_count == 0
+
+    @respx.mock
+    async def test_a_time_series_value_sends_its_effective_date(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=_catalog(_definition(_TIME_SERIES, name="AUM", is_time_series=True))
+        )
+        route = respx.post(f"{BASE_URL}/bulk-custom-field-values").mock(
+            return_value=_bulk_document(
+                total=1, success=1, errors=[], records=[_written(_TIME_SERIES, "10")]
+            )
+        )
+
+        await make_command(client).run(
+            update=_update(_value(_TIME_SERIES, "10", effective_date=date(2026, 2, 1)))
+        )
+
+        body = recorded_json_bodies(route)[0]
+        attributes = object_dict(object_dict(body["data"])["attributes"])
+        written = object_list(attributes["records"])
+        assert object_dict(written[0])["effectiveDate"] == "2026-02-01"

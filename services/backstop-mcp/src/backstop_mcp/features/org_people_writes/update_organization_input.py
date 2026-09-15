@@ -165,10 +165,12 @@ class UpdateOrganizationInput(BaseModel):
     def _blank_to_none(cls, value: object) -> object:
         return blank_to_none(value)
 
-    @field_validator("name")
+    # `mode="before"` runs only when the key is present, so an explicit null is told
+    # apart from an omitted field.
+    @field_validator("name", mode="before")
     @classmethod
-    def _name_cannot_be_cleared(cls, value: str | None) -> str | None:
-        if value is not None and not value.strip():
+    def _name_cannot_be_cleared(cls, value: object) -> object:
+        if value is None or (isinstance(value, str) and not value.strip()):
             raise ValueError("name cannot be cleared; Field name is required")
         return value
 

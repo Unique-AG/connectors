@@ -233,3 +233,41 @@ class TestBackfillOpportunityStageHistoryCommand:
         assert result.records[0].status == "applied"
         assert result.records[1].status == "failed"
         assert result.records[1].error is not None
+
+    @respx.mock
+    async def test_an_indexed_error_without_a_message_still_fails_the_record(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        respx.post(f"{BASE_URL}/bulk-opportunity-stage-history").mock(
+            return_value=_bulk_document(
+                total=1,
+                success=1,
+                errors=[{"index": 0}],
+                records=[_landed(record_id="1", opportunity_id="5755101")],
+            )
+        )
+
+        result = await make_command(client).run(backfill=_backfill(_record()))
+
+        assert result.records[0].status == "failed"
+        assert result.applied_count == 0
+
+    @respx.mock
+    async def test_an_unattributable_message_is_surfaced_as_a_warning(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        respx.post(f"{BASE_URL}/bulk-opportunity-stage-history").mock(
+            return_value=_bulk_document(
+                total=1,
+                success=1,
+                errors=[{"message": "partial commit warning"}],
+                records=[_landed(record_id="1", opportunity_id="5755101")],
+            )
+        )
+
+        result = await make_command(client).run(backfill=_backfill(_record()))
+
+        assert result.records[0].status == "applied"
+        assert result.warnings == ("partial commit warning",)

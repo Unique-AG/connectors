@@ -55,7 +55,7 @@ class UpdatePersonCommand:
                 location=person.location,
                 delete_location_id=person.delete_location_id,
             )
-            old_person = await self._read(party_id)
+            written = await self._read(party_id)
             logger.info(
                 "org_people_writes.person.updated",
                 extra={"id": party_id, "location_id": location_id},
@@ -63,7 +63,7 @@ class UpdatePersonCommand:
             return UpdatedPersonResponse(
                 id=party_id,
                 resource_type=_RESOURCE_TYPE,
-                mobile_phone=old_person.data.attributes.mobile_phone,
+                mobile_phone=written.data.attributes.mobile_phone,
                 location_id=location_id,
             )
 

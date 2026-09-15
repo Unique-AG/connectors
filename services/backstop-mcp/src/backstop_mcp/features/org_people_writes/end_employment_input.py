@@ -24,8 +24,8 @@ END_EMPLOYMENT_INPUT_DESCRIPTION = (
     "is the same as `get_person`: exactly one of `party_id` or `search`, plus `search_type`. "
     "Organization identity is exactly one of `organization_id` or `organization_search`. "
     "There is no relationship-id parameter — the command finds the employment row. An "
-    "`end_date` of today is stored but the person still reads as a current contact until "
-    "that date has passed. Never invent an id."
+    "`end_date` that is not strictly before today is stored but the person still reads as "
+    "a current contact until that date has passed. Never invent an id."
 )
 
 _PERSON_SEARCH_TYPE_DESCRIPTION = (
