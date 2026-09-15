@@ -8,6 +8,7 @@ factory, so the login path exercises the real `_auth_call` — including how it 
 import asyncio
 import uuid
 from datetime import timedelta
+from io import BytesIO
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -19,6 +20,7 @@ from mcp.shared.auth import OAuthClientInformationFull
 from mcp_credential_auth import LoginCsrf
 from pydantic import AnyUrl
 from sqlalchemy import func, select
+from starlette.datastructures import FormData, UploadFile
 from starlette.requests import Request
 
 from tests.conftest import DatabaseFixture
@@ -314,6 +316,35 @@ class TestLoginSubmission:
         assert b"required" in response.body
         assert route.call_count == 0
 
+    @respx.mock
+    async def test_file_values_are_rejected(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        route = respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
+        provider = _make_provider(db)
+        request_id = await _pending_request_id(provider, _unique("client"))
+        request = _login_post(request_id, "", "pw")
+        upload = UploadFile(BytesIO(b"user"), filename="username.txt")
+
+        async def uploaded_form() -> FormData:
+            return FormData(
+                {
+                    "request_id": request_id,
+                    "username": upload,
+                    "password": "pw",
+                    "csrf_token": _CSRF_TOKEN,
+                }
+            )
+
+        monkeypatch.setattr(request, "form", uploaded_form)
+        try:
+            response = await provider.handle_login_post(request)
+        finally:
+            await upload.close()
+        assert response.status_code == 400
+        assert b"invalid values" in response.body
+        assert route.call_count == 0
+
 
 class TestLoginCsrf:
     @respx.mock
@@ -421,7 +452,7 @@ class TestLoginThrottling:
         username = "a" * 400
         request_id = await _pending_request_id(provider, _unique("client"))
         response = await provider.handle_login_post(_login_post(request_id, username, "pw"))
-        assert response.status_code == 200
+        assert response.status_code == 400
         assert route.call_count == 0
         async with read_session(factory) as session:
             result = await session.execute(

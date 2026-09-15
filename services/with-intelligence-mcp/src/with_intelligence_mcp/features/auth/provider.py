@@ -12,7 +12,15 @@ from mcp_credential_auth import (
     is_throttled,
     record_failure,
 )
-from pydantic import SecretStr
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    StrictStr,
+    ValidationError,
+    field_validator,
+)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
@@ -51,6 +59,20 @@ _EXPIRED_LINK_MESSAGE = (
 )
 
 _LOGIN_CSRF = LoginCsrf("wi_login_csrf_")
+
+
+class _LoginSubmission(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    request_id: StrictStr = ""
+    username: StrictStr = Field(default="", max_length=MAX_USERNAME_LENGTH)
+    password: StrictStr = ""
+    csrf_token: StrictStr = ""
+
+    @field_validator("username", mode="before")
+    @classmethod
+    def strip_username(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
 
 class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
@@ -136,10 +158,24 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
 
     async def handle_login_post(self, request: Request) -> Response:
         form = await request.form()
-        request_id = str(form.get("request_id", ""))
-        username = str(form.get("username", "")).strip()
-        password = str(form.get("password", ""))
-        csrf_token = str(form.get("csrf_token", ""))
+        try:
+            submission = _LoginSubmission.model_validate(form)
+        except ValidationError:
+            request_id_value = form.get("request_id", "")
+            if not isinstance(request_id_value, str):
+                return self._expired_link_response()
+            pending = await self.load_pending_authorization(request_id_value)
+            if pending is None:
+                return self._expired_link_response()
+            return self._form_response(
+                request_id_value,
+                status_code=400,
+                error="The login form contains invalid values. Please try again.",
+            )
+        request_id = submission.request_id
+        username = submission.username
+        password = submission.password
+        csrf_token = submission.csrf_token
 
         pending = await self.load_pending_authorization(request_id)
         if pending is None:
