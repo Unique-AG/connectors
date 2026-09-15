@@ -1,50 +1,28 @@
-import hashlib
 import logging
-import secrets
-import time
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
-from typing import ClassVar, Literal, override
+from datetime import timedelta
+from typing import ClassVar
 
-from fastmcp.server.auth import AccessToken, OAuthProvider
-from mcp.server.auth.provider import (
-    AuthorizationCode,
-    AuthorizationParams,
-    RefreshToken,
-    TokenError,
-    construct_redirect_uri,
-)
-from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
-from mcp.shared.auth import OAuthClientInformationFull
-from mcp.shared.auth import OAuthToken as OAuthTokenResponse
-from pydantic import AnyUrl, BaseModel, ConfigDict, SecretStr
-from sqlalchemy import delete, select, update
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from starlette.requests import Request
-from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
-
-from with_intelligence_mcp.db import AuthorizationCode as AuthorizationCodeRow
-from with_intelligence_mcp.db import OAuthClient as OAuthClientRow
-from with_intelligence_mcp.db import OAuthToken as OAuthTokenRow
-from with_intelligence_mcp.db import PendingAuthorization, read_session, transaction
-from with_intelligence_mcp.features.auth.login_csrf import (
-    clear_csrf_cookie,
-    csrf_token_is_valid,
-    issue_csrf_token,
-    set_csrf_cookie,
-)
-from with_intelligence_mcp.features.auth.login_form import render_login_form
-from with_intelligence_mcp.features.auth.session_store import (
-    find_user_id_by_username,
-    save_session,
-)
-from with_intelligence_mcp.features.auth.throttle import (
+from mcp_credential_auth import (
     MAX_USERNAME_LENGTH,
+    CredentialOAuthProvider,
+    LoginCsrf,
     ThrottleConfig,
     clear_failures,
     is_throttled,
     record_failure,
+)
+from pydantic import SecretStr
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from starlette.requests import Request
+from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+
+from with_intelligence_mcp.db import read_session
+from with_intelligence_mcp.features.auth.login_form import render_login_form
+from with_intelligence_mcp.features.auth.session_store import (
+    find_user_id_by_username,
+    save_session,
 )
 from with_intelligence_mcp.with_intelligence_client import (
     SignInFailed,
@@ -56,44 +34,10 @@ from with_intelligence_mcp.with_intelligence_client import (
 logger = logging.getLogger(__name__)
 
 
-def _hash_token(token: str) -> str:
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
-
-
 def _source_ip(request: Request) -> str | None:
     """Return the direct peer address."""
     return request.client.host if request.client is not None else None
 
-
-class _RefreshRotated(BaseModel):
-    """The token rotated successfully. `scopes` are the ones actually granted."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    access_token: str
-    refresh_token: str
-    scopes: list[str]
-
-
-class _RefreshRejected(BaseModel):
-    """The rotation was refused, carrying the OAuth error the caller should raise."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    error: Literal["invalid_grant", "invalid_scope"]
-    description: str
-
-
-type _RefreshOutcome = _RefreshRotated | _RefreshRejected
-
-_UNKNOWN_TOKEN = _RefreshRejected(error="invalid_grant", description="Unknown refresh token")
-_REUSED_TOKEN = _RefreshRejected(
-    error="invalid_grant", description="Refresh token has already been used"
-)
-_EXPIRED_TOKEN = _RefreshRejected(error="invalid_grant", description="Refresh token has expired")
-_INVALID_SCOPE = _RefreshRejected(
-    error="invalid_scope", description="Requested scope exceeds originally granted scopes"
-)
 
 _LOGIN_SECURITY_HEADERS = {
     "Referrer-Policy": "no-referrer",
@@ -106,15 +50,14 @@ _EXPIRED_LINK_MESSAGE = (
     "This login link is invalid or has expired. Please reconnect from your MCP client."
 )
 
+_LOGIN_CSRF = LoginCsrf("wi_login_csrf_")
 
-class WithIntelligenceOAuthProvider(OAuthProvider):
+
+class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
     """OAuth provider backed by WI authentication."""
 
-    ACCESS_TOKEN_TTL: ClassVar[timedelta] = timedelta(minutes=15)
-    REFRESH_TOKEN_TTL: ClassVar[timedelta] = timedelta(days=30)
     REFRESH_TOKEN_REUSE_GRACE: ClassVar[timedelta] = timedelta(seconds=10)
-    AUTHORIZATION_CODE_TTL: ClassVar[timedelta] = timedelta(minutes=5)
-    PENDING_AUTHORIZATION_TTL: ClassVar[timedelta] = timedelta(minutes=10)
+    REVOKE_FAMILY_ON_CONCURRENT_REFRESH: ClassVar[bool] = False
 
     _session_factory: async_sessionmaker[AsyncSession]
     _encryption_key: bytes
@@ -136,64 +79,17 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
     ) -> None:
         super().__init__(
             base_url=base_url,
-            client_registration_options=ClientRegistrationOptions(enabled=True),
-            revocation_options=RevocationOptions(enabled=True),
+            session_factory=session_factory,
+            login_path=login_path,
         )
-        self._session_factory = session_factory
         self._encryption_key = encryption_key
         self._wi_clients = wi_clients
         self._throttle = throttle
         self._forget_cached_session = None
-        self.login_path = login_path
-        self._issuer: str = base_url
         self._secure_cookies: bool = secure_cookies
 
     def attach_forget_cached_session(self, forget_cached_session: Callable[[str], None]) -> None:
         self._forget_cached_session = forget_cached_session
-
-    @override
-    async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
-        async with read_session(self._session_factory) as session:
-            row = await session.get(OAuthClientRow, client_id)
-        if row is None:
-            return None
-        return OAuthClientInformationFull.model_validate(row.client_metadata)
-
-    @override
-    async def register_client(self, client_info: OAuthClientInformationFull) -> None:
-        assert client_info.client_id is not None, "client_id must be assigned before registration"
-        async with transaction(self._session_factory) as session:
-            session.add(
-                OAuthClientRow(
-                    client_id=client_info.client_id,
-                    client_metadata=client_info.model_dump(mode="json"),
-                )
-            )
-
-    @override
-    async def authorize(
-        self, client: OAuthClientInformationFull, params: AuthorizationParams
-    ) -> str:
-        assert client.client_id is not None
-        request_id = secrets.token_urlsafe(32)
-        expires_at = datetime.now(UTC) + self.PENDING_AUTHORIZATION_TTL
-
-        async with transaction(self._session_factory) as session:
-            session.add(
-                PendingAuthorization(
-                    request_id=request_id,
-                    client_id=client.client_id,
-                    scopes=params.scopes or [],
-                    code_challenge=params.code_challenge,
-                    redirect_uri=str(params.redirect_uri),
-                    redirect_uri_provided_explicitly=params.redirect_uri_provided_explicitly,
-                    state=params.state,
-                    resource=params.resource,
-                    expires_at=expires_at,
-                )
-            )
-
-        return f"{self._issuer}{self.login_path}?request_id={request_id}"
 
     def _expired_link_response(self) -> Response:
         return PlainTextResponse(
@@ -210,7 +106,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         error: str | None = None,
     ) -> Response:
         """Render the login form with fresh CSRF credentials."""
-        csrf_token = issue_csrf_token()
+        csrf_token = _LOGIN_CSRF.issue_token()
         response = HTMLResponse(
             render_login_form(
                 request_id,
@@ -222,28 +118,24 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
             status_code=status_code,
             headers=_LOGIN_SECURITY_HEADERS,
         )
-        set_csrf_cookie(
+        _LOGIN_CSRF.set_cookie(
             response,
             request_id,
             csrf_token,
             path=self.login_path,
-            max_age_seconds=int(self.PENDING_AUTHORIZATION_TTL.total_seconds()),
+            max_age_seconds=int(self.pending_authorization_ttl.total_seconds()),
             secure=self._secure_cookies,
         )
         return response
 
     async def handle_login_get(self, request: Request) -> Response:
         request_id = request.query_params.get("request_id", "")
-        pending = await self._load_pending(request_id)
+        pending = await self.load_pending_authorization(request_id)
         if pending is None:
             return self._expired_link_response()
 
-        client_name = None
-        async with read_session(self._session_factory) as session:
-            client_row = await session.get(OAuthClientRow, pending.client_id)
-        if client_row is not None:
-            client_info = OAuthClientInformationFull.model_validate(client_row.client_metadata)
-            client_name = client_info.client_name
+        client = await self.get_client(pending.client_id)
+        client_name = client.client_name if client is not None else None
 
         return self._form_response(request_id, client_name=client_name)
 
@@ -254,11 +146,11 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         password = str(form.get("password", ""))
         csrf_token = str(form.get("csrf_token", ""))
 
-        pending = await self._load_pending(request_id)
+        pending = await self.load_pending_authorization(request_id)
         if pending is None:
             return self._expired_link_response()
 
-        if not csrf_token_is_valid(request, request_id, csrf_token):
+        if not _LOGIN_CSRF.token_is_valid(request, request_id, csrf_token):
             logger.warning("auth.login.csrf_mismatch")
             return self._form_response(
                 request_id,
@@ -317,298 +209,24 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
             existing_id = await find_user_id_by_username(session, username)
         logger.info("auth.login.succeeded", extra={"reconnected": existing_id is not None})
 
-        code = secrets.token_urlsafe(32)
-        code_expires_at = (datetime.now(UTC) + self.AUTHORIZATION_CODE_TTL).timestamp()
-
-        user_id: str | None = None
-
-        async with transaction(self._session_factory) as session:
-            claim = await session.execute(
-                delete(PendingAuthorization).where(PendingAuthorization.request_id == request_id)
+        async def save_subject(session: AsyncSession) -> str:
+            return await save_session(
+                session,
+                str(uuid.uuid4()),
+                username,
+                wi_session,
+                self._encryption_key,
             )
-            if claim.rowcount != 0:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-                # Propose a fresh id; `save_session` upserts on `wi_username` and returns
-                # the durable id (an existing row wins under concurrent first logins).
-                user_id = await save_session(
-                    session,
-                    str(uuid.uuid4()),
-                    username,
-                    wi_session,
-                    self._encryption_key,
-                )
-                session.add(
-                    AuthorizationCodeRow(
-                        code=code,
-                        client_id=pending.client_id,
-                        scopes=pending.scopes,
-                        code_challenge=pending.code_challenge,
-                        redirect_uri=pending.redirect_uri,
-                        redirect_uri_provided_explicitly=pending.redirect_uri_provided_explicitly,
-                        resource=pending.resource,
-                        subject=user_id,
-                        expires_at=code_expires_at,
-                    )
-                )
 
-        if user_id is None:
+        redirect_url = await self.complete_authorization(pending, save_subject)
+        if redirect_url is None:
             return self._expired_link_response()
 
-        assert self._forget_cached_session is not None
-        self._forget_cached_session(user_id)
-        redirect_url = construct_redirect_uri(pending.redirect_uri, code=code, state=pending.state)
+        if existing_id is not None:
+            assert self._forget_cached_session is not None
+            self._forget_cached_session(existing_id)
         response = RedirectResponse(redirect_url, status_code=302, headers=_LOGIN_SECURITY_HEADERS)
-        # The pending authorization is gone, so its CSRF cookie has nothing left to protect.
-        clear_csrf_cookie(response, request_id, path=self.login_path, secure=self._secure_cookies)
+        _LOGIN_CSRF.clear_cookie(
+            response, request_id, path=self.login_path, secure=self._secure_cookies
+        )
         return response
-
-    async def _load_pending(self, request_id: str) -> PendingAuthorization | None:
-        if not request_id:
-            return None
-        async with read_session(self._session_factory) as session:
-            pending = await session.get(PendingAuthorization, request_id)
-        if pending is None or pending.expires_at < datetime.now(UTC):
-            return None
-        return pending
-
-    @override
-    async def load_authorization_code(
-        self, client: OAuthClientInformationFull, authorization_code: str
-    ) -> AuthorizationCode | None:
-        async with read_session(self._session_factory) as session:
-            row = await session.get(AuthorizationCodeRow, authorization_code)
-        if row is None or row.client_id != client.client_id:
-            return None
-        # `expires_at` is a POSIX timestamp (same shape as the MCP SDK's AuthorizationCode).
-        if row.expires_at < time.time():
-            return None
-        return AuthorizationCode(
-            code=row.code,
-            scopes=row.scopes,
-            expires_at=row.expires_at,
-            client_id=row.client_id,
-            code_challenge=row.code_challenge,
-            redirect_uri=AnyUrl(row.redirect_uri),
-            redirect_uri_provided_explicitly=row.redirect_uri_provided_explicitly,
-            resource=row.resource,
-            subject=row.subject,
-        )
-
-    @override
-    async def exchange_authorization_code(
-        self, client: OAuthClientInformationFull, authorization_code: AuthorizationCode
-    ) -> OAuthTokenResponse:
-        access_token = secrets.token_urlsafe(32)
-        refresh_token = secrets.token_urlsafe(32)
-        now = datetime.now(UTC)
-
-        already_consumed = False
-
-        async with transaction(self._session_factory) as session:
-            result = await session.execute(
-                delete(AuthorizationCodeRow).where(
-                    AuthorizationCodeRow.code == authorization_code.code
-                )
-            )
-            if result.rowcount == 0:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-                already_consumed = True
-            else:
-                session.add(
-                    OAuthTokenRow(
-                        family_id=uuid.uuid4(),
-                        access_token_hash=_hash_token(access_token),
-                        refresh_token_hash=_hash_token(refresh_token),
-                        client_id=client.client_id,
-                        scopes=authorization_code.scopes,
-                        resource=authorization_code.resource,
-                        subject=authorization_code.subject,
-                        access_token_expires_at=now + self.ACCESS_TOKEN_TTL,
-                        refresh_token_expires_at=now + self.REFRESH_TOKEN_TTL,
-                    )
-                )
-
-        if already_consumed:
-            raise TokenError(
-                error="invalid_grant",
-                error_description="Authorization code has already been used",
-            )
-
-        return OAuthTokenResponse(
-            access_token=access_token,
-            token_type="Bearer",
-            expires_in=int(self.ACCESS_TOKEN_TTL.total_seconds()),
-            scope=" ".join(authorization_code.scopes) if authorization_code.scopes else None,
-            refresh_token=refresh_token,
-        )
-
-    @override
-    async def load_refresh_token(
-        self, client: OAuthClientInformationFull, refresh_token: str
-    ) -> RefreshToken | None:
-        token_hash = _hash_token(refresh_token)
-        async with read_session(self._session_factory) as session:
-            result = await session.execute(
-                select(OAuthTokenRow).where(OAuthTokenRow.refresh_token_hash == token_hash)
-            )
-            row = result.scalar_one_or_none()
-
-        if row is None or row.client_id != client.client_id:
-            return None
-
-        return RefreshToken(
-            token=refresh_token,
-            client_id=row.client_id,
-            scopes=row.scopes,
-            expires_at=(
-                int(row.refresh_token_expires_at.timestamp())
-                if row.refresh_token_expires_at
-                else None
-            ),
-            subject=row.subject,
-        )
-
-    @override
-    async def exchange_refresh_token(
-        self,
-        client: OAuthClientInformationFull,
-        refresh_token: RefreshToken,
-        scopes: list[str],
-    ) -> OAuthTokenResponse:
-        """Rotate a refresh token."""
-        outcome = await self._rotate_refresh_token(refresh_token, scopes)
-
-        if isinstance(outcome, _RefreshRejected):
-            raise TokenError(error=outcome.error, error_description=outcome.description)
-
-        return OAuthTokenResponse(
-            access_token=outcome.access_token,
-            token_type="Bearer",
-            expires_in=int(self.ACCESS_TOKEN_TTL.total_seconds()),
-            scope=" ".join(outcome.scopes) if outcome.scopes else None,
-            refresh_token=outcome.refresh_token,
-        )
-
-    async def _rotate_refresh_token(
-        self, refresh_token: RefreshToken, scopes: list[str]
-    ) -> _RefreshOutcome:
-        """Do the rotation and report what happened. Raises nothing the caller must translate."""
-        token_hash = _hash_token(refresh_token.token)
-        now = datetime.now(UTC)
-
-        async with transaction(self._session_factory) as session:
-            result = await session.execute(
-                select(OAuthTokenRow).where(OAuthTokenRow.refresh_token_hash == token_hash)
-            )
-            row = result.scalar_one_or_none()
-
-            if row is None:
-                return _UNKNOWN_TOKEN
-
-            if row.revoked_at is not None:
-                if now - row.revoked_at > self.REFRESH_TOKEN_REUSE_GRACE:
-                    await self._revoke_family(session, family_id=row.family_id, now=now)
-                return _REUSED_TOKEN
-
-            if row.refresh_token_expires_at is not None and row.refresh_token_expires_at < now:
-                # Enforced here too (not just by the caller) so this holds regardless of
-                # which entry point reaches `exchange_refresh_token`.
-                return _EXPIRED_TOKEN
-
-            # Refresh may only keep or narrow the originally granted scopes — never widen.
-            if scopes and not set(scopes).issubset(row.scopes):
-                return _INVALID_SCOPE
-
-            claim = await session.execute(
-                update(OAuthTokenRow)
-                .where(
-                    OAuthTokenRow.id == row.id,
-                    OAuthTokenRow.revoked_at.is_(None),
-                )
-                .values(revoked_at=now)
-            )
-            if claim.rowcount == 0:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-                return _REUSED_TOKEN
-
-            access_token = secrets.token_urlsafe(32)
-            new_refresh_token = secrets.token_urlsafe(32)
-            effective_scopes = scopes or row.scopes
-
-            session.add(
-                OAuthTokenRow(
-                    family_id=row.family_id,
-                    access_token_hash=_hash_token(access_token),
-                    refresh_token_hash=_hash_token(new_refresh_token),
-                    client_id=row.client_id,
-                    scopes=effective_scopes,
-                    resource=row.resource,
-                    subject=row.subject,
-                    access_token_expires_at=now + self.ACCESS_TOKEN_TTL,
-                    refresh_token_expires_at=now + self.REFRESH_TOKEN_TTL,
-                    rotated_from=row.id,
-                )
-            )
-            return _RefreshRotated(
-                access_token=access_token,
-                refresh_token=new_refresh_token,
-                scopes=effective_scopes,
-            )
-
-    @staticmethod
-    async def _revoke_family(session: AsyncSession, *, family_id: uuid.UUID, now: datetime) -> None:
-        """Revoke every still-live token descending from one grant."""
-        await session.execute(
-            update(OAuthTokenRow)
-            .where(
-                OAuthTokenRow.family_id == family_id,
-                OAuthTokenRow.revoked_at.is_(None),
-            )
-            .values(revoked_at=now)
-        )
-
-    @override
-    async def load_access_token(self, token: str) -> AccessToken | None:
-        token_hash = _hash_token(token)
-        async with read_session(self._session_factory) as session:
-            result = await session.execute(
-                select(OAuthTokenRow).where(OAuthTokenRow.access_token_hash == token_hash)
-            )
-            row = result.scalar_one_or_none()
-
-        if row is None or row.revoked_at is not None:
-            return None
-        if row.access_token_expires_at < datetime.now(UTC):
-            return None
-
-        return AccessToken(
-            token=token,
-            client_id=row.client_id,
-            scopes=row.scopes,
-            expires_at=int(row.access_token_expires_at.timestamp()),
-            resource=row.resource,
-            subject=row.subject,
-        )
-
-    @override
-    async def revoke_token(self, token: AccessToken | RefreshToken) -> None:
-        token_hash = _hash_token(token.token)
-        async with transaction(self._session_factory) as session:
-            result = await session.execute(
-                select(OAuthTokenRow).where(
-                    (OAuthTokenRow.access_token_hash == token_hash)
-                    | (OAuthTokenRow.refresh_token_hash == token_hash)
-                )
-            )
-            row = result.scalar_one_or_none()
-            if row is not None:
-                row.revoked_at = datetime.now(UTC)
-
-    async def revoke_all_tokens_for_subject(self, subject: str) -> None:
-        """Revoke live tokens for a subject."""
-        async with transaction(self._session_factory) as session:
-            await session.execute(
-                update(OAuthTokenRow)
-                .where(
-                    OAuthTokenRow.subject == subject,
-                    OAuthTokenRow.revoked_at.is_(None),
-                )
-                .values(revoked_at=datetime.now(UTC))
-            )

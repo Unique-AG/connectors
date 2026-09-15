@@ -17,6 +17,7 @@ import respx
 from cryptography.fernet import Fernet
 from mcp.server.auth.provider import AuthorizationParams, TokenError
 from mcp.shared.auth import OAuthClientInformationFull
+from mcp_credential_auth import LoginCsrf
 from pydantic import AnyUrl
 from sqlalchemy import func, select
 from starlette.requests import Request
@@ -26,13 +27,13 @@ from tests.helpers import BASE_URL, sign_in_ok, wi_factory
 from with_intelligence_mcp.db import LoginAttempt, PendingAuthorization, read_session
 from with_intelligence_mcp.db import WithIntelligenceSession as SessionRow
 from with_intelligence_mcp.features.auth import ThrottleConfig
-from with_intelligence_mcp.features.auth.login_csrf import csrf_cookie_name
 from with_intelligence_mcp.features.auth.provider import WithIntelligenceOAuthProvider
 from with_intelligence_mcp.features.auth.session_store import get_session
 
 _REDIRECT_URI = "https://client.example/callback"
 _SIGN_IN = f"{BASE_URL}/v3/auth/sign-in"
 _CSRF_TOKEN = "provider-test-csrf-token"
+_LOGIN_CSRF = LoginCsrf("wi_login_csrf_")
 
 
 def _ignore_subject(_subject: str) -> None:
@@ -101,7 +102,9 @@ def _login_post(
     ).encode()
     headers = [(b"content-type", b"application/x-www-form-urlencoded")]
     if cookie_csrf_token is not None:
-        headers.append((b"cookie", f"{csrf_cookie_name(request_id)}={cookie_csrf_token}".encode()))
+        headers.append(
+            (b"cookie", f"{_LOGIN_CSRF.cookie_name(request_id)}={cookie_csrf_token}".encode())
+        )
 
     async def receive() -> dict[str, object]:
         return {"type": "http.request", "body": body, "more_body": False}
@@ -207,6 +210,7 @@ class TestLoginSubmission:
     @respx.mock
     async def test_reconnect_forgets_the_existing_subject(self, db: DatabaseFixture) -> None:
         respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
+        _, factory = db
         forgotten: list[str] = []
         provider = _make_provider(db, forget_cached_session=forgotten.append)
         username = _unique("reconnect")
@@ -214,8 +218,12 @@ class TestLoginSubmission:
         first_request = await _pending_request_id(provider, _unique("client"))
         first = await provider.handle_login_post(_login_post(first_request, username, "pw"))
         assert first.status_code == 302
-        assert len(forgotten) == 1
-        existing_subject = forgotten.pop()
+        assert forgotten == []
+        async with read_session(factory) as session:
+            result = await session.execute(
+                select(SessionRow.user_id).where(SessionRow.wi_username == username)
+            )
+            existing_subject = result.scalar_one()
 
         second_request = await _pending_request_id(provider, _unique("client"))
         second = await provider.handle_login_post(_login_post(second_request, username, "pw"))
@@ -370,7 +378,7 @@ class TestLoginCsrf:
         )
         response = await provider.handle_login_get(request)
         cookie = response.headers["set-cookie"]
-        assert csrf_cookie_name(request_id) in cookie
+        assert _LOGIN_CSRF.cookie_name(request_id) in cookie
         assert "HttpOnly" in cookie
         assert "Secure" in cookie
         assert "SameSite=lax" in cookie
@@ -384,7 +392,7 @@ class TestLoginCsrf:
             _login_post(request_id, _unique("retry"), "pw", cookie_csrf_token=None)
         )
         assert b'name="csrf_token"' in response.body
-        assert csrf_cookie_name(request_id) in response.headers["set-cookie"]
+        assert _LOGIN_CSRF.cookie_name(request_id) in response.headers["set-cookie"]
 
 
 class TestLoginThrottling:

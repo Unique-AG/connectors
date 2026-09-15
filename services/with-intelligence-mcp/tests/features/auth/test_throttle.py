@@ -1,17 +1,18 @@
-"""Failed-login throttling. Keyed on username — see `auth/throttle.py` for why not on IP."""
+"""Failed-login throttling keyed by username."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from tests.conftest import DatabaseFixture
-from with_intelligence_mcp.db import LoginAttempt, transaction
-from with_intelligence_mcp.features.auth import ThrottleConfig
-from with_intelligence_mcp.features.auth.throttle import (
+from mcp_credential_auth import (
     clear_failures,
     count_recent_failures,
     is_throttled,
     record_failure,
 )
+
+from tests.conftest import DatabaseFixture
+from with_intelligence_mcp.db import LoginAttempt, transaction
+from with_intelligence_mcp.features.auth import ThrottleConfig
 
 CONFIG = ThrottleConfig(max_attempts=3, window=timedelta(minutes=15))
 

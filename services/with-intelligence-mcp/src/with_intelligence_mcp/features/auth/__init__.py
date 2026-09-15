@@ -1,5 +1,7 @@
 """WI authentication public API."""
 
+from mcp_credential_auth import ThrottleConfig
+
 from with_intelligence_mcp.features.auth.cleanup import cleanup_lifespan, purge_expired_auth_rows
 from with_intelligence_mcp.features.auth.context import (
     NotConnectedError,
@@ -10,7 +12,6 @@ from with_intelligence_mcp.features.auth.crypto import (
     load_key,
 )
 from with_intelligence_mcp.features.auth.provider import WithIntelligenceOAuthProvider
-from with_intelligence_mcp.features.auth.throttle import ThrottleConfig
 
 __all__ = [
     "InvalidSessionEnvelopeError",

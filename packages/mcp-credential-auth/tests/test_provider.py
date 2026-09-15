@@ -141,6 +141,30 @@ async def test_refresh_rotation_detects_reuse(
     assert await provider.load_access_token(rotated.access_token) is None
 
 
+async def test_refresh_reuse_within_grace_preserves_family(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = _provider(session_factory)
+    monkeypatch.setattr(type(provider), "REFRESH_TOKEN_REUSE_GRACE", timedelta(minutes=1))
+    client = _client("client-refresh-grace")
+    await provider.register_client(client)
+    authorization_code = await _authorization_code(provider, client)
+    tokens = await provider.exchange_authorization_code(client, authorization_code)
+    assert tokens.refresh_token is not None
+    refresh = await provider.load_refresh_token(client, tokens.refresh_token)
+    assert refresh is not None
+
+    rotated = await provider.exchange_refresh_token(client, refresh, [])
+    replay = await provider.load_refresh_token(client, tokens.refresh_token)
+    assert replay is not None
+
+    with pytest.raises(TokenError):
+        await provider.exchange_refresh_token(client, replay, [])
+
+    assert await provider.load_access_token(rotated.access_token) is not None
+
+
 async def test_refresh_rejects_scope_escalation(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
