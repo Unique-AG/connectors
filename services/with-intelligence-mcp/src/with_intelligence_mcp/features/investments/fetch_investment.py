@@ -1,3 +1,5 @@
+from pydantic import TypeAdapter
+
 from with_intelligence_mcp.features.investments.fetch_investments_for_investor import (
     INVESTMENTS_PATH,
 )
@@ -7,15 +9,15 @@ from with_intelligence_mcp.features.investments.wi_responses import (
 from with_intelligence_mcp.with_intelligence_client import (
     NotFound,
     WithIntelligenceClient,
-    narrow_dict,
 )
+
+_INVESTMENT_RESPONSE = TypeAdapter(InvestmentExtendedAttributes)
 
 
 async def fetch_investment(
     client: WithIntelligenceClient, investment_id: int
 ) -> InvestmentExtendedAttributes | None:
     try:
-        body = await client.get_json(f"{INVESTMENTS_PATH}/{investment_id}")
+        return await client.get_json(f"{INVESTMENTS_PATH}/{investment_id}", _INVESTMENT_RESPONSE)
     except NotFound:
         return None
-    return InvestmentExtendedAttributes.model_validate(narrow_dict(body))
