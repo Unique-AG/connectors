@@ -1,6 +1,7 @@
+from collections.abc import Sequence
 from datetime import date
 from enum import StrEnum
-from typing import ClassVar
+from typing import ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict
 
@@ -159,6 +160,27 @@ class EmploymentRulesDto(BaseModel):
 
     employment: TypeVocabularyDto
     former: TypeVocabularyDto
+
+    @classmethod
+    def from_vocabulary(
+        cls,
+        *,
+        employment_type_ids: Sequence[str],
+        employment_type_markers: Sequence[str],
+        former_type_ids: Sequence[str],
+        former_type_markers: Sequence[str],
+    ) -> Self:
+        """Build the tenant vocabulary from configured ids and name markers."""
+        return cls(
+            employment=TypeVocabularyDto(
+                type_ids=frozenset(employment_type_ids),
+                name_markers=frozenset(employment_type_markers),
+            ),
+            former=TypeVocabularyDto(
+                type_ids=frozenset(former_type_ids),
+                name_markers=frozenset(former_type_markers),
+            ),
+        )
 
 
 class EntityRelationshipsDto(BaseModel):

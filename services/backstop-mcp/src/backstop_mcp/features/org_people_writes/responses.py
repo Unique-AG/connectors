@@ -6,9 +6,9 @@ was created or updated.
 """
 
 from datetime import date
-from typing import Literal
+from typing import ClassVar, Literal
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from backstop_mcp.features.party_resolver import PartyAmbiguousResponse
 from backstop_mcp.features.resolution import NotFoundResponse
@@ -19,6 +19,7 @@ __all__ = [
     "CreatedPersonResponse",
     "EndEmploymentResponse",
     "EndedEmploymentResponse",
+    "EntityRelationshipTypeResponse",
     "UpdateOrganizationResponse",
     "UpdatePersonResponse",
     "UpdatedOrganizationResponse",
@@ -125,6 +126,19 @@ class UpdatedOrganizationResponse(OmitNoneModel):
 
 
 type UpdatePersonResponse = UpdatedPersonResponse | PartyAmbiguousResponse | NotFoundResponse
+
+
+class EntityRelationshipTypeResponse(OmitNoneModel):
+    """One row of the instance's entity-relationship-type vocabulary.
+
+    Used to resolve the employment type id a write must send. A row without a name is
+    dropped — matching and reporting types is the whole point of this vocabulary.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str = Field(description="Backstop id of this relationship type. Echo it; never invent one.")
+    name: str = Field(description="Relationship type name as this instance publishes it.")
 
 
 class EndedEmploymentResponse(OmitNoneModel):
