@@ -87,10 +87,6 @@ class WithIntelligenceClientFactory:
         self._http_client: httpx.AsyncClient | None = None
         self._http_client_lock: asyncio.Lock = asyncio.Lock()
 
-    @property
-    def settings(self) -> TransportSettings:
-        return self._settings
-
     def for_session(self, session: CallerSession) -> WithIntelligenceClient:
         from with_intelligence_mcp.with_intelligence_client.client import WithIntelligenceClient
 

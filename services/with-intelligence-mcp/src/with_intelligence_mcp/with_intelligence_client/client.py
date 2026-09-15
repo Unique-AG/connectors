@@ -49,8 +49,8 @@ class WithIntelligenceClient:
         self._session: CallerSession = session
 
     @property
-    def settings(self) -> TransportSettings:
-        return self._settings
+    def asset_class_groups(self) -> tuple[str, ...]:
+        return self._settings.asset_class_groups
 
     async def get_json[T](
         self,
