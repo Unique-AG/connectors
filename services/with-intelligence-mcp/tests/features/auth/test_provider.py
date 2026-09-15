@@ -8,7 +8,7 @@ factory, so the login path exercises the real `_auth_call` — including how it 
 import asyncio
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -24,7 +24,7 @@ from starlette.requests import Request
 
 from tests.conftest import DatabaseFixture
 from tests.helpers import BASE_URL, sign_in_ok, wi_factory
-from with_intelligence_mcp.db import LoginAttempt, PendingAuthorization, read_session
+from with_intelligence_mcp.db import LoginAttempt, read_session
 from with_intelligence_mcp.db import WithIntelligenceSession as SessionRow
 from with_intelligence_mcp.features.auth import ThrottleConfig
 from with_intelligence_mcp.features.auth.provider import WithIntelligenceOAuthProvider
@@ -122,20 +122,6 @@ def _unique(tag: str) -> str:
     return f"{tag}-{uuid.uuid4().hex[:8]}"
 
 
-class TestClientRegistration:
-    async def test_a_registered_client_reads_back(self, db: DatabaseFixture) -> None:
-        provider = _make_provider(db)
-        client_id = _unique("client")
-        registered = await _register_client(provider, client_id)
-        loaded = await provider.get_client(client_id)
-        assert loaded is not None
-        assert loaded.client_id == registered.client_id
-
-    async def test_an_unknown_client_is_none(self, db: DatabaseFixture) -> None:
-        provider = _make_provider(db)
-        assert await provider.get_client(_unique("missing")) is None
-
-
 class TestAuthorize:
     async def test_redirects_to_our_own_login_form(self, db: DatabaseFixture) -> None:
         """No third-party identity provider exists to redirect to."""
@@ -143,15 +129,6 @@ class TestAuthorize:
         client = await _register_client(provider, _unique("client"))
         url = await provider.authorize(client, _params())
         assert url.startswith("https://wi-mcp.example/login?request_id=")
-
-    async def test_persists_the_pending_authorization(self, db: DatabaseFixture) -> None:
-        provider = _make_provider(db)
-        _, factory = db
-        request_id = await _pending_request_id(provider, _unique("client"))
-        async with read_session(factory) as session:
-            pending = await session.get(PendingAuthorization, request_id)
-        assert pending is not None
-        assert pending.redirect_uri == _REDIRECT_URI
 
     async def test_the_form_renders_for_a_pending_request(self, db: DatabaseFixture) -> None:
         provider = _make_provider(db)
@@ -304,29 +281,6 @@ class TestLoginSubmission:
         assert records[0].exc_info is not None
 
     @respx.mock
-    async def test_a_pending_authorization_is_single_use(self, db: DatabaseFixture) -> None:
-        respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
-        provider = _make_provider(db)
-        request_id = await _pending_request_id(provider, _unique("client"))
-        username = _unique("once")
-        first = await provider.handle_login_post(_login_post(request_id, username, "pw"))
-        second = await provider.handle_login_post(_login_post(request_id, username, "pw"))
-        assert first.status_code == 302
-        assert second.status_code == 400
-
-    @respx.mock
-    async def test_concurrent_submissions_mint_one_code(self, db: DatabaseFixture) -> None:
-        respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
-        provider = _make_provider(db)
-        request_id = await _pending_request_id(provider, _unique("client"))
-        username = _unique("race")
-        responses = await asyncio.gather(
-            provider.handle_login_post(_login_post(request_id, username, "pw")),
-            provider.handle_login_post(_login_post(request_id, username, "pw")),
-        )
-        assert sorted(r.status_code for r in responses) == [302, 400]
-
-    @respx.mock
     async def test_missing_fields_are_reported_without_calling_wi(
         self, db: DatabaseFixture
     ) -> None:
@@ -467,18 +421,6 @@ class TestTokenLifecycle:
         return client, code
 
     @respx.mock
-    async def test_a_code_exchanges_for_a_working_token_pair(self, db: DatabaseFixture) -> None:
-        respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
-        provider = _make_provider(db)
-        client, code = await self._login(provider, _unique("exchange"))
-        authorization_code = await provider.load_authorization_code(client, code)
-        assert authorization_code is not None
-        tokens = await provider.exchange_authorization_code(client, authorization_code)
-        access = await provider.load_access_token(tokens.access_token)
-        assert access is not None
-        assert access.subject is not None
-
-    @respx.mock
     async def test_the_subject_is_the_stored_users_id(self, db: DatabaseFixture) -> None:
         """This is what lets a tool call resolve whose WI session to use."""
         respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
@@ -496,17 +438,6 @@ class TestTokenLifecycle:
                 select(SessionRow.user_id).where(SessionRow.wi_username == username)
             )
             assert access.subject == result.scalar_one()
-
-    @respx.mock
-    async def test_a_code_cannot_be_exchanged_twice(self, db: DatabaseFixture) -> None:
-        respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
-        provider = _make_provider(db)
-        client, code = await self._login(provider, _unique("replay"))
-        authorization_code = await provider.load_authorization_code(client, code)
-        assert authorization_code is not None
-        _ = await provider.exchange_authorization_code(client, authorization_code)
-        with pytest.raises(TokenError):
-            _ = await provider.exchange_authorization_code(client, authorization_code)
 
     @respx.mock
     async def test_a_refresh_rotates_and_detects_reuse(
@@ -555,45 +486,3 @@ class TestTokenLifecycle:
         succeeded = [r for r in results if not isinstance(r, BaseException)]
         assert len(succeeded) == 1
         assert await provider.load_access_token(succeeded[0].access_token) is not None
-
-    @respx.mock
-    async def test_revoking_an_access_token_invalidates_it(self, db: DatabaseFixture) -> None:
-        respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
-        provider = _make_provider(db)
-        client, code = await self._login(provider, _unique("revoke"))
-        authorization_code = await provider.load_authorization_code(client, code)
-        assert authorization_code is not None
-        tokens = await provider.exchange_authorization_code(client, authorization_code)
-        access = await provider.load_access_token(tokens.access_token)
-        assert access is not None
-        await provider.revoke_token(access)
-        assert await provider.load_access_token(tokens.access_token) is None
-
-    @respx.mock
-    async def test_revoking_a_subject_invalidates_every_token(self, db: DatabaseFixture) -> None:
-        """A WI session that cannot be renewed pushes the user to re-login."""
-        respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
-        provider = _make_provider(db)
-        client, code = await self._login(provider, _unique("subject-revoke"))
-        authorization_code = await provider.load_authorization_code(client, code)
-        assert authorization_code is not None
-        tokens = await provider.exchange_authorization_code(client, authorization_code)
-        access = await provider.load_access_token(tokens.access_token)
-        assert access is not None and access.subject is not None
-        await provider.revoke_all_tokens_for_subject(access.subject)
-        assert await provider.load_access_token(tokens.access_token) is None
-
-    @respx.mock
-    async def test_an_expired_code_cannot_be_loaded(self, db: DatabaseFixture) -> None:
-        respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
-        provider = _make_provider(db)
-        _, factory = db
-        client, code = await self._login(provider, _unique("expired"))
-        from with_intelligence_mcp.db import AuthorizationCode as CodeRow
-        from with_intelligence_mcp.db import transaction
-
-        async with transaction(factory) as session:
-            row = await session.get(CodeRow, code)
-            assert row is not None
-            row.expires_at = (datetime.now(UTC) - timedelta(minutes=1)).timestamp()
-        assert await provider.load_authorization_code(client, code) is None

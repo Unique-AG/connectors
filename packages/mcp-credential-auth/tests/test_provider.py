@@ -197,6 +197,22 @@ async def test_revoke_all_tokens_for_subject(
     assert await provider.load_access_token(tokens.access_token) is None
 
 
+async def test_expired_authorization_code_is_not_loaded(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = _provider(session_factory)
+    client = _client("client-expired-code")
+    await provider.register_client(client)
+    authorization_code = await _authorization_code(provider, client)
+    monkeypatch.setattr(
+        "mcp_credential_auth.provider.time.time",
+        lambda: authorization_code.expires_at + 1,
+    )
+
+    assert await provider.load_authorization_code(client, authorization_code.code) is None
+
+
 async def test_custom_access_token_ttl(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
