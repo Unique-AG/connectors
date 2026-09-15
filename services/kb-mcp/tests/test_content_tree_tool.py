@@ -28,6 +28,8 @@ from kb_mcp.references import (
     INVALID_METADATA_FILTER_MESSAGE,
     METADATA_FILTER_ARG_DESCRIPTION,
     METADATA_FILTER_EMPTY_RETRY_HINT,
+    UNIQUEQL_EQUALS_PDF,
+    UNIQUEQL_EQUALS_PDF_WRAPPED,
 )
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_tree import (
@@ -535,11 +537,6 @@ async def test_admin_configured_metadata_filter_flows_through_to_service_calls(
     assert fuzzy_kwargs["metadata_filter"] == custom_filter
 
 
-_LLM_PDF_FILTER = {
-    "operator": "equals",
-    "path": ["mimeType"],
-    "value": "application/pdf",
-}
 _DEFAULT_CONTENT_TREE_FILTER = {
     "operator": "notContains",
     "path": ["folderIdPath"],
@@ -550,11 +547,11 @@ _DEFAULT_CONTENT_TREE_FILTER = {
 @pytest.mark.asyncio
 async def test_llm_metadata_filter_ands_default_admin_filter():
     mock_tree = _make_mock_tree()
-    expected_llm = parse_uniqueql(_LLM_PDF_FILTER).to_dict()
+    expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         await content_tree(
             mode="list",
-            metadata_filter=_LLM_PDF_FILTER,
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
             config=ContentTreeToolConfig(),
         )
 
@@ -568,12 +565,12 @@ async def test_llm_metadata_filter_ands_default_admin_filter():
 async def test_llm_metadata_filter_ands_admin_configured_filter():
     custom_filter = {"operator": "equals", "path": ["type"], "value": "pdf"}
     config = ContentTreeToolConfig(metadata_filter=custom_filter)
-    expected_llm = parse_uniqueql(_LLM_PDF_FILTER).to_dict()
+    expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
     mock_tree = _make_mock_tree()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         await content_tree(
             mode="tree",
-            metadata_filter=_LLM_PDF_FILTER,
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
             config=config,
         )
 
@@ -586,9 +583,7 @@ async def test_invalid_uniqueql_returns_tool_error_without_walking():
     with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
         result = await content_tree(
             mode="list",
-            metadata_filter={
-                "equals": {"path": ["mimeType"], "value": "application/pdf"}
-            },
+            metadata_filter=UNIQUEQL_EQUALS_PDF_WRAPPED,
             config=ContentTreeToolConfig(),
         )
 
@@ -603,13 +598,42 @@ async def test_list_empty_hits_with_llm_filter_append_retry_hint():
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="list",
-            metadata_filter=_LLM_PDF_FILTER,
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
             config=ContentTreeToolConfig(),
         )
 
     text = result.content[0].text  # type: ignore[union-attr]
     assert text.startswith("No visible files match.")
     assert METADATA_FILTER_EMPTY_RETRY_HINT in text
+
+
+@pytest.mark.asyncio
+async def test_tree_empty_hits_with_llm_filter_append_retry_hint():
+    mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=[]))
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree",
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert METADATA_FILTER_EMPTY_RETRY_HINT in text
+
+
+@pytest.mark.asyncio
+async def test_incomplete_empty_list_does_not_append_retry_hint():
+    mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=[], complete=False))
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="list",
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "incomplete" in text.lower()
+    assert METADATA_FILTER_EMPTY_RETRY_HINT not in text
 
 
 @pytest.mark.asyncio

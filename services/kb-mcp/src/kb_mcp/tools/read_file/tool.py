@@ -33,7 +33,12 @@ from unique_toolkit.content.schemas import Content, ContentChunk
 from unique_toolkit.content.utils import sort_content_chunks
 
 from kb_mcp.correlation import correlation_id
-from kb_mcp.references import file_reference_url, markdown_citation_link
+from kb_mcp.references import (
+    MIME_TYPE_JSON,
+    MIME_TYPE_PDF,
+    file_reference_url,
+    markdown_citation_link,
+)
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.read_file.config import ReadFileToolConfig
 
@@ -45,7 +50,7 @@ _CHUNKED_EXTENSIONS = {".pdf", ".docx"}
 # The only two formats with a page-aware extraction pipeline; everything
 # else that decodes cleanly enough gets the flat-text path instead.
 _CHUNKED_MIME_TYPES = {
-    "application/pdf",
+    MIME_TYPE_PDF,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 
@@ -58,7 +63,7 @@ def _is_chunked(content: Content) -> bool | None:
     mime = content.mime_type
     if mime in _CHUNKED_MIME_TYPES:
         return True
-    if mime == "application/json" or (mime is not None and mime.startswith("text/")):
+    if mime == MIME_TYPE_JSON or (mime is not None and mime.startswith("text/")):
         return False
 
     suffix = Path(content.key).suffix.lower()

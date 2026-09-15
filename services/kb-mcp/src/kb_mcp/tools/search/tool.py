@@ -15,7 +15,7 @@ from typing import Annotated, Any
 from fastmcp.dependencies import Depends
 from fastmcp.tools import ToolResult, tool
 from mcp.types import TextContent, ToolAnnotations
-from pydantic import Field, ValidationError
+from pydantic import Field
 from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
@@ -24,7 +24,6 @@ from unique_mcp import (
     get_unique_settings_async,
     merge_tool_meta,
 )
-from unique_toolkit.content.smart_rules import parse_uniqueql
 from unique_toolkit.experimental.components.internal_search import (
     InternalSearchPostProcessor,
     KnowledgeBaseInternalSearchService,
@@ -32,7 +31,6 @@ from unique_toolkit.experimental.components.internal_search import (
 
 from kb_mcp.correlation import correlation_id
 from kb_mcp.references import (
-    INVALID_METADATA_FILTER_MESSAGE,
     METADATA_FILTER_ARG_DESCRIPTION,
     METADATA_FILTER_EMPTY_RETRY_HINT,
     SEARCH_SYSTEM_PROMPT,
@@ -44,7 +42,10 @@ from kb_mcp.references import (
 )
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.search.config import SearchToolConfig
-from kb_mcp.tools.search.metadata_filter import merge_request_metadata_filter
+from kb_mcp.tools.search.metadata_filter import (
+    merge_request_metadata_filter,
+    try_parse_llm_metadata_filter,
+)
 from kb_mcp.tools.search.scope_resolver import resolve_scope_ids
 
 _LOGGER = logging.getLogger(__name__)
@@ -123,19 +124,10 @@ async def search(
     """Search the knowledge base using ``SearchToolConfig`` from the config meta key."""
     kb_settings = get_settings()
     cid: str | None = None
-    parsed_llm_filter = None
-
     try:
-        if metadata_filter is not None:
-            try:
-                parsed_llm_filter = parse_uniqueql(metadata_filter)
-            except ValueError, ValidationError:
-                return ToolResult(
-                    content=[
-                        TextContent(type="text", text=INVALID_METADATA_FILTER_MESSAGE)
-                    ],
-                    is_error=True,
-                )
+        parsed_llm_filter, parse_error = try_parse_llm_metadata_filter(metadata_filter)
+        if parse_error is not None:
+            return parse_error
 
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.
         settings = await get_unique_settings_async()

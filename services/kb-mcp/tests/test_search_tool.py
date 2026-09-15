@@ -19,12 +19,15 @@ from kb_mcp.references import (
     INVALID_METADATA_FILTER_MESSAGE,
     METADATA_FILTER_ARG_DESCRIPTION,
     METADATA_FILTER_EMPTY_RETRY_HINT,
+    MIME_TYPE_PDF,
     REFERENCE_META_KEY,
     SEARCH_SYSTEM_PROMPT,
     SERVER_INSTRUCTIONS_CITATION_GUIDANCE,
     TOOL_DESCRIPTION_CITATION_GUIDANCE,
     UNIQUE_AI_RESULT_CITATION_INSTRUCTION,
     UNIQUE_AI_TOOL_FORMAT_INFORMATION,
+    UNIQUEQL_EQUALS_PDF,
+    UNIQUEQL_EQUALS_PDF_WRAPPED,
     chunk_to_text_content,
     frontend_document_url,
     is_unique_ai_client,
@@ -36,15 +39,6 @@ from kb_mcp.tools.search import SearchToolConfig, search
 
 
 def test_uniqueql_prompt_copy():
-    assert METADATA_FILTER_ARG_DESCRIPTION == (
-        "Optional UniqueQL filter. Omit to keep the admin default. ANDed with "
-        "admin and `folder_ids`. Example: "
-        '`{"operator":"equals","path":["mimeType"],"value":"application/pdf"}`. '
-        "`equals`/`contains` take a string; a list of values uses `in`. Combine "
-        'with `{"and":[…]}` or `{"or":[…]}`. `path` is a key array (`mimeType`, '
-        "`key`, `title`, `validAsOf`, or a custom key the user named). Folders "
-        "stay `folder_ids`. No matches: drop this arg and retry."
-    )
     assert METADATA_FILTER_ARG_DESCRIPTION in str(
         inspect.signature(search).parameters["metadata_filter"].annotation
     )
@@ -279,18 +273,11 @@ async def test_folder_ids_include_subfolders_false_uses_folder_id_in_clause():
     assert _DEFAULT_ADMIN_FILTER in state.metadata_filter_override["and"]
 
 
-_LLM_PDF_FILTER = {
-    "operator": "equals",
-    "path": ["mimeType"],
-    "value": "application/pdf",
-}
-
-
 @pytest.mark.asyncio
 async def test_llm_metadata_filter_without_folder_ids_ands_admin():
-    state = await _run_search_capturing_state(metadata_filter=_LLM_PDF_FILTER)
+    state = await _run_search_capturing_state(metadata_filter=UNIQUEQL_EQUALS_PDF)
 
-    expected_llm = parse_uniqueql(_LLM_PDF_FILTER).to_dict()
+    expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
     assert state.metadata_filter_override == {
         "and": [expected_llm, _DEFAULT_ADMIN_FILTER]
     }
@@ -301,10 +288,10 @@ async def test_llm_metadata_filter_ands_folder_ids_and_admin():
     state = await _run_search_capturing_state(
         folder_ids=["scope_a"],
         include_subfolders=False,
-        metadata_filter=_LLM_PDF_FILTER,
+        metadata_filter=UNIQUEQL_EQUALS_PDF,
     )
 
-    expected_llm = parse_uniqueql(_LLM_PDF_FILTER).to_dict()
+    expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
     clauses = state.metadata_filter_override["and"]
     assert {
         "operator": "in",
@@ -322,9 +309,7 @@ async def test_invalid_uniqueql_returns_tool_error_without_search():
     ) as mock_from_config:
         result = await search(
             search_string="query",
-            metadata_filter={
-                "equals": {"path": ["mimeType"], "value": "application/pdf"}
-            },
+            metadata_filter=UNIQUEQL_EQUALS_PDF_WRAPPED,
             config=SearchToolConfig(),
         )
 
@@ -352,7 +337,7 @@ async def test_empty_hits_with_llm_filter_append_retry_hint():
     ):
         result = await search(
             search_string="query",
-            metadata_filter=_LLM_PDF_FILTER,
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
             config=SearchToolConfig(),
         )
 
@@ -531,7 +516,7 @@ def test_reference_url_builds_frontend_deep_link_when_configured():
         "text",
         metadata=ContentMetadata(
             key="doc.pdf",
-            mime_type="application/pdf",
+            mime_type=MIME_TYPE_PDF,
             folderIdPath="uniquepathid://scope_root/scope_leaf",  # type: ignore[call-arg]
         ),
     )

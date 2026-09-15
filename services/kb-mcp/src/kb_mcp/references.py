@@ -35,6 +35,7 @@ Referencing style
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, cast
 from urllib.parse import quote
@@ -177,10 +178,37 @@ SERVER_INSTRUCTIONS_CITATION_GUIDANCE = (
     "stay `folder_ids` from `content_tree` — UniqueQL is not for folders."
 )
 
+MIME_TYPE_PDF = "application/pdf"
+MIME_TYPE_JSON = "application/json"
+MIME_TYPE_TEXT_PLAIN = "text/plain"
+
+UNIQUEQL_EQUALS_PDF: dict[str, Any] = {
+    "operator": "equals",
+    "path": ["mimeType"],
+    "value": MIME_TYPE_PDF,
+}
+UNIQUEQL_EQUALS_PDF_WRAPPED: dict[str, Any] = {
+    UNIQUEQL_EQUALS_PDF["operator"]: {
+        "path": UNIQUEQL_EQUALS_PDF["path"],
+        "value": UNIQUEQL_EQUALS_PDF["value"],
+    }
+}
+UNIQUEQL_EQUALS_PDF_PATH_AS_STRING: dict[str, Any] = {
+    "operator": UNIQUEQL_EQUALS_PDF["operator"],
+    "path": UNIQUEQL_EQUALS_PDF["path"][0],
+    "value": UNIQUEQL_EQUALS_PDF["value"],
+}
+UNIQUEQL_IN_PDF: dict[str, Any] = {
+    "operator": "in",
+    "path": UNIQUEQL_EQUALS_PDF["path"],
+    "value": [MIME_TYPE_PDF, MIME_TYPE_TEXT_PLAIN],
+}
+_UNIQUEQL_EQUALS_PDF_JSON = json.dumps(UNIQUEQL_EQUALS_PDF, separators=(",", ":"))
+
 METADATA_FILTER_ARG_DESCRIPTION = (
     "Optional UniqueQL filter. Omit to keep the admin default. ANDed with "
     "admin and `folder_ids`. Example: "
-    '`{"operator":"equals","path":["mimeType"],"value":"application/pdf"}`. '
+    f"`{_UNIQUEQL_EQUALS_PDF_JSON}`. "
     "`equals`/`contains` take a string; a list of values uses `in`. Combine "
     'with `{"and":[…]}` or `{"or":[…]}`. `path` is a key array (`mimeType`, '
     "`key`, `title`, `validAsOf`, or a custom key the user named). Folders "
@@ -190,7 +218,7 @@ METADATA_FILTER_ARG_DESCRIPTION = (
 INVALID_METADATA_FILTER_MESSAGE = (
     "Invalid UniqueQL metadata_filter; use operator, path as a string array, "
     "and value. Example: "
-    '{"operator":"equals","path":["mimeType"],"value":"application/pdf"}.'
+    f"{_UNIQUEQL_EQUALS_PDF_JSON}."
 )
 
 METADATA_FILTER_EMPTY_RETRY_HINT = (

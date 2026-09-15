@@ -13,7 +13,7 @@ from typing import Annotated, Any, Literal
 from fastmcp.dependencies import Depends
 from fastmcp.tools import ToolResult, tool
 from mcp.types import TextContent, ToolAnnotations
-from pydantic import Field, ValidationError
+from pydantic import Field
 from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
@@ -23,12 +23,10 @@ from unique_mcp import (
     merge_tool_meta,
 )
 from unique_toolkit.content.schemas import ContentInfo
-from unique_toolkit.content.smart_rules import parse_uniqueql
 from unique_toolkit.experimental.components.content_tree import ContentTree, FuzzyMatch
 
 from kb_mcp.correlation import correlation_id
 from kb_mcp.references import (
-    INVALID_METADATA_FILTER_MESSAGE,
     METADATA_FILTER_ARG_DESCRIPTION,
     METADATA_FILTER_EMPTY_RETRY_HINT,
     file_reference_url,
@@ -50,7 +48,10 @@ from kb_mcp.tools.content_tree.path_utils import (
     path_parts,
     render_tree_with_folder_ids,
 )
-from kb_mcp.tools.search.metadata_filter import merge_request_metadata_filter
+from kb_mcp.tools.search.metadata_filter import (
+    merge_request_metadata_filter,
+    try_parse_llm_metadata_filter,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,6 +64,14 @@ _INCOMPLETE_NOTICE = (
 
 def _with_incomplete_notice(complete: bool, body: str) -> str:
     return ("" if complete else _INCOMPLETE_NOTICE) + body
+
+
+def _with_empty_metadata_filter_hint(
+    body: str, *, empty: bool, complete: bool, llm_filter: object
+) -> str:
+    if empty and complete and llm_filter is not None:
+        return f"{body}\n{METADATA_FILTER_EMPTY_RETRY_HINT}"
+    return body
 
 
 def clamped_content_tree_timeout(requested: float | None, settings: Settings) -> float:
@@ -337,17 +346,9 @@ async def content_tree(
                 content=[TextContent(type="text", text=misuse_error)],
             )
 
-        parsed_llm_filter = None
-        if metadata_filter is not None:
-            try:
-                parsed_llm_filter = parse_uniqueql(metadata_filter)
-            except ValueError, ValidationError:
-                return ToolResult(
-                    is_error=True,
-                    content=[
-                        TextContent(type="text", text=INVALID_METADATA_FILTER_MESSAGE)
-                    ],
-                )
+        parsed_llm_filter, parse_error = try_parse_llm_metadata_filter(metadata_filter)
+        if parse_error is not None:
+            return parse_error
 
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.
         settings = await get_unique_settings_async()
@@ -389,15 +390,18 @@ async def content_tree(
         )
 
         if mode == "tree":
-            text = _with_incomplete_notice(
-                snapshot.complete,
+            tree_body = _with_empty_metadata_filter_hint(
                 render_tree_with_folder_ids(
                     snapshot,
                     folder_scope_ids(snapshot.files),
                     max_depth=max_depth,
                     show_files=not folders_only,
                 ),
+                empty=not snapshot.files,
+                complete=snapshot.complete,
+                llm_filter=parsed_llm_filter,
             )
+            text = _with_incomplete_notice(snapshot.complete, tree_body)
             _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)
             return ToolResult(content=[TextContent(type="text", text=text)])
 
@@ -422,9 +426,12 @@ async def content_tree(
                 f"(content_id={content_info.id})"
                 for content_info, path in rows
             ]
-            body = "\n".join(lines) if lines else "No visible files match."
-            if not lines and parsed_llm_filter is not None:
-                body = f"{body}\n{METADATA_FILTER_EMPTY_RETRY_HINT}"
+            body = _with_empty_metadata_filter_hint(
+                "\n".join(lines) if lines else "No visible files match.",
+                empty=not lines,
+                complete=snapshot.complete,
+                llm_filter=parsed_llm_filter,
+            )
             text = _with_incomplete_notice(snapshot.complete, body)
             _LOGGER.info(
                 "content_tree complete correlation_id=%s mode=%s result_count=%d",
@@ -472,9 +479,12 @@ async def content_tree(
             f"(score={m.score:.2f}, content_id={m.content_info.id})"
             for m in matches
         ]
-        body = "\n".join(lines) if lines else "No matching files found."
-        if not lines and parsed_llm_filter is not None:
-            body = f"{body}\n{METADATA_FILTER_EMPTY_RETRY_HINT}"
+        body = _with_empty_metadata_filter_hint(
+            "\n".join(lines) if lines else "No matching files found.",
+            empty=not lines,
+            complete=snapshot.complete,
+            llm_filter=parsed_llm_filter,
+        )
         text = _with_incomplete_notice(snapshot.complete, body)
         _LOGGER.info(
             "content_tree complete correlation_id=%s mode=%s result_count=%d",
