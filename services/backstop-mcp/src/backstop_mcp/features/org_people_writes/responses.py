@@ -19,6 +19,10 @@ __all__ = [
     "CreatedEmploymentResponse",
     "CreatedOrganizationResponse",
     "CreatedPersonResponse",
+    "DeleteOrganizationResponse",
+    "DeletePersonResponse",
+    "DeletedOrganizationResponse",
+    "DeletedPersonResponse",
     "EndEmploymentResponse",
     "EndedEmploymentResponse",
     "EntityRelationshipTypeResponse",
@@ -75,6 +79,51 @@ class CreatedOrganizationResponse(OmitNoneModel):
     )
 
 
+class DeletedPersonResponse(OmitNoneModel):
+    """A hard delete: Backstop has no recycle bin, so `permanent` is always true."""
+
+    id: str = Field(description="Backstop id of the deleted person. Echo it; never invent one.")
+    resource_type: Literal["people"] = Field(
+        default="people",
+        description="Always `people`.",
+    )
+    permanent: Literal[True] = Field(
+        default=True,
+        description="Always true: Backstop hard-deletes the record. There is no recycle bin.",
+    )
+    deleted_location_ids: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Contact-location ids removed before the person. Empty when the person had "
+            "none. From `include=contactLocations` — not `include=locations`."
+        ),
+    )
+
+
+class DeletedOrganizationResponse(OmitNoneModel):
+    """A hard delete: Backstop has no recycle bin, so `permanent` is always true."""
+
+    id: str = Field(
+        description="Backstop id of the deleted organization. Echo it; never invent one."
+    )
+    resource_type: Literal["organizations"] = Field(
+        default="organizations",
+        description="Always `organizations`.",
+    )
+    permanent: Literal[True] = Field(
+        default=True,
+        description="Always true: Backstop hard-deletes the record. There is no recycle bin.",
+    )
+    deleted_location_ids: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Contact-location ids removed before the organization. Empty when the "
+            "organization had none. From `include=contactLocations` — not "
+            "`include=locations`."
+        ),
+    )
+
+
 class UpdatedPersonResponse(OmitNoneModel):
     """A person after a PATCH, with the phone Backstop actually stored."""
 
@@ -128,6 +177,8 @@ class UpdatedOrganizationResponse(OmitNoneModel):
 
 
 type UpdatePersonResponse = UpdatedPersonResponse | PartyAmbiguousResponse | NotFoundResponse
+
+type DeletePersonResponse = DeletedPersonResponse | PartyAmbiguousResponse | NotFoundResponse
 
 
 class EntityRelationshipTypeResponse(OmitNoneModel):
@@ -197,6 +248,10 @@ class EndedEmploymentResponse(OmitNoneModel):
 
 type UpdateOrganizationResponse = (
     UpdatedOrganizationResponse | PartyAmbiguousResponse | NotFoundResponse
+)
+
+type DeleteOrganizationResponse = (
+    DeletedOrganizationResponse | PartyAmbiguousResponse | NotFoundResponse
 )
 
 type EndEmploymentResponse = EndedEmploymentResponse | PartyAmbiguousResponse | NotFoundResponse

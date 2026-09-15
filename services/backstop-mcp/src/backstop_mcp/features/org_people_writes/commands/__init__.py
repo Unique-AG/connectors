@@ -7,6 +7,9 @@ from backstop_mcp.features.org_people_writes.commands.create_organization_comman
 from backstop_mcp.features.org_people_writes.commands.create_person_command import (
     CreatePersonCommand,
 )
+from backstop_mcp.features.org_people_writes.commands.delete_party_with_locations_command import (
+    DeletePartyWithLocationsCommand,
+)
 from backstop_mcp.features.org_people_writes.commands.end_employment_command import (
     EndEmploymentCommand,
 )
@@ -24,6 +27,7 @@ __all__ = [
     "CreateEmploymentCommand",
     "CreateOrganizationCommand",
     "CreatePersonCommand",
+    "DeletePartyWithLocationsCommand",
     "EndEmploymentCommand",
     "ModifyContactLocationCommand",
     "UpdateOrganizationCommand",
