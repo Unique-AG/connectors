@@ -58,6 +58,8 @@ def main() -> None:
     # Opt-in via OTEL_* (e.g. OTEL_TRACES_EXPORTER=console locally).
     configure_tracing(service_name="kb-mcp")
     configure_logging()
+    # unique_toolkit logs every trim cycle at INFO; too noisy for prod.
+    logging.getLogger("unique_toolkit.monitoring.memory").setLevel(logging.WARNING)
     start_memory_trimmer()
     # Before FastMCP(...): that imports the tool modules, and unique_sdk pins
     # whichever client exists the first time anything issues a request.
