@@ -144,8 +144,19 @@ class WithIntelligenceClientFactory:
             attempt += 1
             try:
                 response = await self._post_auth(path, payload)
-                self._raise_for_auth_status(response, path)
-                return response
+                status = response.status_code
+                if status == 200:
+                    return response
+                if status == 429:
+                    raise RateLimited(
+                        f"{path} is rate-limited",
+                        retry_after_seconds=self._retry_policy.parse_retry_after(
+                            cast("object", response.headers.get("retry-after"))
+                        ),
+                    )
+                if status >= 500:
+                    raise Unreachable(f"{path} returned {status}")
+                raise SignInFailed(f"{path} returned {status}")
             except (RateLimited, Unreachable) as error:
                 if not self._retry_policy.should_retry(error, attempt):
                     raise
@@ -157,21 +168,6 @@ class WithIntelligenceClientFactory:
                 return await client.post(path, json=payload)
             except httpx.RequestError as exc:
                 raise Unreachable(f"could not reach {path}") from exc
-
-    def _raise_for_auth_status(self, response: httpx.Response, path: str) -> None:
-        status = response.status_code
-        if status == 200:
-            return
-        if status == 429:
-            raise RateLimited(
-                f"{path} is rate-limited",
-                retry_after_seconds=self._retry_policy.parse_retry_after(
-                    cast("object", response.headers.get("retry-after"))
-                ),
-            )
-        if status >= 500:
-            raise Unreachable(f"{path} returned {status}")
-        raise SignInFailed(f"{path} returned {status}")
 
     async def aclose(self) -> None:
         async with self._http_client_lock:
