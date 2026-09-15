@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.1](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.0...office-365-mcp@0.2.1) (2026-09-15)
+
+
+### Features
+
+* **office-365-mcp:** add server-side filters and date windows to the read tools ([#995](https://github.com/Unique-AG/connectors/issues/995)) ([ca52382](https://github.com/Unique-AG/connectors/commit/ca523825d013f64a5c90298ba6842911ed68aa26))
+
+
+### Bug Fixes
+
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** align the Python image build layouts ([#1038](https://github.com/Unique-AG/connectors/issues/1038)) ([ecdffb6](https://github.com/Unique-AG/connectors/commit/ecdffb656c2f9ed98217c2f4215b33bb9751efd9))
+
+
+### Dependencies
+
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** remove pip from the Python images ([#1033](https://github.com/Unique-AG/connectors/issues/1033)) ([3c0c51f](https://github.com/Unique-AG/connectors/commit/3c0c51f0feb886f41fcc7c6728cea9c040e30741))
+* bump mcp in /services/backstop-mcp ([#1024](https://github.com/Unique-AG/connectors/issues/1024)) ([f0f626f](https://github.com/Unique-AG/connectors/commit/f0f626fda57d873a783d7eac16e67e23f3393c02))
+* bump unique-mcp in /services/office-365-mcp ([#1006](https://github.com/Unique-AG/connectors/issues/1006)) ([ff07e2e](https://github.com/Unique-AG/connectors/commit/ff07e2ed7e8a654c2802a5caabeca85517dda75d))
+* **hello-mcp,kb-mcp,office-365-mcp:** apply Debian security updates in the Python runtime images ([#1022](https://github.com/Unique-AG/connectors/issues/1022)) ([83a61f8](https://github.com/Unique-AG/connectors/commit/83a61f88d73645a607300ac9dc7ae424a5b29294))
+
 ## [0.2.0](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.1.0...office-365-mcp@0.2.0) (2026-09-09)
 
 
