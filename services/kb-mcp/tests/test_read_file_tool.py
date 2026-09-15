@@ -634,10 +634,10 @@ async def test_successful_read_starts_with_reference_link():
 
 @pytest.mark.parametrize(
     ("requested", "expected"),
-    [(None, 8_000), (500, 500), (99_999, 8_000)],
+    [(None, 8_000), (500, 500), (99_999, 99_999)],
 )
 @pytest.mark.asyncio
-async def test_max_tokens_per_call_clamps_to_admin(
+async def test_max_tokens_per_call_uses_request_or_admin_default(
     requested: int | None, expected: int
 ):
     chunks = [_make_chunk("hello", 0, 1, 1)]
