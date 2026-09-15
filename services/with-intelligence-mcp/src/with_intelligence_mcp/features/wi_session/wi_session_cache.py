@@ -1,10 +1,4 @@
-"""One live With Intelligence session per authenticated user, in front of the stored one.
-
-Two layers, because they solve different problems. The in-memory holder keeps a fresh access
-token for its hour so an ordinary tool call touches neither the database nor the encryption key.
-The stored row is the source of truth, and renewal goes through it under a row lock — the
-in-memory lock is per process, and this service runs several replicas.
-"""
+"""Process-local WI session cache."""
 
 import asyncio
 import logging
@@ -18,8 +12,6 @@ from with_intelligence_mcp.with_intelligence_client import (
 
 logger = logging.getLogger(__name__)
 
-# Well above any plausible concurrent user count for one process; exists so a long-lived
-# process with high user churn cannot grow this cache without bound.
 MAX_TRACKED_SUBJECTS = 512
 
 type SessionReader = Callable[[], Awaitable[WiSession]]
@@ -72,8 +64,6 @@ class WiSessionCache:
             if current is not None and current is not stale and current.is_fresh:
                 return current.access_token.get_secret_value()
 
-            # The stored session may already be fresher than this process knows — another
-            # replica may have renewed it — so read before deciding to renew.
             stored = await read()
             if stored.is_fresh and stored.has_different_access_token(stale):
                 holder.session = stored

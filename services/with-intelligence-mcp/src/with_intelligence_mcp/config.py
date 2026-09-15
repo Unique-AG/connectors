@@ -212,25 +212,14 @@ class DatabaseConfig(BaseSettings):
 
 
 class AuthConfig(BaseSettings):
-    """Retention and sweep cadence for the OAuth rows this service issues.
-
-    Without a periodic sweep four tables grow without bound, `oauth_tokens` fastest: every
-    refresh rotation adds a row to the table `load_access_token` queries on every request.
-    """
+    """OAuth retention, cleanup, and login throttling settings."""
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="AUTH_")
 
     token_retention_days: int = Field(default=30, ge=1)
-
-    # Client registration is open (RFC 7591), so every caller that ever registered leaves a row.
-    # Comfortably longer than the pending-authorization TTL, so a client waiting on its user to
-    # fill in the form cannot be swept mid-handshake.
     unused_client_retention_hours: float = Field(default=24.0, gt=0)
 
     cleanup_interval_hours: float = Field(default=6.0, gt=0)
-
-    # Without this, the login form forwards any username/password pair to With Intelligence, which
-    # makes it a credential-testing oracle for anyone who can start an OAuth flow.
     login_max_attempts: int = Field(default=10, ge=1)
     login_attempt_window_minutes: int = Field(default=15, ge=1)
 

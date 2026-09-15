@@ -8,11 +8,7 @@ from with_intelligence_mcp.with_intelligence_client import WiSession
 
 
 async def find_user_id_by_username(session: AsyncSession, username: str) -> str | None:
-    """The durable `user_id` for a username, if that user has logged in before.
-
-    So a returning user gets their existing id — and its tokens and history — instead of a
-    fresh duplicate row.
-    """
+    """Return the durable user ID for a known username."""
     result = await session.execute(
         select(WithIntelligenceSession.user_id).where(
             WithIntelligenceSession.wi_username == username
@@ -28,12 +24,7 @@ async def save_session(
     wi_session: WiSession,
     key: bytes,
 ) -> str:
-    """Encrypt and upsert a user's WI session, keyed by username. Returns the durable id.
-
-    Concurrent first logins for the same username both propose a fresh id; `ON CONFLICT
-    (wi_username)` keeps a single row and returns whichever won, so both callers agree on the
-    subject. Does not commit — the caller owns the transaction boundary.
-    """
+    """Encrypt and upsert a WI session by username."""
     encrypted_blob = encrypt_session(wi_session, key)
     statement = (
         pg_insert(WithIntelligenceSession)
@@ -57,12 +48,7 @@ async def get_session(session: AsyncSession, user_id: str, key: bytes) -> WiSess
 
 
 async def lock_session(session: AsyncSession, user_id: str, key: bytes) -> WiSession | None:
-    """Read the row for update, so only one caller renews a rotating refresh token.
-
-    `SELECT ... FOR UPDATE` rather than the in-memory lock alone: that lock is per process, and
-    the chart scales this service horizontally. Two replicas renewing at once would each spend
-    the same refresh token, and if With Intelligence rotates on refresh the loser's token is dead.
-    """
+    """Lock and return a stored WI session for renewal."""
     result = await session.execute(
         select(WithIntelligenceSession)
         .where(WithIntelligenceSession.user_id == user_id)

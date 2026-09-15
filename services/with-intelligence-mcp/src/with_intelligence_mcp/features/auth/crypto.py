@@ -12,12 +12,7 @@ class InvalidSessionEnvelopeError(ValueError):
 
 
 class _SessionPayload(BaseModel):
-    """The JSON shape encrypted inside a session blob.
-
-    Plain `str`, not `SecretStr`: this is the payload actually encrypted, and pydantic's
-    `SecretStr` serializes to the literal "**********" via `model_dump_json()` — using it here
-    would encrypt the redacted placeholder instead of the real token.
-    """
+    """The JSON payload encrypted inside a session blob."""
 
     access_token: str
     refresh_token: str

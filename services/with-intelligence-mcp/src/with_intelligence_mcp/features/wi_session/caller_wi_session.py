@@ -3,12 +3,7 @@ from with_intelligence_mcp.features.wi_session.wi_session_cache import WiSession
 
 
 class CallerWiSession:
-    """The `CallerSession` the transport asks for a token: whoever is calling right now.
-
-    Satisfies the transport's Protocol structurally. Reading and renewing are handed to the
-    auth context as callables, so this class never touches the database or the encryption key
-    and `WiSessionCache` never learns what a subject is.
-    """
+    """Provides the current caller's WI access token."""
 
     def __init__(self, cache: WiSessionCache, context: WithIntelligenceAuthContext) -> None:
         self._cache: WiSessionCache = cache

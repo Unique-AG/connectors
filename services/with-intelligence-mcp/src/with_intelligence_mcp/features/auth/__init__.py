@@ -1,9 +1,4 @@
-"""Bridging MCP OAuth to a With Intelligence session: login, token lifetime, encryption.
-
-The public surface: what `create_app` wires together and what other features need to resolve
-the calling user. `session_store`, the login form and the CSRF helpers are this package's own
-business. Enforced by `tests/test_layering.py`.
-"""
+"""WI authentication public API."""
 
 from with_intelligence_mcp.features.auth.cleanup import cleanup_lifespan, purge_expired_auth_rows
 from with_intelligence_mcp.features.auth.context import (

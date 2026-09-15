@@ -32,12 +32,7 @@ async def _close_singletons() -> AsyncGenerator[None]:
 
 
 def _migrate(url: str) -> None:
-    """Apply migrations against `url`.
-
-    `env.py` reads `DB_URL` from the environment and would overwrite anything set via
-    `Config.set_main_option`. It also calls `load_dotenv()`, which would otherwise leak the
-    developer's `.env` into every later test in the session — hence the snapshot/restore.
-    """
+    """Apply migrations against the database URL."""
     environment_before = os.environ.copy()
     os.environ["DB_URL"] = url
     try:

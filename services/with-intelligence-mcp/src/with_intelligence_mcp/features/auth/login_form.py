@@ -18,14 +18,7 @@ def render_login_form(
     username: str = "",
     error: str | None = None,
 ) -> str:
-    """Render the form collecting a With Intelligence username and password.
-
-    `request_id` identifies the pending authorization and is round-tripped as a hidden field.
-    `csrf_token` is required rather than optional, so a new render path cannot quietly ship a
-    form the POST handler will reject. `username` is re-filled after a failure; the password
-    never is. Values are autoescaped because `client_name` comes from a dynamically-registered,
-    and therefore untrusted, OAuth client.
-    """
+    """Render the WI login form."""
     return _ENV.get_template("login.html").render(
         request_id=request_id,
         csrf_token=csrf_token,

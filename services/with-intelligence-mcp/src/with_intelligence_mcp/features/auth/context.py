@@ -17,19 +17,11 @@ from with_intelligence_mcp.with_intelligence_client import SignInFailed, WiSessi
 
 
 class NotConnectedError(ToolError):
-    """Raised when the caller isn't authenticated, or has no usable session on file.
-
-    Surfaced to the MCP client as a tool error telling them to reconnect this server. The
-    password is deliberately not stored, so the login flow is the only way back.
-    """
+    """Raised when the caller has no usable WI session."""
 
 
 class WithIntelligenceAuthContext(BaseModel):
-    """Resolves whose WI session to use for the in-flight MCP request, and renews it.
-
-    Satisfies the transport's expectations structurally, so that layer never imports this
-    module.
-    """
+    """Resolves and renews the current caller's WI session."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
@@ -54,14 +46,7 @@ class WithIntelligenceAuthContext(BaseModel):
         renew: Callable[[WiSession], Awaitable[WiSession]],
         stale: WiSession | None = None,
     ) -> WiSession:
-        """Renew under a row lock, so one caller renews and the rest read the result.
-
-        The lock is held across the WI refresh call on purpose (see `lock_session`), which the
-        transport timeout bounds.
-
-        A refused refresh revokes the caller's MCP tokens. The password is deliberately not
-        stored, so the client has to come back through the login form.
-        """
+        """Renew the stored session under a row lock."""
         subject = self.require_subject()
         async with transaction(self.session_factory) as session:
             try:
