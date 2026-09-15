@@ -21,7 +21,7 @@ packages = ["src/mcp_credential_auth"]
 [dependency-groups]
 dev = [
     "asyncpg==0.31.0",
-    "basedpyright==1.39.10",
+    "basedpyright==1.40.1",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "ruff==0.16.6",
