@@ -204,16 +204,26 @@ UNIQUEQL_IN_PDF: dict[str, Any] = {
     "path": UNIQUEQL_EQUALS_PDF["path"],
     "value": [MIME_TYPE_PDF, MIME_TYPE_TEXT_PLAIN],
 }
+UNIQUEQL_IS_NOT_EMPTY_CUSTOM_FIELD: dict[str, Any] = {
+    "operator": "isNotEmpty",
+    "path": ["customField"],
+    "value": "",
+}
 _UNIQUEQL_EQUALS_PDF_JSON = json.dumps(UNIQUEQL_EQUALS_PDF, separators=(",", ":"))
+_UNIQUEQL_IS_NOT_EMPTY_JSON = json.dumps(
+    UNIQUEQL_IS_NOT_EMPTY_CUSTOM_FIELD, separators=(",", ":")
+)
 
 METADATA_FILTER_ARG_DESCRIPTION = (
     "Optional UniqueQL filter. Omit to keep the admin default. ANDed with "
     "admin and `folder_ids`. Example: "
     f"`{_UNIQUEQL_EQUALS_PDF_JSON}`. "
-    "`equals`/`contains` take a string; a list of values uses `in`. Combine "
-    'with `{"and":[…]}` or `{"or":[…]}`. `path` is a key array (`mimeType`, '
-    "`key`, `title`, `validAsOf`, or a custom key the user named). Folders "
-    "stay `folder_ids`. No matches: drop this arg and retry."
+    "`equals`/`contains` take a string; a list of values uses `in`. To check "
+    "a key is set at all, regardless of value, use `isNotEmpty`/`isEmpty` "
+    f"(still requires `value`, ignored): `{_UNIQUEQL_IS_NOT_EMPTY_JSON}`. "
+    'Combine with `{"and":[…]}` or `{"or":[…]}`. `path` is a key array '
+    "(`mimeType`, `key`, `title`, `validAsOf`, or a custom key the user "
+    "named). Folders stay `folder_ids`. No matches: drop this arg and retry."
 )
 
 type MetadataFilterArgument = Annotated[
