@@ -4,7 +4,7 @@ a different week correctly.
 """
 
 from collections.abc import Mapping, Sequence
-from datetime import date, timedelta
+from datetime import date
 from typing import cast
 
 import httpx
@@ -13,9 +13,10 @@ import respx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden
-from office_365_mcp.shared.calendar import MAX_WINDOW_DAYS, SUMMARY_FIELDS
+from office_365_mcp.shared.calendar import SUMMARY_FIELDS
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle, MailMessageHandle
 from office_365_mcp.tools import outlook_list_events as lister
 
@@ -873,32 +874,33 @@ class TestWhatItRefuses:
 
         assert my_calendar.call_count == 0
 
-    async def test_a_window_wider_than_the_cap_never_reaches_graph(
-        self, client: GraphServiceClient, my_calendar: respx.Route
-    ) -> None:
-        """A calendar view expands every recurring series into one row per occurrence, so a year of
-        a daily stand-up is hundreds of rows of one meeting."""
-        with pytest.raises(ToolError, match="wider than"):
-            _ = await lister.list_events(
-                client, starts_on=date(2026, 1, 1), ends_on=date(2026, 12, 31), limit=25
-            )
-
-        assert my_calendar.call_count == 0
-
-    async def test_the_widest_window_the_cap_allows_is_accepted(
+    async def test_a_window_of_any_width_reaches_graph(
         self, client: GraphServiceClient, my_calendar: respx.Route, my_view: respx.Route
     ) -> None:
-        opens = date(2026, 1, 1)
-
+        """This tool used to refuse a window wider than a quarter. The refusal protected nothing:
+        `$top` and `limit` bound the rows fetched, not the width, so a year costs exactly what a
+        week costs. What a wide window really does is answer with the START of the range, because
+        the rows arrive earliest first — and `capped` already reports that."""
         _ = await lister.list_events(
-            client,
-            starts_on=opens,
-            ends_on=opens + timedelta(days=MAX_WINDOW_DAYS - 1),
-            limit=25,
+            client, starts_on=date(2026, 1, 1), ends_on=date(2026, 12, 31), limit=25
         )
 
         assert my_calendar.call_count == 1
         assert my_view.call_count == 1
+
+    @pytest.mark.usefixtures("my_calendar")
+    async def test_a_wide_window_asks_for_no_more_rows_than_a_narrow_one(
+        self, client: GraphServiceClient, my_view: respx.Route
+    ) -> None:
+        """The whole case for removing the cap: width does not buy rows. If a refactor ever let the
+        window reach `$top`, this is what catches it."""
+        for ends_on in (date(2026, 1, 8), date(2027, 1, 1)):
+            _ = await lister.list_events(
+                client, starts_on=date(2026, 1, 1), ends_on=ends_on, limit=25
+            )
+
+        asked = [call.request.url.params["$top"] for call in cast("Sequence[Call]", my_view.calls)]
+        assert asked == ["25", "25"], "the window widened by a year and the row budget did not move"
 
     @pytest.mark.parametrize(
         "time_zone",

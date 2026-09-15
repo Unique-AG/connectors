@@ -18,9 +18,8 @@ at any spelling, which is why no argument here asks about one.
 """
 
 from collections.abc import Callable, Mapping
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Annotated, Literal
-from zoneinfo import ZoneInfo
 
 import httpx
 from fastmcp import FastMCP
@@ -36,7 +35,6 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.calendar import (
-    MAX_WINDOW_DAYS,
     SUMMARY_FIELDS,
     CalendarSummary,
     EventSummary,
@@ -48,7 +46,7 @@ from office_365_mcp.shared.calendar import (
 from office_365_mcp.shared.handles import calendar_handle
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
+from office_365_mcp.shared.window import runs_backwards
 
 TOOL_NAME = "outlook_list_events"
 
@@ -129,15 +127,6 @@ _ENDS_BEFORE_STARTS = (
     + "its whole day — so one date in both lists that single day. Put the earlier bound in "
     + "`starts_on` and the later one in `ends_on`, then call again. Retrying with the same two "
     + "will fail identically."
-)
-
-_WINDOW_TOO_WIDE = (
-    "outlook_list_events read nothing, because the window between `starts_on` and `ends_on` is "
-    + f"wider than {MAX_WINDOW_DAYS} days. A calendar view expands every recurring series into one "
-    + "row per occurrence, so a year of a daily stand-up is hundreds of rows of the same meeting "
-    + f"and answers no question. Ask for {MAX_WINDOW_DAYS} days or fewer. If the question really "
-    + "is about a whole year, ask one window at a time and say which window each answer covers. "
-    + "Retrying with the same two dates will fail identically."
 )
 
 _NOT_A_ZONE = (
@@ -247,8 +236,6 @@ async def list_events(
         raise ToolError(_NOT_A_ZONE)
     if runs_backwards(starts_on, ends_on, zone=zone):
         raise ToolError(_ENDS_BEFORE_STARTS)
-    if _days_covered(starts_on, ends_on, zone=zone) > MAX_WINDOW_DAYS:
-        raise ToolError(_WINDOW_TOO_WIDE)
     named = _calendar_named(calendar_ref)
     opens, closes = window_bounds(starts_on, ends_on, zone=zone)
     narrowed = _filter_for(subject_contains=subject_contains, cancelled=cancelled)
@@ -299,16 +286,6 @@ def _calendar_named(calendar_ref: str | None) -> str | None:
     if handle is None:
         raise ToolError(_NOT_A_CALENDAR_HANDLE)
     return handle.calendar_id
-
-
-def _days_covered(starts_on: date | datetime, ends_on: date | datetime, *, zone: ZoneInfo) -> int:
-    """How many days the window spans, rounded up, for the width guard alone.
-
-    Measured between the resolved instants because Python refuses to subtract a date from a moment,
-    and rounded UP so the 1st to the 1st keeps the one inclusive day it has always counted as.
-    """
-    span = closes_at(ends_on, zone=zone) - opens_at(starts_on, zone=zone)
-    return -(-span // timedelta(days=1))
 
 
 def _filter_for(*, subject_contains: str | None, cancelled: bool | None) -> str | None:
@@ -395,9 +372,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "Where the window closes, inclusive, in the same two shapes `starts_on` "
                     + "takes. A date covers the whole of that day, so the same date in both "
                     + "arguments lists that one day; a moment closes at the second it names, and "
-                    + "an occurrence starting exactly then belongs to the next window. The window "
-                    + f"covers at most {MAX_WINDOW_DAYS} days, because a calendar view expands "
-                    + "every recurring series into one row per occurrence."
+                    + "an occurrence starting exactly then belongs to the next window. Any width "
+                    + "Microsoft accepts is allowed, but a calendar view expands every recurring "
+                    + "series into one row per occurrence and the rows come back earliest first, "
+                    + "so a window far wider than `limit` answers with the START of the window "
+                    + "rather than a summary of it. `capped` says when that happened. For a long "
+                    + "stretch, ask one window at a time and say which window each answer covers."
                 )
             ),
         ],

@@ -90,10 +90,6 @@ SUMMARY_FIELDS: tuple[str, ...] = (
     "webLink",
 )
 
-# `calendarView` expands a recurring series into one row per occurrence, so a wide window is
-# hundreds of rows of the same meeting.
-MAX_WINDOW_DAYS = 92
-
 # Graph's own cap is 500 (https://learn.microsoft.com/en-us/graph/api/resources/event); far lower
 # here on purpose, because every address receives an invitation this connector cannot recall.
 MAX_ATTENDEES = 20
