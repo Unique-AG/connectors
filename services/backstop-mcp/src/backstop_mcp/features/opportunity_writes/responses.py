@@ -8,13 +8,51 @@ from typing import Literal
 
 from pydantic import Field
 
+from backstop_mcp.features.party_resolver import PartyAmbiguousResponse
+from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
 
 __all__ = [
     "BackfillOpportunityStageHistoryResponse",
+    "CreateOpportunityResponse",
+    "CreatedOpportunityResponse",
     "RecordOutcomeResponse",
     "UpdatedOpportunityResponse",
 ]
+
+
+class CreatedOpportunityResponse(OmitNoneModel):
+    """An opportunity after a POST, with the stage Backstop actually stored."""
+
+    id: str = Field(
+        description="Backstop id of the created opportunity. Echo it; never invent one."
+    )
+    resource_type: Literal["opportunities"] = Field(
+        default="opportunities",
+        description="Always `opportunities`.",
+    )
+    name: str | None = Field(
+        default=None,
+        description="Deal name READ BACK after the write.",
+    )
+    stage: str | None = Field(
+        default=None,
+        description=(
+            "Stage name READ BACK after the write. A requested stage that did not land "
+            "is named here as whatever Backstop stored, with an entry in `warnings`."
+        ),
+    )
+    stage_id: str | None = Field(
+        default=None,
+        description="Backstop id of that stage, kept even when the name could not be resolved.",
+    )
+    warnings: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Silent-failure notes: a requested stage that did not land. Empty when the "
+            "write landed as asked."
+        ),
+    )
 
 
 class UpdatedOpportunityResponse(OmitNoneModel):
@@ -82,3 +120,8 @@ class BackfillOpportunityStageHistoryResponse(OmitNoneModel):
             "row. Empty when every message landed on a record."
         ),
     )
+
+
+type CreateOpportunityResponse = (
+    CreatedOpportunityResponse | PartyAmbiguousResponse | NotFoundResponse
+)

@@ -21,63 +21,59 @@ IS_ERISA_DESCRIPTION = "Whether the deal is ERISA."
 class _OpportunityWritableFields(BaseModel):
     """Fields optional on both `create_opportunity` and `update_opportunity`."""
 
-    description: NonEmptyStr | None = Field(
-        default=None, description="Replacement deal description."
-    )
-    aliases: NonEmptyStr | None = Field(default=None, description="Replacement aliases string.")
-    other_id: NonEmptyStr | None = Field(default=None, description="Replacement external/other id.")
+    description: NonEmptyStr | None = Field(default=None, description="Deal description.")
+    aliases: NonEmptyStr | None = Field(default=None, description="Aliases string.")
+    other_id: NonEmptyStr | None = Field(default=None, description="External/other id.")
     classification: NonEmptyStr | None = Field(
         default=None,
-        description=(
-            "Replacement deal classification (wire `type`) — not the JSON:API resource type."
-        ),
+        description="Deal classification (wire `type`) — not the JSON:API resource type.",
     )
     requested_amount: float | None = Field(
-        default=None, description="Replacement requested amount, in `currency_code`."
+        default=None, description="Requested amount, in `currency_code`."
     )
     allocated_amount: float | None = Field(
-        default=None, description="Replacement allocated amount, in `currency_code`."
+        default=None, description="Allocated amount, in `currency_code`."
     )
     probability: float | None = Field(
         default=None,
         ge=0,
         le=1,
         description=(
-            "Replacement likelihood as a fraction: 0.3 is 30%. Setting `stage` does not "
+            "Likelihood as a fraction: 0.3 is 30%. Setting `stage` does not "
             "change this — pass it explicitly if the deal's probability should move."
         ),
     )
     expected_investment_date: date | None = Field(
-        default=None, description="Replacement expected investment day."
+        default=None, description="Expected investment day."
     )
-    waitlist_id: int | None = Field(default=None, description="Replacement waitlist id.")
+    waitlist_id: int | None = Field(default=None, description="Waitlist id.")
     stage: NonEmptyStr | None = Field(
         default=None,
         description=(
-            "Replacement stage **name** (e.g. IDD), resolved against this instance's "
-            "vocabulary. This is the only way to move a deal's stage. A `closed` stage "
-            "closes the deal automatically."
+            "Stage **name** (e.g. IDD), resolved against this instance's vocabulary. "
+            "A `closed` stage closes the deal automatically. On an existing deal this "
+            "is how you move the stage."
         ),
     )
     product_id: NonEmptyStr | None = Field(
-        default=None, description="Replacement product id. Never invent or guess."
+        default=None, description="Product id. Never invent or guess."
     )
     primary_contact_id: NonEmptyStr | None = Field(
         default=None,
-        description="Replacement primary contact people id. Never invent or guess.",
+        description="Primary contact people id. Never invent or guess.",
     )
     referral_source_id: NonEmptyStr | None = Field(
         default=None,
-        description="Replacement referral-source contact id (`contacts`). Never invent or guess.",
+        description="Referral-source contact id (`contacts`). Never invent or guess.",
     )
     owner_login: NonEmptyStr | None = Field(
         default=None,
         description=(
-            "Replacement owner of this deal: the colleague at our own firm. A "
+            "Owner of this deal: the colleague at our own firm. A "
             "`list_system_users` login (`userName`), not a system-user id. Same role as "
             "`representative` on `search_opportunities`."
         ),
     )
     investor_type_id: NonEmptyStr | None = Field(
-        default=None, description="Replacement investor-type id. Never invent or guess."
+        default=None, description="Investor-type id. Never invent or guess."
     )
