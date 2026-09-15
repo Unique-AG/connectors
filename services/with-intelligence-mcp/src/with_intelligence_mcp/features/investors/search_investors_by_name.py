@@ -1,3 +1,5 @@
+from pydantic import TypeAdapter
+
 from with_intelligence_mcp.features.investors.fetch_investor import INVESTORS_PATH
 from with_intelligence_mcp.features.investors.wi_responses import InvestorListItemAttributes
 from with_intelligence_mcp.with_intelligence_client import (
@@ -5,6 +7,8 @@ from with_intelligence_mcp.with_intelligence_client import (
     QueryValue,
     WithIntelligenceClient,
 )
+
+_INVESTORS_PAGE = TypeAdapter(Page[InvestorListItemAttributes])
 
 
 async def search_investors_by_name(
@@ -16,13 +20,8 @@ async def search_investors_by_name(
     caller handles both by treating one match as resolved and several as ambiguous.
     """
     params: dict[str, QueryValue] = {"name": [name]}
-    if client.settings.asset_class_groups:
-        params["asset_class_group"] = list(client.settings.asset_class_groups)
+    if client.asset_class_groups:
+        params["asset_class_group"] = list(client.asset_class_groups)
 
-    page: Page = await client.get_page(INVESTORS_PATH, params, page=1, page_size=limit)
-    matches = [
-        InvestorListItemAttributes.model_validate(record)
-        for record in page.results
-        if "id" in record
-    ]
-    return matches, page.pagination.total
+    page = await client.get_page(INVESTORS_PATH, _INVESTORS_PAGE, params, page=1, page_size=limit)
+    return page.results, page.pagination.total
