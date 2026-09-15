@@ -83,6 +83,11 @@ from backstop_mcp.features.party_resolver import (
     get_party_name_query_factory,
     get_resolve_party_query_factory,
 )
+from backstop_mcp.features.org_people_writes import (
+    get_modify_contact_location_command_factory,
+    get_update_organization_command_factory,
+    get_update_person_command_factory,
+)
 from backstop_mcp.features.system_users import get_system_users_service
 from backstop_mcp.features.tasks import get_tasks_for_party_query_factory
 from backstop_mcp.features.time_zones import get_time_zones_service
@@ -146,6 +151,9 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_people_for_organization_query_factory,
     get_party_name_query_factory,
     get_resolve_party_query_factory,
+    get_modify_contact_location_command_factory,
+    get_update_person_command_factory,
+    get_update_organization_command_factory,
     get_accounts_for_product_query_factory,
     get_capital_flows_query_factory,
     get_holdings_query_factory,
