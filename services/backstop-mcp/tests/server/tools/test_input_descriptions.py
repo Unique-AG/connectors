@@ -39,6 +39,7 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "update_activity",
         "update_opportunity",
         "create_opportunity",
+        "delete_opportunity",
         "backfill_opportunity_stage_history",
         "update_custom_field_values",
         "create_person",
@@ -86,6 +87,7 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         "update_opportunity",
         "destructive_hint",
     ),
+    "delete_opportunity": ('"opportunity_id"', "permanent", "destructive_hint"),
     "update_custom_field_values": (
         '"definition_id"',
         '"entity_type"',
