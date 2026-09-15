@@ -9,8 +9,12 @@ from cryptography.fernet import Fernet
 from pydantic import SecretStr
 
 from with_intelligence_mcp.config import EncryptionConfig
-from with_intelligence_mcp.features.auth import InvalidSessionEnvelopeError, load_key
-from with_intelligence_mcp.features.auth.crypto import decrypt_session, encrypt_session
+from with_intelligence_mcp.features.auth import load_key
+from with_intelligence_mcp.features.auth.crypto import (
+    InvalidSessionEnvelopeError,
+    decrypt_session,
+    encrypt_session,
+)
 from with_intelligence_mcp.with_intelligence_client import WiSession
 
 SESSION = WiSession(

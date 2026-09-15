@@ -62,7 +62,7 @@ _LOGIN_CSRF = LoginCsrf("wi_login_csrf_")
 
 
 class _LoginSubmission(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     request_id: StrictStr = ""
     username: StrictStr = Field(default="", max_length=MAX_USERNAME_LENGTH)

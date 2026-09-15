@@ -12,7 +12,7 @@ from with_intelligence_mcp.with_intelligence_client import (
 
 logger = logging.getLogger(__name__)
 
-MAX_TRACKED_SUBJECTS = 512
+_MAX_TRACKED_SUBJECTS = 512
 
 type SessionReader = Callable[[], Awaitable[WiSession]]
 type SessionRenewer = Callable[
@@ -71,7 +71,7 @@ class WiSessionCache:
         async with self._holders_lock:
             holder = self._holders.get(subject)
             if holder is None:
-                if len(self._holders) >= MAX_TRACKED_SUBJECTS:
+                if len(self._holders) >= _MAX_TRACKED_SUBJECTS:
                     self._evict_idle_unlocked()
                 holder = _Holder()
                 self._holders[subject] = holder

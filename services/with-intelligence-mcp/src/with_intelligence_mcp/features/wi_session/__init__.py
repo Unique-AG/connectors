@@ -5,13 +5,9 @@ from with_intelligence_mcp.features.wi_session.dependencies import (
     get_wi_session_cache,
     get_with_intelligence_client,
 )
-from with_intelligence_mcp.features.wi_session.wi_session_cache import (
-    MAX_TRACKED_SUBJECTS,
-    WiSessionCache,
-)
+from with_intelligence_mcp.features.wi_session.wi_session_cache import WiSessionCache
 
 __all__ = [
-    "MAX_TRACKED_SUBJECTS",
     "CallerWiSession",
     "WiSessionCache",
     "get_wi_session_cache",

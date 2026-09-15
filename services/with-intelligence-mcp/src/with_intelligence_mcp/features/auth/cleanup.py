@@ -4,9 +4,6 @@ from contextlib import asynccontextmanager
 from mcp_credential_auth import (
     cleanup_lifespan as shared_cleanup_lifespan,
 )
-from mcp_credential_auth import (
-    purge_expired_auth_rows,
-)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from with_intelligence_mcp.config import AuthConfig
@@ -24,6 +21,3 @@ async def cleanup_lifespan(
         cleanup_interval=config.cleanup_interval,
     ):
         yield
-
-
-__all__ = ["cleanup_lifespan", "purge_expired_auth_rows"]
