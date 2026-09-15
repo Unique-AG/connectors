@@ -12,17 +12,19 @@ from backstop_mcp.backstop_client import (
     BackstopClient,
     Included,
     IncludedResource,
-    isoformat,
     json_api_update,
     omit_none_values,
     relationship_data,
-    relationship_to_one,
 )
 from backstop_mcp.features.opportunities import (
     OpportunityResourceAttributes,
     OpportunityStageAttributes,
     OpportunityStageResponse,
     OpportunityStagesService,
+)
+from backstop_mcp.features.opportunity_writes.commands._opportunity_attributes import (
+    opportunity_attributes,
+    opportunity_relationships,
 )
 from backstop_mcp.features.opportunity_writes.responses import UpdatedOpportunityResponse
 from backstop_mcp.features.opportunity_writes.update_opportunity_input import UpdateOpportunityInput
@@ -118,36 +120,15 @@ class UpdateOpportunityCommand:
         replace_notify: tuple[str, ...] | None,
     ) -> None:
         path = f"/{_RESOURCE_TYPE}/{quote(opportunity.opportunity_id, safe='')}"
-        attributes = omit_none_values(
-            {
-                "name": opportunity.name,
-                "description": opportunity.description,
-                "aliases": opportunity.aliases,
-                "otherId": opportunity.other_id,
-                "type": opportunity.classification,
-                "currencyCode": opportunity.currency_code,
-                "isErisa": opportunity.is_erisa,
-                "requestedAmount": opportunity.requested_amount,
-                "allocatedAmount": opportunity.allocated_amount,
-                "probability": opportunity.probability,
-                "expectedInvestmentDate": isoformat(opportunity.expected_investment_date),
-                "stageEffectiveDate": isoformat(opportunity.stage_effective_date),
-                "waitlistId": opportunity.waitlist_id,
-            }
-        )
+        attributes = omit_none_values(opportunity_attributes(opportunity))
         relationships = omit_none_values(
-            {
-                "stage": relationship_to_one(
-                    "opportunity-stages", requested_stage.id if requested_stage else None
-                ),
-                "investor": relationship_to_one("contacts", opportunity.investor_id),
-                "product": relationship_to_one("products", opportunity.product_id),
-                "primaryContact": relationship_to_one("people", opportunity.primary_contact_id),
-                "referralSource": relationship_to_one("contacts", opportunity.referral_source_id),
-                "representative": owner,
-                "investorType": relationship_to_one("investor-types", opportunity.investor_type_id),
-                "ccedUsers": relationship_data("system-users", add_notify),
-            }
+            opportunity_relationships(
+                opportunity,
+                owner=owner,
+                stage_id=requested_stage.id if requested_stage else None,
+                add_notify=add_notify,
+                omit_empty=False,
+            )
         )
         # A to-many PATCH appends; `data: []` is the only clear. Replacing the notify
         # list is therefore this PATCH (clear, plus any other fields) and, when the

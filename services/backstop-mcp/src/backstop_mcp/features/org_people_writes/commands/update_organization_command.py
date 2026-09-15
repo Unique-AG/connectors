@@ -12,13 +12,15 @@ from opentelemetry import trace
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
     BackstopClient,
-    isoformat,
     json_api_update,
     omit_none_values,
     relationship_data,
-    relationship_to_one,
 )
 from backstop_mcp.features.org_people_writes.api_responses import OrganizationWriteAttributes
+from backstop_mcp.features.org_people_writes.commands._contact_attributes import (
+    organization_attributes,
+    organization_relationships,
+)
 from backstop_mcp.features.org_people_writes.commands.modify_contact_location_command import (
     ModifyContactLocationCommand,
 )
@@ -82,45 +84,9 @@ class UpdateOrganizationCommand:
         party_id: str,
         owner: dict[str, object] | None,
     ) -> None:
-        attributes = omit_none_values(
-            {
-                "name": new_organization_fields.name,
-                "legalName": new_organization_fields.legal_name,
-                "aliases": new_organization_fields.aliases,
-                "contactDescription": new_organization_fields.contact_description,
-                "dateFounded": isoformat(new_organization_fields.date_founded),
-                "email": new_organization_fields.email,
-                "email2": new_organization_fields.email2,
-                "email3": new_organization_fields.email3,
-                "website": new_organization_fields.website,
-                "otherId": new_organization_fields.other_id,
-                "investableAssets": new_organization_fields.investable_assets,
-                "numberOfEmployees": new_organization_fields.number_of_employees,
-                "internalOrganization": new_organization_fields.internal_organization,
-                "ria": new_organization_fields.ria,
-                "matchingDomains": (
-                    list(new_organization_fields.matching_domains)
-                    if new_organization_fields.matching_domains is not None
-                    else None
-                ),
-            }
-        )
+        attributes = omit_none_values(organization_attributes(new_organization_fields))
         relationships = omit_none_values(
-            {
-                "contactSource": relationship_to_one(
-                    "contact-sources", new_organization_fields.contact_source_id
-                ),
-                "referralSource": relationship_to_one(
-                    "contacts", new_organization_fields.referral_source_id
-                ),
-                "representative": owner,
-                "primaryContact": relationship_to_one(
-                    "people", new_organization_fields.primary_contact_id
-                ),
-                "categories": relationship_data(
-                    "contact-categories", new_organization_fields.add_category_ids
-                ),
-            }
+            organization_relationships(new_organization_fields, owner=owner, omit_empty=False)
         )
         # A to-many PATCH appends; `data: []` is the only clear. The replacement ids
         # cannot go on this first PATCH — they would be added to the existing list.
