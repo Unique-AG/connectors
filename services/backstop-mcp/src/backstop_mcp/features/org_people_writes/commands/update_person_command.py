@@ -8,13 +8,15 @@ from opentelemetry import trace
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
     BackstopClient,
-    isoformat,
     json_api_update,
     omit_none_values,
     relationship_data,
-    relationship_to_one,
 )
 from backstop_mcp.features.org_people_writes.api_responses import PersonWriteAttributes
+from backstop_mcp.features.org_people_writes.commands._contact_attributes import (
+    person_attributes,
+    person_relationships,
+)
 from backstop_mcp.features.org_people_writes.commands.modify_contact_location_command import (
     ModifyContactLocationCommand,
 )
@@ -78,41 +80,9 @@ class UpdatePersonCommand:
         party_id: str,
         owner: dict[str, object] | None,
     ) -> None:
-        attributes = omit_none_values(
-            {
-                "firstName": person.first_name,
-                "middleName": person.middle_name,
-                "lastName": person.last_name,
-                "nickName": person.nick_name,
-                "prefix": person.prefix,
-                "suffix": person.suffix,
-                "salutation": person.salutation,
-                "pronunciation": person.pronunciation,
-                "gender": person.gender,
-                "birthday": isoformat(person.birthday),
-                "spouseName": person.spouse_name,
-                "jobTitle": person.job_title,
-                "department": person.department,
-                "companyName": person.company_name,
-                "contactDescription": person.contact_description,
-                "email": person.email,
-                "email2": person.email2,
-                "email3": person.email3,
-                "mobilePhone": person.mobile_phone,
-                "website": person.website,
-                "otherId": person.other_id,
-                "investableAssets": person.investable_assets,
-                "isEmployee": person.is_employee,
-            }
-        )
+        attributes = omit_none_values(person_attributes(person))
         relationships = omit_none_values(
-            {
-                "company": relationship_to_one("organizations", person.company_id),
-                "contactSource": relationship_to_one("contact-sources", person.contact_source_id),
-                "referralSource": relationship_to_one("contacts", person.referral_source_id),
-                "representative": owner,
-                "categories": relationship_data("contact-categories", person.add_category_ids),
-            }
+            person_relationships(person, owner=owner, omit_empty=False)
         )
         # A to-many PATCH appends; `data: []` is the only clear. The replacement ids
         # cannot go on this first PATCH — they would be added to the existing list.
