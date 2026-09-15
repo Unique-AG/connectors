@@ -1,27 +1,18 @@
 """`teams_list_meeting_recordings` — did a call record, how long it ran, and who can get the file.
 
-TRAP: no video ever comes back, and none of it is reachable anywhere in this connector. A Teams
-meeting runs 30 hours max
-(https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams) and Graph serves
-a recording as one MP4 byte stream. `recordingContentUrl` is never returned either: that link opens
-only with this connector's own token, so passing it on leaks a credential or does nothing.
-`tests/test_layering.py` rule 7 blocks every module from addressing one recording, this file too.
+TRAP: no video ever comes back, and none is reachable anywhere in this connector. Graph serves a
+recording as one MP4 byte stream, and `recordingContentUrl` opens only with this connector's own
+token, so passing it on leaks a credential or does nothing. `tests/test_layering.py` rule 7 blocks
+every module from addressing one recording, this file too.
 
 Separate from `teams_list_meeting_transcripts` because Graph gates them independently, under
 `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All`, and a default tenant has
-the transcript gate shut. Combining them into one tool forces a choice: fail a reachable
-recording, or hold two incompatible statuses. `content_correlation_id` links them.
+the transcript gate shut. `content_correlation_id` links them.
 
-Newest first: Graph has no `$orderby` on this collection. Read up to MAX_ARTIFACT_SCAN, sort, then
-cut to `limit`. Stopping at `limit` before sorting returns an arbitrary subset sorted among itself.
-
-**No date window, deliberately.** This tool used to take `started_after`/`started_before` and apply
-them to the rows after the fetch. They are gone. The collection enumerates `$select`, `$filter` and
-`$top`, so `$filter` is documented by name — but it names no filterable *property*, and
-`createdDateTime` appears in no `$filter` context for `callRecording`. Offering a date therefore
-published a filter this connector performed itself. Every row still carries its own `started_at`,
-so one occurrence of a series is picked by reading the answer. See
-`teams_list_meeting_transcripts` for the second reason a server-side date bound was refused.
+Graph offers neither an `$orderby` nor any documented filterable property on this collection, so
+rows are read up to MAX_ARTIFACT_SCAN and sorted before `limit` cuts them, and no date bound is
+offered. Every row carries its own `started_at`, so one occurrence of a series is picked by reading
+the answer.
 """
 
 from collections.abc import Mapping
@@ -51,12 +42,9 @@ from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_list_meeting_recordings"
 
-# The meeting resolve counts under `shared/meetings.py`'s step and the identity check under
-# `shared/identity.py`'s, so this names only the listing request and the walk that continues it.
 STEP_RECORDINGS = "recordings"
 
-# Meeting resolve, recordings read, and the identity check the organizer-only rule needs. Entra
-# redeems all three under one token or none. The names live in `shared/meetings.py`.
+# Entra redeems all three under one token or none.
 GRAPH_PERMISSIONS: tuple[str, ...] = (
     MEETING_PERMISSION,
     RECORDING_PERMISSION,
@@ -71,11 +59,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 # Graph sets no ceiling on `$top`, so this limit is ours.
 MAX_RECORDINGS = 50
 
-# Both vocabularies are this connector's, not Microsoft's, so they are closed and publish as enums
-# in the output schema rather than as bare strings a model has to mine out of the prose. Graph-owned
-# vocabularies (`meeting_type` here) stay `str`, because Microsoft can add a member at any time.
-# Bare assignment, not `type X = ...`: PEP 695 aliases publish as a `$ref` into `$defs`, which puts
-# the values one hop away from the property a model reads.
+# Graph-owned vocabularies (`meeting_type` here) stay `str`: Microsoft can add a member at any
+# time. Bare assignment, not `type X = ...`: a PEP 695 alias publishes as a `$ref` into `$defs`,
+# one hop away from the property a model reads.
 RecordingStatus = Literal["available", "not_ready", "not_recorded", "meeting_not_found"]
 ContentAccess = Literal["you_are_the_organizer", "organizer_only", "unknown"]
 
@@ -88,8 +74,7 @@ exists but is out of reach: never report it as missing. Returns `status` and eac
 times, duration, and access.\
 """
 
-# Local, not shared with teams_list_meeting_transcripts: `tests/test_layering.py` rule 4 forbids
-# that.
+# Local, not shared with teams_list_meeting_transcripts: `tests/test_layering.py` rule 4 forbids it.
 _NOT_A_MEETING_HANDLE = (
     "teams_list_meeting_recordings takes the `meeting_uri` from teams_list_chats: "
     + "teams:///meetings/{join_web_url}. This is not one. Call teams_list_chats, find the meeting "
@@ -245,7 +230,7 @@ async def teams_list_meeting_recordings(
     """Recordings of the meeting `handle` addresses.
 
     Two or three Graph requests: resolve, list, and — only when something was found — the caller id
-    the organizer-only rule needs. Graph names no filterable date here, so this tool offers none.
+    the organizer-only rule needs.
     """
     assert 1 <= limit <= MAX_RECORDINGS, f"limit must be within 1..{MAX_RECORDINGS}, got {limit}"
 
@@ -269,7 +254,6 @@ async def teams_list_meeting_recordings(
             assert first_page is not None, "Graph answered a recording listing with no collection"
             collected = await newest_of(first_page, client, limit=limit)
         found = collected.items
-        # Only when it changes an answer: an empty listing has no organizer to compare anyone with.
         caller = (await identity.signed_in_user(client)).id if found else None
 
     return MeetingRecordings(
@@ -292,9 +276,9 @@ def _absence(*, settled: bool) -> RecordingStatus:
 def _organizer_user_id(recording: CallRecording) -> str | None:
     """Organizer's Entra object id, or None if Graph named nobody.
 
-    TRAP: the identitySet's @odata.type is not always a known SDK type — Microsoft's own sample
-    sends #Microsoft.Teams.GraphSvc.teamworkUserIdentity. An unknown discriminator deserializes to
-    base identity, which still carries the id.
+    TRAP: the identitySet's @odata.type is not always a known SDK type (Microsoft's own sample
+    sends #Microsoft.Teams.GraphSvc.teamworkUserIdentity); an unknown discriminator deserializes
+    to base identity, which still carries the id.
     """
     organizer = recording.meeting_organizer
     if organizer is None or organizer.user is None:
@@ -305,8 +289,7 @@ def _organizer_user_id(recording: CallRecording) -> str | None:
 def _content_access(organizer: str | None, caller: str | None) -> ContentAccess:
     """Which side of the organizer-only rule the signed-in user is on.
 
-    Guessing is wrong both ways, so a missing id is `unknown`. Ids compare case-insensitively: an
-    Entra object id is a GUID and casing is not part of identity.
+    Ids compare case-insensitively: an Entra object id is a GUID and casing is not part of identity.
     """
     if organizer is None or caller is None:
         return "unknown"
@@ -317,8 +300,8 @@ def _content_access(organizer: str | None, caller: str | None) -> ContentAccess:
 def _duration_seconds(recording: CallRecording) -> float | None:
     """Recording length, or None if Graph did not send enough to compute one.
 
-    A missing offset reads as Z, so no subtraction raises. Graph's negative offsets apply to content
-    cue times, not to these fields, so a negative result is unknown rather than a duration.
+    Graph's negative offsets apply to content cue times, not to these fields, so a negative result
+    is unknown rather than a duration.
     """
     began, ended = recording.created_date_time, recording.end_date_time
     if began is None or ended is None:

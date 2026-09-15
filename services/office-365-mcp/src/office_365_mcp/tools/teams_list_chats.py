@@ -1,23 +1,12 @@
 """`teams_list_chats` — the signed-in user's Teams chats, most recent first.
 
-TRAP: Graph's `lastUpdatedDateTime` changes on a rename or a member change and is not recency. Only
-the last message sent decides `last_message_at` and the sort order, which needs `Chat.Read` rather
-than `Chat.ReadBasic`.
+TRAP: `lastUpdatedDateTime` changes on a rename or a member change and is not recency. Only the
+last message sent decides `last_message_at` and the sort order, which needs `Chat.Read`.
 
-**`chat_type` and `topic_contains` narrow the rows here, never in `$filter`.** Microsoft lists
-`$filter` among the supported query parameters for this collection and then enumerates no
-filterable property, and it documents that an unsupported parameter can be dropped in silence
-rather than refused (https://learn.microsoft.com/en-us/graph/query-parameters). So a
-`chatType eq 'meeting'` is the ideal shape for a 200 OK carrying every chat under an argument that
-named one kind. A predicate here cannot be dropped.
-
-**Which is why `capped` exists, and why it had to come first.** `collect_pages` stops on `limit`
-MATCHES rather than on `limit` rows, so a filtered walk really does reach a chat that has been
-quiet for months — but when `limit` fills, the rows are "the matches among the ones read", and
-that reads exactly like "the matches". Every other tool here that filters rows in process — both
-mail listers, both calendar listers, both meeting-artifact listers — publishes the cap for that
-reason. This one discarded it, so a full window of matches was indistinguishable from the end of
-the list, on the deep-history lookup that is `topic_contains`'s whole purpose.
+`chat_type` and `topic_contains` narrow rows in process: Graph names no filterable property on this
+collection and drops an unsupported `$filter` in silence
+(https://learn.microsoft.com/en-us/graph/query-parameters). The walk stops on `limit` MATCHES
+rather than `limit` rows, so `capped` is what tells a full window apart from the end of the list.
 """
 
 from collections.abc import Callable, Mapping
@@ -53,9 +42,6 @@ MEMBERS_PER_CHAT = 25
 
 _RECENCY = "lastMessagePreview/createdDateTime desc"
 
-# The three kinds Microsoft names for a chat. `unknownFutureValue` is the evolvable-enum sentinel
-# rather than a kind, so it is not offered here — the same reason rows report `unknown` for one
-# this code cannot name.
 type ChatKind = Literal["oneOnOne", "group", "meeting"]
 
 type _ChatsQuery = ChatsRequestBuilder.ChatsRequestBuilderGetQueryParameters
@@ -157,11 +143,11 @@ class ChatSummary(BaseModel):
         # Graph documents `topic` as absent when unnamed. A blank one survives the SDK as `""`.
         topic = chat.topic if chat.topic is not None and chat.topic.strip() else None
         members = _members(chat, include_member_emails) if topic is None else None
-        # Not `.value`: `ChatType` subclasses `str`, so the member is its wire value already, and
-        # `.value` is typed as a one-tuple (the generated members carry a trailing comma).
         meeting = chat.online_meeting_info
         return cls(
             chat_id=chat.id,
+            # Not `.value`: `ChatType` subclasses `str`, and its generated members carry a trailing
+            # comma, so `.value` is typed as a one-tuple.
             chat_type=chat.chat_type if chat.chat_type is not None else "unknown",
             topic=topic,
             meeting_uri=meeting_uri_for(meeting.join_web_url) if meeting is not None else None,
@@ -245,15 +231,8 @@ def _keeps(chat_type: ChatKind | None, topic_contains: str | None) -> Callable[[
 def _is_kind(chat_type: ChatKind) -> Callable[[Chat], bool]:
     """Whether the chat is of this kind, compared as enum members rather than as strings.
 
-    The argument is resolved to a `ChatType` once, here, and never re-spelled per row. Two traps
-    make that the shape worth having. `ChatType`'s generated members carry a trailing comma, so
-    every one of them is declared as a one-tuple and the `str` mixin is what resolves it back to
-    the wire value — which means a comparison against a string is correct at runtime and reads to
-    a type checker as impossible. And `str()` of a member is `ChatType.OneOnOne`, not `oneOnOne`,
-    so converting the other way is a bug that looks like the fix.
-
-    A kind Microsoft adds after this code deserializes to None and matches nothing, which is
-    right: it is not the kind that was asked for.
+    `str()` of a `ChatType` member is `ChatType.OneOnOne`, not `oneOnOne`, so converting the other
+    way is a bug that looks like the fix.
     """
     wanted = ChatType(chat_type)
     return lambda chat: chat.chat_type is wanted
@@ -262,9 +241,8 @@ def _is_kind(chat_type: ChatKind) -> Callable[[Chat], bool]:
 def _topic_holds(fragment: str) -> Callable[[Chat], bool]:
     """Whether the chat's topic carries this text, case-insensitively.
 
-    A chat with no topic is not a match. Microsoft documents `topic` as "Only available for group
-    chats", so this silently excludes every one-to-one chat — which is what somebody hunting a
-    named meeting wants, and is why the argument says so.
+    Graph records a topic for group chats only, so a topicless chat never matches and every
+    one-to-one chat is silently excluded.
     """
     wanted = fragment.casefold()
     return lambda chat: chat.topic is not None and wanted in chat.topic.casefold()

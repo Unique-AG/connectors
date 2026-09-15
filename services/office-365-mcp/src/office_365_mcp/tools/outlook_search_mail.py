@@ -1,47 +1,17 @@
 """`outlook_search_mail` — find a message anywhere in the signed-in user's mailbox.
 
-`GET /me/messages?$search="…"` rather than `POST /search/query` with `entityTypes: ["message"]`,
-the endpoint `teams_search_messages` uses. Three facts about the mail entity decide it. The Search
-API cannot reach a delegated mailbox at all — "Users can search their own mailbox, but can't
-search delegated mailboxes" (https://learn.microsoft.com/en-us/graph/search-concept-messages) — so
-`$search` keeps the shape open to a shared-mailbox tool later. Its message hit carries no `id`,
-documented only by example: both sample projections omit it and offer `hitId` instead, a `RestId`
-for a message (https://learn.microsoft.com/en-us/graph/api/resources/searchhit), and `fields`
-cannot add back a field Graph left out. And its `total` is the page size, not the match count.
-
-**Two Graph calls, and the second is not optional.** `Prefer: IdType="ImmutableId"` is not
-honoured under `$search`, and Graph answers `Preference-Applied` anyway, so the header lies rather
-than fails; Microsoft's own maintainer says to "make a secondary call to translate those IDs …
-using the translateExchangeIds API"
-(https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/698). A handle minted from the raw
-hit id dies the moment an inbox rule or retention files the message, and a model reads that 404 as
-"deleted". So every id is exchanged before it becomes a handle. `User.Read` covers the exchange
-and is always on.
-
-**One request, and `$top` is the window.** Whether `$search` pages on this collection is
-undocumented, and no Microsoft page shows an `@odata.nextLink` on a searched message collection.
-So this tool asks once rather than walking with an unverified stop condition.
-
-**The date bound goes in the KQL, and nowhere else.** A live probe against a real tenant on
-2026-09-10 sent `received>=`, `received<` and `received<=` with full ISO instants beside the
-equivalent `receivedDateTime` `$filter` over the same mailbox: identical row sets in all six
-paired comparisons, fractional seconds and a non-UTC offset both honoured, and
-`received>=2099-01-01` returned nothing — so the operator is applied rather than degraded to free
-text. A `$filter` beside `$search` is refused outright, `SearchWithFilter`, reproduced on three
-different arguments. That 400 is louder than Microsoft's published rule for an unsupported
-combination, which is to fail *silently*
-(https://learn.microsoft.com/en-us/graph/query-parameters) and would drop the bound and answer the
-whole `$top` window under an argument named for a date. Only absolute instants are safe: the same
-probe found `received>=today-5` returns zero rows silently, and `received:"last week"` is a 400.
-
-**The window can under-return and never over-return.** The same probe found `$search` does not
-reach drafts in Deleted Items, which `$filter` does — 3 rows of 32 over one month, ~106 of 378
-over the whole mailbox. That is the direction every other criterion here already fails in, and
-`outlook_list_mail` is what reaches those rows.
-
-**Still no `$orderby`.** Ignored under `$search`, and silently, it would return the index's own
-order under a label promising receipt order. So recency stays `outlook_list_mail`, which sorts and
-filters the property Exchange itself evaluates.
+`GET /me/messages?$search="…"` rather than `POST /search/query`, which cannot reach a delegated
+mailbox at all (https://learn.microsoft.com/en-us/graph/search-concept-messages).
+`Prefer: IdType="ImmutableId"` is not honoured under `$search` and Graph answers
+`Preference-Applied` anyway, so every hit id is exchanged through `translateExchangeIds`
+(https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/698) before it becomes a handle.
+Paging is undocumented here, so this asks once and `$top` is the window; `$orderby` is ignored
+silently, so there is none. The date bounds go in the KQL, because a `$filter` beside `$search` is
+refused with `SearchWithFilter` — a live probe on 2026-09-10 matched `received>=`, `received<` and
+`received<=` against the equivalent `receivedDateTime` `$filter` row for row, while
+`received>=today-5` returned nothing silently and `received:"last week"` was a 400. `$search` does
+not reach drafts in Deleted Items, so a window here under-returns where `outlook_list_mail` does
+not.
 """
 
 from collections.abc import Mapping
@@ -75,8 +45,7 @@ TOOL_NAME = "outlook_search_mail"
 STEP_SEARCH = "mail_search"
 STEP_IDS = "mail_ids"
 
-# The token is exchanged for exactly these, so an undeclared `User.Read` 403s the id exchange
-# alone, on the second call and nowhere else.
+# `User.Read` covers the id exchange, which is the only call that 403s without it.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "User.Read")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
@@ -127,8 +96,6 @@ class MailSearchResults(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class SearchCriteria:
-    """What was asked for, separately from how it is spelled for Graph."""
-
     query: str | None = None
     sender: str | None = None
     recipient: str | None = None
@@ -139,8 +106,6 @@ class SearchCriteria:
 
 CRITERIA: tuple[str, ...] = tuple(field.name for field in fields(SearchCriteria))
 
-# Spelled from `CRITERIA`, so the refusal always lists the arguments the schema publishes as the
-# way out of it.
 _NO_CRITERIA = (
     f"outlook_search_mail needs at least one of {', '.join(CRITERIA[:-1])} or {CRITERIA[-1]}. "
     + "Graph answers a criteria-free search with an arbitrary slice of the mailbox. This slice is "
@@ -202,8 +167,7 @@ async def search_mail(
 async def _stable_ids(client: GraphServiceClient, found: list[Message]) -> dict[str, str]:
     """Each hit's mutable id, mapped to one that survives after the mailbox files the message.
 
-    A hit Graph fails to translate is dropped rather than answered with the mutable id: a handle
-    that works now and 404s within the hour is the failure this call exists to prevent.
+    A hit Graph fails to translate is dropped rather than handed back with its mutable id.
     """
     raw = [message.id for message in found if message.id is not None]
     if not raw:
@@ -229,9 +193,8 @@ async def _stable_ids(client: GraphServiceClient, found: list[Message]) -> dict[
 def _query_string(criteria: SearchCriteria) -> str:
     """The KQL these criteria become, empty exactly when the caller named none.
 
-    Every property is Microsoft's own for a message collection, published with an example against
-    `/me/messages` (https://learn.microsoft.com/en-us/graph/search-query-parameter). A query of
-    only punctuation contributes no term, so this string is the honest test of a criterion."""
+    Properties per https://learn.microsoft.com/en-us/graph/search-query-parameter. A query of only
+    punctuation contributes no term, so this string is the honest test of a criterion."""
     terms: list[str] = []
     if criteria.query:
         rendered = kql.free_text(criteria.query)
@@ -255,13 +218,9 @@ def _window_terms(
 ) -> list[str]:
     """The bounds as KQL comparisons on `received`, at most one per end.
 
-    Joined to the criteria and to each other with the explicit `AND`, never a space: a live probe
-    on 2026-09-10 found two space-separated `received` comparisons are BOTH DROPPED, returning the
-    criterion's own unbounded matches under a windowed argument. `AND` matched the equivalent
-    `receivedDateTime` `$filter` exactly in every shape tried.
-
-    Not quoted. The value is a pydantic-parsed date or moment, so it carries no quote and no
-    operator, and `kql.quoted` would phrase-quote it for its colons into a form no probe verified.
+    Joined with an explicit `AND`, never a space: two space-separated `received` comparisons are
+    both dropped, answering the criterion's own unbounded matches. Unquoted, because `kql.quoted`
+    would phrase-quote an instant for its colons into a form no probe verified.
     """
     terms: list[str] = []
     if received_after is not None:
@@ -277,11 +236,7 @@ def _opening_term(received_after: date | datetime) -> str:
 
 
 def _closing_term(received_before: date | datetime) -> str:
-    """`received<` the day after a date, `received<=` a named moment.
-
-    Both are the same promise, that the value named is inside the window: half-open on the
-    following day covers a whole day without choosing a precision, and a moment is exact already.
-    """
+    """Either spelling covers the whole of the value the caller named."""
     if isinstance(received_before, datetime):
         return f"received<={_wire(closes_at(received_before))}"
     return f"received<{_wire(opens_at(received_before + timedelta(days=1)))}"
@@ -290,9 +245,8 @@ def _closing_term(received_before: date | datetime) -> str:
 def _wire(instant: datetime) -> str:
     """An instant as the UTC literal the live probe verified, keeping whatever precision it has.
 
-    `outlook_list_mail._wire` renders a bound identically, so the two windows read against each
-    other. Truncating to whole seconds widens the lower bound and narrows the upper, and a row
-    lost at that boundary leaves a well-formed answer that says nothing was dropped."""
+    Renders identically to `outlook_list_mail._wire`, so the two windows read against each other.
+    Truncating to whole seconds moves a bound silently and drops a row at the boundary."""
     if instant.microsecond:
         return f"{instant:%Y-%m-%dT%H:%M:%S.%f}Z"
     return f"{instant:%Y-%m-%dT%H:%M:%SZ}"
@@ -454,7 +408,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 def _require_a_criterion(tool: Tool) -> None:
     """Say "at least one of these" in the schema, which a Python signature cannot express.
 
-    The runtime refusal stays. FastMCP validates arguments against the signature, not against
-    this schema. So a client that ignores `anyOf` still receives the refusal at runtime.
+    FastMCP validates arguments against the signature rather than this schema, so the runtime
+    refusal stays.
     """
     tool.parameters["anyOf"] = [{"required": [name]} for name in CRITERIA]

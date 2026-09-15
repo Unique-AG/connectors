@@ -1,23 +1,15 @@
 """`teams_search_messages` — full-text search across every Teams message the signed-in user can see.
 
-`POST /search/query` with `entityTypes: ["chatMessage"]` is the only full-text path Graph offers
-over Teams messages, and it runs in delegated context only
-(https://learn.microsoft.com/en-us/graph/search-concept-chat-messages). Four of its documented
-properties shape everything below.
+`POST /search/query` with `entityTypes: ["chatMessage"]` is Graph's only full-text path over Teams
+messages, delegated context only
+(https://learn.microsoft.com/en-us/graph/search-concept-chat-messages). A hit is a projection with
+no `body`; `total` counts the page rather than the matches, so only `moreResultsAvailable` says
+whether to keep going; no custom sort is supported; and paging is stateless `from`/`size` integers
+rather than an `@odata.nextLink`, so `collect_pages` has no part here.
 
-* **The hit is a projection, not a message.** The retrievable set is `channelIdentity`, `chatId`,
-  `createdDateTime`, `etag`, `from`, `id`, `importance`, `lastModifiedDateTime`, `subject` and
-  `webUrl`, with no `body`.
-* **`total` is not a match count.** Graph puts the number of results on the page in it, so nothing
-  here reads it. `moreResultsAvailable` is its only "keep going" signal.
-* **Sorting is unsupported.** Graph supports no custom sort for `chatMessage`.
-* **Paging is stateless.** `from`/`size` integers rather than an opaque `@odata.nextLink`, so
-  `graph_client.collect_pages` has no part here.
-
-Deliberately absent: the per-chat scan the connector this one replaces falls back to. Graph caps
-reads at one request per second per app per tenant on a given channel or chat
-(https://learn.microsoft.com/en-us/graph/throttling), and the budget is per app, so one user's
-sweep of fifty chats degrades every other user in the tenant.
+Graph throttles reads on a chat or channel to one request per second per app per tenant
+(https://learn.microsoft.com/en-us/graph/throttling), and that budget is the app's rather than the
+caller's, so one user's wide sweep degrades every other user in the tenant.
 """
 
 from collections.abc import Mapping
@@ -53,16 +45,13 @@ TOOL_NAME = "teams_search_messages"
 
 STEP = "search_query"
 
-# TRAP: `/search/query` accepts `Chat.Read` alone, and a search never returns more than the
-# equivalent GET returns, so without `ChannelMessage.Read.All` it silently covers chats only. Both
-# are requested, so a tenant withholding the broad one is refused at consent time, not at query
-# time.
+# TRAP: `/search/query` accepts `Chat.Read` alone and then silently covers chats only. Requesting
+# both refuses a tenant withholding the broad one at consent time rather than at query time.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "release"}
 
-# Graph documents a general `size` maximum of 1000 and caps the `message` and `event` entities at
-# 25. It publishes no ceiling for `chatMessage`, so 50 is an undocumented choice between the two.
+# Graph publishes no `size` ceiling for `chatMessage` — 1000 generally, 25 for `message`/`event`.
 MAX_RESULTS = 50
 
 _DESCRIPTION = """\
@@ -163,9 +152,8 @@ class MessageHit(BaseModel):
             return None
         sender = MessageSender.from_identity(resource.from_)
         if sender is None:
-            # Graph documents the identity as null for a deleted message or a Teams system event.
-            # The retrievable set holds neither `messageType` nor `eventDetail`, so a missing sender
-            # is the only signal, and such a hit carries no text either.
+            # Graph nulls the identity on a deleted message or a system event, and the retrievable
+            # set holds neither `messageType` nor `eventDetail`, so this is the only signal.
             return None
         channel = resource.channel_identity
         team_id = channel.team_id if channel is not None else None
@@ -234,8 +222,6 @@ class SearchCriteria:
 
 CRITERIA: tuple[str, ...] = tuple(field.name for field in fields(SearchCriteria))
 
-# TRAP: Graph answers a criteria-free search with an arbitrary slice of everything the user can
-# read, and that slice reads like a real result set — the one failure a model cannot detect.
 _NO_CRITERIA = (
     "teams_search_messages needs at least one of "
     + ", ".join(CRITERIA)
@@ -247,10 +233,9 @@ _NO_CRITERIA = (
 def _query_string(criteria: SearchCriteria) -> str:
     """The `queryString` these criteria become. Empty exactly when nothing was asked for.
 
-    The scope terms below, and their odd casing, are Microsoft's own for `chatMessage`. `sent` is a
-    comparison rather than a `term:value` pair, and uses `>=` and `<=` so a bound lands on the day
-    the caller named. A query of nothing but punctuation contributes no term, so this string, not
-    the arguments behind it, is the honest test of `is_empty`.
+    The term names and their odd casing are Microsoft's own for `chatMessage`; `sent` is a
+    comparison rather than a `term:value` pair. A query of nothing but punctuation contributes no
+    term, which is why this string, not the arguments behind it, is what `is_empty` tests.
     """
     terms: list[str] = []
     if criteria.query:
@@ -262,8 +247,7 @@ def _query_string(criteria: SearchCriteria) -> str:
     if criteria.recipient:
         terms.append(f"to:{quoted(criteria.recipient)}")
     if criteria.mentions is not None:
-        # Microsoft's example is a user id "without '-'", which is exactly `UUID.hex`. Typing the
-        # parameter as a UUID is also what makes this the one term that needs no quoting.
+        # Graph matches a user id with the dashes stripped, which is exactly `UUID.hex`.
         terms.append(f"mentions:{criteria.mentions.hex}")
     if criteria.sent_after is not None:
         terms.append(f"sent>={_kql_moment(criteria.sent_after)}")
@@ -281,20 +265,10 @@ def _query_string(criteria: SearchCriteria) -> str:
 def _kql_moment(bound: date | datetime) -> str:
     """One of KQL's documented datetime literal formats: a whole day, or a second.
 
-    KQL publishes four literal shapes for a comparison on a DateTime property — `YYYY-MM-DD`,
-    `YYYY-MM-DDThh:mm:ss`, the same with a trailing `Z`, and one with fractional seconds. A date
-    renders as the first, byte for byte as it always has. A datetime renders as the third, because
-    `isoformat()` would write an aware moment as `+00:00`, which is none of the four.
-
-    `datetime` is checked first, and must be: it is a subclass of `date`, so the other order
-    renders a moment as the day it falls on and silently discards the time the caller asked about.
-
-    Both halves of the zone handling are needed, and `as_utc` alone is not enough. It supplies the
-    zone a naive moment lacks — UTC, as `OccurrenceWindow` reads one, rather than whichever zone
-    the pod happens to run in — but it leaves an aware moment in the zone it arrived in. Since the
-    format below writes a literal `Z`, that would stamp UTC on a wall clock: `09:30+02:00` would
-    reach Graph as `09:30Z` and move the bound two hours. So the moment is converted, not
-    relabelled.
+    KQL accepts no `+00:00` offset, so an aware moment is converted to UTC and written with a
+    literal `Z` — relabelling it would move the bound. `as_utc` only supplies the zone a naive
+    moment lacks. `datetime` must be checked first: it subclasses `date`, and the other order
+    silently discards the time.
     """
     if isinstance(bound, datetime):
         return f"{as_utc(bound).astimezone(UTC):%Y-%m-%dT%H:%M:%SZ}"
@@ -334,16 +308,15 @@ async def teams_search_messages(
         messages=[
             message for message in (MessageHit.from_hit(hit) for hit in hits) if message is not None
         ],
-        # `moreResultsAvailable` alone is not a next page: without the `hits` check, a hitless page
-        # hands back the offset it was asked at, and a caller obeying `next_offset` re-requests it
-        # forever.
+        # `moreResultsAvailable` alone is not a next page: a hitless page would hand back the
+        # offset it was asked at, and a caller obeying `next_offset` re-requests it forever.
         next_offset=offset + len(hits) if more_to_come and hits else None,
     )
 
 
 def _hits_container(response: QueryPostResponse) -> SearchHitsContainer | None:
-    """The one container this request produces. Graph "currently supports only a single
-    searchRequest at a time" and one entity type, so the nesting holds one of each.
+    """The one container this request produces: Graph accepts a single `searchRequest` at a time,
+    and this one names a single entity type, so the nesting holds one of each.
     """
     for search_response in response.value or []:
         for container in search_response.hits_containers or []:
@@ -364,8 +337,8 @@ def _hit_uri(
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
-    # Two steps rather than `@mcp.tool`, which hands back the function: `add_tool` returns the
-    # registered tool, the only way to reach the schema `_require_a_criterion` adds to.
+    # Two steps rather than `@mcp.tool`, which hands back the function: only `add_tool` returns the
+    # registered tool, whose schema `_require_a_criterion` adds to.
     @tool_metadata(
         name=TOOL_NAME,
         title="Search Teams Messages",
@@ -501,8 +474,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 def _require_a_criterion(tool: Tool) -> None:
     """Put "at least one criterion" in the tool's schema, where a client can enforce it.
 
-    A signature cannot say that optional parameters must not all be omitted, and FastMCP derives
-    the schema from the signature. The runtime check stays: FastMCP validates arguments against the
-    signature rather than against this schema, so a client that ignores it must still be refused.
+    FastMCP validates arguments against the signature rather than against this schema, so the
+    runtime check in the tool stays.
     """
     tool.parameters["anyOf"] = [{"required": [name]} for name in CRITERIA]

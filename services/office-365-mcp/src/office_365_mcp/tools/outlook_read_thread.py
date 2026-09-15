@@ -1,36 +1,12 @@
 """`outlook_read_thread` — every message of one conversation that is in this mailbox.
 
-**Microsoft publishes no thread endpoint for a personal mailbox.** `conversationThread` belongs to
-Microsoft 365 Groups, not to mail. What a message carries is `conversationId`, and the only route
-from it to the thread is `$filter=conversationId eq '…'` — which appears in no Microsoft document.
-A grep of the whole of `microsoftgraph/microsoft-graph-docs-contrib` finds zero occurrences of it.
-A Microsoft SDK maintainer confirmed it works, in
+Microsoft publishes no thread endpoint for a personal mailbox, and the only route from a message's
+`conversationId` to its thread is `$filter=conversationId eq '…'`, which appears in no Microsoft
+document — a Microsoft SDK maintainer confirmed it works in
 https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/757, and that is the whole of the
-evidence.
-
-**So this tool verifies the filter on every call, rather than trusting it once.**
-`conversationId` is a selectable property of the filtered collection. So this tool can select the
-property it filtered on, and check the answer. If Graph ignored the filter, the response is an
-arbitrary slice of the mailbox carrying many different conversations. Then the anchor message is
-unlikely to be in it. This tool asserts both, and a failure refuses rather than answers. That is
-the difference between this undocumented filter and a dangerous one. Microsoft documents `$filter`
-on `/attachments` as *ignored*, and nothing in that response reveals it.
-
-**The anchor is a message handle, not a conversation id.** Three reasons exist, and the first is
-the one that matters: the check above needs a message that must be present, and only an anchor
-provides one. It also keeps this tool independent of how a caller found the message. An
-80-character opaque id is a hallucination surface with nothing to validate it against. A handle,
-by contrast, is this connector's own grammar.
-
-**No `$orderby`.** Rule one of Microsoft's three is that every property in `$orderby` must also
-appear in `$filter`, so `$orderby=receivedDateTime desc` beside `$filter=conversationId eq …`
-answers `InefficientFilter`. This tool sorts the messages here instead. A thread is small and this
-cannot fail.
-
-**A thread is this mailbox's copy of a conversation, never the conversation.** A message another
-participant sent to somebody else was never in this mailbox, and one this user permanently deleted
-is gone from it. The answer says which scope it searched, so a reader does not take absence as
-proof.
+evidence. Graph ignores an unsupported `$filter` rather than refusing it, so every call selects
+`conversationId` back and refuses an answer carrying a foreign conversation. There is no
+`$orderby`: beside this `$filter` it answers `InefficientFilter`, so the sort happens here.
 """
 
 from collections.abc import Mapping
@@ -68,9 +44,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 MAX_MESSAGES = 100
 
-# This header names the id space every handle in this connector uses. This tool sends it so one
-# id space runs through the whole surface. Whether Graph also re-parses a path id in the space a
-# header names is undocumented.
+# The id space every handle in this connector uses. Whether Graph also re-parses a path id in the
+# space a header names is undocumented.
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _ANCHOR_FIELDS: tuple[str, ...] = ("id", "conversationId")
@@ -152,9 +127,7 @@ async def read_thread(client: GraphServiceClient, *, handle: MailMessageHandle) 
             page = await client.me.messages.get(request_configuration=_thread_request(conversation))
 
     found = list((page.value if page is not None else None) or [])
-    # Graph's own "there is more" signal, rather than a full window.
-    # A page can come back short of `$top` and still carry a next link, because `$skip` counts
-    # every item the service walked.
+    # A page can come back short of `$top` and still carry a next link, so the link is the signal.
     truncated = page is not None and page.odata_next_link is not None
     _make_sure_the_filter_was_applied(
         found, conversation=conversation, anchor=handle.message_id, truncated=truncated
@@ -167,12 +140,9 @@ def _make_sure_the_filter_was_applied(
 ) -> None:
     """Refuse an answer Graph did not filter.
 
-    Two checks, and only one of them survives a truncated page. A foreign conversation proves
-    Graph dropped the filter, whatever the page size. Anchor-absent is the subtler shape. It is
-    what a filter applied to the wrong value looks like. Answering with it reports somebody
-    else's thread as this one. But a thread longer than one page can leave the anchor off it
-    honestly, with no `$orderby` to say which messages the page holds. Checking it there refuses
-    a correct answer, and blames Graph for a filter it applied.
+    A foreign conversation proves the filter was dropped at any page size. An absent anchor means
+    the filter ran on the wrong value — but only on a whole page: with no `$orderby`, a truncated
+    page can honestly leave the anchor off.
     """
     if not found:
         return
@@ -202,8 +172,7 @@ def _answer(found: list[Message], *, complete: bool) -> MailThread:
 
 
 def _received_at(message: Message) -> str:
-    """Oldest first, and a message with no received time sorts first rather than crashing the sort:
-    a draft in the thread has none."""
+    """Oldest first, with a draft — which carries no received time — sorting first."""
     return "" if message.received_date_time is None else message.received_date_time.isoformat()
 
 
@@ -217,7 +186,7 @@ def _anchor_request() -> RequestConfiguration[_AnchorQuery]:
 
 
 def _thread_request(conversation: str) -> RequestConfiguration[_ThreadQuery]:
-    """No `$orderby`. See the module docstring."""
+    """No `$orderby`: beside this `$filter` Graph answers `InefficientFilter`."""
     return RequestConfiguration[_ThreadQuery](
         query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
             filter=f"conversationId eq '{odata_literal(conversation)}'",
@@ -229,8 +198,8 @@ def _thread_request(conversation: str) -> RequestConfiguration[_ThreadQuery]:
 
 
 def _immutable_ids() -> HeadersCollection:
-    """Built per call: kiota's `RequestConfiguration.headers` default is one collection shared by
-    every configuration in the process. So a preference added to it leaks onto every Graph call."""
+    """Built per call: kiota's `RequestConfiguration.headers` default is one collection shared
+    process-wide, so a preference added to it leaks onto every Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
     return headers

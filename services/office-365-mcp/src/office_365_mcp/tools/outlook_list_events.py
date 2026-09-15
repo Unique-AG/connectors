@@ -1,20 +1,16 @@
 """`outlook_list_events` — one calendar's occurrences over a window, never a recurrence rule.
 
-`GET /me/events` returns series masters, not occurrences: "To get expanded event instances, you can
-get the calendar view" (https://learn.microsoft.com/en-us/graph/api/user-list-events). So this tool
-reads `calendarView`, whose required `startDateTime`/`endDateTime` carry their own offset and
-"aren't impacted by the value of the Prefer: outlook.timezone header"; with no offset they are UTC
-(https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview). That header is not sent,
-so rows arrive in UTC and `zoneinfo` converts them. Graph puts no calendar id on a `calendarView`
-row, so the calendar is read first and supplies half of every handle minted here.
+`GET /me/events` returns series masters, so this reads `calendarView`, whose required
+`startDateTime`/`endDateTime` carry their own offset and ignore the `Prefer: outlook.timezone`
+header (https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview). That header is not
+sent, so rows arrive in UTC. A `calendarView` row carries no calendar id, so the calendar is read
+first and supplies half of every handle minted here.
 
-`calendarView` does accept a `$filter` on a FLAT property, against what its own page suggests by
-naming only "some of" the OData parameters and no filterable property at all
-(https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview). `cancelled` and
-`subject_contains` are therefore server-side, both live-verified. A NESTED path is the exception:
-`responseStatus/response` answers correctly alone and returns 500 as soon as it is conjoined with
+`calendarView` accepts a `$filter` on a FLAT property, which its own page documents nowhere —
+hence server-side `cancelled` and `subject_contains`, both live-verified. A NESTED path is the
+exception: `responseStatus/response` answers alone but returns 500 as soon as it is conjoined with
 another property, so `owner_response` stays a predicate over the rows. There is no attendee filter
-at any spelling, which is why no argument here asks about one.
+at any spelling.
 """
 
 from collections.abc import Callable, Mapping
@@ -293,8 +289,7 @@ def _filter_for(*, subject_contains: str | None, cancelled: bool | None) -> str 
 
     Both forms are live-verified against `calendarView` beside `$orderby=start/dateTime`, each sent
     once with a value present in the window and once with one that cannot match — which is what
-    separates a filter Graph evaluates from one it drops in silence. `owner_response` is absent on
-    purpose: see `_owner_answered`.
+    separates a filter Graph evaluates from one it drops in silence.
     """
     terms: list[str] = []
     if cancelled is not None:
@@ -321,10 +316,8 @@ def _owner_answered(event: Event, owner_response: OwnerResponse) -> bool:
     """Whether the calendar owner's answer is the one asked for, compared in process.
 
     `responseStatus/response` IS filterable on `calendarView` alone, but a live probe on 2026-09-10
-    found a nested path 500s as soon as it is conjoined with any other property — in both orders
-    and parenthesised — so sending it beside `cancelled` or `subject_contains` would crash the very
-    combination a caller most wants. Compared through `spelled`, which is how
-    `EventSummary.owner_response` is built, so the argument and the field cannot drift apart.
+    found a nested path 500s once conjoined with any other property, in both orders and
+    parenthesised.
     """
     status = event.response_status
     if status is None or status.response is None:

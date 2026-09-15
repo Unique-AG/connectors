@@ -1,24 +1,10 @@
 """`teams_list_channels` — channels of one team the signed-in user can access.
 
-TRAP: `$select` is a requirement, not an optimization — it excludes `email`, which Graph documents
-as "an expensive operation that results in slow performance". The collection accepts no `$top`
-(Graph returns 400), so the window is this connector's own, applied while walking pages.
-
-**`membership_type` is a real `$filter`, and one of few on any Teams collection.** Microsoft
-publishes "This method supports the $filter and $select OData query parameters" for this
-collection, and backs it with worked examples naming the property — `channels?$filter=
-membershipType eq 'private'` among them (https://learn.microsoft.com/en-us/graph/api/channel-list).
-So this bound goes to the server rather than filtering rows here.
-
-**And it is checked on the way back, because a `$filter` Graph does not honour is documented to
-fail in silence** rather than with an error
-(https://learn.microsoft.com/en-us/graph/query-parameters). Dropped, the filter would answer with
-every channel of the team under an argument that named one kind — and `ChannelList.channels`
-promises that fewer rows than `limit` means those are all of them, so a caller reading a full
-inventory as "all the private channels" has no way to tell. The check raises rather than
-discarding the wrong rows: discarding would keep that promise intact while quietly turning a
-dropped filter into a false "none found". `membershipType` is already in `$select`, so it costs
-nothing.
+TRAP: `$select` excludes `email`, which Graph documents as an expensive property, and the
+collection rejects `$top` with a 400 — so the window is applied while walking pages.
+`membership_type` is a real `$filter` (https://learn.microsoft.com/en-us/graph/api/channel-list),
+and it is checked on the way back because a `$filter` Graph does not honour fails in silence
+rather than with an error (https://learn.microsoft.com/en-us/graph/query-parameters).
 """
 
 from collections.abc import Mapping
@@ -42,8 +28,8 @@ TOOL_NAME = "teams_list_channels"
 
 STEP = "channels"
 
-# This permission is not `ChannelMessage.Read.All`, which teams_browse_channel declares to read
-# posted messages. A tenant commonly grants one and withholds the other.
+# Not `ChannelMessage.Read.All`, which teams_browse_channel declares: a tenant commonly grants one
+# and withholds the other.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Channel.ReadBasic.All",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"team_id": "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"}
@@ -53,15 +39,12 @@ MAX_CHANNELS = 200
 # Excludes `isArchived` (a Teams preview) and `layoutType` (Graph documents it as always null).
 _CHANNEL_FIELDS = ("id", "displayName", "description", "createdDateTime", "membershipType")
 
-# TRAP: without this header Graph answers a shared channel's `membershipType` with the literal
-# `unknownFutureValue` — `shared` sits after that sentinel in the evolvable enum. A `$filter` on
-# the real value needs no header. This listing reports the type instead, so it needs the header.
+# TRAP: without this header Graph reports a shared channel's `membershipType` as the literal
+# `unknownFutureValue` — `shared` sits after that sentinel in the evolvable enum.
 _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 
-# The three kinds Microsoft names. `unknownFutureValue` is the evolvable-enum sentinel rather than
-# a kind of channel, so it is not offered: filtering on it asks for the marker, not for whatever
-# Microsoft adds next. A closed set is also what keeps this value out of reach of an OData literal
-# escape — nothing a caller writes reaches the query string.
+# Closed set: this value is interpolated into `$filter`, so nothing a caller writes can reach the
+# query string.
 type ChannelMembership = Literal["standard", "private", "shared"]
 
 type _ChannelsQuery = ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParameters
@@ -121,7 +104,7 @@ class ChannelSummary(BaseModel):
     @classmethod
     def from_channel(cls, channel: Channel) -> Self:
         assert channel.id is not None, "Graph returned a channel with no id"
-        # `ChannelMembershipType` subclasses `str`. An unnamed type becomes None. It never raises.
+        # `ChannelMembershipType` subclasses `str`; a kind this SDK cannot name becomes None.
         return cls(
             channel_id=channel.id,
             display_name=channel.display_name,
@@ -173,18 +156,14 @@ async def teams_list_channels(
 def _make_sure_the_filter_was_applied(
     channels: list[ChannelSummary], membership_type: ChannelMembership | None
 ) -> None:
-    """Refuse an answer holding a channel of a kind nobody asked for. See the module docstring.
+    """Refuse an answer holding a channel of a kind nobody asked for.
 
-    A row whose `membership_type` is null passes: Microsoft can add a kind after this code, and the
-    `Prefer` header asks for the real name of one, so a null here is a kind this tool cannot name
-    rather than evidence about the filter. A row naming a DIFFERENT one of the three is the
-    evidence, and it is what a dropped filter produces.
+    A null `membership_type` passes: it is a kind this tool cannot name, not evidence about the
+    filter. Only a row naming a DIFFERENT one of the three is.
     """
     if membership_type is None:
         return
-    # Case-folded, for the same reason `outlook_list_mail` folds a sender address: the answer
-    # echoes whatever spelling Microsoft 365 holds, not the spelling that was filtered with. A
-    # bare `!=` turns a `Private` where `private` was asked into a refused answer that was right.
+    # Case-folded: the answer echoes whatever spelling Microsoft 365 holds, not the one filtered on.
     wanted = membership_type.casefold()
     for channel in channels:
         recorded = channel.membership_type

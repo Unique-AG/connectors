@@ -1,14 +1,13 @@
-"""What an Outlook calendar and an Outlook event are: the shapes every calendar tool answers in.
+"""The shapes every Outlook calendar tool answers in.
 
-- Graph states an instant as a `dateTime` with no offset plus a separate `timeZone` name, and with
-  no `Prefer: outlook.timezone` header both come back in UTC
-  (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview). No tool here sends it.
-- `timeZone` is often a Windows name such as `W. Europe Standard Time`, which `zoneinfo` cannot
-  resolve, so `EventTime.iso` is null for those; on an all-day event both bounds are UTC midnight,
-  so `local` and not `iso` names the day it covers.
-- A create is a send: "the server sends invitations to all attendees", and that "can't be
-  configured" (https://learn.microsoft.com/en-us/graph/api/user-post-events). `transactionId` is
-  the only defense against a duplicated one, and Microsoft documents no comparison rule for it.
+- Graph states an instant as an offset-less `dateTime` plus a separate `timeZone` name, both UTC
+  unless `Prefer: outlook.timezone` is sent, which no tool here sends
+  (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview).
+- A `timeZone` is often a Windows name such as `W. Europe Standard Time`, which `zoneinfo` cannot
+  resolve, leaving `EventTime.iso` null; all-day bounds are UTC midnight, so `local` names the day.
+- A create sends invitations to every attendee and that "can't be configured"
+  (https://learn.microsoft.com/en-us/graph/api/user-post-events); `transactionId` is the only
+  defense against a duplicate, and Microsoft documents no comparison rule for it.
 """
 
 import html
@@ -90,8 +89,8 @@ SUMMARY_FIELDS: tuple[str, ...] = (
     "webLink",
 )
 
-# Graph's own cap is 500 (https://learn.microsoft.com/en-us/graph/api/resources/event); far lower
-# here on purpose, because every address receives an invitation this connector cannot recall.
+# Graph's own cap is 500 (https://learn.microsoft.com/en-us/graph/api/resources/event); lower here
+# because every address receives an invitation this connector cannot recall.
 MAX_ATTENDEES = 20
 
 MAX_SUBJECT_CHARACTERS = 255
@@ -109,14 +108,13 @@ MAX_ALL_DAY_EVENT_DAYS = 14
 # `2026-03-02T24:00` (the next day's midnight), and a create sends the caller's own string.
 WALL_CLOCK = re.compile(r"\A\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\Z")
 
-# Both name families Graph accepts fit these characters (`W. Europe Standard Time`, `Etc/GMT+2`),
-# and the name reaches verbatim the question a person answers.
+# Both name families Graph accepts fit these characters: `W. Europe Standard Time`, `Etc/GMT+2`.
 ZONE_NAME = r"^[A-Za-z0-9][A-Za-z0-9 _./+-]*$"
 
 MAX_ZONE_CHARACTERS = 64
 
-# What a real tag looks like, so a "<" followed by a space, a digit or a symbol stays as the text
-# it is: `Budget < 5000 EUR` is a sentence and `<[^>]+>` deletes the rest of it without a marker.
+# A "<" followed by a space, a digit or a symbol stays text: `<[^>]+>` would silently delete the
+# rest of `Budget < 5000 EUR`.
 _A_TAG = re.compile(r"<(?:!--.*?--|/?[A-Za-z][^<>]*)>", re.DOTALL)
 
 # Script and style go with their contents: CSS filling the cut hides the words a recipient reads.
@@ -128,8 +126,7 @@ _PREVIEW_CHARACTERS = 120
 _DefaultCalendarQuery = CalendarRequestBuilder.CalendarRequestBuilderGetQueryParameters
 _NamedCalendarQuery = CalendarItemRequestBuilder.CalendarItemRequestBuilderGetQueryParameters
 
-# Never change this: a new namespace makes every id already sent unrecognizable to Graph, which is
-# the point of sending one.
+# Never change this: a new namespace makes every id already sent unrecognizable to Graph.
 _TRANSACTION_NAMESPACE = uuid.UUID("eb6f3437-0196-4593-b4d7-a6044db0acdf")
 
 # Graph answers `responseStatus.time` with `0001-01-01T00:00:00Z` when nobody responded.
@@ -209,15 +206,9 @@ def window_bounds(
     """The two instants `calendarView` requires, rendered with the offset Graph reads them by.
 
     Graph reads these bounds by the offset in the value and not the `Prefer` header
-    (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview), so the whole of the zone
-    handling is in the string.
-
-    What a bound MEANS is `shared/window.py`'s, and `zone` is handed to it: a bare date is that
-    local day, a wall clock with no offset is that local time, and an offset a caller wrote wins.
-    Only the closing form is this function's own. A bare `ends_on` closes at the first instant of
-    the day AFTER it, which is what covers that day whole; a moment closes at itself. Either way
-    the window is half-open at the top, so an event starting exactly on the closing instant
-    belongs to the next window.
+    (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview), so all of the zone
+    handling is in the string. The window is half-open at the top: a bare `ends_on` closes at the
+    first instant of the day after it, which is what covers that day whole.
     """
     opens = opens_at(starts_on, zone=zone)
     closes = (
@@ -599,8 +590,6 @@ def repeated_address(addresses: Sequence[str]) -> str | None:
 
 
 async def calendar_of(client: GraphServiceClient, *, calendar_id: str | None) -> Calendar:
-    """This opens no error mapping: only the calling tool knows what refusal a missing calendar
-    deserves."""
     with graph_step(STEP_CALENDAR):
         found = (
             await client.me.calendar.get(

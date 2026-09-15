@@ -1,51 +1,19 @@
 """`teams_list_meeting_transcripts` — transcripts a Teams meeting holds and whether it was
 transcribed.
 
-TRAP: transcript access is a tenant-wide Teams switch, OFF by default, and every call answers 403
-while it is off. It is not a permission. It needs admin action. Microsoft scopes the switch to
-transcripts, so in an untouched tenant this fails and `teams_list_meeting_recordings` answers.
+TRAP: transcript access is a tenant-wide Teams switch, OFF by default and scoped to transcripts
+alone, so an untouched tenant answers 403 here while `teams_list_meeting_recordings` succeeds. It
+is admin action, not a permission.
 
 TRAP: Graph can return an empty page that still carries a next link, so an empty page is not the
-end of the collection. `graph_client/pagination.py` follows the link. Without it, a meeting whose
-Graph pages as `[3, nothing, 1]` looks like it holds only 3 transcripts.
+end of the collection. `graph_client/pagination.py` follows the link.
 
-Newest first: Graph has no `$orderby`. Read up to MAX_ARTIFACT_SCAN, sort, then cut to `limit` —
-cutting first returns an arbitrary subset sorted among itself, a wrong answer in the right shape.
-That is why `newest_of` is a named function.
-
-**No date window, deliberately.** This collection is one of few on the surface that ENUMERATES
-its options — "This method supports the `$select`, `$filter`, and `$top` OData query parameters" —
-so `$filter` is documented by name. What is documented is no filterable *property*: the only
-published example filters `contentCorrelationId`
-(https://learn.microsoft.com/en-us/graph/api/calltranscript-get, Example 11), and `createdDateTime`
-appears in no `$filter` context for `callTranscript` at all.
-
-This tool used to take `started_after`/`started_before` and apply them to the rows after the fetch.
-They are gone. Microsoft 365 will not evaluate a date here, so offering one published a filter this
-connector performed itself, which read in the schema exactly like the one below that Graph really
-does apply. Pushing them to the wire instead was refused for a second reason worth keeping on
-record: Microsoft's own sample artifacts carry seven fractional digits
-(`2021-09-16T18:56:00.9038309Z`), so a `le` bound rendered to whole seconds would drop the row at
-the very edge of the caller's window, server-side, with `capped` false. Every row still carries its
-own `started_at`, so one occurrence of a series is picked by reading the answer.
-
-**`content_correlation_id` is the one bound that does reach the server**, and it is the only
-`$filter` example Microsoft publishes anywhere in the v1.0 artifact documentation: Example 11 above
-gets "a single transcript of an online meeting corresponding to a recording" with
-`?$filter=contentcorrelationId eq '…'` — that lowercase spelling, verbatim. It exists to close the
-loop `teams_list_meeting_recordings` opens: every recording row already carries this id, and it is
-Microsoft's own link between a recording and the transcript of the SAME call, so a caller who found
-the recording of one occurrence can ask for its words without knowing anything else.
-
-It is checked on the way back, on the same terms every other undocumented-adjacent filter in this
-service is. Microsoft's rule is that an unsupported parameter can be dropped in silence
-(https://learn.microsoft.com/en-us/graph/query-parameters), and a dropped one here would answer
-with every transcript of the meeting under an argument naming one call — which for a recurring
-series is somebody else's occurrence, presented as this one's.
-
-**And it is not a promise of one row.** Microsoft's own List transcripts response shows several
-transcripts sharing a single `contentCorrelationId`, so the sort and `limit` still run over
-whatever comes back.
+Graph offers no `$orderby` here, so rows are read up to MAX_ARTIFACT_SCAN and sorted before `limit`
+cuts them. The one `$filter` Microsoft publishes for this collection is on `contentCorrelationId`,
+in that lowercase `contentcorrelationId` spelling, and no date property appears in any `$filter`
+context (https://learn.microsoft.com/en-us/graph/api/calltranscript-get, Example 11). Graph may
+drop an unsupported parameter in silence (https://learn.microsoft.com/en-us/graph/query-parameters),
+so the answer is checked against the filter that was sent.
 """
 
 from collections.abc import Mapping
@@ -78,12 +46,10 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "teams_list_meeting_transcripts"
 
-# The meeting resolve before this one counts under `shared/meetings.py`'s own step, not this.
 STEP_TRANSCRIPTS = "transcripts"
 
-# Meeting resolve and transcript read, redeemed under one token by Entra. The transcript permission
-# lives in `shared/meetings.py`: `tests/test_layering.py` rule 4 forbids importing
-# teams_read_transcript.
+# `tests/test_layering.py` rule 4 forbids importing teams_read_transcript, so the transcript
+# permission lives in `shared/meetings.py`. Entra redeems both under one token or neither.
 GRAPH_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, TRANSCRIPT_PERMISSION)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
@@ -106,11 +72,9 @@ _FILTER_IGNORED = (
     + "own `content_correlation_id` instead."
 )
 
-# This connector's own vocabulary, not Microsoft's, so it is closed and publishes as an enum
-# in the output schema rather than as a bare string a model has to mine out of the prose.
-# Graph-owned vocabularies (`meeting_type` here) stay `str`, because Microsoft can add a
-# member at any time. Bare assignment, not `type X = ...`: PEP 695 aliases publish as a
-# `$ref` into `$defs`, which puts the values one hop away from the property a model reads.
+# Graph-owned vocabularies (`meeting_type` here) stay `str`: Microsoft can add a member at any
+# time. Bare assignment, not `type X = ...`: a PEP 695 alias publishes as a `$ref` into `$defs`,
+# one hop away from the property a model reads.
 TranscriptStatus = Literal["available", "not_ready", "not_transcribed", "meeting_not_found"]
 
 _DESCRIPTION = """\
@@ -277,9 +241,7 @@ def _paired_with(
 ) -> RequestConfiguration[_TranscriptsQuery] | None:
     """The one `$filter` this collection documents, or None when the caller named no call.
 
-    `contentcorrelationId` in Microsoft's own lowercase spelling, and the value escaped by
-    `odata_literal` — the same escape `resolve_meeting` applies to a join URL one call earlier,
-    for the same reason: an unescaped quote ends the literal and leaves the rest as predicate.
+    `contentcorrelationId` is Microsoft's own lowercase spelling of the property.
     """
     if content_correlation_id is None:
         return None
@@ -295,16 +257,12 @@ def _make_sure_the_filter_was_applied(
 ) -> None:
     """Refuse an answer holding a transcript of another call. See the module docstring.
 
-    A transcript Graph sent no `contentCorrelationId` for passes: the property is one this listing
-    reports rather than one it can insist on, and a null is not evidence about the filter. A
-    DIFFERENT id is the evidence, and it is what a dropped filter produces on a recurring series.
+    A null `contentCorrelationId` passes: it is not evidence about the filter. A DIFFERENT id is,
+    and it is what a dropped filter produces on a recurring series.
     """
     if content_correlation_id is None:
         return
-    # Case-folded, as `teams_list_channels` and `outlook_list_mail` both fold: the answer echoes
-    # the spelling Microsoft 365 holds, not the one that was filtered with. Microsoft renders this
-    # id as a lowercase GUID with a suffix, but a bare `!=` would refuse a right answer over a
-    # spelling this tool never chose.
+    # Case-folded: the answer echoes the spelling Microsoft 365 holds, not the one filtered with.
     wanted = content_correlation_id.casefold()
     for transcript in found:
         recorded = transcript.content_correlation_id
@@ -313,13 +271,7 @@ def _make_sure_the_filter_was_applied(
 
 
 def _absence(*, settled: bool) -> TranscriptStatus:
-    """Which empty answer: the meeting is over and nothing came, or it is too soon to say.
-
-    There is no third case any more. An empty listing used to be able to mean "the scan stopped
-    before the window", which needed a status of its own; without a window an empty listing means
-    Graph returned nothing, and a scan that stops at the cap always returns rows. `scan_incomplete`
-    survives as a FIELD, where it still says whether older artifacts may exist beyond the cap.
-    """
+    """Which empty answer: the meeting is over and nothing came, or it is too soon to say."""
     return "not_transcribed" if settled else "not_ready"
 
 
