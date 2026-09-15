@@ -1,3 +1,6 @@
+from backstop_mcp.features.org_people_writes.commands.create_employment_command import (
+    CreateEmploymentCommand,
+)
 from backstop_mcp.features.org_people_writes.commands.create_organization_command import (
     CreateOrganizationCommand,
 )
@@ -18,6 +21,7 @@ from backstop_mcp.features.org_people_writes.commands.update_person_command impo
 )
 
 __all__ = [
+    "CreateEmploymentCommand",
     "CreateOrganizationCommand",
     "CreatePersonCommand",
     "EndEmploymentCommand",

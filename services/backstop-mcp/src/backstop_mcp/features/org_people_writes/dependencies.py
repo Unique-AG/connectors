@@ -10,6 +10,7 @@ from backstop_mcp.features.data_hygiene import (
     get_employment_rules,
 )
 from backstop_mcp.features.org_people_writes.commands import (
+    CreateEmploymentCommand,
     CreateOrganizationCommand,
     CreatePersonCommand,
     EndEmploymentCommand,
@@ -86,6 +87,19 @@ def get_entity_relationship_types_service_factory(
         client=client,
         ttl_minutes=config.entity_relationship_type_ttl_minutes,
         rules=get_employment_rules(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_create_employment_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    entity_relationship_types_service: EntityRelationshipTypesService = Depends(
+        get_entity_relationship_types_service_factory
+    ),
+) -> CreateEmploymentCommand:
+    return CreateEmploymentCommand(
+        client=client,
+        entity_relationship_types_service=entity_relationship_types_service,
     )
 
 

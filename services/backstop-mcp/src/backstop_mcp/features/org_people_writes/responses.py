@@ -15,6 +15,8 @@ from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
 
 __all__ = [
+    "CreateEmploymentResponse",
+    "CreatedEmploymentResponse",
     "CreatedOrganizationResponse",
     "CreatedPersonResponse",
     "EndEmploymentResponse",
@@ -141,6 +143,35 @@ class EntityRelationshipTypeResponse(OmitNoneModel):
     name: str = Field(description="Relationship type name as this instance publishes it.")
 
 
+class CreatedEmploymentResponse(OmitNoneModel):
+    """An employment relationship after a POST.
+
+    One POST also created the reverse mirror row (person→org and org→person).
+    """
+
+    id: str = Field(
+        description="Backstop `entity-relationships` id of the created employment. Echo it."
+    )
+    resource_type: Literal["entity-relationships"] = Field(
+        default="entity-relationships",
+        description="Always `entity-relationships`.",
+    )
+    start_date: date | None = Field(
+        default=None,
+        description="`startDate` READ BACK after the write, as YYYY-MM-DD.",
+    )
+    created_mirror_row: Literal[True] = Field(
+        default=True,
+        description=(
+            "Always true. One POST also created the reverse mirror row (person→org and org→person)."
+        ),
+    )
+    warnings: tuple[str, ...] = Field(
+        default=(),
+        description="Silent-failure notes. Empty when the write landed as asked.",
+    )
+
+
 class EndedEmploymentResponse(OmitNoneModel):
     """An employment relationship after `endDate` was written."""
 
@@ -169,3 +200,7 @@ type UpdateOrganizationResponse = (
 )
 
 type EndEmploymentResponse = EndedEmploymentResponse | PartyAmbiguousResponse | NotFoundResponse
+
+type CreateEmploymentResponse = (
+    CreatedEmploymentResponse | PartyAmbiguousResponse | NotFoundResponse
+)

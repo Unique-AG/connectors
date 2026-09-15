@@ -80,6 +80,7 @@ from backstop_mcp.features.org_people import (
     get_person_query_factory,
 )
 from backstop_mcp.features.org_people_writes import (
+    get_create_employment_command_factory,
     get_create_organization_command_factory,
     get_create_person_command_factory,
     get_end_employment_command_factory,
@@ -159,6 +160,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_modify_contact_location_command_factory,
     get_create_person_command_factory,
     get_create_organization_command_factory,
+    get_create_employment_command_factory,
     get_update_person_command_factory,
     get_update_organization_command_factory,
     get_end_employment_command_factory,
