@@ -3,6 +3,7 @@
 import httpx
 import pytest
 import respx
+from pydantic import BaseModel, TypeAdapter
 
 from tests.helpers import (
     BASE_URL,
@@ -24,6 +25,15 @@ from with_intelligence_mcp.with_intelligence_client import (
     Unreachable,
     WiCredential,
 )
+
+_JSON = TypeAdapter(object)
+
+
+class _TypedResponse(BaseModel):
+    ok: bool
+
+
+_TYPED_RESPONSE = TypeAdapter(_TypedResponse)
 
 
 class _RecordingMetric:
@@ -69,7 +79,7 @@ class TestStatusMapping:
         respx.get(f"{BASE_URL}/v3/intentions").mock(return_value=httpx.Response(403))
         client, _ = build_client()
         with pytest.raises(NotEntitled) as caught:
-            await client.get_json("/v3/intentions")
+            await client.get_json("/v3/intentions", _JSON)
         assert caught.value.path == "/v3/intentions"
         assert "licensed" in str(caught.value)
 
@@ -78,14 +88,14 @@ class TestStatusMapping:
         respx.get(f"{BASE_URL}/v3/investors/1").mock(return_value=httpx.Response(404))
         client, _ = build_client()
         with pytest.raises(NotFound):
-            await client.get_json("/v3/investors/1")
+            await client.get_json("/v3/investors/1", _JSON)
 
     @respx.mock
     async def test_400_is_a_plain_api_error_and_is_not_retried(self) -> None:
         route = respx.get(f"{BASE_URL}/v3/investors").mock(return_value=httpx.Response(400))
         client, _ = build_client()
         with pytest.raises(ApiError):
-            await client.get_json("/v3/investors")
+            await client.get_json("/v3/investors", _JSON)
         assert route.call_count == 1
 
     @respx.mock
@@ -93,14 +103,14 @@ class TestStatusMapping:
         respx.get(f"{BASE_URL}/v3/investors").mock(return_value=httpx.Response(500))
         client, _ = build_client(max_attempts=1)
         with pytest.raises(Unreachable):
-            await client.get_json("/v3/investors")
+            await client.get_json("/v3/investors", _JSON)
 
     @respx.mock
     async def test_a_network_failure_is_unreachable(self) -> None:
         respx.get(f"{BASE_URL}/v3/investors").mock(side_effect=httpx.ConnectError("nope"))
         client, _ = build_client(max_attempts=1)
         with pytest.raises(Unreachable):
-            await client.get_json("/v3/investors")
+            await client.get_json("/v3/investors", _JSON)
 
 
 class TestTokenRenewal:
@@ -110,7 +120,8 @@ class TestTokenRenewal:
             side_effect=[httpx.Response(401), httpx.Response(200, json={"ok": True})]
         )
         client, session = build_client()
-        assert await client.get_json("/v3/investors") == {"ok": True}
+        response = await client.get_json("/v3/investors", _TYPED_RESPONSE)
+        assert response == _TypedResponse(ok=True)
         assert session.renewals == 1
         assert route.call_count == 2
 
@@ -120,7 +131,7 @@ class TestTokenRenewal:
             side_effect=[httpx.Response(401), httpx.Response(200, json={})]
         )
         client, _ = build_client(FakeSession("stale"))
-        _ = await client.get_json("/v3/investors")
+        _ = await client.get_json("/v3/investors", _JSON)
         assert sent_header(route, "authorization", 0) == "Bearer stale"
         assert sent_header(route, "authorization", 1) == "Bearer token-2"
 
@@ -130,7 +141,7 @@ class TestTokenRenewal:
         route = respx.get(f"{BASE_URL}/v3/investors").mock(return_value=httpx.Response(401))
         client, session = build_client()
         with pytest.raises(AuthError):
-            await client.get_json("/v3/investors")
+            await client.get_json("/v3/investors", _JSON)
         assert session.renewals == 1
         assert route.call_count == 2
 
@@ -148,7 +159,7 @@ class TestRetries:
         respx.get(f"{BASE_URL}/v3/investors/123").mock(return_value=httpx.Response(429))
         client, _ = build_client(max_attempts=1)
         with pytest.raises(RateLimited):
-            await client.get_json("/v3/investors/123")
+            await client.get_json("/v3/investors/123", _JSON)
         assert metric.values == [1]
 
     @respx.mock
@@ -157,7 +168,7 @@ class TestRetries:
             side_effect=[httpx.Response(429), httpx.Response(200, json={"ok": 1})]
         )
         client, _ = build_client()
-        assert await client.get_json("/v3/investors") == {"ok": 1}
+        assert await client.get_json("/v3/investors", _JSON) == {"ok": 1}
         assert route.call_count == 2
 
     @respx.mock
@@ -165,7 +176,7 @@ class TestRetries:
         route = respx.get(f"{BASE_URL}/v3/investors").mock(return_value=httpx.Response(429))
         client, _ = build_client(max_attempts=2)
         with pytest.raises(RateLimited):
-            await client.get_json("/v3/investors")
+            await client.get_json("/v3/investors", _JSON)
         assert route.call_count == 2
 
 
@@ -235,4 +246,4 @@ class TestPaging:
         )
         client, _ = build_client()
         with pytest.raises(Unreachable):
-            await client.get_json("/v3/investors")
+            await client.get_json("/v3/investors", _JSON)

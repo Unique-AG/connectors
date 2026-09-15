@@ -1,6 +1,6 @@
 """WI API pagination."""
 
-from typing import ClassVar, cast
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -26,9 +26,3 @@ class Page(BaseModel):
     def has_more(self) -> bool:
         seen = (self.pagination.page - 1) * self.pagination.page_size + len(self.results)
         return seen < self.pagination.total
-
-
-def parse_page(body: object) -> Page:
-    if not isinstance(body, dict):
-        return Page()
-    return Page.model_validate(cast(dict[str, object], body))

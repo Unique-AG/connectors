@@ -20,14 +20,14 @@ from with_intelligence_mcp.with_intelligence_client.errors import (
     RateLimited,
     Unreachable,
 )
-from with_intelligence_mcp.with_intelligence_client.pagination import Page, parse_page
+from with_intelligence_mcp.with_intelligence_client.pagination import Page
 from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy, parse_retry_after
 from with_intelligence_mcp.with_intelligence_client.settings import TransportSettings
 
 type QueryValue = str | int | float | bool | Sequence[str | int]
 type Gate = Callable[[str], AbstractAsyncContextManager[None]]
 
-_JSON = TypeAdapter(object)
+_PAGE = TypeAdapter(Page)
 
 
 class WithIntelligenceClient:
@@ -54,12 +54,17 @@ class WithIntelligenceClient:
     def settings(self) -> TransportSettings:
         return self._settings
 
-    async def get_json(self, path: str, params: Mapping[str, QueryValue] | None = None) -> object:
+    async def get_json[T](
+        self,
+        path: str,
+        response_adapter: TypeAdapter[T],
+        params: Mapping[str, QueryValue] | None = None,
+    ) -> T:
         response = await self._request("GET", path, params or {})
         try:
-            return _JSON.validate_json(response.content)
+            return response_adapter.validate_json(response.content)
         except ValueError as exc:
-            raise Unreachable(f"{path} returned a body that is not JSON") from exc
+            raise Unreachable(f"{path} returned an invalid response") from exc
 
     async def get_page(
         self,
@@ -72,7 +77,7 @@ class WithIntelligenceClient:
         query: dict[str, QueryValue] = dict(params or {})
         query["page"] = page
         query["page_size"] = page_size or self._settings.default_page_size
-        return parse_page(await self.get_json(path, query))
+        return await self.get_json(path, _PAGE, query)
 
     async def iterate(
         self,
@@ -168,7 +173,3 @@ class WithIntelligenceClient:
 def as_query(values: Mapping[str, QueryValue | None]) -> dict[str, QueryValue]:
     """Drop unset filters, so an omitted tool argument does not become `?x=None`."""
     return {key: value for key, value in values.items() if value is not None}
-
-
-def narrow_dict(value: object) -> dict[str, object]:
-    return cast(dict[str, object], value) if isinstance(value, dict) else {}

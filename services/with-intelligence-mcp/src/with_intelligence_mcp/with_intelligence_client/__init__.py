@@ -10,7 +10,6 @@ from with_intelligence_mcp.with_intelligence_client.client import (
     QueryValue,
     WithIntelligenceClient,
     as_query,
-    narrow_dict,
 )
 from with_intelligence_mcp.with_intelligence_client.credential import (
     CallerSession,
@@ -31,7 +30,7 @@ from with_intelligence_mcp.with_intelligence_client.factory import (
     SIGN_IN_PATH,
     WithIntelligenceClientFactory,
 )
-from with_intelligence_mcp.with_intelligence_client.pagination import Page, PageInfo, parse_page
+from with_intelligence_mcp.with_intelligence_client.pagination import Page, PageInfo
 from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy
 from with_intelligence_mcp.with_intelligence_client.session import WiSession
 from with_intelligence_mcp.with_intelligence_client.settings import RetrySettings, TransportSettings
@@ -63,6 +62,4 @@ __all__ = [
     "as_query",
     "as_sequence",
     "as_single",
-    "narrow_dict",
-    "parse_page",
 ]
