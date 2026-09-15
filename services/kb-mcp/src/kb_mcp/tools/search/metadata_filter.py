@@ -23,6 +23,8 @@ from unique_toolkit.content.smart_rules import (
 
 from kb_mcp.references import INVALID_METADATA_FILTER_MESSAGE
 
+type RawOrParsedUniqueQL = UniqueQL | Mapping[str, Any] | None
+
 
 def _folder_ids_clause(
     folder_ids: list[str], *, include_subfolders: bool
@@ -54,13 +56,13 @@ def try_parse_llm_metadata_filter(
 
 def merge_request_metadata_filter(
     *,
-    admin_metadata_filter: UniqueQL | Mapping[str, Any] | None,
+    admin_metadata_filter: RawOrParsedUniqueQL,
     folder_ids: list[str] | None = None,
     include_subfolders: bool = True,
-    llm_metadata_filter: UniqueQL | Mapping[str, Any] | None = None,
+    llm_metadata_filter: RawOrParsedUniqueQL = None,
     admin_scope_ids: list[str] | None = None,
 ) -> dict[str, Any] | None:
-    result: UniqueQL | Mapping[str, Any] | None = admin_metadata_filter
+    result: RawOrParsedUniqueQL = admin_metadata_filter
     if llm_metadata_filter is not None:
         llm_dict = uniqueql_to_dict(llm_metadata_filter)
         assert llm_dict is not None
