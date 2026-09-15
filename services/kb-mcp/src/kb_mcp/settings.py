@@ -22,7 +22,7 @@ from unique_mcp.util.find_env_file import find_env_file
 # main.py also loads this into the process env for libraries that bypass Settings.
 ENV_FILE: Path | None = find_env_file(filenames=["kb_mcp.env", ".env"], required=False)
 
-KNOWN_MCP_TOOLS = frozenset({"search", "content_tree", "read_file"})
+KNOWN_MCP_TOOLS = frozenset({"search", "content_tree", "read_file", "content_metadata"})
 
 
 class Settings(BaseSettings):

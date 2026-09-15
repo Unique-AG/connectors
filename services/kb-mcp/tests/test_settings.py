@@ -122,7 +122,9 @@ def test_enabled_tools_parses_comma_list(monkeypatch):
     get_settings.cache_clear()
     settings = get_settings()
     assert settings.enabled_tools == frozenset({"search", "read_file"})
-    assert settings.disabled_tool_names() == frozenset({"content_tree"})
+    assert settings.disabled_tool_names() == frozenset(
+        {"content_tree", "content_metadata"}
+    )
 
 
 def test_enabled_tools_rejects_unknown_name(monkeypatch):
