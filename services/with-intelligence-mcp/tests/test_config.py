@@ -66,6 +66,10 @@ class TestWithIntelligenceConfig:
     def test_defaults_to_the_documented_base_url(self) -> None:
         assert WithIntelligenceConfig().base_url == "https://api.withintelligence.com"
 
+    def test_rejects_an_http_api_url(self) -> None:
+        with pytest.raises(ValidationError, match="HTTPS"):
+            WithIntelligenceConfig(base_url="http://api.withintelligence.com")
+
 
 class TestDatabaseConfig:
     def test_builds_a_dsn_from_discrete_fields(self) -> None:

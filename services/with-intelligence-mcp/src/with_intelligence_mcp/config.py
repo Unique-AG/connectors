@@ -7,7 +7,15 @@ from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from typing import ClassVar, Self, TypedDict, cast
 
-from pydantic import Field, HttpUrl, PostgresDsn, PrivateAttr, SecretStr, model_validator
+from pydantic import (
+    Field,
+    HttpUrl,
+    PostgresDsn,
+    PrivateAttr,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine.url import URL, make_url
 
@@ -133,6 +141,14 @@ class WithIntelligenceConfig(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="WITH_INTELLIGENCE_")
 
     base_url: str = "https://api.withintelligence.com"
+
+    @field_validator("base_url")
+    @classmethod
+    def require_https_base_url(cls, value: str) -> str:
+        parsed = HttpUrl(value)
+        if parsed.scheme != "https":
+            raise ValueError("WITH_INTELLIGENCE_BASE_URL must use HTTPS")
+        return str(parsed).rstrip("/")
 
     asset_class_groups: tuple[AssetClassGroup, ...] = (AssetClassGroup.HFM,)
 

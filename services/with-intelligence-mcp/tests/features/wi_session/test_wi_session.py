@@ -136,6 +136,25 @@ class TestRenewal:
         _ = await wi.access_token("s1", store.read, store.renew)
         assert await wi.renewed_access_token("s1", store.read, store.renew) == "refreshed-1"
 
+    async def test_renewal_after_eviction_does_not_reuse_the_rejected_token(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "with_intelligence_mcp.features.wi_session.wi_session_cache._MAX_TRACKED_SUBJECTS",
+            1,
+        )
+        factory = FakeFactory()
+        wi = _cache(factory)
+        rejected = FakeStore(_session("rejected"))
+        other = FakeStore(_session("other"))
+        assert await wi.access_token("rejected", rejected.read, rejected.renew) == "rejected"
+        assert await wi.access_token("other", other.read, other.renew) == "other"
+
+        token = await wi.renewed_access_token("rejected", rejected.read, rejected.renew)
+
+        assert token == "refreshed-1"
+        assert factory.refreshes == 1
+
 
 class TestConcurrentRenewal:
     async def test_simultaneous_first_use_reads_once(self) -> None:
