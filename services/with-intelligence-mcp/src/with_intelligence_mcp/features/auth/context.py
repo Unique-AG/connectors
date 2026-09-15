@@ -48,6 +48,7 @@ class WithIntelligenceAuthContext(BaseModel):
     ) -> WiSession:
         """Renew the stored session under a row lock."""
         subject = self.require_subject()
+        refusal: SignInFailed | None = None
         async with transaction(self.session_factory) as session:
             try:
                 stored = await lock_session(session, subject, self.encryption_key)
@@ -60,13 +61,17 @@ class WithIntelligenceAuthContext(BaseModel):
             try:
                 renewed = await renew(stored)
             except SignInFailed as exc:
-                await self.revoke_current_subject_tokens()
-                raise NotConnectedError(
-                    "Your With Intelligence session has expired and could not be renewed — "
-                    + "please reconnect."
-                ) from exc
-            await replace_session(session, subject, renewed, self.encryption_key)
-            return renewed
+                refusal = exc
+            else:
+                await replace_session(session, subject, renewed, self.encryption_key)
+                return renewed
+
+        assert refusal is not None
+        await self.revoke_tokens_for_subject(subject)
+        raise NotConnectedError(
+            "Your With Intelligence session has expired and could not be renewed — "
+            + "please reconnect."
+        ) from refusal
 
     def current_subject(self) -> str | None:
         access_token = get_access_token()
@@ -80,11 +85,6 @@ class WithIntelligenceAuthContext(BaseModel):
                 + "and complete the login flow first."
             )
         return subject
-
-    async def revoke_current_subject_tokens(self) -> None:
-        subject = self.current_subject()
-        if subject is not None:
-            await self.revoke_tokens_for_subject(subject)
 
     @staticmethod
     def _not_connected() -> NotConnectedError:

@@ -1,5 +1,6 @@
 """Resolving and renewing the caller's WI session, and what happens when it cannot be."""
 
+import asyncio
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -11,7 +12,11 @@ from pydantic import SecretStr
 from tests.conftest import DatabaseFixture
 from with_intelligence_mcp.db import read_session, transaction
 from with_intelligence_mcp.features.auth import NotConnectedError, WithIntelligenceAuthContext
-from with_intelligence_mcp.features.auth.session_store import get_session, save_session
+from with_intelligence_mcp.features.auth.session_store import (
+    get_session,
+    lock_session,
+    save_session,
+)
 from with_intelligence_mcp.with_intelligence_client import SignInFailed, Unreachable, WiSession
 
 KEY = Fernet.generate_key()
@@ -155,15 +160,28 @@ class TestRenewal:
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The password is not stored, so a refused refresh requires another login."""
+        _, factory = db
         user_id = await _store(db, _session("dead", age=timedelta(hours=2)))
-        context, revocations = _context(db)
+        revocations = Revocations()
+
+        async def revoke(subject: str) -> None:
+            async with transaction(factory) as session:
+                locked = await lock_session(session, subject, KEY)
+            assert locked is not None
+            await revocations(subject)
+
+        context = WithIntelligenceAuthContext(
+            session_factory=factory,
+            encryption_key=KEY,
+            revoke_tokens_for_subject=revoke,
+        )
         monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
 
         async def refuse(_stale: WiSession) -> WiSession:
             raise SignInFailed("refresh token spent")
 
         with pytest.raises(NotConnectedError, match="could not be renewed"):
-            _ = await context.renew_session(refuse)
+            _ = await asyncio.wait_for(context.renew_session(refuse), timeout=1)
         assert revocations.subjects == [user_id]
 
     async def test_an_outage_does_not_revoke_the_callers_mcp_tokens(
