@@ -281,6 +281,31 @@ class TestLoginSubmission:
         assert records[0].exc_info is not None
 
     @respx.mock
+    async def test_wi_rate_limit_returns_a_controlled_response(
+        self, db: DatabaseFixture, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.post(_SIGN_IN).mock(return_value=httpx.Response(429))
+        provider = _make_provider(db)
+        _, factory = db
+        username = _unique("rate-limited")
+        request_id = await _pending_request_id(provider, _unique("client"))
+        response = await provider.handle_login_post(_login_post(request_id, username, "pw"))
+        assert response.status_code == 429
+        assert b"rate-limiting sign-in requests" in response.body
+        async with read_session(factory) as session:
+            result = await session.execute(
+                select(func.count())
+                .select_from(LoginAttempt)
+                .where(LoginAttempt.username == username)
+            )
+            assert result.scalar_one() == 0
+        records = [
+            record for record in caplog.records if record.message == "auth.login.wi_rate_limited"
+        ]
+        assert len(records) == 1
+        assert records[0].exc_info is not None
+
+    @respx.mock
     async def test_missing_fields_are_reported_without_calling_wi(
         self, db: DatabaseFixture
     ) -> None:

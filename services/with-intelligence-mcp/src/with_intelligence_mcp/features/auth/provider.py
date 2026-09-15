@@ -25,6 +25,7 @@ from with_intelligence_mcp.features.auth.session_store import (
     save_session,
 )
 from with_intelligence_mcp.with_intelligence_client import (
+    RateLimited,
     SignInFailed,
     Unreachable,
     WiCredential,
@@ -191,6 +192,17 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
                 request_id,
                 username=username,
                 error="Invalid username or password.",
+            )
+        except RateLimited as exc:
+            logger.warning("auth.login.wi_rate_limited", exc_info=exc)
+            return self._form_response(
+                request_id,
+                status_code=429,
+                username=username,
+                error=(
+                    "With Intelligence is rate-limiting sign-in requests — "
+                    + "please try again shortly."
+                ),
             )
         except Unreachable as exc:
             # Not recorded as a failed attempt: nothing was learned about the credential, so
