@@ -19,6 +19,10 @@ RUN apt-get update \
     && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 1000 app && useradd --system --uid 1000 --gid app app
+RUN rm -rf /usr/local/lib/python*/site-packages/pip \
+           /usr/local/lib/python*/site-packages/pip-*.dist-info \
+           /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.* \
+ && ! python -c "import pip" 2>/dev/null
 COPY --from=builder --chown=app:app /workspace/services/backstop-mcp/.venv /app/.venv
 COPY --from=builder --chown=app:app /workspace/services/backstop-mcp/alembic.ini /app/alembic.ini
 COPY --from=builder --chown=app:app /workspace/services/backstop-mcp/src /app/src
