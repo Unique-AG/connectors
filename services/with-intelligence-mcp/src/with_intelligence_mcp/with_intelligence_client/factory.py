@@ -33,7 +33,7 @@ _SHARED_HEADERS = {"accept": "application/json", "content-type": "application/js
 # Bounds the registry for a long-lived process with high user churn.
 _MAX_TRACKED_SUBJECTS = 512
 
-_JSON = TypeAdapter(object)
+_SESSION = TypeAdapter(WiSession)
 
 
 @dataclass
@@ -119,24 +119,12 @@ class WithIntelligenceClientFactory:
         )
 
     async def _auth_call(self, path: str, payload: dict[str, str]) -> WiSession:
-        from datetime import UTC, datetime
-
         response = await self._auth_response(path, payload)
 
         try:
-            body = _JSON.validate_json(response.content)
+            return _SESSION.validate_json(response.content)
         except ValueError as exc:
-            raise SignInFailed(f"{path} returned a body that is not JSON") from exc
-        if not isinstance(body, dict):
-            raise SignInFailed(f"{path} returned {type(body).__name__}, expected an object")
-
-        fields = cast(dict[str, object], body)
-        access, refresh = fields.get("accessToken"), fields.get("refreshToken")
-        if not isinstance(access, str) or not isinstance(refresh, str):
-            raise SignInFailed(f"{path} returned no accessToken/refreshToken")
-        return WiSession.model_validate(
-            {"access_token": access, "refresh_token": refresh, "issued_at": datetime.now(UTC)}
-        )
+            raise SignInFailed(f"{path} returned an invalid response") from exc
 
     async def _auth_response(self, path: str, payload: dict[str, str]) -> httpx.Response:
         response = await self._post_auth(path, payload)

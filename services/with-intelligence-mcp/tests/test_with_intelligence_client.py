@@ -12,6 +12,7 @@ from tests.helpers import (
     page_body,
     sent_header,
     sent_query,
+    sign_in_ok,
     wi_factory,
 )
 from with_intelligence_mcp.with_intelligence_client import (
@@ -53,6 +54,33 @@ class _RecordingMetric:
 
 
 class TestAuthentication:
+    @respx.mock
+    async def test_sign_in_deserializes_the_session(self) -> None:
+        respx.post(f"{BASE_URL}/v3/auth/sign-in").mock(return_value=sign_in_ok())
+        factory = wi_factory()
+        credential = WiCredential.model_validate({"username": "user", "password": "password"})
+        try:
+            session = await factory.sign_in(credential)
+        finally:
+            await factory.aclose()
+        assert session.access_token.get_secret_value() == "access-1"
+        assert session.refresh_token.get_secret_value() == "refresh-1"
+
+    @pytest.mark.parametrize(
+        "body",
+        [{}, {"accessToken": 1, "refreshToken": True}, []],
+    )
+    @respx.mock
+    async def test_invalid_auth_responses_are_rejected(self, body: object) -> None:
+        respx.post(f"{BASE_URL}/v3/auth/sign-in").mock(return_value=httpx.Response(200, json=body))
+        factory = wi_factory()
+        credential = WiCredential.model_validate({"username": "user", "password": "password"})
+        try:
+            with pytest.raises(SignInFailed):
+                await factory.sign_in(credential)
+        finally:
+            await factory.aclose()
+
     @pytest.mark.parametrize(
         ("status_code", "error_type"),
         [(429, RateLimited), (503, Unreachable)],
