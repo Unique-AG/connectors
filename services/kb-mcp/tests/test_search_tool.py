@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastmcp.tools import ToolResult
 from unique_mcp.meta.rjsf import ConfigSchemaMeta
+from unique_sdk import UniqueError
 from unique_toolkit.content.schemas import ContentChunk, ContentMetadata
 from unique_toolkit.content.smart_rules import parse_uniqueql
 from unique_toolkit.experimental.components.internal_search import (
@@ -563,6 +564,35 @@ async def test_search_returns_error_result_on_service_failure():
 
     assert result.is_error is True
     assert "KB unavailable" in result.content[0].text  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_search_logs_unique_error_detail(caplog):
+    """Extra UniqueError fields land in the log even when __str__ collapses
+    to '<Unknown code>: <No message>' for an empty backend error payload."""
+    exc = UniqueError(
+        message="Error while performing combined search",
+        http_status=400,
+        code=None,
+        json_body={"error": {"cause": {"status": 400, "error": {}}}},
+        headers={"request-id": "req_abc123"},
+        original_error="<Unknown code>: <No message>",
+    )
+
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            side_effect=exc,
+        ),
+        _patch_identity(),
+        caplog.at_level(logging.ERROR, logger="kb_mcp"),
+    ):
+        result = await search(search_string="query", config=SearchToolConfig())
+
+    assert result.is_error is True
+    log_text = " ".join(r.getMessage() for r in caplog.records)
+    assert "http_status=400" in log_text
+    assert "request_id=req_abc123" in log_text
 
 
 @pytest.mark.asyncio

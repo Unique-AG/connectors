@@ -24,6 +24,7 @@ from unique_mcp import (
     get_unique_settings_async,
     merge_tool_meta,
 )
+from unique_sdk import UniqueError
 from unique_toolkit.experimental.components.internal_search import (
     InternalSearchPostProcessor,
     KnowledgeBaseInternalSearchConfig,
@@ -206,8 +207,19 @@ async def search(
         )
         chunks = await post_processor.process(result)
     except Exception as exc:
+        # UniqueError.__str__ can collapse to "<Unknown code>: <No message>"
+        # when the backend's error payload has no nested cause.error.
+        sdk_detail = (
+            f" http_status={exc.http_status} code={exc.code} "
+            f"request_id={exc.request_id} json_body={exc.json_body}"
+            if isinstance(exc, UniqueError)
+            else ""
+        )
         _LOGGER.exception(
-            "search error correlation_id=%s error_type=%s", cid, type(exc).__name__
+            "search error correlation_id=%s error_type=%s%s",
+            cid,
+            type(exc).__name__,
+            sdk_detail,
         )
         return ToolResult(
             content=[TextContent(type="text", text=str(exc))], is_error=True
