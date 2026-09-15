@@ -15,6 +15,12 @@ from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
+from backstop_mcp.features.opportunity_writes._opportunity_writable_fields import (
+    CURRENCY_CODE_DESCRIPTION,
+    IS_ERISA_DESCRIPTION,
+    NAME_DESCRIPTION,
+    _OpportunityWritableFields,
+)
 from backstop_mcp.models import NonEmptyStr
 
 __all__ = [
@@ -32,8 +38,8 @@ UPDATE_OPPORTUNITY_INPUT_DESCRIPTION = (
 _IDENTITY_FIELDS = frozenset({"opportunity_id"})
 
 
-class UpdateOpportunityInput(BaseModel):
-    """PATCH an opportunity. Only supplied fields are sent; PATCH is merge."""
+class _UpdateOpportunityIdentity(BaseModel):
+    """Opportunity id. Inherited first so it leads the published schema."""
 
     opportunity_id: NonEmptyStr = Field(
         description=(
@@ -41,82 +47,17 @@ class UpdateOpportunityInput(BaseModel):
             "`get_opportunities_by_ids`. Never invent or guess."
         )
     )
-    name: NonEmptyStr | None = Field(default=None, description="Replacement deal name.")
-    description: NonEmptyStr | None = Field(
-        default=None, description="Replacement deal description."
-    )
-    aliases: NonEmptyStr | None = Field(default=None, description="Replacement aliases string.")
-    other_id: NonEmptyStr | None = Field(default=None, description="Replacement external/other id.")
-    classification: NonEmptyStr | None = Field(
-        default=None,
-        description=(
-            "Replacement deal classification (wire `type`) — not the JSON:API resource type."
-        ),
-    )
-    currency_code: NonEmptyStr | None = Field(
-        default=None, description="Replacement ISO currency code, e.g. USD."
-    )
-    is_erisa: bool | None = Field(default=None, description="Whether the deal is ERISA.")
-    requested_amount: float | None = Field(
-        default=None, description="Replacement requested amount, in `currency_code`."
-    )
-    allocated_amount: float | None = Field(
-        default=None, description="Replacement allocated amount, in `currency_code`."
-    )
-    probability: float | None = Field(
-        default=None,
-        ge=0,
-        le=1,
-        description=(
-            "Replacement likelihood as a fraction: 0.3 is 30%. Setting `stage` does not "
-            "change this — pass it explicitly if the deal's probability should move."
-        ),
-    )
-    expected_investment_date: date | None = Field(
-        default=None, description="Replacement expected investment day."
-    )
-    stage_effective_date: date | None = Field(
-        default=None,
-        description=(
-            "Day the stage move should be dated. Requires `stage`. A date earlier than the "
-            "deal's `dateEnteredCurrentStage` is rejected: Backstop would write history "
-            "without moving the deal. Omit to move the deal today."
-        ),
-    )
-    waitlist_id: int | None = Field(default=None, description="Replacement waitlist id.")
-    stage: NonEmptyStr | None = Field(
-        default=None,
-        description=(
-            "Replacement stage **name** (e.g. IDD), resolved against this instance's "
-            "vocabulary. This is the only way to move a deal's stage. A `closed` stage "
-            "closes the deal automatically."
-        ),
-    )
+
+
+class UpdateOpportunityInput(_UpdateOpportunityIdentity, _OpportunityWritableFields):
+    """PATCH an opportunity. Only supplied fields are sent; PATCH is merge."""
+
+    name: NonEmptyStr | None = Field(default=None, description=NAME_DESCRIPTION)
+    currency_code: NonEmptyStr | None = Field(default=None, description=CURRENCY_CODE_DESCRIPTION)
+    is_erisa: bool | None = Field(default=None, description=IS_ERISA_DESCRIPTION)
     investor_id: NonEmptyStr | None = Field(
         default=None,
         description="Replacement investor contact id (`contacts`). Never invent or guess.",
-    )
-    product_id: NonEmptyStr | None = Field(
-        default=None, description="Replacement product id. Never invent or guess."
-    )
-    primary_contact_id: NonEmptyStr | None = Field(
-        default=None,
-        description="Replacement primary contact people id. Never invent or guess.",
-    )
-    referral_source_id: NonEmptyStr | None = Field(
-        default=None,
-        description="Replacement referral-source contact id (`contacts`). Never invent or guess.",
-    )
-    owner_login: NonEmptyStr | None = Field(
-        default=None,
-        description=(
-            "Replacement owner of this deal: the colleague at our own firm. A "
-            "`list_system_users` login (`userName`), not a system-user id. Same role as "
-            "`representative` on `search_opportunities`."
-        ),
-    )
-    investor_type_id: NonEmptyStr | None = Field(
-        default=None, description="Replacement investor-type id. Never invent or guess."
     )
     add_users_to_notify: tuple[str, ...] | None = Field(
         default=None,
@@ -138,6 +79,14 @@ class UpdateOpportunityInput(BaseModel):
             "tuple clears the list. Unknown logins are skipped and listed in `warnings`; "
             "if none resolve, the list is left unchanged. Cannot be combined with "
             "`add_users_to_notify`. There is no way to remove a single member."
+        ),
+    )
+    stage_effective_date: date | None = Field(
+        default=None,
+        description=(
+            "Day the stage move should be dated. Requires `stage`. A date earlier than the "
+            "deal's `dateEnteredCurrentStage` is rejected: Backstop would write history "
+            "without moving the deal. Omit to move the deal today."
         ),
     )
 
