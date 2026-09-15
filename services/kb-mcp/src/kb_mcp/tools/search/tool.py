@@ -155,10 +155,11 @@ async def search(
         Field(
             ge=0.0,
             le=1.0,
+            multiple_of=0.01,
             description=(
-                "Minimum relevance score in [0.0, 1.0]; higher is stricter. "
-                "Admin default is 0.0. Leave unset unless you have a "
-                "specific reason to change it."
+                "Minimum relevance score in [0.0, 1.0], up to 2 decimal "
+                "places; higher is stricter. Admin default is 0.0. Leave "
+                "unset unless you have a specific reason to change it."
             ),
         ),
     ] = None,
