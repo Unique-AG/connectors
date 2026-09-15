@@ -178,12 +178,17 @@ class CredentialOAuthProvider(OAuthProvider):
         subject_factory: SubjectFactory,
     ) -> str | None:
         code = secrets.token_urlsafe(32)
-        expires_at = (datetime.now(UTC) + self.authorization_code_ttl).timestamp()
+        now = datetime.now(UTC)
+        expires_at = (now + self.authorization_code_ttl).timestamp()
 
         async with transaction(self._session_factory) as session:
             claim = await session.execute(
                 delete(PendingAuthorization)
-                .where(PendingAuthorization.request_id == pending.request_id)
+                .where(
+                    PendingAuthorization.request_id == pending.request_id,
+                    PendingAuthorization.client_id == pending.client_id,
+                    PendingAuthorization.expires_at >= now,
+                )
                 .returning(PendingAuthorization.request_id)
             )
             if claim.scalar_one_or_none() is None:
@@ -237,7 +242,11 @@ class CredentialOAuthProvider(OAuthProvider):
         async with transaction(self._session_factory) as session:
             result = await session.execute(
                 delete(AuthorizationCodeRow)
-                .where(AuthorizationCodeRow.code == authorization_code.code)
+                .where(
+                    AuthorizationCodeRow.code == authorization_code.code,
+                    AuthorizationCodeRow.client_id == client.client_id,
+                    AuthorizationCodeRow.expires_at >= now.timestamp(),
+                )
                 .returning(AuthorizationCodeRow.code)
             )
             if result.scalar_one_or_none() is None:

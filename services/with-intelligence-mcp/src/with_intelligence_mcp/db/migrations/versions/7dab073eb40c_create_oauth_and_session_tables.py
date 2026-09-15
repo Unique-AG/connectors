@@ -156,6 +156,7 @@ def upgrade() -> None:
         sa.Column("username", sa.String(), nullable=False),
         sa.Column("source_ip", sa.String(), nullable=True),
         sa.Column("attempted_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("pending", sa.Boolean(), server_default="false", nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
     # The throttle read is `WHERE username = ? AND attempted_at >= ?`, so the composite index

@@ -8,6 +8,7 @@ from mcp_credential_auth import (
     LoginCsrf,
     ThrottleConfig,
     clear_failures,
+    complete_login_attempt,
     discard_login_attempt,
     reserve_login_attempt,
 )
@@ -234,13 +235,14 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
             )
 
         if not valid:
+            await complete_login_attempt(self._session_factory, attempt_id)
             return self._form_response(
                 request_id,
                 username=username,
                 error="Invalid username or API token.",
             )
 
-        await clear_failures(self._session_factory, username)
+        await clear_failures(self._session_factory, username, reservation_id=attempt_id)
 
         assert self._resolve_system_user is not None, (
             "resolve_system_user must be provided or attached before login"

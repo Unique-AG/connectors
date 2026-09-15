@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from mcp_credential_auth.database import read_session, transaction
@@ -110,9 +110,19 @@ async def reserve_login_attempt(
                 username=username,
                 source_ip=source_ip,
                 attempted_at=now,
+                pending=True,
             )
         )
         return attempt_id
+
+
+async def complete_login_attempt(
+    session_factory: async_sessionmaker[AsyncSession], attempt_id: uuid.UUID
+) -> None:
+    async with transaction(session_factory) as session:
+        await session.execute(
+            update(LoginAttempt).where(LoginAttempt.id == attempt_id).values(pending=False)
+        )
 
 
 async def discard_login_attempt(
@@ -122,6 +132,16 @@ async def discard_login_attempt(
         await session.execute(delete(LoginAttempt).where(LoginAttempt.id == attempt_id))
 
 
-async def clear_failures(session_factory: async_sessionmaker[AsyncSession], username: str) -> None:
+async def clear_failures(
+    session_factory: async_sessionmaker[AsyncSession],
+    username: str,
+    *,
+    reservation_id: uuid.UUID | None = None,
+) -> None:
     async with transaction(session_factory) as session:
-        await session.execute(delete(LoginAttempt).where(LoginAttempt.username == username))
+        predicate = LoginAttempt.pending.is_(False)
+        if reservation_id is not None:
+            predicate = or_(predicate, LoginAttempt.id == reservation_id)
+        await session.execute(
+            delete(LoginAttempt).where(LoginAttempt.username == username, predicate)
+        )

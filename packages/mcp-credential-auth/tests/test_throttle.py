@@ -9,6 +9,7 @@ from mcp_credential_auth import (
     LoginAttempt,
     ThrottleConfig,
     clear_failures,
+    complete_login_attempt,
     count_recent_failures,
     discard_login_attempt,
     is_throttled,
@@ -111,6 +112,25 @@ async def test_discarding_a_reservation_restores_the_budget(
         )
         is not None
     )
+
+
+async def test_success_preserves_other_pending_reservations(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    username = "throttle-pending-user"
+    successful = await reserve_login_attempt(
+        session_factory, username, source_ip=None, config=_config()
+    )
+    pending = await reserve_login_attempt(
+        session_factory, username, source_ip=None, config=_config()
+    )
+    assert successful is not None
+    assert pending is not None
+
+    await clear_failures(session_factory, username, reservation_id=successful)
+    await complete_login_attempt(session_factory, pending)
+
+    assert await count_recent_failures(session_factory, username, window=_WINDOW) == 1
 
 
 async def test_a_successful_login_clears_the_budget(

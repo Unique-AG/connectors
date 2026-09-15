@@ -32,6 +32,12 @@ class TestAppConfig:
         )
         assert config.issuer == "https://wi.example.com"
 
+    def test_rejects_http_for_a_real_issuer_in_production(self) -> None:
+        with pytest.raises(ValidationError, match="HTTPS"):
+            AppConfig.model_validate(
+                {"app_env": AppEnv.PRODUCTION, "public_base_url": "http://wi.example.com"}
+            )
+
     def test_issuer_has_no_trailing_slash(self) -> None:
         config = AppConfig.model_validate(
             {"app_env": AppEnv.DEVELOPMENT, "public_base_url": "https://wi.example.com/"}

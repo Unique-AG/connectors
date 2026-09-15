@@ -83,6 +83,16 @@ class TestFirstUse:
         assert await wi.access_token("s1", store.read, store.renew) == "reconnected"
         assert store.reads == 2
 
+    async def test_consecutive_access_does_not_refresh_a_fresh_session(self) -> None:
+        factory = FakeFactory()
+        store = FakeStore(_session("stored"))
+        wi = _cache(factory)
+
+        assert await wi.access_token("s1", store.read, store.renew) == "stored"
+        assert await wi.access_token("s1", store.read, store.renew) == "stored"
+        assert factory.refreshes == 0
+        assert store.reads == 2
+
 
 class TestPerSubject:
     async def test_two_users_get_their_own_session(self) -> None:
@@ -109,17 +119,6 @@ class TestRenewal:
         store = FakeStore(_session("old", age=timedelta(hours=2)))
         _ = await _cache(factory).access_token("s1", store.read, store.renew)
         assert store.stored.access_token.get_secret_value() == "refreshed-1"
-
-    async def test_a_session_a_replica_already_renewed_is_not_refreshed_again(self) -> None:
-        """The holder is stale but the row is fresh, so reading it is enough."""
-        factory = FakeFactory()
-        store = FakeStore(_session("renewed-elsewhere"))
-        wi = _cache(factory)
-        holder = await wi._holder_for("s1")  # pyright: ignore[reportPrivateUsage]
-        holder.session = _session("old", age=timedelta(hours=2))
-        token = await wi.access_token("s1", store.read, store.renew)
-        assert token == "renewed-elsewhere"
-        assert factory.refreshes == 0
 
     async def test_a_spent_refresh_token_surfaces(self) -> None:
         """There is no password to fall back on, so the caller has to log in again."""
@@ -170,3 +169,35 @@ class TestConcurrentRenewal:
             wi.access_token("bob", bob.read, bob.renew),
         )
         assert factory.refreshes == 2
+
+    async def test_active_holder_is_not_evicted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "with_intelligence_mcp.features.wi_session.wi_session_cache._MAX_TRACKED_SUBJECTS",
+            1,
+        )
+        started = asyncio.Event()
+        release = asyncio.Event()
+        first_store = FakeStore(_session("first"))
+        reads = 0
+
+        async def blocked_read() -> WiSession:
+            nonlocal reads
+            reads += 1
+            started.set()
+            await release.wait()
+            return await first_store.read()
+
+        factory = FakeFactory()
+        wi = _cache(factory)
+        first = asyncio.create_task(wi.access_token("s1", blocked_read, first_store.renew))
+        await started.wait()
+
+        second_store = FakeStore(_session("second"))
+        assert await wi.access_token("s2", second_store.read, second_store.renew) == "second"
+        same_subject = asyncio.create_task(wi.access_token("s1", blocked_read, first_store.renew))
+        await asyncio.sleep(0.01)
+        assert reads == 1
+
+        release.set()
+        assert await first == "first"
+        assert await same_subject == "first"

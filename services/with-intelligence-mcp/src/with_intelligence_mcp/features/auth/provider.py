@@ -1,7 +1,7 @@
 import logging
 import uuid
 from datetime import timedelta
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from mcp_credential_auth import (
     MAX_USERNAME_LENGTH,
@@ -9,6 +9,7 @@ from mcp_credential_auth import (
     LoginCsrf,
     ThrottleConfig,
     clear_failures,
+    complete_login_attempt,
     discard_login_attempt,
     reserve_login_attempt,
 )
@@ -22,8 +23,10 @@ from pydantic import (
     field_validator,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from starlette.datastructures import FormData
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from starlette.types import Message
 
 from with_intelligence_mcp.db import read_session
 from with_intelligence_mcp.features.auth.login_form import render_login_form
@@ -59,15 +62,54 @@ _EXPIRED_LINK_MESSAGE = (
 )
 
 _LOGIN_CSRF = LoginCsrf("wi_login_csrf_")
+_MAX_LOGIN_BODY_BYTES = 16 * 1024
+_MAX_LOGIN_FIELD_LENGTH = 1024
+
+
+class _LoginBodyTooLarge(ValueError):
+    pass
+
+
+async def _read_login_form(request: Request) -> FormData:
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            parsed_content_length = int(content_length)
+        except ValueError as exc:
+            raise _LoginBodyTooLarge from exc
+        if parsed_content_length > _MAX_LOGIN_BODY_BYTES:
+            raise _LoginBodyTooLarge
+
+    received = 0
+    receive = request.receive
+
+    async def limited_receive() -> Message:
+        nonlocal received
+        message = await receive()
+        if message["type"] == "http.request":
+            body = cast("object", message.get("body", b""))
+            if not isinstance(body, bytes):
+                raise _LoginBodyTooLarge
+            received += len(body)
+            if received > _MAX_LOGIN_BODY_BYTES:
+                raise _LoginBodyTooLarge
+        return message
+
+    limited_request = Request(request.scope, limited_receive)
+    return await limited_request.form(
+        max_files=0,
+        max_fields=8,
+        max_part_size=_MAX_LOGIN_BODY_BYTES,
+    )
 
 
 class _LoginSubmission(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    request_id: StrictStr = ""
+    request_id: StrictStr = Field(default="", max_length=128)
     username: StrictStr = Field(default="", max_length=MAX_USERNAME_LENGTH)
-    password: StrictStr = ""
-    csrf_token: StrictStr = ""
+    password: StrictStr = Field(default="", max_length=_MAX_LOGIN_FIELD_LENGTH)
+    csrf_token: StrictStr = Field(default="", max_length=128)
 
     @field_validator("username", mode="before")
     @classmethod
@@ -157,7 +199,12 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         return self._form_response(request_id, client_name=client_name)
 
     async def handle_login_post(self, request: Request) -> Response:
-        form = await request.form()
+        try:
+            form = await _read_login_form(request)
+        except _LoginBodyTooLarge:
+            return PlainTextResponse(
+                "Login form is too large.", status_code=413, headers=_LOGIN_SECURITY_HEADERS
+            )
         try:
             submission = _LoginSubmission.model_validate(form)
         except ValidationError:
@@ -221,6 +268,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         try:
             wi_session = await self._wi_clients.sign_in(credential)
         except SignInFailed:
+            await complete_login_attempt(self._session_factory, attempt_id)
             return self._form_response(
                 request_id,
                 username=username,
@@ -247,7 +295,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
                 error="With Intelligence is unreachable right now — please try again shortly.",
             )
 
-        await clear_failures(self._session_factory, username)
+        await clear_failures(self._session_factory, username, reservation_id=attempt_id)
 
         async with read_session(self._session_factory) as session:
             existing_id = await find_user_id_by_username(session, username)

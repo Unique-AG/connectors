@@ -1,14 +1,17 @@
 import asyncio
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 from mcp.server.auth.provider import AuthorizationCode, AuthorizationParams, TokenError
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from pydantic import AnyUrl
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from mcp_credential_auth import CredentialOAuthProvider
+from mcp_credential_auth import CredentialOAuthProvider, transaction
+from mcp_credential_auth.models import AuthorizationCode as AuthorizationCodeRow
+from mcp_credential_auth.models import PendingAuthorization
 
 _REDIRECT_URI = "https://client.example/callback"
 
@@ -100,6 +103,29 @@ async def test_authorization_completion_is_single_use(
     assert len([result for result in (first, second) if result is not None]) == 1
 
 
+async def test_authorization_completion_rechecks_expiry(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = _provider(session_factory)
+    client = _client("client-expired-pending")
+    await provider.register_client(client)
+    location = await provider.authorize(client, _params())
+    request_id = parse_qs(urlparse(location).query)["request_id"][0]
+    pending = await provider.load_pending_authorization(request_id)
+    assert pending is not None
+    async with transaction(session_factory) as session:
+        await session.execute(
+            update(PendingAuthorization)
+            .where(PendingAuthorization.request_id == request_id)
+            .values(expires_at=datetime.now(UTC) - timedelta(seconds=1))
+        )
+
+    async def subject_factory(_session: AsyncSession) -> str:
+        return "subject"
+
+    assert await provider.complete_authorization(pending, subject_factory) is None
+
+
 async def test_authorization_code_exchange_is_single_use(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -116,6 +142,24 @@ async def test_authorization_code_exchange_is_single_use(
 
     assert len([result for result in results if isinstance(result, OAuthToken)]) == 1
     assert len([result for result in results if isinstance(result, TokenError)]) == 1
+
+
+async def test_authorization_code_exchange_rechecks_expiry(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = _provider(session_factory)
+    client = _client("client-expired-code-claim")
+    await provider.register_client(client)
+    authorization_code = await _authorization_code(provider, client)
+    async with transaction(session_factory) as session:
+        await session.execute(
+            update(AuthorizationCodeRow)
+            .where(AuthorizationCodeRow.code == authorization_code.code)
+            .values(expires_at=datetime.now(UTC).timestamp() - 1)
+        )
+
+    with pytest.raises(TokenError):
+        await provider.exchange_authorization_code(client, authorization_code)
 
 
 async def test_refresh_rotation_detects_reuse(

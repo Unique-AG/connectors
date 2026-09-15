@@ -326,7 +326,7 @@ class TestLoginSubmission:
         request = _login_post(request_id, "", "pw")
         upload = UploadFile(BytesIO(b"user"), filename="username.txt")
 
-        async def uploaded_form() -> FormData:
+        async def uploaded_form(_request: Request) -> FormData:
             return FormData(
                 {
                     "request_id": request_id,
@@ -336,13 +336,28 @@ class TestLoginSubmission:
                 }
             )
 
-        monkeypatch.setattr(request, "form", uploaded_form)
+        monkeypatch.setattr(
+            "with_intelligence_mcp.features.auth.provider._read_login_form", uploaded_form
+        )
         try:
             response = await provider.handle_login_post(request)
         finally:
             await upload.close()
         assert response.status_code == 400
         assert b"invalid values" in response.body
+        assert route.call_count == 0
+
+    @respx.mock
+    async def test_oversized_login_body_is_rejected(self, db: DatabaseFixture) -> None:
+        route = respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
+        provider = _make_provider(db)
+        request_id = await _pending_request_id(provider, _unique("client"))
+
+        response = await provider.handle_login_post(
+            _login_post(request_id, _unique("user"), "x" * 20_000)
+        )
+
+        assert response.status_code == 413
         assert route.call_count == 0
 
 

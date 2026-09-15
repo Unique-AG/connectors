@@ -96,6 +96,8 @@ class AppConfig(BaseSettings):
         """Reject local public URLs in production."""
         if self.app_env != AppEnv.PRODUCTION:
             return self
+        if self.public_base_url.scheme != "https":
+            raise ValueError("PUBLIC_BASE_URL must use HTTPS in production")
         host = self.public_base_url.host
         assert host is not None, f"validated HttpUrl without a host: {self.public_base_url}"
         if host in _NON_PUBLIC_HOSTS:

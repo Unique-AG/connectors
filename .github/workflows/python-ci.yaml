@@ -112,7 +112,7 @@ jobs:
               packages=$(list_changed_python_services)
             fi
             if [ "$SHARED_AUTH_CHANGED" = "true" ]; then
-              packages=$(jq -c '. + ["backstop-mcp"] | unique' <<< "$packages")
+              packages=$(jq -c '. + ["backstop-mcp", "with-intelligence-mcp"] | unique' <<< "$packages")
             fi
           fi
 

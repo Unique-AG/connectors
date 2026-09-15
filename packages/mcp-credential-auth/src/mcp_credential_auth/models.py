@@ -83,3 +83,4 @@ class LoginAttempt(AuthBase):
     username: Mapped[str] = mapped_column(String)
     source_ip: Mapped[str | None] = mapped_column(String, nullable=True)
     attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    pending: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
