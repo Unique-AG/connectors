@@ -20,6 +20,7 @@ from with_intelligence_mcp.with_intelligence_client import (
     AuthError,
     NotEntitled,
     NotFound,
+    Page,
     RateLimited,
     SignInFailed,
     Unreachable,
@@ -27,6 +28,7 @@ from with_intelligence_mcp.with_intelligence_client import (
 )
 
 _JSON = TypeAdapter(object)
+_PAGE = TypeAdapter(Page[dict[str, object]])
 
 
 class _TypedResponse(BaseModel):
@@ -34,6 +36,13 @@ class _TypedResponse(BaseModel):
 
 
 _TYPED_RESPONSE = TypeAdapter(_TypedResponse)
+
+
+class _PageResult(BaseModel):
+    id: int
+
+
+_TYPED_PAGE = TypeAdapter(Page[_PageResult])
 
 
 class _RecordingMetric:
@@ -187,7 +196,7 @@ class TestQueryEncoding:
             return_value=httpx.Response(200, json=page_body([], total=0))
         )
         client, _ = build_client()
-        _ = await client.get_page("/v3/investors", {"active": True})
+        _ = await client.get_page("/v3/investors", _PAGE, {"active": True})
         assert "active=true" in sent_query(route)
 
     @respx.mock
@@ -196,7 +205,7 @@ class TestQueryEncoding:
             return_value=httpx.Response(200, json=page_body([], total=0))
         )
         client, _ = build_client()
-        _ = await client.get_page("/v3/investors", {"id": [1, 2], "name": ["Acme"]})
+        _ = await client.get_page("/v3/investors", _PAGE, {"id": [1, 2], "name": ["Acme"]})
         query = sent_query(route)
         assert "id=1&id=2" in query
         assert "name=Acme" in query
@@ -207,7 +216,7 @@ class TestQueryEncoding:
             return_value=httpx.Response(200, json=page_body([], total=0))
         )
         client, _ = build_client()
-        _ = await client.get_page("/v3/investors")
+        _ = await client.get_page("/v3/investors", _PAGE)
         assert "page_size=50" in sent_query(route)
 
 
@@ -223,8 +232,8 @@ class TestPaging:
             return_value=httpx.Response(200, json=page_body([{"id": 3}], total=3, page=2, size=2))
         )
         client, _ = build_client()
-        seen = [record async for record in client.iterate("/v3/investors")]
-        assert [record["id"] for record in seen] == [1, 2, 3]
+        seen = [record async for record in client.iterate("/v3/investors", _TYPED_PAGE)]
+        assert [record.id for record in seen] == [1, 2, 3]
 
     @respx.mock
     async def test_iterate_is_bounded_by_max_pages(self) -> None:
@@ -235,7 +244,7 @@ class TestPaging:
             )
         )
         client, _ = build_client()
-        seen = [record async for record in client.iterate("/v3/investors", max_pages=3)]
+        seen = [record async for record in client.iterate("/v3/investors", _PAGE, max_pages=3)]
         assert len(seen) == 3
         assert route.call_count == 3
 

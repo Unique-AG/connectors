@@ -14,13 +14,11 @@ class PageInfo(BaseModel):
     total: int = 0
 
 
-class Page(BaseModel):
-    """A listing response, results left unparsed for the feature to model."""
-
+class Page[T](BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     pagination: PageInfo = Field(default_factory=PageInfo)
-    results: list[dict[str, object]] = Field(default_factory=list)
+    results: list[T] = Field(default_factory=list)
 
     @property
     def has_more(self) -> bool:

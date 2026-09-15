@@ -27,8 +27,6 @@ from with_intelligence_mcp.with_intelligence_client.settings import TransportSet
 type QueryValue = str | int | float | bool | Sequence[str | int]
 type Gate = Callable[[str], AbstractAsyncContextManager[None]]
 
-_PAGE = TypeAdapter(Page)
-
 
 class WithIntelligenceClient:
     """Client for one caller's authenticated WI API requests."""
@@ -66,29 +64,31 @@ class WithIntelligenceClient:
         except ValueError as exc:
             raise Unreachable(f"{path} returned an invalid response") from exc
 
-    async def get_page(
+    async def get_page[T](
         self,
         path: str,
+        response_adapter: TypeAdapter[Page[T]],
         params: Mapping[str, QueryValue] | None = None,
         *,
         page: int = 1,
         page_size: int | None = None,
-    ) -> Page:
+    ) -> Page[T]:
         query: dict[str, QueryValue] = dict(params or {})
         query["page"] = page
         query["page_size"] = page_size or self._settings.default_page_size
-        return await self.get_json(path, _PAGE, query)
+        return await self.get_json(path, response_adapter, query)
 
-    async def iterate(
+    async def iterate[T](
         self,
         path: str,
+        response_adapter: TypeAdapter[Page[T]],
         params: Mapping[str, QueryValue] | None = None,
         *,
         max_pages: int = 10,
-    ) -> AsyncGenerator[dict[str, object]]:
+    ) -> AsyncGenerator[T]:
         """Walk a listing, bounded. `max_pages` exists so a broad filter cannot run away."""
         for page_number in range(1, max_pages + 1):
-            page = await self.get_page(path, params, page=page_number)
+            page = await self.get_page(path, response_adapter, params, page=page_number)
             for record in page.results:
                 yield record
             if not page.has_more:
