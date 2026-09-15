@@ -13,6 +13,13 @@ import { TokenProvider } from '../token.provider';
 const mockFetch = vi.mocked(fetch);
 const mockDispatcher = { kind: 'proxy-dispatcher' } as unknown as Dispatcher;
 
+const AADSTS7000215_BODY = {
+  error: 'invalid_client',
+  error_description:
+    "AADSTS7000215: Invalid client secret provided. Ensure the secret being sent in the request is the client secret value, not the client secret ID, for a secret added to app 'ba326974-edcf-49ef-bf7a-74b3e0ea450a'.",
+  error_codes: [7000215],
+};
+
 describe('TokenProvider', () => {
   const mockConfig = {
     userProfileId: 'user-profile-123',
@@ -228,6 +235,33 @@ describe('TokenProvider', () => {
 
       await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
         'AADSTS50173: The provided grant has expired',
+      );
+      expect(mockDependencies.drizzle.update).toHaveBeenCalled();
+      expect(onPermanentAuthFailure).toHaveBeenCalledWith('user-profile-123');
+    });
+
+    it('clears Graph tokens and revokes the MCP session on invalid_client (AADSTS7000215)', async () => {
+      const mockUserProfile = {
+        id: 'user-profile-123',
+        refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+      };
+      const onPermanentAuthFailure = vi.fn().mockResolvedValue(undefined);
+
+      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        text: vi.fn().mockResolvedValue(JSON.stringify(AADSTS7000215_BODY)),
+      } as never);
+
+      const unit = new TokenProvider(mockConfig, {
+        ...mockDependencies,
+        onPermanentAuthFailure,
+      } as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
+        AADSTS7000215_BODY.error_description,
       );
       expect(mockDependencies.drizzle.update).toHaveBeenCalled();
       expect(onPermanentAuthFailure).toHaveBeenCalledWith('user-profile-123');

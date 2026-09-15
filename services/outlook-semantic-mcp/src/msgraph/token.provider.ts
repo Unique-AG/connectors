@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { microsoftOAuthTokenUrl } from '../auth/microsoft.provider';
 import { DrizzleDatabase } from '../db/drizzle.module';
 import { userProfiles } from '../db/schema';
+import { isAppLevelOAuthError } from './is-app-level-oauth-error';
 
 const TokenRefreshResponseSchema = z.object({
   access_token: z.string().min(1),
@@ -133,7 +134,17 @@ export class TokenProvider implements AuthenticationProvider {
           errorSource: 'microsoft_graph_api',
         });
 
-        if (isPermanentUpstreamOAuthError(parsedError.error)) {
+        // Errors handled:
+        // - isPermanentUpstreamOAuthError: invalid_grant, interaction_required, consent_required
+        //   (user revoked consent or the refresh grant expired)
+        // - isAppLevelOAuthError: invalid_client, unauthorized_client
+        //   Error triggered by: Entra app registration change — e.g. the client secret was
+        //   rotated, or the secret ID was configured instead of the secret value
+        //   (AADSTS7000215). Clear stored tokens so we do not retry the same refresh forever.
+        if (
+          isPermanentUpstreamOAuthError(parsedError.error) ||
+          isAppLevelOAuthError(parsedError.error)
+        ) {
           await this.clearGraphTokens(userProfileId);
           await this.onPermanentAuthFailure?.(userProfileId);
           throw new UpstreamCredentialRevokedError(parsedError.error_description);
