@@ -1,6 +1,6 @@
 ---
 name: backstop-api
-description: Explains how Backstop's JSON:API-style REST responses work — the relationships/links envelope, resolving a person/organization to an id, following relationships to related data (activities, notes, entity-relationships, ...), the `?include=` side-loading param, and mandatory pagination — and how to read this instance's swagger plus the Elevio product docs together. Use this EVERY TIME you need to understand how some Backstop entity works or where its data comes from — before reading the Backstop swagger or Elevio help articles, adding a backstop-mcp tool/feature that walks relationships, or exploring the live Backstop API.
+description: Explains how Backstop's JSON:API-style REST responses work — the relationships/links envelope, resolving a person/organization to an id, following relationships to related data (activities, notes, entity-relationships, ...), the `?include=` side-loading param, mandatory pagination, and the write-payload rules this instance taught (parent `resourceType`, identity as relationships, required fields swagger omits). Use this EVERY TIME you need to understand how some Backstop entity works or where its data comes from — before reading the Backstop swagger or Elevio help articles, adding a backstop-mcp tool/feature that walks relationships or writes a record, or exploring the live Backstop API.
 ---
 
 # The Backstop REST API
@@ -11,16 +11,17 @@ have to guess an endpoint — you resolve a record once, then read its own `rela
 the next one.
 
 Use this skill whenever the question is "how does entity X work in Backstop / how do I get X's
-data out of Backstop". Combine three sources, in this order of authority for *behaviour*:
-live `GET` (§6) > Elevio article (`docs.py`) > instance swagger (`explore.py`). Never design
-from swagger or Elevio alone.
+data out of Backstop / how do I write X". Combine three sources, in this order of authority
+for *behaviour*: live response (§6, §8) > Elevio article (`docs.py`) > instance swagger
+(`explore.py`). Never design from swagger or Elevio alone. Writes designed from swagger
+alone have been wrong every time so far — see §8.
 
 ## 0. Where the docs live
 
 This skill file lives in `.claude/skills/backstop-api/` and `.cursor/skills/backstop-api/`
 (where agents load skills). The scripts and `.env` live in
 `services/backstop-mcp/agent-explore/`. Do not send the API token to Elevio, and do not
-POST to `BACKSTOP_BASE_URL`.
+POST to `BACKSTOP_BASE_URL` unless the user says so for that task (§8).
 
 **A. Instance swagger — `explore.py`, API token.** Same host as the CRM:
 
@@ -232,8 +233,12 @@ BACKSTOP_SERVICE_USERNAME
 BACKSTOP_SERVICE_API_TOKEN
 ```
 
-This instance is **read-only for agents**. Probe with `GET` only. Never `POST`/`PATCH`/`PUT`/`DELETE`
-against `BACKSTOP_BASE_URL`, and never send a request body. Do not print credentials.
+This instance is **read-only for agents by default**. Probe with `GET` only. Never
+`POST`/`PATCH`/`PUT`/`DELETE` against `BACKSTOP_BASE_URL` unless the user says so for
+that task — and then delete every record you created and verify the follow-up `GET`
+404s. Never send a request body through `explore.py` (it is GET-only; do not rewrite
+it). Do not print credentials. Write-payload rules that only a live `400` taught are
+in §8.
 
 Auth is `Authorization: Basic base64(username:token)` plus a `token: true` header. The script
 is `services/backstop-mcp/agent-explore/explore.py`: always `GET`s, loads that folder's `.env`,
@@ -282,3 +287,67 @@ new backstop-mcp tool/feature:
 This mirrors how the rest of this repo was built: `features/party_resolver/search.py` and
 `features/custom_fields/values.py` both encode things (fuzzy-search limitations, a relationship
 with no `sort=`) that only came from exploring real responses, not from reading the swagger cold.
+
+For a **write** feature the same loop applies, plus §8. Do not skip to a POST body from the
+swagger `parameters` / required list. The coding shape (tool split, facade command,
+discriminated union) lives in `services/backstop-mcp/AGENT_README.md`; the reference
+implementation is `features/activity_writes/`.
+
+## 8. Writing records (POST / PATCH / DELETE)
+
+The live tenant stays read-only until the user says otherwise for that task. When they
+do: create, confirm the record appears on the parent's `/activities` feed, then
+hard-delete and verify the follow-up `GET` 404s. Write every response to
+`.probe-cache/`. `explore.py` is GET-only — do not add a method flag.
+
+Four payload rules, each learned from a `400` on this instance. The swagger is wrong or
+silent about all four.
+
+**1. A parent link's `resourceType` is the plural resource name.** `attachedTo`,
+`regarding`, `resources`, `linkedResources` and `secondaryRegarding` carry
+`{resourceId, resourceType, resourceLink}` where `resourceType` is `organizations` /
+`people` / `contacts` / `employees`. Bean casing is rejected —
+`400 "Can not find OrganizationBean with id ..."`; `linkedResources` is blunter:
+`400 "Invalid LinkResourceType EmployeeBean"`. A `SearchType` is already the right
+string. `map_search_type_to_resource_type_bean` is for `filter[entityType][eq]` on the
+**read** side only; it has no business in a write payload. Backstop normalizes aliasing
+collections itself — an `employees` link comes back as `people`.
+
+**2. Identity pointers are relationships, never attributes.** `author`, `createdBy` and
+`assignedUser` go in `relationships` as `{"data": {"type": "system-users", "id": ...}}`.
+In `attributes` Backstop answers
+`400 "author should not be in the 'attributes' but 'relationship."`. `attendees` and
+`activityTags` are relationships too, and both persist on the `POST` — no follow-up
+PATCH. `system_user_relationship` in `features/system_users/` is the helper.
+
+**3. Required fields are not the swagger's required list.** Notes need `effectiveDate`;
+`meeting-or-calls` need `title`, `type`, `timeZone`, `startTimestamp`, `stopTimestamp`,
+`regarding` and `author`; tasks need `name`, `dueDate` and `attachedTo`; `emails` need
+`data` **and** `emailFormat`. A metadata-only `POST /emails` is
+`400 "Field data is required in POST request."` — the UI can log an email without a
+file; the REST API cannot. Put each required field on the pydantic input (or default it
+in the command) so the model rejects the call instead of the agent reading a `400`.
+
+**4. Silent defaults bite.** `sendNotification` defaults to **true** when omitted, which
+mails the assignee — always write the flag explicitly. `isDraft` defaults to false. A
+`linkedResources` entry that repeats the parent is silently dropped, so filter it out
+rather than reporting a link that is not there.
+
+Also before you pick a route:
+
+- Nested collection POSTs are not uniformly writable.
+  `POST /contacts/{id}/notes` is `403 "contacts/notes is read only."` while top-level
+  `POST /notes` accepts every party type and still lands in that party's `/activities`
+  feed.
+- Nested `POST /{segment}/{id}/meeting-or-calls` returns `201` but **orphans** the
+  record from the parent's activity feed. Route meetings and calls through top-level
+  `POST /meeting-or-calls` with an explicit `regarding`.
+- `Accept: application/json` gets an HTML 404 page instead of a JSON error. The client
+  pins `application/vnd.api+json` (`backstop_client/factory.py`).
+- `DELETE` is a hard delete (no recycle bin) and a `204` with an empty body — do not
+  invent a schema for it.
+- `filter[userName][eq]` on `/system-users` is rejected; match the caller login
+  client-side (the login path caches `external_user_id` on `backstop_credentials`).
+
+Pin write tests to these recorded shapes, not to the swagger. A suite that asserts
+`PersonBean` and an attribute `author` will stay green while Backstop returns `400`.
