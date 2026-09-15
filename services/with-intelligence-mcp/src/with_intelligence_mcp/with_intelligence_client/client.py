@@ -21,7 +21,7 @@ from with_intelligence_mcp.with_intelligence_client.errors import (
     Unreachable,
 )
 from with_intelligence_mcp.with_intelligence_client.pagination import Page
-from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy, parse_retry_after
+from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy
 from with_intelligence_mcp.with_intelligence_client.settings import TransportSettings
 
 type QueryValue = str | int | float | bool | Sequence[str | int]
@@ -161,7 +161,7 @@ class WithIntelligenceClient:
             UPSTREAM_RATE_LIMITED.add(1)
             raise RateLimited(
                 f"{path} is rate-limited",
-                retry_after_seconds=parse_retry_after(
+                retry_after_seconds=self._retry.parse_retry_after(
                     cast("object", response.headers.get("retry-after"))
                 ),
             )

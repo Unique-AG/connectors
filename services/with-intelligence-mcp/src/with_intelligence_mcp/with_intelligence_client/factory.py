@@ -19,7 +19,7 @@ from with_intelligence_mcp.with_intelligence_client.errors import (
     SignInFailed,
     Unreachable,
 )
-from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy, parse_retry_after
+from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy
 from with_intelligence_mcp.with_intelligence_client.session import WiSession
 from with_intelligence_mcp.with_intelligence_client.settings import RetrySettings, TransportSettings
 
@@ -165,7 +165,7 @@ class WithIntelligenceClientFactory:
         if status == 429:
             raise RateLimited(
                 f"{path} is rate-limited",
-                retry_after_seconds=parse_retry_after(
+                retry_after_seconds=self._retry_policy.parse_retry_after(
                     cast("object", response.headers.get("retry-after"))
                 ),
             )
