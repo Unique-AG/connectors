@@ -64,9 +64,9 @@ There are no open questions. Every product decision this ticket needed has been 
 | `update_opportunity` | `opportunity_writes` | `PATCH /opportunities/{id}` |
 | `backfill_opportunity_stage_history` | `opportunity_writes` | `POST /bulk-opportunity-stage-history` |
 | `update_custom_field_values` | `custom_fields` (existing) | `POST /bulk-custom-field-values` |
-| `update_person` | `party_writes` | `PATCH /people/{id}` + `/contact-locations` |
-| `update_organization` | `party_writes` | `PATCH /organizations/{id}` + `/contact-locations` |
-| `end_employment` | `party_writes` | `PATCH /entity-relationships/{id}` |
+| `update_person` | `org_people_writes` | `PATCH /people/{id}` + `/contact-locations` |
+| `update_organization` | `org_people_writes` | `PATCH /organizations/{id}` + `/contact-locations` |
+| `end_employment` | `org_people_writes` | `PATCH /entity-relationships/{id}` |
 
 Custom-field writes live in the existing `custom_fields` feature because the catalog they
 validate against, and the picklist matcher they reuse, are already there. Adding
@@ -78,15 +78,15 @@ the package when the first command appears.
 Follow `UpdatedActivityResponse`: a write response is **small**. It reports the id, the
 resource type, and only the extra fields a measured trap requires.
 
-In `opportunity_writes/responses.py` and `party_writes/responses.py` respectively:
+In `opportunity_writes/responses.py` and `org_people_writes/responses.py` respectively:
 
 ```python
 class UpdatedOpportunityResponse(OmitNoneModel):
     id: str
-    resource_type: str            # "opportunities"
-    stage: str | None             # stage name READ BACK after the write
+    resource_type: str  # "opportunities"
+    stage: str | None  # stage name READ BACK after the write
     stage_id: str | None
-    warnings: tuple[str, ...]     # empty when nothing needs saying
+    warnings: tuple[str, ...]  # empty when nothing needs saying
 ```
 
 `warnings` is how a silent failure becomes visible — a requested stage that did not move, an
@@ -97,7 +97,7 @@ For the multi-record tools (`backfill_opportunity_stage_history`,
 
 ```python
 class RecordOutcomeResponse(OmitNoneModel):
-    index: int                    # 0-based position in the request
+    index: int  # 0-based position in the request
     record_id: str | None
     status: Literal["applied", "failed"]
     error: str | None
@@ -424,7 +424,7 @@ be an opportunity, which the party resolver does not resolve. Callers get ids fr
 
 ## Slice 4 — `update_person` and `update_organization`
 
-New feature package `src/backstop_mcp/features/party_writes/`. Two tools, two commands
+New feature package `src/backstop_mcp/features/org_people_writes/`. Two tools, two commands
 (`UpdatePersonCommand`, `UpdateOrganizationCommand`), one shared
 `commands/_json_api_utils.py`.
 
@@ -484,15 +484,14 @@ trap and same two-field treatment as slice 1's `add_users_to_notify` /
 The ticket's separate `update_contact_location` tool is **not** built. Locations are edited
 through the contact, via an optional block on each tool:
 
-- `add_location: ContactLocationInput | None`
-- `update_location: ContactLocationUpdateInput | None` (carries `location_id`)
+- `location: ContactLocationInput | None` — omit `location_id` to create, pass it to patch
 - `delete_location_id: str | None`
 
 `location_id` comes from `get_person` / `get_organization` with
 **`include=contactLocations`** — **not** `include=locations`, which is a hard
 `400 "The system does not support includes for locations"`. Fix that in the field description.
 
-`ContactLocationInput` fields: `location_title` (**required**, `max_length=30`), `address`,
+`ContactLocationInput` fields: `location_id` (omit to create), `location_title` (**required on create**, `max_length=30`), `address`,
 `city`, `state`, `country`, `postal_code`, `phone_number`, `secondary_phone_number`, `fax`,
 `note`, `is_primary_location`.
 
@@ -525,7 +524,7 @@ direction, and it is why `AGENT_README`'s "split when the annotations cannot tel
 rule is satisfied here. Say this in the tool docstring so the next reader does not re-litigate
 it.
 
-### Tests — `tests/features/party_writes/`
+### Tests — `tests/features/org_people_writes/`
 
 - `test_only_the_changed_attribute_is_sent`
 - `test_over_length_job_title_is_rejected_by_the_input_model`
@@ -542,7 +541,7 @@ it.
 
 ## Slice 5 — `end_employment`
 
-Same `party_writes` package. `PATCH /entity-relationships/{id}` with `endDate` only.
+Same `org_people_writes` package. `PATCH /entity-relationships/{id}` with `endDate` only.
 
 ### Input
 
