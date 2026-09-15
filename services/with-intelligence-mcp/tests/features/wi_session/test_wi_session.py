@@ -38,12 +38,6 @@ class FakeFactory:
 
 
 class FakeStore:
-    """Stands in for the encrypted row and the auth context that reads and renews it.
-
-    `renew` mirrors `WithIntelligenceAuthContext.renew_session`: it serialises callers, returns
-    the stored session if someone else already renewed it, and writes the renewal back.
-    """
-
     def __init__(self, stored: WiSession, *, delay: float = 0.0) -> None:
         self.stored: WiSession = stored
         self.reads: int = 0
