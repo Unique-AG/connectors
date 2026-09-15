@@ -13,6 +13,7 @@ from backstop_mcp.features.org_people_writes.commands import (
     CreateEmploymentCommand,
     CreateOrganizationCommand,
     CreatePersonCommand,
+    DeletePartyWithLocationsCommand,
     EndEmploymentCommand,
     ModifyContactLocationCommand,
     UpdateOrganizationCommand,
@@ -100,6 +101,19 @@ def get_create_employment_command_factory(
     return CreateEmploymentCommand(
         client=client,
         entity_relationship_types_service=entity_relationship_types_service,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_delete_party_with_locations_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    modify_contact_location_command: ModifyContactLocationCommand = Depends(
+        get_modify_contact_location_command_factory
+    ),
+) -> DeletePartyWithLocationsCommand:
+    return DeletePartyWithLocationsCommand(
+        client=client,
+        modify_contact_location_command=modify_contact_location_command,
     )
 
 
