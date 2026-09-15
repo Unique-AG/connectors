@@ -16,6 +16,7 @@ __all__ = [
     "BackfillOpportunityStageHistoryResponse",
     "CreateOpportunityResponse",
     "CreatedOpportunityResponse",
+    "DeletedOpportunityResponse",
     "RecordOutcomeResponse",
     "UpdatedOpportunityResponse",
 ]
@@ -52,6 +53,22 @@ class CreatedOpportunityResponse(OmitNoneModel):
             "Silent-failure notes: a requested stage that did not land. Empty when the "
             "write landed as asked."
         ),
+    )
+
+
+class DeletedOpportunityResponse(OmitNoneModel):
+    """A hard delete: Backstop has no recycle bin, so `permanent` is always true."""
+
+    id: str = Field(
+        description="Backstop id of the deleted opportunity. Echo it; never invent one."
+    )
+    resource_type: Literal["opportunities"] = Field(
+        default="opportunities",
+        description="Always `opportunities`.",
+    )
+    permanent: Literal[True] = Field(
+        default=True,
+        description="Always true: Backstop hard-deletes the record. There is no recycle bin.",
     )
 
 

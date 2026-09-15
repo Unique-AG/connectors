@@ -11,6 +11,7 @@ from backstop_mcp.features.opportunities import (
 from backstop_mcp.features.opportunity_writes.commands import (
     BackfillOpportunityStageHistoryCommand,
     CreateOpportunityCommand,
+    DeleteOpportunityCommand,
     UpdateOpportunityCommand,
 )
 from backstop_mcp.features.system_users import SystemUsersService, get_system_users_service
@@ -44,6 +45,13 @@ def get_create_opportunity_command_factory(
         opportunity_stages_service=opportunity_stages_service,
         system_users_service=system_users_service,
     )
+
+
+@lru_cache(maxsize=1)
+def get_delete_opportunity_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+) -> DeleteOpportunityCommand:
+    return DeleteOpportunityCommand(client=client)
 
 
 @lru_cache(maxsize=1)

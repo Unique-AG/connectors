@@ -35,6 +35,7 @@ from backstop_mcp.features.opportunity_writes.tools.backfill_opportunity_stage_h
     backfill_opportunity_stage_history,
 )
 from backstop_mcp.features.opportunity_writes.tools.create_opportunity import create_opportunity
+from backstop_mcp.features.opportunity_writes.tools.delete_opportunity import delete_opportunity
 from backstop_mcp.features.opportunity_writes.tools.update_opportunity import update_opportunity
 from backstop_mcp.features.org_people.tools.get_organization import get_organization
 from backstop_mcp.features.org_people.tools.get_people_for_party import get_people_for_party
@@ -76,6 +77,7 @@ TOOLS: tuple[ToolFunction, ...] = (
     delete_activity,
     update_opportunity,
     create_opportunity,
+    delete_opportunity,
     backfill_opportunity_stage_history,
     update_custom_field_values,
     create_person,

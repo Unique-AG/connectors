@@ -4,6 +4,9 @@ from backstop_mcp.features.opportunity_writes.commands.backfill_opportunity_stag
 from backstop_mcp.features.opportunity_writes.commands.create_opportunity_command import (
     CreateOpportunityCommand,
 )
+from backstop_mcp.features.opportunity_writes.commands.delete_opportunity_command import (
+    DeleteOpportunityCommand,
+)
 from backstop_mcp.features.opportunity_writes.commands.update_opportunity_command import (
     UpdateOpportunityCommand,
 )
@@ -11,5 +14,6 @@ from backstop_mcp.features.opportunity_writes.commands.update_opportunity_comman
 __all__ = [
     "BackfillOpportunityStageHistoryCommand",
     "CreateOpportunityCommand",
+    "DeleteOpportunityCommand",
     "UpdateOpportunityCommand",
 ]

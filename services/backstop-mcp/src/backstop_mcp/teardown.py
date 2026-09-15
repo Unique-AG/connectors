@@ -73,6 +73,7 @@ from backstop_mcp.features.opportunities import (
 from backstop_mcp.features.opportunity_writes import (
     get_backfill_opportunity_stage_history_command_factory,
     get_create_opportunity_command_factory,
+    get_delete_opportunity_command_factory,
     get_update_opportunity_command_factory,
 )
 from backstop_mcp.features.org_people import (
@@ -147,6 +148,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_opportunity_stages_service_factory,
     get_update_opportunity_command_factory,
     get_create_opportunity_command_factory,
+    get_delete_opportunity_command_factory,
     get_backfill_opportunity_stage_history_command_factory,
     get_stage_history_query_factory,
     get_map_opportunity_to_response_util_factory,
