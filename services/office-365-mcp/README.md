@@ -221,7 +221,11 @@ bearer token, so passing it on is either useless or a token leak. What `teams_li
 answers is "there is a 47-minute recording from Tuesday, only the organizer can download it, and
 here is the transcript instead" — existence, start and end, a derived `duration_seconds` (Microsoft
 publishes no duration property at all), and `content_correlation_id`, which is Microsoft's own link
-to the transcript of the same call. Layering rule 7 forbids any module from addressing a single
+to the transcript of the same call — and which `teams_list_meeting_transcripts` takes back as an
+argument, so "the words of that recording" is one hop rather than a guess between occurrences. It
+is the one artifact filter Microsoft publishes a `$filter` example for, and only on the transcripts
+collection, which is why the two listers' arguments differ by exactly that one.
+Layering rule 7 forbids any module from addressing a single
 recording, because that is the only door to those bytes and the change that opens it looks like a
 convenience. The organizer-only rule is reported rather than recited: Microsoft permits only the
 meeting organizer to download a recording under delegated access, the *metadata* is not so

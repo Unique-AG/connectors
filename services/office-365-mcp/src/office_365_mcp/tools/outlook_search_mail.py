@@ -1,48 +1,22 @@
 """`outlook_search_mail` — find a message anywhere in the signed-in user's mailbox.
 
-`GET /me/messages?$search="…"` rather than `POST /search/query` with `entityTypes: ["message"]`,
-which is the endpoint `teams_search_messages` uses for Teams. Three documented facts decide this
-choice. All three concern the mail entity:
-
-* **The Search API cannot reach a delegated mailbox at all** — "Users can search their own
-  mailbox, but can't search delegated mailboxes"
-  (https://learn.microsoft.com/en-us/graph/search-concept-messages). `$search` on the collection
-  has no such restriction, so the shape stays open to a shared-mailbox tool later.
-* **Its message hit carries no `id`.** The documented projection is `createdDateTime`,
-  `lastModifiedDateTime`, `receivedDateTime`, `sentDateTime`, `hasAttachments`, `subject`,
-  `bodyPreview`, `importance`, `replyTo`, `sender` and `from`. Microsoft documents `hitId` as a
-  separate field, of type `RestId`. `fields` only narrows a message hit. It cannot add back a
-  field Graph left out.
-* **Its `total` is the page size, not the match count**, exactly as for `chatMessage`.
-
-**Two Graph calls, and the second is not optional.** `Prefer: IdType="ImmutableId"` is *not*
-honoured on a `$search` request. Graph answers `Preference-Applied` anyway, so the header lies
-rather than fails. Microsoft's own maintainer confirmed this in
-https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/698 with "the immutableId is not
-supported with $search query parameters when targeting messages. You'd need to make a secondary
-call to translate those IDs … using the translateExchangeIds API." A handle minted from the raw
-hit id dies the moment Outlook files the message. Inbox rules and retention can file a message
-with no warning, and when this happens, the model reports the message as deleted. So every id
-here is exchanged before it becomes a handle. The exchange costs no extra consent: `User.Read` is
-already always on.
-
-**One request, `$top` is the window.** Whether `$search` paging works on this collection is
-undocumented. No Microsoft page shows an `@odata.nextLink` on a searched message collection. So
-this tool asks once for what the caller wants, instead of a walk with an unverified stop
-condition. Microsoft documents a `$search` limit of at most 1000 results, and `limit` here stays
-far below that.
-
-**No date arguments, and no `$orderby`.** Microsoft documents `received` as an exact-date KQL
-property on this collection and publishes no range syntax for it. Graph fails unsupported
-query-parameter combinations *silently* rather than with an error
-(https://learn.microsoft.com/en-us/graph/query-parameters). If Graph silently ignores
-`$orderby`, it still returns results in its own order, under a label that promises a different
-order. Date-bounded questions are `outlook_list_mail`, which filters and sorts on one property
-and cannot be silently ignored.
+`GET /me/messages?$search="…"` rather than `POST /search/query`, which cannot reach a delegated
+mailbox at all (https://learn.microsoft.com/en-us/graph/search-concept-messages).
+`Prefer: IdType="ImmutableId"` is not honoured under `$search` and Graph answers
+`Preference-Applied` anyway, so every hit id is exchanged through `translateExchangeIds`
+(https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/698) before it becomes a handle.
+Paging is undocumented here, so this asks once and `$top` is the window; `$orderby` is ignored
+silently, so there is none. The date bounds go in the KQL, because a `$filter` beside `$search` is
+refused with `SearchWithFilter` — a live probe on 2026-09-10 matched `received>=`, `received<` and
+`received<=` against the equivalent `receivedDateTime` `$filter` row for row, while
+`received>=today-5` returned nothing silently and `received:"last week"` was a 400. `$search` does
+not reach drafts in Deleted Items, so a window here under-returns where `outlook_list_mail` does
+not.
 """
 
 from collections.abc import Mapping
 from dataclasses import dataclass, fields
+from datetime import date, datetime, timedelta
 from typing import Annotated
 
 import httpx
@@ -64,16 +38,14 @@ from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared import kql
 from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailSummary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "outlook_search_mail"
 
 STEP_SEARCH = "mail_search"
 STEP_IDS = "mail_ids"
 
-# `Mail.Read` covers the search. `User.Read` covers the id exchange.
-# `User.Read` is always on by default, but this file names it anyway.
-# This tool exchanges its token for exactly the permissions declared here.
-# An undeclared permission causes a 403 on the second call, and nowhere else.
+# `User.Read` covers the id exchange, which is the only call that 403s without it.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "User.Read")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
@@ -81,20 +53,25 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 MAX_RESULTS = 50
 
 _DESCRIPTION = """\
-Search the signed-in user's own mailbox by keyword, sender, recipient or subject. Use it for \
-"find the mail where…" and for anything about a person. The tool needs at least one criterion, \
-and combines all given criteria with AND. Hits carry metadata and a short preview only. Pass a \
-hit's `uri` to outlook_read_mail for what the message actually says. There is no date filter and \
-no sort here. Microsoft's index returns its own order. For "the newest" or "this week", use \
-outlook_list_mail, which orders by receipt within one folder. This tool searches only this \
+Search the signed-in user's own mailbox by keyword, sender, recipient, subject or attachment \
+file name, within a receipt-date window when the question has one. Use it for "find the mail \
+where…" and for anything about a person. The tool needs at least one criterion, and combines all \
+given criteria with AND, so each one narrows the answer. Pick the recipient argument \
+deliberately: `to` is the To line only, which is what "addressed to me" means, while `recipient` \
+also matches Cc, Bcc and mail the person sent — on the user's own mailbox that is nearly \
+everything. `attachment_name` is the only way to reach a file's name; `query` does not read it. \
+`received_after` and `received_before` bound receipt date at either end, and both of those days \
+are covered whole, so "the invoice mail from March" is one call. They narrow a search rather than \
+standing in for one: at least one criterion is still required, because a window on its own is \
+outlook_list_mail's question. There is no sort here, inside a window or outside one. Microsoft's \
+index returns its own order, so a window does not make an answer "the newest". Hits carry \
+metadata and a short preview only. Pass a hit's `uri` to outlook_read_mail for what the message \
+actually says. Use outlook_list_mail instead for a date range with nothing to search for, for \
+"the newest" and anything else about receipt order, and when unsent drafts matter: the index \
+behind this tool does not reach drafts in Deleted Items, so a window here can return fewer \
+messages than the same window on outlook_list_mail, never more. This tool searches only this \
 user's mailbox, never a shared one.\
 """
-
-_NO_CRITERIA = (
-    "outlook_search_mail needs at least one of query, sender, recipient or subject. Graph answers "
-    + "a criteria-free search with an arbitrary slice of the mailbox. This slice is a sample of "
-    + "what the user can read, not an answer. Add the words or the person the question is about."
-)
 
 
 class MailSearchResults(BaseModel):
@@ -119,24 +96,49 @@ class MailSearchResults(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class SearchCriteria:
-    """What was asked for, separately from how it is spelled for Graph."""
-
     query: str | None = None
     sender: str | None = None
     recipient: str | None = None
+    to: str | None = None
     subject: str | None = None
+    attachment_name: str | None = None
 
 
 CRITERIA: tuple[str, ...] = tuple(field.name for field in fields(SearchCriteria))
 
+_NO_CRITERIA = (
+    f"outlook_search_mail needs at least one of {', '.join(CRITERIA[:-1])} or {CRITERIA[-1]}. "
+    + "Graph answers a criteria-free search with an arbitrary slice of the mailbox. This slice is "
+    + "a sample of what the user can read, not an answer. Add the words or the person the "
+    + "question is about. `received_after` and `received_before` narrow a search and are not "
+    + "criteria: a date range with nothing to search for is outlook_list_mail, which orders by "
+    + "receipt and reaches drafts this index does not."
+)
+
+_WINDOW_RUNS_BACKWARDS = (
+    "outlook_search_mail searched nothing, because `received_before` falls before "
+    + "`received_after` and no mailbox holds a window that runs backwards. A date covers the whole "
+    + "of the day it names at either end, so one date in both bounds searches that single day. "
+    + "Put the earlier point in `received_after` and the later one in `received_before`, then call "
+    + "again. Retrying with the same two values will fail identically."
+)
+
 
 async def search_mail(
-    client: GraphServiceClient, criteria: SearchCriteria, *, limit: int
+    client: GraphServiceClient,
+    criteria: SearchCriteria,
+    *,
+    received_after: date | datetime | None = None,
+    received_before: date | datetime | None = None,
+    limit: int,
 ) -> MailSearchResults:
     assert 1 <= limit <= MAX_RESULTS, f"limit is bounded by the schema, got {limit}"
-    search = _query_string(criteria)
-    if not search:
+    asked = _query_string(criteria)
+    if not asked:
         raise ToolError(_NO_CRITERIA)
+    if runs_backwards(received_after, received_before):
+        raise ToolError(_WINDOW_RUNS_BACKWARDS)
+    search = " AND ".join([asked, *_window_terms(received_after, received_before)])
 
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_SEARCH):
@@ -165,9 +167,7 @@ async def search_mail(
 async def _stable_ids(client: GraphServiceClient, found: list[Message]) -> dict[str, str]:
     """Each hit's mutable id, mapped to one that survives after the mailbox files the message.
 
-    This exchange drops a hit that Graph fails to translate, rather than answer with the mutable
-    id. A handle that works now, and then fails with a 404 within an hour, is the failure this
-    exchange exists to prevent. The model reads that 404 as "deleted".
+    A hit Graph fails to translate is dropped rather than handed back with its mutable id.
     """
     raw = [message.id for message in found if message.id is not None]
     if not raw:
@@ -191,13 +191,10 @@ async def _stable_ids(client: GraphServiceClient, found: list[Message]) -> dict[
 
 
 def _query_string(criteria: SearchCriteria) -> str:
-    """The KQL string these criteria become. This string is empty when the caller gives no
-    criteria.
+    """The KQL these criteria become, empty exactly when the caller named none.
 
-    The property names are Microsoft's own for a message collection. A query of only punctuation
-    contributes no term. So this string, not the arguments behind it, is the honest test of
-    whether the caller gave a criterion.
-    """
+    Properties per https://learn.microsoft.com/en-us/graph/search-query-parameter. A query of only
+    punctuation contributes no term, so this string is the honest test of a criterion."""
     terms: list[str] = []
     if criteria.query:
         rendered = kql.free_text(criteria.query)
@@ -207,9 +204,52 @@ def _query_string(criteria: SearchCriteria) -> str:
         terms.append(f"from:{kql.quoted(criteria.sender)}")
     if criteria.recipient:
         terms.append(f"participants:{kql.quoted(criteria.recipient)}")
+    if criteria.to:
+        terms.append(f"to:{kql.quoted(criteria.to)}")
     if criteria.subject:
         terms.append(f"subject:{kql.quoted(criteria.subject)}")
+    if criteria.attachment_name:
+        terms.append(f"attachment:{kql.quoted(criteria.attachment_name)}")
     return " ".join(terms)
+
+
+def _window_terms(
+    received_after: date | datetime | None, received_before: date | datetime | None
+) -> list[str]:
+    """The bounds as KQL comparisons on `received`, at most one per end.
+
+    Joined with an explicit `AND`, never a space: two space-separated `received` comparisons are
+    both dropped, answering the criterion's own unbounded matches. Unquoted, because `kql.quoted`
+    would phrase-quote an instant for its colons into a form no probe verified.
+    """
+    terms: list[str] = []
+    if received_after is not None:
+        terms.append(_opening_term(received_after))
+    if received_before is not None:
+        terms.append(_closing_term(received_before))
+    return terms
+
+
+def _opening_term(received_after: date | datetime) -> str:
+    """`received>=` the first instant the bound admits, which for a date is that day's."""
+    return f"received>={_wire(opens_at(received_after))}"
+
+
+def _closing_term(received_before: date | datetime) -> str:
+    """Either spelling covers the whole of the value the caller named."""
+    if isinstance(received_before, datetime):
+        return f"received<={_wire(closes_at(received_before))}"
+    return f"received<{_wire(opens_at(received_before + timedelta(days=1)))}"
+
+
+def _wire(instant: datetime) -> str:
+    """An instant as the UTC literal the live probe verified, keeping whatever precision it has.
+
+    Renders identically to `outlook_list_mail._wire`, so the two windows read against each other.
+    Truncating to whole seconds moves a bound silently and drops a row at the boundary."""
+    if instant.microsecond:
+        return f"{instant:%Y-%m-%dT%H:%M:%S.%f}Z"
+    return f"{instant:%Y-%m-%dT%H:%M:%SZ}"
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -252,9 +292,24 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only mail this person was on, as sender or as any recipient including Bcc. "
-                    + "Use the signed-in user's own address, from get_me, for \"mail addressed to "
-                    + 'me". Use `sender` for "mail from them".'
+                    "Only mail this person was on ANYWHERE — as the sender, or as a To, Cc or "
+                    + 'Bcc recipient. That width makes it the wrong argument for "mail addressed '
+                    + "to me\": on the user's own mailbox nearly every message has them on it "
+                    + "somewhere, so this matches nearly everything. Use `to` for that, `sender` "
+                    + 'for "mail from them", and this one for "anything involving Dana".'
+                ),
+            ),
+        ] = None,
+        to: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Only mail addressed directly to this person, on the To line — not Cc, not "
+                    + 'Bcc, and not mail they merely sent. This is the argument for "mail '
+                    + "addressed to me\", with the signed-in user's own address from get_me: it "
+                    + "separates the mail written to them from the mail they were copied on. "
+                    + "Takes an address, alias or display name, as `sender` does."
                 ),
             ),
         ] = None,
@@ -266,6 +321,56 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "Only mail whose subject carries these words. Narrower than `query`, which "
                     + "reads the body too, and the better choice when the user quoted a subject."
                 ),
+            ),
+        ] = None,
+        attachment_name: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Only mail carrying an attachment whose FILE NAME matches, for example "
+                    + "`budget_2026.xlsx`. Attachment file names are reachable by no other "
+                    + "argument here: `query` reads the sender, the subject and the body text, "
+                    + "and a file's name is in none of them. Pass the name whole and as the user "
+                    + "wrote it. Matching is on the words of the name rather than the name "
+                    + "itself, so `budget.xlsx` also finds `2017 budget.xlsx`, while a fragment "
+                    + "such as `budg` finds neither — this tool sends `*` as a literal, so a "
+                    + "partial name silently returns nothing instead of matching a prefix. This "
+                    + "is not a has-any-attachment switch: every row already reports "
+                    + "`has_attachments`, so read that field rather than inventing a name here."
+                ),
+            ),
+        ] = None,
+        received_after: Annotated[
+            date | datetime | None,
+            Field(
+                description=(
+                    "Only mail received on or after this point, inclusive. Two shapes: a date, "
+                    + "`2026-03-04`, which is that whole UTC day from its first instant; or a "
+                    + "moment, `2026-03-04T09:00:00Z`, which is the second it names. A moment "
+                    + "carrying no zone is read as UTC, so a user's early morning or late evening "
+                    + "can fall on the neighbouring UTC day. This narrows the criteria and does "
+                    + "not stand in for one: a criterion is still required, and a window with "
+                    + "nothing to search for is outlook_list_mail's question. It does not order "
+                    + "the answer either — hits come back in the index's own order inside a "
+                    + "window exactly as outside one, so this is not a way to ask for the newest."
+                )
+            ),
+        ] = None,
+        received_before: Annotated[
+            date | datetime | None,
+            Field(
+                description=(
+                    "Only mail received on or before this point, inclusive, in the same two "
+                    + "shapes `received_after` takes. A date closes at the END of that UTC day, "
+                    + "so the whole of it is inside the bound and the same date in both bounds "
+                    + "searches that one day; a moment closes at the second it names. Pair it "
+                    + 'with `received_after` for a window that has closed — "the invoice mail '
+                    + 'from March", "what Dana sent last week". Like `received_after` it narrows '
+                    + "a search rather than being one, and it sorts nothing: for "
+                    + "recency or receipt order, and for the drafts this index does not reach, "
+                    + "use outlook_list_mail."
+                )
             ),
         ] = None,
         limit: Annotated[
@@ -284,7 +389,16 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     ) -> MailSearchResults:
         return await search_mail(
             client,
-            SearchCriteria(query=query, sender=sender, recipient=recipient, subject=subject),
+            SearchCriteria(
+                query=query,
+                sender=sender,
+                recipient=recipient,
+                to=to,
+                subject=subject,
+                attachment_name=attachment_name,
+            ),
+            received_after=received_after,
+            received_before=received_before,
             limit=limit,
         )
 
@@ -294,7 +408,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 def _require_a_criterion(tool: Tool) -> None:
     """Say "at least one of these" in the schema, which a Python signature cannot express.
 
-    The runtime refusal stays. FastMCP validates arguments against the signature, not against
-    this schema. So a client that ignores `anyOf` still receives the refusal at runtime.
+    FastMCP validates arguments against the signature rather than this schema, so the runtime
+    refusal stays.
     """
     tool.parameters["anyOf"] = [{"required": [name]} for name in CRITERIA]

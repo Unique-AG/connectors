@@ -1,14 +1,13 @@
-"""What an Outlook calendar and an Outlook event are: the shapes every calendar tool answers in.
+"""The shapes every Outlook calendar tool answers in.
 
-- Graph states an instant as a `dateTime` with no offset plus a separate `timeZone` name, and with
-  no `Prefer: outlook.timezone` header both come back in UTC
-  (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview). No tool here sends it.
-- `timeZone` is often a Windows name such as `W. Europe Standard Time`, which `zoneinfo` cannot
-  resolve, so `EventTime.iso` is null for those; on an all-day event both bounds are UTC midnight,
-  so `local` and not `iso` names the day it covers.
-- A create is a send: "the server sends invitations to all attendees", and that "can't be
-  configured" (https://learn.microsoft.com/en-us/graph/api/user-post-events). `transactionId` is
-  the only defense against a duplicated one, and Microsoft documents no comparison rule for it.
+- Graph states an instant as an offset-less `dateTime` plus a separate `timeZone` name, both UTC
+  unless `Prefer: outlook.timezone` is sent, which no tool here sends
+  (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview).
+- A `timeZone` is often a Windows name such as `W. Europe Standard Time`, which `zoneinfo` cannot
+  resolve, leaving `EventTime.iso` null; all-day bounds are UTC midnight, so `local` names the day.
+- A create sends invitations to every attendee and that "can't be configured"
+  (https://learn.microsoft.com/en-us/graph/api/user-post-events); `transactionId` is the only
+  defense against a duplicate, and Microsoft documents no comparison rule for it.
 """
 
 import html
@@ -47,6 +46,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle
 from office_365_mcp.shared.mail import MailAddress
+from office_365_mcp.shared.window import closes_at, opens_at
 
 STEP_CALENDAR = "calendar"
 
@@ -89,12 +89,8 @@ SUMMARY_FIELDS: tuple[str, ...] = (
     "webLink",
 )
 
-# `calendarView` expands a recurring series into one row per occurrence, so a wide window is
-# hundreds of rows of the same meeting.
-MAX_WINDOW_DAYS = 92
-
-# Graph's own cap is 500 (https://learn.microsoft.com/en-us/graph/api/resources/event); far lower
-# here on purpose, because every address receives an invitation this connector cannot recall.
+# Graph's own cap is 500 (https://learn.microsoft.com/en-us/graph/api/resources/event); lower here
+# because every address receives an invitation this connector cannot recall.
 MAX_ATTENDEES = 20
 
 MAX_SUBJECT_CHARACTERS = 255
@@ -112,14 +108,13 @@ MAX_ALL_DAY_EVENT_DAYS = 14
 # `2026-03-02T24:00` (the next day's midnight), and a create sends the caller's own string.
 WALL_CLOCK = re.compile(r"\A\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\Z")
 
-# Both name families Graph accepts fit these characters (`W. Europe Standard Time`, `Etc/GMT+2`),
-# and the name reaches verbatim the question a person answers.
+# Both name families Graph accepts fit these characters: `W. Europe Standard Time`, `Etc/GMT+2`.
 ZONE_NAME = r"^[A-Za-z0-9][A-Za-z0-9 _./+-]*$"
 
 MAX_ZONE_CHARACTERS = 64
 
-# What a real tag looks like, so a "<" followed by a space, a digit or a symbol stays as the text
-# it is: `Budget < 5000 EUR` is a sentence and `<[^>]+>` deletes the rest of it without a marker.
+# A "<" followed by a space, a digit or a symbol stays text: `<[^>]+>` would silently delete the
+# rest of `Budget < 5000 EUR`.
 _A_TAG = re.compile(r"<(?:!--.*?--|/?[A-Za-z][^<>]*)>", re.DOTALL)
 
 # Script and style go with their contents: CSS filling the cut hides the words a recipient reads.
@@ -131,8 +126,7 @@ _PREVIEW_CHARACTERS = 120
 _DefaultCalendarQuery = CalendarRequestBuilder.CalendarRequestBuilderGetQueryParameters
 _NamedCalendarQuery = CalendarItemRequestBuilder.CalendarItemRequestBuilderGetQueryParameters
 
-# Never change this: a new namespace makes every id already sent unrecognizable to Graph, which is
-# the point of sending one.
+# Never change this: a new namespace makes every id already sent unrecognizable to Graph.
 _TRANSACTION_NAMESPACE = uuid.UUID("eb6f3437-0196-4593-b4d7-a6044db0acdf")
 
 # Graph answers `responseStatus.time` with `0001-01-01T00:00:00Z` when nobody responded.
@@ -206,11 +200,22 @@ def _converted(local: str, named: str | None, zone: ZoneInfo) -> str | None:
     return naive.replace(tzinfo=stated).astimezone(zone).isoformat(timespec="seconds")
 
 
-def window_bounds(starts_on: date, ends_on: date, *, zone: ZoneInfo) -> tuple[str, str]:
-    """Graph reads these bounds by the offset in the value and not the `Prefer` header
-    (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview)."""
-    opens = datetime.combine(starts_on, time.min, tzinfo=zone)
-    closes = datetime.combine(ends_on + timedelta(days=1), time.min, tzinfo=zone)
+def window_bounds(
+    starts_on: date | datetime, ends_on: date | datetime, *, zone: ZoneInfo
+) -> tuple[str, str]:
+    """The two instants `calendarView` requires, rendered with the offset Graph reads them by.
+
+    Graph reads these bounds by the offset in the value and not the `Prefer` header
+    (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview), so all of the zone
+    handling is in the string. The window is half-open at the top: a bare `ends_on` closes at the
+    first instant of the day after it, which is what covers that day whole.
+    """
+    opens = opens_at(starts_on, zone=zone)
+    closes = (
+        closes_at(ends_on, zone=zone)
+        if isinstance(ends_on, datetime)
+        else opens_at(ends_on + timedelta(days=1), zone=zone)
+    )
     return opens.isoformat(timespec="seconds"), closes.isoformat(timespec="seconds")
 
 
@@ -585,8 +590,6 @@ def repeated_address(addresses: Sequence[str]) -> str | None:
 
 
 async def calendar_of(client: GraphServiceClient, *, calendar_id: str | None) -> Calendar:
-    """This opens no error mapping: only the calling tool knows what refusal a missing calendar
-    deserves."""
     with graph_step(STEP_CALENDAR):
         found = (
             await client.me.calendar.get(
@@ -739,29 +742,6 @@ def created_event(created: Event | None) -> Event:
         "and any invitations went out."
     )
     return created
-
-
-def person_matches(event: Event, fragment: str) -> bool:
-    wanted = fragment.casefold()
-    return any(wanted in known.casefold() for known in _named_people(event))
-
-
-def subject_matches(event: Event, fragment: str) -> bool:
-    subject = event.subject
-    return subject is not None and fragment.casefold() in subject.casefold()
-
-
-def _named_people(event: Event) -> list[str]:
-    people = [
-        text
-        for one in [_recipient_name(event.organizer), _recipient_address(event.organizer)]
-        if (text := one) is not None
-    ]
-    for attendee in event.attendees or []:
-        people.extend(
-            text for one in [_name_of(attendee), _address_of(attendee)] if (text := one) is not None
-        )
-    return people
 
 
 def _invited(address: str, kind: AttendeeType) -> Attendee:

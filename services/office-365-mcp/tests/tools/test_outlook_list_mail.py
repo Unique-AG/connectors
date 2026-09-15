@@ -2,14 +2,20 @@
 
 The query is most of this file. Microsoft answers `InefficientFilter` to an `$orderby` naming a
 property `$filter` does not, in a different order, or after an unfiltered one, so the assertions
-below pin the one construction that cannot break those rules: `receivedDateTime` ordered always,
-`receivedDateTime` filtered when a date was given, and nothing else in either — `isRead` least of
-all, which is why `unread_only` is applied to the rows rather than to the query.
+below pin a construction that cannot break those rules whatever it is passed: `receivedDateTime`
+ordered always, `receivedDateTime` filtered first whenever `$filter` exists at all, and every
+term on another property strictly after it.
+
+The narrowing arguments are asserted twice over, and deliberately. `unread_only` and
+`from_address` each reach `$filter` only beside a date, because alone they would leave `$filter`
+naming no ordered property; and each is checked again on the returned rows, because Microsoft
+documents that an unsupported filter can be dropped in silence. So there are two families of test
+here: what goes on the wire, and what the answer holds when the wire is not believed.
 
 Every response body here is synthesised. None came from a real mailbox.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import httpx
 import pytest
@@ -55,12 +61,15 @@ def _message_payload(
     subject: str = "Invoice 4471",
     received_at: str = "2026-03-04T09:15:00Z",
     is_read: bool | None = False,
+    sender: str | None = "bob@vance.invalid",
 ) -> dict[str, object]:
     return {
         "id": message_id,
         "subject": subject,
         "bodyPreview": "Please find the invoice attached.",
-        "from": {"emailAddress": {"name": "Bob Vance", "address": "bob@vance.invalid"}},
+        "from": (
+            None if sender is None else {"emailAddress": {"name": "Bob Vance", "address": sender}}
+        ),
         "toRecipients": [{"emailAddress": {"name": "Ada", "address": "ada@contoso.invalid"}}],
         "receivedDateTime": received_at,
         "isRead": is_read,
@@ -124,28 +133,52 @@ class TestTheQueryItComposes:
         assert inbox_messages.calls.last.request.url.params["$orderby"] == "receivedDateTime desc"
 
     @pytest.mark.usefixtures("inbox")
-    @pytest.mark.parametrize(
-        ("unread_only", "received_after"),
-        [
-            (False, None),
-            (True, None),
-            (False, date(2026, 3, 4)),
-            (True, date(2026, 3, 4)),
-        ],
-    )
+    @pytest.mark.parametrize("unread_only", [False, True])
+    @pytest.mark.parametrize("received_after", [None, date(2026, 3, 4)])
+    @pytest.mark.parametrize("received_before", [None, date(2026, 3, 31)])
     async def test_receipt_order_is_unconditional(
         self,
         client: GraphServiceClient,
         inbox_messages: respx.Route,
         unread_only: bool,
         received_after: date | None,
+        received_before: date | None,
     ) -> None:
         """A promise of "newest first" kept only for some arguments is worse than none."""
         _ = await lister.list_mail(
-            client, unread_only=unread_only, received_after=received_after, limit=25
+            client,
+            unread_only=unread_only,
+            received_after=received_after,
+            received_before=received_before,
+            limit=25,
         )
 
         assert inbox_messages.calls.last.request.url.params["$orderby"] == "receivedDateTime desc"
+
+    @pytest.mark.usefixtures("inbox")
+    @pytest.mark.parametrize("received_after", [None, date(2026, 3, 4)])
+    @pytest.mark.parametrize("received_before", [None, date(2026, 3, 31)])
+    async def test_the_dates_alone_put_nothing_but_dates_in_the_filter(
+        self,
+        client: GraphServiceClient,
+        inbox_messages: respx.Route,
+        received_after: date | None,
+        received_before: date | None,
+    ) -> None:
+        """With no narrowing argument beside them, the two bounds are the whole `$filter`: one
+        property, once or twice, and nothing else."""
+        _ = await lister.list_mail(
+            client, received_after=received_after, received_before=received_before, limit=25
+        )
+
+        params = inbox_messages.calls.last.request.url.params
+        assert params["$orderby"] == "receivedDateTime desc"
+        if received_after is None and received_before is None:
+            assert "$filter" not in params
+            return
+        terms = params["$filter"].split(" and ")
+        assert len(terms) == (received_after is not None) + (received_before is not None)
+        assert all(term.startswith("receivedDateTime ") for term in terms), params["$filter"]
 
     @pytest.mark.usefixtures("inbox")
     async def test_no_date_means_no_filter_at_all(
@@ -168,26 +201,323 @@ class TestTheQueryItComposes:
         assert params["$orderby"].split(" ")[0] == params["$filter"].split(" ")[0]
 
     @pytest.mark.usefixtures("inbox")
+    async def test_a_closing_date_bounds_the_day_after_it_so_that_day_is_covered_whole(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """`lt` the start of the following day, which is how `shared/calendar.py` closes an Outlook
+        date window. A `le` on this day's own last instant has to pick a precision, and drops
+        whatever arrived after it."""
+        _ = await lister.list_mail(client, received_before=date(2026, 3, 4), limit=25)
+
+        params = inbox_messages.calls.last.request.url.params
+        assert params["$filter"] == "receivedDateTime lt 2026-03-05T00:00:00Z"
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_two_dates_close_the_window_at_both_ends(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        _ = await lister.list_mail(
+            client, received_after=date(2026, 3, 1), received_before=date(2026, 3, 31), limit=25
+        )
+
+        assert inbox_messages.calls.last.request.url.params["$filter"] == (
+            "receivedDateTime ge 2026-03-01T00:00:00Z and receivedDateTime lt 2026-04-01T00:00:00Z"
+        )
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_one_date_in_both_bounds_asks_for_that_single_day(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """The bound both arguments promise is a whole UTC day, so "what came in on Tuesday" is
+        that date twice. Two first instants would bracket nothing at all."""
+        _ = await lister.list_mail(
+            client, received_after=date(2026, 3, 4), received_before=date(2026, 3, 4), limit=25
+        )
+
+        assert inbox_messages.calls.last.request.url.params["$filter"] == (
+            "receivedDateTime ge 2026-03-04T00:00:00Z and receivedDateTime lt 2026-03-05T00:00:00Z"
+        )
+
+    @pytest.mark.usefixtures("inbox")
     @pytest.mark.parametrize("received_after", [None, date(2026, 3, 4)])
-    async def test_the_filter_never_carries_is_read(
+    @pytest.mark.parametrize("received_before", [None, date(2026, 3, 31)])
+    async def test_an_unordered_term_reaches_the_filter_only_beside_a_date(
         self,
         client: GraphServiceClient,
         inbox_messages: respx.Route,
         received_after: date | None,
+        received_before: date | None,
     ) -> None:
-        """`isRead` in `$filter` is unordered beside an `$orderby` on `receivedDateTime`, which
-        Microsoft answers with `InefficientFilter`. Read state is a predicate over the rows here,
-        so no combination of arguments can put it in the query."""
+        """`isRead` is unordered beside an `$orderby` on `receivedDateTime`. With a date term
+        present it is legal — the third rule asks only that the ordered property come first. Alone
+        it breaks the first rule, because then `$filter` would name no ordered property at all,
+        and that request is a published `InefficientFilter`."""
         _ = await lister.list_mail(
-            client, unread_only=True, received_after=received_after, limit=25
+            client,
+            unread_only=True,
+            received_after=received_after,
+            received_before=received_before,
+            limit=25,
         )
 
         params = inbox_messages.calls.last.request.url.params
-        if received_after is None:
-            assert "$filter" not in params, "read state is the only thing left to filter on"
+        if received_after is None and received_before is None:
+            assert "$filter" not in params, "read state alone cannot carry the query"
         else:
-            assert params["$filter"] == "receivedDateTime ge 2026-03-04T00:00:00Z"
-            assert "isRead" not in params["$filter"]
+            assert params["$filter"].endswith("and isRead eq false")
+
+    @pytest.mark.usefixtures("inbox")
+    @pytest.mark.parametrize("unread_only", [False, True])
+    @pytest.mark.parametrize("from_address", [None, "bob@vance.invalid"])
+    @pytest.mark.parametrize("received_after", [None, date(2026, 3, 4)])
+    @pytest.mark.parametrize("received_before", [None, date(2026, 3, 31)])
+    async def test_every_ordered_term_precedes_every_unordered_one(
+        self,
+        client: GraphServiceClient,
+        inbox_messages: respx.Route,
+        unread_only: bool,
+        from_address: str | None,
+        received_after: date | None,
+        received_before: date | None,
+    ) -> None:
+        """Microsoft's third rule, asserted over all sixteen argument combinations rather than the
+        ones somebody thought to try: no `receivedDateTime` term may follow a term on any other
+        property. A refactor that reorders the conjuncts composes an `InefficientFilter` out of
+        arguments that are each individually fine."""
+        _ = await lister.list_mail(
+            client,
+            unread_only=unread_only,
+            from_address=from_address,
+            received_after=received_after,
+            received_before=received_before,
+            limit=25,
+        )
+
+        params = inbox_messages.calls.last.request.url.params
+        assert params["$orderby"] == "receivedDateTime desc"
+        if "$filter" not in params:
+            assert received_after is None and received_before is None
+            return
+        ordered = [
+            term.startswith("receivedDateTime ") for term in params["$filter"].split(" and ")
+        ]
+        assert ordered[0], params["$filter"]
+        assert ordered == sorted(ordered, reverse=True), params["$filter"]
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_moment_bounds_the_second_it_names_rather_than_the_day(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """A named second is exact already, so the upper bound closes with `le` at it rather than
+        with `lt` at the next day. Both spellings keep the one promise `shared/window.py` makes:
+        the value the caller named is inside the window."""
+        _ = await lister.list_mail(
+            client,
+            received_after=datetime(2026, 3, 4, 9, 0, tzinfo=UTC),
+            received_before=datetime(2026, 3, 4, 17, 0, tzinfo=UTC),
+            limit=25,
+        )
+
+        assert inbox_messages.calls.last.request.url.params["$filter"] == (
+            "receivedDateTime ge 2026-03-04T09:00:00Z and receivedDateTime le 2026-03-04T17:00:00Z"
+        )
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_moment_with_no_zone_is_read_as_utc_and_not_as_the_servers_own(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """Otherwise the bound would land in whichever zone the pod runs in — one no caller chose
+        and no answer names."""
+        _ = await lister.list_mail(client, received_after=datetime(2026, 3, 4, 9, 0), limit=25)
+
+        assert inbox_messages.calls.last.request.url.params["$filter"] == (
+            "receivedDateTime ge 2026-03-04T09:00:00Z"
+        )
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_moment_east_of_utc_is_converted_rather_than_relabelled(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """09:00+02:00 is 07:00 UTC. Stamping `Z` on the wall clock would move the bound two
+        hours, which is the trap `shared/window.py` documents against `as_utc` alone."""
+        _ = await lister.list_mail(
+            client,
+            received_after=datetime(2026, 3, 4, 9, 0, tzinfo=timezone(timedelta(hours=2))),
+            limit=25,
+        )
+
+        assert inbox_messages.calls.last.request.url.params["$filter"] == (
+            "receivedDateTime ge 2026-03-04T07:00:00Z"
+        )
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_sub_second_bound_keeps_its_precision_on_the_wire(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """Truncating to whole seconds moves both bounds earlier, and both failures are silent: the
+        lower one lets in mail the caller excluded, the upper one shuts out mail the caller
+        included, with `capped` false and nothing to say a row was dropped."""
+        _ = await lister.list_mail(
+            client,
+            received_after=datetime(2026, 3, 4, 9, 0, 0, 750000, tzinfo=UTC),
+            received_before=datetime(2026, 3, 4, 17, 0, 0, 750000, tzinfo=UTC),
+            limit=25,
+        )
+
+        assert inbox_messages.calls.last.request.url.params["$filter"] == (
+            "receivedDateTime ge 2026-03-04T09:00:00.750000Z "
+            + "and receivedDateTime le 2026-03-04T17:00:00.750000Z"
+        )
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_whole_second_bound_carries_no_fraction(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """The other half of the rule: precision is kept, never added. A date resolves to midnight,
+        so every date-bounded query still sends the bytes it always did."""
+        _ = await lister.list_mail(
+            client, received_after=datetime(2026, 3, 4, 9, 0, tzinfo=UTC), limit=25
+        )
+
+        assert inbox_messages.calls.last.request.url.params["$filter"] == (
+            "receivedDateTime ge 2026-03-04T09:00:00Z"
+        )
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_date_and_a_moment_can_bound_the_same_window(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """The two shapes mix, and each end keeps its own spelling."""
+        _ = await lister.list_mail(
+            client,
+            received_after=date(2026, 3, 1),
+            received_before=datetime(2026, 3, 4, 17, 30, tzinfo=UTC),
+            limit=25,
+        )
+
+        assert inbox_messages.calls.last.request.url.params["$filter"] == (
+            "receivedDateTime ge 2026-03-01T00:00:00Z and receivedDateTime le 2026-03-04T17:30:00Z"
+        )
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_sender_is_filtered_on_the_address_graph_documents(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        _ = await lister.list_mail(
+            client,
+            received_after=date(2026, 3, 4),
+            from_address="bob@vance.invalid",
+            limit=25,
+        )
+
+        assert inbox_messages.calls.last.request.url.params["$filter"] == (
+            "receivedDateTime ge 2026-03-04T00:00:00Z "
+            + "and from/emailAddress/address eq 'bob@vance.invalid'"
+        )
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_quote_in_an_address_cannot_close_the_literal(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """`o'brien@…` is a legal SMTP address, and an unescaped quote there ends the literal and
+        leaves the rest as predicate syntax."""
+        _ = await lister.list_mail(
+            client,
+            received_after=date(2026, 3, 4),
+            from_address="o'brien@vance.invalid",
+            limit=25,
+        )
+
+        sent = inbox_messages.calls.last.request.url.params["$filter"]
+        assert sent.endswith("and from/emailAddress/address eq 'o''brien@vance.invalid'")
+        assert sent.count("'") % 2 == 0
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_sender_with_no_date_is_left_out_of_the_query_and_still_narrows_the_rows(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """Undated, the term would be the only one in `$filter` and would break the first rule. The
+        row check is what keeps the promise instead, so the answer is narrowed either way."""
+        inbox_messages.mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _message_payload(_FIRST_ID, sender="bob@vance.invalid"),
+                        _message_payload(_SECOND_ID, sender="dana@contoso.invalid"),
+                    ]
+                },
+            )
+        )
+
+        answered = await lister.list_mail(client, from_address="bob@vance.invalid", limit=25)
+
+        assert "$filter" not in inbox_messages.calls.last.request.url.params
+        assert [row.sender.address for row in answered.messages if row.sender is not None] == [
+            "bob@vance.invalid"
+        ]
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_row_graph_returned_against_the_filter_is_still_discarded(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """Microsoft documents that an unsupported filter can fail silently. Dropped, the term
+        would put another sender's mail in an answer that named one — so the rows are checked even
+        when the term went on the wire."""
+        inbox_messages.mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _message_payload(_FIRST_ID, sender="bob@vance.invalid"),
+                        _message_payload(_SECOND_ID, sender="dana@contoso.invalid"),
+                    ]
+                },
+            )
+        )
+
+        answered = await lister.list_mail(
+            client,
+            received_after=date(2026, 3, 4),
+            from_address="bob@vance.invalid",
+            limit=25,
+        )
+
+        assert (
+            "from/emailAddress/address" in inbox_messages.calls.last.request.url.params["$filter"]
+        )
+        assert [row.uri for row in answered.messages] == [MailMessageHandle(_FIRST_ID).uri]
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_sender_matches_whatever_casing_the_message_carried(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        """Exchange echoes the sender's own casing, not the casing that was filtered with, and an
+        SMTP address is case-insensitive. Comparing exactly would drop a row Exchange itself
+        considers a match."""
+        inbox_messages.mock(
+            return_value=httpx.Response(
+                200, json={"value": [_message_payload(_FIRST_ID, sender="Bob.Vance@Vance.INVALID")]}
+            )
+        )
+
+        answered = await lister.list_mail(client, from_address="bob.vance@vance.invalid", limit=25)
+
+        assert len(answered.messages) == 1
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_row_with_no_sender_is_not_credited_to_the_one_asked_for(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        inbox_messages.mock(
+            return_value=httpx.Response(
+                200, json={"value": [_message_payload(_FIRST_ID, sender=None)]}
+            )
+        )
+
+        answered = await lister.list_mail(client, from_address="bob@vance.invalid", limit=25)
+
+        assert answered.messages == []
 
     @pytest.mark.usefixtures("inbox")
     async def test_the_first_page_is_never_reached_by_skipping(
@@ -513,6 +843,112 @@ class TestWhatItRefuses:
     ) -> None:
         with pytest.raises(AssertionError):
             _ = await lister.list_mail(client, limit=limit)
+
+    async def test_a_backwards_window_is_caught_across_the_two_shapes(
+        self, client: GraphServiceClient, inbox: respx.Route
+    ) -> None:
+        """Python refuses to order a date against a moment, so the bounds are compared as
+        instants. Left to a direct comparison this raises `TypeError` instead of refusing."""
+        with pytest.raises(ToolError, match="backwards"):
+            _ = await lister.list_mail(
+                client,
+                received_after=datetime(2026, 3, 31, 9, 0, tzinfo=UTC),
+                received_before=date(2026, 3, 1),
+                limit=25,
+            )
+
+        assert inbox.call_count == 0
+
+    @pytest.mark.usefixtures("inbox", "inbox_messages")
+    async def test_two_moments_naming_one_instant_are_not_backwards(
+        self, client: GraphServiceClient
+    ) -> None:
+        """Both bounds include what they name, so one instant in both is that instant — the
+        narrowest window there is, and still a window."""
+        moment = datetime(2026, 3, 4, 9, 15, tzinfo=UTC)
+
+        answered = await lister.list_mail(
+            client, received_after=moment, received_before=moment, limit=25
+        )
+
+        assert answered.messages != []
+
+    async def test_a_window_that_runs_backwards_never_reaches_graph(
+        self, client: GraphServiceClient, inbox: respx.Route
+    ) -> None:
+        """Graph answers a backwards window with an empty page, which is the same answer as "no
+        mail in that window". Only one of the two is worth reporting, so the refusal happens
+        here."""
+        with pytest.raises(ToolError, match="backwards"):
+            _ = await lister.list_mail(
+                client,
+                received_after=date(2026, 3, 31),
+                received_before=date(2026, 3, 1),
+                limit=25,
+            )
+
+        assert inbox.call_count == 0
+
+    async def test_the_backwards_refusal_names_both_arguments_and_which_takes_the_earlier_date(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as refusal:
+            _ = await lister.list_mail(
+                client,
+                received_after=date(2026, 3, 31),
+                received_before=date(2026, 3, 1),
+                limit=25,
+            )
+
+        message = str(refusal.value)
+        assert "`received_after`" in message
+        assert "`received_before`" in message
+        assert "earlier date in `received_after`" in message
+
+    @pytest.mark.parametrize(
+        "from_address",
+        [
+            "Bob Vance",
+            "Bob Vance <bob@vance.invalid>",
+            "bob@vance.invalid, dana@contoso.invalid",
+            "bob",
+            "@vance.invalid",
+        ],
+    )
+    async def test_a_sender_that_is_not_one_address_never_reaches_graph(
+        self, client: GraphServiceClient, inbox: respx.Route, from_address: str
+    ) -> None:
+        """`eq` on a display name matches nothing, and Graph answers that with an empty page, not
+        an error — so it reads as "no mail from Bob" for a caller who spelled Bob's name."""
+        with pytest.raises(ToolError, match="one address"):
+            _ = await lister.list_mail(client, from_address=from_address, limit=25)
+
+        assert inbox.call_count == 0
+
+    @pytest.mark.usefixtures("inbox", "inbox_messages")
+    async def test_a_sender_is_taken_with_surrounding_space_trimmed(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        _ = await lister.list_mail(
+            client,
+            received_after=date(2026, 3, 4),
+            from_address="  bob@vance.invalid  ",
+            limit=25,
+        )
+
+        assert inbox_messages.calls.last.request.url.params["$filter"].endswith(
+            "and from/emailAddress/address eq 'bob@vance.invalid'"
+        )
+
+    @pytest.mark.usefixtures("inbox", "inbox_messages")
+    async def test_a_window_of_one_day_is_not_backwards(self, client: GraphServiceClient) -> None:
+        """The whole of that day is inside both bounds, so the narrowest window there is remains a
+        window rather than a refusal."""
+        answered = await lister.list_mail(
+            client, received_after=date(2026, 3, 4), received_before=date(2026, 3, 4), limit=25
+        )
+
+        assert answered.messages != []
 
 
 class TestTheSchemaItPublishes:

@@ -1,23 +1,22 @@
 """`teams_list_meeting_recordings` — did a call record, how long it ran, and who can get the file.
 
-TRAP: no video ever comes back, and none of it is reachable anywhere in this connector. A Teams
-meeting runs 30 hours max
-(https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams) and Graph serves
-a recording as one MP4 byte stream. `recordingContentUrl` is never returned either: that link opens
-only with this connector's own token, so passing it on leaks a credential or does nothing.
-`tests/test_layering.py` rule 7 blocks every module from addressing one recording, this file too.
+TRAP: no video ever comes back, and none is reachable anywhere in this connector. Graph serves a
+recording as one MP4 byte stream, and `recordingContentUrl` opens only with this connector's own
+token, so passing it on leaks a credential or does nothing. `tests/test_layering.py` rule 7 blocks
+every module from addressing one recording, this file too.
 
 Separate from `teams_list_meeting_transcripts` because Graph gates them independently, under
 `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All`, and a default tenant has
-the transcript gate shut. Combining them into one tool forces a choice: fail a reachable
-recording, or hold two incompatible statuses. `content_correlation_id` links them.
+the transcript gate shut. `content_correlation_id` links them.
 
-Newest first: Graph has no `$orderby` on this collection. Read up to MAX_ARTIFACT_SCAN, sort, then
-cut to `limit`. Stopping at `limit` before sorting returns an arbitrary subset sorted among itself.
+Graph offers neither an `$orderby` nor any documented filterable property on this collection, so
+rows are read up to MAX_ARTIFACT_SCAN and sorted before `limit` cuts them, and no date bound is
+offered. Every row carries its own `started_at`, so one occurrence of a series is picked by reading
+the answer.
 """
 
 from collections.abc import Mapping
-from datetime import date, datetime
+from datetime import datetime
 from typing import Annotated, Literal, Self
 
 import httpx
@@ -34,21 +33,18 @@ from office_365_mcp.shared.meetings import (
     MAX_ARTIFACT_SCAN,
     MEETING_PERMISSION,
     RECORDING_PERMISSION,
-    OccurrenceWindow,
-    as_utc,
-    newest_in_window,
+    newest_of,
     resolve_meeting,
+    settled,
 )
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_list_meeting_recordings"
 
-# The meeting resolve counts under `shared/meetings.py`'s step and the identity check under
-# `shared/identity.py`'s, so this names only the listing request and the walk that continues it.
 STEP_RECORDINGS = "recordings"
 
-# Meeting resolve, recordings read, and the identity check the organizer-only rule needs. Entra
-# redeems all three under one token or none. The names live in `shared/meetings.py`.
+# Entra redeems all three under one token or none.
 GRAPH_PERMISSIONS: tuple[str, ...] = (
     MEETING_PERMISSION,
     RECORDING_PERMISSION,
@@ -63,14 +59,10 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 # Graph sets no ceiling on `$top`, so this limit is ours.
 MAX_RECORDINGS = 50
 
-# Both vocabularies are this connector's, not Microsoft's, so they are closed and publish as enums
-# in the output schema rather than as bare strings a model has to mine out of the prose. Graph-owned
-# vocabularies (`meeting_type` here) stay `str`, because Microsoft can add a member at any time.
-# Bare assignment, not `type X = ...`: PEP 695 aliases publish as a `$ref` into `$defs`, which puts
-# the values one hop away from the property a model reads.
-RecordingStatus = Literal[
-    "available", "not_ready", "not_recorded", "scan_incomplete", "meeting_not_found"
-]
+# Graph-owned vocabularies (`meeting_type` here) stay `str`: Microsoft can add a member at any
+# time. Bare assignment, not `type X = ...`: a PEP 695 alias publishes as a `$ref` into `$defs`,
+# one hop away from the property a model reads.
+RecordingStatus = Literal["available", "not_ready", "not_recorded", "meeting_not_found"]
 ContentAccess = Literal["you_are_the_organizer", "organizer_only", "unknown"]
 
 _DESCRIPTION = """\
@@ -82,8 +74,7 @@ exists but is out of reach: never report it as missing. Returns `status` and eac
 times, duration, and access.\
 """
 
-# Local, not shared with teams_list_meeting_transcripts: `tests/test_layering.py` rule 4 forbids
-# that.
+# Local, not shared with teams_list_meeting_transcripts: `tests/test_layering.py` rule 4 forbids it.
 _NOT_A_MEETING_HANDLE = (
     "teams_list_meeting_recordings takes the `meeting_uri` from teams_list_chats: "
     + "teams:///meetings/{join_web_url}. This is not one. Call teams_list_chats, find the meeting "
@@ -168,22 +159,12 @@ class MeetingRecordings(BaseModel):
         description=(
             "What was found and what to do next. One of:\n"
             + "- `available` — recordings are listed with durations and access info.\n"
-            + "- `not_ready` — nothing arrived yet. The window or meeting recently ended. Wait "
+            + "- `not_ready` — nothing arrived yet. The meeting recently ended. Wait "
             + "and retry. This is NOT 'the call was not recorded'. Microsoft publishes no "
-            + "availability SLA, so this tool infers timing and errs towards wait. A window that "
-            + "demonstrably passed is never reported this way.\n"
-            + "- `not_recorded` — the window is past. Nothing is there. The call was not "
+            + "availability SLA, so this tool infers timing and errs towards wait. A meeting that "
+            + "demonstrably ended is never reported this way.\n"
+            + "- `not_recorded` — the meeting is over. Nothing is there. The call was not "
             + "recorded. Retrying will not help.\n"
-            + "- `scan_incomplete` — this meeting has more recordings than one call reads "
-            + f"({MAX_ARTIFACT_SCAN}) and none of the ones read fall in your window, so whether "
-            + "one "
-            + "exists there is NOT known. There is nothing to try: this tool applies the window "
-            + "to the recordings after Microsoft answers, not while Microsoft is still "
-            + "answering, so "
-            + "changing `started_after`/`started_before` reads the same recordings and returns "
-            + "this "
-            + "same status. Stop, and report that whether that occurrence was recorded is not "
-            + "known. Never report this as 'the call was not recorded'.\n"
             + "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
             + "see. Do not retry or rebuild the handle."
         )
@@ -203,7 +184,7 @@ class MeetingRecordings(BaseModel):
     meeting_type: str | None = Field(
         description=(
             "`scheduled`, `recurring`, `adhoc`, `meetNow`, `broadcast`, or null. When `recurring`, "
-            + "use `started_after`/`started_before` to reach one occurrence."
+            + "read each row's `started_at` to tell one occurrence from another."
         )
     )
     started_at: datetime | None = Field(
@@ -215,17 +196,17 @@ class MeetingRecordings(BaseModel):
     ended_at: datetime | None = Field(description="Meeting end (same caveat as `started_at`).")
     recordings: list[RecordingSummary] = Field(
         description=(
-            "Recordings that fall inside the requested window, newest first. The order is over "
+            "The meeting's recordings, newest first. The order is over "
             + f"every recording this call read (up to {MAX_ARTIFACT_SCAN}), not over one page of "
             + "Microsoft's answer. For meetings with fewer recordings than that cap — all but "
             + "series "
-            + "recorded daily for most of a year — the first entry is the latest of the window. "
+            + "recorded daily for most of a year — the first entry is the latest that was read. "
             + "Past "
             + "the cap the first entry is the latest of what was READ. Microsoft returns this "
             + "collection in its own order and offers no `$orderby`. Set "
             + "`include_scan_completeness` "
-            + "to learn if the read reached the end. As many as `limit` means the window can hold "
-            + "older ones. Fewer means the window holds no more than was read. Empty for every "
+            + "to learn if the read reached the end. As many as `limit` means the meeting can "
+            + "hold older ones. Fewer means it holds no more than was read. Empty for every "
             + "status other than `available`."
         )
     )
@@ -233,10 +214,8 @@ class MeetingRecordings(BaseModel):
         description=(
             f"Whether the read stopped at {MAX_ARTIFACT_SCAN} recordings (true), read all (false), "
             + "or null if not requested. Set only when `include_scan_completeness` is true. True "
-            + "means recordings ordered over those read, not all recordings. False means the order "
-            + "and any absence are exact. Status is always `scan_incomplete` when nothing was "
-            + "found "
-            + "and the read stopped short."
+            + "means recordings ordered over those read, not all recordings. False means the "
+            + "order and any absence are exact."
         )
     )
 
@@ -245,18 +224,15 @@ async def teams_list_meeting_recordings(
     client: GraphServiceClient,
     *,
     handle: MeetingHandle,
-    started_after: date | datetime | None,
-    started_before: date | datetime | None,
     limit: int,
     include_scan_completeness: bool,
 ) -> MeetingRecordings:
     """Recordings of the meeting `handle` addresses.
 
     Two or three Graph requests: resolve, list, and — only when something was found — the caller id
-    the organizer-only rule needs. Graph documents no date filter, so the window applies after.
+    the organizer-only rule needs.
     """
     assert 1 <= limit <= MAX_RECORDINGS, f"limit must be within 1..{MAX_RECORDINGS}, got {limit}"
-    window = OccurrenceWindow.of(started_after, started_before)
 
     with graph_errors(TOOL_NAME):
         meeting = await resolve_meeting(client, handle)
@@ -276,15 +252,12 @@ async def teams_list_meeting_recordings(
                 meeting.id
             ).recordings.get()
             assert first_page is not None, "Graph answered a recording listing with no collection"
-            collected = await newest_in_window(first_page, client, window=window, limit=limit)
+            collected = await newest_of(first_page, client, limit=limit)
         found = collected.items
-        # Only when it changes an answer: an empty listing has no organizer to compare anyone with.
         caller = (await identity.signed_in_user(client)).id if found else None
 
     return MeetingRecordings(
-        status="available"
-        if found
-        else _absence(scan_stopped_short=collected.capped, settled=window.settled(meeting)),
+        status="available" if found else _absence(settled=settled(meeting)),
         meeting_id=meeting.id,
         subject=meeting.subject,
         meeting_type=meeting.meeting_type,
@@ -295,19 +268,17 @@ async def teams_list_meeting_recordings(
     )
 
 
-def _absence(*, scan_stopped_short: bool, settled: bool) -> RecordingStatus:
+def _absence(*, settled: bool) -> RecordingStatus:
     """Which empty answer to give: stop, wait, or neither."""
-    if scan_stopped_short:
-        return "scan_incomplete"
     return "not_recorded" if settled else "not_ready"
 
 
 def _organizer_user_id(recording: CallRecording) -> str | None:
     """Organizer's Entra object id, or None if Graph named nobody.
 
-    TRAP: the identitySet's @odata.type is not always a known SDK type — Microsoft's own sample
-    sends #Microsoft.Teams.GraphSvc.teamworkUserIdentity. An unknown discriminator deserializes to
-    base identity, which still carries the id.
+    TRAP: the identitySet's @odata.type is not always a known SDK type (Microsoft's own sample
+    sends #Microsoft.Teams.GraphSvc.teamworkUserIdentity); an unknown discriminator deserializes
+    to base identity, which still carries the id.
     """
     organizer = recording.meeting_organizer
     if organizer is None or organizer.user is None:
@@ -318,8 +289,7 @@ def _organizer_user_id(recording: CallRecording) -> str | None:
 def _content_access(organizer: str | None, caller: str | None) -> ContentAccess:
     """Which side of the organizer-only rule the signed-in user is on.
 
-    Guessing is wrong both ways, so a missing id is `unknown`. Ids compare case-insensitively: an
-    Entra object id is a GUID and casing is not part of identity.
+    Ids compare case-insensitively: an Entra object id is a GUID and casing is not part of identity.
     """
     if organizer is None or caller is None:
         return "unknown"
@@ -330,8 +300,8 @@ def _content_access(organizer: str | None, caller: str | None) -> ContentAccess:
 def _duration_seconds(recording: CallRecording) -> float | None:
     """Recording length, or None if Graph did not send enough to compute one.
 
-    A missing offset reads as Z, so no subtraction raises. Graph's negative offsets apply to content
-    cue times, not to these fields, so a negative result is unknown rather than a duration.
+    Graph's negative offsets apply to content cue times, not to these fields, so a negative result
+    is unknown rather than a duration.
     """
     began, ended = recording.created_date_time, recording.end_date_time
     if began is None or ended is None:
@@ -360,31 +330,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        started_after: Annotated[
-            date | datetime | None,
-            Field(
-                description=(
-                    "Only recordings that began at or after this moment. Scope to one occurrence "
-                    + "of a recurring meeting. Shapes accepted: `2026-08-11T09:00:00+02:00` or "
-                    + "`...Z` (the instant named), `2026-08-11T09:00:00` (IS READ AS UTC), or "
-                    + "`2026-08-11` (that whole UTC day, first instant). Pass offset for local "
-                    + "time "
-                    + "— 09:00 in Zurich is 07:00Z. A window with no recording inside is an answer "
-                    + "and not an error."
-                )
-            ),
-        ] = None,
-        started_before: Annotated[
-            date | datetime | None,
-            Field(
-                description=(
-                    "Only recordings that began at or before this moment. Pair with "
-                    + "`started_after`. A bare `2026-08-11` means the END of that UTC day — same "
-                    + "date in both bounds is that whole day. A window whose end is already well "
-                    + "past reports not_recorded rather than not_ready."
-                )
-            ),
-        ] = None,
         limit: Annotated[
             int,
             Field(
@@ -392,7 +337,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_RECORDINGS,
                 description=(
                     f"How many recordings to return. Default 20, maximum {MAX_RECORDINGS}. These "
-                    + "are the NEWEST that many of the window. All recordings are read (up to "
+                    + "are the NEWEST that many of the meeting. All recordings are read (up to "
                     + f"{MAX_ARTIFACT_SCAN}, the call's whole cost) and ordered before this cuts "
                     + "them. Past that cap they are the newest OF THE ONES READ, not the meeting's "
                     + "newest. Raising limit does not read further past the cap."
@@ -405,9 +350,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Report whether the read reached the end of this meeting's recordings, as "
                     + "`scan_incomplete`. Off by default. Use it to learn if the first recording "
-                    + "listed is the meeting's latest. You do not need it to trust an empty "
-                    + "answer: "
-                    + "status already reports scan_incomplete."
+                    + "listed is the meeting's latest, and whether an older one may sit beyond "
+                    + "the cap."
                 )
             ),
         ] = False,
@@ -419,8 +363,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await teams_list_meeting_recordings(
             client,
             handle=handle,
-            started_after=started_after,
-            started_before=started_before,
             limit=limit,
             include_scan_completeness=include_scan_completeness,
         )

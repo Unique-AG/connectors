@@ -308,7 +308,7 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "outlook_browse_folders": {"parent": ("outlook_browse_folders",)},
     "outlook_read_thread": {"uri": ("outlook_search_mail",)},
     "outlook_list_mail": {"folder_ref": ("outlook_browse_folders",)},
-    "outlook_search_mail": {"recipient": ("get_me",)},
+    "outlook_search_mail": {"to": ("get_me",)},
     "outlook_mark_mail": {
         "message_refs": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
     },
@@ -330,10 +330,11 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
 
 # Arguments a caller writes rather than copies from another tool's answer, per tool.
 #
-# TRAP: keyed by tool, not a flat set of names, because one name can be both. `recipient` is free
-# text on `teams_search_messages` and is the signed-in user's own address on `outlook_search_mail`,
-# whose description says to take it from `get_me` — under a flat set the second would inherit the
-# first's classification and the reachability check below would never ask about it.
+# TRAP: keyed by tool, not a flat set of names, because one name can be both. `to` is free text on
+# `outlook_draft_mail`, where it is whoever the mail is being written to, and is the signed-in
+# user's own address on `outlook_search_mail`, whose description says to take it from `get_me` —
+# under a flat set the second would inherit the first's classification and the reachability check
+# below would never ask about it.
 _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "teams_search_messages": frozenset(
         {
@@ -347,7 +348,9 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
             "mentions_me",
         }
     ),
-    "outlook_search_mail": frozenset({"query", "sender", "subject"}),
+    "outlook_search_mail": frozenset(
+        {"query", "sender", "recipient", "subject", "attachment_name"}
+    ),
     "outlook_list_mail": frozenset({"folder"}),
     "outlook_find_recipient": frozenset({"query"}),
     "outlook_mark_mail": frozenset({"is_read", "flagged", "importance"}),
@@ -356,9 +359,7 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "outlook_draft_reply": frozenset({"mode", "body_html"}),
     "outlook_set_automatic_reply": frozenset({"status"}),
     "outlook_disable_mail_rule": frozenset({"enabled"}),
-    "outlook_list_events": frozenset(
-        {"starts_on", "ends_on", "time_zone", "with_person", "subject_contains"}
-    ),
+    "outlook_list_events": frozenset({"starts_on", "ends_on", "time_zone", "subject_contains"}),
     "outlook_read_event": frozenset({"time_zone"}),
     "outlook_create_event": frozenset(
         {"subject", "starts_at", "ends_at", "time_zone", "attendees"}

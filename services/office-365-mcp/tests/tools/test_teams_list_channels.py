@@ -5,6 +5,7 @@ from collections.abc import Callable
 import httpx
 import pytest
 import respx
+from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
@@ -88,12 +89,113 @@ class TestTheQueryItSends:
 
         assert route.calls.last.request.headers["prefer"] == _PREFER_UNKNOWN_MEMBERS
 
+    async def test_no_membership_type_sends_no_filter_at_all(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get(_CHANNELS_PATH).mock(
+            return_value=httpx.Response(200, json={"value": [_channel_payload(_CHANNEL_ID)]})
+        )
+
+        _ = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=10)
+
+        assert "$filter" not in route.calls.last.request.url.params
+
+    @pytest.mark.parametrize("membership_type", ["standard", "private", "shared"])
+    async def test_a_membership_type_is_filtered_by_microsoft_and_not_here(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        membership_type: lister.ChannelMembership,
+    ) -> None:
+        """Microsoft publishes `$filter` on this collection with worked examples naming this very
+        property, so the window is never spent on channels that are then discarded."""
+        route = graph.get(_CHANNELS_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={"value": [_channel_payload(_CHANNEL_ID, membership_type=membership_type)]},
+            )
+        )
+
+        _ = await lister.teams_list_channels(
+            client, team_id=_TEAM_ID, membership_type=membership_type, limit=10
+        )
+
+        params = route.calls.last.request.url.params
+        assert params["$filter"] == f"membershipType eq '{membership_type}'"
+
     @pytest.mark.parametrize("limit", [0, lister.MAX_CHANNELS + 1])
     async def test_a_limit_outside_the_window_is_a_programming_error(
         self, client: GraphServiceClient, limit: int
     ) -> None:
         with pytest.raises(AssertionError):
             _ = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=limit)
+
+
+class TestWhenTheFilterIsNotHonoured:
+    async def test_a_channel_of_another_kind_refuses_rather_than_answers(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """A dropped `$filter` returns the team's whole inventory, and `channels` promises that
+        fewer rows than `limit` means those are all of them — so the inventory would read as "all
+        the private channels" with nothing to say otherwise."""
+        graph.get(_CHANNELS_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _channel_payload("19:secret@thread.tacv2", membership_type="private"),
+                        _channel_payload(_CHANNEL_ID, membership_type="standard"),
+                    ]
+                },
+            )
+        )
+
+        with pytest.raises(ToolError, match="did not apply the filter"):
+            _ = await lister.teams_list_channels(
+                client, team_id=_TEAM_ID, membership_type="private", limit=10
+            )
+
+    async def test_a_kind_this_tool_cannot_name_is_not_evidence_of_a_dropped_filter(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Microsoft can add a kind after this code, and a null `membership_type` is that rather
+        than a channel of the wrong kind. Refusing on it would break the tool on a Teams release."""
+        graph.get(_CHANNELS_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _channel_payload(_CHANNEL_ID, membership_type="somethingMicrosoftAddsLater")
+                    ]
+                },
+            )
+        )
+
+        listed = await lister.teams_list_channels(
+            client, team_id=_TEAM_ID, membership_type="private", limit=10
+        )
+
+        assert [channel.membership_type for channel in listed.channels] == [None]
+
+    async def test_an_unfiltered_listing_is_never_checked_against_anything(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Every kind is a right answer when no kind was asked for."""
+        graph.get(_CHANNELS_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _channel_payload(_CHANNEL_ID, membership_type="standard"),
+                        _channel_payload("19:secret@thread.tacv2", membership_type="private"),
+                    ]
+                },
+            )
+        )
+
+        listed = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=10)
+
+        assert len(listed.channels) == 2
 
 
 class TestTheInventoryItReports:

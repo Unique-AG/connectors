@@ -1,7 +1,7 @@
 """`teams_list_meeting_transcripts`: the window, the order, and the five answers."""
 
 from collections.abc import Mapping
-from datetime import UTC, date, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from typing import cast
 
 import httpx
@@ -139,8 +139,6 @@ class TestNoMatchIsNotAnError:
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=None,
-            started_before=None,
             limit=20,
             include_scan_completeness=False,
         )
@@ -165,8 +163,6 @@ class TestNoMatchIsNotAnError:
             _ = await lister.teams_list_meeting_transcripts(
                 client,
                 handle=_handle(),
-                started_after=None,
-                started_before=None,
                 limit=20,
                 include_scan_completeness=False,
             )
@@ -187,8 +183,6 @@ class TestTheKindsOfAbsence:
             _ = await lister.teams_list_meeting_transcripts(
                 client,
                 handle=_handle(),
-                started_after=None,
-                started_before=None,
                 limit=20,
                 include_scan_completeness=False,
             )
@@ -205,8 +199,6 @@ class TestTheKindsOfAbsence:
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=None,
-            started_before=None,
             limit=20,
             include_scan_completeness=False,
         )
@@ -234,16 +226,14 @@ class TestTheKindsOfAbsence:
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=None,
-            started_before=None,
             limit=20,
             include_scan_completeness=False,
         )
 
         assert found.status == "not_ready"
 
-    def test_the_five_answers_reach_the_schema_as_an_enum_and_not_only_as_prose(self) -> None:
-        """These five words are this connector's invention, not Microsoft's, so a model can only
+    def test_the_four_answers_reach_the_schema_as_an_enum_and_not_only_as_prose(self) -> None:
+        """These four words are this connector's invention, not Microsoft's, so a model can only
         learn them from what this tool publishes. Typed `str` they would arrive as
         `{"type": "string"}` and exist only inside the description. Asserted inline on the property
         rather than anywhere in the document: a `$ref` into `$defs` — what a PEP 695 `type` alias
@@ -254,56 +244,16 @@ class TestTheKindsOfAbsence:
             "available",
             "not_ready",
             "not_transcribed",
-            "scan_incomplete",
             "meeting_not_found",
         ]
         assert status["type"] == "string"
         assert "$ref" not in status
-        assert "There is nothing to try" in str(status["description"]), (
+        assert "Retrying will not change this" in str(status["description"]), (
             "the enum says what the values are; the prose still has to say what to do with them"
         )
 
 
 class TestScopingToOneOccurrence:
-    async def test_a_series_is_one_meeting_and_a_window_picks_an_occurrence(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _weekly_series(graph)
-
-        found = await lister.teams_list_meeting_transcripts(
-            client,
-            handle=_handle(),
-            started_after=datetime(2026, 2, 10, tzinfo=UTC),
-            started_before=datetime(2026, 2, 11, tzinfo=UTC),
-            limit=20,
-            include_scan_completeness=False,
-        )
-
-        assert found.meeting_type == "recurring"
-        assert [t.transcript_id for t in found.transcripts] == ["week-2"]
-
-    async def test_a_window_with_nothing_in_it_is_not_ready_or_not_transcribed_not_an_error(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _resolved(graph, meeting_type="recurring", end="2026-02-10T15:00:00Z")
-        graph.get(_TRANSCRIPTS).mock(
-            return_value=httpx.Response(
-                200, json={"value": [transcript_payload(created_at="2026-02-03T14:02:00Z")]}
-            )
-        )
-
-        found = await lister.teams_list_meeting_transcripts(
-            client,
-            handle=_handle(),
-            started_after=datetime(2026, 3, 1, tzinfo=UTC),
-            started_before=None,
-            limit=20,
-            include_scan_completeness=False,
-        )
-
-        assert found.status == "not_transcribed"
-        assert found.transcripts == []
-
     async def test_transcripts_come_back_newest_first(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -328,8 +278,6 @@ class TestScopingToOneOccurrence:
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=None,
-            started_before=None,
             limit=20,
             include_scan_completeness=False,
         )
@@ -352,8 +300,6 @@ class TestScopingToOneOccurrence:
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=None,
-            started_before=None,
             limit=1,
             include_scan_completeness=True,
         )
@@ -391,8 +337,6 @@ class TestScopingToOneOccurrence:
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=None,
-            started_before=None,
             limit=1,
             include_scan_completeness=False,
         )
@@ -413,99 +357,35 @@ class TestScopingToOneOccurrence:
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=None,
-            started_before=None,
             limit=1,
             include_scan_completeness=False,
         )
 
         assert [t.transcript_id for t in found.transcripts] == ["newest"]
 
-    async def test_a_scan_that_stopped_short_asserts_no_absence(
+    async def test_a_capped_scan_never_reports_an_absence(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """`not_transcribed` ("retrying will not help") alongside "there is more" cannot both be
-        true, so `scan_incomplete` claims nothing about absence and reaches `status` whether or not
-        the caller asked about the scan."""
+        true. Nothing has to reconcile them: with no window to filter rows out, a scan that stops
+        at the cap has collected the cap's worth of rows, so it always answers `available`. This is
+        why there is no partial-scan status."""
         ended = datetime.now(UTC) - timedelta(days=30)
         _resolved(graph, meeting_type="recurring", end=ended.isoformat())
-        graph.get(_TRANSCRIPTS).mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "value": [
-                        transcript_payload(
-                            transcript_id=f"occurrence-{index}", created_at="2026-02-03T14:00:00Z"
-                        )
-                        for index in range(meetings.MAX_ARTIFACT_SCAN + 50)
-                    ]
-                },
-            )
-        )
+        _daily_series(graph)
 
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=datetime(2026, 3, 1, tzinfo=UTC),
-            started_before=datetime(2026, 3, 2, tzinfo=UTC),
             limit=20,
-            include_scan_completeness=False,
+            include_scan_completeness=True,
         )
 
-        assert found.transcripts == []
-        assert found.status == "scan_incomplete", (
-            "the one place a scan that stopped short reaches a caller who did not ask: an absence "
-            "over a prefix is no absence"
+        assert found.scan_incomplete is True, "the read stopped at the cap"
+        assert found.status == "available", (
+            "and the rows it stopped on are the answer, so no absence is claimed over a prefix"
         )
-        assert found.scan_incomplete is None, "and still only `status` says it, unless asked"
-        assert found.status not in ("not_transcribed", "not_ready"), (
-            "a window whose collection was not read to the end settles nothing either way"
-        )
-
-    async def test_narrowing_the_window_cannot_reach_past_the_scan_cap(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        """Graph documents no filterable date on this collection, so the request goes out bare and
-        the same first `MAX_ARTIFACT_SCAN` transcripts are read whatever window was asked for:
-        "narrow it and ask again" is a loop. The narrow window here brackets `day-250`, which
-        genuinely exists and is still never seen."""
-        _resolved(graph, meeting_type="recurring")
-        listing = _daily_series(graph)
-
-        wide = await lister.teams_list_meeting_transcripts(
-            client,
-            handle=_handle(),
-            started_after=_day(meetings.MAX_ARTIFACT_SCAN).date(),
-            started_before=_day(_PAST_THE_CAP - 1).date(),
-            limit=20,
-            include_scan_completeness=False,
-        )
-        wide_request = listing.calls.last.request.url
-        narrow = await lister.teams_list_meeting_transcripts(
-            client,
-            handle=_handle(),
-            started_after=_day(250).date(),
-            started_before=_day(250).date(),
-            limit=20,
-            include_scan_completeness=False,
-        )
-        narrow_request = listing.calls.last.request.url
-
-        assert (wide.status, wide.transcripts) == ("scan_incomplete", [])
-        assert (narrow.status, narrow.transcripts) == (wide.status, [])
-        assert str(wide_request) == str(narrow_request), "two windows, one request"
-        for asked in (wide_request, narrow_request):
-            assert not {"$filter", "$orderby", "$top"} & set(asked.params), (
-                f"the window is applied here, not by Graph: {asked}"
-            )
-
-    async def test_the_unreadable_answer_tells_a_caller_to_stop_rather_than_to_retry(self) -> None:
-        described = str(lister.MeetingTranscripts.model_fields["status"].description)
-
-        assert "There is nothing to try" in described
-        assert "Never report this as 'there is no transcript'" in described
-        assert "This status is final and cannot be retried" in described
-        assert "Narrow `started_after`/`started_before` to the occurrence you mean" not in described
+        assert len(found.transcripts) == 20, "a capped scan is never short of the asked-for limit"
 
     async def test_past_the_cap_the_newest_returned_is_the_newest_of_what_was_read(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -519,8 +399,6 @@ class TestScopingToOneOccurrence:
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=None,
-            started_before=None,
             limit=3,
             include_scan_completeness=True,
         )
@@ -542,8 +420,6 @@ class TestScopingToOneOccurrence:
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=None,
-            started_before=None,
             limit=3,
             include_scan_completeness=False,
         )
@@ -601,8 +477,6 @@ class TestScopingToOneOccurrence:
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=None,
-            started_before=None,
             limit=20,
             include_scan_completeness=True,
         )
@@ -620,35 +494,32 @@ class TestScopingToOneOccurrence:
         )
         assert len(listing.calls) == 3
 
-    async def test_a_short_list_is_not_a_complete_window_when_the_scan_stopped_short(
+    async def test_a_short_list_means_the_collection_was_read_to_its_end(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """ "Fewer than `limit` means the whole window" holds wherever a walk reaches the end of its
-        collection, and this walk stops at `MAX_ARTIFACT_SCAN` instead, so a short list can mean the
-        opposite of what the convention says."""
+        """ "Fewer than `limit` means there are no more" is trustworthy here only because the
+        largest `limit` a caller may ask for sits below the scan cap. A read that stops at the cap
+        therefore always has more rows in hand than it was asked for, and can never hand back a
+        short list that a caller would misread as the end of the collection."""
+        assert lister.MAX_TRANSCRIPTS < meetings.MAX_ARTIFACT_SCAN, (
+            "the ceiling that makes a short list mean what the field says it means"
+        )
         _resolved(graph, meeting_type="recurring")
         _daily_series(graph)
 
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=_day(10).date(),
-            started_before=_day(11).date(),
-            limit=20,
+            limit=lister.MAX_TRANSCRIPTS,
             include_scan_completeness=True,
         )
 
-        assert found.status == "available"
-        assert 0 < len(found.transcripts) < 20, "a window shorter than the limit that was asked for"
-        assert found.scan_incomplete is True, (
-            "and yet the collection was not read to its end, so this short list is NOT the whole "
-            "window — the claim a caller would otherwise read off its length"
+        assert found.scan_incomplete is True, "the collection was not read to its end"
+        assert len(found.transcripts) == lister.MAX_TRANSCRIPTS, (
+            "and even the largest limit is answered in full, so nothing here reads as an end"
         )
         described = str(lister.MeetingTranscripts.model_fields["transcripts"].description)
-        assert "the window holds no more than was read" in described
-        assert "these are the whole window." not in described, (
-            "the unqualified claim, which this meeting is the counter-example to"
-        )
+        assert "Fewer means it holds no more than was read." in described
 
     async def test_the_order_is_promised_over_what_was_read_and_not_over_the_meeting(self) -> None:
         described = str(lister.MeetingTranscripts.model_fields["transcripts"].description)
@@ -665,8 +536,6 @@ class TestScopingToOneOccurrence:
             _ = await lister.teams_list_meeting_transcripts(
                 client,
                 handle=_handle(),
-                started_after=None,
-                started_before=None,
                 limit=lister.MAX_TRANSCRIPTS + 1,
                 include_scan_completeness=False,
             )
@@ -682,8 +551,6 @@ class TestScopingToOneOccurrence:
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            started_after=None,
-            started_before=None,
             limit=20,
             include_scan_completeness=False,
         )
@@ -694,200 +561,3 @@ class TestScopingToOneOccurrence:
         )
         assert summary.content_correlation_id == "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3"
         assert summary.started_at is not None and summary.ended_at is not None
-
-
-class TestTheWindowShapesAModelActuallySends:
-    """`2026-02-10` and `2026-02-10T14:00:00` both used to reach a comparison between a naive
-    datetime and Graph's aware one and raise `TypeError` at the caller. What the resolution does
-    with each shape is `tests/shared/test_meetings.py`'s."""
-
-    @pytest.mark.parametrize(
-        ("started_after", "started_before", "expected"),
-        [
-            (date(2026, 2, 10), date(2026, 2, 10), ["week-2"]),
-            (datetime(2026, 2, 10, 14, 0), datetime(2026, 2, 10, 14, 2), ["week-2"]),
-            (datetime(2026, 2, 10), datetime(2026, 2, 11), ["week-2"]),
-            (
-                datetime(2026, 2, 10, 15, 0, tzinfo=_CET),
-                datetime(2026, 2, 10, 16, 0, tzinfo=_CET),
-                ["week-2"],
-            ),
-            (datetime(2026, 2, 10, 14, 0, tzinfo=UTC), None, ["week-3", "week-2"]),
-            (None, date(2026, 2, 10), ["week-2", "week-1"]),
-        ],
-        ids=[
-            "bare-dates",
-            "naive-datetimes",
-            "naive-midnights",
-            "offset-aware",
-            "open-at-the-top",
-            "open-at-the-bottom",
-        ],
-    )
-    async def test_every_shape_bounds_the_series_and_none_of_them_raises(
-        self,
-        client: GraphServiceClient,
-        graph: respx.MockRouter,
-        started_after: date | datetime | None,
-        started_before: date | datetime | None,
-        expected: list[str],
-    ) -> None:
-        """`15:00+01:00` is `14:00Z`, so an offset is honoured and a bound carrying none is not
-        silently given the host's."""
-        _weekly_series(graph)
-
-        found = await lister.teams_list_meeting_transcripts(
-            client,
-            handle=_handle(),
-            started_after=started_after,
-            started_before=started_before,
-            limit=20,
-            include_scan_completeness=False,
-        )
-
-        assert found.status == "available"
-        assert [summary.transcript_id for summary in found.transcripts] == expected
-
-    async def test_a_bare_date_keeps_the_last_minute_of_its_day_and_not_the_next_one(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        """A turn transcribed at 23:59 belongs to the day asked for and one at 00:00 does not."""
-        _resolved(graph, meeting_type="recurring")
-        graph.get(_TRANSCRIPTS).mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "value": [
-                        transcript_payload(transcript_id="dawn", created_at="2026-02-10T00:00:01Z"),
-                        transcript_payload(transcript_id="dusk", created_at="2026-02-10T23:59:30Z"),
-                        transcript_payload(
-                            transcript_id="after", created_at="2026-02-11T00:00:30Z"
-                        ),
-                    ]
-                },
-            )
-        )
-
-        found = await lister.teams_list_meeting_transcripts(
-            client,
-            handle=_handle(),
-            started_after=date(2026, 2, 10),
-            started_before=date(2026, 2, 10),
-            limit=20,
-            include_scan_completeness=False,
-        )
-
-        assert [summary.transcript_id for summary in found.transcripts] == ["dusk", "dawn"]
-
-    async def test_a_graph_timestamp_carrying_no_offset_is_still_comparable(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        """Graph timestamps in UTC and says so with a `Z`, but one payload without one must not
-        take the whole call down."""
-        _resolved(graph, meeting_type="recurring")
-        graph.get(_TRANSCRIPTS).mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "value": [
-                        transcript_payload(transcript_id="naive", created_at="2026-02-10T14:01:00")
-                    ]
-                },
-            )
-        )
-
-        found = await lister.teams_list_meeting_transcripts(
-            client,
-            handle=_handle(),
-            started_after=date(2026, 2, 10),
-            started_before=date(2026, 2, 10),
-            limit=20,
-            include_scan_completeness=False,
-        )
-
-        assert [summary.transcript_id for summary in found.transcripts] == ["naive"]
-
-
-class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
-    """A series is one meeting and its `endDateTime` is one value for the whole series, so a
-    verdict read off the meeting tells a caller to wait for an occurrence that ended last month."""
-
-    @pytest.mark.parametrize(
-        "end",
-        [None, (datetime.now(UTC) + timedelta(days=180)).isoformat()],
-        ids=["no-end-time", "series-runs-for-months"],
-    )
-    async def test_a_long_past_occurrence_of_a_running_series_was_never_transcribed(
-        self, client: GraphServiceClient, graph: respx.MockRouter, end: str | None
-    ) -> None:
-        past = (datetime.now(UTC) - timedelta(days=30)).date()
-        _weekly_series(graph, end=end)
-
-        found = await lister.teams_list_meeting_transcripts(
-            client,
-            handle=_handle(),
-            started_after=past,
-            started_before=past,
-            limit=20,
-            include_scan_completeness=False,
-        )
-
-        assert found.transcripts == []
-        assert found.status == "not_transcribed", (
-            "the occurrence is a month gone; the series' own end time says nothing about it"
-        )
-
-    async def test_a_window_that_has_only_just_closed_is_still_not_ready(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        """The allowance applies to the window too, or a transcript minutes away is reported as
-        never coming."""
-        _weekly_series(graph, end=None)
-
-        found = await lister.teams_list_meeting_transcripts(
-            client,
-            handle=_handle(),
-            started_after=datetime.now(UTC) - timedelta(hours=1),
-            started_before=datetime.now(UTC) - timedelta(minutes=5),
-            limit=20,
-            include_scan_completeness=False,
-        )
-
-        assert found.status == "not_ready"
-
-    async def test_a_window_still_open_at_its_far_end_admits_the_answer_is_not_known(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        """`started_after` alone leaves the window running up to now, and Graph publishes neither
-        a processing status nor an SLA, so the cheap wrong answer wins."""
-        _weekly_series(graph, end=None)
-
-        found = await lister.teams_list_meeting_transcripts(
-            client,
-            handle=_handle(),
-            started_after=datetime.now(UTC) - timedelta(days=30),
-            started_before=None,
-            limit=20,
-            include_scan_completeness=False,
-        )
-
-        assert found.status == "not_ready"
-
-    async def test_a_meeting_long_over_settles_even_a_window_set_in_the_future(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        """Either side may settle it: a window set in next week is not an instruction to wait for
-        a meeting that ended nine days ago."""
-        _resolved(graph, end=(datetime.now(UTC) - timedelta(days=9)).isoformat())
-        graph.get(_TRANSCRIPTS).mock(return_value=httpx.Response(200, json={"value": []}))
-
-        found = await lister.teams_list_meeting_transcripts(
-            client,
-            handle=_handle(),
-            started_after=(datetime.now(UTC) + timedelta(days=7)).date(),
-            started_before=None,
-            limit=20,
-            include_scan_completeness=False,
-        )
-
-        assert found.status == "not_transcribed"

@@ -439,6 +439,229 @@ class TestTheWindowAndItsHonesty:
             "link here, and the second page is not fetched to be discarded"
         )
         assert len(graph.calls) == 1
+        assert listed.capped is True
+
+    async def test_a_chat_list_that_ran_out_says_so(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The half that makes a filtered answer readable: with no next link, a short list is
+        every chat there is, so nothing further back went unsearched."""
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(200, json={"value": [chat_payload("19:a@thread.v2")]})
+        )
+
+        listed = await chats.list_recent_chats(client, limit=25, include_member_emails=False)
+
+        assert listed.capped is False
+
+
+class TestTheChatsItNarrowsTo:
+    async def test_neither_filter_changes_the_request(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Microsoft names no filterable property on this collection, so a `$filter` here is the
+        shape it drops in silence. Both arguments narrow the rows instead."""
+        route = graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200, json={"value": [chat_payload("19:a@thread.v2", chat_type="meeting")]}
+            )
+        )
+
+        _ = await chats.list_recent_chats(
+            client,
+            chat_type="meeting",
+            topic_contains="release",
+            limit=7,
+            include_member_emails=False,
+        )
+
+        params = route.calls.last.request.url.params
+        assert "$filter" not in params
+        assert "$search" not in params
+        assert params["$orderby"] == "lastMessagePreview/createdDateTime desc"
+
+    async def test_a_kind_keeps_only_the_chats_of_that_kind(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        chat_payload("19:meeting@thread.v2", chat_type="meeting"),
+                        chat_payload("19:group@thread.v2", chat_type="group"),
+                        chat_payload("19:direct@thread.v2", chat_type="oneOnOne", topic=None),
+                    ]
+                },
+            )
+        )
+
+        listed = await chats.list_recent_chats(
+            client, chat_type="meeting", limit=25, include_member_emails=False
+        )
+
+        assert [chat.chat_id for chat in listed.chats] == ["19:meeting@thread.v2"]
+
+    async def test_a_kind_microsoft_adds_later_is_not_the_kind_that_was_asked_for(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """It deserializes to None, and None is not `meeting`. Keeping it would answer a question
+        about meetings with a chat of an unknown kind."""
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={"value": [chat_payload("19:future@thread.v2", chat_type="somethingNewer")]},
+            )
+        )
+
+        listed = await chats.list_recent_chats(
+            client, chat_type="meeting", limit=25, include_member_emails=False
+        )
+
+        assert listed.chats == []
+
+    async def test_a_topic_fragment_matches_anywhere_and_ignores_case(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        chat_payload("19:a@thread.v2", topic="Q3 Release Planning"),
+                        chat_payload("19:b@thread.v2", topic="Hiring loop"),
+                    ]
+                },
+            )
+        )
+
+        listed = await chats.list_recent_chats(
+            client, topic_contains="release", limit=25, include_member_emails=False
+        )
+
+        assert [chat.topic for chat in listed.chats] == ["Q3 Release Planning"]
+
+    async def test_a_chat_with_no_topic_is_never_a_topic_match(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Microsoft records a topic for group and meeting chats only, so filtering on one drops
+        every direct conversation — which the argument's description promises it does."""
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        chat_payload("19:direct@thread.v2", chat_type="oneOnOne", topic=None),
+                        chat_payload("19:blank@thread.v2", topic="   "),
+                    ]
+                },
+            )
+        )
+
+        listed = await chats.list_recent_chats(
+            client, topic_contains="release", limit=25, include_member_emails=False
+        )
+
+        assert listed.chats == []
+
+    async def test_both_filters_together_are_anded(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        chat_payload("19:right@thread.v2", chat_type="meeting", topic="Q3 review"),
+                        chat_payload("19:kind@thread.v2", chat_type="group", topic="Q3 review"),
+                        chat_payload("19:topic@thread.v2", chat_type="meeting", topic="Standup"),
+                    ]
+                },
+            )
+        )
+
+        listed = await chats.list_recent_chats(
+            client,
+            chat_type="meeting",
+            topic_contains="q3",
+            limit=25,
+            include_member_emails=False,
+        )
+
+        assert [chat.chat_id for chat in listed.chats] == ["19:right@thread.v2"]
+
+    async def test_a_filter_reads_past_limit_rows_to_find_limit_matches(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The walk stops on `limit` MATCHES, not on `limit` rows, so a filtered answer reaches a
+        chat that has been quiet for months. Stopping after `limit` rows would make
+        `topic_contains` a search of the newest handful and nothing more."""
+        graph.get("/me/chats", params={"$skiptoken": "synthetic"}).mock(
+            return_value=httpx.Response(
+                200, json={"value": [chat_payload("19:old@thread.v2", chat_type="meeting")]}
+            )
+        )
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        chat_payload(f"19:{index}@thread.v2", chat_type="group")
+                        for index in range(3)
+                    ],
+                    "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=synthetic",
+                },
+            )
+        )
+
+        listed = await chats.list_recent_chats(
+            client, chat_type="meeting", limit=1, include_member_emails=False
+        )
+
+        assert [chat.chat_id for chat in listed.chats] == ["19:old@thread.v2"]
+
+    async def test_an_exhausted_filtered_answer_is_a_real_nothing_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`capped` false after a filter is the strong answer: the walk read the chat list to its
+        end, so an empty result really is "there is no such chat" rather than "I stopped early"."""
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200, json={"value": [chat_payload("19:a@thread.v2", chat_type="group")]}
+            )
+        )
+
+        listed = await chats.list_recent_chats(
+            client, chat_type="meeting", limit=25, include_member_emails=False
+        )
+
+        assert listed.chats == []
+        assert listed.capped is False
+
+    async def test_a_filtered_answer_filled_to_limit_says_capped(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The other side: `limit` matches with the list still going means a higher `limit`
+        returns more, and the rows are the matches among the ones read."""
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        chat_payload("19:a@thread.v2", chat_type="meeting"),
+                        chat_payload("19:b@thread.v2", chat_type="meeting"),
+                    ],
+                    "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=synthetic",
+                },
+            )
+        )
+
+        listed = await chats.list_recent_chats(
+            client, chat_type="meeting", limit=1, include_member_emails=False
+        )
+
+        assert [chat.chat_id for chat in listed.chats] == ["19:a@thread.v2"]
+        assert listed.capped is True
 
 
 class TestGraphFailures:
