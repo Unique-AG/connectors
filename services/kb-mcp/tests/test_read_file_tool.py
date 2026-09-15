@@ -7,6 +7,7 @@ import httpx
 import pytest
 from unique_toolkit.content.schemas import Content, ContentChunk
 
+from kb_mcp.references import MIME_TYPE_JSON, MIME_TYPE_PDF, MIME_TYPE_TEXT_PLAIN
 from kb_mcp.tools.read_file import ReadFileToolConfig, read_file
 from kb_mcp.tools.read_file.tool import _download_with_retry
 
@@ -218,7 +219,7 @@ async def test_unrecognized_text_mime_subtype_is_treated_as_text():
 async def test_mime_type_takes_precedence_over_a_mismatched_extension():
     """Covers the real case where an upload's key still carries a stale
     or wrong extension."""
-    content = _make_content("upload.bin", mime_type="text/plain")
+    content = _make_content("upload.bin", mime_type=MIME_TYPE_TEXT_PLAIN)
     with (
         _patch_search_contents(content),
         _patch_download(b"just plain text"),
@@ -231,7 +232,7 @@ async def test_mime_type_takes_precedence_over_a_mismatched_extension():
 
 @pytest.mark.asyncio
 async def test_json_mime_type_is_supported_despite_not_being_under_text():
-    content = _make_content("cont_opaque_key", mime_type="application/json")
+    content = _make_content("cont_opaque_key", mime_type=MIME_TYPE_JSON)
     with (
         _patch_search_contents(content),
         _patch_download(b'{"a": 1}'),
@@ -245,7 +246,7 @@ async def test_json_mime_type_is_supported_despite_not_being_under_text():
 @pytest.mark.asyncio
 async def test_chunked_mime_type_dispatches_to_page_aware_rendering():
     chunks = [_make_chunk("hello", 0, 1, 1)]
-    content = _make_content("cont_opaque_key", chunks, mime_type="application/pdf")
+    content = _make_content("cont_opaque_key", chunks, mime_type=MIME_TYPE_PDF)
     with (
         _patch_search_contents(content),
         patch(
@@ -629,3 +630,28 @@ async def test_successful_read_starts_with_reference_link():
 
     text = result.content[0].text  # type: ignore[union-attr]
     assert text.startswith("[doc.pdf](unique://content/cont_abc)\n\n")
+
+
+@pytest.mark.parametrize(
+    ("requested", "expected"),
+    [(None, 8_000), (500, 500), (99_999, 99_999)],
+)
+@pytest.mark.asyncio
+async def test_max_tokens_per_call_uses_request_or_admin_default(
+    requested: int | None, expected: int
+):
+    chunks = [_make_chunk("hello", 0, 1, 1)]
+    content = _make_content("doc.pdf", chunks)
+    with (
+        _patch_search_contents(content),
+        patch(
+            "kb_mcp.tools.read_file.tool._render_chunked", return_value=(False, "ok")
+        ) as render,
+    ):
+        await read_file(
+            content_id="cont_abc",
+            max_tokens_per_call=requested,
+            config=ReadFileToolConfig(),
+        )
+
+    assert render.call_args.args[3] == expected

@@ -1,5 +1,6 @@
 """Tests for the search tool — config schema, routing logic, and references."""
 
+import inspect
 import logging
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,18 +8,28 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastmcp.tools import ToolResult
 from unique_mcp.meta.rjsf import ConfigSchemaMeta
+from unique_sdk import UniqueError
 from unique_toolkit.content.schemas import ContentChunk, ContentMetadata
+from unique_toolkit.content.smart_rules import parse_uniqueql
 from unique_toolkit.experimental.components.internal_search import (
     KnowledgeBaseInternalSearchConfig,
 )
 
 from kb_mcp.references import (
     GENERIC_RESULT_CITATION_INSTRUCTION,
+    INVALID_METADATA_FILTER_MESSAGE,
+    METADATA_FILTER_ARG_DESCRIPTION,
+    METADATA_FILTER_EMPTY_RETRY_HINT,
+    MIME_TYPE_PDF,
     REFERENCE_META_KEY,
     SEARCH_SYSTEM_PROMPT,
+    SERVER_INSTRUCTIONS_CITATION_GUIDANCE,
     TOOL_DESCRIPTION_CITATION_GUIDANCE,
     UNIQUE_AI_RESULT_CITATION_INSTRUCTION,
     UNIQUE_AI_TOOL_FORMAT_INFORMATION,
+    UNIQUEQL_EQUALS_PDF,
+    UNIQUEQL_EQUALS_PDF_WRAPPED,
+    MetadataFilterArgument,
     chunk_to_text_content,
     frontend_document_url,
     is_unique_ai_client,
@@ -27,6 +38,25 @@ from kb_mcp.references import (
     scope_id_from_folder_id_path,
 )
 from kb_mcp.tools.search import SearchToolConfig, search
+from kb_mcp.tools.search.tool import _effective_service_config
+
+
+def test_uniqueql_prompt_copy():
+    assert (
+        inspect.signature(search).parameters["metadata_filter"].annotation
+        is MetadataFilterArgument
+    )
+    assert METADATA_FILTER_ARG_DESCRIPTION in str(MetadataFilterArgument.__value__)
+    assert SERVER_INSTRUCTIONS_CITATION_GUIDANCE.startswith(
+        "If your system prompt or a tool result instructs you to cite"
+    )
+    assert (
+        "`search` and `content_tree` accept an optional UniqueQL `metadata_filter`"
+        in SERVER_INSTRUCTIONS_CITATION_GUIDANCE
+    )
+    description = search.__fastmcp__.description or ""
+    assert "UniqueQL" not in SEARCH_SYSTEM_PROMPT
+    assert "UniqueQL" not in description
 
 
 def test_json_schema_has_service_config():
@@ -173,6 +203,7 @@ async def _run_search_capturing_state(**search_kwargs) -> _FakeState:
     mock_service.bind_settings.return_value = mock_service
     mock_service.state = _FakeState()
     mock_service.run = AsyncMock(return_value=MagicMock())
+    config = search_kwargs.pop("config", SearchToolConfig())
 
     with (
         patch(
@@ -184,9 +215,99 @@ async def _run_search_capturing_state(**search_kwargs) -> _FakeState:
         _patch_kb_settings(None),
         _patch_resolve_scope_ids(),
     ):
-        await search(search_string="query", config=SearchToolConfig(), **search_kwargs)
+        await search(search_string="query", config=config, **search_kwargs)
 
     return mock_service.state
+
+
+async def _run_search_capturing_service_config(
+    **search_kwargs,
+) -> KnowledgeBaseInternalSearchConfig:
+    chunks = [_make_chunk("result A")]
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = _FakeState()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+    config = search_kwargs.pop("config", SearchToolConfig())
+
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ) as mock_from_config,
+        _patch_post_processor(chunks),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+    ):
+        await search(search_string="query", config=config, **search_kwargs)
+
+    return mock_from_config.call_args.args[0]
+
+
+def test_effective_service_config_omits_both_returns_same_object():
+    config = KnowledgeBaseInternalSearchConfig()
+
+    result = _effective_service_config(config, limit=None, score_threshold=None)
+
+    assert result is config
+
+
+def test_effective_service_config_overrides_limit_only():
+    config = KnowledgeBaseInternalSearchConfig()
+
+    result = _effective_service_config(config, limit=50, score_threshold=None)
+
+    assert result is not config
+    assert result.filtering.limit == 50
+    assert result.filtering.score_threshold == config.filtering.score_threshold
+
+
+def test_effective_service_config_overrides_score_threshold_only():
+    config = KnowledgeBaseInternalSearchConfig()
+
+    result = _effective_service_config(config, limit=None, score_threshold=0.8)
+
+    assert result.filtering.score_threshold == 0.8
+    assert result.filtering.limit == config.filtering.limit
+
+
+def test_effective_service_config_overrides_both():
+    config = KnowledgeBaseInternalSearchConfig()
+
+    result = _effective_service_config(config, limit=10, score_threshold=0.5)
+
+    assert result.filtering.limit == 10
+    assert result.filtering.score_threshold == 0.5
+
+
+def test_effective_service_config_leaves_other_fields_untouched():
+    config = KnowledgeBaseInternalSearchConfig()
+
+    result = _effective_service_config(config, limit=10, score_threshold=None)
+
+    assert result.metadata_filter == config.metadata_filter
+    assert result.scope_ids == config.scope_ids
+    assert result.search == config.search
+
+
+@pytest.mark.asyncio
+async def test_search_omits_limit_and_score_threshold_by_default():
+    service_config = await _run_search_capturing_service_config()
+
+    default_filtering = SearchToolConfig().service_config.filtering
+    assert service_config.filtering.limit == default_filtering.limit
+    assert service_config.filtering.score_threshold == default_filtering.score_threshold
+
+
+@pytest.mark.asyncio
+async def test_search_wires_limit_and_score_threshold_through():
+    service_config = await _run_search_capturing_service_config(
+        limit=25, score_threshold=0.9
+    )
+
+    assert service_config.filtering.limit == 25
+    assert service_config.filtering.score_threshold == 0.9
 
 
 @pytest.mark.asyncio
@@ -246,6 +367,129 @@ async def test_folder_ids_include_subfolders_false_uses_folder_id_in_clause():
         "value": ["scope_a"],
     }
     assert _DEFAULT_ADMIN_FILTER in state.metadata_filter_override["and"]
+
+
+@pytest.mark.asyncio
+async def test_llm_metadata_filter_without_folder_ids_ands_admin():
+    state = await _run_search_capturing_state(metadata_filter=UNIQUEQL_EQUALS_PDF)
+
+    expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
+    assert state.metadata_filter_override == {
+        "and": [expected_llm, _DEFAULT_ADMIN_FILTER]
+    }
+
+
+@pytest.mark.asyncio
+async def test_llm_metadata_filter_ands_folder_ids_and_admin():
+    state = await _run_search_capturing_state(
+        folder_ids=["scope_a"],
+        include_subfolders=False,
+        metadata_filter=UNIQUEQL_EQUALS_PDF,
+    )
+
+    expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
+    clauses = state.metadata_filter_override["and"]
+    assert {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_a"],
+    } in clauses
+    assert expected_llm in clauses
+    assert _DEFAULT_ADMIN_FILTER in clauses
+
+
+@pytest.mark.asyncio
+async def test_llm_metadata_filter_ands_deprecated_admin_scope_ids():
+    default = SearchToolConfig()
+    state = await _run_search_capturing_state(
+        metadata_filter=UNIQUEQL_EQUALS_PDF,
+        config=SearchToolConfig(
+            service_config=KnowledgeBaseInternalSearchConfig(
+                scope_ids=["scope_admin"],
+                metadata_filter=default.service_config.metadata_filter,
+            )
+        ),
+    )
+
+    expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
+    clauses = state.metadata_filter_override["and"]
+    assert expected_llm in clauses
+    assert _DEFAULT_ADMIN_FILTER in clauses
+    assert {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_admin"],
+    } in clauses
+
+
+@pytest.mark.asyncio
+async def test_folder_ids_without_llm_filter_still_folds_deprecated_scope_ids():
+    default = SearchToolConfig()
+    state = await _run_search_capturing_state(
+        folder_ids=["scope_a"],
+        include_subfolders=False,
+        config=SearchToolConfig(
+            service_config=KnowledgeBaseInternalSearchConfig(
+                scope_ids=["scope_admin"],
+                metadata_filter=default.service_config.metadata_filter,
+            )
+        ),
+    )
+
+    clauses = state.metadata_filter_override["and"]
+    assert {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_a"],
+    } in clauses
+    assert {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_admin"],
+    } in clauses
+
+
+@pytest.mark.asyncio
+async def test_invalid_uniqueql_returns_tool_error_without_search():
+    with patch(
+        "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config"
+    ) as mock_from_config:
+        result = await search(
+            search_string="query",
+            metadata_filter=UNIQUEQL_EQUALS_PDF_WRAPPED,
+            config=SearchToolConfig(),
+        )
+
+    assert result.is_error is True
+    assert result.content[0].text == INVALID_METADATA_FILTER_MESSAGE  # type: ignore[union-attr]
+    mock_from_config.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_empty_hits_with_llm_filter_append_retry_hint():
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = _FakeState()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ),
+        _patch_post_processor([]),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+    ):
+        result = await search(
+            search_string="query",
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
+            config=SearchToolConfig(),
+        )
+
+    assert result.is_error is not True
+    assert result.content[0].text == METADATA_FILTER_EMPTY_RETRY_HINT  # type: ignore[union-attr]
 
 
 @pytest.mark.asyncio
@@ -320,6 +564,37 @@ async def test_search_returns_error_result_on_service_failure():
 
     assert result.is_error is True
     assert "KB unavailable" in result.content[0].text  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_search_logs_unique_error_detail(caplog):
+    """Extra UniqueError fields land in the log even when __str__ collapses
+    to '<Unknown code>: <No message>' for an empty backend error payload."""
+    exc = UniqueError(
+        message="Error while performing combined search",
+        http_status=400,
+        code=None,
+        json_body={"error": {"cause": {"status": 400, "error": {}}}},
+        headers={"request-id": "req_abc123"},
+        original_error="<Unknown code>: <No message>",
+    )
+
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            side_effect=exc,
+        ),
+        _patch_identity(),
+        caplog.at_level(logging.ERROR, logger="kb_mcp"),
+    ):
+        result = await search(search_string="query", config=SearchToolConfig())
+
+    assert result.is_error is True
+    log_text = " ".join(r.getMessage() for r in caplog.records)
+    assert "http_status=400" in log_text
+    assert "request_id=req_abc123" in log_text
+    # json_body can echo the caller's query/filter values — never logged.
+    assert "json_body" not in log_text
 
 
 @pytest.mark.asyncio
@@ -419,7 +694,7 @@ def test_reference_url_builds_frontend_deep_link_when_configured():
         "text",
         metadata=ContentMetadata(
             key="doc.pdf",
-            mime_type="application/pdf",
+            mime_type=MIME_TYPE_PDF,
             folderIdPath="uniquepathid://scope_root/scope_leaf",  # type: ignore[call-arg]
         ),
     )

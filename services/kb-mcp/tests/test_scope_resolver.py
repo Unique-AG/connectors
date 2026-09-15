@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from unique_toolkit.content.schemas import Content, ContentChunk, ContentMetadata
 
+from kb_mcp.references import MIME_TYPE_TEXT_PLAIN
 from kb_mcp.tools.search.scope_resolver import resolve_scope_ids
 
 pytestmark = pytest.mark.ai
@@ -20,7 +21,9 @@ def _reset_semaphore(monkeypatch):
 
 
 def _metadata(folder_id_path: str) -> ContentMetadata:
-    return ContentMetadata(key="k", mimeType="text/plain", folderIdPath=folder_id_path)
+    return ContentMetadata(
+        key="k", mimeType=MIME_TYPE_TEXT_PLAIN, folderIdPath=folder_id_path
+    )
 
 
 def _chunk(content_id: str, folder_id_path: str | None = None) -> ContentChunk:

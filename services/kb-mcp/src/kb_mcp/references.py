@@ -35,12 +35,14 @@ Referencing style
 
 from __future__ import annotations
 
+import json
 import logging
-from typing import Any, cast
+from typing import Annotated, Any, cast
 from urllib.parse import quote
 
 from fastmcp.server.dependencies import get_context
 from mcp.types import TextContent
+from pydantic import Field
 from unique_toolkit.content.schemas import ContentChunk
 
 _LOGGER = logging.getLogger(__name__)
@@ -170,7 +172,72 @@ SERVER_INSTRUCTIONS_CITATION_GUIDANCE = (
     "answering using content from any of its tools, cite sources inline by "
     "pasting the exact markdown links [document name](url) provided in "
     "each result header. End with a Sources section listing the cited "
-    "documents as those same markdown links."
+    "documents as those same markdown links. "
+    "`search` and `content_tree` accept an optional UniqueQL "
+    "`metadata_filter`. Omit it unless the user names a metadata constraint "
+    "(mime type, title, date, or a custom field they named). Folder names "
+    "stay `folder_ids` from `content_tree` — UniqueQL is not for folders."
+)
+
+MIME_TYPE_PDF = "application/pdf"
+MIME_TYPE_JSON = "application/json"
+MIME_TYPE_TEXT_PLAIN = "text/plain"
+
+UNIQUEQL_EQUALS_PDF: dict[str, Any] = {
+    "operator": "equals",
+    "path": ["mimeType"],
+    "value": MIME_TYPE_PDF,
+}
+UNIQUEQL_EQUALS_PDF_WRAPPED: dict[str, Any] = {
+    UNIQUEQL_EQUALS_PDF["operator"]: {
+        "path": UNIQUEQL_EQUALS_PDF["path"],
+        "value": UNIQUEQL_EQUALS_PDF["value"],
+    }
+}
+UNIQUEQL_EQUALS_PDF_PATH_AS_STRING: dict[str, Any] = {
+    "operator": UNIQUEQL_EQUALS_PDF["operator"],
+    "path": UNIQUEQL_EQUALS_PDF["path"][0],
+    "value": UNIQUEQL_EQUALS_PDF["value"],
+}
+UNIQUEQL_IN_PDF: dict[str, Any] = {
+    "operator": "in",
+    "path": UNIQUEQL_EQUALS_PDF["path"],
+    "value": [MIME_TYPE_PDF, MIME_TYPE_TEXT_PLAIN],
+}
+UNIQUEQL_IS_NOT_EMPTY_CUSTOM_FIELD: dict[str, Any] = {
+    "operator": "isNotEmpty",
+    "path": ["customField"],
+    "value": "",
+}
+_UNIQUEQL_EQUALS_PDF_JSON = json.dumps(UNIQUEQL_EQUALS_PDF, separators=(",", ":"))
+_UNIQUEQL_IS_NOT_EMPTY_JSON = json.dumps(
+    UNIQUEQL_IS_NOT_EMPTY_CUSTOM_FIELD, separators=(",", ":")
+)
+
+METADATA_FILTER_ARG_DESCRIPTION = (
+    "Optional UniqueQL filter. Omit to keep the admin default. ANDed with "
+    "admin and `folder_ids`. Example: "
+    f"`{_UNIQUEQL_EQUALS_PDF_JSON}`. "
+    "`equals`/`contains` take a string; a list of values uses `in`. To check "
+    "a key is set at all, regardless of value, use `isNotEmpty`/`isEmpty` "
+    f"(still requires `value`, ignored): `{_UNIQUEQL_IS_NOT_EMPTY_JSON}`. "
+    'Combine with `{"and":[…]}` or `{"or":[…]}`. `path` is a key array '
+    "(`mimeType`, `key`, `title`, `validAsOf`, or a custom key the user "
+    "named). Folders stay `folder_ids`. No matches: drop this arg and retry."
+)
+
+type MetadataFilterArgument = Annotated[
+    dict[str, Any] | None, Field(description=METADATA_FILTER_ARG_DESCRIPTION)
+]
+
+INVALID_METADATA_FILTER_MESSAGE = (
+    "Invalid UniqueQL metadata_filter; use operator, path as a string array, "
+    "and value. Example: "
+    f"{_UNIQUEQL_EQUALS_PDF_JSON}."
+)
+
+METADATA_FILTER_EMPTY_RETRY_HINT = (
+    "Drop metadata_filter and retry before telling the user there is no content."
 )
 
 

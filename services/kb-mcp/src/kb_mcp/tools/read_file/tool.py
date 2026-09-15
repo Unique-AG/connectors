@@ -33,7 +33,12 @@ from unique_toolkit.content.schemas import Content, ContentChunk
 from unique_toolkit.content.utils import sort_content_chunks
 
 from kb_mcp.correlation import correlation_id
-from kb_mcp.references import file_reference_url, markdown_citation_link
+from kb_mcp.references import (
+    MIME_TYPE_JSON,
+    MIME_TYPE_PDF,
+    file_reference_url,
+    markdown_citation_link,
+)
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.read_file.config import ReadFileToolConfig
 
@@ -45,7 +50,7 @@ _CHUNKED_EXTENSIONS = {".pdf", ".docx"}
 # The only two formats with a page-aware extraction pipeline; everything
 # else that decodes cleanly enough gets the flat-text path instead.
 _CHUNKED_MIME_TYPES = {
-    "application/pdf",
+    MIME_TYPE_PDF,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 
@@ -58,7 +63,7 @@ def _is_chunked(content: Content) -> bool | None:
     mime = content.mime_type
     if mime in _CHUNKED_MIME_TYPES:
         return True
-    if mime == "application/json" or (mime is not None and mime.startswith("text/")):
+    if mime == MIME_TYPE_JSON or (mime is not None and mime.startswith("text/")):
         return False
 
     suffix = Path(content.key).suffix.lower()
@@ -252,6 +257,17 @@ async def read_file(
         int | None,
         Field(description="Last page to return (1-indexed), inclusive."),
     ] = None,
+    max_tokens_per_call: Annotated[
+        int | None,
+        Field(
+            gt=0,
+            description=(
+                "Optional token limit for this call. Ships with a default "
+                "of 8000 this tenant's admin may have changed — omit to "
+                "use whatever's actually configured."
+            ),
+        ),
+    ] = None,
     config: ReadFileToolConfig = Depends(get_tool_config(ReadFileToolConfig)),
 ) -> ToolResult:
     """Read a specific knowledge-base file's text content. Requires
@@ -322,10 +338,12 @@ async def read_file(
                 is_error=True,
             )
 
+        effective_max_tokens = max_tokens_per_call or config.max_tokens_per_call
+
         if is_chunked:
             chunks = sort_content_chunks(list(content.chunks))
             is_error, text = _render_chunked(
-                chunks, start_page, end_page, config.max_tokens_per_call
+                chunks, start_page, end_page, effective_max_tokens
             )
         else:
             try:
@@ -343,7 +361,7 @@ async def read_file(
                 chunks = sort_content_chunks(list(content.chunks))
                 full_text = "\n".join(c.text for c in chunks)
             is_error, text = _render_text(
-                full_text, start_page, end_page, config.max_tokens_per_call
+                full_text, start_page, end_page, effective_max_tokens
             )
 
         _LOGGER.info(

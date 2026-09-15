@@ -2,6 +2,7 @@
 
 import asyncio
 import gc
+import inspect
 import logging
 import weakref
 from dataclasses import dataclass, field
@@ -12,6 +13,7 @@ import pytest
 from fastmcp.server.providers.filesystem_discovery import import_module_from_file
 from fastmcp.tools import ToolResult
 from pydantic import SecretStr
+from unique_toolkit.content.smart_rules import parse_uniqueql
 from unique_toolkit.experimental.components.content_tree.schemas import (
     FolderWalkSnapshot,
 )
@@ -22,6 +24,14 @@ from unique_toolkit.experimental.resources.feature_flags._ttl_cache import (
     AsyncTTLCache,
 )
 
+from kb_mcp.references import (
+    INVALID_METADATA_FILTER_MESSAGE,
+    METADATA_FILTER_ARG_DESCRIPTION,
+    METADATA_FILTER_EMPTY_RETRY_HINT,
+    UNIQUEQL_EQUALS_PDF,
+    UNIQUEQL_EQUALS_PDF_WRAPPED,
+    MetadataFilterArgument,
+)
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_tree import (
     ContentTreeToolConfig,
@@ -111,6 +121,14 @@ def _reset_cache():
 
 def test_match_target_matches_service_definition():
     assert set(MatchTarget.__args__) == set(ServiceMatchTarget.__args__)
+
+
+def test_metadata_filter_arg_uses_locked_field_description():
+    assert (
+        inspect.signature(content_tree).parameters["metadata_filter"].annotation
+        is MetadataFilterArgument
+    )
+    assert METADATA_FILTER_ARG_DESCRIPTION in str(MetadataFilterArgument.__value__)
 
 
 def _make_dispatch_probe_tree():
@@ -520,6 +538,105 @@ async def test_admin_configured_metadata_filter_flows_through_to_service_calls(
     assert kwargs["metadata_filter"] == custom_filter
     _, fuzzy_kwargs = mock_tree.search_visible_files_fuzzy_async.call_args
     assert fuzzy_kwargs["metadata_filter"] == custom_filter
+
+
+_DEFAULT_CONTENT_TREE_FILTER = {
+    "operator": "notContains",
+    "path": ["folderIdPath"],
+    "value": "user-memory",
+}
+
+
+@pytest.mark.asyncio
+async def test_llm_metadata_filter_ands_default_admin_filter():
+    mock_tree = _make_mock_tree()
+    expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        await content_tree(
+            mode="list",
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
+            config=ContentTreeToolConfig(),
+        )
+
+    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
+    assert kwargs["metadata_filter"] == {
+        "and": [expected_llm, _DEFAULT_CONTENT_TREE_FILTER]
+    }
+
+
+@pytest.mark.asyncio
+async def test_llm_metadata_filter_ands_admin_configured_filter():
+    custom_filter = {"operator": "equals", "path": ["type"], "value": "pdf"}
+    config = ContentTreeToolConfig(metadata_filter=custom_filter)
+    expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
+    mock_tree = _make_mock_tree()
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        await content_tree(
+            mode="tree",
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
+            config=config,
+        )
+
+    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
+    assert kwargs["metadata_filter"] == {"and": [expected_llm, custom_filter]}
+
+
+@pytest.mark.asyncio
+async def test_invalid_uniqueql_returns_tool_error_without_walking():
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
+        result = await content_tree(
+            mode="list",
+            metadata_filter=UNIQUEQL_EQUALS_PDF_WRAPPED,
+            config=ContentTreeToolConfig(),
+        )
+
+    assert result.is_error is True
+    assert result.content[0].text == INVALID_METADATA_FILTER_MESSAGE  # type: ignore[union-attr]
+    mock_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_list_empty_hits_with_llm_filter_append_retry_hint():
+    mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=[]))
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="list",
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert text.startswith("No visible files match.")
+    assert METADATA_FILTER_EMPTY_RETRY_HINT in text
+
+
+@pytest.mark.asyncio
+async def test_tree_empty_hits_with_llm_filter_append_retry_hint():
+    mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=[]))
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree",
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert METADATA_FILTER_EMPTY_RETRY_HINT in text
+
+
+@pytest.mark.asyncio
+async def test_incomplete_empty_list_does_not_append_retry_hint():
+    mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=[], complete=False))
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="list",
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "incomplete" in text.lower()
+    assert METADATA_FILTER_EMPTY_RETRY_HINT not in text
 
 
 @pytest.mark.asyncio

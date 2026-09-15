@@ -3,6 +3,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
+from typing import override
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
@@ -21,6 +22,18 @@ from kb_mcp.settings import ENV_FILE, Settings, get_settings
 from kb_mcp.tools.content_tree.cache import expire_idle_trees_loop
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class _DowngradeMemoryTrimNoise(logging.Filter):
+    """Relabel the per-cycle "[MEMORY-TRIM:...]" log as DEBUG; other records on
+    this logger (warnings, exceptions, the SIGTERM notice) pass through."""
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str) and record.msg.startswith("[MEMORY-TRIM:%s]"):
+            record.levelno = logging.DEBUG
+            record.levelname = logging.getLevelName(logging.DEBUG)
+        return True
 
 
 def apply_enabled_tools(mcp: FastMCP, settings: Settings) -> None:
@@ -58,6 +71,9 @@ def main() -> None:
     # Opt-in via OTEL_* (e.g. OTEL_TRACES_EXPORTER=console locally).
     configure_tracing(service_name="kb-mcp")
     configure_logging()
+    logging.getLogger("unique_toolkit.monitoring.memory").addFilter(
+        _DowngradeMemoryTrimNoise()
+    )
     start_memory_trimmer()
     # Before FastMCP(...): that imports the tool modules, and unique_sdk pins
     # whichever client exists the first time anything issues a request.
