@@ -42,6 +42,7 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "update_custom_field_values",
         "create_person",
         "create_organization",
+        "create_employment",
         "update_person",
         "update_organization",
         "end_employment",
@@ -93,6 +94,13 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         '"category_ids"',
         "update_organization",
         "destructive_hint",
+    ),
+    "create_employment": (
+        '"party_id"',
+        '"search_type"',
+        '"organization_id"',
+        '"start_date"',
+        "mirror",
     ),
     "update_person": (
         '"party_id"',
