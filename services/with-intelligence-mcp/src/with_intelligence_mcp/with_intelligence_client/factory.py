@@ -54,8 +54,7 @@ class _GateRegistry:
 
     @asynccontextmanager
     async def hold(self, subject: str) -> AsyncGenerator[None]:
-        gate = await self._gate_for(subject)
-        gate.in_flight += 1
+        gate = await self._enter(subject)
         acquired = False
         try:
             start = asyncio.get_running_loop().time()
@@ -66,9 +65,10 @@ class _GateRegistry:
         finally:
             if acquired:
                 gate.semaphore.release()
-            gate.in_flight -= 1
+            async with self._lock:
+                gate.in_flight -= 1
 
-    async def _gate_for(self, subject: str) -> _Gate:
+    async def _enter(self, subject: str) -> _Gate:
         async with self._lock:
             gate = self._gates.get(subject)
             if gate is None:
@@ -76,6 +76,7 @@ class _GateRegistry:
                     self._evict_idle_unlocked()
                 gate = _Gate(semaphore=asyncio.Semaphore(self.limit))
                 self._gates[subject] = gate
+            gate.in_flight += 1
             return gate
 
     def _evict_idle_unlocked(self) -> None:

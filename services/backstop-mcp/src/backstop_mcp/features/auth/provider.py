@@ -8,8 +8,9 @@ from mcp_credential_auth import (
     LoginCsrf,
     ThrottleConfig,
     clear_failures,
-    is_throttled,
-    record_failure,
+    complete_login_attempt,
+    discard_login_attempt,
+    reserve_login_attempt,
 )
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -205,9 +206,13 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         if len(username) > MAX_USERNAME_LENGTH:
             return self._form_response(request_id, error="Invalid username or API token.")
 
-        # Checked before contacting Backstop — the point of the limit is to stop this endpoint
-        # being used to test credentials against Backstop at all.
-        if await is_throttled(self._session_factory, username, config=self._throttle):
+        attempt_id = await reserve_login_attempt(
+            self._session_factory,
+            username,
+            source_ip=_source_ip(request),
+            config=self._throttle,
+        )
+        if attempt_id is None:
             return self._form_response(
                 request_id,
                 status_code=429,
@@ -221,8 +226,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         try:
             valid = await self._backstop_clients.verify_credential(username, api_token)
         except BackstopUnreachableError as exc:
-            # Not recorded as a failed attempt: nothing was learned about the credential, so
-            # counting it would let a Backstop outage lock users out.
+            await discard_login_attempt(self._session_factory, attempt_id)
             logger.warning("auth.login.backstop_unreachable", extra={"error": str(exc)})
             return self._form_response(
                 request_id,
@@ -231,12 +235,14 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
             )
 
         if not valid:
-            await record_failure(self._session_factory, username, source_ip=_source_ip(request))
+            await complete_login_attempt(self._session_factory, attempt_id)
             return self._form_response(
                 request_id,
                 username=username,
                 error="Invalid username or API token.",
             )
+
+        await clear_failures(self._session_factory, username, reservation_id=attempt_id)
 
         assert self._resolve_system_user is not None, (
             "resolve_system_user must be provided or attached before login"
@@ -261,9 +267,6 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
                 ),
             )
         external_user_id, system_user_raw = system_user
-
-        # Authenticated, so the guessing budget is irrelevant for this username.
-        await clear_failures(self._session_factory, username)
 
         existing_id: str | None
         previous: BackstopCredentialSecret | None = None
