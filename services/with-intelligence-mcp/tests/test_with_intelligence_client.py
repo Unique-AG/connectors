@@ -132,13 +132,23 @@ class TestAuthentication:
 
 class TestStatusMapping:
     @respx.mock
-    async def test_403_is_not_entitled_and_names_the_path(self) -> None:
-        respx.get(f"{BASE_URL}/v3/intentions").mock(return_value=httpx.Response(403))
+    async def test_403_preserves_the_error_context(self) -> None:
+        respx.get(f"{BASE_URL}/v3/intentions").mock(
+            return_value=httpx.Response(
+                403,
+                json={
+                    "message": "Subscription required",
+                    "error": "Forbidden",
+                    "statusCode": 403,
+                },
+            )
+        )
         client, _ = build_client()
         with pytest.raises(NotEntitled) as caught:
             await client.get_json("/v3/intentions", _JSON)
         assert caught.value.path == "/v3/intentions"
         assert "licensed" in str(caught.value)
+        assert "Forbidden: Subscription required" in str(caught.value)
 
     @respx.mock
     async def test_404_is_not_found(self) -> None:

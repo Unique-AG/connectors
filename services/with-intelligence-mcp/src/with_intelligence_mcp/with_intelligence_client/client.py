@@ -1,10 +1,10 @@
 import asyncio
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
-from typing import cast
+from typing import ClassVar, cast
 
 import httpx
-from pydantic import TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from with_intelligence_mcp.metrics import (
     UPSTREAM_RATE_LIMITED,
@@ -27,10 +27,35 @@ from with_intelligence_mcp.with_intelligence_client.settings import TransportSet
 type QueryValue = str | int | float | bool | Sequence[str | int]
 type Gate = Callable[[str], AbstractAsyncContextManager[None]]
 
+_MAX_ERROR_DETAIL_LENGTH = 500
+
+
+class _ErrorResponse(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    message: str
+    error: str
+    status_code: int = Field(alias="statusCode")
+
+
+_ERROR_RESPONSE = TypeAdapter(_ErrorResponse)
+
 
 def _metric_path(path: str) -> str:
     segments = [segment for segment in path.split("/") if segment]
     return "/" + "/".join(":id" if segment.isdecimal() else segment for segment in segments)
+
+
+def _error_message(response: httpx.Response, fallback: str) -> str:
+    try:
+        error = _ERROR_RESPONSE.validate_json(response.content)
+    except ValueError:
+        return fallback
+    parts = (" ".join(error.error.split()), " ".join(error.message.split()))
+    detail = ": ".join(dict.fromkeys(part for part in parts if part))
+    if not detail:
+        return fallback
+    return f"{fallback}: {detail[:_MAX_ERROR_DETAIL_LENGTH]}"
 
 
 class WithIntelligenceClient:
@@ -162,26 +187,29 @@ class WithIntelligenceClient:
         if status < 400:
             return
         if status == 401:
-            raise AuthError()
+            raise AuthError(_error_message(response, "With Intelligence rejected the access token"))
         if status == 403:
             raise NotEntitled(
-                f"With Intelligence refused {path} for this account — most likely the data is "
-                + "outside its licensed packages or subscription add-ons",
+                _error_message(
+                    response,
+                    f"With Intelligence refused {path} for this account — most likely the data is "
+                    + "outside its licensed packages or subscription add-ons",
+                ),
                 path=path,
             )
         if status == 404:
-            raise NotFound(f"{path} does not exist", path=path)
+            raise NotFound(_error_message(response, f"{path} does not exist"), path=path)
         if status == 429:
             UPSTREAM_RATE_LIMITED.add(1)
             raise RateLimited(
-                f"{path} is rate-limited",
+                _error_message(response, f"{path} is rate-limited"),
                 retry_after_seconds=self._retry.parse_retry_after(
                     cast("object", response.headers.get("retry-after"))
                 ),
             )
         if status >= 500:
-            raise Unreachable(f"{path} returned {status}")
-        raise ApiError(f"{path} returned {status}", status_code=status)
+            raise Unreachable(_error_message(response, f"{path} returned {status}"))
+        raise ApiError(_error_message(response, f"{path} returned {status}"), status_code=status)
 
 
 def as_query(values: Mapping[str, QueryValue | None]) -> dict[str, QueryValue]:
