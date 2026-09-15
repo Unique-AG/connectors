@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM python:3.14-slim-trixie@sha256:cae66f2ef0ec51a9891263eeee7f987dacf0a9879e8aa9353d5606e0530619a5 AS runtime
 WORKDIR /app
 RUN apt-get update \
-    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends perl-base=5.40.1-6+deb13u1 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 1000 app && useradd --system --uid 1000 --gid app app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
