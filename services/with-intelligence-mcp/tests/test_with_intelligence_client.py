@@ -12,7 +12,6 @@ from tests.helpers import (
     page_body,
     sent_header,
     sent_query,
-    sign_in_ok,
     wi_factory,
 )
 from with_intelligence_mcp.with_intelligence_client import (
@@ -54,20 +53,25 @@ class _RecordingMetric:
 
 
 class TestAuthentication:
-    @pytest.mark.parametrize("status_code", [429, 503])
+    @pytest.mark.parametrize(
+        ("status_code", "error_type"),
+        [(429, RateLimited), (503, Unreachable)],
+    )
     @respx.mock
-    async def test_transient_failures_are_retried(self, status_code: int) -> None:
+    async def test_transient_failures_are_not_retried(
+        self, status_code: int, error_type: type[Exception]
+    ) -> None:
         route = respx.post(f"{BASE_URL}/v3/auth/sign-in").mock(
-            side_effect=[httpx.Response(status_code), sign_in_ok()]
+            return_value=httpx.Response(status_code)
         )
         factory = wi_factory(max_attempts=2)
         credential = WiCredential.model_validate({"username": "user", "password": "password"})
         try:
-            session = await factory.sign_in(credential)
+            with pytest.raises(error_type):
+                await factory.sign_in(credential)
         finally:
             await factory.aclose()
-        assert session.access_token.get_secret_value() == "access-1"
-        assert route.call_count == 2
+        assert route.call_count == 1
 
     @respx.mock
     async def test_credential_rejection_is_not_retried(self) -> None:

@@ -139,28 +139,20 @@ class WithIntelligenceClientFactory:
         )
 
     async def _auth_response(self, path: str, payload: dict[str, str]) -> httpx.Response:
-        attempt = 0
-        while True:
-            attempt += 1
-            try:
-                response = await self._post_auth(path, payload)
-                status = response.status_code
-                if status == 200:
-                    return response
-                if status == 429:
-                    raise RateLimited(
-                        f"{path} is rate-limited",
-                        retry_after_seconds=self._retry_policy.parse_retry_after(
-                            cast("object", response.headers.get("retry-after"))
-                        ),
-                    )
-                if status >= 500:
-                    raise Unreachable(f"{path} returned {status}")
-                raise SignInFailed(f"{path} returned {status}")
-            except (RateLimited, Unreachable) as error:
-                if not self._retry_policy.should_retry(error, attempt):
-                    raise
-                await asyncio.sleep(self._retry_policy.wait_seconds(error, attempt))
+        response = await self._post_auth(path, payload)
+        status = response.status_code
+        if status == 200:
+            return response
+        if status == 429:
+            raise RateLimited(
+                f"{path} is rate-limited",
+                retry_after_seconds=self._retry_policy.parse_retry_after(
+                    cast("object", response.headers.get("retry-after"))
+                ),
+            )
+        if status >= 500:
+            raise Unreachable(f"{path} returned {status}")
+        raise SignInFailed(f"{path} returned {status}")
 
     async def _post_auth(self, path: str, payload: dict[str, str]) -> httpx.Response:
         async with self._borrow_http_client() as client:
