@@ -37,11 +37,12 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, cast
+from typing import Annotated, Any, cast
 from urllib.parse import quote
 
 from fastmcp.server.dependencies import get_context
 from mcp.types import TextContent
+from pydantic import Field
 from unique_toolkit.content.schemas import ContentChunk
 
 _LOGGER = logging.getLogger(__name__)
@@ -214,6 +215,10 @@ METADATA_FILTER_ARG_DESCRIPTION = (
     "`key`, `title`, `validAsOf`, or a custom key the user named). Folders "
     "stay `folder_ids`. No matches: drop this arg and retry."
 )
+
+type MetadataFilterArgument = Annotated[
+    dict[str, Any] | None, Field(description=METADATA_FILTER_ARG_DESCRIPTION)
+]
 
 INVALID_METADATA_FILTER_MESSAGE = (
     "Invalid UniqueQL metadata_filter; use operator, path as a string array, "

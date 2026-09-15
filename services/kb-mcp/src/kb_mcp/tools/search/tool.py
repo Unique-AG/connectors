@@ -10,7 +10,7 @@ Separation of concerns:
 """
 
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import ToolResult, tool
@@ -31,11 +31,11 @@ from unique_toolkit.experimental.components.internal_search import (
 
 from kb_mcp.correlation import correlation_id
 from kb_mcp.references import (
-    METADATA_FILTER_ARG_DESCRIPTION,
     METADATA_FILTER_EMPTY_RETRY_HINT,
     SEARCH_SYSTEM_PROMPT,
     TOOL_DESCRIPTION_CITATION_GUIDANCE,
     UNIQUE_AI_TOOL_FORMAT_INFORMATION,
+    MetadataFilterArgument,
     chunk_to_text_content,
     citation_instruction_content,
     is_unique_ai_client,
@@ -115,10 +115,7 @@ async def search(
             )
         ),
     ] = True,
-    metadata_filter: Annotated[
-        dict[str, Any] | None,
-        Field(description=METADATA_FILTER_ARG_DESCRIPTION),
-    ] = None,
+    metadata_filter: MetadataFilterArgument = None,
     config: SearchToolConfig = Depends(get_tool_config(SearchToolConfig)),
 ) -> ToolResult:
     """Search the knowledge base using ``SearchToolConfig`` from the config meta key."""

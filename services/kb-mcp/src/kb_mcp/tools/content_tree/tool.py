@@ -8,7 +8,7 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import ToolResult, tool
@@ -27,8 +27,8 @@ from unique_toolkit.experimental.components.content_tree import ContentTree, Fuz
 
 from kb_mcp.correlation import correlation_id
 from kb_mcp.references import (
-    METADATA_FILTER_ARG_DESCRIPTION,
     METADATA_FILTER_EMPTY_RETRY_HINT,
+    MetadataFilterArgument,
     file_reference_url,
     markdown_citation_link,
 )
@@ -280,10 +280,7 @@ async def content_tree(
             ),
         ),
     ] = None,
-    metadata_filter: Annotated[
-        dict[str, Any] | None,
-        Field(description=METADATA_FILTER_ARG_DESCRIPTION),
-    ] = None,
+    metadata_filter: MetadataFilterArgument = None,
     config: ContentTreeToolConfig = Depends(get_tool_config(ContentTreeToolConfig)),
 ) -> ToolResult:
     """Browse the knowledge base's folder/file structure — use this only when

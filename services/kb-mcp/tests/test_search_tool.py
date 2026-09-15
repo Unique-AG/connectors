@@ -28,6 +28,7 @@ from kb_mcp.references import (
     UNIQUE_AI_TOOL_FORMAT_INFORMATION,
     UNIQUEQL_EQUALS_PDF,
     UNIQUEQL_EQUALS_PDF_WRAPPED,
+    MetadataFilterArgument,
     chunk_to_text_content,
     frontend_document_url,
     is_unique_ai_client,
@@ -39,9 +40,11 @@ from kb_mcp.tools.search import SearchToolConfig, search
 
 
 def test_uniqueql_prompt_copy():
-    assert METADATA_FILTER_ARG_DESCRIPTION in str(
+    assert (
         inspect.signature(search).parameters["metadata_filter"].annotation
+        is MetadataFilterArgument
     )
+    assert METADATA_FILTER_ARG_DESCRIPTION in str(MetadataFilterArgument.__value__)
     assert SERVER_INSTRUCTIONS_CITATION_GUIDANCE.startswith(
         "If your system prompt or a tool result instructs you to cite"
     )

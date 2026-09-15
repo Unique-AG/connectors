@@ -30,6 +30,7 @@ from kb_mcp.references import (
     METADATA_FILTER_EMPTY_RETRY_HINT,
     UNIQUEQL_EQUALS_PDF,
     UNIQUEQL_EQUALS_PDF_WRAPPED,
+    MetadataFilterArgument,
 )
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_tree import (
@@ -123,9 +124,11 @@ def test_match_target_matches_service_definition():
 
 
 def test_metadata_filter_arg_uses_locked_field_description():
-    assert METADATA_FILTER_ARG_DESCRIPTION in str(
+    assert (
         inspect.signature(content_tree).parameters["metadata_filter"].annotation
+        is MetadataFilterArgument
     )
+    assert METADATA_FILTER_ARG_DESCRIPTION in str(MetadataFilterArgument.__value__)
 
 
 def _make_dispatch_probe_tree():
