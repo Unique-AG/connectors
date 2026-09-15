@@ -53,6 +53,22 @@ class _RecordingMetric:
         self.values.append(value)
 
 
+class _RecordingHistogram:
+    def __init__(self) -> None:
+        self.attributes: list[dict[str, str]] = []
+
+    def record(self, _value: float, attributes: dict[str, str]) -> None:
+        self.attributes.append(attributes)
+
+
+class _RecordingCounter:
+    def __init__(self) -> None:
+        self.records: list[tuple[int, dict[str, str]]] = []
+
+    def add(self, value: int, attributes: dict[str, str]) -> None:
+        self.records.append((value, attributes))
+
+
 class TestAuthentication:
     @respx.mock
     async def test_sign_in_deserializes_the_session(self) -> None:
@@ -188,6 +204,29 @@ class TestTokenRenewal:
 
 
 class TestRetries:
+    @respx.mock
+    async def test_request_metrics_sanitize_ids(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        duration_metric = _RecordingHistogram()
+        request_metric = _RecordingCounter()
+        monkeypatch.setattr(
+            "with_intelligence_mcp.with_intelligence_client.client.UPSTREAM_REQUEST_DURATION",
+            duration_metric,
+        )
+        monkeypatch.setattr(
+            "with_intelligence_mcp.with_intelligence_client.client.UPSTREAM_REQUESTS",
+            request_metric,
+        )
+        respx.get(f"{BASE_URL}/v3/investors/123").mock(return_value=httpx.Response(200, json={}))
+        client, _ = build_client()
+        _ = await client.get_json("/v3/investors/123", _JSON)
+        assert duration_metric.attributes == [{"method": "GET", "path": "/v3/investors/:id"}]
+        assert request_metric.records == [
+            (
+                1,
+                {"method": "GET", "outcome": "200", "path": "/v3/investors/:id"},
+            )
+        ]
+
     @respx.mock
     async def test_rate_limit_metric_has_no_path_attribute(
         self, monkeypatch: pytest.MonkeyPatch

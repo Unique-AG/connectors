@@ -28,6 +28,11 @@ type QueryValue = str | int | float | bool | Sequence[str | int]
 type Gate = Callable[[str], AbstractAsyncContextManager[None]]
 
 
+def _metric_path(path: str) -> str:
+    segments = [segment for segment in path.split("/") if segment]
+    return "/" + "/".join(":id" if segment.isdecimal() else segment for segment in segments)
+
+
 class WithIntelligenceClient:
     """Client for one caller's authenticated WI API requests."""
 
@@ -122,6 +127,7 @@ class WithIntelligenceClient:
     ) -> httpx.Response:
         token = await self._session.access_token()
         subject = self._session.subject()
+        metric_path = _metric_path(path)
         async with self._gate(subject), self._http_client() as client:
             start = asyncio.get_running_loop().time()
             try:
@@ -132,15 +138,23 @@ class WithIntelligenceClient:
                     headers={"authorization": f"Bearer {token}"},
                 )
             except httpx.TimeoutException as exc:
-                UPSTREAM_REQUESTS.add(1, {"method": method, "outcome": "timeout"})
+                UPSTREAM_REQUESTS.add(
+                    1, {"method": method, "outcome": "timeout", "path": metric_path}
+                )
                 raise Unreachable(f"{method} {path} timed out") from exc
             except httpx.RequestError as exc:
-                UPSTREAM_REQUESTS.add(1, {"method": method, "outcome": "network_error"})
+                UPSTREAM_REQUESTS.add(
+                    1,
+                    {"method": method, "outcome": "network_error", "path": metric_path},
+                )
                 raise Unreachable(f"{method} {path} could not be reached") from exc
             finally:
                 duration = asyncio.get_running_loop().time() - start
-                UPSTREAM_REQUEST_DURATION.record(duration, {"method": method})
-        UPSTREAM_REQUESTS.add(1, {"method": method, "outcome": str(response.status_code)})
+                UPSTREAM_REQUEST_DURATION.record(duration, {"method": method, "path": metric_path})
+        UPSTREAM_REQUESTS.add(
+            1,
+            {"method": method, "outcome": str(response.status_code), "path": metric_path},
+        )
         return response
 
     def _raise_for_status(self, response: httpx.Response, path: str) -> None:

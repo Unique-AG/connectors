@@ -28,12 +28,12 @@ _meter = metrics.get_meter("with_intelligence_mcp")
 
 UPSTREAM_REQUESTS = _meter.create_counter(
     "with_intelligence_requests_total",
-    description="Upstream With Intelligence API requests, by method/outcome.",
+    description="Upstream With Intelligence API requests, by method, outcome, and normalized path.",
 )
 UPSTREAM_REQUEST_DURATION = _meter.create_histogram(
     "with_intelligence_request_duration_seconds",
     unit="s",
-    description="Wall-clock duration of a single upstream With Intelligence API request.",
+    description="Upstream With Intelligence API request duration, by method and normalized path.",
 )
 UPSTREAM_RATE_LIMITED = _meter.create_counter(
     "with_intelligence_rate_limited_total",
