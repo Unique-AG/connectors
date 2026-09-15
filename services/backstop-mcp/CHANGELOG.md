@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.0.6](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.5...backstop-mcp@0.0.6) (2026-09-15)
+
+
+### Bug Fixes
+
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** align the Python image build layouts ([#1038](https://github.com/Unique-AG/connectors/issues/1038)) ([ecdffb6](https://github.com/Unique-AG/connectors/commit/ecdffb656c2f9ed98217c2f4215b33bb9751efd9))
+
+
+### Dependencies
+
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** remove pip from the Python images ([#1033](https://github.com/Unique-AG/connectors/issues/1033)) ([3c0c51f](https://github.com/Unique-AG/connectors/commit/3c0c51f0feb886f41fcc7c6728cea9c040e30741))
+* bump alembic in /services/backstop-mcp ([#1005](https://github.com/Unique-AG/connectors/issues/1005)) ([2448752](https://github.com/Unique-AG/connectors/commit/2448752f98b386e9f14334a2f247d6e1d5d461d3))
+* bump alembic in /services/backstop-mcp ([#1029](https://github.com/Unique-AG/connectors/issues/1029)) ([3956589](https://github.com/Unique-AG/connectors/commit/3956589ff84c8bed9234ab4a3873876e09992844))
+* bump mcp in /services/backstop-mcp ([#1024](https://github.com/Unique-AG/connectors/issues/1024)) ([f0f626f](https://github.com/Unique-AG/connectors/commit/f0f626fda57d873a783d7eac16e67e23f3393c02))
+* bump starlette in /services/backstop-mcp ([#1007](https://github.com/Unique-AG/connectors/issues/1007)) ([5f680b5](https://github.com/Unique-AG/connectors/commit/5f680b52b18891b35875a04d37acd0ad2e5ab49b))
+* bump unique-mcp in /services/backstop-mcp ([#1030](https://github.com/Unique-AG/connectors/issues/1030)) ([1573360](https://github.com/Unique-AG/connectors/commit/1573360b00cdcaaf3911375e24654730efe0f503))
+
 ## [0.0.5](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.4...backstop-mcp@0.0.5) (2026-09-14)
 
 
