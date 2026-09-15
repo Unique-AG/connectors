@@ -4,6 +4,14 @@
 
 Before creating or updating a PR title, read `.gitcommitizen` to verify the scope matches all changed files. The pattern is `scope = last path segment` (e.g. `packages/logger` → `logger`), with one exception: `pnpm-lock.yaml` and root `package.json` require scope `deps`.
 
+## PR descriptions
+
+Keep the body short. Write only what a reviewer cannot get from reading the diff. `.github/pull_request_template.md` holds the structure: **What this does**, **Why**, **What a reviewer must know**. Drop any heading you have nothing to put under.
+
+Write short sentences, plain words, active voice, no contractions.
+
+Never put file, line or test counts, or commit hashes in the body. A later commit on the base branch invalidates them.
+
 # Code Style
 
 ## No argument mutation
