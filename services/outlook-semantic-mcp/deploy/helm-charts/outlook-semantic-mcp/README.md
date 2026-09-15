@@ -67,7 +67,7 @@ spec:
 | fullnameOverride | string | `"outlook-semantic-mcp"` |  |
 | grafana.dashboard.enabled | bool | `true` | Enable Grafana dashboard ConfigMap creation |
 | grafana.dashboard.folder | string | `"mcp-servers"` | Grafana folder where the dashboard will be placed |
-| hooks.migration.command | string | `"pnpm run db:migrate\n"` |  |
+| hooks.migration.command | string | `"cd /app && ./node_modules/.bin/drizzle-kit migrate\n"` |  |
 | hooks.migration.enabled | bool | `true` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.registry | string | `"ghcr.io"` |  |
