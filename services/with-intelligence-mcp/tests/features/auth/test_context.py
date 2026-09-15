@@ -60,13 +60,13 @@ def _context(
     )
 
 
-async def _store(db: DatabaseFixture, stored: WiSession) -> str:
+async def _store(db: DatabaseFixture, stored: WiSession, *, username: str | None = None) -> str:
     _, factory = db
     async with transaction(factory) as session:
         return await save_session(
             session,
             str(uuid.uuid4()),
-            f"ctx-{uuid.uuid4().hex[:8]}@example.invalid",
+            username or f"ctx-{uuid.uuid4().hex[:8]}@example.invalid",
             stored,
             KEY,
         )
@@ -203,6 +203,68 @@ class TestRenewal:
 
         assert calls == 1
         assert {session.access_token.get_secret_value() for session in sessions} == {"renewed"}
+
+    async def test_concurrent_login_wins_over_a_successful_refresh(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _, factory = db
+        username = f"ctx-{uuid.uuid4().hex[:8]}@example.invalid"
+        user_id = await _store(
+            db,
+            _session("old", age=timedelta(hours=2)),
+            username=username,
+        )
+        context, _ = _context(db)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def renew(_stale: WiSession) -> WiSession:
+            started.set()
+            await release.wait()
+            return _session("refresh")
+
+        renewal = asyncio.create_task(context.renew_session(renew))
+        await started.wait()
+        async with transaction(factory) as session:
+            await save_session(session, str(uuid.uuid4()), username, _session("login"), KEY)
+        release.set()
+
+        result = await renewal
+
+        assert result.access_token.get_secret_value() == "login"
+        async with read_session(factory) as session:
+            stored = await get_session(session, user_id, KEY)
+        assert stored is not None
+        assert stored.access_token.get_secret_value() == "login"
+
+    async def test_concurrent_login_prevents_revocation_after_a_rejected_refresh(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _, factory = db
+        username = f"ctx-{uuid.uuid4().hex[:8]}@example.invalid"
+        stale = _session("old", age=timedelta(hours=2))
+        user_id = await _store(db, stale, username=username)
+        context, revocations = _context(db)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def refuse(_stale: WiSession) -> WiSession:
+            started.set()
+            await release.wait()
+            raise SignInFailed("rejected")
+
+        renewal = asyncio.create_task(context.renew_session(refuse, stale))
+        await started.wait()
+        async with transaction(factory) as session:
+            await save_session(session, str(uuid.uuid4()), username, _session("login"), KEY)
+        release.set()
+
+        result = await renewal
+
+        assert result.access_token.get_secret_value() == "login"
+        assert revocations.subjects == []
 
     async def test_a_refused_renewal_revokes_the_callers_mcp_tokens(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch

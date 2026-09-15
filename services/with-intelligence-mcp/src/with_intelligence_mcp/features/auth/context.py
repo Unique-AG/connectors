@@ -77,7 +77,9 @@ class WithIntelligenceAuthContext(BaseModel):
             try:
                 renewed = await renew(stored)
             except SignInFailed as exc:
-                await self._release_refresh_claim(subject, claim_id)
+                released = await self._release_refresh_claim(subject, claim_id)
+                if not released:
+                    continue
                 await self.revoke_tokens_for_subject(subject)
                 raise NotConnectedError(
                     "Your With Intelligence session has expired and could not be renewed — "
@@ -98,9 +100,9 @@ class WithIntelligenceAuthContext(BaseModel):
             if replaced:
                 return renewed
 
-    async def _release_refresh_claim(self, subject: str, claim_id: uuid.UUID) -> None:
+    async def _release_refresh_claim(self, subject: str, claim_id: uuid.UUID) -> bool:
         async with transaction(self.session_factory) as session:
-            await release_session_refresh(session, subject, claim_id)
+            return await release_session_refresh(session, subject, claim_id)
 
     def current_subject(self) -> str | None:
         access_token = get_access_token()

@@ -34,7 +34,12 @@ async def save_session(
         .values(user_id=user_id, wi_username=username, encrypted_blob=encrypted_blob)
         .on_conflict_do_update(
             index_elements=[WithIntelligenceSession.wi_username],
-            set_={"encrypted_blob": encrypted_blob, "updated_at": func.now()},
+            set_={
+                "encrypted_blob": encrypted_blob,
+                "refresh_claim_id": None,
+                "refresh_claimed_at": None,
+                "updated_at": func.now(),
+            },
         )
         .returning(WithIntelligenceSession.user_id)
     )
@@ -100,15 +105,17 @@ async def claim_session_refresh(
     return stored, True
 
 
-async def release_session_refresh(session: AsyncSession, user_id: str, claim_id: uuid.UUID) -> None:
-    await session.execute(
+async def release_session_refresh(session: AsyncSession, user_id: str, claim_id: uuid.UUID) -> bool:
+    result = await session.execute(
         update(WithIntelligenceSession)
         .where(
             WithIntelligenceSession.user_id == user_id,
             WithIntelligenceSession.refresh_claim_id == claim_id,
         )
         .values(refresh_claim_id=None, refresh_claimed_at=None)
+        .returning(WithIntelligenceSession.user_id)
     )
+    return result.scalar_one_or_none() is not None
 
 
 async def replace_claimed_session(
