@@ -116,7 +116,7 @@ class BackfillOpportunityStageHistoryCommand:
         written_pairs = [
             pair
             for written_row in attributes.records
-            if (pair := _written_pair(written_row)) is not None
+            if (pair := self._written_pair(written_row)) is not None
         ]
         outcomes: list[RecordOutcomeResponse] = []
         for index, (requested_row, stage_id) in enumerate(
@@ -144,12 +144,12 @@ class BackfillOpportunityStageHistoryCommand:
             )
         return tuple(outcomes)
 
-
-def _written_pair(
-    written_row: BulkOpportunityStageHistoryRecordAttributes,
-) -> tuple[str, str] | None:
-    opportunity_id = written_row.opportunity.resource_id if written_row.opportunity else None
-    stage_id = written_row.stage.resource_id if written_row.stage else None
-    if opportunity_id is None or stage_id is None:
-        return None
-    return (opportunity_id, stage_id)
+    def _written_pair(
+        self,
+        written_row: BulkOpportunityStageHistoryRecordAttributes,
+    ) -> tuple[str, str] | None:
+        opportunity_id = written_row.opportunity.resource_id if written_row.opportunity else None
+        stage_id = written_row.stage.resource_id if written_row.stage else None
+        if opportunity_id is None or stage_id is None:
+            return None
+        return (opportunity_id, stage_id)
