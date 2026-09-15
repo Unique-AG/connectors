@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.3](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.2...sharepoint-connector@3.1.3) (2026-09-15)
+
+
+### Dependencies
+
+* bump node in /services/confluence-connector/deploy ([#996](https://github.com/Unique-AG/connectors/issues/996)) ([0b051f4](https://github.com/Unique-AG/connectors/commit/0b051f4a54096b2b91e9e5f2bea8e41d52444855))
+* remove pnpm from the Node runtime images ([#1035](https://github.com/Unique-AG/connectors/issues/1035)) ([5ad580a](https://github.com/Unique-AG/connectors/commit/5ad580abb79f72f60d4e68a461c301c816692fcd))
+
 ## [3.1.2](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.1...sharepoint-connector@3.1.2) (2026-09-11)
 
 
