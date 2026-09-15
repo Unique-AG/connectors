@@ -1,6 +1,5 @@
 import logging
 import uuid
-from collections.abc import Callable
 from datetime import timedelta
 from typing import ClassVar
 
@@ -64,7 +63,6 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
     _encryption_key: bytes
     _wi_clients: WithIntelligenceClientFactory
     _throttle: ThrottleConfig
-    _forget_cached_session: Callable[[str], None] | None
     login_path: str
 
     def __init__(
@@ -86,11 +84,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         self._encryption_key = encryption_key
         self._wi_clients = wi_clients
         self._throttle = throttle
-        self._forget_cached_session = None
         self._secure_cookies: bool = secure_cookies
-
-    def attach_forget_cached_session(self, forget_cached_session: Callable[[str], None]) -> None:
-        self._forget_cached_session = forget_cached_session
 
     def _expired_link_response(self) -> Response:
         return PlainTextResponse(
@@ -234,9 +228,6 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         if redirect_url is None:
             return self._expired_link_response()
 
-        if existing_id is not None:
-            assert self._forget_cached_session is not None
-            self._forget_cached_session(existing_id)
         response = RedirectResponse(redirect_url, status_code=302, headers=_LOGIN_SECURITY_HEADERS)
         _LOGIN_CSRF.clear_cookie(
             response, request_id, path=self.login_path, secure=self._secure_cookies

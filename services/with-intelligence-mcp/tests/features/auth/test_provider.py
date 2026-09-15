@@ -7,7 +7,6 @@ factory, so the login path exercises the real `_auth_call` — including how it 
 
 import asyncio
 import uuid
-from collections.abc import Callable
 from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 
@@ -36,15 +35,10 @@ _CSRF_TOKEN = "provider-test-csrf-token"
 _LOGIN_CSRF = LoginCsrf("wi_login_csrf_")
 
 
-def _ignore_subject(_subject: str) -> None:
-    pass
-
-
 def _make_provider(
     db: DatabaseFixture,
     *,
     throttle: ThrottleConfig | None = None,
-    forget_cached_session: Callable[[str], None] = _ignore_subject,
 ) -> WithIntelligenceOAuthProvider:
     _, factory = db
     provider = WithIntelligenceOAuthProvider(
@@ -57,7 +51,6 @@ def _make_provider(
         # logins its neighbours happened to make.
         throttle=throttle or ThrottleConfig(max_attempts=1_000_000, window=timedelta(minutes=15)),
     )
-    provider.attach_forget_cached_session(forget_cached_session)
     return provider
 
 
@@ -185,17 +178,15 @@ class TestLoginSubmission:
         assert "state=xyz" in location
 
     @respx.mock
-    async def test_reconnect_forgets_the_existing_subject(self, db: DatabaseFixture) -> None:
-        respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
+    async def test_reconnect_reuses_the_existing_subject(self, db: DatabaseFixture) -> None:
+        respx.post(_SIGN_IN).mock(side_effect=[sign_in_ok(), sign_in_ok("access-2", "refresh-2")])
         _, factory = db
-        forgotten: list[str] = []
-        provider = _make_provider(db, forget_cached_session=forgotten.append)
+        provider = _make_provider(db)
         username = _unique("reconnect")
 
         first_request = await _pending_request_id(provider, _unique("client"))
         first = await provider.handle_login_post(_login_post(first_request, username, "pw"))
         assert first.status_code == 302
-        assert forgotten == []
         async with read_session(factory) as session:
             result = await session.execute(
                 select(SessionRow.user_id).where(SessionRow.wi_username == username)
@@ -205,7 +196,14 @@ class TestLoginSubmission:
         second_request = await _pending_request_id(provider, _unique("client"))
         second = await provider.handle_login_post(_login_post(second_request, username, "pw"))
         assert second.status_code == 302
-        assert forgotten == [existing_subject]
+        async with read_session(factory) as session:
+            result = await session.execute(
+                select(SessionRow.user_id).where(SessionRow.wi_username == username)
+            )
+            assert result.scalar_one() == existing_subject
+            stored = await get_session(session, existing_subject, provider._encryption_key)  # pyright: ignore[reportPrivateUsage]
+        assert stored is not None
+        assert stored.access_token.get_secret_value() == "access-2"
 
     @respx.mock
     async def test_the_wi_session_is_stored_and_the_password_is_not(

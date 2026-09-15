@@ -80,13 +80,14 @@ class TestFirstUse:
         assert await _cache(factory).access_token("s1", store.read, store.renew) == "stored"
         assert factory.refreshes == 0
 
-    async def test_reuses_a_fresh_token_without_reading_again(self) -> None:
+    async def test_observes_a_reconnect_handled_by_another_replica(self) -> None:
         factory = FakeFactory()
         store = FakeStore(_session("stored"))
         wi = _cache(factory)
-        first = await wi.access_token("s1", store.read, store.renew)
-        assert await wi.access_token("s1", store.read, store.renew) == first
-        assert store.reads == 1
+        assert await wi.access_token("s1", store.read, store.renew) == "stored"
+        store.stored = _session("reconnected")
+        assert await wi.access_token("s1", store.read, store.renew) == "reconnected"
+        assert store.reads == 2
 
 
 class TestPerSubject:
@@ -98,17 +99,6 @@ class TestPerSubject:
         bob = FakeStore(_session("bob-token"))
         assert await wi.access_token("alice", alice.read, alice.renew) == "alice-token"
         assert await wi.access_token("bob", bob.read, bob.renew) == "bob-token"
-
-    async def test_forgetting_one_user_leaves_the_other(self) -> None:
-        factory = FakeFactory()
-        wi = _cache(factory)
-        alice = FakeStore(_session("alice-token"))
-        bob = FakeStore(_session("bob-token"))
-        _ = await wi.access_token("alice", alice.read, alice.renew)
-        _ = await wi.access_token("bob", bob.read, bob.renew)
-        wi.forget("bob")
-        assert await wi.access_token("alice", alice.read, alice.renew) == "alice-token"
-        assert alice.reads == 1
 
 
 class TestRenewal:

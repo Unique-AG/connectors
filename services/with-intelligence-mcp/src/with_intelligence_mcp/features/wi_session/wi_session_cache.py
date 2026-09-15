@@ -36,29 +36,23 @@ class WiSessionCache:
 
     async def access_token(self, subject: str, read: SessionReader, renew: SessionRenewer) -> str:
         holder = await self._holder_for(subject)
-        held = holder.session
-        if held is not None and held.is_fresh:
-            return held.access_token.get_secret_value()
-        return await self._refresh_holder(holder, read, renew, stale=held)
+        return await self._refresh_subject(subject, read, renew, stale=holder.session)
 
     async def renewed_access_token(
         self, subject: str, read: SessionReader, renew: SessionRenewer
     ) -> str:
         holder = await self._holder_for(subject)
-        return await self._refresh_holder(holder, read, renew, stale=holder.session)
+        return await self._refresh_subject(subject, read, renew, stale=holder.session)
 
-    def forget(self, subject: str) -> None:
-        """Drop a subject's cached session, so the next call reads the stored one."""
-        _ = self._holders.pop(subject, None)
-
-    async def _refresh_holder(
+    async def _refresh_subject(
         self,
-        holder: _Holder,
+        subject: str,
         read: SessionReader,
         renew: SessionRenewer,
         *,
         stale: WiSession | None,
     ) -> str:
+        holder = await self._holder_for(subject)
         async with holder.lock:
             current = holder.session
             if current is not None and current is not stale and current.is_fresh:
