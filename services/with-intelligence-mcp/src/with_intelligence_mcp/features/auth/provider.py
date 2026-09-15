@@ -3,6 +3,7 @@ import logging
 import secrets
 import time
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar, Literal, override
 
@@ -119,6 +120,7 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
     _encryption_key: bytes
     _wi_clients: WithIntelligenceClientFactory
     _throttle: ThrottleConfig
+    _forget_cached_session: Callable[[str], None] | None
     login_path: str
 
     def __init__(
@@ -141,9 +143,13 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         self._encryption_key = encryption_key
         self._wi_clients = wi_clients
         self._throttle = throttle
+        self._forget_cached_session = None
         self.login_path = login_path
         self._issuer: str = base_url
         self._secure_cookies: bool = secure_cookies
+
+    def attach_forget_cached_session(self, forget_cached_session: Callable[[str], None]) -> None:
+        self._forget_cached_session = forget_cached_session
 
     @override
     async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
@@ -314,15 +320,13 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         code = secrets.token_urlsafe(32)
         code_expires_at = (datetime.now(UTC) + self.AUTHORIZATION_CODE_TTL).timestamp()
 
-        already_claimed = False
+        user_id: str | None = None
 
         async with transaction(self._session_factory) as session:
             claim = await session.execute(
                 delete(PendingAuthorization).where(PendingAuthorization.request_id == request_id)
             )
-            if claim.rowcount == 0:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-                already_claimed = True
-            else:
+            if claim.rowcount != 0:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
                 # Propose a fresh id; `save_session` upserts on `wi_username` and returns
                 # the durable id (an existing row wins under concurrent first logins).
                 user_id = await save_session(
@@ -346,9 +350,11 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
                     )
                 )
 
-        if already_claimed:
+        if user_id is None:
             return self._expired_link_response()
 
+        assert self._forget_cached_session is not None
+        self._forget_cached_session(user_id)
         redirect_url = construct_redirect_uri(pending.redirect_uri, code=code, state=pending.state)
         response = RedirectResponse(redirect_url, status_code=302, headers=_LOGIN_SECURITY_HEADERS)
         # The pending authorization is gone, so its CSRF cookie has nothing left to protect.

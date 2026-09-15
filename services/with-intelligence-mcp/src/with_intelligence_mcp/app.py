@@ -20,6 +20,7 @@ from with_intelligence_mcp.dependencies import (
     get_session_factory,
 )
 from with_intelligence_mcp.features.auth import cleanup_lifespan
+from with_intelligence_mcp.features.wi_session import get_wi_session_cache
 from with_intelligence_mcp.logging import configure_logging
 from with_intelligence_mcp.metrics import configure_metrics
 from with_intelligence_mcp.server.instructions import INSTRUCTIONS
@@ -40,6 +41,7 @@ def create_app() -> Starlette:
     engine = get_engine()
     session_factory = get_session_factory()
     auth_provider = get_auth_provider()
+    auth_provider.attach_forget_cached_session(get_wi_session_cache().forget)
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None]:
