@@ -375,10 +375,17 @@ class UpdateCustomFieldValuesResponse(OmitNoneModel):
     total_count: int = Field(description="How many values were sent.")
     applied_count: int = Field(
         description=(
-            "How many request rows Backstop returned among the written records. "
-            "A `201` is not success."
+            "How many request rows came back with `status` `applied`. A `201` is not success; "
+            "compare this with `total_count`."
         )
     )
     records: tuple[RecordOutcomeResponse, ...] = Field(
         description="One outcome per request value, in request order."
+    )
+    warnings: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Messages Backstop returned that could not be attributed to a single request "
+            "row. Empty when every message landed on a record."
+        ),
     )

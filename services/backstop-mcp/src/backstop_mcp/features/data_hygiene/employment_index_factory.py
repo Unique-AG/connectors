@@ -75,6 +75,14 @@ class EmploymentIndexFactory:
         self._rules: EmploymentRulesDto = rules
         self._clock: Callable[[], date] = clock
 
+    def today(self) -> date:
+        """The date this factory calls `today` when deciding current vs. former.
+
+        A writer that wants to warn on the same boundary the read path uses must ask
+        here rather than calling `date.today()` and drifting from an injected clock.
+        """
+        return self._clock()
+
     @classmethod
     def from_vocabulary(
         cls,

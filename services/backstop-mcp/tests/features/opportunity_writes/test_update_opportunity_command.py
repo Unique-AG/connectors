@@ -240,6 +240,43 @@ class TestUpdateOpportunityCommand:
         assert "relationships" not in _data(body)
 
     @respx.mock
+    async def test_classification_is_sent_as_the_type_attribute(
+        self, client: BackstopClient
+    ) -> None:
+        _mock_catalogs()
+        respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(return_value=_opportunity_document(_ID))
+        route = respx.patch(f"{BASE_URL}/opportunities/{_ID}").mock(
+            return_value=_opportunity_document(_ID)
+        )
+
+        await make_command(client).run(
+            new_opportunity=_update(opportunity_id=_ID, classification="Direct")
+        )
+
+        body = recorded_json_bodies(route)[0]
+        assert _attributes(body) == {"type": "Direct"}
+        assert _data(body)["type"] == "opportunities"
+
+    @respx.mock
+    async def test_stage_effective_date_is_sent_as_an_attribute(
+        self, client: BackstopClient
+    ) -> None:
+        _mock_catalogs()
+        respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(return_value=_opportunity_document(_ID))
+        route = respx.patch(f"{BASE_URL}/opportunities/{_ID}").mock(
+            return_value=_opportunity_document(_ID)
+        )
+
+        await make_command(client).run(
+            new_opportunity=_update(
+                opportunity_id=_ID, stage="IDD", stage_effective_date="2099-01-15"
+            )
+        )
+
+        body = recorded_json_bodies(route)[0]
+        assert _attributes(body) == {"stageEffectiveDate": "2099-01-15"}
+
+    @respx.mock
     async def test_relationship_pointers_use_json_api_linkage(self, client: BackstopClient) -> None:
         _mock_catalogs()
         respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(return_value=_opportunity_document(_ID))
@@ -389,10 +426,7 @@ class TestUpdateOpportunityCommand:
             new_opportunity=_update(opportunity_id=_ID, replace_users_to_notify=["not-a-user"])
         )
 
-        assert route.call_count == 1
-        data = _data(recorded_json_bodies(route)[0])
-        relationships = data.get("relationships")
-        assert relationships is None or "ccedUsers" not in object_dict(relationships)
+        assert route.call_count == 0
         assert any("not-a-user" in warning for warning in result.warnings)
 
     @respx.mock

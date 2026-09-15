@@ -1,4 +1,8 @@
-"""PATCH `/organizations/{id}`, then optional `/contact-locations` writes."""
+"""PATCH `/organizations/{id}`, then optional `/contact-locations` writes.
+
+No re-read, unlike `update_person`: Backstop rewrites phone numbers, and an organization
+has no phone attribute here.
+"""
 
 import logging
 from urllib.parse import quote
@@ -61,7 +65,6 @@ class UpdateOrganizationCommand:
                 location=new_organization_fields.location,
                 delete_location_id=new_organization_fields.delete_location_id,
             )
-            await self._read(party_id)
             logger.info(
                 "org_people_writes.organization.updated",
                 extra={"id": party_id, "location_id": location_id},
@@ -71,10 +74,6 @@ class UpdateOrganizationCommand:
                 resource_type=_RESOURCE_TYPE,
                 location_id=location_id,
             )
-
-    async def _read(self, party_id: str) -> _Document:
-        path = f"/{_RESOURCE_TYPE}/{quote(party_id, safe='')}"
-        return await self._client.get(path, schema=_Document)
 
     async def _patch(
         self,

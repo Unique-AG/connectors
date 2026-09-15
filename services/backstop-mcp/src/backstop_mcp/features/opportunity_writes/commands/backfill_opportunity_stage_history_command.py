@@ -77,7 +77,9 @@ class BackfillOpportunityStageHistoryCommand:
                 schema=BulkOpportunityStageHistoryDocument,
                 json=payload,
             )
-            outcomes = self._outcomes(backfill.records, tuple(stage_ids), document.data.attributes)
+            outcomes, warnings = self._outcomes(
+                backfill.records, tuple(stage_ids), document.data.attributes
+            )
             applied_count = sum(1 for outcome in outcomes if outcome.status == "applied")
             logger.info(
                 "opportunity_writes.stage_history.backfilled",
@@ -85,12 +87,14 @@ class BackfillOpportunityStageHistoryCommand:
                     "total_count": len(outcomes),
                     "applied_count": applied_count,
                     "failed_count": len(outcomes) - applied_count,
+                    "warning_count": len(warnings),
                 },
             )
             return BackfillOpportunityStageHistoryResponse(
                 total_count=len(outcomes),
                 applied_count=applied_count,
                 records=outcomes,
+                warnings=warnings,
             )
 
     def _outcomes(
@@ -98,10 +102,11 @@ class BackfillOpportunityStageHistoryCommand:
         requested_rows: tuple[OpportunityStageHistoryRecordInput, ...],
         stage_ids: tuple[str, ...],
         attributes: BulkOpportunityStageHistoryAttributes,
-    ) -> tuple[RecordOutcomeResponse, ...]:
+    ) -> tuple[tuple[RecordOutcomeResponse, ...], tuple[str, ...]]:
         summary = attributes.summary()
         error_by_index = {
             message.index: message.message
+            or f"Backstop reported an error for record #{message.index} without a message."
             for message in summary.error_messages
             if message.index is not None
         }
@@ -142,7 +147,13 @@ class BackfillOpportunityStageHistoryCommand:
                     error=error,
                 )
             )
-        return tuple(outcomes)
+        reported = {outcome.error for outcome in outcomes if outcome.error}
+        warnings = tuple(
+            message.message
+            for message in summary.error_messages
+            if message.message and message.message not in reported
+        )
+        return tuple(outcomes), warnings
 
     def _written_pair(
         self,

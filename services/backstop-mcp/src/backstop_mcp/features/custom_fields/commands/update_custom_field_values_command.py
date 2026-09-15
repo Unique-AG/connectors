@@ -71,7 +71,7 @@ class UpdateCustomFieldValuesCommand:
                 schema=BulkCustomFieldValuesDocument,
                 json=payload,
             )
-            outcomes = self._outcomes(update.values, document.data.attributes)
+            outcomes, warnings = self._outcomes(update.values, document.data.attributes)
             applied_count = sum(1 for outcome in outcomes if outcome.status == "applied")
             logger.info(
                 "custom_fields.values.updated",
@@ -80,12 +80,14 @@ class UpdateCustomFieldValuesCommand:
                     "total_count": len(outcomes),
                     "applied_count": applied_count,
                     "failed_count": len(outcomes) - applied_count,
+                    "warning_count": len(warnings),
                 },
             )
             return UpdateCustomFieldValuesResponse(
                 total_count=len(outcomes),
                 applied_count=applied_count,
                 records=outcomes,
+                warnings=warnings,
             )
 
     def _raise_if_invalid(
@@ -131,10 +133,11 @@ class UpdateCustomFieldValuesCommand:
         self,
         requested_rows: tuple[UpdateCustomFieldValueInput, ...],
         attributes: BulkCustomFieldValuesAttributes,
-    ) -> tuple[RecordOutcomeResponse, ...]:
+    ) -> tuple[tuple[RecordOutcomeResponse, ...], tuple[str, ...]]:
         summary = attributes.summary()
         error_by_index = {
             message.index: message.message
+            or f"Backstop reported an error for record #{message.index} without a message."
             for message in summary.error_messages
             if message.index is not None
         }
@@ -173,7 +176,13 @@ class UpdateCustomFieldValuesCommand:
                     error=error,
                 )
             )
-        return tuple(outcomes)
+        reported = {outcome.error for outcome in outcomes if outcome.error}
+        warnings = tuple(
+            message.message
+            for message in summary.error_messages
+            if message.message and message.message not in reported
+        )
+        return tuple(outcomes), warnings
 
 
 def _is_blank(value: object) -> bool:

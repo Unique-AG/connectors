@@ -1,7 +1,7 @@
 """`end_employment`: registered and wired through the command factory."""
 
 from collections.abc import AsyncGenerator
-from datetime import date, timedelta
+from datetime import timedelta
 
 import httpx
 import pytest
@@ -19,13 +19,19 @@ from backstop_mcp.features.org_people_writes.tools.end_employment import end_emp
 from backstop_mcp.server.tools import TOOLS
 from tests.features.data_hygiene.helpers import EMPLOYEE_TYPE, person_org, relationship_types
 from tests.features.party_resolver.helpers import ctx_never_elicit, make_resolve_party_query
-from tests.helpers import BASE_URL, build_employment_index_factory, client_factory, credential
+from tests.helpers import (
+    BASE_URL,
+    FIXED_TODAY,
+    build_employment_index_factory,
+    client_factory,
+    credential,
+)
 from tests.server.tools.helpers import tool_model
 
 _PERSON_ID = "p1"
 _ORG_ID = "o1"
 _REL_ID = "127921399"
-_PAST = date.today() - timedelta(days=1)
+_PAST = FIXED_TODAY - timedelta(days=1)
 _EMPLOYMENT: TypeAdapter[EndEmploymentInput] = TypeAdapter(EndEmploymentInput)
 
 

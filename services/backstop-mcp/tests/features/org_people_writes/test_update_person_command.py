@@ -155,3 +155,49 @@ class TestUpdatePersonCommand:
             "type": "system-users",
             "id": _REPRESENTATIVE_ID,
         }
+
+    @respx.mock
+    async def test_a_location_block_is_threaded_through_to_the_location_write(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
+        respx.patch(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
+        location = respx.post(f"{BASE_URL}/contact-locations").mock(
+            return_value=httpx.Response(
+                201,
+                json={"data": {"id": "loc-1", "type": "contact-locations", "attributes": {}}},
+            )
+        )
+
+        result = await make_command(client).run(
+            person=_update(
+                job_title="Managing Director",
+                location={"location_title": "Office", "city": "Chicago"},
+            ),
+            party_id=_ID,
+        )
+
+        assert location.call_count == 1
+        assert result.location_id == "loc-1"
+        contact = object_dict(
+            object_dict(
+                object_dict(_data(recorded_json_bodies(location)[0])["relationships"])["contact"]
+            )["data"]
+        )
+        assert contact == {"type": "contacts", "id": _ID}
+
+    @respx.mock
+    async def test_a_delete_location_id_is_threaded_through_to_the_delete(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
+        deletion = respx.delete(f"{BASE_URL}/contact-locations/loc-9").mock(
+            return_value=httpx.Response(204, content=b"")
+        )
+
+        result = await make_command(client).run(
+            person=_update(delete_location_id="loc-9"), party_id=_ID
+        )
+
+        assert deletion.call_count == 1
+        assert result.location_id is None
