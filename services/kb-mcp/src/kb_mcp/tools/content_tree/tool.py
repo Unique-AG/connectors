@@ -8,7 +8,7 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import ToolResult, tool
@@ -26,7 +26,12 @@ from unique_toolkit.content.schemas import ContentInfo
 from unique_toolkit.experimental.components.content_tree import ContentTree, FuzzyMatch
 
 from kb_mcp.correlation import correlation_id
-from kb_mcp.references import file_reference_url, markdown_citation_link
+from kb_mcp.references import (
+    METADATA_FILTER_ARG_DESCRIPTION,
+    METADATA_FILTER_EMPTY_RETRY_HINT,
+    file_reference_url,
+    markdown_citation_link,
+)
 from kb_mcp.settings import Settings, get_settings
 from kb_mcp.tools.content_tree.cache import get_tree_cache
 from kb_mcp.tools.content_tree.config import (
@@ -43,6 +48,10 @@ from kb_mcp.tools.content_tree.path_utils import (
     path_parts,
     render_tree_with_folder_ids,
 )
+from kb_mcp.tools.search.metadata_filter import (
+    merge_request_metadata_filter,
+    try_parse_llm_metadata_filter,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,6 +64,14 @@ _INCOMPLETE_NOTICE = (
 
 def _with_incomplete_notice(complete: bool, body: str) -> str:
     return ("" if complete else _INCOMPLETE_NOTICE) + body
+
+
+def _with_empty_metadata_filter_hint(
+    body: str, *, empty: bool, complete: bool, llm_filter: object
+) -> str:
+    if empty and complete and llm_filter is not None:
+        return f"{body}\n{METADATA_FILTER_EMPTY_RETRY_HINT}"
+    return body
 
 
 def clamped_content_tree_timeout(requested: float | None, settings: Settings) -> float:
@@ -263,6 +280,10 @@ async def content_tree(
             ),
         ),
     ] = None,
+    metadata_filter: Annotated[
+        dict[str, Any] | None,
+        Field(description=METADATA_FILTER_ARG_DESCRIPTION),
+    ] = None,
     config: ContentTreeToolConfig = Depends(get_tool_config(ContentTreeToolConfig)),
 ) -> ToolResult:
     """Browse the knowledge base's folder/file structure — use this only when
@@ -325,6 +346,10 @@ async def content_tree(
                 content=[TextContent(type="text", text=misuse_error)],
             )
 
+        parsed_llm_filter, parse_error = try_parse_llm_metadata_filter(metadata_filter)
+        if parse_error is not None:
+            return parse_error
+
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.
         settings = await get_unique_settings_async()
         company_id = settings.authcontext.get_confidential_company_id()
@@ -344,11 +369,12 @@ async def content_tree(
         if refresh:
             tree_svc.invalidate_cache()
 
-        metadata_filter = (
-            config.metadata_filter.to_dict()
-            if config.metadata_filter is not None
-            else DEFAULT_METADATA_FILTER_STATEMENT.to_dict()
+        resolved_metadata_filter = merge_request_metadata_filter(
+            admin_metadata_filter=config.metadata_filter
+            or DEFAULT_METADATA_FILTER_STATEMENT,
+            llm_metadata_filter=parsed_llm_filter,
         )
+        assert resolved_metadata_filter is not None
         wait = clamped_content_tree_timeout(timeout, kb_settings)
         # Walk one level past max_depth — otherwise a folder exactly at the
         # cutoff never gets its own contents visited and stays id-less.
@@ -357,22 +383,25 @@ async def content_tree(
             walk_depth = max_depth if max_depth is None else max_depth + 1
 
         snapshot = await tree_svc.resolve_visible_file_paths_via_folders_async(
-            metadata_filter=metadata_filter,
+            metadata_filter=resolved_metadata_filter,
             max_depth=walk_depth,
             timeout=wait,
             max_concurrent_directory_listings=config.max_concurrent_scope_lookups,
         )
 
         if mode == "tree":
-            text = _with_incomplete_notice(
-                snapshot.complete,
+            tree_body = _with_empty_metadata_filter_hint(
                 render_tree_with_folder_ids(
                     snapshot,
                     folder_scope_ids(snapshot.files),
                     max_depth=max_depth,
                     show_files=not folders_only,
                 ),
+                empty=not snapshot.files,
+                complete=snapshot.complete,
+                llm_filter=parsed_llm_filter,
             )
+            text = _with_incomplete_notice(snapshot.complete, tree_body)
             _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)
             return ToolResult(content=[TextContent(type="text", text=text)])
 
@@ -397,7 +426,12 @@ async def content_tree(
                 f"(content_id={content_info.id})"
                 for content_info, path in rows
             ]
-            body = "\n".join(lines) if lines else "No visible files match."
+            body = _with_empty_metadata_filter_hint(
+                "\n".join(lines) if lines else "No visible files match.",
+                empty=not lines,
+                complete=snapshot.complete,
+                llm_filter=parsed_llm_filter,
+            )
             text = _with_incomplete_notice(snapshot.complete, body)
             _LOGGER.info(
                 "content_tree complete correlation_id=%s mode=%s result_count=%d",
@@ -427,7 +461,7 @@ async def content_tree(
                 min_score=effective_min_score,
                 match_on=effective_match_on,
                 case_sensitive=effective_case_sensitive,
-                metadata_filter=metadata_filter,
+                metadata_filter=resolved_metadata_filter,
                 max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
             )
         else:
@@ -445,7 +479,12 @@ async def content_tree(
             f"(score={m.score:.2f}, content_id={m.content_info.id})"
             for m in matches
         ]
-        body = "\n".join(lines) if lines else "No matching files found."
+        body = _with_empty_metadata_filter_hint(
+            "\n".join(lines) if lines else "No matching files found.",
+            empty=not lines,
+            complete=snapshot.complete,
+            llm_filter=parsed_llm_filter,
+        )
         text = _with_incomplete_notice(snapshot.complete, body)
         _LOGGER.info(
             "content_tree complete correlation_id=%s mode=%s result_count=%d",
