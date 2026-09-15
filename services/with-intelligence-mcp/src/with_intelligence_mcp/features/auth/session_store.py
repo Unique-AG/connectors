@@ -1,4 +1,7 @@
-from sqlalchemy import func, select
+import uuid
+from datetime import datetime
+
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,3 +71,65 @@ async def replace_session(
     if row is None:
         return
     row.encrypted_blob = encrypt_session(wi_session, key)
+
+
+async def claim_session_refresh(
+    session: AsyncSession,
+    user_id: str,
+    key: bytes,
+    claim_id: uuid.UUID,
+    expired_before: datetime,
+) -> tuple[WiSession | None, bool]:
+    result = await session.execute(
+        select(WithIntelligenceSession)
+        .where(WithIntelligenceSession.user_id == user_id)
+        .with_for_update()
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None, False
+    stored = decrypt_session(row.encrypted_blob, key)
+    if (
+        row.refresh_claim_id is not None
+        and row.refresh_claimed_at is not None
+        and row.refresh_claimed_at >= expired_before
+    ):
+        return stored, False
+    row.refresh_claim_id = claim_id
+    row.refresh_claimed_at = func.now()
+    return stored, True
+
+
+async def release_session_refresh(session: AsyncSession, user_id: str, claim_id: uuid.UUID) -> None:
+    await session.execute(
+        update(WithIntelligenceSession)
+        .where(
+            WithIntelligenceSession.user_id == user_id,
+            WithIntelligenceSession.refresh_claim_id == claim_id,
+        )
+        .values(refresh_claim_id=None, refresh_claimed_at=None)
+    )
+
+
+async def replace_claimed_session(
+    session: AsyncSession,
+    user_id: str,
+    wi_session: WiSession,
+    key: bytes,
+    claim_id: uuid.UUID,
+) -> bool:
+    result = await session.execute(
+        update(WithIntelligenceSession)
+        .where(
+            WithIntelligenceSession.user_id == user_id,
+            WithIntelligenceSession.refresh_claim_id == claim_id,
+        )
+        .values(
+            encrypted_blob=encrypt_session(wi_session, key),
+            refresh_claim_id=None,
+            refresh_claimed_at=None,
+            updated_at=func.now(),
+        )
+        .returning(WithIntelligenceSession.user_id)
+    )
+    return result.scalar_one_or_none() is not None

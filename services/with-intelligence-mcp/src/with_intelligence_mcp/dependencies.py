@@ -1,5 +1,6 @@
 """Cached application dependencies."""
 
+from datetime import timedelta
 from functools import lru_cache
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -76,6 +77,9 @@ def get_auth_context() -> WithIntelligenceAuthContext:
     return WithIntelligenceAuthContext(
         session_factory=get_session_factory(),
         encryption_key=get_encryption_key(),
+        refresh_claim_ttl=timedelta(
+            seconds=get_with_intelligence_config().default_timeout_seconds + 5
+        ),
         # Deferred: the provider needs nothing from here, but looking it up lazily keeps the
         # two providers independent of construction order.
         revoke_tokens_for_subject=_revoke_subject_tokens,

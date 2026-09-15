@@ -1,4 +1,7 @@
+import asyncio
+import uuid
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 from typing import ClassVar
 
 from fastmcp.exceptions import ToolError
@@ -9,9 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from with_intelligence_mcp.db import read_session, transaction
 from with_intelligence_mcp.features.auth.crypto import InvalidSessionEnvelopeError
 from with_intelligence_mcp.features.auth.session_store import (
+    claim_session_refresh,
     get_session,
-    lock_session,
-    replace_session,
+    release_session_refresh,
+    replace_claimed_session,
 )
 from with_intelligence_mcp.with_intelligence_client import SignInFailed, WiSession
 
@@ -28,6 +32,7 @@ class WithIntelligenceAuthContext(BaseModel):
     session_factory: async_sessionmaker[AsyncSession]
     encryption_key: bytes
     revoke_tokens_for_subject: Callable[[str], Awaitable[None]]
+    refresh_claim_ttl: timedelta = timedelta(minutes=1)
 
     async def current_session(self) -> WiSession:
         """The calling user's stored WI session, whatever its freshness."""
@@ -46,32 +51,56 @@ class WithIntelligenceAuthContext(BaseModel):
         renew: Callable[[WiSession], Awaitable[WiSession]],
         stale: WiSession | None = None,
     ) -> WiSession:
-        """Renew the stored session under a row lock."""
         subject = self.require_subject()
-        refusal: SignInFailed | None = None
-        async with transaction(self.session_factory) as session:
-            try:
-                stored = await lock_session(session, subject, self.encryption_key)
-            except InvalidSessionEnvelopeError as exc:
-                raise self._unreadable_session() from exc
-            if stored is None:
-                raise self._not_connected()
-            if stored.is_fresh and stored.has_different_access_token(stale):
-                return stored
+        claim_id = uuid.uuid4()
+        while True:
+            async with transaction(self.session_factory) as session:
+                try:
+                    stored, claimed = await claim_session_refresh(
+                        session,
+                        subject,
+                        self.encryption_key,
+                        claim_id,
+                        datetime.now(UTC) - self.refresh_claim_ttl,
+                    )
+                except InvalidSessionEnvelopeError as exc:
+                    raise self._unreadable_session() from exc
+                if stored is None:
+                    raise self._not_connected()
+                if stored.is_fresh and stored.has_different_access_token(stale):
+                    if claimed:
+                        await release_session_refresh(session, subject, claim_id)
+                    return stored
+            if not claimed:
+                await asyncio.sleep(0.1)
+                continue
             try:
                 renewed = await renew(stored)
             except SignInFailed as exc:
-                refusal = exc
-            else:
-                await replace_session(session, subject, renewed, self.encryption_key)
+                await self._release_refresh_claim(subject, claim_id)
+                await self.revoke_tokens_for_subject(subject)
+                raise NotConnectedError(
+                    "Your With Intelligence session has expired and could not be renewed — "
+                    + "please reconnect."
+                ) from exc
+            except Exception:
+                await self._release_refresh_claim(subject, claim_id)
+                raise
+
+            async with transaction(self.session_factory) as session:
+                replaced = await replace_claimed_session(
+                    session,
+                    subject,
+                    renewed,
+                    self.encryption_key,
+                    claim_id,
+                )
+            if replaced:
                 return renewed
 
-        assert refusal is not None
-        await self.revoke_tokens_for_subject(subject)
-        raise NotConnectedError(
-            "Your With Intelligence session has expired and could not be renewed — "
-            + "please reconnect."
-        ) from refusal
+    async def _release_refresh_claim(self, subject: str, claim_id: uuid.UUID) -> None:
+        async with transaction(self.session_factory) as session:
+            await release_session_refresh(session, subject, claim_id)
 
     def current_subject(self) -> str | None:
         access_token = get_access_token()

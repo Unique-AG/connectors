@@ -156,6 +156,54 @@ class TestRenewal:
         current = await context.renew_session(renew, stale.model_copy())
         assert current.access_token.get_secret_value() == "renewed"
 
+    async def test_http_refresh_does_not_hold_the_session_row_lock(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _, factory = db
+        user_id = await _store(db, _session("old", age=timedelta(hours=2)))
+        context, _ = _context(db)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        started = asyncio.Event()
+        release = asyncio.Event()
+        renewed = _session("renewed")
+
+        async def renew(_stale: WiSession) -> WiSession:
+            started.set()
+            await release.wait()
+            return renewed
+
+        renewal = asyncio.create_task(context.renew_session(renew))
+        await started.wait()
+        async with transaction(factory) as session:
+            stored = await asyncio.wait_for(lock_session(session, user_id, KEY), timeout=0.2)
+        assert stored is not None
+
+        release.set()
+        assert await renewal == renewed
+
+    async def test_concurrent_replicas_share_one_refresh(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        user_id = await _store(db, _session("old", age=timedelta(hours=2)))
+        first, _ = _context(db)
+        second, _ = _context(db)
+        monkeypatch.setattr(type(first), "current_subject", _fixed_subject(user_id), raising=True)
+        calls = 0
+
+        async def renew(_stale: WiSession) -> WiSession:
+            nonlocal calls
+            calls += 1
+            await asyncio.sleep(0.05)
+            return _session("renewed")
+
+        sessions = await asyncio.gather(
+            first.renew_session(renew),
+            second.renew_session(renew),
+        )
+
+        assert calls == 1
+        assert {session.access_token.get_secret_value() for session in sessions} == {"renewed"}
+
     async def test_a_refused_renewal_revokes_the_callers_mcp_tokens(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:

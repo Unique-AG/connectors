@@ -24,6 +24,8 @@ def upgrade() -> None:
         sa.Column("user_id", sa.String(), nullable=False),
         sa.Column("wi_username", sa.String(), nullable=False),
         sa.Column("encrypted_blob", sa.LargeBinary(), nullable=False),
+        sa.Column("refresh_claim_id", sa.Uuid(), nullable=True),
+        sa.Column("refresh_claimed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
