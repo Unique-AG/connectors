@@ -9,6 +9,8 @@ from backstop_mcp.features.data_hygiene import (
     get_employment_index_factory,
 )
 from backstop_mcp.features.org_people_writes.commands import (
+    CreateOrganizationCommand,
+    CreatePersonCommand,
     EndEmploymentCommand,
     ModifyContactLocationCommand,
     UpdateOrganizationCommand,
@@ -22,6 +24,22 @@ def get_modify_contact_location_command_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> ModifyContactLocationCommand:
     return ModifyContactLocationCommand(client=client)
+
+
+@lru_cache(maxsize=1)
+def get_create_person_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    system_users_service: SystemUsersService = Depends(get_system_users_service),
+) -> CreatePersonCommand:
+    return CreatePersonCommand(client=client, system_users_service=system_users_service)
+
+
+@lru_cache(maxsize=1)
+def get_create_organization_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    system_users_service: SystemUsersService = Depends(get_system_users_service),
+) -> CreateOrganizationCommand:
+    return CreateOrganizationCommand(client=client, system_users_service=system_users_service)
 
 
 @lru_cache(maxsize=1)
