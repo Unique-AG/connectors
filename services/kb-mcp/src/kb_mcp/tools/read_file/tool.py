@@ -262,8 +262,9 @@ async def read_file(
         Field(
             gt=0,
             description=(
-                "Optional token limit for this call. Admin default is 8000. "
-                "Omit to use it."
+                "Optional token limit for this call. Ships with a default "
+                "of 8000 this tenant's admin may have changed — omit to "
+                "use whatever's actually configured."
             ),
         ),
     ] = None,

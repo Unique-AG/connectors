@@ -143,10 +143,11 @@ async def search(
         Field(
             gt=0,
             description=(
-                "Maximum chunks to return before post-processing. Admin "
-                "default is 200 — the conservative baseline; raise it for "
-                "higher recall. Omit unless you have a specific reason to "
-                "change it."
+                "Maximum chunks to return before post-processing. Ships "
+                "with a conservative default (200) this tenant's admin may "
+                "have changed — omit to use whatever's actually configured, "
+                "and only pass a value if you specifically need to raise or "
+                "lower it."
             ),
         ),
     ] = None,
@@ -158,8 +159,9 @@ async def search(
             multiple_of=0.01,
             description=(
                 "Minimum relevance score in [0.0, 1.0], up to 2 decimal "
-                "places; higher is stricter. Admin default is 0.0. Leave "
-                "unset unless you have a specific reason to change it."
+                "places; higher is stricter. Ships with a default of 0.0 "
+                "this tenant's admin may have changed — omit to use "
+                "whatever's actually configured."
             ),
         ),
     ] = None,
@@ -208,11 +210,11 @@ async def search(
         )
         chunks = await post_processor.process(result)
     except Exception as exc:
-        # UniqueError.__str__ can collapse to "<Unknown code>: <No message>"
-        # when the backend's error payload has no nested cause.error.
+        # UniqueError.__str__ can collapse to "<Unknown code>: <No message>".
+        # No json_body here — it can echo the caller's query/filter values.
         sdk_detail = (
             f" http_status={exc.http_status} code={exc.code} "
-            f"request_id={exc.request_id} json_body={exc.json_body}"
+            f"request_id={exc.request_id}"
             if isinstance(exc, UniqueError)
             else ""
         )

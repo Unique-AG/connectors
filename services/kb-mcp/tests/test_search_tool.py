@@ -593,6 +593,8 @@ async def test_search_logs_unique_error_detail(caplog):
     log_text = " ".join(r.getMessage() for r in caplog.records)
     assert "http_status=400" in log_text
     assert "request_id=req_abc123" in log_text
+    # json_body can echo the caller's query/filter values — never logged.
+    assert "json_body" not in log_text
 
 
 @pytest.mark.asyncio
