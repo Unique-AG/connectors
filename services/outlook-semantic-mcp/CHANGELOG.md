@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.6.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.0...outlook-semantic-mcp@3.6.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **mcp-oauth,outlook-semantic-mcp,teams-mcp,deps:** re-auth MCP clients on revoked Microsoft grants ([#981](https://github.com/Unique-AG/connectors/issues/981)) ([2c2155b](https://github.com/Unique-AG/connectors/commit/2c2155b643af4b3c5b816c2f33ecf4552798164c))
+* **outlook-semantic-mcp:** clear Graph tokens when Entra rejects a refresh as invalid_client ([#1013](https://github.com/Unique-AG/connectors/issues/1013)) ([0694d83](https://github.com/Unique-AG/connectors/commit/0694d8332333a5d742e17990e16b2b5a38dd5587))
+
+
+### Dependencies
+
+* stop shipping dev dependencies in the service images ([#978](https://github.com/Unique-AG/connectors/issues/978)) ([29c1613](https://github.com/Unique-AG/connectors/commit/29c1613b89b5dd0edb0cd2dd92bdf921bf26c18a))
+
 ## [3.6.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.5.1...outlook-semantic-mcp@3.6.0) (2026-09-08)
 
 
