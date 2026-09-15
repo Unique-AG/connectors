@@ -5,6 +5,7 @@ requires: the phone Backstop stored (it rewrites numbers), and a location id whe
 was created or updated.
 """
 
+from datetime import date
 from typing import Literal
 
 from pydantic import Field
@@ -14,6 +15,8 @@ from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
 
 __all__ = [
+    "EndEmploymentResponse",
+    "EndedEmploymentResponse",
     "UpdateOrganizationResponse",
     "UpdatePersonResponse",
     "UpdatedOrganizationResponse",
@@ -75,6 +78,32 @@ class UpdatedOrganizationResponse(OmitNoneModel):
 
 type UpdatePersonResponse = UpdatedPersonResponse | PartyAmbiguousResponse | NotFoundResponse
 
+
+class EndedEmploymentResponse(OmitNoneModel):
+    """An employment relationship after `endDate` was written."""
+
+    id: str = Field(
+        description="Backstop `entity-relationships` id that received `endDate`. Echo it."
+    )
+    resource_type: Literal["entity-relationships"] = Field(
+        default="entity-relationships",
+        description="Always `entity-relationships`.",
+    )
+    end_date: date | None = Field(
+        default=None,
+        description="`endDate` READ BACK after the write, as YYYY-MM-DD.",
+    )
+    warnings: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Silent-failure notes. A date that is not strictly before today is recorded "
+            "but the person still reads as a current contact until it passes."
+        ),
+    )
+
+
 type UpdateOrganizationResponse = (
     UpdatedOrganizationResponse | PartyAmbiguousResponse | NotFoundResponse
 )
+
+type EndEmploymentResponse = EndedEmploymentResponse | PartyAmbiguousResponse | NotFoundResponse

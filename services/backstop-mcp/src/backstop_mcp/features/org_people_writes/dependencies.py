@@ -4,7 +4,12 @@ from fastmcp.dependencies import Depends
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller
+from backstop_mcp.features.data_hygiene import (
+    EmploymentIndexFactory,
+    get_employment_index_factory,
+)
 from backstop_mcp.features.org_people_writes.commands import (
+    EndEmploymentCommand,
     ModifyContactLocationCommand,
     UpdateOrganizationCommand,
     UpdatePersonCommand,
@@ -46,4 +51,15 @@ def get_update_organization_command_factory(
         client=client,
         system_users_service=system_users_service,
         modify_contact_location_command=modify_contact_location_command,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_end_employment_command_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    employment_index_factory: EmploymentIndexFactory = Depends(get_employment_index_factory),
+) -> EndEmploymentCommand:
+    return EndEmploymentCommand(
+        client=client,
+        employment_index_factory=employment_index_factory,
     )

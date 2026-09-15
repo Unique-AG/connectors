@@ -9,17 +9,17 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.features.party_resolver import (
-    ResolvePartyQuery,
-    get_resolve_party_query_factory,
-    unresolved_party_response,
-)
 from backstop_mcp.features.org_people_writes import (
     UPDATE_PERSON_INPUT_DESCRIPTION,
     UpdatePersonCommand,
     UpdatePersonInput,
     UpdatePersonResponse,
     get_update_person_command_factory,
+)
+from backstop_mcp.features.party_resolver import (
+    ResolvePartyQuery,
+    get_resolve_party_query_factory,
+    unresolved_party_response,
 )
 from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous
 from backstop_mcp.models import published_output_schema

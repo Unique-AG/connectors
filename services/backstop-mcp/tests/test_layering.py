@@ -263,6 +263,7 @@ def _is_feature_tool_module_import(module: str) -> bool:
                 "update_",
                 "delete_",
                 "backfill_",
+                "end_",
             )
         )
     )

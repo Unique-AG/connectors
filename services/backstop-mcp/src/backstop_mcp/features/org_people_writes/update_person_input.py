@@ -17,13 +17,13 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from backstop_mcp.features.org_people_writes.contact_location_input import ContactLocationInput
 from backstop_mcp.features.party_resolver import (
     PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     blank_to_none,
     require_exactly_one_party_selector,
 )
-from backstop_mcp.features.org_people_writes.contact_location_input import ContactLocationInput
 from backstop_mcp.models import NonEmptyStr
 
 __all__ = [
