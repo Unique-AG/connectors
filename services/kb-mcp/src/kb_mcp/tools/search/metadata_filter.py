@@ -45,7 +45,7 @@ def try_parse_llm_metadata_filter(
         return None, None
     try:
         return parse_uniqueql(dict(raw)), None
-    except (ValueError, ValidationError):
+    except ValueError, ValidationError:
         return None, ToolResult(
             content=[TextContent(type="text", text=INVALID_METADATA_FILTER_MESSAGE)],
             is_error=True,
@@ -58,6 +58,7 @@ def merge_request_metadata_filter(
     folder_ids: list[str] | None = None,
     include_subfolders: bool = True,
     llm_metadata_filter: UniqueQL | Mapping[str, Any] | None = None,
+    admin_scope_ids: list[str] | None = None,
 ) -> dict[str, Any] | None:
     result: UniqueQL | Mapping[str, Any] | None = admin_metadata_filter
     if llm_metadata_filter is not None:
@@ -67,6 +68,11 @@ def merge_request_metadata_filter(
     if folder_ids:
         result = merge_scope_clause_into_metadata_filter(
             _folder_ids_clause(folder_ids, include_subfolders=include_subfolders),
+            result,
+        )
+    if admin_scope_ids:
+        result = merge_scope_clause_into_metadata_filter(
+            build_folder_id_in_clause(admin_scope_ids),
             result,
         )
     return uniqueql_to_dict(result)

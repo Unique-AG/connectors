@@ -103,6 +103,24 @@ def test_merge_folder_without_llm_ands_admin_and_folder():
     }
 
 
+def test_merge_llm_ands_deprecated_admin_scope_ids():
+    result = merge_request_metadata_filter(
+        admin_metadata_filter=ADMIN_FILTER,
+        llm_metadata_filter=UNIQUEQL_EQUALS_PDF,
+        admin_scope_ids=["scope_admin"],
+    )
+
+    assert result is not None
+    clauses = result["and"]
+    assert UNIQUEQL_EQUALS_PDF in clauses
+    assert ADMIN_FILTER.to_dict() in clauses
+    assert {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_admin"],
+    } in clauses
+
+
 def test_merge_llm_and_folder_ands_all_three():
     assert merge_request_metadata_filter(
         admin_metadata_filter=ADMIN_FILTER,

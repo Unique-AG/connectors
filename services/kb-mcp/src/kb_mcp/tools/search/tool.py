@@ -142,14 +142,19 @@ async def search(
         ).bind_settings(settings)
         service.state.search_queries = [search_string]
         if folder_ids or parsed_llm_filter is not None:
-            # KnowledgeBaseInternalSearchState narrows this in, but .state is
-            # typed via the generic InternalSearchState base at this call site.
+            # Override skips toolkit folding of deprecated config.scope_ids.
+            scope_ids = config.service_config.scope_ids
             service.state.metadata_filter_override = (  # pyright: ignore[reportAttributeAccessIssue]
                 merge_request_metadata_filter(
                     admin_metadata_filter=config.service_config.metadata_filter,
                     folder_ids=folder_ids,
                     include_subfolders=include_subfolders,
                     llm_metadata_filter=parsed_llm_filter,
+                    admin_scope_ids=(
+                        scope_ids
+                        if parsed_llm_filter is not None and isinstance(scope_ids, list)
+                        else None
+                    ),
                 )
             )
 

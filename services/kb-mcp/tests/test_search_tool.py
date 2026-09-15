@@ -198,6 +198,7 @@ async def _run_search_capturing_state(**search_kwargs) -> _FakeState:
     mock_service.bind_settings.return_value = mock_service
     mock_service.state = _FakeState()
     mock_service.run = AsyncMock(return_value=MagicMock())
+    config = search_kwargs.pop("config", SearchToolConfig())
 
     with (
         patch(
@@ -209,7 +210,7 @@ async def _run_search_capturing_state(**search_kwargs) -> _FakeState:
         _patch_kb_settings(None),
         _patch_resolve_scope_ids(),
     ):
-        await search(search_string="query", config=SearchToolConfig(), **search_kwargs)
+        await search(search_string="query", config=config, **search_kwargs)
 
     return mock_service.state
 
@@ -300,6 +301,57 @@ async def test_llm_metadata_filter_ands_folder_ids_and_admin():
     } in clauses
     assert expected_llm in clauses
     assert _DEFAULT_ADMIN_FILTER in clauses
+
+
+@pytest.mark.asyncio
+async def test_llm_metadata_filter_ands_deprecated_admin_scope_ids():
+    default = SearchToolConfig()
+    state = await _run_search_capturing_state(
+        metadata_filter=UNIQUEQL_EQUALS_PDF,
+        config=SearchToolConfig(
+            service_config=KnowledgeBaseInternalSearchConfig(
+                scope_ids=["scope_admin"],
+                metadata_filter=default.service_config.metadata_filter,
+            )
+        ),
+    )
+
+    expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
+    clauses = state.metadata_filter_override["and"]
+    assert expected_llm in clauses
+    assert _DEFAULT_ADMIN_FILTER in clauses
+    assert {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_admin"],
+    } in clauses
+
+
+@pytest.mark.asyncio
+async def test_folder_ids_without_llm_filter_do_not_fold_deprecated_scope_ids():
+    default = SearchToolConfig()
+    state = await _run_search_capturing_state(
+        folder_ids=["scope_a"],
+        include_subfolders=False,
+        config=SearchToolConfig(
+            service_config=KnowledgeBaseInternalSearchConfig(
+                scope_ids=["scope_admin"],
+                metadata_filter=default.service_config.metadata_filter,
+            )
+        ),
+    )
+
+    clauses = state.metadata_filter_override["and"]
+    assert {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_a"],
+    } in clauses
+    assert {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_admin"],
+    } not in clauses
 
 
 @pytest.mark.asyncio
