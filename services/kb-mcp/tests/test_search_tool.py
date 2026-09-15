@@ -328,7 +328,7 @@ async def test_llm_metadata_filter_ands_deprecated_admin_scope_ids():
 
 
 @pytest.mark.asyncio
-async def test_folder_ids_without_llm_filter_do_not_fold_deprecated_scope_ids():
+async def test_folder_ids_without_llm_filter_still_folds_deprecated_scope_ids():
     default = SearchToolConfig()
     state = await _run_search_capturing_state(
         folder_ids=["scope_a"],
@@ -351,7 +351,7 @@ async def test_folder_ids_without_llm_filter_do_not_fold_deprecated_scope_ids():
         "operator": "in",
         "path": ["folderId"],
         "value": ["scope_admin"],
-    } not in clauses
+    } in clauses
 
 
 @pytest.mark.asyncio

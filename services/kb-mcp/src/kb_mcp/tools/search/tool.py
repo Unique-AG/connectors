@@ -150,11 +150,7 @@ async def search(
                     folder_ids=folder_ids,
                     include_subfolders=include_subfolders,
                     llm_metadata_filter=parsed_llm_filter,
-                    admin_scope_ids=(
-                        scope_ids
-                        if parsed_llm_filter is not None and isinstance(scope_ids, list)
-                        else None
-                    ),
+                    admin_scope_ids=scope_ids if isinstance(scope_ids, list) else None,
                 )
             )
 
