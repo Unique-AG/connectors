@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from cryptography.fernet import Fernet, InvalidToken
+from mcp_credential_auth import load_fernet_key
 from pydantic import BaseModel, SecretStr, ValidationError
 
 from with_intelligence_mcp.config import EncryptionConfig
@@ -21,18 +22,9 @@ class _SessionPayload(BaseModel):
 
 def load_key(config: EncryptionConfig) -> bytes:
     """Load and validate the Fernet key: url-safe base64 encoding of 32 bytes."""
-    assert config.encryption_key is not None, "EncryptionConfig validates this is set"
-    key = config.encryption_key.get_secret_value().encode("ascii")
-    try:
-        Fernet(key)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(
-            "WITH_INTELLIGENCE_MCP_ENCRYPTION_KEY must be a Fernet key "
-            + "(url-safe base64-encoded 32-byte key); generate with: "
-            + 'python -c "from cryptography.fernet import Fernet; '
-            + 'print(Fernet.generate_key().decode())"'
-        ) from exc
-    return key
+    return load_fernet_key(
+        config.encryption_key, setting_name="WITH_INTELLIGENCE_MCP_ENCRYPTION_KEY"
+    )
 
 
 def encrypt_session(session: WiSession, key: bytes) -> bytes:

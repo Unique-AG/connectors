@@ -1,11 +1,7 @@
-import asyncio
 import logging
 import uuid
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import ClassVar
-from weakref import WeakValueDictionary
 
 from mcp_credential_auth import (
     MAX_USERNAME_LENGTH,
@@ -89,8 +85,6 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
     _encryption_key: bytes
     _wi_clients: WithIntelligenceClientFactory
     _throttle: ThrottleConfig
-    _login_locks: WeakValueDictionary[str, asyncio.Lock]
-    _login_locks_guard: asyncio.Lock
     login_path: str
 
     def __init__(
@@ -113,18 +107,6 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         self._wi_clients = wi_clients
         self._throttle = throttle
         self._secure_cookies: bool = secure_cookies
-        self._login_locks = WeakValueDictionary()
-        self._login_locks_guard = asyncio.Lock()
-
-    @asynccontextmanager
-    async def _login_lock(self, username: str) -> AsyncGenerator[None]:
-        async with self._login_locks_guard:
-            lock = self._login_locks.get(username)
-            if lock is None:
-                lock = asyncio.Lock()
-                self._login_locks[username] = lock
-        async with lock:
-            yield
 
     def _expired_link_response(self) -> Response:
         return PlainTextResponse(
@@ -218,55 +200,54 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         if len(username) > MAX_USERNAME_LENGTH:
             return self._form_response(request_id, error="Invalid username or password.")
 
-        async with self._login_lock(username):
-            attempt_id = await reserve_login_attempt(
-                self._session_factory,
-                username,
-                source_ip=_source_ip(request),
-                config=self._throttle,
+        attempt_id = await reserve_login_attempt(
+            self._session_factory,
+            username,
+            source_ip=_source_ip(request),
+            config=self._throttle,
+        )
+        if attempt_id is None:
+            return self._form_response(
+                request_id,
+                status_code=429,
+                username=username,
+                error=(
+                    "Too many failed attempts for this username. "
+                    + "Please wait a few minutes and try again."
+                ),
             )
-            if attempt_id is None:
-                return self._form_response(
-                    request_id,
-                    status_code=429,
-                    username=username,
-                    error=(
-                        "Too many failed attempts for this username. "
-                        + "Please wait a few minutes and try again."
-                    ),
-                )
 
-            credential = WiCredential(username=username, password=SecretStr(password))
-            try:
-                wi_session = await self._wi_clients.sign_in(credential)
-            except SignInFailed:
-                return self._form_response(
-                    request_id,
-                    username=username,
-                    error="Invalid username or password.",
-                )
-            except RateLimited as exc:
-                await discard_login_attempt(self._session_factory, attempt_id)
-                logger.warning("auth.login.wi_rate_limited", exc_info=exc)
-                return self._form_response(
-                    request_id,
-                    status_code=429,
-                    username=username,
-                    error=(
-                        "With Intelligence is rate-limiting sign-in requests — "
-                        + "please try again shortly."
-                    ),
-                )
-            except Unreachable as exc:
-                await discard_login_attempt(self._session_factory, attempt_id)
-                logger.warning("auth.login.wi_unreachable", exc_info=exc)
-                return self._form_response(
-                    request_id,
-                    username=username,
-                    error="With Intelligence is unreachable right now — please try again shortly.",
-                )
+        credential = WiCredential(username=username, password=SecretStr(password))
+        try:
+            wi_session = await self._wi_clients.sign_in(credential)
+        except SignInFailed:
+            return self._form_response(
+                request_id,
+                username=username,
+                error="Invalid username or password.",
+            )
+        except RateLimited as exc:
+            await discard_login_attempt(self._session_factory, attempt_id)
+            logger.warning("auth.login.wi_rate_limited", exc_info=exc)
+            return self._form_response(
+                request_id,
+                status_code=429,
+                username=username,
+                error=(
+                    "With Intelligence is rate-limiting sign-in requests — "
+                    + "please try again shortly."
+                ),
+            )
+        except Unreachable as exc:
+            await discard_login_attempt(self._session_factory, attempt_id)
+            logger.warning("auth.login.wi_unreachable", exc_info=exc)
+            return self._form_response(
+                request_id,
+                username=username,
+                error="With Intelligence is unreachable right now — please try again shortly.",
+            )
 
-            await clear_failures(self._session_factory, username)
+        await clear_failures(self._session_factory, username)
 
         async with read_session(self._session_factory) as session:
             existing_id = await find_user_id_by_username(session, username)

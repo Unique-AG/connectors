@@ -1,5 +1,6 @@
 from mcp_credential_auth.cleanup import cleanup_lifespan, purge_expired_auth_rows
 from mcp_credential_auth.database import read_session, transaction
+from mcp_credential_auth.fernet import load_fernet_key
 from mcp_credential_auth.login_csrf import LoginCsrf
 from mcp_credential_auth.models import (
     AuthBase,
@@ -38,6 +39,7 @@ __all__ = [
     "count_recent_failures",
     "discard_login_attempt",
     "is_throttled",
+    "load_fernet_key",
     "purge_expired_auth_rows",
     "read_session",
     "record_failure",
