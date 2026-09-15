@@ -38,6 +38,7 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "log_activity",
         "update_activity",
         "update_opportunity",
+        "create_opportunity",
         "backfill_opportunity_stage_history",
         "update_custom_field_values",
         "create_person",
@@ -75,6 +76,15 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         '"opportunity_id"',
         "update_opportunity",
         "does not move",
+    ),
+    "create_opportunity": (
+        '"name"',
+        '"currency_code"',
+        '"is_erisa"',
+        '"party_id"',
+        '"search_type"',
+        "update_opportunity",
+        "destructive_hint",
     ),
     "update_custom_field_values": (
         '"definition_id"',
