@@ -5,6 +5,10 @@ envelopes (`json_api_update`, `relationship_data`, …) live on `backstop_client
 """
 
 from backstop_mcp.backstop_client import isoformat, relationship_data, relationship_to_one
+from backstop_mcp.features.org_people_writes.create_organization_input import (
+    CreateOrganizationInput,
+)
+from backstop_mcp.features.org_people_writes.create_person_input import CreatePersonInput
 from backstop_mcp.features.org_people_writes.update_organization_input import (
     UpdateOrganizationInput,
 )
@@ -18,7 +22,7 @@ __all__ = [
 ]
 
 
-def person_attributes(person: UpdatePersonInput) -> dict[str, object | None]:
+def person_attributes(person: UpdatePersonInput | CreatePersonInput) -> dict[str, object | None]:
     """Wire attributes for a person write. Callers wrap with `omit_none_values`."""
     return {
         "firstName": person.first_name,
@@ -48,7 +52,10 @@ def person_attributes(person: UpdatePersonInput) -> dict[str, object | None]:
 
 
 def person_relationships(
-    person: UpdatePersonInput, *, owner: dict[str, object] | None, omit_empty: bool = False
+    person: UpdatePersonInput | CreatePersonInput,
+    *,
+    owner: dict[str, object] | None,
+    omit_empty: bool = False,
 ) -> dict[str, object | None]:
     """Wire relationships for a person write.
 
@@ -56,19 +63,22 @@ def person_relationships(
     `omit_empty=True` so `()` is not sent; updates leave `()` as a clear.
     Callers wrap with `omit_none_values`.
     """
+    category_ids = (
+        person.add_category_ids if isinstance(person, UpdatePersonInput) else person.category_ids
+    )
     return {
         "company": relationship_to_one("organizations", person.company_id),
         "contactSource": relationship_to_one("contact-sources", person.contact_source_id),
         "referralSource": relationship_to_one("contacts", person.referral_source_id),
         "representative": owner,
         "categories": relationship_data(
-            "contact-categories", _to_many_ids(person.add_category_ids, omit_empty=omit_empty)
+            "contact-categories", _to_many_ids(category_ids, omit_empty=omit_empty)
         ),
     }
 
 
 def organization_attributes(
-    new_organization_fields: UpdateOrganizationInput,
+    new_organization_fields: UpdateOrganizationInput | CreateOrganizationInput,
 ) -> dict[str, object | None]:
     """Wire attributes for an organization write. Callers wrap with `omit_none_values`."""
     return {
@@ -95,7 +105,7 @@ def organization_attributes(
 
 
 def organization_relationships(
-    new_organization_fields: UpdateOrganizationInput,
+    new_organization_fields: UpdateOrganizationInput | CreateOrganizationInput,
     *,
     owner: dict[str, object] | None,
     omit_empty: bool = False,
@@ -106,6 +116,11 @@ def organization_relationships(
     `omit_empty=True` so `()` is not sent; updates leave `()` as a clear.
     Callers wrap with `omit_none_values`.
     """
+    category_ids = (
+        new_organization_fields.add_category_ids
+        if isinstance(new_organization_fields, UpdateOrganizationInput)
+        else new_organization_fields.category_ids
+    )
     return {
         "contactSource": relationship_to_one(
             "contact-sources", new_organization_fields.contact_source_id
@@ -117,7 +132,7 @@ def organization_relationships(
         "primaryContact": relationship_to_one("people", new_organization_fields.primary_contact_id),
         "categories": relationship_data(
             "contact-categories",
-            _to_many_ids(new_organization_fields.add_category_ids, omit_empty=omit_empty),
+            _to_many_ids(category_ids, omit_empty=omit_empty),
         ),
     }
 

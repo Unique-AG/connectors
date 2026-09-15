@@ -40,6 +40,8 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "update_opportunity",
         "backfill_opportunity_stage_history",
         "update_custom_field_values",
+        "create_person",
+        "create_organization",
         "update_person",
         "update_organization",
         "end_employment",
@@ -78,6 +80,19 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         '"entity_type"',
         "list_custom_fields",
         "Probability",
+    ),
+    "create_person": (
+        '"last_name"',
+        '"gender"',
+        '"category_ids"',
+        "update_person",
+        "destructive_hint",
+    ),
+    "create_organization": (
+        '"name"',
+        '"category_ids"',
+        "update_organization",
+        "destructive_hint",
     ),
     "update_person": (
         '"party_id"',

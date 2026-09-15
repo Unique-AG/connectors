@@ -14,10 +14,11 @@ __all__ = [
 
 
 class PersonWriteAttributes(BaseModel):
-    """Person attributes we re-read after a PATCH. Phone is rewritten server-side."""
+    """Person attributes we re-read after a write. Phone is rewritten server-side."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
+    name: LenientStr = None
     mobile_phone: LenientStr = Field(default=None, validation_alias="mobilePhone")
 
 

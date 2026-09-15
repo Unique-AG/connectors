@@ -15,6 +15,8 @@ from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
 
 __all__ = [
+    "CreatedOrganizationResponse",
+    "CreatedPersonResponse",
     "EndEmploymentResponse",
     "EndedEmploymentResponse",
     "UpdateOrganizationResponse",
@@ -22,6 +24,52 @@ __all__ = [
     "UpdatedOrganizationResponse",
     "UpdatedPersonResponse",
 ]
+
+
+class CreatedPersonResponse(OmitNoneModel):
+    """A person after a POST, with the name and phone Backstop actually stored."""
+
+    id: str = Field(description="Backstop id of the created person. Echo it; never invent one.")
+    resource_type: Literal["people"] = Field(
+        default="people",
+        description="Always `people`.",
+    )
+    name: str | None = Field(
+        default=None,
+        description="Display name READ BACK after the write.",
+    )
+    mobile_phone: str | None = Field(
+        default=None,
+        description=(
+            "Mobile phone READ BACK after the write. Backstop normalizes numbers "
+            "(e.g. `+1 555 0100` is stored as `555-0100`); this is the stored value, "
+            "not the requested one."
+        ),
+    )
+    warnings: tuple[str, ...] = Field(
+        default=(),
+        description="Silent-failure notes. Empty when the write landed as asked.",
+    )
+
+
+class CreatedOrganizationResponse(OmitNoneModel):
+    """An organization after a POST, with the name Backstop actually stored."""
+
+    id: str = Field(
+        description="Backstop id of the created organization. Echo it; never invent one."
+    )
+    resource_type: Literal["organizations"] = Field(
+        default="organizations",
+        description="Always `organizations`.",
+    )
+    name: str | None = Field(
+        default=None,
+        description="Organization name READ BACK after the write.",
+    )
+    warnings: tuple[str, ...] = Field(
+        default=(),
+        description="Silent-failure notes. Empty when the write landed as asked.",
+    )
 
 
 class UpdatedPersonResponse(OmitNoneModel):
