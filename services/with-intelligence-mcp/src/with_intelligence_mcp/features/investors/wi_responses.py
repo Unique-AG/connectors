@@ -1,11 +1,3 @@
-"""With Intelligence DTOs.
-
-Only the fields the tools use are declared, and `extra="ignore"` carries the rest of a 40-field
-record past us rather than breaking when it changes. Nested shapes are the spec's own, which is
-not a detail: `address.country` is an object rather than a string, `latest_aum` dates its value
-in `as_of`, `currency` names itself `short_name`, and an `Entity` carries an id and nothing else.
-"""
-
 from typing import Annotated, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field

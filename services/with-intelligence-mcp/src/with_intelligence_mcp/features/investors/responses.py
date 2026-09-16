@@ -1,18 +1,9 @@
 """What the tool returns to the model: trimmed, renamed where With Intelligence's naming misleads,
 and documented for the model that reads it."""
 
-from typing import ClassVar
+from pydantic import Field
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class OmitNoneModel(BaseModel):
-    """Drops unset fields from the payload, so a sparse record does not read as a wall of nulls."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    def serializable(self) -> dict[str, object]:
-        return self.model_dump(exclude_none=True, exclude_defaults=False)
+from with_intelligence_mcp.response_model import OmitNoneModel
 
 
 class NamedValueResponse(OmitNoneModel):

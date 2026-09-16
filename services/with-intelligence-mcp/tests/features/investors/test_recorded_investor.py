@@ -1,11 +1,3 @@
-"""The recorded shape of `GET /v3/investors/{id}`, parsed and projected.
-
-Structure taken verbatim from a live response; every value replaced. Two fields here are the
-reason this file exists — the spec declares `consultants` an array and the API sends an
-index-keyed object, and declares `asset_allocation_breakdown` an object and sends a list — so
-conformance against the spec alone would have passed while the tool crashed.
-"""
-
 import json
 import pathlib
 from typing import cast
