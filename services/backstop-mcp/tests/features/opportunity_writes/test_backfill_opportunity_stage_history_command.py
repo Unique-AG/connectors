@@ -15,9 +15,6 @@ from backstop_mcp.features.opportunity_writes import (
     BackfillOpportunityStageHistoryInput,
     get_backfill_opportunity_stage_history_command_factory,
 )
-from tests.features.opportunity_writes.test_update_opportunity_command import (
-    _two_type_stages_page,
-)
 from tests.helpers import (
     BASE_URL,
     client_factory,
@@ -60,6 +57,33 @@ def _stages_page() -> httpx.Response:
             "data": [
                 resource(_IDD, "opportunity-stages", name="IDD", closed=False),
                 resource(_PROJECT, "opportunity-stages", name="Project", closed=False),
+            ],
+            "links": {"next": None},
+        },
+    )
+
+
+def _two_type_stages_page() -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "data": [
+                {
+                    "id": "s-opp",
+                    "type": "opportunity-stages",
+                    "attributes": {"name": "Prospect", "closed": False},
+                    "relationships": {
+                        "opportunityTypes": {"data": [{"type": "entity-types", "id": "16"}]}
+                    },
+                },
+                {
+                    "id": "s-other",
+                    "type": "opportunity-stages",
+                    "attributes": {"name": "Other Pipe", "closed": False},
+                    "relationships": {
+                        "opportunityTypes": {"data": [{"type": "entity-types", "id": "99"}]}
+                    },
+                },
             ],
             "links": {"next": None},
         },

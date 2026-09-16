@@ -116,10 +116,15 @@ def _opportunity_document(
     opportunity_id: str,
     *,
     stage_id: str | None = "42478",
+    entity_type_id: str | None = None,
     **attributes: object,
 ) -> httpx.Response:
     relationships: dict[str, object] = {}
     included: list[dict[str, object]] = []
+    if entity_type_id is not None:
+        relationships["clientDefinedEntityType"] = {
+            "data": {"id": entity_type_id, "type": "entity-types"}
+        }
     if stage_id is not None:
         known = VOCABULARY.get(stage_id)
         relationships["stage"] = {"data": {"id": stage_id, "type": "opportunity-stages"}}
@@ -585,12 +590,8 @@ class TestUpdateOpportunityCommand:
     ) -> None:
         respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_two_type_stages_page())
         respx.get(f"{BASE_URL}/system-users").mock(return_value=_users_page())
-        payload = _opportunity_document(_ID).json()
-        payload["data"]["relationships"]["clientDefinedEntityType"] = {
-            "data": {"id": "16", "type": "entity-types"}
-        }
         respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(
-            return_value=httpx.Response(200, json=payload)
+            return_value=_opportunity_document(_ID, entity_type_id="16")
         )
         route = respx.patch(f"{BASE_URL}/opportunities/{_ID}").mock(
             return_value=_opportunity_document(_ID)
