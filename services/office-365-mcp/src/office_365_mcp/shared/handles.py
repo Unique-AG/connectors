@@ -331,8 +331,6 @@ def _message_handle(handle: MessageHandle) -> MessageHandle | None:
 
 
 def _two_ids(pattern: re.Pattern[str], uri: str) -> tuple[str, str] | None:
-    """The two ids a drive handle carries, or None when `uri` is not that shape or one decoded to
-    nothing."""
     match = pattern.match(uri)
     if match is None:
         return None

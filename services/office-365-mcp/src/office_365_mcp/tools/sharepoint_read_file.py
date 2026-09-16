@@ -1,5 +1,3 @@
-"""`sharepoint_read_file`: one file's own bytes, from a handle another tool made."""
-
 from collections.abc import Mapping
 from typing import Annotated, override
 
@@ -80,8 +78,6 @@ _ItemQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryPara
 
 
 class _FileFromGraph(File):
-    """A file that carries the media type Microsoft Graph reported for it."""
-
     def __init__(self, content: bytes, *, name: str | None, mime_type: str) -> None:
         self.mime_type: str = mime_type
         super().__init__(data=content, name=name)
@@ -92,7 +88,6 @@ class _FileFromGraph(File):
 
 
 async def sharepoint_read_file(client: GraphServiceClient, *, file: str) -> File:
-    """The bytes of the file `file` addresses, under its own name and media type."""
     handle = drive_file_handle(file)
     if handle is None:
         raise ToolError(_NOT_A_FILE_HANDLE)

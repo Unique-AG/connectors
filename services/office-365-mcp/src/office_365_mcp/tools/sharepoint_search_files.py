@@ -141,7 +141,6 @@ def _from_hit(hit: SearchHit) -> DriveItemSummary | None:
 
 
 def _hits_container(response: QueryPostResponse) -> SearchHitsContainer | None:
-    """The one container this request produces."""
     for search_response in response.value or []:
         for container in search_response.hits_containers or []:
             return container
@@ -172,19 +171,16 @@ def _query_string(
 
 
 def _opening_term(modified_after: date | datetime) -> str:
-    """`LastModifiedTime>=` the first instant the bound admits."""
     return f"LastModifiedTime>={_wire(opens_at(modified_after))}"
 
 
 def _closing_term(modified_before: date | datetime) -> str:
-    """`LastModifiedTime<` the next day, or `<=` the second a moment names."""
     if isinstance(modified_before, datetime):
         return f"LastModifiedTime<={_wire(closes_at(modified_before))}"
     return f"LastModifiedTime<{_wire(opens_at(modified_before + timedelta(days=1)))}"
 
 
 def _wire(instant: datetime) -> str:
-    """`YYYY-MM-DDThh:mm:ssZ`, with the fraction kept where the bound carries one."""
     if instant.microsecond:
         return f"{instant:%Y-%m-%dT%H:%M:%S.%f}Z"
     return f"{instant:%Y-%m-%dT%H:%M:%SZ}"

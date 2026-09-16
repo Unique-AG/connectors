@@ -1,9 +1,3 @@
-"""One row of OneDrive or SharePoint, as every tool that lists a `driveItem` reports it.
-
-Shared because a search hit and a folder listing are the same Graph type, and a caller pages
-between the two. A second projection would name the same file two ways.
-"""
-
 from datetime import datetime
 from typing import Self
 
@@ -116,11 +110,6 @@ class DriveItemSummary(BaseModel):
 
     @classmethod
     def from_item(cls, item: DriveItem) -> Self | None:
-        """The row, or None when Graph returned an item this connector cannot address again.
-
-        None rather than a raised error: one unaddressable row must not cost a caller the whole
-        page it arrived in.
-        """
         parent = item.parent_reference
         drive_id = parent.drive_id if parent is not None else None
         if item.id is None or drive_id is None:

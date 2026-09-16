@@ -1,5 +1,3 @@
-"""`sharepoint_read_file`: what comes back, and what it refuses. Every payload here is synthetic."""
-
 from collections.abc import Iterator, Mapping
 from typing import cast
 
@@ -76,8 +74,6 @@ class TestWhatComesBack:
     async def test_a_word_file_comes_back_as_that_word_file(
         self, client: GraphServiceClient, item: respx.Route, content: respx.Route
     ) -> None:
-        """The bytes Microsoft returned, under the name and the media type Microsoft reported for
-        them. Nothing is converted on the way."""
         read = await _read(client)
 
         assert isinstance(read, File)
@@ -91,8 +87,6 @@ class TestWhatComesBack:
     async def test_it_asks_for_the_fields_every_drive_tool_agrees_on(
         self, client: GraphServiceClient, item: respx.Route
     ) -> None:
-        """Without `$select` Graph answers a default projection, and the size this tool refuses a
-        file on is part of it."""
         _ = await _read(client)
 
         selected = item.calls.last.request.url.params["$select"]
@@ -103,8 +97,6 @@ class TestWhatComesBack:
     async def test_the_content_request_asks_for_no_conversion_at_all(
         self, client: GraphServiceClient, content: respx.Route
     ) -> None:
-        """Graph documents a `format` parameter that turns a document into a PDF. This tool never
-        sends one, so what comes back is the stored file."""
         _ = await _read(client)
 
         assert content.calls.last.request.url.params == httpx.QueryParams()
@@ -124,8 +116,6 @@ class TestWhatComesBack:
     async def test_an_empty_file_comes_back_empty_rather_than_as_a_failure(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph answers an empty file with an empty body, and the SDK turns that into no bytes at
-        all. A file of nothing is still the file the caller asked for."""
         _ = graph.get(_ITEM_PATH).mock(return_value=httpx.Response(200, json=_payload(size=0)))
         _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=b""))
 
@@ -147,8 +137,6 @@ class TestWhatItRefuses:
     async def test_a_folder_handle_is_refused_and_sent_to_the_browsing_tool(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A folder handle parses as a handle and is still not a file: the refusal has to say which
-        tool takes it."""
         with pytest.raises(ToolError, match="sharepoint_browse_folder") as refused:
             _ = await _read(client, file=_FOLDER)
 
@@ -158,8 +146,6 @@ class TestWhatItRefuses:
     async def test_an_item_graph_reports_as_a_folder_is_refused_before_any_content_is_asked_for(
         self, client: GraphServiceClient, graph: respx.MockRouter, content: respx.Route
     ) -> None:
-        """A file handle can name a folder: the ids are the same two ids, and only Graph knows
-        which facet the item carries."""
         _ = graph.get(_ITEM_PATH).mock(
             return_value=httpx.Response(200, json=_payload(a_folder=True))
         )
@@ -173,8 +159,6 @@ class TestWhatItRefuses:
     async def test_a_file_above_the_limit_is_refused_without_ever_being_fetched(
         self, client: GraphServiceClient, graph: respx.MockRouter, content: respx.Route
     ) -> None:
-        """The whole file would be held in memory, so the size is read first and the bytes are
-        never asked for."""
         _ = graph.get(_ITEM_PATH).mock(
             return_value=httpx.Response(200, json=_payload(size=reader.MAX_BYTES + 1))
         )
@@ -217,8 +201,6 @@ class TestWhatItRefuses:
     async def test_no_bytes_for_a_file_that_holds_data_is_refused_rather_than_answered_empty(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """An empty answer for a file Graph says is 24 kB is a fault, and an empty file handed back
-        as the document would be read as one."""
         _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=b""))
 
         with pytest.raises(ToolError, match="sent no content"):
@@ -242,8 +224,6 @@ class TestWhatItCounts:
     async def test_the_two_requests_are_counted_under_a_step_each(
         self, client: GraphServiceClient
     ) -> None:
-        """One step for the whole tool would make a refused content read look like a slow lookup.
-        Every assertion is a delta: the registry is process-wide."""
         before = {
             step: _value(GRAPH_STEPS_TOTAL, operation=reader.TOOL_NAME, step=step, status="ok")
             for step in (reader.STEP_ITEM, reader.STEP_CONTENT)
@@ -266,7 +246,6 @@ class TestHowItDeclaresItself:
         assert (reader.STEP_ITEM, reader.STEP_CONTENT) == ("drive_item", "drive_content")
 
     def test_the_refusable_call_is_a_handle_this_tool_accepts(self) -> None:
-        """An argument the tool rejects never reaches Graph, so it proves nothing about a 403."""
         assert set(reader.GRAPH_CALL_EXAMPLE) == {"file"}
         example = cast("str", reader.GRAPH_CALL_EXAMPLE["file"])
         assert drive_file_handle(example) is not None
@@ -291,8 +270,6 @@ class TestHowItDeclaresItself:
     async def test_no_argument_offers_a_conversion_or_a_page_of_a_file(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The absence of the argument is the control: a published `format` is a conversion the
-        model asks for, and this tool has none to give."""
         parameters = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
@@ -315,8 +292,6 @@ class TestHowItDeclaresItself:
     async def test_the_description_says_the_file_comes_back_as_itself(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """A model that reads this as a document reader will call it for the text of a contract and
-        report that the tool returned nothing readable."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         reader.register(mcp, transport)
         tool = await mcp.get_tool(reader.TOOL_NAME)
@@ -333,8 +308,6 @@ class TestHowItDeclaresItself:
     async def test_the_answer_carries_the_file_and_no_schema_to_validate_it_against(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """A file is content, not structured output. FastMCP publishes no output schema for one and
-        skips result validation, which is what lets the bytes through untouched."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         reader.register(mcp, transport)
 
@@ -354,8 +327,6 @@ async def _registered(transport: httpx.AsyncClient) -> Mapping[str, object]:
 
 @pytest.fixture(autouse=True)
 def metrics_provider() -> None:
-    """Idempotent and not torn down: an OpenTelemetry meter provider is installed once per
-    process."""
     _ = configure_metrics(
         AppConfig.model_validate({"public_base_url": "https://office-365-mcp.example"})
     )

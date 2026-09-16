@@ -1,5 +1,3 @@
-"""`sharepoint_search_files`: the KQL Graph is sent, and what a hit becomes on the way back."""
-
 import json
 from datetime import UTC, date, datetime, timedelta, timezone
 from typing import cast
@@ -76,8 +74,6 @@ class TestTheQueryItSends:
     async def test_it_asks_only_for_drive_items_and_pages_by_offset(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph refuses to mix entity types, and a file search pages by `from`/`size` integers
-        rather than by a cursor."""
         route = _matching(graph, _file_hit())
 
         _ = await sharepoint_search_files.sharepoint_search_files(
@@ -114,8 +110,6 @@ class TestTheQueryItSends:
     async def test_every_argument_becomes_its_documented_term(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`filetype` and `path` are Microsoft's own spellings, and `LastModifiedTime` is a
-        comparison rather than a `term:value` pair."""
         route = _matching(graph)
 
         _ = await sharepoint_search_files.sharepoint_search_files(
@@ -139,8 +133,6 @@ class TestTheQueryItSends:
     async def test_the_terms_are_joined_with_an_explicit_and(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft's own example writes the `AND` out between two date comparisons, and two
-        space-separated comparisons are both dropped."""
         route = _matching(graph)
 
         _ = await sharepoint_search_files.sharepoint_search_files(
@@ -152,8 +144,6 @@ class TestTheQueryItSends:
     async def test_a_file_type_travels_bare_and_a_path_is_quoted(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A web address carries `:` and `/`, which KQL reads as syntax; an extension carries
-        neither, and quoting it would turn it into a phrase."""
         route = _matching(graph)
 
         _ = await sharepoint_search_files.sharepoint_search_files(
@@ -167,8 +157,6 @@ class TestTheQueryItSends:
     async def test_date_bounds_cover_the_days_they_name(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The upper bound is the first instant of the NEXT day, so the whole of the named day is
-        inside the window; `<2026-03-31T00:00:00Z` drops everything changed on the 31st."""
         route = _matching(graph)
 
         _ = await sharepoint_search_files.sharepoint_search_files(
@@ -207,8 +195,6 @@ class TestTheQueryItSends:
     async def test_a_moment_bounds_the_second_rather_than_the_day(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`datetime` subclasses `date`, so a check in the wrong order renders every moment as the
-        day it falls on and silently widens the window to 24 hours."""
         route = _matching(graph)
 
         _ = await sharepoint_search_files.sharepoint_search_files(
@@ -228,7 +214,6 @@ class TestTheQueryItSends:
     async def test_a_moment_with_no_zone_is_read_as_utc(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Otherwise the zone is whichever one the pod runs in: a zone no caller chose."""
         route = _matching(graph)
 
         _ = await sharepoint_search_files.sharepoint_search_files(
@@ -288,8 +273,6 @@ class TestTheQueryItSends:
     async def test_a_caller_cannot_smuggle_kql_through_the_free_text(
         self, client: GraphServiceClient, graph: respx.MockRouter, injection: str
     ) -> None:
-        """Free text reaches Microsoft as Keyword Query Language and can widen the search past
-        every filter the tool applied."""
         route = _matching(graph)
 
         _ = await sharepoint_search_files.sharepoint_search_files(
@@ -349,8 +332,6 @@ class TestAWindowThatHoldsNothing:
     async def test_a_query_with_no_word_in_it_is_refused(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A query of punctuation alone renders no term, and an empty `queryString` asks Graph for
-        an arbitrary sample of every file the user can read."""
         route = _matching(graph)
 
         with pytest.raises(ToolError) as refused:
@@ -377,9 +358,6 @@ class TestTheHandleItMints:
     async def test_a_file_gets_a_file_handle_and_a_folder_gets_a_folder_one(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph uses one type for both and tells them apart by which facet it returns, so the
-        facet is the only thing that can pick the handle family. The drive id is percent-encoded
-        because it carries a `!`."""
         _ = _matching(
             graph,
             _file_hit(item_id="01SYNTHETICFILE0001"),
@@ -418,8 +396,6 @@ class TestHitsThisToolCannotUse:
     async def test_a_hit_whose_resource_is_not_a_drive_item_is_skipped(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """One request names one entity type, but the container is the same shape for every type,
-        and a resource of another type carries none of the fields a row needs."""
         _ = _matching(graph, chat_hit(), _file_hit(item_id="01SYNTHETICITEM0007"))
 
         found = await sharepoint_search_files.sharepoint_search_files(
@@ -431,8 +407,6 @@ class TestHitsThisToolCannotUse:
     async def test_a_hit_with_no_drive_id_is_skipped(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A handle needs the drive as well as the item, and an item id on its own reaches
-        nothing."""
         _ = _matching(
             graph,
             _file_hit(item_id="01SYNTHETICITEM0008", drive_id=None),
@@ -477,8 +451,6 @@ class TestPagingAndItsHonesty:
     async def test_the_next_offset_counts_graphs_hits_not_the_rows_kept(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Advancing by the number of rows returned would re-read the skipped hits for ever,
-        because the skipping happens on this side of the offset."""
         _ = _matching(
             graph,
             _file_hit(item_id="01SYNTHETICITEM0001", drive_id=None),
@@ -508,7 +480,6 @@ class TestPagingAndItsHonesty:
     async def test_a_search_that_matched_nothing_is_an_empty_page_not_a_failure(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph answers a no-match search with a container holding no `hits` key at all."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response(None))
         )
@@ -523,9 +494,6 @@ class TestPagingAndItsHonesty:
     async def test_a_page_of_no_hits_never_offers_the_offset_it_was_asked_at(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A caller obeying a `next_offset` equal to the offset just asked at re-requests the same
-        empty page for ever. Both directions are asserted, because either alone would pass while
-        the other rotted."""
         empty = _matching(graph, more=True)
 
         stalled = await sharepoint_search_files.sharepoint_search_files(

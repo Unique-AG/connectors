@@ -1,8 +1,3 @@
-"""`sharepoint_browse_folder`: the level it asks Graph for, the level it answers, what it refuses.
-
-Every response body here is synthesised. None came from a real drive.
-"""
-
 import httpx
 import pytest
 import respx
@@ -102,8 +97,6 @@ class TestTheLevelItAsksFor:
         assert reports_children.call_count == 0
 
     def test_the_startup_probe_calls_this_tool_with_no_arguments_at_all(self) -> None:
-        """`GRAPH_CALL_EXAMPLE` is what the probe passes, and the test above is that same call: no
-        argument is needed to reach Microsoft."""
         assert browser.GRAPH_CALL_EXAMPLE == {}
 
     async def test_a_folder_handle_asks_for_that_folders_children(
@@ -128,8 +121,6 @@ class TestTheLevelItAsksFor:
     async def test_a_handle_from_another_drive_is_read_out_of_that_drive(
         self, client: GraphServiceClient, graph: respx.MockRouter, my_drive: respx.Route
     ) -> None:
-        """The drive id travels inside the handle, so browsing a SharePoint site never reaches the
-        caller's own OneDrive."""
         elsewhere = graph.get(f"/drives/{_OTHER_DRIVE_ID}/items/{_REPORTS_ID}/children").mock(
             return_value=_page(_item_payload(_BUDGET_ID, drive_id=_OTHER_DRIVE_ID))
         )
@@ -156,8 +147,6 @@ class TestTheLevelItAsksFor:
     async def test_it_neither_filters_nor_orders_this_collection(
         self, client: GraphServiceClient, root_children: respx.Route
     ) -> None:
-        """Microsoft documents neither on a children collection, and a `$filter` there answers 200
-        with the wrong rows instead of refusing."""
         root_children.mock(return_value=_page(_item_payload(_BUDGET_ID)))
 
         _ = await browser.browse_folder(client, limit=25)
@@ -189,8 +178,6 @@ class TestTheLevelItAnswers:
     async def test_a_file_and_a_folder_are_told_apart_and_handled_apart(
         self, client: GraphServiceClient, root_children: respx.Route
     ) -> None:
-        """Graph gives both one type and tells them apart by the facet it returns, so the two
-        handle families are minted off `folder` being present and nothing else."""
         root_children.mock(
             return_value=_page(
                 _item_payload(_BUDGET_ID, name="Budget.xlsx"),
@@ -213,8 +200,6 @@ class TestTheLevelItAnswers:
         root_children: respx.Route,
         reports_children: respx.Route,
     ) -> None:
-        """The round trip the answer promises: a folder's own `uri`, handed straight back, reaches
-        that folder's children and nothing else."""
         root_children.mock(
             return_value=_page(_item_payload(_REPORTS_ID, name="Reports", is_folder=True))
         )
@@ -229,8 +214,6 @@ class TestTheLevelItAnswers:
     async def test_an_item_microsoft_named_no_drive_for_is_left_out(
         self, client: GraphServiceClient, root_children: respx.Route
     ) -> None:
-        """A handle needs the drive as well as the item, so a row without one cannot be addressed
-        again. It is dropped rather than costing the caller the whole page it arrived in."""
         root_children.mock(
             return_value=_page(
                 _item_payload(_BUDGET_ID, name="Budget.xlsx"),
@@ -246,9 +229,6 @@ class TestTheLevelItAnswers:
     async def test_the_pages_of_one_level_are_followed_rather_than_read_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The cursor route is registered before the bare one, which respx matches in registration
-        order: the bare path matches a `$skiptoken` request too, and would answer every page.
-        """
         graph.get(_ROOT_CHILDREN, params={"$skiptoken": "second"}).mock(
             return_value=_page(_item_payload(_NOTES_ID, name="Notes.txt"))
         )
@@ -284,8 +264,6 @@ class TestTheLevelItAnswers:
     async def test_a_window_filled_exactly_by_the_end_of_the_level_is_not_capped(
         self, client: GraphServiceClient, root_children: respx.Route
     ) -> None:
-        """`capped` means a cap stopped the walk with more still on offer, never that the answer
-        was short: a level that ran out on its own says False however tight the window was."""
         root_children.mock(
             return_value=_page(
                 _item_payload(_BUDGET_ID, name="Budget.xlsx"),
@@ -330,7 +308,6 @@ class TestWhatItRefuses:
         root_children: respx.Route,
         folder: str,
     ) -> None:
-        """A name, a path, a bare item id, a web address and a file handle are all not one."""
         with pytest.raises(ToolError, match="folder handle"):
             _ = await browser.browse_folder(client, folder=folder, limit=25)
 
@@ -362,7 +339,5 @@ class TestGraphFailures:
         assert browser.GRAPH_PERMISSIONS == ("Files.Read.All",)
 
     def test_a_stale_folder_handle_is_answered_with_the_recovery_that_works(self) -> None:
-        """A 404 here is not the default "check you copied the id" advice: the id was this
-        connector's own, so the recovery is to find the folder again and take the new handle."""
         assert "deleted" in browser.GRAPH_NOT_FOUND
         assert "fails in the same way" in browser.GRAPH_NOT_FOUND

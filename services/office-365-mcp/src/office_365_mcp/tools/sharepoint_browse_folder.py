@@ -1,5 +1,3 @@
-"""`sharepoint_browse_folder`: one level of one drive folder, and a handle for every row."""
-
 from collections.abc import Mapping
 from typing import Annotated
 
@@ -114,7 +112,6 @@ async def browse_folder(
 
 
 def _folder_to_browse(folder: str | None) -> DriveFolderHandle | None:
-    """The folder to list, or None for the root of the signed-in user's own OneDrive."""
     if folder is None:
         return None
     handle = drive_folder_handle(folder)
@@ -124,7 +121,6 @@ def _folder_to_browse(folder: str | None) -> DriveFolderHandle | None:
 
 
 async def _my_drive_root(client: GraphServiceClient) -> DriveFolderHandle:
-    """The root of the signed-in user's own OneDrive, as the drive id and the root item id."""
     with graph_step(STEP_MY_DRIVE):
         drive = await client.me.drive.get(
             request_configuration=RequestConfiguration[_DriveQuery](
