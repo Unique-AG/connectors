@@ -1,7 +1,8 @@
 name: Container image vulnerability gate
 description: >
-  Scan a built docker tar with Trivy and fail PRs on patchable CRITICAL findings
-  unless security-exception is set.
+  Scan a container image tar with Trivy. Fail the pull request on patchable
+  findings at the given severity. Do not fail when the security-exception
+  label is present.
 
 inputs:
   image_tar:
@@ -11,6 +12,10 @@ inputs:
     description: Trivy severity filter
     required: false
     default: CRITICAL
+  trivy_ignore_files:
+    description: Comma-separated paths to Trivy ignore files
+    required: false
+    default: ""
   trivy_timeout:
     description: Trivy scan timeout
     required: false
@@ -39,6 +44,7 @@ runs:
         severity: ${{ inputs.severity }}
         scanners: vuln
         ignore-unfixed: false
+        trivyignores: ${{ inputs.trivy_ignore_files }}
         exit-code: "0"
         timeout: ${{ inputs.trivy_timeout }}
         cache: true
@@ -53,7 +59,7 @@ runs:
         SEVERITY="${{ inputs.severity }}"
         if [ ! -s trivy-results.json ]; then
           echo "No trivy results file — treating as clean."
-          echo "✅ No ${SEVERITY} vulnerabilities reported." >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ No ${SEVERITY} findings reported." >> "$GITHUB_STEP_SUMMARY"
           exit 0
         fi
         if command -v trivy >/dev/null 2>&1; then
@@ -73,18 +79,18 @@ runs:
         unfixable_count=$(echo "$unfixable_json" | jq 'length')
         echo "Fixable ${SEVERITY}: ${fixable_count}; unfixable ${SEVERITY}: ${unfixable_count}"
         if [ "$unfixable_count" -gt 0 ]; then
-          echo "$unfixable_json" | jq -r '.[] | "::warning title=Unpatched vulnerability::\(.PkgName) \(.VulnerabilityID) (\(.Severity)) — no patch available"'
+          echo "$unfixable_json" | jq -r '.[] | "::warning title=Unpatched finding::\(.PkgName) \(.VulnerabilityID) (\(.Severity)) — no patch available"'
         fi
         if [ "$fixable_count" -eq 0 ]; then
-          echo "✅ No patchable ${SEVERITY} vulnerabilities." >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ No patchable ${SEVERITY} findings." >> "$GITHUB_STEP_SUMMARY"
           exit 0
         fi
         if [ "$IS_PULL_REQUEST" = "true" ] && [ "$SECURITY_EXCEPTION" != "true" ]; then
-          echo "$fixable_json" | jq -r '.[] | "::error title=Patchable vulnerability::\(.PkgName) \(.InstalledVersion) → \(.FixedVersion) \(.VulnerabilityID) (\(.Severity))"'
-          echo "::error::${fixable_count} patchable ${SEVERITY} finding(s). Apply the fix or add the security-exception label and re-run this job."
+          echo "$fixable_json" | jq -r '.[] | "::error title=Patchable finding::\(.PkgName) \(.InstalledVersion) → \(.FixedVersion) \(.VulnerabilityID) (\(.Severity))"'
+          echo "::error::Patchable ${SEVERITY} findings: ${fixable_count}. Apply the fix, or add the security-exception label. The label starts a new run. Do not re-run this job. A re-run reads the first run's event data."
           exit 1
         fi
-        echo "$fixable_json" | jq -r '.[] | "::warning title=Patchable vulnerability::\(.PkgName) \(.InstalledVersion) → \(.FixedVersion) \(.VulnerabilityID) (\(.Severity))"'
+        echo "$fixable_json" | jq -r '.[] | "::warning title=Patchable finding::\(.PkgName) \(.InstalledVersion) → \(.FixedVersion) \(.VulnerabilityID) (\(.Severity))"'
         if [ "$SECURITY_EXCEPTION" = "true" ]; then
           echo "security-exception label set — patchable findings reported as warnings only." >> "$GITHUB_STEP_SUMMARY"
         else
