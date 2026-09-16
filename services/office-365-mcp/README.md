@@ -32,7 +32,7 @@ invitations as it does; and `outlook_create_event_on_behalf`, which does the sam
 somebody delegated, under that person's name; and `sharepoint_search_files`, which finds a file the
 user can already open, in their OneDrive or on any SharePoint site; and `sharepoint_browse_folder`,
 which lists one level of one folder; and `sharepoint_read_file`, which returns one file as
-Microsoft stores it,
+Microsoft stores it, or asks Microsoft to convert a document to PDF first,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -330,7 +330,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `outlook-calendar-write` | the read tier, plus creating one event on the user's own calendar and inviting people to it | + `outlook_create_event` | + `Calendars.ReadWrite` | 0 |
 | `outlook-calendar-delegate` | the above, plus creating an event on a calendar somebody delegated, as that person | + `outlook_create_event_on_behalf` | + `Calendars.ReadWrite.Shared` | 0 |
 | `sharepoint-search` | find a file in the user's OneDrive or on a SharePoint site, and say where it is | `sharepoint_search_files` | `User.Read`, `Files.Read.All` | 1 |
-| `sharepoint-read` | the above, plus listing one level of a folder and returning one file itself | + `sharepoint_browse_folder`, `sharepoint_read_file` | `User.Read`, `Files.Read.All` | 1 |
+| `sharepoint-read` | the above, plus listing one level of a folder and returning one file itself, or the PDF Microsoft converts it to | + `sharepoint_browse_folder`, `sharepoint_read_file` | `User.Read`, `Files.Read.All` | 1 |
 
 `get_me` is always on, which is why no preset lists it — each of those rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
@@ -349,6 +349,15 @@ to review. `tests/test_tool_selection.py` refuses a derived preset, and refuses 
 that no preset names. The names carry a product axis from the
 start: the `outlook-*` and then the `sharepoint-*` rows joined the table as those tools landed, and
 no name already in it had to be re-cut.
+
+**Microsoft Graph cannot turn a document into text, so this connector does not pretend to.**
+There is no endpoint for it. The complete method list of the file resource has none, in the stable
+version or the preview one, and a search result carries only a short broken-up snippet.
+`sharepoint_read_file` therefore returns the file itself. What Graph does offer is a conversion to
+PDF, run on Microsoft's own servers, and the tool exposes that as `convert_to`. Ask for it when the
+goal is to read what a document says: a Word or PowerPoint file is a zip archive a reader cannot
+use, and the PDF carries the text. This connector converts nothing itself, in either case. A live
+run against the test tenant on 2026-09-16 returned a 966 KB PDF from a 6.4 MB PowerPoint file.
 
 **The Outlook rows are three axes, not one ladder.** Mail content goes `outlook-read` →
 `outlook-write` → `outlook-send`, each row adding one permission to the row above. Mailbox
