@@ -158,8 +158,12 @@ async def _resolve_scope_id(
         return await unique_sdk.Folder.resolve_scope_id_from_folder_path_async(
             user_id=user_id, company_id=company_id, folder_path=absolute
         )
-    except UniqueError, ValueError:
-        _LOGGER.info("folder_path did not resolve; filtering the unscoped walk")
+    except (UniqueError, ValueError) as exc:
+        # Name omitted: folder names can identify a customer. The exception is
+        # kept, since "did not resolve" alone cannot tell a typo from an outage.
+        _LOGGER.info(
+            "folder_path did not resolve; filtering the unscoped walk", exc_info=exc
+        )
         return None
 
 
