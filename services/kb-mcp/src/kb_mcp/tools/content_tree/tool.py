@@ -440,6 +440,11 @@ async def content_tree(
 
         # Rooting the walk at the requested folder is the whole speed fix:
         # measured on QA, 24.6s unscoped versus 2.0s for a 6.5k-file subtree.
+        # TODO [proschu2/ean]: a rooted walk yields paths relative to the root,
+        # so scoping to Contracts renders "2024/a.pdf", not "Contracts/2024/a.pdf"
+        # as the filtered walk did. Reads naturally, like ls in a directory, and
+        # matches what content_metadata already does — but it is a visible change
+        # to list/search output, so say if you would rather re-prefix the root.
         root_scope_id: str | None = None
         if folder_path:
             try:
@@ -514,7 +519,10 @@ async def content_tree(
             tree_body = _with_empty_metadata_filter_hint(
                 render_tree_with_folder_ids(
                     rendered,
-                    folder_scope_ids(rendered.files),
+                    # Ids come from the full snapshot, not the truncated one: a
+                    # folder whose files all fall past the cap would otherwise
+                    # lose the folder_id callers need to scope a follow-up call.
+                    folder_scope_ids(snapshot.files),
                     max_depth=max_depth,
                     show_files=not folders_only,
                 ),
