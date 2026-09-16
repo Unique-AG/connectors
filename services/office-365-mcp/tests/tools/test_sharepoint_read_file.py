@@ -127,6 +127,48 @@ class TestWhatComesBack:
         assert read.to_resource_content().resource.mime_type == _DOCX
 
 
+class TestTheConversionMicrosoftPerforms:
+    @pytest.mark.usefixtures("item")
+    async def test_asking_for_pdf_sends_the_query_parameter_graph_accepts(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        converted = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=b"%PDF-1.7\nsynthetic")
+        )
+
+        answer = await reader.sharepoint_read_file(client, file=_FILE, convert_to="pdf")
+
+        assert converted.calls.last.request.url.params["$format"] == "pdf", (
+            "the SDK spells Graph's `format` parameter with a dollar, and a live tenant accepts it"
+        )
+        resource = answer.to_resource_content().resource
+        assert resource.mime_type == "application/pdf", "the answer is a PDF, not the source type"
+
+    @pytest.mark.usefixtures("item")
+    async def test_a_converted_file_is_named_as_the_pdf_it_now_is(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=b"%PDF-1.7\nsynthetic")
+        )
+
+        answer = await reader.sharepoint_read_file(client, file=_FILE, convert_to="pdf")
+
+        uri = str(answer.to_resource_content().resource.uri)
+        assert uri.endswith(".pdf"), f"a converted file keeps the source name and gains .pdf: {uri}"
+        assert _NAME.removesuffix(".docx") in uri
+
+    @pytest.mark.usefixtures("item")
+    async def test_asking_for_nothing_sends_no_format_at_all(
+        self, client: GraphServiceClient, content: respx.Route
+    ) -> None:
+        _ = await _read(client)
+
+        assert content.calls.last.request.url.params == httpx.QueryParams(), (
+            "the default must be the file in its own format"
+        )
+
+
 class TestWhatItRefuses:
     async def test_a_value_that_is_not_a_handle_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -346,16 +388,32 @@ class TestHowItDeclaresItself:
         parameters = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"file"}
-        assert parameters["required"] == ["file"]
+        assert set(properties) == {"file", "convert_to"}
+        assert parameters["required"] == ["file"], "only the handle is required"
 
-    async def test_no_argument_offers_a_conversion_or_a_page_of_a_file(
+    async def test_the_only_conversion_offered_is_the_one_microsoft_performs(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        for word in ("format", "convert", "text", "page", "offset"):
+        convert = cast("Mapping[str, object]", properties["convert_to"])
+        branches = cast("list[Mapping[str, object]]", convert["anyOf"])
+        allowed = [branch["const"] for branch in branches if "const" in branch]
+
+        assert allowed == ["pdf"], "Graph also documents jpg and html, and neither works here"
+        assert "$defs" not in parameters, (
+            "a type alias would publish a $ref a client has to resolve; the value belongs inline"
+        )
+        assert convert["default"] is None, "the file's own format is what a caller gets by default"
+
+    async def test_no_argument_offers_a_page_of_a_file_or_text_extraction(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters = await _registered(transport)
+
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        for word in ("text", "page", "offset", "extract"):
             assert not [name for name in properties if word in name.casefold()]
 
     async def test_it_announces_itself_as_reading_and_changing_nothing(

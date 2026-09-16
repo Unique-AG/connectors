@@ -1,11 +1,14 @@
 from collections.abc import Mapping
-from typing import Annotated, override
+from typing import Annotated, Literal, override
 
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.utilities.types import File
 from kiota_abstractions.base_request_configuration import RequestConfiguration
+from msgraph.generated.drives.item.items.item.content.content_request_builder import (
+    ContentRequestBuilder,
+)
 from msgraph.generated.drives.item.items.item.drive_item_item_request_builder import (
     DriveItemItemRequestBuilder,
 )
@@ -41,8 +44,11 @@ a sharepoint_search_files hit or a sharepoint_browse_folder row. The file comes 
 original format, exactly as Microsoft stores it. This tool converts nothing and it reads nothing \
 out of the file. It does not turn a document into text. A Word file comes back as a Word file. A \
 PowerPoint file comes back as a PowerPoint file. Open the file yourself after this tool returns \
-it, or give it to the user. A folder has no content: browse a folder with \
-sharepoint_browse_folder. A file above {MAX_BYTES // _MEGABYTE} MB is refused, because the whole \
+it, or give it to the user. To read what a document says, set `convert_to` to `pdf`: Microsoft \
+then converts the file on its own servers and sends a PDF, which carries the text that a Word or \
+PowerPoint file hides inside a zip archive. This connector still converts nothing itself. A \
+folder has no content: browse a folder with sharepoint_browse_folder. A file above \
+{MAX_BYTES // _MEGABYTE} MB is refused, because the whole \
 file travels in one message.\
 """
 
@@ -90,6 +96,11 @@ GRAPH_NOT_FOUND = (
 )
 
 _ItemQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryParameters
+_ContentQuery = ContentRequestBuilder.ContentRequestBuilderGetQueryParameters
+
+_PDF_MEDIA_TYPE = "application/pdf"
+
+type ConvertTo = Literal["pdf"]
 
 
 class _FileFromGraph(File):
@@ -102,7 +113,9 @@ class _FileFromGraph(File):
         return self.mime_type
 
 
-async def sharepoint_read_file(client: GraphServiceClient, *, file: str) -> File:
+async def sharepoint_read_file(
+    client: GraphServiceClient, *, file: str, convert_to: ConvertTo | None = None
+) -> File:
     handle = drive_file_handle(file)
     if handle is None:
         raise ToolError(_NOT_A_FILE_HANDLE)
@@ -118,13 +131,15 @@ async def sharepoint_read_file(client: GraphServiceClient, *, file: str) -> File
     if item.size > MAX_BYTES:
         raise ToolError(_too_large(size=item.size, web_url=item.web_url))
 
-    content = await _content(client, handle)
+    content = await _content(client, handle, convert_to=convert_to)
     if content is None and item.size > 0:
         raise ToolError(_NOTHING_CAME_BACK)
     body = content or b""
     if len(body) > MAX_BYTES:
         raise ToolError(_too_large(size=len(body), web_url=item.web_url))
-    return _FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
+    if convert_to is None:
+        return _FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
+    return _FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE)
 
 
 async def _item(client: GraphServiceClient, handle: DriveFileHandle) -> DriveItem | None:
@@ -140,13 +155,27 @@ async def _item(client: GraphServiceClient, handle: DriveFileHandle) -> DriveIte
         )
 
 
-async def _content(client: GraphServiceClient, handle: DriveFileHandle) -> bytes | None:
+async def _content(
+    client: GraphServiceClient, handle: DriveFileHandle, *, convert_to: ConvertTo | None
+) -> bytes | None:
+    content = (
+        client.drives.by_drive_id(handle.drive_id).items.by_drive_item_id(handle.item_id).content
+    )
     with graph_errors(TOOL_NAME, step=STEP_CONTENT):
-        return await (
-            client.drives.by_drive_id(handle.drive_id)
-            .items.by_drive_item_id(handle.item_id)
-            .content.get()
+        if convert_to is None:
+            return await content.get()
+        return await content.get(
+            request_configuration=RequestConfiguration[_ContentQuery](
+                query_parameters=_ContentQuery(format=convert_to)
+            )
         )
+
+
+def _converted_name(name: str | None) -> str | None:
+    if name is None:
+        return None
+    stem = name.rsplit(".", 1)[0] if "." in name else name
+    return f"{stem}.pdf"
 
 
 def _media_type(item: DriveItem, body: bytes) -> str:
@@ -220,6 +249,23 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
+        convert_to: Annotated[
+            Literal["pdf"] | None,
+            Field(
+                description=(
+                    "Ask Microsoft to convert the file to PDF before it is sent. Leave it out to "
+                    + "get the file in its own format, which is the default. Microsoft does the "
+                    + "conversion on its own servers; this connector never converts anything. Set "
+                    + "it to `pdf` when you need to read what a document says, because a Word, "
+                    + "PowerPoint or Excel file is a zip archive that you cannot read, and a PDF "
+                    + "carries the text. Microsoft converts these file types: doc, docx, dot, "
+                    + "dotx, eml, epub, htm, html, md, msg, odp, ods, odt, pps, ppsx, ppt, pptx, "
+                    + "rtf, tif, tiff, xls, xlsm and xlsx. A file that is already a PDF is not on "
+                    + "that list, so read it with no conversion. Microsoft says not every file "
+                    + "can be converted, so a conversion can fail for a file that is on the list."
+                )
+            ),
+        ] = None,
         client: GraphServiceClient = graph,
     ) -> File:
-        return await sharepoint_read_file(client, file=file)
+        return await sharepoint_read_file(client, file=file, convert_to=convert_to)

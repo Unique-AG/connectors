@@ -45,7 +45,8 @@ class DriveItemSummary(BaseModel):
         description=(
             "True for a folder, false for a file. Graph uses one type for both and tells them "
             + "apart by which facet it returns, so this is the only reliable test. A folder has "
-            + "no content to read; browse it instead."
+            + "no content to read; browse it instead. A search never returns a folder, so every "
+            + "search result has this false; a folder listing returns both."
         )
     )
     size: int | None = Field(
@@ -97,14 +98,17 @@ class DriveItemSummary(BaseModel):
             "Where the item sits inside its drive, as Graph's own percent-encoded path, for "
             + "example `/drive/root:/Reports/2026`. Read it to tell two files of the same name "
             + "apart. It is a description of a location and not a handle: browsing needs the "
-            + "parent folder's own `uri`."
+            + "parent folder's own `uri`. Always null on a search result, because Microsoft's "
+            + "search index does not carry the path. Browse a folder to get it."
         )
     )
     drive_type: str | None = Field(
         description=(
             "Which kind of drive holds this item, as Graph names it: `personal` or `business` for "
             + "a OneDrive, and `documentLibrary` for a SharePoint document library. This is how to "
-            + "tell a file in the user's own OneDrive from one on a SharePoint site."
+            + "tell a file in the user's own OneDrive from one on a SharePoint site. Always null "
+            + "on a search result, because Microsoft's search index does not carry it. Browse a "
+            + "folder to get it."
         )
     )
 
