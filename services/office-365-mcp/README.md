@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-nine
+Users sign in with their own Microsoft account and the server acts as them. It exposes thirty-two
 MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
 most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
 channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
@@ -29,7 +29,10 @@ and `outlook_list_events`, what sits on one of those calendars between two dates
 `outlook_read_event`, one of those events in full with every attendee and their answer; and
 `outlook_create_event`, which puts one event on the user's own calendar and sends the
 invitations as it does; and `outlook_create_event_on_behalf`, which does the same on a calendar
-somebody delegated, under that person's name,
+somebody delegated, under that person's name; and `sharepoint_search_files`, which finds a file the
+user can already open, in their OneDrive or on any SharePoint site; and `sharepoint_browse_folder`,
+which lists one level of one folder; and `sharepoint_read_file`, which returns one file as
+Microsoft stores it,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -82,7 +85,7 @@ copies would be a bug a caller could see — a handle one tool minted and anothe
 answers to "who am I", a refusal that sounds like a different server. What does not belong there is
 anything one tool could own — a description, an argument, an answer shape, a request, a refusal.
 
-**`handles.py` spells one segment per family, and one family spells two.** Every `teams:///`
+**`handles.py` spells one segment per family, and four families spell two.** Every `teams:///`
 family and every `outlook:///` mail family names a single id, and so does a calendar: Microsoft
 documents that a container type supports no immutable id, because its regular ids
 *"were already constant"*. An event is `outlook:///events/{calendar}/{event}`, two
@@ -99,9 +102,9 @@ at all**, taking its own frozen `GraphSettings` instead of reading config; that 
 tool file is one in name only; that **no tool module imports another tool module**, which is what
 independent means and is the rule the whole layout exists for; that **only `create_app` constructs a
 config**, so nothing downstream can quietly re-read the environment and disagree with the app it
-runs in; that **`shared/handles.py` is the only module that builds or parses a `teams:///` URI**
-(showing the shape to a model in a description, an `examples=` or a refusal is prose and is not
-that); and that **a package is entered through its `__init__`** — `graph_client/`, `server/` and
+runs in; that **`shared/handles.py` is the only module that builds or parses a `teams:///`, `outlook:///`
+or `sharepoint:///` URI** (showing the shape to a model in a description, an `examples=` or a
+refusal is prose and is not that); and that **a package is entered through its `__init__`** — `graph_client/`, `server/` and
 `tools/` each publish an `__all__`, and `shared/` deliberately does not, being a grouping whose
 modules are the units and whose consumers say which one they depend on at the import line.
 
@@ -168,6 +171,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Calendars.Read.Shared` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event_on_behalf` (the pre-read) |
 | `Calendars.ReadWrite` | Delegated | No | `outlook_create_event` |
 | `Calendars.ReadWrite.Shared` | Delegated | No | `outlook_create_event_on_behalf` |
+| `Files.Read.All` | Delegated | **Yes** | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_read_file` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -276,6 +280,14 @@ one. Each is the least-privileged permission Microsoft documents for its collect
 refusing the message permission still lists teams and channels, and each tool's 403 names only the
 permission its own request needed.
 
+**`Files.Read.All` needs an administrator, and that is Microsoft's rule and not a choice made
+here.** The three file tools read through it. `sharepoint_search_files` searches with Microsoft's
+Search API, and that API does not accept the narrower `Files.Read` for files. So there is no
+cheaper permission for a search across sites. Microsoft applies each file's own access control
+inside the search, and a user therefore gets back only files they can already open. The permission
+lets the connector ask about any file; it does not let a user read a file they could not read
+before.
+
 **State.** Every token is a reference token re-validated on each request. State location decides
 whether a restart or second replica causes loss. FastMCP defaults to an encrypted file tree in
 process home. This service uses Postgres. The store creates table oauth_kv on first use. The
@@ -317,6 +329,8 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `outlook-calendar` | name every calendar this mailbox reaches, own and delegated, read what sits on one between two dates, and read one event in full | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` | `User.Read`, `Calendars.Read`, `Calendars.Read.Shared` | 0 |
 | `outlook-calendar-write` | the read tier, plus creating one event on the user's own calendar and inviting people to it | + `outlook_create_event` | + `Calendars.ReadWrite` | 0 |
 | `outlook-calendar-delegate` | the above, plus creating an event on a calendar somebody delegated, as that person | + `outlook_create_event_on_behalf` | + `Calendars.ReadWrite.Shared` | 0 |
+| `sharepoint-search` | find a file in the user's OneDrive or on a SharePoint site, and say where it is | `sharepoint_search_files` | `User.Read`, `Files.Read.All` | 1 |
+| `sharepoint-read` | the above, plus listing one level of a folder and returning one file itself | + `sharepoint_browse_folder`, `sharepoint_read_file` | `User.Read`, `Files.Read.All` | 1 |
 
 `get_me` is always on, which is why no preset lists it — each of those rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
@@ -333,7 +347,8 @@ tool of another product on the day it lands, put that tool's permission on the c
 every `teams` deployment, and cost every signed-in user a fresh sign-in — with no edit for anyone
 to review. `tests/test_tool_selection.py` refuses a derived preset, and refuses a registered tool
 that no preset names. The names carry a product axis from the
-start: `outlook-*` and `sharepoint-*` join the table as those tools land, without re-cutting these.
+start: the `outlook-*` and then the `sharepoint-*` rows joined the table as those tools landed, and
+no name already in it had to be re-cut.
 
 **The Outlook rows are three axes, not one ladder.** Mail content goes `outlook-read` →
 `outlook-write` → `outlook-send`, each row adding one permission to the row above. Mailbox
