@@ -39,6 +39,9 @@ from office_365_mcp.tools import (
     outlook_search_mail,
     outlook_send_draft,
     outlook_set_automatic_reply,
+    sharepoint_browse_folder,
+    sharepoint_read_file,
+    sharepoint_search_files,
     teams_browse_channel,
     teams_list_channels,
     teams_list_chats,
@@ -151,6 +154,9 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_read_event,
     outlook_create_event,
     outlook_create_event_on_behalf,
+    sharepoint_search_files,
+    sharepoint_browse_folder,
+    sharepoint_read_file,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -259,6 +265,12 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_read_event",
         "outlook_create_event",
         "outlook_create_event_on_behalf",
+    ),
+    "sharepoint-search": ("sharepoint_search_files",),
+    "sharepoint-read": (
+        "sharepoint_search_files",
+        "sharepoint_browse_folder",
+        "sharepoint_read_file",
     ),
 }
 

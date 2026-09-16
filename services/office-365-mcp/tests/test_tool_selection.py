@@ -325,6 +325,7 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "outlook_list_events": {"calendar_ref": ("outlook_list_calendars",)},
     "outlook_read_event": {"uri": ("outlook_list_events",)},
     "outlook_create_event_on_behalf": {"calendar_ref": ("outlook_list_calendars",)},
+    "sharepoint_read_file": {"file": ("sharepoint_search_files", "sharepoint_browse_folder")},
 }
 
 
@@ -367,6 +368,7 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "outlook_create_event_on_behalf": frozenset(
         {"subject", "starts_at", "ends_at", "time_zone", "attendees"}
     ),
+    "sharepoint_search_files": frozenset({"query"}),
 }
 
 
@@ -641,6 +643,8 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         0,
         6,
     ),
+    (ToolsPreset.SHAREPOINT_SEARCH, ("User.Read", "Files.Read.All"), 1, 2),
+    (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 4),
 )
 
 

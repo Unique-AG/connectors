@@ -612,6 +612,7 @@ _WINDOWED_TOOLS: Mapping[str, tuple[str, str]] = {
     "outlook_list_events": ("starts_on", "ends_on"),
     "outlook_search_mail": ("received_after", "received_before"),
     "teams_search_messages": ("sent_after", "sent_before"),
+    "sharepoint_search_files": ("modified_after", "modified_before"),
 }
 
 

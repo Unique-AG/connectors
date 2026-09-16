@@ -730,6 +730,11 @@ def _is_chosen_in_code(named: ast.expr, chosen: frozenset[str]) -> bool:
 GRAPH_STEPS = frozenset(
     {
         "signed_in_user",
+        "file_search",
+        "my_drive",
+        "folder_children",
+        "drive_item",
+        "drive_content",
         "chats",
         "joined_teams",
         "channels",
