@@ -30,18 +30,18 @@ def transport_settings(**overrides: object) -> TransportSettings:
 
 
 class FakeSession:
-    """Hands out a token and counts renewals, so a 401 path is observable."""
+    """Hands out a token and counts refreshes, so a 401 path is observable."""
 
     def __init__(self, token: str = "token-1") -> None:
         self.token: str = token
-        self.renewals: int = 0
+        self.refreshes: int = 0
 
     async def get_access_token(self) -> str:
         return self.token
 
     async def refresh_access_token(self) -> str:
-        self.renewals += 1
-        self.token = f"token-{self.renewals + 1}"
+        self.refreshes += 1
+        self.token = f"token-{self.refreshes + 1}"
         return self.token
 
     def subject(self) -> str:
@@ -63,13 +63,13 @@ def build_client(
             yield client
 
     @asynccontextmanager
-    async def gate(_subject: str) -> AsyncGenerator[None]:
+    async def limit_concurrency(_subject: str) -> AsyncGenerator[None]:
         yield
 
     client = WithIntelligenceClient(
         resolved,
         http_client=http_client,
-        gate=gate,
+        limit_concurrency=limit_concurrency,
         retry_policy=RetryPolicy(max_attempts=max_attempts, max_wait_seconds=0.0),
         session=caller,
     )

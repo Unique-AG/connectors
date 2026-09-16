@@ -1,6 +1,6 @@
 """WI authentication public API."""
 
-from mcp_credential_auth import ThrottleConfig
+from mcp_credential_auth import LoginThrottleConfig
 
 from with_intelligence_mcp.features.auth.cleanup import cleanup_lifespan
 from with_intelligence_mcp.features.auth.context import (
@@ -12,7 +12,7 @@ from with_intelligence_mcp.features.auth.provider import WithIntelligenceOAuthPr
 
 __all__ = [
     "NotConnectedError",
-    "ThrottleConfig",
+    "LoginThrottleConfig",
     "WithIntelligenceAuthContext",
     "WithIntelligenceOAuthProvider",
     "cleanup_lifespan",

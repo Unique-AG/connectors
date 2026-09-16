@@ -1,4 +1,4 @@
-"""Resolving and renewing the caller's WI session, and what happens when it cannot be."""
+"""Resolving and refreshing the caller's WI session, and what happens when it cannot be."""
 
 import asyncio
 import uuid
@@ -8,16 +8,20 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from cryptography.fernet import Fernet
 from pydantic import SecretStr
+from sqlalchemy import select
 
 from tests.conftest import DatabaseFixture
-from with_intelligence_mcp.db import read_session, transaction
+from with_intelligence_mcp.db import WithIntelligenceSession, read_session, transaction
 from with_intelligence_mcp.features.auth import NotConnectedError, WithIntelligenceAuthContext
 from with_intelligence_mcp.features.auth.session_store import (
-    get_session,
-    lock_session,
-    save_session,
+    get_stored_wi_session,
+    upsert_stored_wi_session,
 )
-from with_intelligence_mcp.with_intelligence_client import SignInFailed, Unreachable, WiSession
+from with_intelligence_mcp.with_intelligence_client import (
+    AuthenticationRejected,
+    Unreachable,
+    WiSession,
+)
 
 KEY = Fernet.generate_key()
 
@@ -63,7 +67,7 @@ def _context(
 async def _store(db: DatabaseFixture, stored: WiSession, *, username: str | None = None) -> str:
     _, factory = db
     async with transaction(factory) as session:
-        return await save_session(
+        return await upsert_stored_wi_session(
             session,
             str(uuid.uuid4()),
             username or f"ctx-{uuid.uuid4().hex[:8]}@example.invalid",
@@ -88,9 +92,9 @@ class TestReadingTheStoredSession:
     async def test_a_stored_session_is_returned_for_its_subject(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        user_id = await _store(db, _session("held"))
+        subject = await _store(db, _session("held"))
         context, _ = _context(db)
-        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(subject), raising=True)
         current = await context.current_session()
         assert current.access_token.get_secret_value() == "held"
 
@@ -105,136 +109,145 @@ class TestReadingTheStoredSession:
             _ = await context.current_session()
 
 
-class TestRenewal:
-    async def test_a_stale_session_is_renewed_and_written_back(
+class TestRefresh:
+    async def test_a_stale_session_is_refreshed_and_written_back(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The refresh token may rotate, so the row has to carry the new one."""
         _, factory = db
-        user_id = await _store(db, _session("old", age=timedelta(hours=2)))
+        subject = await _store(db, _session("old", age=timedelta(hours=2)))
         context, _ = _context(db)
-        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(subject), raising=True)
 
-        async def renew(_stale: WiSession) -> WiSession:
+        async def refresh(_stale: WiSession) -> WiSession:
             return _session("rotated")
 
-        renewed = await context.renew_session(renew)
-        assert renewed.access_token.get_secret_value() == "rotated"
+        refreshed = await context.refresh_session(refresh)
+        assert refreshed.access_token.get_secret_value() == "rotated"
         async with read_session(factory) as session:
-            stored = await get_session(session, user_id, KEY)
+            stored = await get_stored_wi_session(session, subject, KEY)
         assert stored is not None
         assert stored.refresh_token.get_secret_value() == "refresh-rotated"
 
-    async def test_a_session_another_replica_already_renewed_is_not_renewed_again(
+    async def test_a_session_another_replica_already_refreshed_is_not_refreshed_again(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """What the row lock buys: the loser of the race reads the winner's result."""
-        user_id = await _store(db, _session("fresh"))
+        subject = await _store(db, _session("fresh"))
         context, _ = _context(db)
-        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(subject), raising=True)
         calls: list[str] = []
 
-        async def renew(_stale: WiSession) -> WiSession:
-            calls.append("renewed")
+        async def refresh(_stale: WiSession) -> WiSession:
+            calls.append("refreshed")
             return _session("should-not-happen")
 
-        current = await context.renew_session(renew)
+        current = await context.refresh_session(refresh)
         assert calls == []
         assert current.access_token.get_secret_value() == "fresh"
 
-    async def test_a_rejected_fresh_session_is_renewed(
+    async def test_a_rejected_fresh_session_is_refreshed(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         stale = _session("rejected")
-        user_id = await _store(db, stale)
+        subject = await _store(db, stale)
         context, _ = _context(db)
-        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(subject), raising=True)
 
-        async def renew(_stale: WiSession) -> WiSession:
-            return _session("renewed")
+        async def refresh(_stale: WiSession) -> WiSession:
+            return _session("refreshed")
 
-        current = await context.renew_session(renew, stale.model_copy())
-        assert current.access_token.get_secret_value() == "renewed"
+        current = await context.refresh_session(refresh, stale.model_copy())
+        assert current.access_token.get_secret_value() == "refreshed"
 
     async def test_http_refresh_does_not_hold_the_session_row_lock(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _, factory = db
-        user_id = await _store(db, _session("old", age=timedelta(hours=2)))
+        subject = await _store(db, _session("old", age=timedelta(hours=2)))
         context, _ = _context(db)
-        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(subject), raising=True)
         started = asyncio.Event()
         release = asyncio.Event()
-        renewed = _session("renewed")
+        refreshed = _session("refreshed")
 
-        async def renew(_stale: WiSession) -> WiSession:
+        async def refresh(_stale: WiSession) -> WiSession:
             started.set()
             await release.wait()
-            return renewed
+            return refreshed
 
-        renewal = asyncio.create_task(context.renew_session(renew))
+        refresh_task = asyncio.create_task(context.refresh_session(refresh))
         await started.wait()
         async with transaction(factory) as session:
-            stored = await asyncio.wait_for(lock_session(session, user_id, KEY), timeout=0.2)
-        assert stored is not None
+            locked_subject = await asyncio.wait_for(
+                session.scalar(
+                    select(WithIntelligenceSession.user_id)
+                    .where(WithIntelligenceSession.user_id == subject)
+                    .with_for_update()
+                ),
+                timeout=0.2,
+            )
+        assert locked_subject == subject
 
         release.set()
-        assert await renewal == renewed
+        assert await refresh_task == refreshed
 
     async def test_concurrent_replicas_share_one_refresh(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        user_id = await _store(db, _session("old", age=timedelta(hours=2)))
+        subject = await _store(db, _session("old", age=timedelta(hours=2)))
         first, _ = _context(db)
         second, _ = _context(db)
-        monkeypatch.setattr(type(first), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(first), "current_subject", _fixed_subject(subject), raising=True)
         calls = 0
 
-        async def renew(_stale: WiSession) -> WiSession:
+        async def refresh(_stale: WiSession) -> WiSession:
             nonlocal calls
             calls += 1
             await asyncio.sleep(0.05)
-            return _session("renewed")
+            return _session("refreshed")
 
         sessions = await asyncio.gather(
-            first.renew_session(renew),
-            second.renew_session(renew),
+            first.refresh_session(refresh),
+            second.refresh_session(refresh),
         )
 
         assert calls == 1
-        assert {session.access_token.get_secret_value() for session in sessions} == {"renewed"}
+        assert {session.access_token.get_secret_value() for session in sessions} == {"refreshed"}
 
     async def test_concurrent_login_wins_over_a_successful_refresh(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _, factory = db
         username = f"ctx-{uuid.uuid4().hex[:8]}@example.invalid"
-        user_id = await _store(
+        subject = await _store(
             db,
             _session("old", age=timedelta(hours=2)),
             username=username,
         )
         context, _ = _context(db)
-        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(subject), raising=True)
         started = asyncio.Event()
         release = asyncio.Event()
 
-        async def renew(_stale: WiSession) -> WiSession:
+        async def refresh(_stale: WiSession) -> WiSession:
             started.set()
             await release.wait()
             return _session("refresh")
 
-        renewal = asyncio.create_task(context.renew_session(renew))
+        refresh_task = asyncio.create_task(context.refresh_session(refresh))
         await started.wait()
         async with transaction(factory) as session:
-            await save_session(session, str(uuid.uuid4()), username, _session("login"), KEY)
+            await upsert_stored_wi_session(
+                session, str(uuid.uuid4()), username, _session("login"), KEY
+            )
         release.set()
 
-        result = await renewal
+        result = await refresh_task
 
         assert result.access_token.get_secret_value() == "login"
         async with read_session(factory) as session:
-            stored = await get_session(session, user_id, KEY)
+            stored = await get_stored_wi_session(session, subject, KEY)
         assert stored is not None
         assert stored.access_token.get_secret_value() == "login"
 
@@ -244,40 +257,46 @@ class TestRenewal:
         _, factory = db
         username = f"ctx-{uuid.uuid4().hex[:8]}@example.invalid"
         stale = _session("old", age=timedelta(hours=2))
-        user_id = await _store(db, stale, username=username)
+        subject = await _store(db, stale, username=username)
         context, revocations = _context(db)
-        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(subject), raising=True)
         started = asyncio.Event()
         release = asyncio.Event()
 
         async def refuse(_stale: WiSession) -> WiSession:
             started.set()
             await release.wait()
-            raise SignInFailed("rejected")
+            raise AuthenticationRejected("rejected")
 
-        renewal = asyncio.create_task(context.renew_session(refuse, stale))
+        refresh = asyncio.create_task(context.refresh_session(refuse, stale))
         await started.wait()
         async with transaction(factory) as session:
-            await save_session(session, str(uuid.uuid4()), username, _session("login"), KEY)
+            await upsert_stored_wi_session(
+                session, str(uuid.uuid4()), username, _session("login"), KEY
+            )
         release.set()
 
-        result = await renewal
+        result = await refresh
 
         assert result.access_token.get_secret_value() == "login"
         assert revocations.subjects == []
 
-    async def test_a_refused_renewal_revokes_the_callers_mcp_tokens(
+    async def test_a_refused_refresh_revokes_the_callers_mcp_tokens(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The password is not stored, so a refused refresh requires another login."""
         _, factory = db
-        user_id = await _store(db, _session("dead", age=timedelta(hours=2)))
+        subject = await _store(db, _session("dead", age=timedelta(hours=2)))
         revocations = Revocations()
 
         async def revoke(subject: str) -> None:
             async with transaction(factory) as session:
-                locked = await lock_session(session, subject, KEY)
-            assert locked is not None
+                locked_subject = await session.scalar(
+                    select(WithIntelligenceSession.user_id)
+                    .where(WithIntelligenceSession.user_id == subject)
+                    .with_for_update()
+                )
+            assert locked_subject == subject
             await revocations(subject)
 
         context = WithIntelligenceAuthContext(
@@ -285,34 +304,34 @@ class TestRenewal:
             encryption_key=KEY,
             revoke_tokens_for_subject=revoke,
         )
-        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(subject), raising=True)
 
         async def refuse(_stale: WiSession) -> WiSession:
-            raise SignInFailed("refresh token spent")
+            raise AuthenticationRejected("refresh token spent")
 
-        with pytest.raises(NotConnectedError, match="could not be renewed"):
-            _ = await asyncio.wait_for(context.renew_session(refuse), timeout=1)
-        assert revocations.subjects == [user_id]
+        with pytest.raises(NotConnectedError, match="could not be refreshed"):
+            _ = await asyncio.wait_for(context.refresh_session(refuse), timeout=1)
+        assert revocations.subjects == [subject]
 
     async def test_an_outage_does_not_revoke_the_callers_mcp_tokens(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _, factory = db
-        user_id = await _store(db, _session("stale", age=timedelta(hours=2)))
+        subject = await _store(db, _session("stale", age=timedelta(hours=2)))
         context, revocations = _context(db)
-        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(subject), raising=True)
 
         async def unavailable(_stale: WiSession) -> WiSession:
             raise Unreachable("WI is unavailable")
 
         with pytest.raises(Unreachable):
-            _ = await context.renew_session(unavailable)
+            _ = await context.refresh_session(unavailable)
         assert revocations.subjects == []
         async with read_session(factory) as session:
-            stored = await get_session(session, user_id, KEY)
+            stored = await get_stored_wi_session(session, subject, KEY)
         assert stored is not None
 
-    async def test_renewing_without_a_stored_session_is_reported_not_retried(
+    async def test_refreshing_without_a_stored_session_is_reported_not_retried(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         context, _ = _context(db)
@@ -320,11 +339,11 @@ class TestRenewal:
             type(context), "current_subject", _fixed_subject(str(uuid.uuid4())), raising=True
         )
 
-        async def renew(_stale: WiSession) -> WiSession:
+        async def refresh(_stale: WiSession) -> WiSession:
             return _session("x")
 
         with pytest.raises(NotConnectedError):
-            _ = await context.renew_session(renew)
+            _ = await context.refresh_session(refresh)
 
 
 class TestAnUnreadableBlob:
@@ -333,31 +352,31 @@ class TestAnUnreadableBlob:
     ) -> None:
         """Nothing can recover it, so the honest answer is to ask the user to reconnect."""
         _, factory = db
-        user_id = await _store(db, _session("orphaned"))
+        subject = await _store(db, _session("orphaned"))
         other_key = Fernet.generate_key()
         context = WithIntelligenceAuthContext(
             session_factory=factory,
             encryption_key=other_key,
             revoke_tokens_for_subject=Revocations(),
         )
-        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(subject), raising=True)
         with pytest.raises(NotConnectedError, match="could not be read"):
             _ = await context.current_session()
 
-    async def test_a_rotated_encryption_key_during_renewal_is_not_connected(
+    async def test_a_rotated_encryption_key_during_refresh_is_not_connected(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _, factory = db
-        user_id = await _store(db, _session("orphaned"))
+        subject = await _store(db, _session("orphaned"))
         context = WithIntelligenceAuthContext(
             session_factory=factory,
             encryption_key=Fernet.generate_key(),
             revoke_tokens_for_subject=Revocations(),
         )
-        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(user_id), raising=True)
+        monkeypatch.setattr(type(context), "current_subject", _fixed_subject(subject), raising=True)
 
-        async def renew(_stale: WiSession) -> WiSession:
+        async def refresh(_stale: WiSession) -> WiSession:
             return _session("unused")
 
         with pytest.raises(NotConnectedError, match="could not be read"):
-            _ = await context.renew_session(renew)
+            _ = await context.refresh_session(refresh)

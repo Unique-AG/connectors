@@ -2,7 +2,7 @@ from with_intelligence_mcp.features.auth import WithIntelligenceAuthContext
 from with_intelligence_mcp.features.wi_session.wi_session_cache import WiSessionCache
 
 
-class CallerWiSession:
+class CallerWiSessionProvider:
     """Provides the current caller's WI access token."""
 
     def __init__(self, cache: WiSessionCache, context: WithIntelligenceAuthContext) -> None:
@@ -11,12 +11,12 @@ class CallerWiSession:
 
     async def get_access_token(self) -> str:
         return await self._cache.get_access_token(
-            self.subject(), self._context.current_session, self._context.renew_session
+            self.subject(), self._context.current_session, self._context.refresh_session
         )
 
     async def refresh_access_token(self) -> str:
         return await self._cache.refresh_access_token(
-            self.subject(), self._context.current_session, self._context.renew_session
+            self.subject(), self._context.current_session, self._context.refresh_session
         )
 
     def subject(self) -> str:

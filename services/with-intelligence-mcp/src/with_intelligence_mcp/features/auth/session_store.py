@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import func, select, update
@@ -10,7 +11,13 @@ from with_intelligence_mcp.features.auth.crypto import decrypt_session, encrypt_
 from with_intelligence_mcp.with_intelligence_client import WiSession
 
 
-async def find_user_id_by_username(session: AsyncSession, username: str) -> str | None:
+@dataclass(frozen=True)
+class SessionRefreshClaim:
+    stored_session: WiSession | None
+    acquired: bool
+
+
+async def find_subject_by_username(session: AsyncSession, username: str) -> str | None:
     """Return the durable user ID for a known username."""
     result = await session.execute(
         select(WithIntelligenceSession.user_id).where(
@@ -20,9 +27,9 @@ async def find_user_id_by_username(session: AsyncSession, username: str) -> str 
     return result.scalar_one_or_none()
 
 
-async def save_session(
+async def upsert_stored_wi_session(
     session: AsyncSession,
-    user_id: str,
+    subject: str,
     username: str,
     wi_session: WiSession,
     key: bytes,
@@ -31,7 +38,7 @@ async def save_session(
     encrypted_blob = encrypt_session(wi_session, key)
     statement = (
         pg_insert(WithIntelligenceSession)
-        .values(user_id=user_id, wi_username=username, encrypted_blob=encrypted_blob)
+        .values(user_id=subject, wi_username=username, encrypted_blob=encrypted_blob)
         .on_conflict_do_update(
             index_elements=[WithIntelligenceSession.wi_username],
             set_={
@@ -47,69 +54,48 @@ async def save_session(
     return result.scalar_one()
 
 
-async def get_session(session: AsyncSession, user_id: str, key: bytes) -> WiSession | None:
+async def get_stored_wi_session(
+    session: AsyncSession, subject: str, key: bytes
+) -> WiSession | None:
     """Fetch and decrypt a user's stored session, or `None` if they never connected."""
-    row = await session.get(WithIntelligenceSession, user_id)
+    row = await session.get(WithIntelligenceSession, subject)
     if row is None:
         return None
     return decrypt_session(row.encrypted_blob, key)
-
-
-async def lock_session(session: AsyncSession, user_id: str, key: bytes) -> WiSession | None:
-    """Lock and return a stored WI session for renewal."""
-    result = await session.execute(
-        select(WithIntelligenceSession)
-        .where(WithIntelligenceSession.user_id == user_id)
-        .with_for_update()
-    )
-    row = result.scalar_one_or_none()
-    if row is None:
-        return None
-    return decrypt_session(row.encrypted_blob, key)
-
-
-async def replace_session(
-    session: AsyncSession, user_id: str, wi_session: WiSession, key: bytes
-) -> None:
-    """Write a renewed session back over the locked row."""
-    row = await session.get(WithIntelligenceSession, user_id)
-    if row is None:
-        return
-    row.encrypted_blob = encrypt_session(wi_session, key)
 
 
 async def claim_session_refresh(
     session: AsyncSession,
-    user_id: str,
+    subject: str,
     key: bytes,
     claim_id: uuid.UUID,
-    expired_before: datetime,
-) -> tuple[WiSession | None, bool]:
+    claim_expired_before: datetime,
+) -> SessionRefreshClaim:
     result = await session.execute(
         select(WithIntelligenceSession)
-        .where(WithIntelligenceSession.user_id == user_id)
+        .where(WithIntelligenceSession.user_id == subject)
         .with_for_update()
     )
     row = result.scalar_one_or_none()
     if row is None:
-        return None, False
+        return SessionRefreshClaim(stored_session=None, acquired=False)
     stored = decrypt_session(row.encrypted_blob, key)
     if (
         row.refresh_claim_id is not None
         and row.refresh_claimed_at is not None
-        and row.refresh_claimed_at >= expired_before
+        and row.refresh_claimed_at >= claim_expired_before
     ):
-        return stored, False
+        return SessionRefreshClaim(stored_session=stored, acquired=False)
     row.refresh_claim_id = claim_id
     row.refresh_claimed_at = func.now()
-    return stored, True
+    return SessionRefreshClaim(stored_session=stored, acquired=True)
 
 
-async def release_session_refresh(session: AsyncSession, user_id: str, claim_id: uuid.UUID) -> bool:
+async def release_session_refresh(session: AsyncSession, subject: str, claim_id: uuid.UUID) -> bool:
     result = await session.execute(
         update(WithIntelligenceSession)
         .where(
-            WithIntelligenceSession.user_id == user_id,
+            WithIntelligenceSession.user_id == subject,
             WithIntelligenceSession.refresh_claim_id == claim_id,
         )
         .values(refresh_claim_id=None, refresh_claimed_at=None)
@@ -118,9 +104,9 @@ async def release_session_refresh(session: AsyncSession, user_id: str, claim_id:
     return result.scalar_one_or_none() is not None
 
 
-async def replace_claimed_session(
+async def complete_session_refresh(
     session: AsyncSession,
-    user_id: str,
+    subject: str,
     wi_session: WiSession,
     key: bytes,
     claim_id: uuid.UUID,
@@ -128,7 +114,7 @@ async def replace_claimed_session(
     result = await session.execute(
         update(WithIntelligenceSession)
         .where(
-            WithIntelligenceSession.user_id == user_id,
+            WithIntelligenceSession.user_id == subject,
             WithIntelligenceSession.refresh_claim_id == claim_id,
         )
         .values(

@@ -6,10 +6,14 @@ from typing import Protocol, cast, runtime_checkable
 
 import pytest
 
-from with_intelligence_mcp import dependencies
-from with_intelligence_mcp.teardown import PROVIDERS, close_singletons
+from with_intelligence_mcp import dependencies, teardown
+from with_intelligence_mcp.teardown import close_singletons
 
 _SRC = pathlib.Path(__file__).parent.parent / "src" / "with_intelligence_mcp"
+_TEARDOWN_MEMBERS = cast("dict[str, object]", cast("object", vars(teardown)))
+_PROVIDERS = cast(
+    "tuple[object, ...]", _TEARDOWN_MEMBERS["_CACHED_DEPENDENCY_PROVIDERS"]
+)
 
 
 @runtime_checkable
@@ -47,12 +51,12 @@ def _cached_provider_names(module_name: str) -> set[str]:
 
 class TestProvidersCoversEveryCachedProvider:
     def test_every_cached_provider_is_listed(self) -> None:
-        listed = {_name(provider) for provider in PROVIDERS}
+        listed = {_name(provider) for provider in _PROVIDERS}
         defined: set[str] = set()
         for module_name in _provider_modules():
             defined |= _cached_provider_names(module_name)
         missing = defined - listed
-        assert missing == set(), "cached providers missing from teardown.PROVIDERS: " + ", ".join(
+        assert missing == set(), "cached dependency providers missing from teardown: " + ", ".join(
             sorted(missing)
         )
 
@@ -60,9 +64,10 @@ class TestProvidersCoversEveryCachedProvider:
         defined: set[str] = set()
         for module_name in _provider_modules():
             defined |= _cached_provider_names(module_name)
-        stale = {_name(provider) for provider in PROVIDERS} - defined
+        stale = {_name(provider) for provider in _PROVIDERS} - defined
         assert stale == set(), (
-            "teardown.PROVIDERS lists providers that no longer exist: " + ", ".join(sorted(stale))
+            "teardown lists cached dependency providers that no longer exist: "
+            + ", ".join(sorted(stale))
         )
 
     def test_the_detection_finds_a_known_provider(self) -> None:

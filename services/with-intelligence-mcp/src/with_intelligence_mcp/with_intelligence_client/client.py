@@ -11,7 +11,7 @@ from with_intelligence_mcp.metrics import (
     UPSTREAM_REQUEST_DURATION,
     UPSTREAM_REQUESTS,
 )
-from with_intelligence_mcp.with_intelligence_client.credential import CallerSession
+from with_intelligence_mcp.with_intelligence_client.credential import CallerSessionProvider
 from with_intelligence_mcp.with_intelligence_client.errors import (
     ApiError,
     AuthError,
@@ -25,7 +25,7 @@ from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy
 from with_intelligence_mcp.with_intelligence_client.settings import TransportSettings
 
 type QueryValue = str | int | float | bool | Sequence[str | int]
-type Gate = Callable[[str], AbstractAsyncContextManager[None]]
+type ConcurrencyLimiter = Callable[[str], AbstractAsyncContextManager[None]]
 
 _MAX_ERROR_DETAIL_LENGTH = 500
 
@@ -66,17 +66,17 @@ class WithIntelligenceClient:
         settings: TransportSettings,
         *,
         http_client: Callable[[], AbstractAsyncContextManager[httpx.AsyncClient]],
-        gate: Gate,
+        limit_concurrency: ConcurrencyLimiter,
         retry_policy: RetryPolicy,
-        session: CallerSession,
+        session: CallerSessionProvider,
     ) -> None:
         self._settings: TransportSettings = settings
         self._http_client: Callable[[], AbstractAsyncContextManager[httpx.AsyncClient]] = (
             http_client
         )
-        self._gate: Gate = gate
+        self._limit_concurrency: ConcurrencyLimiter = limit_concurrency
         self._retry: RetryPolicy = retry_policy
-        self._session: CallerSession = session
+        self._session: CallerSessionProvider = session
 
     @property
     def asset_class_groups(self) -> tuple[str, ...]:
@@ -128,7 +128,7 @@ class WithIntelligenceClient:
         self, method: str, path: str, params: Mapping[str, QueryValue]
     ) -> httpx.Response:
         attempt = 0
-        renewed = False
+        refreshed = False
         while True:
             attempt += 1
             try:
@@ -136,11 +136,11 @@ class WithIntelligenceClient:
                 self._raise_for_status(response, path)
                 return response
             except AuthError:
-                # One renewal per request: the token expired mid-session, or another caller
+                # One refresh per request: the token expired mid-session, or another caller
                 # rotated it. A second 401 on a fresh token is a real rejection.
-                if renewed:
+                if refreshed:
                     raise
-                renewed = True
+                refreshed = True
                 _ = await self._session.refresh_access_token()
             except (RateLimited, Unreachable) as error:
                 retry = self._retry.should_retry(error, attempt)
@@ -156,7 +156,7 @@ class WithIntelligenceClient:
         token = await self._session.get_access_token()
         subject = self._session.subject()
         metric_path = _metric_path(path)
-        async with self._gate(subject), self._http_client() as client:
+        async with self._limit_concurrency(subject), self._http_client() as client:
             start = asyncio.get_running_loop().time()
             try:
                 response = await client.request(

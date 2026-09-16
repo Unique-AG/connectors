@@ -1,4 +1,4 @@
-"""The transport: status mapping, the one token renewal, retries, and paging."""
+"""The transport: status mapping, the one token refresh, retries, and paging."""
 
 import httpx
 import pytest
@@ -17,12 +17,12 @@ from tests.helpers import (
 )
 from with_intelligence_mcp.with_intelligence_client import (
     ApiError,
+    AuthenticationRejected,
     AuthError,
     NotEntitled,
     NotFound,
     Page,
     RateLimited,
-    SignInFailed,
     Unreachable,
     WiCredential,
 )
@@ -92,7 +92,7 @@ class TestAuthentication:
         factory = wi_factory()
         credential = WiCredential.model_validate({"username": "user", "password": "password"})
         try:
-            with pytest.raises(SignInFailed):
+            with pytest.raises(AuthenticationRejected):
                 await factory.sign_in(credential)
         finally:
             await factory.aclose()
@@ -123,7 +123,7 @@ class TestAuthentication:
         factory = wi_factory(max_attempts=3)
         credential = WiCredential.model_validate({"username": "user", "password": "wrong"})
         try:
-            with pytest.raises(SignInFailed):
+            with pytest.raises(AuthenticationRejected):
                 await factory.sign_in(credential)
         finally:
             await factory.aclose()
@@ -180,16 +180,16 @@ class TestStatusMapping:
             await client.get_json("/v3/investors", _JSON)
 
 
-class TestTokenRenewal:
+class TestTokenRefresh:
     @respx.mock
-    async def test_a_401_renews_once_and_retries(self) -> None:
+    async def test_a_401_refreshes_once_and_retries(self) -> None:
         route = respx.get(f"{BASE_URL}/v3/investors").mock(
             side_effect=[httpx.Response(401), httpx.Response(200, json={"ok": True})]
         )
         client, session = build_client()
         response = await client.get_json("/v3/investors", _TYPED_RESPONSE)
         assert response == _TypedResponse(ok=True)
-        assert session.renewals == 1
+        assert session.refreshes == 1
         assert route.call_count == 2
 
     @respx.mock
@@ -204,12 +204,12 @@ class TestTokenRenewal:
 
     @respx.mock
     async def test_a_second_401_is_a_real_rejection(self) -> None:
-        """Renewing forever would hide a revoked account behind an infinite loop."""
+        """Refreshing forever would hide a revoked account behind an infinite loop."""
         route = respx.get(f"{BASE_URL}/v3/investors").mock(return_value=httpx.Response(401))
         client, session = build_client()
         with pytest.raises(AuthError):
             await client.get_json("/v3/investors", _JSON)
-        assert session.renewals == 1
+        assert session.refreshes == 1
         assert route.call_count == 2
 
 

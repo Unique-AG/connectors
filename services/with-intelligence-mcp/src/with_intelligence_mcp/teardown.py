@@ -18,11 +18,11 @@ from with_intelligence_mcp.dependencies import (
 from with_intelligence_mcp.features.wi_session import get_wi_session_cache
 
 
-class CachedProvider(Protocol):
+class _CachedDependencyProvider(Protocol):
     def cache_clear(self) -> None: ...
 
 
-PROVIDERS: tuple[CachedProvider, ...] = (
+_CACHED_DEPENDENCY_PROVIDERS: tuple[_CachedDependencyProvider, ...] = (
     get_app_config,
     get_with_intelligence_config,
     get_database_config,
@@ -42,7 +42,7 @@ async def close_singletons() -> None:
     try:
         await _release_pools()
     finally:
-        for provider in PROVIDERS:
+        for provider in _CACHED_DEPENDENCY_PROVIDERS:
             provider.cache_clear()
 
 

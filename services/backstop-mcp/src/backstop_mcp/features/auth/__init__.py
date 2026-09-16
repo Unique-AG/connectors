@@ -10,7 +10,7 @@ the absent re-export kept that from being a package cycle. Those types now live 
 `backstop_client/credential.py`, so the direction is one-way and this file can do its job.
 """
 
-from mcp_credential_auth import ThrottleConfig
+from mcp_credential_auth import LoginThrottleConfig
 
 from backstop_mcp.features.auth.cleanup import cleanup_lifespan
 from backstop_mcp.features.auth.context import (
@@ -25,7 +25,7 @@ __all__ = [
     "BackstopAuthContext",
     "BackstopOAuthProvider",
     "NotConnectedError",
-    "ThrottleConfig",
+    "LoginThrottleConfig",
     "cleanup_lifespan",
     "get_system_user_cache",
     "load_key",

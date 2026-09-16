@@ -3,7 +3,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
-# With Intelligence documents 1 hour; renewing early costs one request and avoids a 401 mid-call.
+# With Intelligence documents 1 hour; refreshing early costs one request and avoids a 401 mid-call.
 ACCESS_TOKEN_LIFETIME = timedelta(hours=1)
 _EARLY_RENEWAL = timedelta(minutes=1)
 

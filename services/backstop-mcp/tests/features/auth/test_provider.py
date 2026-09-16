@@ -10,8 +10,8 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from mcp_credential_auth import (
     MAX_USERNAME_LENGTH,
     LoginCsrf,
-    ThrottleConfig,
-    count_recent_failures,
+    LoginThrottleConfig,
+    count_recent_login_failures,
 )
 from pydantic import AnyUrl
 from sqlalchemy import func, select
@@ -41,7 +41,7 @@ async def _stub_system_user(username: str, _api_token: str) -> tuple[str, dict[s
 def _make_provider(
     db: DatabaseFixture,
     *,
-    throttle: ThrottleConfig | None = None,
+    throttle: LoginThrottleConfig | None = None,
     resolve_system_user: ResolveSystemUser | None = None,
 ) -> BackstopOAuthProvider:
     _, factory = db
@@ -58,7 +58,7 @@ def _make_provider(
         # here would otherwise depend on how many failed logins its neighbours happened to make.
         throttle=throttle
         if throttle is not None
-        else ThrottleConfig(max_attempts=1_000_000, window=timedelta(minutes=15)),
+        else LoginThrottleConfig(max_attempts=1_000_000, window=timedelta(minutes=15)),
     )
 
 
@@ -596,7 +596,7 @@ class TestLoginThrottling:
 
         monkeypatch.setattr(BackstopClientFactory, "verify_credential", counting_invalid)
         provider = _make_provider(
-            db, throttle=ThrottleConfig(max_attempts=2, window=timedelta(minutes=15))
+            db, throttle=LoginThrottleConfig(max_attempts=2, window=timedelta(minutes=15))
         )
 
         # Each attempt needs its own pending authorization: a successful submission consumes the
@@ -633,7 +633,7 @@ class TestLoginThrottling:
 
         monkeypatch.setattr(BackstopClientFactory, "verify_credential", unreachable)
         provider = _make_provider(
-            db, throttle=ThrottleConfig(max_attempts=1, window=timedelta(minutes=15))
+            db, throttle=LoginThrottleConfig(max_attempts=1, window=timedelta(minutes=15))
         )
 
         for attempt in range(3):
@@ -646,7 +646,7 @@ class TestLoginThrottling:
 
         _, session_factory = db
         assert (
-            await count_recent_failures(
+            await count_recent_login_failures(
                 session_factory, "th-outage-user", window=timedelta(minutes=15)
             )
             == 0
@@ -659,7 +659,7 @@ class TestLoginThrottling:
         """Two typos then the right token must leave no residue for the next login."""
         monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_invalid)
         provider = _make_provider(
-            db, throttle=ThrottleConfig(max_attempts=5, window=timedelta(minutes=15))
+            db, throttle=LoginThrottleConfig(max_attempts=5, window=timedelta(minutes=15))
         )
         for attempt in range(2):
             request_id = await self._pending_request_id(provider, f"throttle-reset-bad-{attempt}")
@@ -669,7 +669,7 @@ class TestLoginThrottling:
 
         _, session_factory = db
         assert (
-            await count_recent_failures(
+            await count_recent_login_failures(
                 session_factory, "th-clumsy-user", window=timedelta(minutes=15)
             )
             == 2
@@ -683,7 +683,7 @@ class TestLoginThrottling:
 
         assert response.status_code == 302
         assert (
-            await count_recent_failures(
+            await count_recent_login_failures(
                 session_factory, "th-clumsy-user", window=timedelta(minutes=15)
             )
             == 0

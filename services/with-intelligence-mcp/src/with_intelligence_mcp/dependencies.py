@@ -14,7 +14,7 @@ from with_intelligence_mcp.config import (
 )
 from with_intelligence_mcp.db import create_engine, create_session_factory
 from with_intelligence_mcp.features.auth import (
-    ThrottleConfig,
+    LoginThrottleConfig,
     WithIntelligenceAuthContext,
     WithIntelligenceOAuthProvider,
     load_key,
@@ -69,7 +69,9 @@ def get_encryption_key() -> bytes:
 @lru_cache(maxsize=1)
 def get_with_intelligence_client_factory() -> WithIntelligenceClientFactory:
     config = get_with_intelligence_config()
-    return WithIntelligenceClientFactory(transport_settings(config), retry_settings(config))
+    return WithIntelligenceClientFactory(
+        _build_transport_settings(config), _build_retry_settings(config)
+    )
 
 
 @lru_cache(maxsize=1)
@@ -77,7 +79,7 @@ def get_auth_context() -> WithIntelligenceAuthContext:
     return WithIntelligenceAuthContext(
         session_factory=get_session_factory(),
         encryption_key=get_encryption_key(),
-        refresh_claim_ttl=timedelta(
+        refresh_lease_ttl=timedelta(
             seconds=get_with_intelligence_config().default_timeout_seconds + 5
         ),
         # Deferred: the provider needs nothing from here, but looking it up lazily keeps the
@@ -100,14 +102,14 @@ def get_auth_provider() -> WithIntelligenceOAuthProvider:
         session_factory=get_session_factory(),
         encryption_key=get_encryption_key(),
         wi_clients=get_with_intelligence_client_factory(),
-        throttle=ThrottleConfig(
+        throttle=LoginThrottleConfig(
             max_attempts=auth_config.login_max_attempts,
             window=auth_config.login_attempt_window,
         ),
     )
 
 
-def transport_settings(config: WithIntelligenceConfig) -> TransportSettings:
+def _build_transport_settings(config: WithIntelligenceConfig) -> TransportSettings:
     """Field-for-field and deliberately explicit: a knob the transport should not see never
     appears here."""
     return TransportSettings(
@@ -119,7 +121,7 @@ def transport_settings(config: WithIntelligenceConfig) -> TransportSettings:
     )
 
 
-def retry_settings(config: WithIntelligenceConfig) -> RetrySettings:
+def _build_retry_settings(config: WithIntelligenceConfig) -> RetrySettings:
     return RetrySettings(
         max_attempts=config.max_retry_attempts, max_wait_ms=config.max_retry_wait_ms
     )

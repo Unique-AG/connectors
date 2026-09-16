@@ -15,14 +15,14 @@ logger = logging.getLogger(__name__)
 MAX_USERNAME_LENGTH = 320
 
 
-class ThrottleConfig(BaseModel):
+class LoginThrottleConfig(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     max_attempts: int
     window: timedelta
 
 
-async def count_recent_failures(
+async def count_recent_login_failures(
     session_factory: async_sessionmaker[AsyncSession],
     username: str,
     *,
@@ -38,44 +38,12 @@ async def count_recent_failures(
         return result.scalar_one()
 
 
-async def is_throttled(
-    session_factory: async_sessionmaker[AsyncSession],
-    username: str,
-    *,
-    config: ThrottleConfig,
-) -> bool:
-    failures = await count_recent_failures(session_factory, username, window=config.window)
-    if failures < config.max_attempts:
-        return False
-    logger.warning(
-        "auth.login.throttled",
-        extra={
-            "failures": failures,
-            "max_attempts": config.max_attempts,
-            "window_minutes": int(config.window.total_seconds() // 60),
-        },
-    )
-    return True
-
-
-async def record_failure(
-    session_factory: async_sessionmaker[AsyncSession],
-    username: str,
-    *,
-    source_ip: str | None,
-) -> None:
-    async with transaction(session_factory) as session:
-        session.add(
-            LoginAttempt(username=username, source_ip=source_ip, attempted_at=datetime.now(UTC))
-        )
-
-
 async def reserve_login_attempt(
     session_factory: async_sessionmaker[AsyncSession],
     username: str,
     *,
     source_ip: str | None,
-    config: ThrottleConfig,
+    config: LoginThrottleConfig,
 ) -> uuid.UUID | None:
     now = datetime.now(UTC)
     async with transaction(session_factory) as session:
@@ -132,16 +100,16 @@ async def discard_login_attempt(
         await session.execute(delete(LoginAttempt).where(LoginAttempt.id == attempt_id))
 
 
-async def clear_failures(
+async def record_login_success(
     session_factory: async_sessionmaker[AsyncSession],
     username: str,
     *,
-    reservation_id: uuid.UUID | None = None,
+    attempt_id: uuid.UUID,
 ) -> None:
     async with transaction(session_factory) as session:
-        predicate = LoginAttempt.pending.is_(False)
-        if reservation_id is not None:
-            predicate = or_(predicate, LoginAttempt.id == reservation_id)
         await session.execute(
-            delete(LoginAttempt).where(LoginAttempt.username == username, predicate)
+            delete(LoginAttempt).where(
+                LoginAttempt.username == username,
+                or_(LoginAttempt.pending.is_(False), LoginAttempt.id == attempt_id),
+            )
         )

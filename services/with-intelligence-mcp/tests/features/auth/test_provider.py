@@ -27,9 +27,9 @@ from tests.conftest import DatabaseFixture
 from tests.helpers import BASE_URL, sign_in_ok, wi_factory
 from with_intelligence_mcp.db import LoginAttempt, read_session
 from with_intelligence_mcp.db import WithIntelligenceSession as SessionRow
-from with_intelligence_mcp.features.auth import ThrottleConfig
+from with_intelligence_mcp.features.auth import LoginThrottleConfig
 from with_intelligence_mcp.features.auth.provider import WithIntelligenceOAuthProvider
-from with_intelligence_mcp.features.auth.session_store import get_session
+from with_intelligence_mcp.features.auth.session_store import get_stored_wi_session
 
 _REDIRECT_URI = "https://client.example/callback"
 _SIGN_IN = f"{BASE_URL}/v3/auth/sign-in"
@@ -40,18 +40,20 @@ _LOGIN_CSRF = LoginCsrf("wi_login_csrf_")
 def _make_provider(
     db: DatabaseFixture,
     *,
-    throttle: ThrottleConfig | None = None,
+    throttle: LoginThrottleConfig | None = None,
+    encryption_key: bytes | None = None,
 ) -> WithIntelligenceOAuthProvider:
     _, factory = db
     provider = WithIntelligenceOAuthProvider(
         base_url="https://wi-mcp.example",
         secure_cookies=True,
         session_factory=factory,
-        encryption_key=Fernet.generate_key(),
+        encryption_key=encryption_key or Fernet.generate_key(),
         wi_clients=wi_factory(),
         # Effectively off unless a test asks for it, so no test depends on how many failed
         # logins its neighbours happened to make.
-        throttle=throttle or ThrottleConfig(max_attempts=1_000_000, window=timedelta(minutes=15)),
+        throttle=throttle
+        or LoginThrottleConfig(max_attempts=1_000_000, window=timedelta(minutes=15)),
     )
     return provider
 
@@ -183,7 +185,8 @@ class TestLoginSubmission:
     async def test_reconnect_reuses_the_existing_subject(self, db: DatabaseFixture) -> None:
         respx.post(_SIGN_IN).mock(side_effect=[sign_in_ok(), sign_in_ok("access-2", "refresh-2")])
         _, factory = db
-        provider = _make_provider(db)
+        encryption_key = Fernet.generate_key()
+        provider = _make_provider(db, encryption_key=encryption_key)
         username = _unique("reconnect")
 
         first_request = await _pending_request_id(provider, _unique("client"))
@@ -203,7 +206,7 @@ class TestLoginSubmission:
                 select(SessionRow.user_id).where(SessionRow.wi_username == username)
             )
             assert result.scalar_one() == existing_subject
-            stored = await get_session(session, existing_subject, provider._encryption_key)  # pyright: ignore[reportPrivateUsage]
+            stored = await get_stored_wi_session(session, existing_subject, encryption_key)
         assert stored is not None
         assert stored.access_token.get_secret_value() == "access-2"
 
@@ -225,7 +228,7 @@ class TestLoginSubmission:
             )
             row = result.scalar_one()
             assert b"the-password" not in row.encrypted_blob
-            restored = await get_session(session, row.user_id, provider._encryption_key)  # pyright: ignore[reportPrivateUsage]
+            restored = await get_stored_wi_session(session, row.user_id, provider._encryption_key)  # pyright: ignore[reportPrivateUsage]
         assert restored is not None
         assert restored.access_token.get_secret_value() == "access-1"
         assert restored.refresh_token.get_secret_value() == "refresh-1"
@@ -423,7 +426,7 @@ class TestLoginThrottling:
     async def test_stops_calling_wi_once_the_budget_is_spent(self, db: DatabaseFixture) -> None:
         route = respx.post(_SIGN_IN).mock(return_value=httpx.Response(401))
         provider = _make_provider(
-            db, throttle=ThrottleConfig(max_attempts=2, window=timedelta(minutes=15))
+            db, throttle=LoginThrottleConfig(max_attempts=2, window=timedelta(minutes=15))
         )
         username = _unique("spent")
         for _ in range(2):
@@ -444,7 +447,7 @@ class TestLoginThrottling:
 
         route = respx.post(_SIGN_IN).mock(side_effect=refuse)
         provider = _make_provider(
-            db, throttle=ThrottleConfig(max_attempts=2, window=timedelta(minutes=15))
+            db, throttle=LoginThrottleConfig(max_attempts=2, window=timedelta(minutes=15))
         )
         username = _unique("concurrent")
         request_ids = [await _pending_request_id(provider, _unique("client")) for _ in range(5)]
@@ -462,7 +465,7 @@ class TestLoginThrottling:
     @respx.mock
     async def test_a_success_resets_the_budget(self, db: DatabaseFixture) -> None:
         provider = _make_provider(
-            db, throttle=ThrottleConfig(max_attempts=2, window=timedelta(minutes=15))
+            db, throttle=LoginThrottleConfig(max_attempts=2, window=timedelta(minutes=15))
         )
         username = _unique("reset")
         respx.post(_SIGN_IN).mock(return_value=httpx.Response(401))

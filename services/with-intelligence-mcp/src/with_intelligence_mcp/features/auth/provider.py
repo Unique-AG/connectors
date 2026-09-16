@@ -7,10 +7,10 @@ from mcp_credential_auth import (
     MAX_USERNAME_LENGTH,
     CredentialOAuthProvider,
     LoginCsrf,
-    ThrottleConfig,
-    clear_failures,
+    LoginThrottleConfig,
     discard_login_attempt,
     finalize_login_failure,
+    record_login_success,
     reserve_login_attempt,
 )
 from pydantic import (
@@ -31,12 +31,12 @@ from starlette.types import Message
 from with_intelligence_mcp.db import read_session
 from with_intelligence_mcp.features.auth.login_form import render_login_form
 from with_intelligence_mcp.features.auth.session_store import (
-    find_user_id_by_username,
-    save_session,
+    find_subject_by_username,
+    upsert_stored_wi_session,
 )
 from with_intelligence_mcp.with_intelligence_client import (
+    AuthenticationRejected,
     RateLimited,
-    SignInFailed,
     Unreachable,
     WiCredential,
     WithIntelligenceClientFactory,
@@ -66,7 +66,7 @@ _MAX_LOGIN_BODY_BYTES = 16 * 1024
 _MAX_LOGIN_FIELD_LENGTH = 1024
 
 
-class _LoginBodyTooLarge(ValueError):
+class _LoginBodyTooLargeError(ValueError):
     pass
 
 
@@ -76,9 +76,9 @@ async def _read_login_form(request: Request) -> FormData:
         try:
             parsed_content_length = int(content_length)
         except ValueError as exc:
-            raise _LoginBodyTooLarge from exc
+            raise _LoginBodyTooLargeError from exc
         if parsed_content_length > _MAX_LOGIN_BODY_BYTES:
-            raise _LoginBodyTooLarge
+            raise _LoginBodyTooLargeError
 
     received = 0
     receive = request.receive
@@ -89,10 +89,10 @@ async def _read_login_form(request: Request) -> FormData:
         if message["type"] == "http.request":
             body = cast("object", message.get("body", b""))
             if not isinstance(body, bytes):
-                raise _LoginBodyTooLarge
+                raise _LoginBodyTooLargeError
             received += len(body)
             if received > _MAX_LOGIN_BODY_BYTES:
-                raise _LoginBodyTooLarge
+                raise _LoginBodyTooLargeError
         return message
 
     limited_request = Request(request.scope, limited_receive)
@@ -125,7 +125,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
     _session_factory: async_sessionmaker[AsyncSession]
     _encryption_key: bytes
     _wi_clients: WithIntelligenceClientFactory
-    _throttle: ThrottleConfig
+    _throttle: LoginThrottleConfig
     login_path: str
 
     def __init__(
@@ -136,7 +136,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         session_factory: async_sessionmaker[AsyncSession],
         encryption_key: bytes,
         wi_clients: WithIntelligenceClientFactory,
-        throttle: ThrottleConfig,
+        throttle: LoginThrottleConfig,
         login_path: str = "/login",
     ) -> None:
         super().__init__(
@@ -200,7 +200,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
     async def handle_login_post(self, request: Request) -> Response:
         try:
             form = await _read_login_form(request)
-        except _LoginBodyTooLarge:
+        except _LoginBodyTooLargeError:
             return PlainTextResponse(
                 "Login form is too large.", status_code=413, headers=_LOGIN_SECURITY_HEADERS
             )
@@ -266,7 +266,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         credential = WiCredential(username=username, password=SecretStr(password))
         try:
             wi_session = await self._wi_clients.sign_in(credential)
-        except SignInFailed:
+        except AuthenticationRejected:
             await finalize_login_failure(self._session_factory, attempt_id)
             return self._form_response(
                 request_id,
@@ -294,14 +294,14 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
                 error="With Intelligence is unreachable right now — please try again shortly.",
             )
 
-        await clear_failures(self._session_factory, username, reservation_id=attempt_id)
+        await record_login_success(self._session_factory, username, attempt_id=attempt_id)
 
         async with read_session(self._session_factory) as session:
-            existing_id = await find_user_id_by_username(session, username)
+            existing_id = await find_subject_by_username(session, username)
         logger.info("auth.login.succeeded", extra={"reconnected": existing_id is not None})
 
         async def save_subject(session: AsyncSession) -> str:
-            return await save_session(
+            return await upsert_stored_wi_session(
                 session,
                 str(uuid.uuid4()),
                 username,

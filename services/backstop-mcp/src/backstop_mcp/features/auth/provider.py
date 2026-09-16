@@ -6,10 +6,10 @@ from mcp_credential_auth import (
     MAX_USERNAME_LENGTH,
     CredentialOAuthProvider,
     LoginCsrf,
-    ThrottleConfig,
-    clear_failures,
+    LoginThrottleConfig,
     discard_login_attempt,
     finalize_login_failure,
+    record_login_success,
     reserve_login_attempt,
 )
 from pydantic import SecretStr
@@ -76,7 +76,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
     _encryption_key: bytes
     _backstop_clients: BackstopClientFactory
     _resolve_system_user: ResolveSystemUser | None
-    _throttle: ThrottleConfig
+    _throttle: LoginThrottleConfig
     login_path: str
 
     def __init__(
@@ -87,7 +87,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         session_factory: async_sessionmaker[AsyncSession],
         encryption_key: bytes,
         backstop_clients: BackstopClientFactory,
-        throttle: ThrottleConfig,
+        throttle: LoginThrottleConfig,
         resolve_system_user: ResolveSystemUser | None = None,
         login_path: str = "/backstop/login",
     ) -> None:
@@ -242,7 +242,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
                 error="Invalid username or API token.",
             )
 
-        await clear_failures(self._session_factory, username, reservation_id=attempt_id)
+        await record_login_success(self._session_factory, username, attempt_id=attempt_id)
 
         assert self._resolve_system_user is not None, (
             "resolve_system_user must be provided or attached before login"

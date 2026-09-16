@@ -14,7 +14,7 @@ class WiCredential(BaseModel):
     password: SecretStr
 
 
-class CallerSession(Protocol):
+class CallerSessionProvider(Protocol):
     """Provides authentication for one caller."""
 
     async def get_access_token(self) -> str: ...

@@ -100,7 +100,7 @@ class AppConfig(BaseSettings):
     public_base_url: HttpUrl = HttpUrl("http://localhost:9011")
 
     @model_validator(mode="after")
-    def _reject_local_base_url_in_production(self) -> Self:
+    def _require_public_https_base_url_in_production(self) -> Self:
         """Reject local public URLs in production."""
         if self.app_env != AppEnv.PRODUCTION:
             return self
@@ -144,7 +144,7 @@ class WithIntelligenceConfig(BaseSettings):
 
     @field_validator("base_url")
     @classmethod
-    def require_https_base_url(cls, value: str) -> str:
+    def _require_https_base_url(cls, value: str) -> str:
         parsed = HttpUrl(value)
         if parsed.scheme != "https":
             raise ValueError("WITH_INTELLIGENCE_BASE_URL must use HTTPS")
