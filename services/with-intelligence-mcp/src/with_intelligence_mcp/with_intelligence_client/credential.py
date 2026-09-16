@@ -17,9 +17,9 @@ class WiCredential(BaseModel):
 class CallerSession(Protocol):
     """Provides authentication for one caller."""
 
-    async def access_token(self) -> str: ...
+    async def get_access_token(self) -> str: ...
 
-    async def renewed_access_token(self) -> str:
+    async def refresh_access_token(self) -> str:
         """A fresh token after a 401. Refreshes, or signs in again if the refresh is spent."""
         ...
 

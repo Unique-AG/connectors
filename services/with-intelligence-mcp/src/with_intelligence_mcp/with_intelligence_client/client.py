@@ -141,7 +141,7 @@ class WithIntelligenceClient:
                 if renewed:
                     raise
                 renewed = True
-                _ = await self._session.renewed_access_token()
+                _ = await self._session.refresh_access_token()
             except (RateLimited, Unreachable) as error:
                 retry = self._retry.should_retry(error, attempt)
                 if isinstance(error, RateLimited):
@@ -153,7 +153,7 @@ class WithIntelligenceClient:
     async def _send(
         self, method: str, path: str, params: Mapping[str, QueryValue]
     ) -> httpx.Response:
-        token = await self._session.access_token()
+        token = await self._session.get_access_token()
         subject = self._session.subject()
         metric_path = _metric_path(path)
         async with self._gate(subject), self._http_client() as client:

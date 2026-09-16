@@ -9,13 +9,13 @@ class CallerWiSession:
         self._cache: WiSessionCache = cache
         self._context: WithIntelligenceAuthContext = context
 
-    async def access_token(self) -> str:
-        return await self._cache.access_token(
+    async def get_access_token(self) -> str:
+        return await self._cache.get_access_token(
             self.subject(), self._context.current_session, self._context.renew_session
         )
 
-    async def renewed_access_token(self) -> str:
-        return await self._cache.renewed_access_token(
+    async def refresh_access_token(self) -> str:
+        return await self._cache.refresh_access_token(
             self.subject(), self._context.current_session, self._context.renew_session
         )
 

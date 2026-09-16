@@ -71,16 +71,16 @@ class TestFirstUse:
         """The login already signed in, so the first call needs no WI round trip."""
         factory = FakeFactory()
         store = FakeStore(_session("stored"))
-        assert await _cache(factory).access_token("s1", store.read, store.renew) == "stored"
+        assert await _cache(factory).get_access_token("s1", store.read, store.renew) == "stored"
         assert factory.refreshes == 0
 
     async def test_observes_a_reconnect_handled_by_another_replica(self) -> None:
         factory = FakeFactory()
         store = FakeStore(_session("stored"))
         wi = _cache(factory)
-        assert await wi.access_token("s1", store.read, store.renew) == "stored"
+        assert await wi.get_access_token("s1", store.read, store.renew) == "stored"
         store.stored = _session("reconnected")
-        assert await wi.access_token("s1", store.read, store.renew) == "reconnected"
+        assert await wi.get_access_token("s1", store.read, store.renew) == "reconnected"
         assert store.reads == 2
 
     async def test_consecutive_access_does_not_refresh_a_fresh_session(self) -> None:
@@ -88,8 +88,8 @@ class TestFirstUse:
         store = FakeStore(_session("stored"))
         wi = _cache(factory)
 
-        assert await wi.access_token("s1", store.read, store.renew) == "stored"
-        assert await wi.access_token("s1", store.read, store.renew) == "stored"
+        assert await wi.get_access_token("s1", store.read, store.renew) == "stored"
+        assert await wi.get_access_token("s1", store.read, store.renew) == "stored"
         assert factory.refreshes == 0
         assert store.reads == 2
 
@@ -101,8 +101,8 @@ class TestPerSubject:
         wi = _cache(factory)
         alice = FakeStore(_session("alice-token"))
         bob = FakeStore(_session("bob-token"))
-        assert await wi.access_token("alice", alice.read, alice.renew) == "alice-token"
-        assert await wi.access_token("bob", bob.read, bob.renew) == "bob-token"
+        assert await wi.get_access_token("alice", alice.read, alice.renew) == "alice-token"
+        assert await wi.get_access_token("bob", bob.read, bob.renew) == "bob-token"
 
 
 class TestRenewal:
@@ -110,14 +110,14 @@ class TestRenewal:
         factory = FakeFactory()
         store = FakeStore(_session("old", age=timedelta(hours=2)))
         wi = _cache(factory)
-        assert await wi.access_token("s1", store.read, store.renew) == "refreshed-1"
+        assert await wi.get_access_token("s1", store.read, store.renew) == "refreshed-1"
         assert factory.refreshes == 1
 
     async def test_the_renewal_is_written_back_to_the_store(self) -> None:
         """So the next process to read it gets the renewed session, not the spent one."""
         factory = FakeFactory()
         store = FakeStore(_session("old", age=timedelta(hours=2)))
-        _ = await _cache(factory).access_token("s1", store.read, store.renew)
+        _ = await _cache(factory).get_access_token("s1", store.read, store.renew)
         assert store.stored.access_token.get_secret_value() == "refreshed-1"
 
     async def test_a_spent_refresh_token_surfaces(self) -> None:
@@ -126,15 +126,15 @@ class TestRenewal:
         store = FakeStore(_session("old", age=timedelta(hours=2)))
         wi = _cache(factory)
         with pytest.raises(RuntimeError):
-            _ = await wi.access_token("s1", store.read, store.renew)
+            _ = await wi.get_access_token("s1", store.read, store.renew)
         assert factory.refreshes == 1
 
-    async def test_renewed_access_token_forces_a_renewal(self) -> None:
+    async def test_refresh_access_token_forces_a_renewal(self) -> None:
         factory = FakeFactory()
         store = FakeStore(_session("stored"))
         wi = _cache(factory)
-        _ = await wi.access_token("s1", store.read, store.renew)
-        assert await wi.renewed_access_token("s1", store.read, store.renew) == "refreshed-1"
+        _ = await wi.get_access_token("s1", store.read, store.renew)
+        assert await wi.refresh_access_token("s1", store.read, store.renew) == "refreshed-1"
 
     async def test_renewal_after_eviction_does_not_reuse_the_rejected_token(
         self, monkeypatch: pytest.MonkeyPatch
@@ -147,10 +147,10 @@ class TestRenewal:
         wi = _cache(factory)
         rejected = FakeStore(_session("rejected"))
         other = FakeStore(_session("other"))
-        assert await wi.access_token("rejected", rejected.read, rejected.renew) == "rejected"
-        assert await wi.access_token("other", other.read, other.renew) == "other"
+        assert await wi.get_access_token("rejected", rejected.read, rejected.renew) == "rejected"
+        assert await wi.get_access_token("other", other.read, other.renew) == "other"
 
-        token = await wi.renewed_access_token("rejected", rejected.read, rejected.renew)
+        token = await wi.refresh_access_token("rejected", rejected.read, rejected.renew)
 
         assert token == "refreshed-1"
         assert factory.refreshes == 1
@@ -162,7 +162,7 @@ class TestConcurrentRenewal:
         store = FakeStore(_session("stored"), delay=0.02)
         wi = _cache(factory)
         tokens = await asyncio.gather(
-            *(wi.access_token("s1", store.read, store.renew) for _ in range(5))
+            *(wi.get_access_token("s1", store.read, store.renew) for _ in range(5))
         )
         assert store.reads == 1
         assert set(tokens) == {"stored"}
@@ -173,7 +173,7 @@ class TestConcurrentRenewal:
         store = FakeStore(_session("old", age=timedelta(hours=2)))
         wi = _cache(factory)
         tokens = await asyncio.gather(
-            *(wi.access_token("s1", store.read, store.renew) for _ in range(5))
+            *(wi.get_access_token("s1", store.read, store.renew) for _ in range(5))
         )
         assert factory.refreshes == 1
         assert set(tokens) == {"refreshed-1"}
@@ -184,8 +184,8 @@ class TestConcurrentRenewal:
         alice = FakeStore(_session("old-alice", age=timedelta(hours=2)))
         bob = FakeStore(_session("old-bob", age=timedelta(hours=2)))
         _ = await asyncio.gather(
-            wi.access_token("alice", alice.read, alice.renew),
-            wi.access_token("bob", bob.read, bob.renew),
+            wi.get_access_token("alice", alice.read, alice.renew),
+            wi.get_access_token("bob", bob.read, bob.renew),
         )
         assert factory.refreshes == 2
 
@@ -208,12 +208,14 @@ class TestConcurrentRenewal:
 
         factory = FakeFactory()
         wi = _cache(factory)
-        first = asyncio.create_task(wi.access_token("s1", blocked_read, first_store.renew))
+        first = asyncio.create_task(wi.get_access_token("s1", blocked_read, first_store.renew))
         await started.wait()
 
         second_store = FakeStore(_session("second"))
-        assert await wi.access_token("s2", second_store.read, second_store.renew) == "second"
-        same_subject = asyncio.create_task(wi.access_token("s1", blocked_read, first_store.renew))
+        assert await wi.get_access_token("s2", second_store.read, second_store.renew) == "second"
+        same_subject = asyncio.create_task(
+            wi.get_access_token("s1", blocked_read, first_store.renew)
+        )
         await asyncio.sleep(0.01)
         assert reads == 1
 

@@ -36,15 +36,17 @@ class WiSessionCache:
         self._holders: dict[str, _Holder] = {}
         self._holders_lock: asyncio.Lock = asyncio.Lock()
 
-    async def access_token(self, subject: str, read: SessionReader, renew: SessionRenewer) -> str:
-        return await self._access(subject, read, renew, force_renewal=False)
-
-    async def renewed_access_token(
+    async def get_access_token(
         self, subject: str, read: SessionReader, renew: SessionRenewer
     ) -> str:
-        return await self._access(subject, read, renew, force_renewal=True)
+        return await self._resolve_access_token(subject, read, renew, force_renewal=False)
 
-    async def _access(
+    async def refresh_access_token(
+        self, subject: str, read: SessionReader, renew: SessionRenewer
+    ) -> str:
+        return await self._resolve_access_token(subject, read, renew, force_renewal=True)
+
+    async def _resolve_access_token(
         self,
         subject: str,
         read: SessionReader,

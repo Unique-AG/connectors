@@ -36,10 +36,10 @@ class FakeSession:
         self.token: str = token
         self.renewals: int = 0
 
-    async def access_token(self) -> str:
+    async def get_access_token(self) -> str:
         return self.token
 
-    async def renewed_access_token(self) -> str:
+    async def refresh_access_token(self) -> str:
         self.renewals += 1
         self.token = f"token-{self.renewals + 1}"
         return self.token
