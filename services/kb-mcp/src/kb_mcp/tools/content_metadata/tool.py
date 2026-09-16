@@ -204,13 +204,9 @@ async def content_metadata(
 
         cache = get_tree_cache(kb_settings)
 
-        # folder_paths resolves to scope ids up front so the rest of the
-        # function treats them exactly like folder_ids — same fast path,
-        # same include_subfolders=False fallback. The backend's folder-path
-        # lookup only accepts an absolute path (every real value the SDK's
-        # own CLI ever sends starts with "/"), so a bare relative path like
-        # "demo" or "Contracts/2024" is normalized rather than requiring the
-        # caller to know that convention.
+        # Resolved up front so the rest of the function treats them as folder
+        # ids. The backend's lookup needs an absolute path, so bare ones are
+        # normalized rather than making the caller know that.
         effective_folder_ids = folder_ids
         if folder_paths:
             resolved_ids = await asyncio.gather(
@@ -225,10 +221,8 @@ async def content_metadata(
             )
             effective_folder_ids = [rid for rid in resolved_ids if rid] or None
 
-        # Any folder ids at all can walk just those subtrees instead of the whole
-        # knowledge base. include_subfolders=False is max_depth=1 on the same
-        # walk: roots enter at depth 0 and the guard is `depth + 1 < max_depth`,
-        # so nothing below the roots is visited.
+        # include_subfolders=False is max_depth=1 on the same rooted walk:
+        # roots enter at depth 0, so nothing below them is visited.
         scoped_root_ids: tuple[str, ...] | None = None
         if effective_folder_ids:
             scoped_root_ids = tuple(sorted(set(effective_folder_ids)))

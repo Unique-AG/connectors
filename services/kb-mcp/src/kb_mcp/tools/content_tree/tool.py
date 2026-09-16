@@ -149,22 +149,17 @@ async def _resolve_scope_id(
             ) from exc
         return folder_path
 
-    # A path only resolves against real folder names, but callers pass display
-    # names: rendering strips "[" and "]", so the folder stored as "[SM]" is
-    # shown, and passed back, as "SM". Those paths cannot be resolved, so they
-    # fall back to filtering the unscoped walk — slow, but the behaviour callers
-    # already have.
-    # TODO [proschu2/ean]: better would be to stop stripping brackets in the
-    # rendered label, so what the model reads back is resolvable and every
-    # folder_path gets the fast path. That changes rendered output, so it is
-    # your call rather than mine.
+    # Rendering strips "[" and "]", so a folder stored as "[SM]" comes back as
+    # "SM" and will not resolve; those fall back to filtering the unscoped walk.
+    # TODO [proschu2/ean]: not stripping at render time would make every
+    # folder_path resolvable, but it changes rendered output — your call.
     absolute = "/" + folder_path.strip("/")
     try:
         return await unique_sdk.Folder.resolve_scope_id_from_folder_path_async(
             user_id=user_id, company_id=company_id, folder_path=absolute
         )
     except UniqueError, ValueError:
-        _LOGGER.info("folder_path %r did not resolve; filtering instead", folder_path)
+        _LOGGER.info("folder_path did not resolve; filtering the unscoped walk")
         return None
 
 
@@ -281,8 +276,8 @@ async def content_tree(
         Field(
             description=(
                 "Which view to return. 'tree' for an overview, 'list' for a "
-                "flat file listing (optionally scoped to folder_path), "
-                "'search' for fuzzy filename lookup (requires `query`)."
+                "flat file listing, 'search' for fuzzy filename lookup "
+                "(requires `query`). All three accept folder_path."
             )
         ),
     ],
@@ -319,7 +314,12 @@ async def content_tree(
     ] = None,
     limit: Annotated[
         int | None,
-        Field(description="Maximum number of files/matches to return."),
+        Field(
+            description=(
+                "Maximum files/matches to return. In mode='tree' it caps the "
+                "files rendered, and the output says when it truncated."
+            )
+        ),
     ] = None,
     min_score: Annotated[
         float | None,
@@ -378,19 +378,24 @@ async def content_tree(
     request (use mode='list' with folder_path, or mode='tree'), not a content
     search; or you're about to call read_file and need the content_id first.
     Pick a mode; only that mode's args below apply, rest ignored. '*' = required.
-    - mode='tree': max_depth, folders_only, timeout — first orientation view
-    of folders/files. Folder lines carry `(folder_id=scope_xxx)` when known —
-    pass that id as search's `folder_ids` to scope a search to that folder.
-    A folder shows no id until the walk reaches a file beneath it; if the one
-    you need is missing, re-run with a larger max_depth (folders_only=true
-    keeps this cheap — it only hides files from the rendered lines, not from
-    the walk that discovers ids).
-    - mode='list': folder_path, limit, timeout — flat listing; each result's
-    content_id is needed for a later read_file call.
-    - mode='search': query*, limit, min_score, match_on, case_sensitive,
-    timeout — fuzzy filename/path lookup when you know roughly what a file
-    is called but not where it is — not for finding files by their content,
-    use search for that.
+    folder_path, metadata_filter, limit and timeout apply to every mode.
+    Pass folder_path whenever the request is about one folder rather than the
+    whole knowledge base — it scopes the walk rather than filtering afterwards,
+    which is the difference between a fast call and a slow one. It takes a path
+    ('Contracts/2024') or a scope_xxx id.
+    - mode='tree': max_depth, folders_only — first orientation view of
+    folders/files. Folder lines carry `(folder_id=scope_xxx)` when known — pass
+    that id back as folder_path here, or as search's `folder_ids`, to scope to
+    that folder. A folder shows no id until the walk reaches a file beneath it;
+    if the one you need is missing, re-run with a larger max_depth
+    (folders_only=true keeps this cheap — it only hides files from the rendered
+    lines, not from the walk that discovers ids). Capped at `limit` files; the
+    output says so when it truncated.
+    - mode='list': flat listing; each result's content_id is needed for a later
+    read_file call.
+    - mode='search': query*, min_score, match_on, case_sensitive — fuzzy
+    filename/path lookup when you know roughly what a file is called but not
+    where it is — not for finding files by their content, use search for that.
     'list' and 'search' rows start with a markdown link that opens the file
     in the Unique knowledge base — paste it as-is when referring the user to
     a file; use the content_id for read_file calls.
@@ -438,13 +443,10 @@ async def content_tree(
         cid = correlation_id(user_id, company_id)
         _LOGGER.info("content_tree start correlation_id=%s mode=%s", cid, mode)
 
-        # Rooting the walk at the requested folder is the whole speed fix:
-        # measured on QA, 24.6s unscoped versus 2.0s for a 6.5k-file subtree.
-        # TODO [proschu2/ean]: a rooted walk yields paths relative to the root,
-        # so scoping to Contracts renders "2024/a.pdf", not "Contracts/2024/a.pdf"
-        # as the filtered walk did. Reads naturally, like ls in a directory, and
-        # matches what content_metadata already does — but it is a visible change
-        # to list/search output, so say if you would rather re-prefix the root.
+        # Rooting the walk here is the speed fix: 24.6s unscoped vs 2.0s scoped.
+        # TODO [proschu2/ean]: rooted paths are relative, so scoping to
+        # Contracts renders "2024/a.pdf" not "Contracts/2024/a.pdf" — a visible
+        # output change; say if you would rather re-prefix the root.
         root_scope_id: str | None = None
         if folder_path:
             try:
