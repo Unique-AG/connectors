@@ -53,7 +53,7 @@ jobs:
           done
 
           if [ "$COUNT" -gt 1 ]; then
-            echo "::warning title=Too many service scopes::PR declares $COUNT service scopes. Keep PRs focused to a single service. Use the 'skip-validation' label to suppress this warning."
+            echo "::warning title=Too many service scopes::This pull request declares $COUNT service scopes. Keep a pull request to one service. Add the title-exception label to waive this warning."
           fi
 
   gatekeeper:
