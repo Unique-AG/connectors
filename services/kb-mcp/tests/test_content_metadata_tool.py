@@ -338,21 +338,30 @@ async def test_duplicate_folder_ids_deduplicated_before_scoped_walk():
 
 
 @pytest.mark.asyncio
-async def test_single_folder_id_without_subfolders_falls_back_to_unscoped_walk():
-    """include_subfolders=False means direct children only — narrower than
-    what the scoped walk (which always recurses) can express, so it must
-    still use the old unscoped-walk-then-filter path even for one id."""
+async def test_without_subfolders_scopes_the_walk_at_depth_one():
+    """include_subfolders=False is direct-children-only, which the scoped walk
+    expresses as max_depth=1 — no need to fall back to walking everything."""
     mock_tree = _make_mock_tree()
-    with patch(
-        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
-    ) as mock_cls:
+    with (
+        patch(
+            "kb_mcp.tools.content_metadata.tool.ScopedContentTree",
+            return_value=mock_tree,
+        ) as scoped_cls,
+        patch("kb_mcp.tools.content_metadata.tool.ContentTree") as unscoped_cls,
+    ):
         await content_metadata(
             folder_ids=["scope_a"],
             include_subfolders=False,
             config=ContentMetadataToolConfig(),
         )
 
-    mock_cls.assert_called_once_with(company_id="company-1", user_id="user-1")
+    scoped_cls.assert_called_once()
+    assert scoped_cls.call_args.kwargs["root_scope_ids"] == ("scope_a",)
+    unscoped_cls.assert_not_called()
+    walk_kwargs = (
+        mock_tree.resolve_visible_file_paths_via_folders_async.call_args.kwargs
+    )
+    assert walk_kwargs["max_depth"] == 1
 
 
 @pytest.mark.asyncio
@@ -478,10 +487,12 @@ async def test_folder_ids_and_folder_paths_together_errors_without_calling_servi
 
 
 @pytest.mark.asyncio
-async def test_folder_ids_include_subfolders_false_uses_folder_id_in_clause():
+async def test_without_subfolders_needs_no_folder_clause_in_the_filter():
+    """The walk is rooted and depth-capped, so the folder scope is already
+    expressed by where it walks — repeating it as a filter clause is redundant."""
     mock_tree = _make_mock_tree()
     with patch(
-        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+        "kb_mcp.tools.content_metadata.tool.ScopedContentTree", return_value=mock_tree
     ):
         await content_metadata(
             folder_ids=["scope_a"],
@@ -490,11 +501,7 @@ async def test_folder_ids_include_subfolders_false_uses_folder_id_in_clause():
         )
 
     _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"]["and"][0] == {
-        "operator": "in",
-        "path": ["folderId"],
-        "value": ["scope_a"],
-    }
+    assert "['folderId']" not in str(kwargs["metadata_filter"])
 
 
 @pytest.mark.asyncio

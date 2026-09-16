@@ -19,7 +19,6 @@ no caps — pagination will be added once scale requires it.
 import asyncio
 import json
 import logging
-import os
 from collections import Counter, defaultdict
 from typing import Annotated, Any
 
@@ -58,13 +57,6 @@ _INCOMPLETE_NOTICE = (
     "background; call content_metadata again (same arguments) to get the "
     "complete picture — that follow-up is usually instant from cache."
 )
-
-# TODO(ean): temporary benchmarking knob — DELETE this flag, this comment,
-# and the `not _DEBUG_FORCE_UNSCOPED_WALK` clause below before merging.
-# Set KB_MCP_DEBUG_FORCE_UNSCOPED_WALK=1 (and restart the server) to force
-# the pre-ScopedContentTree unscoped-walk-then-filter path, for comparing
-# against the scoped fast path below.
-_DEBUG_FORCE_UNSCOPED_WALK = os.environ.get("KB_MCP_DEBUG_FORCE_UNSCOPED_WALK") == "1"
 
 
 def _clamped_timeout(requested: float | None) -> float:
@@ -233,20 +225,15 @@ async def content_metadata(
             )
             effective_folder_ids = [rid for rid in resolved_ids if rid] or None
 
-        # Any number of folder ids, with subfolders included, can walk just
-        # those folders' subtrees instead of the whole knowledge base (see
-        # ScopedContentTree) — only include_subfolders=False's
-        # direct-children-only semantics (narrower than what the always-
-        # recursive scoped walk can express) falls back to the unscoped walk
-        # filtered by folder_ids below, as before.
+        # Any folder ids at all can walk just those subtrees instead of the whole
+        # knowledge base. include_subfolders=False is max_depth=1 on the same
+        # walk: roots enter at depth 0 and the guard is `depth + 1 < max_depth`,
+        # so nothing below the roots is visited.
         scoped_root_ids: tuple[str, ...] | None = None
-        if (
-            effective_folder_ids
-            and include_subfolders
-            and not _DEBUG_FORCE_UNSCOPED_WALK  # TODO(ean): delete with the flag above
-        ):
+        if effective_folder_ids:
             scoped_root_ids = tuple(sorted(set(effective_folder_ids)))
         use_scoped_walk = scoped_root_ids is not None
+        walk_depth = None if include_subfolders else 1
 
         async def _construct() -> ContentTree:
             if scoped_root_ids:
@@ -277,6 +264,7 @@ async def content_metadata(
         wait = _clamped_timeout(timeout)
         snapshot = await tree_svc.resolve_visible_file_paths_via_folders_async(
             metadata_filter=metadata_filter,
+            max_depth=walk_depth if use_scoped_walk else None,
             timeout=wait,
             max_concurrent_directory_listings=config.max_concurrent_scope_lookups,
         )
