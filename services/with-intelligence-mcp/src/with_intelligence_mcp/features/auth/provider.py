@@ -121,7 +121,6 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
     """OAuth provider backed by WI authentication."""
 
     REFRESH_TOKEN_REUSE_GRACE: ClassVar[timedelta] = timedelta(seconds=10)
-    REVOKE_FAMILY_ON_CONCURRENT_REFRESH: ClassVar[bool] = False
 
     _session_factory: async_sessionmaker[AsyncSession]
     _encryption_key: bytes

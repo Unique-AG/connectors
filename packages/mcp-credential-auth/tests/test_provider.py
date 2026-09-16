@@ -185,6 +185,29 @@ async def test_refresh_rotation_detects_reuse(
     assert await provider.load_access_token(rotated.access_token) is None
 
 
+async def test_concurrent_refresh_revokes_the_winner_without_grace(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = _provider(session_factory)
+    client = _client("client-concurrent-refresh")
+    await provider.register_client(client)
+    authorization_code = await _authorization_code(provider, client)
+    tokens = await provider.exchange_authorization_code(client, authorization_code)
+    assert tokens.refresh_token is not None
+    refresh = await provider.load_refresh_token(client, tokens.refresh_token)
+    assert refresh is not None
+
+    results = await asyncio.gather(
+        provider.exchange_refresh_token(client, refresh, []),
+        provider.exchange_refresh_token(client, refresh, []),
+        return_exceptions=True,
+    )
+
+    succeeded = [result for result in results if isinstance(result, OAuthToken)]
+    assert len(succeeded) == 1
+    assert await provider.load_access_token(succeeded[0].access_token) is None
+
+
 async def test_refresh_reuse_within_grace_preserves_family(
     session_factory: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
