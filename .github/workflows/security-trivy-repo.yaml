@@ -1,7 +1,7 @@
-name: "Security · Trivy Repository Scan"
+name: "[Security] Trivy Repository Scan"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: security-trivy-repo-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 on:
