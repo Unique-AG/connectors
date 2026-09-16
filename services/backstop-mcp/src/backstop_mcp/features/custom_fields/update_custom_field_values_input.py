@@ -38,7 +38,13 @@ class UpdateCustomFieldValueInput(BaseModel):
             "called Probability that is not the native probability attribute."
         )
     )
-    value: object = Field(description="Value to store, in the shape the definition expects.")
+    value: object = Field(
+        description=(
+            "Value to store, in the shape the definition expects. `null` clears the field "
+            "and is rejected on a required one. To leave a field as it is, omit its row "
+            "from `values` — never send `null` for a field you mean to keep."
+        )
+    )
     effective_date: date | None = Field(
         default=None,
         description=(
@@ -68,6 +74,8 @@ class UpdateCustomFieldValuesInput(BaseModel):
         max_length=MAX_CUSTOM_FIELD_VALUES,
         description=(
             f"Values to write, 1 to {MAX_CUSTOM_FIELD_VALUES}. Each row is a definition "
-            "id plus a value. Time-series rows also need `effective_date`."
+            "id plus a value. Time-series rows also need `effective_date`. Only the fields "
+            "listed here are touched: this is not a full-record replace, so do not pad the "
+            "batch with fields you are not changing."
         ),
     )

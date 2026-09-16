@@ -10,15 +10,14 @@ from pydantic import (
     ValidationError,
 )
 
-from backstop_mcp.lenient import LenientBool, LenientInt, LenientStr
+from backstop_mcp.features.bulk_writes import BulkLoadSummaryAttributes
+from backstop_mcp.lenient import LenientBool, LenientInt
 from backstop_mcp.models import StrippedStr
 
 __all__ = [
     "BulkCustomFieldValuesAttributes",
     "BulkCustomFieldValuesDocument",
     "BulkCustomFieldValueRecordAttributes",
-    "BulkLoadErrorMessageAttributes",
-    "BulkLoadSummaryAttributes",
     "CustomFieldDefinitionAttributes",
     "CustomFieldGroupAttributes",
     "CustomFieldGroupParentAttributes",
@@ -164,27 +163,6 @@ class CustomFieldGroupAttributes(BaseModel):
     parent: Annotated[
         CustomFieldGroupParentAttributes | None, BeforeValidator(_mapping_or_none)
     ] = None
-
-
-class BulkLoadErrorMessageAttributes(BaseModel):
-    """One per-record error from a bulk write. `index` is 0-based."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    index: LenientInt = None
-    message: LenientStr = None
-
-
-class BulkLoadSummaryAttributes(BaseModel):
-    """`bulkLoadSummary` on a bulk POST. A `201` with `successCount: 0` is a total failure."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    total_count: LenientInt = Field(default=None, validation_alias="totalCount")
-    success_count: LenientInt = Field(default=None, validation_alias="successCount")
-    error_messages: list[BulkLoadErrorMessageAttributes] = Field(
-        default_factory=list, validation_alias="errorMessages"
-    )
 
 
 class BulkCustomFieldValueRecordAttributes(BaseModel):

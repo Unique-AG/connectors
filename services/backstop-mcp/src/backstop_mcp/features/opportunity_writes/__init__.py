@@ -2,6 +2,7 @@
 stage-history rows.
 """
 
+from backstop_mcp.features.bulk_writes import RecordOutcomeResponse
 from backstop_mcp.features.opportunity_writes.backfill_opportunity_stage_history_input import (
     BACKFILL_OPPORTUNITY_STAGE_HISTORY_INPUT_DESCRIPTION,
     MAX_STAGE_HISTORY_RECORDS,
@@ -33,7 +34,6 @@ from backstop_mcp.features.opportunity_writes.responses import (
     CreatedOpportunityResponse,
     CreateOpportunityResponse,
     DeletedOpportunityResponse,
-    RecordOutcomeResponse,
     UpdatedOpportunityResponse,
 )
 from backstop_mcp.features.opportunity_writes.update_opportunity_input import (

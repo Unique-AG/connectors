@@ -44,7 +44,9 @@ async def update_custom_field_values(
     opportunity has a custom field literally called Probability that is not the native
     `probability` attribute. Time-series vs regular branching comes from the catalog: a
     time-series field needs `effective_date`; a regular field rejects one. Picklist values
-    must match current options. Do not write custom fields on `update_opportunity` — that
+    must match current options. Only the fields you list are touched — omit a field to leave
+    it unchanged, and send `value: null` only when you mean to clear it. Do not write custom
+    fields on `update_opportunity` — that
     skips this validation. The entity id comes from `get_person`, `get_organization`, or
     `get_opportunities`. A `201` is not success: read `records[].status`.
 

@@ -444,6 +444,19 @@ them if they ever show up).
 **DELETE has no body.** `client.delete(path)` — no dummy `*Attributes`, no `schema=` on a
 204. Pass `schema=` only when Backstop returns a body.
 
+**A bulk POST is read through `features/bulk_writes`.** Every `POST /bulk-*` answers `201`
+whether or not anything landed, so `BulkLoadSummaryAttributes`, `RecordOutcomeResponse` and
+the `bulk_record_outcomes` fold (error index → row, `successCount: 0` → whole batch failed,
+landed key → `applied`, leftover message → warning) live there once. A new bulk writer
+supplies the two things that are actually its own: the `match_key` its rows are identified by
+in Backstop's echo (a definition id; an `(opportunity_id, stage_id)` pair) and the document
+shape wrapping `attributes.records`. Do not copy the fold into the feature.
+
+**Never let `omit_none_values` eat a value the caller meant to clear.** It is for keys that
+are absent, not for keys that are null. Custom-field writes send `"value": null` explicitly —
+dropping the key posts a record with nothing to write, and Backstop still echoes the
+definition id back, so the fold above would have reported `applied` for a no-op.
+
 **Elicitation is a capability, then a fetch.** `elicit_entity_deletion` takes a callback
 and runs it only after the client is known to support elicitation. Do not GET a preview
 for a prompt that will never be shown. Id spaces differ (`/entity-activity-details` is

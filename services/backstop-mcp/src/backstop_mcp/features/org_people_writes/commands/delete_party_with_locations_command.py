@@ -119,9 +119,7 @@ class DeletePartyWithLocationsCommand:
         )
         if linkage_ids:
             return linkage_ids
-        linked = Included(document.included).by_type(
-            "contact-locations", schema=_LOCATION_RESOURCE
-        )
+        linked = Included(document.included).by_type("contact-locations", schema=_LOCATION_RESOURCE)
         return tuple(item.id for item in linked if item.id)
 
     async def _delete_contact_locations(

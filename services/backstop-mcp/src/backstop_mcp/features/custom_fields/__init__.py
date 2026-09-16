@@ -1,3 +1,4 @@
+from backstop_mcp.features.bulk_writes import RecordOutcomeResponse
 from backstop_mcp.features.custom_fields.api_responses import (
     CustomFieldDefinitionAttributes,
     CustomFieldGroupAttributes,
@@ -34,7 +35,6 @@ from backstop_mcp.features.custom_fields.responses import (
     CustomFieldGroupResponse,
     ListCustomFieldGroupsResponse,
     ListCustomFieldsResponse,
-    RecordOutcomeResponse,
     ResolvedCustomFieldValueResponse,
     UpdateCustomFieldValuesResponse,
 )

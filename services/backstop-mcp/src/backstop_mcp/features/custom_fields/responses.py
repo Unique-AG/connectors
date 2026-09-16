@@ -4,6 +4,7 @@ from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from backstop_mcp.features.bulk_writes import RecordOutcomeResponse
 from backstop_mcp.features.custom_fields.entity_types import CustomFieldEntityType
 from backstop_mcp.features.custom_fields.internal_dto import (
     CustomFieldDefinitionDto,
@@ -23,7 +24,6 @@ __all__ = [
     "CustomFieldGroupResponse",
     "ListCustomFieldGroupsResponse",
     "ListCustomFieldsResponse",
-    "RecordOutcomeResponse",
     "ResolvedCustomFieldValueResponse",
     "UpdateCustomFieldValuesResponse",
 ]
@@ -349,23 +349,6 @@ class ListCustomFieldGroupsResponse(BaseModel):
             "membership is the definitions whose group_id matches this group. Groups with no "
             "matching definitions are still present with an empty membership list."
         )
-    )
-
-
-class RecordOutcomeResponse(OmitNoneModel):
-    """One row of a multi-record write: applied or failed, never preview."""
-
-    index: int = Field(description="0-based position of this record in the request.")
-    record_id: str | None = Field(
-        default=None,
-        description="Definition id this row targeted, when the request supplied one.",
-    )
-    status: Literal["applied", "failed"] = Field(
-        description="Whether Backstop wrote this row. There is no preview status."
-    )
-    error: str | None = Field(
-        default=None,
-        description="Backstop's per-record message when `status` is `failed`.",
     )
 
 

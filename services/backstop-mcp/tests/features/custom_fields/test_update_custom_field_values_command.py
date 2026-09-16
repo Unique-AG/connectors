@@ -352,6 +352,29 @@ class TestUpdateCustomFieldValuesCommand:
         assert route.call_count == 0
 
     @respx.mock
+    async def test_clearing_an_optional_field_sends_an_explicit_null_value(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=_catalog(_definition(_TEXT, name="Notes"))
+        )
+        route = respx.post(f"{BASE_URL}/bulk-custom-field-values").mock(
+            return_value=_bulk_document(
+                total=1, success=1, errors=[], records=[_written(_TEXT, None)]
+            )
+        )
+
+        result = await make_command(client).run(update=_update(_value(_TEXT, None)))
+
+        assert result.applied_count == 1
+        body = recorded_json_bodies(route)[0]
+        attributes = object_dict(object_dict(body["data"])["attributes"])
+        row = object_dict(object_list(attributes["records"])[0])
+        assert "value" in row
+        assert row["value"] is None
+        assert "effectiveDate" not in row
+
+    @respx.mock
     async def test_an_over_length_value_is_rejected_before_writing(
         self, client: BackstopClient
     ) -> None:

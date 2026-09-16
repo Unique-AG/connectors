@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from backstop_mcp.features.bulk_writes import RecordOutcomeResponse
 from backstop_mcp.features.party_resolver import PartyAmbiguousResponse
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
@@ -17,7 +18,6 @@ __all__ = [
     "CreateOpportunityResponse",
     "CreatedOpportunityResponse",
     "DeletedOpportunityResponse",
-    "RecordOutcomeResponse",
     "UpdatedOpportunityResponse",
 ]
 
@@ -97,23 +97,6 @@ class UpdatedOpportunityResponse(OmitNoneModel):
             "Silent-failure notes: a requested stage that did not move, or a notify "
             "login that did not match a system user. Empty when the write landed as asked."
         ),
-    )
-
-
-class RecordOutcomeResponse(OmitNoneModel):
-    """One row of a multi-record write: applied or failed, never preview."""
-
-    index: int = Field(description="0-based position of this record in the request.")
-    record_id: str | None = Field(
-        default=None,
-        description="Opportunity id this row targeted, when the request supplied one.",
-    )
-    status: Literal["applied", "failed"] = Field(
-        description="Whether Backstop wrote this row. There is no preview status."
-    )
-    error: str | None = Field(
-        default=None,
-        description="Backstop's per-record message when `status` is `failed`.",
     )
 
 

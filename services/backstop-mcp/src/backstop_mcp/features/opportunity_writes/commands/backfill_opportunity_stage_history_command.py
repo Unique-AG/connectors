@@ -10,6 +10,11 @@ from backstop_mcp.backstop_client import (
     json_api_create,
     resource_pointer,
 )
+from backstop_mcp.features.bulk_writes import (
+    BulkRequestedRowDto,
+    RecordOutcomeResponse,
+    bulk_record_outcomes,
+)
 from backstop_mcp.features.opportunities import OpportunityStagesService
 from backstop_mcp.features.opportunity_writes.api_responses import (
     BulkOpportunityStageHistoryAttributes,
@@ -22,7 +27,6 @@ from backstop_mcp.features.opportunity_writes.backfill_opportunity_stage_history
 )
 from backstop_mcp.features.opportunity_writes.responses import (
     BackfillOpportunityStageHistoryResponse,
-    RecordOutcomeResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -103,57 +107,23 @@ class BackfillOpportunityStageHistoryCommand:
         stage_ids: tuple[str, ...],
         attributes: BulkOpportunityStageHistoryAttributes,
     ) -> tuple[tuple[RecordOutcomeResponse, ...], tuple[str, ...]]:
-        summary = attributes.summary()
-        error_by_index = {
-            message.index: message.message
-            or f"Backstop reported an error for record #{message.index} without a message."
-            for message in summary.error_messages
-            if message.index is not None
-        }
-        batch_error = next(
-            (
-                message.message
-                for message in summary.error_messages
-                if message.index is None and message.message
-            ),
-            None,
-        )
-        written_pairs = [
-            pair
-            for written_row in attributes.records
-            if (pair := self._written_pair(written_row)) is not None
-        ]
-        outcomes: list[RecordOutcomeResponse] = []
-        for index, (requested_row, stage_id) in enumerate(
-            zip(requested_rows, stage_ids, strict=True)
-        ):
-            pair = (requested_row.opportunity_id, stage_id)
-            if index in error_by_index:
-                error: str | None = error_by_index[index]
-            elif summary.success_count == 0:
-                error = batch_error or "Backstop reported successCount 0 for this batch."
-            elif pair in written_pairs:
-                written_pairs.remove(pair)
-                error = None
-            else:
-                error = batch_error or (
-                    "Backstop did not return this row among the written records."
-                )
-            outcomes.append(
-                RecordOutcomeResponse(
-                    index=index,
+        # A history row has no id of its own in the request, so it is matched on the pair it
+        # names: the deal and the stage it was moved to.
+        return bulk_record_outcomes(
+            requested_rows=[
+                BulkRequestedRowDto(
                     record_id=requested_row.opportunity_id,
-                    status="failed" if error else "applied",
-                    error=error,
+                    match_key=(requested_row.opportunity_id, stage_id),
                 )
-            )
-        reported = {outcome.error for outcome in outcomes if outcome.error}
-        warnings = tuple(
-            message.message
-            for message in summary.error_messages
-            if message.message and message.message not in reported
+                for requested_row, stage_id in zip(requested_rows, stage_ids, strict=True)
+            ],
+            written_keys=[
+                pair
+                for written_row in attributes.records
+                if (pair := self._written_pair(written_row)) is not None
+            ],
+            summary=attributes.summary(),
         )
-        return tuple(outcomes), warnings
 
     def _written_pair(
         self,

@@ -1,45 +1,23 @@
 """Write-side wire shapes for opportunity PATCH and bulk stage-history POST.
 
-`BulkLoadSummaryAttributes` is the only part of a bulk `201` that says whether anything
-was written — HTTP status is always success. The document `id` is `null`; landed rows
-are `attributes.records`.
+`BulkLoadSummaryAttributes` (in `features/bulk_writes`) is the only part of a bulk `201` that
+says whether anything was written — HTTP status is always success. The document `id` is
+`null`; landed rows are `attributes.records`.
 """
 
 from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from backstop_mcp.lenient import LenientInt, LenientStr
+from backstop_mcp.features.bulk_writes import BulkLoadSummaryAttributes
+from backstop_mcp.lenient import LenientStr
 
 __all__ = [
-    "BulkLoadErrorMessageAttributes",
-    "BulkLoadSummaryAttributes",
     "BulkOpportunityStageHistoryAttributes",
     "BulkOpportunityStageHistoryDocument",
     "BulkOpportunityStageHistoryRecordAttributes",
     "BulkResourcePointerAttributes",
 ]
-
-
-class BulkLoadErrorMessageAttributes(BaseModel):
-    """One per-record error from a bulk write. `index` is 0-based."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    index: LenientInt = None
-    message: LenientStr = None
-
-
-class BulkLoadSummaryAttributes(BaseModel):
-    """`bulkLoadSummary` on a bulk POST. A `201` with `successCount: 0` is a total failure."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    total_count: LenientInt = Field(default=None, validation_alias="totalCount")
-    success_count: LenientInt = Field(default=None, validation_alias="successCount")
-    error_messages: list[BulkLoadErrorMessageAttributes] = Field(
-        default_factory=list, validation_alias="errorMessages"
-    )
 
 
 class BulkResourcePointerAttributes(BaseModel):

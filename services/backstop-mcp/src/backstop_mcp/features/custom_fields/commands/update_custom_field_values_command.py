@@ -12,16 +12,18 @@ from backstop_mcp.backstop_client import (
     omit_none_values,
     resource_pointer,
 )
+from backstop_mcp.features.bulk_writes import (
+    BulkRequestedRowDto,
+    RecordOutcomeResponse,
+    bulk_record_outcomes,
+)
 from backstop_mcp.features.custom_fields.api_responses import (
     BulkCustomFieldValuesAttributes,
     BulkCustomFieldValuesDocument,
 )
 from backstop_mcp.features.custom_fields.custom_fields_service import CustomFieldsService
 from backstop_mcp.features.custom_fields.internal_dto import CustomFieldDefinitionDto
-from backstop_mcp.features.custom_fields.responses import (
-    RecordOutcomeResponse,
-    UpdateCustomFieldValuesResponse,
-)
+from backstop_mcp.features.custom_fields.responses import UpdateCustomFieldValuesResponse
 from backstop_mcp.features.custom_fields.update_custom_field_values_input import (
     UpdateCustomFieldValueInput,
     UpdateCustomFieldValuesInput,
@@ -51,13 +53,16 @@ class UpdateCustomFieldValuesCommand:
                 resource_type="bulk-custom-field-values",
                 attributes={
                     "records": [
-                        omit_none_values(
-                            {
-                                "definitionId": requested_row.definition_id,
-                                "value": requested_row.value,
-                                "effectiveDate": isoformat(requested_row.effective_date),
-                            }
-                        )
+                        {
+                            "definitionId": requested_row.definition_id,
+                            # `value` is written even when null — that is how a non-required
+                            # field is cleared. Dropping it would post a record with nothing
+                            # to write, which Backstop echoes back as if it had landed.
+                            "value": requested_row.value,
+                            **omit_none_values(
+                                {"effectiveDate": isoformat(requested_row.effective_date)}
+                            ),
+                        }
                         for requested_row in update.values
                     ],
                     "resource": resource_pointer(
@@ -134,55 +139,23 @@ class UpdateCustomFieldValuesCommand:
         requested_rows: tuple[UpdateCustomFieldValueInput, ...],
         attributes: BulkCustomFieldValuesAttributes,
     ) -> tuple[tuple[RecordOutcomeResponse, ...], tuple[str, ...]]:
-        summary = attributes.summary()
-        error_by_index = {
-            message.index: message.message
-            or f"Backstop reported an error for record #{message.index} without a message."
-            for message in summary.error_messages
-            if message.index is not None
-        }
-        batch_error = next(
-            (
-                message.message
-                for message in summary.error_messages
-                if message.index is None and message.message
-            ),
-            None,
-        )
-        written_ids = [
-            written_row.definition_id
-            for written_row in attributes.records
-            if written_row.definition_id
-        ]
-        outcomes: list[RecordOutcomeResponse] = []
-        for index, requested_row in enumerate(requested_rows):
-            definition_id = str(requested_row.definition_id)
-            if index in error_by_index:
-                error: str | None = error_by_index[index]
-            elif summary.success_count == 0:
-                error = batch_error or "Backstop reported successCount 0 for this batch."
-            elif definition_id in written_ids:
-                written_ids.remove(definition_id)
-                error = None
-            else:
-                error = batch_error or (
-                    "Backstop did not return this row among the written records."
+        # A value row is identified by the definition it targets; the entity is the same for
+        # the whole batch.
+        return bulk_record_outcomes(
+            requested_rows=[
+                BulkRequestedRowDto(
+                    record_id=str(requested_row.definition_id),
+                    match_key=str(requested_row.definition_id),
                 )
-            outcomes.append(
-                RecordOutcomeResponse(
-                    index=index,
-                    record_id=definition_id,
-                    status="failed" if error else "applied",
-                    error=error,
-                )
-            )
-        reported = {outcome.error for outcome in outcomes if outcome.error}
-        warnings = tuple(
-            message.message
-            for message in summary.error_messages
-            if message.message and message.message not in reported
+                for requested_row in requested_rows
+            ],
+            written_keys=[
+                written_row.definition_id
+                for written_row in attributes.records
+                if written_row.definition_id
+            ],
+            summary=attributes.summary(),
         )
-        return tuple(outcomes), warnings
 
 
 def _is_blank(value: object) -> bool:
