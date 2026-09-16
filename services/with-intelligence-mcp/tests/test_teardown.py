@@ -11,9 +11,7 @@ from with_intelligence_mcp.teardown import close_singletons
 
 _SRC = pathlib.Path(__file__).parent.parent / "src" / "with_intelligence_mcp"
 _TEARDOWN_MEMBERS = cast("dict[str, object]", cast("object", vars(teardown)))
-_PROVIDERS = cast(
-    "tuple[object, ...]", _TEARDOWN_MEMBERS["_CACHED_DEPENDENCY_PROVIDERS"]
-)
+_PROVIDERS = cast("tuple[object, ...]", _TEARDOWN_MEMBERS["_CACHED_DEPENDENCY_PROVIDERS"])
 
 
 @runtime_checkable
