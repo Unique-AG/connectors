@@ -1,7 +1,7 @@
-name: "Security · Trivy Registry Image Scan"
+name: "[Security] Trivy Registry Image Scan"
 
 concurrency:
-  group: ${{ github.workflow }}
+  group: security-trivy-registry
   cancel-in-progress: false
 
 on:
