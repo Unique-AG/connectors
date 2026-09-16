@@ -19,7 +19,6 @@ no caps — pagination will be added once scale requires it.
 import asyncio
 import json
 import logging
-import os
 from collections import Counter, defaultdict
 from typing import Annotated, Any
 
@@ -39,13 +38,13 @@ from unique_mcp import (
 from unique_toolkit.experimental.components.content_tree import ContentTree
 
 from kb_mcp.correlation import correlation_id
-from kb_mcp.tools.content_metadata.scoped_walk import ScopedContentTree
+from kb_mcp.scoped_walk import ScopedContentTree
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_metadata.config import ContentMetadataToolConfig
-from kb_mcp.tools.content_tree.cache import get_tree_cache
 from kb_mcp.tools.content_metadata.metadata_filter import (
     build_folder_scoped_metadata_filter,
 )
+from kb_mcp.tools.content_tree.cache import get_tree_cache
 from kb_mcp.tools.content_tree.config import DEFAULT_METADATA_FILTER_STATEMENT
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,13 +57,6 @@ _INCOMPLETE_NOTICE = (
     "background; call content_metadata again (same arguments) to get the "
     "complete picture — that follow-up is usually instant from cache."
 )
-
-# TODO(ean): temporary benchmarking knob — DELETE this flag, this comment,
-# and the `not _DEBUG_FORCE_UNSCOPED_WALK` clause below before merging.
-# Set KB_MCP_DEBUG_FORCE_UNSCOPED_WALK=1 (and restart the server) to force
-# the pre-ScopedContentTree unscoped-walk-then-filter path, for comparing
-# against the scoped fast path below.
-_DEBUG_FORCE_UNSCOPED_WALK = os.environ.get("KB_MCP_DEBUG_FORCE_UNSCOPED_WALK") == "1"
 
 
 def _clamped_timeout(requested: float | None) -> float:
@@ -212,13 +204,9 @@ async def content_metadata(
 
         cache = get_tree_cache(kb_settings)
 
-        # folder_paths resolves to scope ids up front so the rest of the
-        # function treats them exactly like folder_ids — same fast path,
-        # same include_subfolders=False fallback. The backend's folder-path
-        # lookup only accepts an absolute path (every real value the SDK's
-        # own CLI ever sends starts with "/"), so a bare relative path like
-        # "demo" or "Contracts/2024" is normalized rather than requiring the
-        # caller to know that convention.
+        # Resolved up front so the rest of the function treats them as folder
+        # ids. The backend's lookup needs an absolute path, so bare ones are
+        # normalized rather than making the caller know that.
         effective_folder_ids = folder_ids
         if folder_paths:
             resolved_ids = await asyncio.gather(
@@ -233,20 +221,13 @@ async def content_metadata(
             )
             effective_folder_ids = [rid for rid in resolved_ids if rid] or None
 
-        # Any number of folder ids, with subfolders included, can walk just
-        # those folders' subtrees instead of the whole knowledge base (see
-        # ScopedContentTree) — only include_subfolders=False's
-        # direct-children-only semantics (narrower than what the always-
-        # recursive scoped walk can express) falls back to the unscoped walk
-        # filtered by folder_ids below, as before.
+        # include_subfolders=False is max_depth=1 on the same rooted walk:
+        # roots enter at depth 0, so nothing below them is visited.
         scoped_root_ids: tuple[str, ...] | None = None
-        if (
-            effective_folder_ids
-            and include_subfolders
-            and not _DEBUG_FORCE_UNSCOPED_WALK  # TODO(ean): delete with the flag above
-        ):
+        if effective_folder_ids:
             scoped_root_ids = tuple(sorted(set(effective_folder_ids)))
         use_scoped_walk = scoped_root_ids is not None
+        walk_depth = None if include_subfolders else 1
 
         async def _construct() -> ContentTree:
             if scoped_root_ids:
@@ -277,6 +258,7 @@ async def content_metadata(
         wait = _clamped_timeout(timeout)
         snapshot = await tree_svc.resolve_visible_file_paths_via_folders_async(
             metadata_filter=metadata_filter,
+            max_depth=walk_depth if use_scoped_walk else None,
             timeout=wait,
             max_concurrent_directory_listings=config.max_concurrent_scope_lookups,
         )

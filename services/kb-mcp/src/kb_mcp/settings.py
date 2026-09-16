@@ -78,9 +78,15 @@ class Settings(BaseSettings):
         description="Seconds a cached ContentTree stays valid.",
         validation_alias="KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS",
     )
+    # TODO [proschu2/ean]: shared across callers and keyed by folder scope, so
+    # one caller browsing many folders evicts others. Sizing needs real numbers.
     content_tree_cache_max_entries: int = Field(
         default=24,
-        description="Max cached ContentTree entries (one per company+user).",
+        description=(
+            "Max cached ContentTree entries, across all callers. One entry per "
+            "company+user+folder scope, so a caller browsing several folders "
+            "holds several."
+        ),
         validation_alias="KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES",
     )
 

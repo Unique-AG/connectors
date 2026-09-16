@@ -268,8 +268,17 @@ async def test_list_mode_with_min_score_errors():
 
 
 @pytest.mark.asyncio
-async def test_search_mode_with_folder_path_errors():
-    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
+async def test_search_mode_accepts_folder_path():
+    """folder_path scopes every mode now, not just list."""
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=[
+                (_make_content_info("c1"), PurePosixPath("Contracts/a.pdf")),
+                (_make_content_info("c2"), PurePosixPath("Other/a.pdf")),
+            ]
+        )
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="search",
             query="a.pdf",
@@ -278,23 +287,32 @@ async def test_search_mode_with_folder_path_errors():
         )
 
     assert isinstance(result, ToolResult)
-    assert result.is_error is True
+    assert result.is_error is not True
     text = result.content[0].text  # type: ignore[union-attr]
-    assert "folder_path" in text
-    assert "mode='list'" in text
-    mock_cls.assert_not_called()
+    assert "content_id=c1" in text
+    assert "content_id=c2" not in text
 
 
 @pytest.mark.asyncio
-async def test_tree_mode_with_folder_path_errors():
-    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
+async def test_tree_mode_accepts_folder_path():
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=[
+                (_make_content_info("c1"), PurePosixPath("Contracts/a.pdf")),
+                (_make_content_info("c2"), PurePosixPath("Other/b.pdf")),
+            ]
+        )
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="tree", folder_path="Contracts", config=ContentTreeToolConfig()
         )
 
     assert isinstance(result, ToolResult)
-    assert result.is_error is True
-    mock_cls.assert_not_called()
+    assert result.is_error is not True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "a.pdf" in text
+    assert "b.pdf" not in text
 
 
 @pytest.mark.asyncio
@@ -1094,3 +1112,69 @@ async def test_tree_folder_with_nothing_beneath_renders_without_id():
     text = result.content[0].text  # type: ignore[union-attr]
     assert "Empty" in text
     assert "Empty (folder_id" not in text
+
+
+@pytest.mark.asyncio
+async def test_resolvable_folder_path_roots_the_walk_instead_of_filtering():
+    """The whole point: scope the walk, do not walk everything and filter after."""
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=[(_make_content_info("c1"), PurePosixPath("a.pdf"))]
+        )
+    )
+    with (
+        patch(
+            "kb_mcp.tools.content_tree.tool.unique_sdk.Folder."
+            "resolve_scope_id_from_folder_path_async",
+            AsyncMock(return_value="scope_target"),
+        ),
+        patch(
+            "kb_mcp.tools.content_tree.tool.ScopedContentTree", return_value=mock_tree
+        ) as scoped_cls,
+        patch("kb_mcp.tools.content_tree.tool.ContentTree") as unscoped_cls,
+    ):
+        result = await content_tree(
+            mode="list", folder_path="Contracts/2024", config=ContentTreeToolConfig()
+        )
+
+    assert result.is_error is not True
+    scoped_cls.assert_called_once()
+    assert scoped_cls.call_args.kwargs["root_scope_ids"] == ("scope_target",)
+    unscoped_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_unreadable_scope_id_is_an_error_not_an_empty_folder():
+    with (
+        patch(
+            "kb_mcp.tools.content_tree.tool.unique_sdk.Folder.get_info_async",
+            AsyncMock(side_effect=ValueError("nope")),
+        ),
+        patch("kb_mcp.tools.content_tree.tool.ContentTree") as unscoped_cls,
+    ):
+        result = await content_tree(
+            mode="list", folder_path="scope_missing", config=ContentTreeToolConfig()
+        )
+
+    assert result.is_error is True
+    assert "scope_missing" in result.content[0].text  # type: ignore[union-attr]
+    unscoped_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_tree_mode_caps_files_and_says_it_truncated():
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=[
+                (_make_content_info(f"c{i}"), PurePosixPath(f"f{i}.pdf"))
+                for i in range(5)
+            ]
+        )
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree", limit=2, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "first 2 of 5" in text
