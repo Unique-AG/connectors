@@ -15,8 +15,6 @@ from backstop_mcp.features.opportunity_writes import (
     CreateOpportunityCommand,
     CreateOpportunityInput,
     get_create_opportunity_command_factory,
-)
-from backstop_mcp.features.opportunity_writes.commands._opportunity_attributes import (
     unique_catalog_entity_type_id,
 )
 from tests.features.opportunity_writes.test_update_opportunity_command import VOCABULARY

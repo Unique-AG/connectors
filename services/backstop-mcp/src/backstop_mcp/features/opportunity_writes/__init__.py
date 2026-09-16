@@ -15,6 +15,9 @@ from backstop_mcp.features.opportunity_writes.commands import (
     DeleteOpportunityCommand,
     UpdateOpportunityCommand,
 )
+from backstop_mcp.features.opportunity_writes.commands._opportunity_attributes import (
+    unique_catalog_entity_type_id,
+)
 from backstop_mcp.features.opportunity_writes.create_opportunity_input import (
     CREATE_OPPORTUNITY_INPUT_DESCRIPTION,
     CreateOpportunityInput,
@@ -66,4 +69,5 @@ __all__ = [
     "get_create_opportunity_command_factory",
     "get_delete_opportunity_command_factory",
     "get_update_opportunity_command_factory",
+    "unique_catalog_entity_type_id",
 ]
