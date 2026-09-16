@@ -339,3 +339,48 @@ class TestBackfillOpportunityStageHistoryCommand:
             await make_command(client).run(backfill=_backfill(_record(stage="Other Pipe")))
 
         assert route.call_count == 0
+
+    @respx.mock
+    async def test_a_missing_opportunity_fails_only_that_row(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        respx.get(url__regex=rf"{BASE_URL}/opportunities/9(?:\?|$)").mock(
+            return_value=httpx.Response(404, json={"errors": [{"detail": "not found"}]})
+        )
+        respx.get(url__regex=rf"{BASE_URL}/opportunities/5755101(?:\?|$)").mock(
+            return_value=_opportunity_document()
+        )
+        route = respx.post(f"{BASE_URL}/bulk-opportunity-stage-history").mock(
+            return_value=_bulk_document(
+                total=1,
+                success=1,
+                errors=[],
+                records=[_landed(record_id="1", opportunity_id="5755101")],
+            )
+        )
+
+        result = await make_command(client).run(backfill=_backfill(_record(), _record("9")))
+
+        assert route.call_count == 1
+        attributes = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
+        assert len(object_list(attributes["records"])) == 1
+        assert result.total_count == 2
+        assert result.applied_count == 1
+        assert result.records[0].status == "applied"
+        assert result.records[1].status == "failed"
+        assert result.records[1].error == "Opportunity 9 was not found."
+
+    @respx.mock
+    async def test_every_unreadable_opportunity_skips_the_bulk_post(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        respx.get(url__regex=rf"{BASE_URL}/opportunities/[^/?]+").mock(
+            return_value=httpx.Response(404, json={"errors": [{"detail": "not found"}]})
+        )
+        route = respx.post(f"{BASE_URL}/bulk-opportunity-stage-history")
+
+        result = await make_command(client).run(backfill=_backfill(_record(), _record("5755102")))
+
+        assert route.call_count == 0
+        assert result.applied_count == 0
+        assert {record.status for record in result.records} == {"failed"}
