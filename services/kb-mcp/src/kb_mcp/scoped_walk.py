@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Coroutine, Sequence
 from pathlib import PurePosixPath
 from typing import Any, override
 
@@ -43,7 +43,7 @@ def _log_walk_failure(task: asyncio.Task[FolderWalkSnapshot]) -> None:
         _LOGGER.debug("Scoped folder walk failed", exc_info=error)
 
 
-async def walk_visible_paths_via_folders_async(
+def create_scoped_walk(
     user_id: str,
     company_id: str,
     root_scope_ids: Sequence[str],
@@ -52,22 +52,17 @@ async def walk_visible_paths_via_folders_async(
     max_depth: int | None = None,
     max_concurrent_directory_listings: int = 25,
     timeout: float | None = None,
-    progress: FolderWalkSnapshot | None = None,
-) -> FolderWalkSnapshot:
-    """Same shape and semantics as unique_toolkit's
-    ``walk_visible_paths_via_folders_async``, except the walk starts at
-    ``root_scope_ids`` instead of the knowledge-base root — so only those
-    folders' subtrees are ever visited, never the whole company tree.
+) -> tuple[Coroutine[Any, Any, FolderWalkSnapshot], FolderWalkSnapshot]:
+    """The not-yet-started walk, plus the snapshot it fills while it runs.
 
-    Every root is walked concurrently; a root that fails to list is skipped
-    (logged) rather than failing the whole call, the same tolerance already
-    given to any other folder encountered mid-walk.
+    Owned here rather than taken as an argument, so no caller's object is
+    mutated; readers of partial results hold this same reference.
     """
     assert root_scope_ids, "root_scope_ids must be a non-empty sequence"
-    acc = progress or FolderWalkSnapshot(files=[], folder_paths=[], complete=False)
+    acc = FolderWalkSnapshot(files=[], folder_paths=[], complete=False)
     dir_semaphore = asyncio.Semaphore(max_concurrent_directory_listings)
-    seen_content_ids = {info.id for info, _path in acc.files}
-    seen_folder_paths = set(acc.folder_paths)
+    seen_content_ids: set[str] = set()
+    seen_folder_paths: set[PurePosixPath] = set()
 
     async def _visit(scope_id: str, path: PurePosixPath, depth: int) -> None:
         def _on_folders(page: list[BaseFolderInfo]) -> None:
@@ -118,20 +113,55 @@ async def walk_visible_paths_via_folders_async(
         )
         for root_id, result in zip(root_scope_ids, results, strict=True):
             if isinstance(result, BaseException):
-                _LOGGER.debug("Skipping root %s", root_id, exc_info=result)
+                # A root that merely fails to list never reaches here —
+                # unique_toolkit swallows that and returns no children.
+                _LOGGER.warning("Skipping root %s", root_id, exc_info=result)
 
-    try:
-        if timeout is None:
-            await _visit_roots()
-        else:
-            async with asyncio.timeout(timeout):
+    async def _run() -> FolderWalkSnapshot:
+        try:
+            if timeout is None:
                 await _visit_roots()
-    except TimeoutError:
-        acc.complete = False
-        return acc.copy(complete=False)
+            else:
+                async with asyncio.timeout(timeout):
+                    await _visit_roots()
+        except TimeoutError:
+            return acc.copy(complete=False)
 
-    acc.complete = True
-    return acc.copy(complete=True)
+        acc.complete = True
+        return acc.copy(complete=True)
+
+    return _run(), acc
+
+
+async def walk_visible_paths_via_folders_async(
+    user_id: str,
+    company_id: str,
+    root_scope_ids: Sequence[str],
+    *,
+    metadata_filter: dict[str, Any] | None = None,
+    max_depth: int | None = None,
+    max_concurrent_directory_listings: int = 25,
+    timeout: float | None = None,
+) -> FolderWalkSnapshot:
+    """Same shape and semantics as unique_toolkit's
+    ``walk_visible_paths_via_folders_async``, except the walk starts at
+    ``root_scope_ids`` instead of the knowledge-base root — so only those
+    folders' subtrees are ever visited, never the whole company tree.
+
+    Every root is walked concurrently; a root that fails to list is skipped
+    (logged) rather than failing the whole call, the same tolerance already
+    given to any other folder encountered mid-walk.
+    """
+    walk, _progress = create_scoped_walk(
+        user_id,
+        company_id,
+        root_scope_ids,
+        metadata_filter=metadata_filter,
+        max_depth=max_depth,
+        max_concurrent_directory_listings=max_concurrent_directory_listings,
+        timeout=timeout,
+    )
+    return await walk
 
 
 class ScopedContentTree(ContentTree):
@@ -166,17 +196,14 @@ class ScopedContentTree(ContentTree):
             None if filter_key == "null" else json.loads(filter_key)
         )
         max_depth = None if max_depth_key < 0 else max_depth_key
-        progress = FolderWalkSnapshot(files=[], folder_paths=[], complete=False)
-        task = asyncio.ensure_future(
-            walk_visible_paths_via_folders_async(
-                user_id=self.user_id,
-                company_id=self.company_id,
-                root_scope_ids=self._root_scope_ids,
-                metadata_filter=effective_filter,
-                max_depth=max_depth,
-                max_concurrent_directory_listings=max_concurrent_directory_listings,
-                progress=progress,
-            )
+        walk, progress = create_scoped_walk(
+            user_id=self.user_id,
+            company_id=self.company_id,
+            root_scope_ids=self._root_scope_ids,
+            metadata_filter=effective_filter,
+            max_depth=max_depth,
+            max_concurrent_directory_listings=max_concurrent_directory_listings,
         )
+        task = asyncio.ensure_future(walk)
         task.add_done_callback(_log_walk_failure)
         return task, progress

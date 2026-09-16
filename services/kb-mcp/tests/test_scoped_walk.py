@@ -8,16 +8,32 @@ root_scope_ids' subtrees.
 import asyncio
 from pathlib import PurePosixPath
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from unique_toolkit.experimental.components.content_tree.schemas import (
     FolderWalkSnapshot,
 )
 
-from kb_mcp.tools.content_metadata.scoped_walk import ScopedContentTree, walk_visible_paths_via_folders_async
+from kb_mcp.scoped_walk import ScopedContentTree, walk_visible_paths_via_folders_async
 
 pytestmark = pytest.mark.ai
+
+
+def _stub_create_scoped_walk() -> MagicMock:
+    """Stands in for create_scoped_walk's (coroutine, snapshot) return.
+
+    Fresh coroutine per call — a coroutine cannot be awaited twice.
+    """
+    snapshot = FolderWalkSnapshot(files=[], folder_paths=[], complete=True)
+
+    def _factory(*_args: Any, **_kwargs: Any):
+        async def _run() -> FolderWalkSnapshot:
+            return snapshot
+
+        return _run(), snapshot
+
+    return MagicMock(side_effect=_factory)
 
 
 def _folder(id_: str, name: str, parent_id: str | None = None) -> dict[str, Any]:
@@ -166,6 +182,31 @@ async def test_walk_skips_a_root_that_fails_without_losing_other_roots():
 
     assert snapshot.complete is True
     assert {info.key for info, _path in snapshot.files} == {"ok.pdf"}
+
+
+@pytest.mark.asyncio
+async def test_walk_reports_an_unreadable_root_as_empty_not_as_an_error():
+    """Documents a real gap: an unreadable root is indistinguishable from an empty one.
+
+    unique_toolkit catches the failed listing inside `_list_direct_children_async`
+    and returns no children, so the walk cannot tell the two apart. Callers that
+    need the distinction must validate the root before walking.
+    """
+
+    async def _folder_infos(*, user_id, company_id, parentId, skip, take):
+        raise RuntimeError("backend error")
+
+    async def _content_infos(*, user_id, company_id, parentId, skip, take):
+        return _content_page()
+
+    folder_patch, content_patch = _patch_sdk(_folder_infos, _content_infos)
+    with folder_patch, content_patch:
+        snapshot = await walk_visible_paths_via_folders_async(
+            "user-1", "company-1", ["scope_broken"]
+        )
+
+    assert snapshot.files == []
+    assert snapshot.complete is True
 
 
 @pytest.mark.asyncio
@@ -322,17 +363,12 @@ async def test_scoped_content_tree_walk_is_rooted_at_root_scope_ids():
     tree = ScopedContentTree(
         company_id="company-1", user_id="user-1", root_scope_ids=["scope_root"]
     )
-    mock_walk = AsyncMock(
-        return_value=FolderWalkSnapshot(files=[], folder_paths=[], complete=True)
-    )
-    with patch(
-        "kb_mcp.tools.content_metadata.scoped_walk.walk_visible_paths_via_folders_async",
-        mock_walk,
-    ):
+    mock_factory = _stub_create_scoped_walk()
+    with patch("kb_mcp.scoped_walk.create_scoped_walk", mock_factory):
         await tree.resolve_visible_file_paths_via_folders_async()
 
-    mock_walk.assert_called_once()
-    _, kwargs = mock_walk.call_args
+    mock_factory.assert_called_once()
+    _, kwargs = mock_factory.call_args
     assert kwargs["root_scope_ids"] == ("scope_root",)
     assert kwargs["user_id"] == "user-1"
     assert kwargs["company_id"] == "company-1"
@@ -343,17 +379,12 @@ async def test_scoped_content_tree_caches_repeated_calls():
     tree = ScopedContentTree(
         company_id="company-1", user_id="user-1", root_scope_ids=["scope_root"]
     )
-    mock_walk = AsyncMock(
-        return_value=FolderWalkSnapshot(files=[], folder_paths=[], complete=True)
-    )
-    with patch(
-        "kb_mcp.tools.content_metadata.scoped_walk.walk_visible_paths_via_folders_async",
-        mock_walk,
-    ):
+    mock_factory = _stub_create_scoped_walk()
+    with patch("kb_mcp.scoped_walk.create_scoped_walk", mock_factory):
         await tree.resolve_visible_file_paths_via_folders_async()
         await tree.resolve_visible_file_paths_via_folders_async()
 
-    mock_walk.assert_called_once()
+    mock_factory.assert_called_once()
 
 
 @pytest.mark.asyncio

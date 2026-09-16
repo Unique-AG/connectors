@@ -39,13 +39,13 @@ from unique_mcp import (
 from unique_toolkit.experimental.components.content_tree import ContentTree
 
 from kb_mcp.correlation import correlation_id
-from kb_mcp.tools.content_metadata.scoped_walk import ScopedContentTree
+from kb_mcp.scoped_walk import ScopedContentTree
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_metadata.config import ContentMetadataToolConfig
-from kb_mcp.tools.content_tree.cache import get_tree_cache
 from kb_mcp.tools.content_metadata.metadata_filter import (
     build_folder_scoped_metadata_filter,
 )
+from kb_mcp.tools.content_tree.cache import get_tree_cache
 from kb_mcp.tools.content_tree.config import DEFAULT_METADATA_FILTER_STATEMENT
 
 _LOGGER = logging.getLogger(__name__)
