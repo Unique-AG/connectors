@@ -249,8 +249,13 @@ _META = merge_tool_meta(
             "find information inside them (use search for that). Do not "
             'call this first "to see what\'s there" — search directly. '
             "mode='search' is fuzzy filename/path lookup, not content search. "
-            "If a listing says it is incomplete, call this tool again; do "
-            "not tell the user missing files do not exist."
+            "When the request is about one folder, pass folder_path — it scopes "
+            "the walk rather than filtering after it, which is the difference "
+            "between a fast call and a slow one. If a listing says it is "
+            "incomplete, call this tool again; if it says it was truncated, "
+            "calling again returns the same thing — raise limit or narrow "
+            "folder_path instead. Either way, do not tell the user missing "
+            "files do not exist."
         ),
     },
     ContextRequirements(
