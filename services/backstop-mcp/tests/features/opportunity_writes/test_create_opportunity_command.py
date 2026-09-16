@@ -9,11 +9,15 @@ from fastmcp.exceptions import ToolError
 from pydantic import TypeAdapter
 
 from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.features.opportunities import OpportunityStageResponse
 from backstop_mcp.features.opportunity_writes import (
     CreatedOpportunityResponse,
     CreateOpportunityCommand,
     CreateOpportunityInput,
     get_create_opportunity_command_factory,
+)
+from backstop_mcp.features.opportunity_writes.commands._opportunity_attributes import (
+    unique_catalog_entity_type_id,
 )
 from tests.features.opportunity_writes.test_update_opportunity_command import VOCABULARY
 from tests.helpers import (
@@ -227,7 +231,7 @@ class TestCreateOpportunityCommand:
             opportunity=_create(stage="IDD"), investor_id=_INVESTOR_ID
         )
 
-        assert recorded_params(get_route)[0]["include"] == "stage"
+        assert recorded_params(get_route)[0]["include"] == "stage,clientDefinedEntityType"
         assert isinstance(result, CreatedOpportunityResponse)
         assert result.id == _ID
         assert result.resource_type == "opportunities"
@@ -266,3 +270,19 @@ class TestCreateOpportunityCommand:
             "type": "system-users",
             "id": _REPRESENTATIVE_ID,
         }
+
+
+class TestUniqueCatalogEntityTypeId:
+    def test_returns_the_only_type_id(self) -> None:
+        catalog = {
+            "a": OpportunityStageResponse(id="a", name="IDD", opportunity_type_ids=("16",)),
+            "b": OpportunityStageResponse(id="b", name="Project", opportunity_type_ids=("16",)),
+        }
+        assert unique_catalog_entity_type_id(catalog) == "16"
+
+    def test_returns_none_when_types_differ(self) -> None:
+        catalog = {
+            "a": OpportunityStageResponse(id="a", name="Prospect", opportunity_type_ids=("16",)),
+            "b": OpportunityStageResponse(id="b", name="Other", opportunity_type_ids=("99",)),
+        }
+        assert unique_catalog_entity_type_id(catalog) is None

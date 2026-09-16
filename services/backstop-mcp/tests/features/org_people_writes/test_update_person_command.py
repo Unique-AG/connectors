@@ -92,7 +92,9 @@ class TestUpdatePersonCommand:
         respx.get(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
         route = respx.patch(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
 
-        await make_command(client).run(person=_update(job_title="Managing Director"), party_id=_ID)
+        await make_command(client).run(
+            person=_update(job_title="Managing Director"), party_id=_ID, search_type="people"
+        )
 
         body = recorded_json_bodies(route)[0]
         assert _attributes(body) == {"jobTitle": "Managing Director"}
@@ -110,7 +112,7 @@ class TestUpdatePersonCommand:
         )
 
         result = await make_command(client).run(
-            person=_update(mobile_phone="+1 555 0100"), party_id=_ID
+            person=_update(mobile_phone="+1 555 0100"), party_id=_ID, search_type="people"
         )
 
         assert isinstance(result, UpdatedPersonResponse)
@@ -123,9 +125,13 @@ class TestUpdatePersonCommand:
         respx.get(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
         route = respx.patch(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
 
-        await make_command(client).run(person=_update(add_category_ids=["cat-1"]), party_id=_ID)
+        await make_command(client).run(
+            person=_update(add_category_ids=["cat-1"]), party_id=_ID, search_type="people"
+        )
         add_count = route.call_count
-        await make_command(client).run(person=_update(replace_category_ids=["cat-2"]), party_id=_ID)
+        await make_command(client).run(
+            person=_update(replace_category_ids=["cat-2"]), party_id=_ID, search_type="people"
+        )
         bodies = recorded_json_bodies(route)
         assert object_dict(_relationships(bodies[0])["categories"])["data"] == [
             {"type": "contact-categories", "id": "cat-1"}
@@ -146,7 +152,9 @@ class TestUpdatePersonCommand:
         respx.get(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
         route = respx.patch(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
 
-        await make_command(client).run(person=_update(owner_login="jdoe"), party_id=_ID)
+        await make_command(client).run(
+            person=_update(owner_login="jdoe"), party_id=_ID, search_type="people"
+        )
 
         representative = object_dict(
             _relationships(recorded_json_bodies(route)[0])["representative"]
@@ -175,6 +183,7 @@ class TestUpdatePersonCommand:
                 location={"location_title": "Office", "city": "Chicago"},
             ),
             party_id=_ID,
+            search_type="people",
         )
 
         assert location.call_count == 1
@@ -196,8 +205,36 @@ class TestUpdatePersonCommand:
         )
 
         result = await make_command(client).run(
-            person=_update(delete_location_id="loc-9"), party_id=_ID
+            person=_update(delete_location_id="loc-9"), party_id=_ID, search_type="people"
         )
 
         assert deletion.call_count == 1
         assert result.location_id is None
+
+    @respx.mock
+    async def test_patches_the_resolved_collection(self, client: BackstopClient) -> None:
+        contact_id = "c9"
+        respx.get(f"{BASE_URL}/contacts/{contact_id}").mock(
+            return_value=httpx.Response(
+                200,
+                json={"data": {"id": contact_id, "type": "contacts", "attributes": {}}},
+            )
+        )
+        route = respx.patch(f"{BASE_URL}/contacts/{contact_id}").mock(
+            return_value=httpx.Response(
+                200,
+                json={"data": {"id": contact_id, "type": "contacts", "attributes": {}}},
+            )
+        )
+        people = respx.patch(url__regex=rf"{BASE_URL}/people/\w+")
+
+        result = await make_command(client).run(
+            person=_PERSON.validate_python({"party_id": contact_id, "job_title": "Director"}),
+            party_id=contact_id,
+            search_type="contacts",
+        )
+
+        assert result.resource_type == "contacts"
+        assert route.call_count == 1
+        assert people.call_count == 0
+        assert _data(recorded_json_bodies(route)[0])["type"] == "contacts"

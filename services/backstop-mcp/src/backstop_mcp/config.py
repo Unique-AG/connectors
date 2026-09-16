@@ -275,11 +275,8 @@ class BackstopConfig(BaseSettings):
     # `CachedValue` with serve-stale off and always holds its vocabulary.
     opportunity_stage_ttl_minutes: int = Field(default=60, ge=1, le=24 * 60)
 
-    # How long a fetched entity-relationship-type vocabulary stays usable. The catalog is a
-    # small admin list, and a type is added about as often as a custom field, so the same
-    # one-hour default and 24-hour cap as opportunity stages apply. No cache flag:
-    # `EntityRelationshipTypesService` composes `CachedValue` with serve-stale off and always
-    # holds its vocabulary.
+    # How long a fetched entity-relationship-type vocabulary stays usable. Same default and cap
+    # as `opportunity_stage_ttl_minutes`.
     entity_relationship_type_ttl_minutes: int = Field(default=60, ge=1, le=24 * 60)
 
     # How long a fetched activity-tag catalog stays usable before it is re-fetched. Tags change

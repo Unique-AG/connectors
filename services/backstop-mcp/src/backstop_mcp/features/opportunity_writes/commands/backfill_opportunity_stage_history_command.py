@@ -1,10 +1,12 @@
 """POST `/bulk-opportunity-stage-history`. Appends history rows; does not move a deal's stage."""
 
 import logging
+from urllib.parse import quote
 
 from opentelemetry import trace
 
 from backstop_mcp.backstop_client import (
+    BackstopApiSingleResourceDocument,
     BackstopClient,
     isoformat,
     json_api_create,
@@ -15,7 +17,10 @@ from backstop_mcp.features.bulk_writes import (
     RecordOutcomeResponse,
     bulk_record_outcomes,
 )
-from backstop_mcp.features.opportunities import OpportunityStagesService
+from backstop_mcp.features.opportunities import (
+    OpportunityResourceAttributes,
+    OpportunityStagesService,
+)
 from backstop_mcp.features.opportunity_writes.api_responses import (
     BulkOpportunityStageHistoryAttributes,
     BulkOpportunityStageHistoryDocument,
@@ -25,12 +30,17 @@ from backstop_mcp.features.opportunity_writes.backfill_opportunity_stage_history
     BackfillOpportunityStageHistoryInput,
     OpportunityStageHistoryRecordInput,
 )
+from backstop_mcp.features.opportunity_writes.commands._opportunity_attributes import (
+    opportunity_entity_type_id,
+)
 from backstop_mcp.features.opportunity_writes.responses import (
     BackfillOpportunityStageHistoryResponse,
 )
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
+
+_OpportunityDocument = BackstopApiSingleResourceDocument[OpportunityResourceAttributes]
 
 
 class BackfillOpportunityStageHistoryCommand:
@@ -52,10 +62,15 @@ class BackfillOpportunityStageHistoryCommand:
             span
         ):
             span.set_attribute("record_count", len(backfill.records))
+            entity_type_ids: dict[str, str | None] = {}
             stage_ids: list[str] = []
             for requested_row in backfill.records:
+                opportunity_id = requested_row.opportunity_id
+                if opportunity_id not in entity_type_ids:
+                    entity_type_ids[opportunity_id] = await self._entity_type_id(opportunity_id)
                 stage = await self._opportunity_stages_service.find_by_stage_name(
-                    name=requested_row.stage
+                    name=requested_row.stage,
+                    entity_type_id=entity_type_ids[opportunity_id],
                 )
                 stage_ids.append(stage.id)
             payload = json_api_create(
@@ -100,6 +115,14 @@ class BackfillOpportunityStageHistoryCommand:
                 records=outcomes,
                 warnings=warnings,
             )
+
+    async def _entity_type_id(self, opportunity_id: str) -> str | None:
+        document = await self._client.get(
+            f"/opportunities/{quote(opportunity_id, safe='')}",
+            schema=_OpportunityDocument,
+            params={"include": "clientDefinedEntityType"},
+        )
+        return opportunity_entity_type_id(document)
 
     def _outcomes(
         self,

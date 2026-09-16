@@ -23,7 +23,9 @@ from backstop_mcp.features.opportunities import (
     OpportunityStagesService,
 )
 from backstop_mcp.features.opportunity_writes.commands._opportunity_attributes import (
+    OPPORTUNITY_READ_INCLUDE,
     opportunity_attributes,
+    opportunity_entity_type_id,
     opportunity_relationships,
 )
 from backstop_mcp.features.opportunity_writes.responses import UpdatedOpportunityResponse
@@ -60,7 +62,7 @@ class UpdateOpportunityCommand:
             requested_stage = (
                 await self._opportunity_stages_service.find_by_stage_name(
                     name=new_opportunity.stage,
-                    entity_type_id=self._entity_type_id(current),
+                    entity_type_id=opportunity_entity_type_id(current),
                 )
                 if new_opportunity.stage is not None
                 else None
@@ -108,7 +110,9 @@ class UpdateOpportunityCommand:
 
     async def _read(self, opportunity_id: str) -> _Document:
         path = f"/{_RESOURCE_TYPE}/{quote(opportunity_id, safe='')}"
-        return await self._client.get(path, schema=_Document, params={"include": "stage"})
+        return await self._client.get(
+            path, schema=_Document, params={"include": OPPORTUNITY_READ_INCLUDE}
+        )
 
     async def _patch(
         self,
@@ -161,10 +165,6 @@ class UpdateOpportunityCommand:
                     relationships={"ccedUsers": relationship_data("system-users", replace_notify)},
                 ),
             )
-
-    def _entity_type_id(self, document: _Document) -> str | None:
-        value = document.data.attributes.client_defined_entity_type
-        return str(value) if value is not None else None
 
     def _raise_if_backdated(
         self, *, requested: date | None, date_entered_current_stage: date | None

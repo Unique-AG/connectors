@@ -578,3 +578,27 @@ class TestUpdateOpportunityCommand:
         assert result.warnings == ()
         stage = object_dict(_relationships(recorded_json_bodies(route)[0])["stage"])
         assert object_dict(stage["data"]) == {"type": "opportunity-stages", "id": "42482"}
+
+    @respx.mock
+    async def test_entity_type_id_is_read_from_the_relationship(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_two_type_stages_page())
+        respx.get(f"{BASE_URL}/system-users").mock(return_value=_users_page())
+        payload = _opportunity_document(_ID).json()
+        payload["data"]["relationships"]["clientDefinedEntityType"] = {
+            "data": {"id": "16", "type": "entity-types"}
+        }
+        respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(
+            return_value=httpx.Response(200, json=payload)
+        )
+        route = respx.patch(f"{BASE_URL}/opportunities/{_ID}").mock(
+            return_value=_opportunity_document(_ID)
+        )
+
+        with pytest.raises(ToolError, match="entity type 16"):
+            await make_command(client).run(
+                new_opportunity=_update(opportunity_id=_ID, stage="Other Pipe")
+            )
+
+        assert route.call_count == 0

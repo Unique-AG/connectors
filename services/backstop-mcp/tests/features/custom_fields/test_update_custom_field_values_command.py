@@ -139,6 +139,38 @@ class TestUpdateCustomFieldValuesCommand:
         assert route.call_count == 0
 
     @respx.mock
+    async def test_a_people_field_cannot_be_written_on_an_organization(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=_catalog(_definition(_TEXT, name="Notes", entity_type="PersonBean"))
+        )
+        route = respx.post(f"{BASE_URL}/bulk-custom-field-values")
+
+        with pytest.raises(ToolError, match="PersonBean, not organizations"):
+            await make_command(client).run(
+                update=_update(_value(_TEXT, "hello"), entity_type="organizations")
+            )
+
+        assert route.call_count == 0
+
+    @respx.mock
+    async def test_a_party_field_can_be_written_on_a_person(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=_catalog(_definition(_TEXT, name="Notes", entity_type="PartyBean"))
+        )
+        route = respx.post(f"{BASE_URL}/bulk-custom-field-values").mock(
+            return_value=_bulk_document(
+                total=1, success=1, errors=[], records=[_written(_TEXT, "hello")]
+            )
+        )
+
+        result = await make_command(client).run(update=_update(_value(_TEXT, "hello")))
+
+        assert result.applied_count == 1
+        assert route.call_count == 1
+
+    @respx.mock
     async def test_time_series_field_requires_an_effective_date(
         self, client: BackstopClient
     ) -> None:

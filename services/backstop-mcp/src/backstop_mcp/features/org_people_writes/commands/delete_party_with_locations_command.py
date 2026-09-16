@@ -21,7 +21,8 @@ from backstop_mcp.features.org_people_writes.commands.modify_contact_location_co
     ModifyContactLocationCommand,
 )
 
-type PartyCollection = Literal["people", "organizations"]
+type PersonCollection = Literal["people", "contacts", "employees"]
+type PartyCollection = PersonCollection | Literal["organizations"]
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,19 @@ _INCLUDE = "contactLocations"
 _LOCATION_RESOURCE = IncludedResource[ContactLocationAttributes]
 _PEOPLE_DOCUMENT = BackstopApiSingleResourceDocument[PersonWriteAttributes]
 _ORGANIZATION_DOCUMENT = BackstopApiSingleResourceDocument[OrganizationWriteAttributes]
-_NOUN: dict[PartyCollection, str] = {"people": "person", "organizations": "organization"}
+_NOUN: dict[PartyCollection, str] = {
+    "people": "person",
+    "contacts": "person",
+    "employees": "person",
+    "organizations": "organization",
+}
+
+
+def as_person_collection(search_type: str) -> PersonCollection:
+    assert search_type == "people" or search_type == "contacts" or search_type == "employees", (
+        search_type
+    )
+    return search_type
 
 
 class DeletePartyWithLocationsCommand:
@@ -80,7 +93,7 @@ class DeletePartyWithLocationsCommand:
         | BackstopApiSingleResourceDocument[OrganizationWriteAttributes],
         tuple[str, ...],
     ]:
-        schema = _PEOPLE_DOCUMENT if collection == "people" else _ORGANIZATION_DOCUMENT
+        schema = _ORGANIZATION_DOCUMENT if collection == "organizations" else _PEOPLE_DOCUMENT
         path = f"/{collection}/{quote(party_id, safe='')}"
         document = await self._client.get(path, schema=schema, params={"include": _INCLUDE})
         return document, self._contact_location_ids(document)

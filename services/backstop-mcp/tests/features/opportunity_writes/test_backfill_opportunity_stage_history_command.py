@@ -15,6 +15,9 @@ from backstop_mcp.features.opportunity_writes import (
     BackfillOpportunityStageHistoryInput,
     get_backfill_opportunity_stage_history_command_factory,
 )
+from tests.features.opportunity_writes.test_update_opportunity_command import (
+    _two_type_stages_page,
+)
 from tests.helpers import (
     BASE_URL,
     client_factory,
@@ -60,6 +63,32 @@ def _stages_page() -> httpx.Response:
             ],
             "links": {"next": None},
         },
+    )
+
+
+def _opportunity_document(*, entity_type_id: str | None = None) -> httpx.Response:
+    relationships: dict[str, object] = {}
+    if entity_type_id is not None:
+        relationships["clientDefinedEntityType"] = {
+            "data": {"id": entity_type_id, "type": "entity-types"}
+        }
+    return httpx.Response(
+        200,
+        json={
+            "data": {
+                "id": "5755101",
+                "type": "opportunities",
+                "attributes": {},
+                "relationships": relationships,
+            }
+        },
+    )
+
+
+def _mock_stages_and_opportunities(*, entity_type_id: str | None = None) -> None:
+    respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+    respx.get(url__regex=rf"{BASE_URL}/opportunities/[^/]+$").mock(
+        return_value=_opportunity_document(entity_type_id=entity_type_id)
     )
 
 
@@ -126,7 +155,7 @@ def _bulk_document(
 class TestBackfillOpportunityStageHistoryCommand:
     @respx.mock
     async def test_pointers_use_resource_id_and_resource_type(self, client: BackstopClient) -> None:
-        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        _mock_stages_and_opportunities()
         route = respx.post(f"{BASE_URL}/bulk-opportunity-stage-history").mock(
             return_value=_bulk_document(
                 total=1,
@@ -156,7 +185,7 @@ class TestBackfillOpportunityStageHistoryCommand:
     async def test_one_invalid_stage_name_blocks_the_whole_batch(
         self, client: BackstopClient
     ) -> None:
-        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        _mock_stages_and_opportunities()
         route = respx.post(f"{BASE_URL}/bulk-opportunity-stage-history").mock(
             return_value=_bulk_document(total=2, success=2, errors=[], records=[])
         )
@@ -170,7 +199,7 @@ class TestBackfillOpportunityStageHistoryCommand:
 
     @respx.mock
     async def test_partial_failure_is_reported_per_record(self, client: BackstopClient) -> None:
-        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        _mock_stages_and_opportunities()
         respx.post(f"{BASE_URL}/bulk-opportunity-stage-history").mock(
             return_value=_bulk_document(
                 total=2,
@@ -197,7 +226,7 @@ class TestBackfillOpportunityStageHistoryCommand:
     async def test_total_failure_on_201_is_not_reported_as_success(
         self, client: BackstopClient
     ) -> None:
-        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        _mock_stages_and_opportunities()
         respx.post(f"{BASE_URL}/bulk-opportunity-stage-history").mock(
             return_value=_bulk_document(
                 total=2,
@@ -215,7 +244,7 @@ class TestBackfillOpportunityStageHistoryCommand:
 
     @respx.mock
     async def test_unreturned_row_is_not_marked_applied(self, client: BackstopClient) -> None:
-        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        _mock_stages_and_opportunities()
         respx.post(f"{BASE_URL}/bulk-opportunity-stage-history").mock(
             return_value=_bulk_document(
                 total=2,
@@ -238,7 +267,7 @@ class TestBackfillOpportunityStageHistoryCommand:
     async def test_an_indexed_error_without_a_message_still_fails_the_record(
         self, client: BackstopClient
     ) -> None:
-        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        _mock_stages_and_opportunities()
         respx.post(f"{BASE_URL}/bulk-opportunity-stage-history").mock(
             return_value=_bulk_document(
                 total=1,
@@ -257,7 +286,7 @@ class TestBackfillOpportunityStageHistoryCommand:
     async def test_an_unattributable_message_is_surfaced_as_a_warning(
         self, client: BackstopClient
     ) -> None:
-        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        _mock_stages_and_opportunities()
         respx.post(f"{BASE_URL}/bulk-opportunity-stage-history").mock(
             return_value=_bulk_document(
                 total=1,
@@ -271,3 +300,18 @@ class TestBackfillOpportunityStageHistoryCommand:
 
         assert result.records[0].status == "applied"
         assert result.warnings == ("partial commit warning",)
+
+    @respx.mock
+    async def test_stage_is_scoped_to_the_opportunity_entity_type(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_two_type_stages_page())
+        respx.get(url__regex=rf"{BASE_URL}/opportunities/[^/]+$").mock(
+            return_value=_opportunity_document(entity_type_id="16")
+        )
+        route = respx.post(f"{BASE_URL}/bulk-opportunity-stage-history")
+
+        with pytest.raises(ToolError, match="entity type 16"):
+            await make_command(client).run(backfill=_backfill(_record(stage="Other Pipe")))
+
+        assert route.call_count == 0

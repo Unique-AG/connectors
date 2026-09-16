@@ -1,4 +1,4 @@
-"""POST `/opportunities`, then re-read the created deal with `include=stage`."""
+"""POST `/opportunities`, then re-read the created deal with stage and entity type."""
 
 import logging
 from urllib.parse import quote
@@ -20,8 +20,10 @@ from backstop_mcp.features.opportunities import (
     OpportunityStagesService,
 )
 from backstop_mcp.features.opportunity_writes.commands._opportunity_attributes import (
+    OPPORTUNITY_READ_INCLUDE,
     opportunity_attributes,
     opportunity_relationships,
+    unique_catalog_entity_type_id,
 )
 from backstop_mcp.features.opportunity_writes.create_opportunity_input import (
     CreateOpportunityInput,
@@ -56,11 +58,13 @@ class CreateOpportunityCommand:
     ) -> CreatedOpportunityResponse:
         with _tracer.start_as_current_span("opportunity_writes.command.create") as span:
             span.set_attribute("investor_id", investor_id)
-            requested_stage = (
-                await self._opportunity_stages_service.find_by_stage_name(name=opportunity.stage)
-                if opportunity.stage is not None
-                else None
-            )
+            requested_stage = None
+            if opportunity.stage is not None:
+                catalog = await self._opportunity_stages_service.get_catalog()
+                requested_stage = await self._opportunity_stages_service.find_by_stage_name(
+                    name=opportunity.stage,
+                    entity_type_id=unique_catalog_entity_type_id(catalog),
+                )
             owner = await self._system_users_service.resolve_relationship(opportunity.owner_login)
             attributes = omit_none_values(opportunity_attributes(opportunity))
             relationships = omit_none_values(
@@ -86,7 +90,7 @@ class CreateOpportunityCommand:
             written = await self._client.get(
                 f"/{_RESOURCE_TYPE}/{quote(created_id, safe='')}",
                 schema=_Document,
-                params={"include": "stage"},
+                params={"include": OPPORTUNITY_READ_INCLUDE},
             )
             catalog = await self._opportunity_stages_service.get_catalog()
             stage_name, stage_id = self._stage_from_document(written, catalog)

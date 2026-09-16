@@ -25,18 +25,7 @@ _FAILURE_COOLDOWN = timedelta(seconds=30)
 class EntityRelationshipTypesService:
     """Process-wide entity-relationship-type vocabulary, refetched when the TTL lapses.
 
-    Exists because a write that creates employment must send a relationship-type id, and that
-    id is per-tenant — it cannot be hardcoded. The catalog is fetched from
-    `/entity-relationship-types` and the employment row is selected from the injected
-    vocabulary, never guessed.
-
-    Composes `CachedValue` with `serve_stale=False`. A failed fetch propagates and the caller
-    fails with it: an empty vocabulary would either invent a type or report every write as
-    unresolvable without saying the catalog is down.
-
-    A failure is remembered for `_FAILURE_COOLDOWN` and re-raised, rather than re-fetched, for
-    callers that arrive inside it. The in-flight pin already collapses concurrent waiters onto
-    one walk; the cooldown is for callers that arrive *after* that walk finishes.
+    Employment writes send a per-tenant type id from this catalog; a failed fetch propagates.
     """
 
     def __init__(

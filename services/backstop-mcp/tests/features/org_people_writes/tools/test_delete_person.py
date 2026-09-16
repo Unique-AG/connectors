@@ -184,3 +184,40 @@ class TestDeletePerson:
         assert loc_1.call_count == 0
         assert loc_2.call_count == 0
         assert party.call_count == 0
+
+    @respx.mock
+    async def test_deletes_the_resolved_collection(self, client: BackstopClient) -> None:
+        contact_id = "c9"
+        respx.get(f"{BASE_URL}/contacts/{contact_id}").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "id": contact_id,
+                        "type": "contacts",
+                        "attributes": {"name": _NAME},
+                        "relationships": {"contactLocations": {"data": []}},
+                    },
+                    "included": [],
+                },
+            )
+        )
+        party = respx.delete(f"{BASE_URL}/contacts/{contact_id}").mock(
+            return_value=httpx.Response(204)
+        )
+        people = respx.delete(url__regex=rf"{BASE_URL}/people/\w+")
+
+        result = tool_model(
+            await delete_person(
+                ctx_no_elicitation_capability(),
+                person=_PERSON.validate_python({"search_type": "contacts", "party_id": contact_id}),
+                resolve_party_query=make_resolve_party_query(client),
+                delete_party_with_locations_command=make_command(client),
+            ),
+            DeletedPersonResponse,
+        )
+
+        assert result.id == contact_id
+        assert result.resource_type == "contacts"
+        assert party.call_count == 1
+        assert people.call_count == 0

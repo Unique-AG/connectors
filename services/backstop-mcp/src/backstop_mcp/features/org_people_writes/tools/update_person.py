@@ -16,6 +16,9 @@ from backstop_mcp.features.org_people_writes import (
     UpdatePersonResponse,
     get_update_person_command_factory,
 )
+from backstop_mcp.features.org_people_writes.commands.delete_party_with_locations_command import (
+    as_person_collection,
+)
 from backstop_mcp.features.party_resolver import (
     ResolvePartyQuery,
     get_resolve_party_query_factory,
@@ -64,8 +67,11 @@ async def update_person(
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value
+    search_type = as_person_collection(party.search_type)
     logger.info(
         "org_people_writes.update_person.start",
-        extra={"search_type": party.search_type, "party_id": party.id},
+        extra={"search_type": search_type, "party_id": party.id},
     )
-    return await update_person_command.run(person=person, party_id=party.id)
+    return await update_person_command.run(
+        person=person, party_id=party.id, search_type=search_type
+    )

@@ -19,6 +19,9 @@ from backstop_mcp.features.org_people_writes import (
     DeletePersonResponse,
     get_delete_party_with_locations_command_factory,
 )
+from backstop_mcp.features.org_people_writes.commands.delete_party_with_locations_command import (
+    as_person_collection,
+)
 from backstop_mcp.features.party_resolver import (
     ResolvePartyQuery,
     get_resolve_party_query_factory,
@@ -29,7 +32,6 @@ from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
 
-_COLLECTION = "people"
 _NOT_CONFIRMED = (
     "Deletion was not confirmed. Nothing was deleted. Do not retry unless the user asks again."
 )
@@ -75,14 +77,15 @@ async def delete_person(
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value
+    collection = as_person_collection(party.search_type)
     logger.info(
         "org_people_writes.delete_person.start",
-        extra={"search_type": party.search_type, "party_id": party.id},
+        extra={"search_type": collection, "party_id": party.id},
     )
 
     async def prompt() -> str:
         return await delete_party_with_locations_command.preview(
-            collection=_COLLECTION, party_id=party.id
+            collection=collection, party_id=party.id
         )
 
     outcome = await elicit_entity_deletion(ctx, callback=prompt)
@@ -98,10 +101,10 @@ async def delete_person(
             extra={"party_id": party.id},
         )
     deleted_location_ids = await delete_party_with_locations_command.run(
-        collection=_COLLECTION, party_id=party.id
+        collection=collection, party_id=party.id
     )
     return DeletedPersonResponse(
         id=party.id,
-        resource_type=_COLLECTION,
+        resource_type=collection,
         deleted_location_ids=deleted_location_ids,
     )

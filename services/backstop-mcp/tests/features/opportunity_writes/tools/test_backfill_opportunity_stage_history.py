@@ -64,6 +64,19 @@ class TestBackfillOpportunityStageHistory:
                 },
             )
         )
+        respx.get(f"{BASE_URL}/opportunities/5755101").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "id": "5755101",
+                        "type": "opportunities",
+                        "attributes": {},
+                        "relationships": {},
+                    }
+                },
+            )
+        )
         route = respx.post(f"{BASE_URL}/bulk-opportunity-stage-history").mock(
             return_value=httpx.Response(
                 201,

@@ -80,3 +80,53 @@ class TestUpdatePerson:
         assert route.call_count == 1
         attributes = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
         assert attributes == {"jobTitle": "Managing Director"}
+
+    @respx.mock
+    async def test_patches_the_resolved_collection(self, client: BackstopClient) -> None:
+        contact_id = "c9"
+        respx.get(f"{BASE_URL}/contacts/{contact_id}").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "id": contact_id,
+                        "type": "contacts",
+                        "attributes": {"mobilePhone": "555-0100"},
+                    }
+                },
+            )
+        )
+        route = respx.patch(f"{BASE_URL}/contacts/{contact_id}").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "id": contact_id,
+                        "type": "contacts",
+                        "attributes": {"mobilePhone": "555-0100"},
+                    }
+                },
+            )
+        )
+        people = respx.patch(url__regex=rf"{BASE_URL}/people/\w+")
+
+        result = tool_model(
+            await update_person(
+                ctx_never_elicit(),
+                person=_PERSON.validate_python(
+                    {
+                        "search_type": "contacts",
+                        "party_id": contact_id,
+                        "job_title": "Managing Director",
+                    }
+                ),
+                resolve_party_query=make_resolve_party_query(client),
+                update_person_command=make_command(client),
+            ),
+            UpdatedPersonResponse,
+        )
+
+        assert result.id == contact_id
+        assert result.resource_type == "contacts"
+        assert route.call_count == 1
+        assert people.call_count == 0

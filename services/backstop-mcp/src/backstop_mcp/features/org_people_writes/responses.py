@@ -83,9 +83,9 @@ class DeletedPersonResponse(OmitNoneModel):
     """A hard delete: Backstop has no recycle bin, so `permanent` is always true."""
 
     id: str = Field(description="Backstop id of the deleted person. Echo it; never invent one.")
-    resource_type: Literal["people"] = Field(
+    resource_type: Literal["people", "contacts", "employees"] = Field(
         default="people",
-        description="Always `people`.",
+        description="Collection the delete targeted: `people`, `contacts`, or `employees`.",
     )
     permanent: Literal[True] = Field(
         default=True,
@@ -128,9 +128,9 @@ class UpdatedPersonResponse(OmitNoneModel):
     """A person after a PATCH, with the phone Backstop actually stored."""
 
     id: str = Field(description="Backstop id of the person. Echo it; never invent one.")
-    resource_type: Literal["people"] = Field(
+    resource_type: Literal["people", "contacts", "employees"] = Field(
         default="people",
-        description="Always `people`.",
+        description="Collection this PATCH targeted: `people`, `contacts`, or `employees`.",
     )
     mobile_phone: str | None = Field(
         default=None,

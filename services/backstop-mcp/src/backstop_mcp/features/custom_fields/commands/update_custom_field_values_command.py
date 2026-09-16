@@ -22,6 +22,10 @@ from backstop_mcp.features.custom_fields.api_responses import (
     BulkCustomFieldValuesDocument,
 )
 from backstop_mcp.features.custom_fields.custom_fields_service import CustomFieldsService
+from backstop_mcp.features.custom_fields.entity_types import (
+    CustomFieldEntityType,
+    custom_field_entity_type_from_bean,
+)
 from backstop_mcp.features.custom_fields.internal_dto import CustomFieldDefinitionDto
 from backstop_mcp.features.custom_fields.responses import UpdateCustomFieldValuesResponse
 from backstop_mcp.features.custom_fields.update_custom_field_values_input import (
@@ -48,7 +52,7 @@ class UpdateCustomFieldValuesCommand:
             span.set_attribute("record_count", len(update.values))
             catalog, _freshness = await self._custom_fields_service.get()
             for requested_row in update.values:
-                self._raise_if_invalid(requested_row, catalog)
+                self._raise_if_invalid(requested_row, catalog, entity_type=update.entity_type)
             payload = json_api_create(
                 resource_type="bulk-custom-field-values",
                 attributes={
@@ -99,12 +103,26 @@ class UpdateCustomFieldValuesCommand:
         self,
         requested_row: UpdateCustomFieldValueInput,
         catalog: dict[str, CustomFieldDefinitionDto],
+        *,
+        entity_type: str,
     ) -> None:
         definition = catalog.get(str(requested_row.definition_id))
         if definition is None:
             raise ToolError(
                 f"No custom-field definition has id {requested_row.definition_id}. "
                 + "Use list_custom_fields."
+            )
+        owned_by = custom_field_entity_type_from_bean(definition.entity_type)
+        if owned_by is CustomFieldEntityType.PARTY:
+            if entity_type not in ("people", "organizations"):
+                raise ToolError(
+                    f"Custom field {requested_row.definition_id} belongs to "
+                    + f"{definition.entity_type}, not {entity_type}. Use list_custom_fields."
+                )
+        elif owned_by is None or owned_by.value != entity_type:
+            raise ToolError(
+                f"Custom field {requested_row.definition_id} belongs to "
+                + f"{definition.entity_type}, not {entity_type}. Use list_custom_fields."
             )
         if definition.is_time_series and requested_row.effective_date is None:
             raise ToolError(

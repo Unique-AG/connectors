@@ -5,16 +5,32 @@ JSON:API envelopes (`json_api_update`, `relationship_data`, …) live on
 `backstop_client`.
 """
 
-from backstop_mcp.backstop_client import isoformat, relationship_data, relationship_to_one
+from backstop_mcp.backstop_client import (
+    BackstopApiSingleResourceDocument,
+    isoformat,
+    relationship_data,
+    relationship_to_one,
+)
+from backstop_mcp.features.opportunities import (
+    OpportunityResourceAttributes,
+    OpportunityStageResponse,
+)
 from backstop_mcp.features.opportunity_writes.create_opportunity_input import (
     CreateOpportunityInput,
 )
 from backstop_mcp.features.opportunity_writes.update_opportunity_input import UpdateOpportunityInput
+from backstop_mcp.utils import first_item
 
 __all__ = [
+    "OPPORTUNITY_READ_INCLUDE",
     "opportunity_attributes",
+    "opportunity_entity_type_id",
     "opportunity_relationships",
+    "unique_catalog_entity_type_id",
 ]
+
+OPPORTUNITY_READ_INCLUDE = "stage,clientDefinedEntityType"
+_OpportunityDocument = BackstopApiSingleResourceDocument[OpportunityResourceAttributes]
 
 
 def opportunity_attributes(
@@ -78,3 +94,18 @@ def opportunity_relationships(
         "investorType": relationship_to_one("investor-types", opportunity.investor_type_id),
         "ccedUsers": relationship_data("system-users", notify_ids),
     }
+
+
+def opportunity_entity_type_id(document: _OpportunityDocument) -> str | None:
+    related = first_item(document.data.related_ids("clientDefinedEntityType"))
+    if related is not None:
+        return related
+    value = document.data.attributes.client_defined_entity_type
+    return str(value) if value is not None else None
+
+
+def unique_catalog_entity_type_id(catalog: dict[str, OpportunityStageResponse]) -> str | None:
+    type_ids = {type_id for stage in catalog.values() for type_id in stage.opportunity_type_ids}
+    if len(type_ids) != 1:
+        return None
+    return next(iter(type_ids))
