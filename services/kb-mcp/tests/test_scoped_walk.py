@@ -251,9 +251,7 @@ async def test_walk_collects_files_with_paths_relative_to_the_root():
             "user-1", "company-1", ["scope_root"]
         )
 
-    assert snapshot.files == [
-        (snapshot.files[0][0], PurePosixPath("Child/a.pdf"))
-    ]
+    assert snapshot.files == [(snapshot.files[0][0], PurePosixPath("Child/a.pdf"))]
     assert snapshot.files[0][0].key == "a.pdf"
 
 

@@ -422,9 +422,7 @@ async def test_multiple_folder_paths_resolve_and_use_scoped_walk():
     ],
 )
 @pytest.mark.asyncio
-async def test_folder_path_is_normalized_to_an_absolute_path(
-    given: str, expected: str
-):
+async def test_folder_path_is_normalized_to_an_absolute_path(given: str, expected: str):
     """The backend's folder-path lookup only accepts an absolute path (every
     value the unique_sdk CLI itself ever sends starts with "/") — a bare
     relative path must be normalized rather than rejected by the backend."""
@@ -440,9 +438,7 @@ async def test_folder_path_is_normalized_to_an_absolute_path(
             return_value=_make_mock_tree(),
         ),
     ):
-        await content_metadata(
-            folder_paths=[given], config=ContentMetadataToolConfig()
-        )
+        await content_metadata(folder_paths=[given], config=ContentMetadataToolConfig())
 
     _, kwargs = resolve.call_args
     assert kwargs["folder_path"] == expected
@@ -451,9 +447,7 @@ async def test_folder_path_is_normalized_to_an_absolute_path(
 @pytest.mark.asyncio
 async def test_folder_path_not_found_surfaces_as_tool_error():
     resolve = AsyncMock(
-        side_effect=ValueError(
-            "Could not find a folder with folderPath: Nonexistent"
-        )
+        side_effect=ValueError("Could not find a folder with folderPath: Nonexistent")
     )
     with patch(
         "kb_mcp.tools.content_metadata.tool.unique_sdk.Folder"
