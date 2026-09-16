@@ -11,7 +11,7 @@ inputs:
   severity:
     description: Trivy severity filter
     required: false
-    default: CRITICAL
+    default: CRITICAL,HIGH
   trivy_ignore_files:
     description: Comma-separated paths to Trivy ignore files
     required: false
