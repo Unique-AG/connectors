@@ -42,5 +42,5 @@ class Unreachable(WithIntelligenceError):
     """Network failure or a 5xx — not the same thing as being refused."""
 
 
-class SignInFailed(WithIntelligenceError):
-    """`/v3/auth/sign-in` refused the username and password."""
+class AuthenticationRejected(WithIntelligenceError):
+    """WI rejected a sign-in or session refresh."""

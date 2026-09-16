@@ -2,11 +2,20 @@
 
 import os
 import ssl
+from datetime import timedelta
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from typing import ClassVar, Self, TypedDict, cast
 
-from pydantic import Field, HttpUrl, PostgresDsn, PrivateAttr, model_validator
+from pydantic import (
+    Field,
+    HttpUrl,
+    PostgresDsn,
+    PrivateAttr,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine.url import URL, make_url
 
@@ -18,17 +27,15 @@ class AsyncpgConnectArgs(TypedDict, total=False):
 
 
 def _ssl_connect_arg(sslmode: str) -> ssl.SSLContext | None:
-    """Map a libpq `sslmode` value to an asyncpg `ssl` connect argument."""
     if sslmode in ("disable", "allow"):
         return None
     if sslmode in ("require", "prefer"):
-        # Encrypt the connection but do not verify the server certificate.
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
         return ctx
     if sslmode == "verify-ca":
-        # Libpq verify-ca checks the CA chain only — not the hostname (that is verify-full).
+        # libpq verify-ca checks the CA chain only; verify-full adds the hostname.
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         return ctx
@@ -76,8 +83,6 @@ _NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.
 
 
 class LogLevel(StrEnum):
-    """Matches `unique_mcp.logging.configure_logging` accepted names (case-insensitive)."""
-
     DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"
@@ -92,14 +97,15 @@ class AppConfig(BaseSettings):
     version: str = PKG_VERSION
     port: int = Field(default=9011, ge=0, le=65535)
     log_level: LogLevel = LogLevel.INFO
-
     public_base_url: HttpUrl = HttpUrl("http://localhost:9011")
 
     @model_validator(mode="after")
-    def _reject_local_base_url_in_production(self) -> Self:
+    def _require_public_https_base_url_in_production(self) -> Self:
         """Reject local public URLs in production."""
         if self.app_env != AppEnv.PRODUCTION:
             return self
+        if self.public_base_url.scheme != "https":
+            raise ValueError("PUBLIC_BASE_URL must use HTTPS in production")
         host = self.public_base_url.host
         assert host is not None, f"validated HttpUrl without a host: {self.public_base_url}"
         if host in _NON_PUBLIC_HOSTS:
@@ -118,6 +124,8 @@ class AppConfig(BaseSettings):
 
 # With Intelligence asset-class package identifiers.
 class AssetClassGroup(StrEnum):
+    """Values the v3 `asset_class_group` query parameter accepts. Unique licenses HFM + SFO."""
+
     HFM = "hfm"
     PEFI = "pefi"
     PCFI = "pcfi"
@@ -134,14 +142,22 @@ class WithIntelligenceConfig(BaseSettings):
 
     base_url: str = "https://api.withintelligence.com"
 
+    @field_validator("base_url")
+    @classmethod
+    def _require_https_base_url(cls, value: str) -> str:
+        parsed = HttpUrl(value)
+        if parsed.scheme != "https":
+            raise ValueError("WITH_INTELLIGENCE_BASE_URL must use HTTPS")
+        return str(parsed).rstrip("/")
+
     asset_class_groups: tuple[AssetClassGroup, ...] = (AssetClassGroup.HFM,)
 
     default_timeout_seconds: float = Field(default=30.0, gt=0)
 
     default_page_size: int = Field(default=50, ge=1, le=500)
 
-    # With Intelligence publishes no concurrency limit, so this remains a politeness bound
-    # until a measured one replaces it. Every path documents 429.
+    # Our own politeness bound: With Intelligence publishes no concurrency limit,
+    # only 429 on every path.
     max_concurrent_requests_per_user: int = Field(default=5, ge=1)
 
     max_retry_attempts: int = Field(default=3, ge=1)
@@ -165,7 +181,6 @@ class DatabaseConfig(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def accept_database_url(cls, data: object) -> object:
-        """Accept DATABASE_URL (injected by the base Helm chart) as an alias for DB_URL."""
         if not isinstance(data, dict):
             return data
         values = cast(dict[str, object], data)
@@ -207,10 +222,53 @@ class DatabaseConfig(BaseSettings):
 
     @property
     def connection_url(self) -> str:
-        """SQLAlchemy/asyncpg URL after driver rewrite and libpq-param stripping."""
         return self._connection_url
 
     @property
     def connect_args(self) -> AsyncpgConnectArgs:
-        """asyncpg connect args derived from libpq query params (e.g. sslmode)."""
         return self._connect_args
+
+
+class AuthConfig(BaseSettings):
+    """OAuth retention, cleanup, and login throttling settings."""
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="AUTH_")
+
+    token_retention_days: int = Field(default=30, ge=1)
+    unused_client_retention_hours: float = Field(default=24.0, gt=0)
+
+    cleanup_interval_hours: float = Field(default=6.0, gt=0)
+    login_max_attempts: int = Field(default=10, ge=1)
+    login_attempt_window_minutes: int = Field(default=15, ge=1)
+
+    @property
+    def token_retention(self) -> timedelta:
+        return timedelta(days=self.token_retention_days)
+
+    @property
+    def unused_client_retention(self) -> timedelta:
+        return timedelta(hours=self.unused_client_retention_hours)
+
+    @property
+    def cleanup_interval(self) -> timedelta:
+        return timedelta(hours=self.cleanup_interval_hours)
+
+    @property
+    def login_attempt_window(self) -> timedelta:
+        return timedelta(minutes=self.login_attempt_window_minutes)
+
+
+class EncryptionConfig(BaseSettings):
+    """Key used to encrypt stored WI sessions at rest."""
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        env_prefix="WITH_INTELLIGENCE_MCP_"
+    )
+
+    encryption_key: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def _require_encryption_key(self) -> Self:
+        if self.encryption_key is None:
+            raise ValueError("WITH_INTELLIGENCE_MCP_ENCRYPTION_KEY not set")
+        return self

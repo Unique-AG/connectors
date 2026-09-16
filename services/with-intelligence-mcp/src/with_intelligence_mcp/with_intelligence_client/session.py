@@ -3,7 +3,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
-# With Intelligence documents 1 hour; renewing early costs one request and avoids a 401 mid-call.
+# With Intelligence documents 1 hour; refreshing early costs one request and avoids a 401 mid-call.
 ACCESS_TOKEN_LIFETIME = timedelta(hours=1)
 _EARLY_RENEWAL = timedelta(minutes=1)
 
@@ -23,3 +23,8 @@ class WiSession(BaseModel):
     def is_fresh(self) -> bool:
         age = datetime.now(UTC) - self.issued_at
         return age < ACCESS_TOKEN_LIFETIME - _EARLY_RENEWAL
+
+    def has_different_access_token(self, other: WiSession | None) -> bool:
+        return other is None or (
+            self.access_token.get_secret_value() != other.access_token.get_secret_value()
+        )

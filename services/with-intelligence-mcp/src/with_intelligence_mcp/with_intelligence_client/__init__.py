@@ -12,16 +12,16 @@ from with_intelligence_mcp.with_intelligence_client.client import (
     as_query,
 )
 from with_intelligence_mcp.with_intelligence_client.credential import (
-    CallerSession,
+    CallerSessionProvider,
     WiCredential,
 )
 from with_intelligence_mcp.with_intelligence_client.errors import (
     ApiError,
+    AuthenticationRejected,
     AuthError,
     NotEntitled,
     NotFound,
     RateLimited,
-    SignInFailed,
     Unreachable,
     WithIntelligenceError,
 )
@@ -40,7 +40,7 @@ __all__ = [
     "SIGN_IN_PATH",
     "ApiError",
     "AuthError",
-    "CallerSession",
+    "CallerSessionProvider",
     "NotEntitled",
     "NotFound",
     "SEQUENCE",
@@ -51,7 +51,7 @@ __all__ = [
     "RateLimited",
     "RetryPolicy",
     "RetrySettings",
-    "SignInFailed",
+    "AuthenticationRejected",
     "TransportSettings",
     "Unreachable",
     "WiCredential",

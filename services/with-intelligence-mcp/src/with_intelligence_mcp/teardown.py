@@ -4,36 +4,45 @@ from typing import Protocol
 
 from with_intelligence_mcp.dependencies import (
     get_app_config,
+    get_auth_config,
+    get_auth_context,
+    get_auth_provider,
     get_database_config,
+    get_encryption_config,
+    get_encryption_key,
     get_engine,
     get_session_factory,
     get_with_intelligence_client_factory,
     get_with_intelligence_config,
 )
+from with_intelligence_mcp.features.wi_session import get_wi_session_cache
 
 
-class CachedProvider(Protocol):
-    """What a teardown needs of an `@lru_cache(maxsize=1)` provider."""
-
+class _CachedDependencyProvider(Protocol):
     def cache_clear(self) -> None: ...
 
 
-PROVIDERS: tuple[CachedProvider, ...] = (
+_CACHED_DEPENDENCY_PROVIDERS: tuple[_CachedDependencyProvider, ...] = (
     get_app_config,
     get_with_intelligence_config,
     get_database_config,
+    get_auth_config,
+    get_encryption_config,
     get_engine,
     get_session_factory,
+    get_encryption_key,
     get_with_intelligence_client_factory,
+    get_auth_context,
+    get_auth_provider,
+    get_wi_session_cache,
 )
 
 
 async def close_singletons() -> None:
-    """Release the pooled resources, then drop every cached provider."""
     try:
         await _release_pools()
     finally:
-        for provider in PROVIDERS:
+        for provider in _CACHED_DEPENDENCY_PROVIDERS:
             provider.cache_clear()
 
 

@@ -12,12 +12,12 @@ from pydantic import TypeAdapter
 
 from with_intelligence_mcp.metrics import UPSTREAM_CONCURRENCY_WAIT
 from with_intelligence_mcp.with_intelligence_client.credential import (
-    CallerSession,
+    CallerSessionProvider,
     WiCredential,
 )
 from with_intelligence_mcp.with_intelligence_client.errors import (
+    AuthenticationRejected,
     RateLimited,
-    SignInFailed,
     Unreachable,
 )
 from with_intelligence_mcp.with_intelligence_client.retry import RetryPolicy
@@ -40,7 +40,7 @@ _SESSION = TypeAdapter(WiSession)
 @dataclass
 class _Gate:
     semaphore: asyncio.Semaphore
-    in_flight: int = 0
+    active_calls: int = 0
 
 
 @dataclass
@@ -53,9 +53,8 @@ class _GateRegistry:
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     @asynccontextmanager
-    async def hold(self, subject: str) -> AsyncGenerator[None]:
-        gate = await self._gate_for(subject)
-        gate.in_flight += 1
+    async def limit_concurrency(self, subject: str) -> AsyncGenerator[None]:
+        gate = await self._register_call(subject)
         acquired = False
         try:
             start = asyncio.get_running_loop().time()
@@ -66,9 +65,10 @@ class _GateRegistry:
         finally:
             if acquired:
                 gate.semaphore.release()
-            gate.in_flight -= 1
+            async with self._lock:
+                gate.active_calls -= 1
 
-    async def _gate_for(self, subject: str) -> _Gate:
+    async def _register_call(self, subject: str) -> _Gate:
         async with self._lock:
             gate = self._gates.get(subject)
             if gate is None:
@@ -76,10 +76,11 @@ class _GateRegistry:
                     self._evict_idle_unlocked()
                 gate = _Gate(semaphore=asyncio.Semaphore(self.limit))
                 self._gates[subject] = gate
+            gate.active_calls += 1
             return gate
 
     def _evict_idle_unlocked(self) -> None:
-        idle = [subject for subject, gate in self._gates.items() if gate.in_flight == 0]
+        idle = [subject for subject, gate in self._gates.items() if gate.active_calls == 0]
         for subject in idle:
             del self._gates[subject]
 
@@ -94,20 +95,20 @@ class WithIntelligenceClientFactory:
         self._http_client: httpx.AsyncClient | None = None
         self._http_client_lock: asyncio.Lock = asyncio.Lock()
 
-    def for_session(self, session: CallerSession) -> WithIntelligenceClient:
+    def for_session(self, session: CallerSessionProvider) -> WithIntelligenceClient:
         from with_intelligence_mcp.with_intelligence_client.client import WithIntelligenceClient
 
         return WithIntelligenceClient(
             self._settings,
             http_client=self._borrow_http_client,
-            gate=self._gates.hold,
+            limit_concurrency=self._gates.limit_concurrency,
             retry_policy=self._retry_policy,
             session=session,
         )
 
     async def sign_in(self, credential: WiCredential) -> WiSession:
         """`POST /v3/auth/sign-in`. Username and password only — no passcode is involved."""
-        return await self._auth_call(
+        return await self._request_session(
             SIGN_IN_PATH,
             {
                 "username": credential.username,
@@ -115,22 +116,22 @@ class WithIntelligenceClientFactory:
             },
         )
 
-    async def refresh(self, session: WiSession) -> WiSession:
+    async def refresh_session(self, session: WiSession) -> WiSession:
         """Refresh a WI session."""
-        return await self._auth_call(
+        return await self._request_session(
             REFRESH_PATH, {"refreshToken": session.refresh_token.get_secret_value()}
         )
 
-    async def _auth_call(self, path: str, payload: dict[str, str]) -> WiSession:
-        response = await self._auth_response(path, payload)
+    async def _request_session(self, path: str, payload: dict[str, str]) -> WiSession:
+        response = await self._send_auth_request(path, payload)
 
         try:
             return _SESSION.validate_json(response.content)
         except ValueError as exc:
-            raise SignInFailed(f"{path} returned an invalid response") from exc
+            raise AuthenticationRejected(f"{path} returned an invalid response") from exc
 
-    async def _auth_response(self, path: str, payload: dict[str, str]) -> httpx.Response:
-        response = await self._post_auth(path, payload)
+    async def _send_auth_request(self, path: str, payload: dict[str, str]) -> httpx.Response:
+        response = await self._post_auth_request(path, payload)
         status = response.status_code
         if status == 200:
             return response
@@ -143,9 +144,9 @@ class WithIntelligenceClientFactory:
             )
         if status >= 500:
             raise Unreachable(f"{path} returned {status}")
-        raise SignInFailed(f"{path} returned {status}")
+        raise AuthenticationRejected(f"{path} returned {status}")
 
-    async def _post_auth(self, path: str, payload: dict[str, str]) -> httpx.Response:
+    async def _post_auth_request(self, path: str, payload: dict[str, str]) -> httpx.Response:
         async with self._borrow_http_client() as client:
             try:
                 return await client.post(path, json=payload)

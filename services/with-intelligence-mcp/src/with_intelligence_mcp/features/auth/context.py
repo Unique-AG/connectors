@@ -1,0 +1,131 @@
+import asyncio
+import uuid
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
+from typing import ClassVar
+
+from fastmcp.exceptions import ToolError
+from fastmcp.server.dependencies import get_access_token
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from with_intelligence_mcp.db import read_session, transaction
+from with_intelligence_mcp.features.auth.crypto import InvalidSessionEnvelopeError
+from with_intelligence_mcp.features.auth.session_store import (
+    claim_session_refresh,
+    complete_session_refresh,
+    get_stored_wi_session,
+    release_session_refresh,
+)
+from with_intelligence_mcp.with_intelligence_client import AuthenticationRejected, WiSession
+
+
+class NotConnectedError(ToolError):
+    """Raised when the caller has no usable WI session."""
+
+
+class WithIntelligenceAuthContext(BaseModel):
+    """Resolves and refreshes the current caller's WI session."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    session_factory: async_sessionmaker[AsyncSession]
+    encryption_key: bytes
+    revoke_tokens_for_subject: Callable[[str], Awaitable[None]]
+    refresh_lease_ttl: timedelta = timedelta(minutes=1)
+
+    async def current_session(self) -> WiSession:
+        """The calling user's stored WI session, whatever its freshness."""
+        subject = self.require_subject()
+        async with read_session(self.session_factory) as session:
+            try:
+                stored = await get_stored_wi_session(session, subject, self.encryption_key)
+            except InvalidSessionEnvelopeError as exc:
+                raise self._unreadable_session() from exc
+        if stored is None:
+            raise self._not_connected()
+        return stored
+
+    async def refresh_session(
+        self,
+        refresh: Callable[[WiSession], Awaitable[WiSession]],
+        stale: WiSession | None = None,
+    ) -> WiSession:
+        subject = self.require_subject()
+        claim_id = uuid.uuid4()
+        while True:
+            async with transaction(self.session_factory) as session:
+                try:
+                    refresh_claim = await claim_session_refresh(
+                        session,
+                        subject,
+                        self.encryption_key,
+                        claim_id,
+                        datetime.now(UTC) - self.refresh_lease_ttl,
+                    )
+                except InvalidSessionEnvelopeError as exc:
+                    raise self._unreadable_session() from exc
+                stored = refresh_claim.stored_session
+                if stored is None:
+                    raise self._not_connected()
+                if stored.is_fresh and stored.has_different_access_token(stale):
+                    if refresh_claim.acquired:
+                        await release_session_refresh(session, subject, claim_id)
+                    return stored
+            if not refresh_claim.acquired:
+                await asyncio.sleep(0.1)
+                continue
+            try:
+                refreshed = await refresh(stored)
+            except AuthenticationRejected as exc:
+                released = await self._release_refresh_claim(subject, claim_id)
+                if not released:
+                    continue
+                await self.revoke_tokens_for_subject(subject)
+                raise NotConnectedError(
+                    "Your With Intelligence session has expired and could not be refreshed — "
+                    + "please reconnect."
+                ) from exc
+            except Exception:
+                await self._release_refresh_claim(subject, claim_id)
+                raise
+
+            async with transaction(self.session_factory) as session:
+                refresh_completed = await complete_session_refresh(
+                    session,
+                    subject,
+                    refreshed,
+                    self.encryption_key,
+                    claim_id,
+                )
+            if refresh_completed:
+                return refreshed
+
+    async def _release_refresh_claim(self, subject: str, claim_id: uuid.UUID) -> bool:
+        async with transaction(self.session_factory) as session:
+            return await release_session_refresh(session, subject, claim_id)
+
+    def current_subject(self) -> str | None:
+        access_token = get_access_token()
+        return access_token.subject if access_token is not None else None
+
+    def require_subject(self) -> str:
+        subject = self.current_subject()
+        if subject is None:
+            raise NotConnectedError(
+                "Not connected to With Intelligence yet — add this MCP server to your client "
+                + "and complete the login flow first."
+            )
+        return subject
+
+    @staticmethod
+    def _not_connected() -> NotConnectedError:
+        return NotConnectedError(
+            "No With Intelligence session on file for this connection — please reconnect."
+        )
+
+    @staticmethod
+    def _unreadable_session() -> NotConnectedError:
+        return NotConnectedError(
+            "Your stored With Intelligence session could not be read — please reconnect."
+        )

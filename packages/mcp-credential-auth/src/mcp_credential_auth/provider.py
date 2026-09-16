@@ -70,6 +70,7 @@ _INVALID_SCOPE = _RefreshRejected(
 class CredentialOAuthProvider(OAuthProvider):
     ACCESS_TOKEN_TTL: ClassVar[timedelta] = timedelta(minutes=15)
     REFRESH_TOKEN_TTL: ClassVar[timedelta] = timedelta(days=30)
+    REFRESH_TOKEN_REUSE_GRACE: ClassVar[timedelta] = timedelta(0)
     AUTHORIZATION_CODE_TTL: ClassVar[timedelta] = timedelta(minutes=5)
     PENDING_AUTHORIZATION_TTL: ClassVar[timedelta] = timedelta(minutes=10)
 
@@ -176,12 +177,17 @@ class CredentialOAuthProvider(OAuthProvider):
         subject_factory: SubjectFactory,
     ) -> str | None:
         code = secrets.token_urlsafe(32)
-        expires_at = (datetime.now(UTC) + self.authorization_code_ttl).timestamp()
+        now = datetime.now(UTC)
+        expires_at = (now + self.authorization_code_ttl).timestamp()
 
         async with transaction(self._session_factory) as session:
             claim = await session.execute(
                 delete(PendingAuthorization)
-                .where(PendingAuthorization.request_id == pending.request_id)
+                .where(
+                    PendingAuthorization.request_id == pending.request_id,
+                    PendingAuthorization.client_id == pending.client_id,
+                    PendingAuthorization.expires_at >= now,
+                )
                 .returning(PendingAuthorization.request_id)
             )
             if claim.scalar_one_or_none() is None:
@@ -235,7 +241,11 @@ class CredentialOAuthProvider(OAuthProvider):
         async with transaction(self._session_factory) as session:
             result = await session.execute(
                 delete(AuthorizationCodeRow)
-                .where(AuthorizationCodeRow.code == authorization_code.code)
+                .where(
+                    AuthorizationCodeRow.code == authorization_code.code,
+                    AuthorizationCodeRow.client_id == client.client_id,
+                    AuthorizationCodeRow.expires_at >= now.timestamp(),
+                )
                 .returning(AuthorizationCodeRow.code)
             )
             if result.scalar_one_or_none() is None:
@@ -331,7 +341,8 @@ class CredentialOAuthProvider(OAuthProvider):
                 return _UNKNOWN_TOKEN
 
             if row.revoked_at is not None:
-                await self._revoke_family(session, family_id=row.family_id, now=now)
+                if now - row.revoked_at > self.REFRESH_TOKEN_REUSE_GRACE:
+                    await self._revoke_family(session, family_id=row.family_id, now=now)
                 return _REUSED_TOKEN
 
             if row.refresh_token_expires_at is not None and row.refresh_token_expires_at < now:
@@ -350,7 +361,15 @@ class CredentialOAuthProvider(OAuthProvider):
                 .returning(OAuthTokenRow.id)
             )
             if claim.scalar_one_or_none() is None:
-                await self._revoke_family(session, family_id=row.family_id, now=now)
+                refreshed = await session.execute(
+                    select(OAuthTokenRow.revoked_at).where(OAuthTokenRow.id == row.id)
+                )
+                revoked_at = refreshed.scalar_one_or_none()
+                if (
+                    revoked_at is None
+                    or datetime.now(UTC) - revoked_at > self.REFRESH_TOKEN_REUSE_GRACE
+                ):
+                    await self._revoke_family(session, family_id=row.family_id, now=now)
                 return _REUSED_TOKEN
 
             access_token = secrets.token_urlsafe(32)

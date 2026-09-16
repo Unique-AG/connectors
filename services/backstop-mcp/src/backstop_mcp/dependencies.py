@@ -28,7 +28,7 @@ from backstop_mcp.db import create_engine, create_session_factory
 from backstop_mcp.features.auth import (
     BackstopAuthContext,
     BackstopOAuthProvider,
-    ThrottleConfig,
+    LoginThrottleConfig,
     load_key,
 )
 
@@ -114,7 +114,7 @@ def get_auth_provider() -> BackstopOAuthProvider:
         session_factory=get_session_factory(),
         encryption_key=get_encryption_key(),
         backstop_clients=get_backstop_client_factory(),
-        throttle=ThrottleConfig(
+        throttle=LoginThrottleConfig(
             max_attempts=auth_config.login_max_attempts,
             window=auth_config.login_attempt_window,
         ),
