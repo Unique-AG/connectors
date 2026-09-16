@@ -65,6 +65,21 @@ _NOTHING_CAME_BACK = (
     + "again, tell the user to open the file in a browser."
 )
 
+_NOT_A_PLAIN_FILE = (
+    "Microsoft 365 does not hold this item as a plain file, so it has no single content to "
+    + "return. A OneNote notebook and a shortcut to another drive both look like files and are "
+    + "not: Microsoft describes them as packages, which are folders in some places and files in "
+    + "others. Open this item in a browser instead. Reading it here fails the same way every "
+    + "time, and no other tool here returns it."
+)
+
+_NO_SIZE = (
+    "Microsoft 365 did not say how large this file is, and sharepoint_read_file will not fetch a "
+    + "file whose size it does not know. The whole file must be held in memory and sent in one "
+    + "message, so the size is what decides whether it can come back at all. This is a gap in "
+    + "what Microsoft reported and not a bad argument. Open the file in a browser instead."
+)
+
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this file. The handle is well formed, so the argument is not "
     + "the problem. The file was most probably deleted, or somebody moved it to another drive. A "
@@ -96,14 +111,20 @@ async def sharepoint_read_file(client: GraphServiceClient, *, file: str) -> File
     assert item is not None, "Graph answered a drive item read with no item"
     if item.folder is not None:
         raise ToolError(_is_a_folder(handle))
-    size = item.size or 0
-    if size > MAX_BYTES:
-        raise ToolError(_too_large(size=size, web_url=item.web_url))
+    if item.file is None:
+        raise ToolError(_NOT_A_PLAIN_FILE)
+    if item.size is None:
+        raise ToolError(_NO_SIZE)
+    if item.size > MAX_BYTES:
+        raise ToolError(_too_large(size=item.size, web_url=item.web_url))
 
     content = await _content(client, handle)
-    if content is None and size > 0:
+    if content is None and item.size > 0:
         raise ToolError(_NOTHING_CAME_BACK)
-    return _FileFromGraph(content or b"", name=item.name, mime_type=_media_type(item))
+    body = content or b""
+    if len(body) > MAX_BYTES:
+        raise ToolError(_too_large(size=len(body), web_url=item.web_url))
+    return _FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
 
 
 async def _item(client: GraphServiceClient, handle: DriveFileHandle) -> DriveItem | None:
@@ -128,9 +149,21 @@ async def _content(client: GraphServiceClient, handle: DriveFileHandle) -> bytes
         )
 
 
-def _media_type(item: DriveItem) -> str:
+def _media_type(item: DriveItem, body: bytes) -> str:
     reported = item.file.mime_type if item.file is not None else None
-    return reported or _DEFAULT_MEDIA_TYPE
+    if reported is None:
+        return _DEFAULT_MEDIA_TYPE
+    if reported.startswith("text/") and not _is_utf8(body):
+        return _DEFAULT_MEDIA_TYPE
+    return reported
+
+
+def _is_utf8(body: bytes) -> bool:
+    try:
+        _ = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
 
 
 def _is_a_folder(handle: DriveFileHandle) -> str:

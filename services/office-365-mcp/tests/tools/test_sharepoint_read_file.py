@@ -1,3 +1,4 @@
+import base64
 from collections.abc import Iterator, Mapping
 from typing import cast
 
@@ -7,6 +8,7 @@ import respx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.utilities.types import File
+from mcp.types import BlobResourceContents, TextResourceContents
 from msgraph.graph_service_client import GraphServiceClient
 from prometheus_client import generate_latest
 from unique_toolkit.monitoring import REGISTRY
@@ -196,6 +198,86 @@ class TestWhatItRefuses:
             _ = await _read(client)
 
         assert "None" not in str(refused.value), "a missing address is described, never printed"
+
+    async def test_a_file_graph_reports_no_size_for_is_refused_before_any_content_is_asked_for(
+        self, client: GraphServiceClient, graph: respx.MockRouter, content: respx.Route
+    ) -> None:
+        _ = graph.get(_ITEM_PATH).mock(return_value=httpx.Response(200, json=_payload(size=None)))
+
+        with pytest.raises(ToolError, match="did not say how large") as refused:
+            _ = await _read(client)
+
+        assert content.call_count == 0, "an unknown size must not fall through to a download"
+        assert "in one message" in str(refused.value)
+
+    async def test_a_package_is_refused_because_it_is_neither_a_file_nor_a_folder(
+        self, client: GraphServiceClient, graph: respx.MockRouter, content: respx.Route
+    ) -> None:
+        package = {
+            "id": ITEM_ID,
+            "name": "Team notebook",
+            "size": 4096,
+            "webUrl": _WEB_URL,
+            "parentReference": {"driveId": DRIVE_ID},
+            "package": {"type": "oneNote"},
+        }
+        _ = graph.get(_ITEM_PATH).mock(return_value=httpx.Response(200, json=package))
+
+        with pytest.raises(ToolError, match="not hold this item as a plain file"):
+            _ = await _read(client)
+
+        assert content.call_count == 0
+
+    async def test_a_body_larger_than_the_limit_is_refused_even_when_graph_understated_its_size(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_ITEM_PATH).mock(return_value=httpx.Response(200, json=_payload(size=10)))
+        _ = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=b"x" * (reader.MAX_BYTES + 1))
+        )
+
+        with pytest.raises(ToolError, match="sharepoint_read_file returns a file of"):
+            _ = await _read(client)
+
+    async def test_text_that_is_not_utf8_keeps_its_bytes_instead_of_being_decoded(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        utf16 = "name,value\r\n".encode("utf-16")
+        _ = graph.get(_ITEM_PATH).mock(
+            return_value=httpx.Response(
+                200, json=_payload(name="rows.csv", size=len(utf16), mime_type="text/csv")
+            )
+        )
+        _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=utf16))
+
+        answer = await _read(client)
+
+        resource = answer.to_resource_content().resource
+
+        assert isinstance(resource, BlobResourceContents), (
+            "a text/* media type sends FastMCP down a decode path that never raises and corrupts"
+        )
+        assert base64.b64decode(resource.blob) == utf16, "the bytes must survive exactly"
+        assert resource.mime_type == "application/octet-stream"
+
+    async def test_text_that_is_utf8_keeps_the_media_type_graph_reported(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        plain = b"name,value\r\nalpha,1\r\n"
+        _ = graph.get(_ITEM_PATH).mock(
+            return_value=httpx.Response(
+                200, json=_payload(name="rows.csv", size=len(plain), mime_type="text/csv")
+            )
+        )
+        _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=plain))
+
+        answer = await _read(client)
+
+        resource = answer.to_resource_content().resource
+
+        assert isinstance(resource, TextResourceContents)
+        assert resource.mime_type == "text/csv"
+        assert resource.text == plain.decode("utf-8")
 
     @pytest.mark.usefixtures("item")
     async def test_no_bytes_for_a_file_that_holds_data_is_refused_rather_than_answered_empty(
