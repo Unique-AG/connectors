@@ -3,6 +3,10 @@
 from with_intelligence_mcp.features.investors.fetch_investor import INVESTORS_PATH, fetch_investor
 from with_intelligence_mcp.features.investors.project_investor import project_investor
 from with_intelligence_mcp.features.investors.resolve_investor import resolve_investor
+from with_intelligence_mcp.features.investors.resolve_investor_record import (
+    InvestorRecordResolution,
+    resolve_investor_record,
+)
 from with_intelligence_mcp.features.investors.responses import (
     ConsultantResponse,
     InvestorAmbiguousResponse,
@@ -29,8 +33,10 @@ __all__ = [
     "InvestorListItemAttributes",
     "InvestorNotFoundResponse",
     "InvestorProfileResponse",
+    "InvestorRecordResolution",
     "fetch_investor",
     "project_investor",
     "resolve_investor",
+    "resolve_investor_record",
     "search_investors_by_name",
 ]

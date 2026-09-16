@@ -1,10 +1,6 @@
-from typing import ClassVar
+from pydantic import Field
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class OmitNoneModel(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+from with_intelligence_mcp.response_model import OmitNoneModel
 
 
 class PositionAmountResponse(OmitNoneModel):

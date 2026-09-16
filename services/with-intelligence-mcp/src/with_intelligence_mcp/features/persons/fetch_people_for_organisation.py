@@ -15,7 +15,10 @@ async def fetch_people_for_organisation(
     Note the count disagrees with the investor record's own `contacts` list, which is longer.
     Which is authoritative is undocumented, so both travel to the caller.
     """
-    params: dict[str, QueryValue] = {"organisation_id": [organisation_id]}
+    params: dict[str, QueryValue] = {
+        "organisation_id": [organisation_id],
+        "sort[updated_at]": "desc",
+    }
     if client.asset_class_groups:
         params["asset_class_group"] = list(client.asset_class_groups)
 

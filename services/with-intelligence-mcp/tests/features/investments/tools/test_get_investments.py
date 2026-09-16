@@ -6,7 +6,10 @@ import respx
 from tests.helpers import BASE_URL, build_client, page_body, sent_query
 from with_intelligence_mcp.features.investments import InvestorPositionsResponse
 from with_intelligence_mcp.features.investments.tools.get_investments import get_investments
-from with_intelligence_mcp.features.investors import InvestorAmbiguousResponse
+from with_intelligence_mcp.features.investors import (
+    InvestorAmbiguousResponse,
+    InvestorNotFoundResponse,
+)
 
 INVESTOR: dict[str, object] = {"id": 2504, "name": "Example Retirement System (ERS)"}
 
@@ -168,4 +171,15 @@ class TestScoping:
         client, _ = build_client()
         result = await get_investments(name="Virginia", client=client)
         assert isinstance(result, InvestorAmbiguousResponse)
+        assert listing.call_count == 0
+
+    @respx.mock
+    async def test_an_unknown_investor_id_is_reported_before_listing(self) -> None:
+        respx.get(f"{BASE_URL}/v3/investors/1").mock(return_value=httpx.Response(404))
+        listing = respx.get(f"{BASE_URL}/v3/investments").mock(
+            return_value=httpx.Response(200, json=page_body([], total=0))
+        )
+        client, _ = build_client()
+        result = await get_investments(investor_id=1, client=client)
+        assert isinstance(result, InvestorNotFoundResponse)
         assert listing.call_count == 0

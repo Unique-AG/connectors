@@ -8,9 +8,9 @@ from pydantic import Field
 
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
+    InvestorExtendedAttributes,
     InvestorNotFoundResponse,
-    fetch_investor,
-    resolve_investor,
+    resolve_investor_record,
 )
 from with_intelligence_mcp.features.persons import (
     PeopleForInvestorResponse,
@@ -53,9 +53,10 @@ async def get_people_for_investor(
     The two counts this returns disagree: the person search and the investor record hold
     different numbers of contacts, and which is authoritative is undocumented.
     """
-    resolved = await _resolve(client, name, investor_id)
-    if not isinstance(resolved, int):
-        return resolved
+    investor = await resolve_investor_record(client, name, investor_id)
+    if not isinstance(investor, InvestorExtendedAttributes):
+        return investor
+    resolved = investor.id
 
     try:
         listed, total = await fetch_people_for_organisation(client, resolved, limit=limit)
@@ -75,21 +76,11 @@ async def get_people_for_investor(
         for index, detail in enumerate(details)
     ]
 
-    investor = await fetch_investor(client, resolved)
     return PeopleForInvestorResponse(
         investor_id=resolved,
-        investor_name=investor.name if investor else name,
+        investor_name=investor.name,
         people=people,
         total_at_organisation=total,
+        contacts_on_investor_record=investor.contacts_total,
         returned=len(people),
     )
-
-
-async def _resolve(
-    client: WithIntelligenceClient, name: str | None, investor_id: int | None
-) -> int | InvestorAmbiguousResponse | InvestorNotFoundResponse:
-    if investor_id is not None:
-        return investor_id
-    if name is None:
-        return InvestorNotFoundResponse(searched_for="", hint="Pass either name or investor_id.")
-    return await resolve_investor(client, name)

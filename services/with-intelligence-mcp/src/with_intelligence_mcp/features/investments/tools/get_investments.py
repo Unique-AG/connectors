@@ -15,9 +15,9 @@ from with_intelligence_mcp.features.investments import (
 )
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
+    InvestorExtendedAttributes,
     InvestorNotFoundResponse,
-    fetch_investor,
-    resolve_investor,
+    resolve_investor_record,
 )
 from with_intelligence_mcp.features.wi_session import get_with_intelligence_client
 from with_intelligence_mcp.with_intelligence_client import NotEntitled, WithIntelligenceClient
@@ -58,9 +58,10 @@ async def get_investments(
     held — do not present it as current. `fund_unidentified` means With Intelligence records the
     position but not which fund it is in, which is not the same as holding nothing.
     """
-    resolved = await _resolve(client, name, investor_id)
-    if not isinstance(resolved, int):
-        return resolved
+    investor = await resolve_investor_record(client, name, investor_id)
+    if not isinstance(investor, InvestorExtendedAttributes):
+        return investor
+    resolved = investor.id
 
     try:
         listed, total = await fetch_investments_for_investor(
@@ -78,21 +79,10 @@ async def get_investments(
         for index, detail in enumerate(details)
     ]
 
-    investor = await fetch_investor(client, resolved)
     return InvestorPositionsResponse(
         investor_id=resolved,
-        investor_name=investor.name if investor else name,
+        investor_name=investor.name,
         positions=positions,
         total=total,
         returned=len(positions),
     )
-
-
-async def _resolve(
-    client: WithIntelligenceClient, name: str | None, investor_id: int | None
-) -> int | InvestorAmbiguousResponse | InvestorNotFoundResponse:
-    if investor_id is not None:
-        return investor_id
-    if name is None:
-        return InvestorNotFoundResponse(searched_for="", hint="Pass either name or investor_id.")
-    return await resolve_investor(client, name)

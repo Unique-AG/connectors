@@ -171,6 +171,7 @@ class TestCountsAndScoping:
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
         assert result.total_at_organisation == 12
+        assert result.contacts_on_investor_record == 64
         assert result.returned == 1
 
     @respx.mock
@@ -186,6 +187,7 @@ class TestCountsAndScoping:
         query = sent_query(route)
         assert "organisation_id=2504" in query
         assert "asset_class_group=hfm" in query
+        assert "sort%5Bupdated_at%5D=desc" in query
 
     @respx.mock
     async def test_an_ambiguous_name_asks_before_fetching_anyone(self) -> None:

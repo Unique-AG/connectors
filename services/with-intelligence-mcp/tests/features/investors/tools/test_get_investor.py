@@ -144,6 +144,15 @@ class TestEntitlements:
         assert "licensed" in result.hint
 
     @respx.mock
+    async def test_an_unlicensed_id_returns_the_same_explanation(self) -> None:
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(return_value=httpx.Response(403))
+        client, _ = build_client()
+        result = await get_investor(investor_id=2504, client=client)
+        assert isinstance(result, InvestorNotFoundResponse)
+        assert result.hint is not None
+        assert "licensed" in result.hint
+
+    @respx.mock
     async def test_absent_preferences_are_flagged_as_unavailable(self) -> None:
         respx.get(f"{BASE_URL}/v3/investors/2504").mock(
             return_value=httpx.Response(200, json=VIRGINIA)
@@ -229,6 +238,7 @@ class TestProjection:
         assert result.aum is not None
         assert result.aum.value_millions == 112_000.0
         assert result.aum.as_of is None
+        assert "as_of" not in result.aum.model_dump()
 
     @respx.mock
     async def test_a_partial_address_omits_the_missing_parts(self) -> None:
@@ -265,3 +275,7 @@ class TestProjection:
         assert result.aum is None
         assert result.managers == []
         assert result.contact_ids == []
+        payload = result.model_dump()
+        assert "aum" not in payload
+        assert "website" not in payload
+        assert payload["managers"] == []

@@ -1,10 +1,6 @@
-from typing import ClassVar
+from pydantic import Field
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class OmitNoneModel(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+from with_intelligence_mcp.response_model import OmitNoneModel
 
 
 class PersonResponse(OmitNoneModel):
@@ -52,4 +48,5 @@ class PeopleForInvestorResponse(OmitNoneModel):
     investor_name: str | None = None
     people: list[PersonResponse] = Field(default_factory=list)
     total_at_organisation: int = 0
+    contacts_on_investor_record: int | None = None
     returned: int = 0

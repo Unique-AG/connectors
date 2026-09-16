@@ -7,11 +7,11 @@ from pydantic import Field
 
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
+    InvestorExtendedAttributes,
     InvestorNotFoundResponse,
     InvestorProfileResponse,
-    fetch_investor,
     project_investor,
-    resolve_investor,
+    resolve_investor_record,
 )
 from with_intelligence_mcp.features.wi_session import get_with_intelligence_client
 from with_intelligence_mcp.with_intelligence_client import WithIntelligenceClient
@@ -48,20 +48,7 @@ async def get_investor(
     `preferences_available: false` means this subscription lacks the Intentions & Preferences
     add-on — not that the investor has stated no preferences.
     """
-    if investor_id is None and name is None:
-        return InvestorNotFoundResponse(searched_for="", hint="Pass either name or investor_id.")
-
-    if investor_id is None:
-        assert name is not None
-        resolved = await resolve_investor(client, name)
-        if not isinstance(resolved, int):
-            return resolved
-        investor_id = resolved
-
-    record = await fetch_investor(client, investor_id)
-    if record is None:
-        return InvestorNotFoundResponse(
-            searched_for=name or str(investor_id),
-            hint=f"No investor with id {investor_id}.",
-        )
+    record = await resolve_investor_record(client, name, investor_id)
+    if not isinstance(record, InvestorExtendedAttributes):
+        return record
     return project_investor(record)
