@@ -71,9 +71,9 @@ jobs:
           cache-to: type=gha,scope=${{ env.GHA_CACHE_SCOPE }},mode=max,ignore-error=true
           outputs: type=docker,dest=${{ steps.image-tar.outputs.path }}
 
-      - name: Vulnerability gate (CRITICAL)
+      - name: Vulnerability gate
         if: steps.check-dockerfile.outputs.exists == 'true'
         uses: ./.github/actions/container-image-vuln-gate
         with:
           image_tar: ${{ steps.image-tar.outputs.path }}
-          severity: CRITICAL
+          severity: CRITICAL,HIGH

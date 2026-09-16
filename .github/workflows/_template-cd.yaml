@@ -171,7 +171,6 @@ jobs:
       GHCR_REGISTRY: ghcr.io
       GHCR_REPO: unique-ag/connectors/services/${{ inputs.service-name }}
       TRIVY_DISABLE_VEX_NOTICE: "true"
-      TRIVY_IMAGE_CONFIG_SCANNERS: misconfig
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

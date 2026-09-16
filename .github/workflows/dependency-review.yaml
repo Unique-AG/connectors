@@ -6,12 +6,11 @@ concurrency:
 
 on:
   pull_request:
-    types: [opened, synchronize, labeled, unlabeled]
-    branches:
-      - main
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "pnpm-lock.yaml"
       - "services/**/package.json"
+      - "services/**/uv.lock"
       - "packages/**"
       - ".github/workflows/dependency-review.yaml"
 
