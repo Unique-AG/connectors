@@ -9,8 +9,8 @@ from mcp_credential_auth import (
     LoginCsrf,
     ThrottleConfig,
     clear_failures,
-    complete_login_attempt,
     discard_login_attempt,
+    finalize_login_failure,
     reserve_login_attempt,
 )
 from pydantic import (
@@ -267,7 +267,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         try:
             wi_session = await self._wi_clients.sign_in(credential)
         except SignInFailed:
-            await complete_login_attempt(self._session_factory, attempt_id)
+            await finalize_login_failure(self._session_factory, attempt_id)
             return self._form_response(
                 request_id,
                 username=username,

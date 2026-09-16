@@ -116,7 +116,7 @@ async def reserve_login_attempt(
         return attempt_id
 
 
-async def complete_login_attempt(
+async def finalize_login_failure(
     session_factory: async_sessionmaker[AsyncSession], attempt_id: uuid.UUID
 ) -> None:
     async with transaction(session_factory) as session:

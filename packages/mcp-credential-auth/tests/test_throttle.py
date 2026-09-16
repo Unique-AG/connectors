@@ -9,9 +9,9 @@ from mcp_credential_auth import (
     LoginAttempt,
     ThrottleConfig,
     clear_failures,
-    complete_login_attempt,
     count_recent_failures,
     discard_login_attempt,
+    finalize_login_failure,
     is_throttled,
     record_failure,
     reserve_login_attempt,
@@ -128,7 +128,7 @@ async def test_success_preserves_other_pending_reservations(
     assert pending is not None
 
     await clear_failures(session_factory, username, reservation_id=successful)
-    await complete_login_attempt(session_factory, pending)
+    await finalize_login_failure(session_factory, pending)
 
     assert await count_recent_failures(session_factory, username, window=_WINDOW) == 1
 
