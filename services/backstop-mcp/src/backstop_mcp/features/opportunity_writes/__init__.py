@@ -37,6 +37,7 @@ from backstop_mcp.features.opportunity_writes.responses import (
     CreatedOpportunityResponse,
     CreateOpportunityResponse,
     DeletedOpportunityResponse,
+    DeleteOpportunityResponse,
     UpdatedOpportunityResponse,
 )
 from backstop_mcp.features.opportunity_writes.update_opportunity_input import (
@@ -59,6 +60,7 @@ __all__ = [
     "CreatedOpportunityResponse",
     "DeleteOpportunityCommand",
     "DeleteOpportunityInput",
+    "DeleteOpportunityResponse",
     "DeletedOpportunityResponse",
     "OpportunityStageHistoryRecordInput",
     "RecordOutcomeResponse",

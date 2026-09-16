@@ -16,8 +16,9 @@ The policy itself:
 2. Several matches, single-entity call → elicit a choice from the user.
 3. Several matches inside a batch → resolve what resolves and return **one** combined payload,
    so the model asks once rather than N times.
-4. Client can't elicit, declines, cancels, or doesn't answer before
-   `RESOLUTION_ELICIT_TIMEOUT_SECONDS` → degrade from (2) to the same structured payload as (3).
+4. Client can't elicit, advertises elicitation on a pre-2026-07-28 protocol, declines,
+   cancels, or doesn't answer before `RESOLUTION_ELICIT_TIMEOUT_SECONDS` → degrade from
+   (2) to the same structured payload as (3).
 5. Zero matches → `NotFound`, naming the query that was actually used.
 """
 
@@ -175,6 +176,12 @@ def collect_batch[T](
 # --- Elicitation (policy steps 2 and 4) -----------------------------------------------------
 
 
+# `InputRequiredResult` (SEP-2322) exists only on this protocol and newer. A handshake-era
+# client that advertises elicitation cannot paint that result — Cursor rejects it as a
+# protocol error — so tools must not return it there.
+INPUT_REQUIRED_PROTOCOL = "2026-07-28"
+
+
 class _ClientCapabilityChecker(Protocol):
     def check_client_capability(self, capability: ClientCapabilities) -> bool: ...
 
@@ -182,6 +189,38 @@ class _ClientCapabilityChecker(Protocol):
 class _RequestContext(Protocol):
     @property
     def session(self) -> _ClientCapabilityChecker: ...
+
+    @property
+    def protocol_version(self) -> str | None: ...
+
+
+def negotiated_protocol_version(ctx: Context) -> str | None:
+    """The MCP protocol version this connection negotiated, when the session exposes one.
+
+    Reads FastMCP's public `request_context` the same way `client_supports_elicitation`
+    does. Prefer the request's own `protocol_version` (what `ServerRequestContext` carries);
+    fall back to `session.protocol_version`. Missing context or a non-string value is
+    `None` — callers must not invent a version.
+    """
+    request_context = cast("_RequestContext | None", getattr(ctx, "request_context", None))
+    if request_context is None:
+        return None
+    version = request_context.protocol_version
+    if version:
+        return version
+    session_version = getattr(request_context.session, "protocol_version", None)
+    return session_version if isinstance(session_version, str) and session_version else None
+
+
+def client_supports_input_required(ctx: Context) -> bool:
+    """Whether this connection can accept `InputRequiredResult` (MCP 2026-07-28+).
+
+    Capability and protocol version are separate. Cursor advertises elicitation on
+    2025-11-25 connections; returning `InputRequiredResult` there is a protocol error
+    and the confirm form never appears.
+    """
+    version = negotiated_protocol_version(ctx)
+    return version is not None and version >= INPUT_REQUIRED_PROTOCOL
 
 
 def client_supports_elicitation(ctx: Context) -> bool:
@@ -263,6 +302,21 @@ async def elicit_choice[T](
         logger.info(
             "resolution.elicit.skipped",
             extra={**outcome_log, "reason": "client lacks elicitation capability"},
+        )
+        return ambiguous
+
+    protocol_version = negotiated_protocol_version(ctx)
+    if protocol_version is not None and not client_supports_input_required(ctx):
+        # Handshake-era clients advertise elicitation but cannot paint a form
+        # (`ctx.elicit` hangs; `InputRequiredResult` is a protocol error). Return the
+        # candidate list so the model asks in chat instead of waiting out the timeout.
+        logger.info(
+            "resolution.elicit.skipped",
+            extra={
+                **outcome_log,
+                "reason": "protocol cannot deliver elicitation",
+                "protocol_version": protocol_version,
+            },
         )
         return ambiguous
 

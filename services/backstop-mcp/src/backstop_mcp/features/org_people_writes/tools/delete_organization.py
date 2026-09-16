@@ -5,12 +5,11 @@ from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
-from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.features.elicitation_utils import EntityDeletion, elicit_entity_deletion
+from backstop_mcp.features.elicitation_utils import elicit_entity_deletion
 from backstop_mcp.features.org_people_writes import (
     DELETE_ORGANIZATION_INPUT_DESCRIPTION,
     DeletedOrganizationResponse,
@@ -24,15 +23,12 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import Resolved
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
 
 _COLLECTION = "organizations"
-_NOT_CONFIRMED = (
-    "Deletion was not confirmed. Nothing was deleted. Do not retry unless the user asks again."
-)
 
 
 @tool(
@@ -53,7 +49,7 @@ async def delete_organization(
     delete_party_with_locations_command: DeletePartyWithLocationsCommand = Depends(
         get_delete_party_with_locations_command_factory
     ),
-) -> DeleteOrganizationResponse:
+) -> DeleteOrganizationResponse | InputRequiredResult:
     """Permanently delete a CRM organization and its contact-locations.
 
     `search_type` plus exactly one of `party_id` or `search` — same identity as
@@ -62,9 +58,11 @@ async def delete_organization(
     `include=locations`); deleting the organization without that cascade strands those
     addresses. `destructive_hint` is true because this hard-deletes the record.
 
-    When the client supports elicitation, this tool reads the organization first and asks
-    the user to confirm the name and location count before deleting. When the client
-    cannot elicit, it deletes immediately.
+    When the client supports elicitation on MCP 2026-07-28+, this tool reads the
+    organization first and returns `InputRequiredResult` so the client can paint the
+    form. On an older protocol that still advertised elicitation it returns
+    `needs_confirmation` — the model asks in chat and retries with `confirm=true`.
+    When the client never advertised elicitation, it deletes immediately.
 
     Call like: {"organization": {"search_type": "organizations",
     "party_id": "<id from get_organization>"}}
@@ -74,7 +72,6 @@ async def delete_organization(
         party_id=organization.party_id,
         search=organization.search,
     )
-    result = await elicit_if_ambiguous(ctx, result)
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value
@@ -83,23 +80,16 @@ async def delete_organization(
         extra={"search_type": party.search_type, "party_id": party.id},
     )
 
-    async def prompt() -> str:
-        return await delete_party_with_locations_command.preview(
-            collection=_COLLECTION, party_id=party.id
-        )
+    if not organization.confirm:
 
-    outcome = await elicit_entity_deletion(ctx, callback=prompt)
-    if outcome is EntityDeletion.DECLINED:
-        logger.info(
-            "org_people_writes.delete_organization.not_confirmed",
-            extra={"party_id": party.id},
-        )
-        raise ToolError(_NOT_CONFIRMED)
-    if outcome is EntityDeletion.NOT_AVAILABLE:
-        logger.info(
-            "org_people_writes.delete_organization.elicit.not_available",
-            extra={"party_id": party.id},
-        )
+        async def prompt() -> str:
+            return await delete_party_with_locations_command.preview(
+                collection=_COLLECTION, party_id=party.id
+            )
+
+        gated = await elicit_entity_deletion(ctx, callback=prompt)
+        if gated is not None:
+            return gated
     deleted_location_ids = await delete_party_with_locations_command.run(
         collection=_COLLECTION, party_id=party.id
     )

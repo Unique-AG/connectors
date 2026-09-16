@@ -8,10 +8,14 @@ import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
-from fastmcp.server.elicitation import AcceptedElicitation
+from mcp.types import ElicitRequestFormParams, ElicitResult, InputRequiredResult
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.elicitation_utils import DELETE, DeletionChoice
+from backstop_mcp.features.elicitation_utils import (
+    DELETE,
+    DELETION_INPUT_KEY,
+    DeletionNeedsConfirmationResponse,
+)
 from backstop_mcp.features.opportunity_writes import (
     DeletedOpportunityResponse,
     DeleteOpportunityInput,
@@ -20,10 +24,9 @@ from backstop_mcp.features.opportunity_writes import (
 from backstop_mcp.features.opportunity_writes.tools.delete_opportunity import delete_opportunity
 from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import (
-    FakeContext,
-    as_context,
-    ctx_accept,
-    ctx_decline,
+    ctx_deletion_answer,
+    ctx_handshake_era,
+    ctx_never_elicit,
     ctx_no_elicitation_capability,
 )
 from tests.helpers import BASE_URL, client_factory, credential
@@ -80,7 +83,7 @@ class TestDeleteOpportunity:
         assert route.call_count == 1
 
     @respx.mock
-    async def test_reads_the_opportunity_then_deletes_after_elicit_accept(
+    async def test_reads_the_opportunity_then_asks_without_deleting(
         self, client: BackstopClient
     ) -> None:
         preview = respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(
@@ -89,19 +92,61 @@ class TestDeleteOpportunity:
         route = respx.delete(f"{BASE_URL}/opportunities/{_ID}").mock(
             return_value=httpx.Response(204)
         )
-        prompts: list[str] = []
 
-        async def elicit(
-            *, message: str, response_type: object
-        ) -> AcceptedElicitation[DeletionChoice]:
-            _ = response_type
-            prompts.append(message)
-            return AcceptedElicitation(data=DeletionChoice(choice=DELETE))
+        result = await delete_opportunity(
+            ctx_never_elicit(),
+            opportunity=DeleteOpportunityInput(opportunity_id=_ID),
+            client=client,
+            delete_opportunity_command=get_delete_opportunity_command_factory(client),
+        )
+
+        assert isinstance(result, InputRequiredResult)
+        assert result.input_requests is not None
+        params = result.input_requests[DELETION_INPUT_KEY].params
+        assert isinstance(params, ElicitRequestFormParams)
+        assert _ID in params.message
+        assert _NAME in params.message
+        assert preview.call_count == 1
+        assert route.call_count == 0
+
+    @respx.mock
+    async def test_handshake_era_returns_needs_confirmation_without_deleting(
+        self, client: BackstopClient
+    ) -> None:
+        preview = respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(
+            return_value=httpx.Response(200, json=_opportunity_document())
+        )
+        route = respx.delete(f"{BASE_URL}/opportunities/{_ID}").mock(
+            return_value=httpx.Response(204)
+        )
 
         result = tool_model(
             await delete_opportunity(
-                as_context(FakeContext(elicit)),
+                ctx_handshake_era(),
                 opportunity=DeleteOpportunityInput(opportunity_id=_ID),
+                client=client,
+                delete_opportunity_command=get_delete_opportunity_command_factory(client),
+            ),
+            DeletionNeedsConfirmationResponse,
+        )
+
+        assert result.status == "needs_confirmation"
+        assert _NAME in result.preview
+        assert preview.call_count == 1
+        assert route.call_count == 0
+
+    @respx.mock
+    async def test_handshake_era_deletes_when_confirm_is_true(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.delete(f"{BASE_URL}/opportunities/{_ID}").mock(
+            return_value=httpx.Response(204)
+        )
+
+        result = tool_model(
+            await delete_opportunity(
+                ctx_handshake_era(),
+                opportunity=DeleteOpportunityInput(opportunity_id=_ID, confirm=True),
                 client=client,
                 delete_opportunity_command=get_delete_opportunity_command_factory(client),
             ),
@@ -109,13 +154,7 @@ class TestDeleteOpportunity:
         )
 
         assert result.id == _ID
-        assert result.permanent is True
-        assert result.resource_type == "opportunities"
-        assert preview.call_count == 1
         assert route.call_count == 1
-        assert len(prompts) == 1
-        assert _ID in prompts[0]
-        assert _NAME in prompts[0]
 
     @respx.mock
     async def test_confirmed_elicitation_deletes(self, client: BackstopClient) -> None:
@@ -128,7 +167,7 @@ class TestDeleteOpportunity:
 
         result = tool_model(
             await delete_opportunity(
-                ctx_accept(DeletionChoice(choice=DELETE)),
+                ctx_deletion_answer(ElicitResult(action="accept", content={"choice": DELETE})),
                 opportunity=DeleteOpportunityInput(opportunity_id=_ID),
                 client=client,
                 delete_opportunity_command=get_delete_opportunity_command_factory(client),
@@ -152,7 +191,7 @@ class TestDeleteOpportunity:
 
         with pytest.raises(ToolError, match="not confirmed") as raised:
             await delete_opportunity(
-                ctx_decline(),
+                ctx_deletion_answer(ElicitResult(action="decline")),
                 opportunity=DeleteOpportunityInput(opportunity_id=_ID),
                 client=client,
                 delete_opportunity_command=get_delete_opportunity_command_factory(client),

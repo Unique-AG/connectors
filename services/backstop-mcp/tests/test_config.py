@@ -83,12 +83,14 @@ class TestBackstopConfigDefaults:
         assert config.custom_field_schema_ttl_minutes == 120
         assert config.opportunity_stage_ttl_minutes == 60
         assert config.entity_relationship_type_ttl_minutes == 60
+        assert config.contact_source_ttl_minutes == 24 * 60
         assert config.activity_tag_ttl_minutes == 24 * 60
         assert config.system_user_ttl_minutes == 24 * 60
         assert config.time_zone_ttl_minutes == 24 * 60
         # Custom-field catalogs ship on (measured 6.15 s walk). The other catalogs stay off
         # until their histograms say otherwise — see `caching/cached_value.py`.
         assert config.custom_field_schema_cache_enabled is True
+        assert config.contact_source_cache_enabled is False
         assert config.activity_tag_cache_enabled is False
         assert config.system_user_cache_enabled is False
         assert config.time_zone_cache_enabled is False
@@ -126,10 +128,12 @@ class TestBackstopConfigDefaults:
         monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_TTL_MINUTES", "60")
         monkeypatch.setenv("BACKSTOP_OPPORTUNITY_STAGE_TTL_MINUTES", "30")
         monkeypatch.setenv("BACKSTOP_ENTITY_RELATIONSHIP_TYPE_TTL_MINUTES", "15")
+        monkeypatch.setenv("BACKSTOP_CONTACT_SOURCE_TTL_MINUTES", "75")
         monkeypatch.setenv("BACKSTOP_ACTIVITY_TAG_TTL_MINUTES", "90")
         monkeypatch.setenv("BACKSTOP_SYSTEM_USER_TTL_MINUTES", "45")
         monkeypatch.setenv("BACKSTOP_TIME_ZONE_TTL_MINUTES", "30")
         monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED", "true")
+        monkeypatch.setenv("BACKSTOP_CONTACT_SOURCE_CACHE_ENABLED", "true")
         monkeypatch.setenv("BACKSTOP_ACTIVITY_TAG_CACHE_ENABLED", "1")
         monkeypatch.setenv("BACKSTOP_SYSTEM_USER_CACHE_ENABLED", "yes")
         monkeypatch.setenv("BACKSTOP_TIME_ZONE_CACHE_ENABLED", "true")
@@ -146,12 +150,14 @@ class TestBackstopConfigDefaults:
         assert config.custom_field_schema_ttl_minutes == 60
         assert config.opportunity_stage_ttl_minutes == 30
         assert config.entity_relationship_type_ttl_minutes == 15
+        assert config.contact_source_ttl_minutes == 75
         assert config.activity_tag_ttl_minutes == 90
         assert config.system_user_ttl_minutes == 45
         assert config.time_zone_ttl_minutes == 30
         # Each catalog cache is turned on per feature, and pydantic-settings accepts the several
         # spellings an operator or a Helm values file is likely to produce.
         assert config.custom_field_schema_cache_enabled is True
+        assert config.contact_source_cache_enabled is True
         assert config.activity_tag_cache_enabled is True
         assert config.system_user_cache_enabled is True
         assert config.time_zone_cache_enabled is True

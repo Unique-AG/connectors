@@ -56,6 +56,7 @@ from backstop_mcp.features.activity_writes import (
     get_update_note_command_factory,
     get_update_task_command_factory,
 )
+from backstop_mcp.features.contact_sources import get_list_contact_sources_query_factory
 from backstop_mcp.features.custom_fields import (
     get_custom_field_groups_service,
     get_custom_fields_service,
@@ -139,6 +140,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_update_document_command_factory,
     get_delete_activity_command_factory,
     get_activity_tags_service,
+    get_list_contact_sources_query_factory,
     get_system_users_service,
     get_time_zones_service,
     get_custom_fields_service,

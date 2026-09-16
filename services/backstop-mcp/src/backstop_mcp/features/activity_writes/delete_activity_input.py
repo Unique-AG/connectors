@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from backstop_mcp.features.elicitation_utils import CONFIRM_FIELD_DESCRIPTION
 from backstop_mcp.models import NonEmptyStr
 
 __all__ = [
@@ -14,8 +15,10 @@ __all__ = [
 DELETE_ACTIVITY_INPUT_DESCRIPTION = (
     "Required. The activity to hard-delete. Needs `kind` and `activity_id` (create echo, "
     "search row, or history handle). Never invent an id. Deletion is permanent: Backstop "
-    "has no recycle bin. The tool reads the record and asks the user to confirm when the "
-    "client can elicit; otherwise it deletes immediately."
+    "has no recycle bin. The tool asks the user to confirm when the client can show a "
+    "form (MCP 2026-07-28+). On an older protocol it returns `needs_confirmation` so "
+    "the model can ask in chat and retry with `confirm=true`. When the client never "
+    "advertised elicitation, it deletes immediately."
 )
 
 
@@ -34,3 +37,4 @@ class DeleteActivityInput(BaseModel):
             "invent or guess."
         )
     )
+    confirm: bool = Field(default=False, description=CONFIRM_FIELD_DESCRIPTION)

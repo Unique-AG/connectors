@@ -21,6 +21,10 @@ from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
 from backstop_mcp.caching import CacheFreshness
 from backstop_mcp.dependencies import get_backstop_config
 from backstop_mcp.features.activity_tags import ActivityTagsService, get_activity_tags_service
+from backstop_mcp.features.contact_sources import (
+    ListContactSourcesQuery,
+    get_list_contact_sources_query_factory,
+)
 from backstop_mcp.features.custom_fields import (
     CustomFieldGroupsService,
     CustomFieldsService,
@@ -39,6 +43,7 @@ def _unused_client() -> BackstopClient:
 type ClientBuilder = Callable[[str], BackstopClient]
 type _WiredCatalog = (
     ActivityTagsService
+    | ListContactSourcesQuery
     | CustomFieldGroupsService
     | CustomFieldsService
     | SystemUsersService
@@ -100,6 +105,14 @@ _CATALOGS: tuple[_CatalogUnderTest, ...] = (
         required_attributes={"quantityTagged": 3, "viewable": True},
         build=lambda client, caching: ActivityTagsService.with_ttl_minutes(
             client=client, ttl_minutes=60, caching_enabled=caching
+        ),
+    ),
+    _CatalogUnderTest(
+        slug="contact-sources",
+        path="/contact-sources",
+        resource_type="contact-sources",
+        build=lambda client, caching: ListContactSourcesQuery(
+            client=client, ttl=timedelta(minutes=60), caching_enabled=caching
         ),
     ),
     _CatalogUnderTest(
@@ -216,6 +229,7 @@ class TestCachingFlagsComeFromTheEnvironment:
 
     _PROVIDERS: ClassVar[tuple[Callable[[BackstopClient], _WiredCatalog], ...]] = (
         get_activity_tags_service,
+        get_list_contact_sources_query_factory,
         get_system_users_service,
         get_time_zones_service,
         get_custom_fields_service,
@@ -223,6 +237,7 @@ class TestCachingFlagsComeFromTheEnvironment:
     )
     _FLAGS: ClassVar[tuple[str, ...]] = (
         "BACKSTOP_ACTIVITY_TAG_CACHE_ENABLED",
+        "BACKSTOP_CONTACT_SOURCE_CACHE_ENABLED",
         "BACKSTOP_SYSTEM_USER_CACHE_ENABLED",
         "BACKSTOP_TIME_ZONE_CACHE_ENABLED",
         "BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED",
@@ -244,6 +259,7 @@ class TestCachingFlagsComeFromTheEnvironment:
         get_backstop_config.cache_clear()
         for provider in (
             get_activity_tags_service,
+            get_list_contact_sources_query_factory,
             get_system_users_service,
             get_time_zones_service,
             get_custom_fields_service,
@@ -262,8 +278,11 @@ class TestCachingFlagsComeFromTheEnvironment:
             monkeypatch.delenv(flag, raising=False)
 
         unused = _unused_client()
-        tags, users, zones, fields, groups = (provider(unused) for provider in self._PROVIDERS)
+        tags, sources, users, zones, fields, groups = (
+            provider(unused) for provider in self._PROVIDERS
+        )
         assert self._enabled(tags) is False
+        assert self._enabled(sources) is False
         assert self._enabled(users) is False
         assert self._enabled(zones) is False
         assert self._enabled(fields) is True
@@ -277,9 +296,12 @@ class TestCachingFlagsComeFromTheEnvironment:
         monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED", "false")
 
         unused = _unused_client()
-        tags, users, zones, fields, groups = (provider(unused) for provider in self._PROVIDERS)
+        tags, sources, users, zones, fields, groups = (
+            provider(unused) for provider in self._PROVIDERS
+        )
 
         assert self._enabled(tags) is True
+        assert self._enabled(sources) is False
         assert self._enabled(users) is False
         assert self._enabled(zones) is False
         assert self._enabled(fields) is False

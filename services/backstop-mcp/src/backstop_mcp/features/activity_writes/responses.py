@@ -10,6 +10,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
+from backstop_mcp.features.elicitation_utils import DeletionNeedsConfirmationResponse
 from backstop_mcp.features.party_resolver import PartyAmbiguousResponse
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
@@ -18,6 +19,7 @@ __all__ = [
     "ActivityBaseResponse",
     "AttachFileResponse",
     "AttachedFileResponse",
+    "DeleteActivityResponse",
     "DeletedActivityResponse",
     "LogActivityResponse",
     "LoggedActivityResponse",
@@ -127,6 +129,8 @@ class DeletedActivityResponse(ActivityBaseResponse):
         description="Always true: Backstop hard-deletes the record. There is no recycle bin.",
     )
 
+
+type DeleteActivityResponse = DeletedActivityResponse | DeletionNeedsConfirmationResponse
 
 type LogActivityResponse = LoggedActivityResponse | PartyAmbiguousResponse | NotFoundResponse
 

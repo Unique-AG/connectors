@@ -457,11 +457,21 @@ are absent, not for keys that are null. Custom-field writes send `"value": null`
 dropping the key posts a record with nothing to write, and Backstop still echoes the
 definition id back, so the fold above would have reported `applied` for a no-op.
 
-**Elicitation is a capability, then a fetch.** `elicit_entity_deletion` takes a callback
-and runs it only after the client is known to support elicitation. Do not GET a preview
-for a prompt that will never be shown. Id spaces differ (`/entity-activity-details` is
-not `/emails` or `/tasks`) — use one parser that knows `kind`, and do not treat a 200
-from the wrong collection as the target record.
+**Elicitation is a capability, then a protocol version, then a fetch.**
+`client_supports_elicitation` is not enough: Cursor advertises the capability on
+2025-11-25 connections, and `InputRequiredResult` (SEP-2322) is a protocol error
+there. Gate the form on `client_supports_input_required` (negotiated version
+`>= 2026-07-28`). `elicit_entity_deletion` takes a callback and returns the
+tool result: `InputRequiredResult`, `needs_confirmation`, or `None` so the tool
+deletes. A decline raises. Do not GET a preview for a prompt that will never be
+shown. Never `ctx.elicit` for a delete: Cursor does not paint a pushed form, so
+the tool hangs. On 2026-07-28 return `InputRequiredResult` and classify
+`ctx.input_responses` on the retry. On an older protocol return
+`needs_confirmation` and let the model retry with `confirm=true` after the user
+agrees in chat. Clients that never advertised elicitation still delete immediately.
+`elicit_choice` skips `ctx.elicit` on handshake-era connections and returns the
+candidate list so the model asks in chat instead of waiting out the timeout. Do not
+wait on `elicit_if_ambiguous` before a delete confirm — return the candidate list.
 
 **Do not premature-optimize a small catalog.** A linear scan of ~200 time zones is fine.
 Cache TTL stays off until a metric says otherwise. Index a roster by casefolded login

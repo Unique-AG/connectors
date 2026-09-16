@@ -78,7 +78,10 @@ class _PersonWritableFields(BaseModel):
     )
     contact_source_id: NonEmptyStr | None = Field(
         default=None,
-        description="Contact-source id. Never invent or guess.",
+        description=(
+            "Contact-source id from `list_contact_sources`. A standard vocabulary, "
+            "not a custom field. Never invent or guess."
+        ),
     )
     referral_source_id: NonEmptyStr | None = Field(
         default=None,

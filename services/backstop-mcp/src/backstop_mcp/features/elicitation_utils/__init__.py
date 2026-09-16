@@ -1,23 +1,35 @@
 """Shared MCP elicitation helpers that are not name-resolution.
 
 `elicit_entity_deletion` asks the user to confirm a hard delete and returns
-`CONFIRMED`, `NOT_AVAILABLE`, or `DECLINED`. Tools pass a prompt string or an
-async callback that builds one after elicitation is known to be available;
-this package only runs the elicit and classifies the answer.
+what the tool should return: `InputRequiredResult` (2026-07-28 form),
+`DeletionNeedsConfirmationResponse` (handshake-era chat retry with
+`confirm=true`), or `None` so the tool deletes. A decline raises. Tools pass a
+prompt string or an async callback that builds one after a confirm is known to
+be needed.
 """
 
 from backstop_mcp.features.elicitation_utils.elicit_entity_deletion import (
+    CONFIRM_FIELD_DESCRIPTION,
+    CONFIRM_RETRY_MESSAGE,
     DELETE,
+    DELETION_INPUT_KEY,
+    DELETION_NOT_CONFIRMED,
     KEEP,
     DeletionChoice,
-    EntityDeletion,
+    DeletionElicitResult,
+    DeletionNeedsConfirmationResponse,
     elicit_entity_deletion,
 )
 
 __all__ = [
+    "CONFIRM_FIELD_DESCRIPTION",
+    "CONFIRM_RETRY_MESSAGE",
     "DELETE",
+    "DELETION_INPUT_KEY",
+    "DELETION_NOT_CONFIRMED",
     "KEEP",
     "DeletionChoice",
-    "EntityDeletion",
+    "DeletionElicitResult",
+    "DeletionNeedsConfirmationResponse",
     "elicit_entity_deletion",
 ]

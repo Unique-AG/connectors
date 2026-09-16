@@ -6,20 +6,19 @@ from urllib.parse import quote
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
-from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller
-from backstop_mcp.features.elicitation_utils import EntityDeletion, elicit_entity_deletion
+from backstop_mcp.features.elicitation_utils import elicit_entity_deletion
 from backstop_mcp.features.opportunities import OpportunityResourceAttributes
 from backstop_mcp.features.opportunity_writes import (
     DELETE_OPPORTUNITY_INPUT_DESCRIPTION,
-    DeletedOpportunityResponse,
     DeleteOpportunityCommand,
     DeleteOpportunityInput,
+    DeleteOpportunityResponse,
     get_delete_opportunity_command_factory,
 )
 from backstop_mcp.models import published_output_schema
@@ -28,9 +27,6 @@ logger = logging.getLogger(__name__)
 
 _Document = BackstopApiSingleResourceDocument[OpportunityResourceAttributes]
 _RESOURCE_TYPE = "opportunities"
-_NOT_CONFIRMED = (
-    "Deletion was not confirmed. Nothing was deleted. Do not retry unless the user asks again."
-)
 
 
 @tool(
@@ -40,7 +36,7 @@ _NOT_CONFIRMED = (
         idempotent_hint=False,
         open_world_hint=False,
     ),
-    output_schema=published_output_schema(DeletedOpportunityResponse),
+    output_schema=published_output_schema(DeleteOpportunityResponse),
 )
 async def delete_opportunity(
     ctx: Context,
@@ -51,16 +47,19 @@ async def delete_opportunity(
     delete_opportunity_command: DeleteOpportunityCommand = Depends(
         get_delete_opportunity_command_factory
     ),
-) -> DeletedOpportunityResponse:
+) -> DeleteOpportunityResponse | InputRequiredResult:
     """Permanently delete a CRM opportunity.
 
     Required on `opportunity`: `opportunity_id`. Never invent an id — echo a create, a
     `get_opportunities` row, or a `get_opportunities_by_ids` result. Deletion is permanent:
     Backstop has no recycle bin.
 
-    When the client supports elicitation, this tool reads the opportunity first and asks
-    the user to confirm the deal name before deleting. When the client cannot elicit, it
-    deletes immediately. `destructive_hint` is true because this hard-deletes the record.
+    When the client supports elicitation on MCP 2026-07-28+, this tool reads the
+    opportunity first and returns `InputRequiredResult` so the client can paint the
+    form. On an older protocol that still advertised elicitation it returns
+    `needs_confirmation` — the model asks in chat and retries with `confirm=true`.
+    When the client never advertised elicitation, it deletes immediately.
+    `destructive_hint` is true because this hard-deletes the record.
 
     Call like: {"opportunity": {"opportunity_id": "<id from get_opportunities>"}}
     """
@@ -69,21 +68,14 @@ async def delete_opportunity(
         extra={"opportunity_id": opportunity.opportunity_id},
     )
 
-    async def prompt() -> str:
-        return await _deletion_prompt(client=client, opportunity_id=opportunity.opportunity_id)
+    if not opportunity.confirm:
 
-    outcome = await elicit_entity_deletion(ctx, callback=prompt)
-    if outcome is EntityDeletion.DECLINED:
-        logger.info(
-            "opportunity_writes.delete.not_confirmed",
-            extra={"opportunity_id": opportunity.opportunity_id},
-        )
-        raise ToolError(_NOT_CONFIRMED)
-    if outcome is EntityDeletion.NOT_AVAILABLE:
-        logger.info(
-            "opportunity_writes.delete.elicit.not_available",
-            extra={"opportunity_id": opportunity.opportunity_id},
-        )
+        async def prompt() -> str:
+            return await _deletion_prompt(client=client, opportunity_id=opportunity.opportunity_id)
+
+        gated = await elicit_entity_deletion(ctx, callback=prompt)
+        if gated is not None:
+            return gated
     return await delete_opportunity_command.run(opportunity=opportunity)
 
 

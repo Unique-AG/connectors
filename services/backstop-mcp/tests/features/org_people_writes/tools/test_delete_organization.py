@@ -8,11 +8,15 @@ import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
-from fastmcp.server.elicitation import AcceptedElicitation
+from mcp.types import ElicitRequestFormParams, ElicitResult, InputRequiredResult
 from pydantic import TypeAdapter
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.elicitation_utils import DELETE, DeletionChoice
+from backstop_mcp.features.elicitation_utils import (
+    DELETE,
+    DELETION_INPUT_KEY,
+    DeletionNeedsConfirmationResponse,
+)
 from backstop_mcp.features.org_people_writes import (
     DeletedOrganizationResponse,
     DeleteOrganizationInput,
@@ -23,10 +27,9 @@ from backstop_mcp.features.org_people_writes import (
 from backstop_mcp.features.org_people_writes.tools.delete_organization import delete_organization
 from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import (
-    FakeContext,
-    as_context,
-    ctx_accept,
-    ctx_decline,
+    ctx_deletion_answer,
+    ctx_handshake_era,
+    ctx_never_elicit,
     ctx_no_elicitation_capability,
     make_resolve_party_query,
 )
@@ -116,24 +119,66 @@ class TestDeleteOrganization:
         assert party.call_count == 1
 
     @respx.mock
-    async def test_reads_the_organization_then_deletes_after_elicit_accept(
+    async def test_reads_the_organization_then_asks_without_deleting(
         self, client: BackstopClient
     ) -> None:
-        preview, _location, party = _mock_cascade()
-        prompts: list[str] = []
+        preview, location, party = _mock_cascade()
 
-        async def elicit(
-            *, message: str, response_type: object
-        ) -> AcceptedElicitation[DeletionChoice]:
-            _ = response_type
-            prompts.append(message)
-            return AcceptedElicitation(data=DeletionChoice(choice=DELETE))
+        result = await delete_organization(
+            ctx_never_elicit(),
+            organization=_ORGANIZATION.validate_python(
+                {"search_type": "organizations", "party_id": _ID}
+            ),
+            resolve_party_query=make_resolve_party_query(client),
+            delete_party_with_locations_command=make_command(client),
+        )
+
+        assert isinstance(result, InputRequiredResult)
+        assert result.input_requests is not None
+        params = result.input_requests[DELETION_INPUT_KEY].params
+        assert isinstance(params, ElicitRequestFormParams)
+        assert _NAME in params.message
+        assert "1" in params.message
+        assert "contact location" in params.message
+        assert preview.call_count == 1
+        assert location.call_count == 0
+        assert party.call_count == 0
+
+    @respx.mock
+    async def test_handshake_era_returns_needs_confirmation_without_deleting(
+        self, client: BackstopClient
+    ) -> None:
+        preview, location, party = _mock_cascade()
 
         result = tool_model(
             await delete_organization(
-                as_context(FakeContext(elicit)),
+                ctx_handshake_era(),
                 organization=_ORGANIZATION.validate_python(
                     {"search_type": "organizations", "party_id": _ID}
+                ),
+                resolve_party_query=make_resolve_party_query(client),
+                delete_party_with_locations_command=make_command(client),
+            ),
+            DeletionNeedsConfirmationResponse,
+        )
+
+        assert result.status == "needs_confirmation"
+        assert _NAME in result.preview
+        assert preview.call_count == 1
+        assert location.call_count == 0
+        assert party.call_count == 0
+
+    @respx.mock
+    async def test_handshake_era_deletes_when_confirm_is_true(
+        self, client: BackstopClient
+    ) -> None:
+        _preview, location, party = _mock_cascade()
+
+        result = tool_model(
+            await delete_organization(
+                ctx_handshake_era(),
+                organization=_ORGANIZATION.validate_python(
+                    {"search_type": "organizations", "party_id": _ID, "confirm": True}
                 ),
                 resolve_party_query=make_resolve_party_query(client),
                 delete_party_with_locations_command=make_command(client),
@@ -142,12 +187,8 @@ class TestDeleteOrganization:
         )
 
         assert result.id == _ID
-        assert preview.call_count == 2
+        assert location.call_count == 1
         assert party.call_count == 1
-        assert len(prompts) == 1
-        assert _NAME in prompts[0]
-        assert "1" in prompts[0]
-        assert "contact location" in prompts[0]
 
     @respx.mock
     async def test_confirmed_elicitation_deletes(self, client: BackstopClient) -> None:
@@ -155,7 +196,7 @@ class TestDeleteOrganization:
 
         result = tool_model(
             await delete_organization(
-                ctx_accept(DeletionChoice(choice=DELETE)),
+                ctx_deletion_answer(ElicitResult(action="accept", content={"choice": DELETE})),
                 organization=_ORGANIZATION.validate_python(
                     {"search_type": "organizations", "party_id": _ID}
                 ),
@@ -174,7 +215,7 @@ class TestDeleteOrganization:
 
         with pytest.raises(ToolError, match="not confirmed") as raised:
             await delete_organization(
-                ctx_decline(),
+                ctx_deletion_answer(ElicitResult(action="decline")),
                 organization=_ORGANIZATION.validate_python(
                     {"search_type": "organizations", "party_id": _ID}
                 ),

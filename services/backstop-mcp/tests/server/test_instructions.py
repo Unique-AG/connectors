@@ -55,6 +55,9 @@ class TestInstructions:
         assert "no email kind on log_activity" in INSTRUCTIONS
         assert "list_activity_tags" in INSTRUCTIONS
         assert "tags are never created" in INSTRUCTIONS
+        assert "list_contact_sources" in INSTRUCTIONS
+        assert "contact_source_id" in INSTRUCTIONS
+        assert "not a custom field" in INSTRUCTIONS
         assert "delete_activity" in INSTRUCTIONS
         assert "no recycle bin" in INSTRUCTIONS
         assert "update_activity" in INSTRUCTIONS
