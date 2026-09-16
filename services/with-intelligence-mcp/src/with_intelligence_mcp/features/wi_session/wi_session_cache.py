@@ -55,20 +55,29 @@ class WiSessionCache:
         force_renewal: bool,
     ) -> str:
         async with self._hold(subject) as holder:
-            stale = holder.session
+            cached_before_wait = holder.session
             async with holder.lock:
-                current = holder.session
-                if current is not None and current is not stale and current.is_fresh:
-                    return current.access_token.get_secret_value()
+                cached_after_wait = holder.session
+                if (
+                    cached_after_wait is not None
+                    and cached_after_wait is not cached_before_wait
+                    and cached_after_wait.is_fresh
+                ):
+                    return cached_after_wait.access_token.get_secret_value()
                 stored = await read()
                 if stored.is_fresh and (
                     not force_renewal
-                    or (stale is not None and stored.has_different_access_token(stale))
+                    or (
+                        cached_before_wait is not None
+                        and stored.has_different_access_token(cached_before_wait)
+                    )
                 ):
                     holder.session = stored
                     return stored.access_token.get_secret_value()
 
-                rejected = stored if force_renewal and stale is None else stale
+                rejected = (
+                    stored if force_renewal and cached_before_wait is None else cached_before_wait
+                )
                 holder.session = await renew(self._factory.refresh, rejected)
                 logger.info("wi_session.renewed")
                 return holder.session.access_token.get_secret_value()
