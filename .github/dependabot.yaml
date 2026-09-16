@@ -9,6 +9,9 @@ updates:
       timezone: Europe/Berlin
     cooldown:
       default-days: 3
+    labels:
+      - dependencies
+      - npm
     commit-message:
       prefix: build
     open-pull-requests-limit: 5
@@ -33,6 +36,9 @@ updates:
       timezone: Europe/Berlin
     cooldown:
       default-days: 3
+    labels:
+      - dependencies
+      - uv
     commit-message:
       prefix: build
     open-pull-requests-limit: 5
@@ -56,6 +62,9 @@ updates:
       timezone: Europe/Berlin
     cooldown:
       default-days: 3
+    labels:
+      - dependencies
+      - docker
     commit-message:
       prefix: build
     open-pull-requests-limit: 5
@@ -78,6 +87,9 @@ updates:
       timezone: Europe/Berlin
     cooldown:
       default-days: 3
+    labels:
+      - dependencies
+      - github-actions
     commit-message:
       prefix: build
     open-pull-requests-limit: 5
@@ -101,6 +113,9 @@ updates:
       timezone: Europe/Berlin
     cooldown:
       default-days: 3
+    labels:
+      - dependencies
+      - terraform
     commit-message:
       prefix: build
     open-pull-requests-limit: 5
@@ -124,6 +139,9 @@ updates:
       timezone: Europe/Berlin
     cooldown:
       default-days: 3
+    labels:
+      - dependencies
+      - helm
     commit-message:
       prefix: build
     open-pull-requests-limit: 5

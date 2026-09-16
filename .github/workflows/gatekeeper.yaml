@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-24.04
     name: Validate PR title and scope
     # Skip automated PRs (release-please, dependabot) and urgent PRs by label
-    if: "!contains(github.event.pull_request.labels.*.name, 'autorelease: pending') && !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') && !contains(github.event.pull_request.labels.*.name, 'dependencies') && !contains(github.event.pull_request.labels.*.name, 'skip-validation')"
+    if: "!contains(github.event.pull_request.labels.*.name, 'autorelease: pending') && !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') && !contains(github.event.pull_request.labels.*.name, 'dependencies') && !contains(github.event.pull_request.labels.*.name, 'title-exception')"
     permissions:
       pull-requests: read
     env:
