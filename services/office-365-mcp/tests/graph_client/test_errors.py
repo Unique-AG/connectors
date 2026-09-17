@@ -230,14 +230,6 @@ def test_a_cancelled_call_stays_cancelled_and_is_not_reported_as_a_graph_failure
 async def test_a_body_the_sdk_cannot_read_keeps_the_status_it_arrived_with(
     client: GraphServiceClient, graph: respx.MockRouter
 ) -> None:
-    """A gateway in front of Graph answering `text/html` on a 500. The parse-node registry has no
-    parser for that content type, so no `error_map` describes the body.
-
-    `kiota_http` catches that itself since 1.12.1 and raises an `APIError` carrying the status
-    (`httpx_request_adapter.throw_failed_responses`), where before it let the registry's bare
-    `Exception` escape and the status was lost. So `_classify` sees a 5xx and sorts it by remedy
-    rather than the block falling through to its unreadable-answer clause.
-    """
     graph.get("/me").mock(
         return_value=httpx.Response(
             500, text="<html>502 Bad Gateway</html>", headers={"content-type": "text/html"}
@@ -250,6 +242,14 @@ async def test_a_body_the_sdk_cannot_read_keeps_the_status_it_arrived_with(
     assert raised.value.status == 500
     assert raised.value.code is None
     assert "Microsoft Graph returned 500" in str(raised.value)
+
+
+def test_a_bare_exception_is_reported_as_an_answer_that_could_not_be_read() -> None:
+    with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
+        raise Exception("no parser for this content type")
+
+    assert raised.value.status is None
+    assert "could not read" in str(raised.value)
 
 
 def test_a_bug_of_our_own_is_not_reported_as_graph_being_unavailable() -> None:
