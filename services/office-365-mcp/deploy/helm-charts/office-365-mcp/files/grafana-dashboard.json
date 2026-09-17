@@ -107,7 +107,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Failing operations as a share of the operations served \u2014 one tool call each, not one HTTP request each. not_found is excluded: a caller asking for a chat or a message that is gone got an answer, not an incident. forbidden is included \u2014 it almost always means the app registration is missing a delegated permission or an admin consent, which is a deployment defect.",
+      "description": "Failing operations as a share of the operations served \u2014 one tool call each, not one HTTP request each. not_found and too_large are excluded: a caller asking for a chat or a message that is gone got an answer, not an incident, and a message over this connector's export ceiling is this connector answering correctly rather than failing. forbidden is included \u2014 it almost always means the app registration is missing a delegated permission or an admin consent, which is a deployment defect.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -162,7 +162,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(graph_operations_total{job=~\"$job\", status!~\"ok|not_found|cancelled\"}[5m])) / sum(rate(graph_operations_total{job=~\"$job\"}[5m])) * 100",
+          "expr": "sum(rate(graph_operations_total{job=~\"$job\", status!~\"ok|not_found|cancelled|too_large\"}[5m])) / sum(rate(graph_operations_total{job=~\"$job\"}[5m])) * 100",
           "range": true,
           "refId": "A"
         }
@@ -845,7 +845,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "status is the remedy class from graph_client/errors.py, not the HTTP code: forbidden (consent or permission), throttled, unavailable (Graph or egress), not_found, paging_unending (a collection Graph would not end), failed, and error for something that is not a Graph failure at all. not_found is excluded: a caller asking for a chat or a message that is gone got an answer, not an incident. forbidden is included \u2014 it almost always means the app registration is missing a delegated permission or an admin consent, which is a deployment defect.",
+      "description": "status is the remedy class from graph_client/errors.py, not the HTTP code: forbidden (consent or permission), throttled, unavailable (Graph or egress), not_found, paging_unending (a collection Graph would not end), too_large (an answer this connector declined to hold), failed, and error for something that is not a Graph failure at all. not_found and too_large are excluded: a caller asking for a chat or a message that is gone got an answer, not an incident, and a message over this connector's export ceiling is this connector answering correctly rather than failing. forbidden is included \u2014 it almost always means the app registration is missing a delegated permission or an admin consent, which is a deployment defect.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -922,7 +922,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (operation, status) (rate(graph_operations_total{job=~\"$job\", status!~\"ok|not_found|cancelled\"}[$__rate_interval]))",
+          "expr": "sum by (operation, status) (rate(graph_operations_total{job=~\"$job\", status!~\"ok|not_found|cancelled|too_large\"}[$__rate_interval]))",
           "legendFormat": "{{operation}} \u2014 {{status}}",
           "range": true,
           "refId": "A"
@@ -1599,7 +1599,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (operation, step, status) (rate(graph_steps_total{job=~\"$job\", status!~\"ok|not_found|cancelled\"}[$__rate_interval]))",
+          "expr": "sum by (operation, step, status) (rate(graph_steps_total{job=~\"$job\", status!~\"ok|not_found|cancelled|too_large\"}[$__rate_interval]))",
           "legendFormat": "{{operation}} \u00b7 {{step}} \u00b7 {{status}}",
           "range": true,
           "refId": "A"

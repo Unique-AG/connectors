@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-nine
+Users sign in with their own Microsoft account and the server acts as them. It exposes thirty
 MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
 most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
 channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
@@ -12,7 +12,9 @@ transcribed and a handle for each transcript; `teams_read_transcript`, what was 
 meetings as speaker-attributed, timestamped turns; and `teams_list_meeting_recordings`, whether a meeting
 was recorded, how long each recording runs and who may download it; and `outlook_search_mail`,
 which finds a message in the signed-in user's own Outlook mailbox, and `outlook_read_mail`,
-which reads one of those in full; and `outlook_browse_folders`, one level of the mail folder
+which reads one of those in full; and `outlook_export_mail`, which hands that same message back as
+the `.eml` file Exchange stores, routing headers and attachments included; and
+`outlook_browse_folders`, one level of the mail folder
 tree; and `outlook_find_recipient`, which resolves a name to the address it sends from — each
 one a file of its own — plus `outlook_read_thread`, every message of one conversation this
 mailbox holds; `outlook_list_mail`, the newest messages of one folder in receipt order; and
@@ -157,7 +159,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `OnlineMeetings.Read` | Delegated | No | `teams_list_meeting_transcripts`, `teams_list_meeting_recordings` (resolving a join URL to a meeting) |
 | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `teams_list_meeting_transcripts`, `teams_read_transcript` |
 | `OnlineMeetingRecording.Read.All` | Delegated | **Yes** | `teams_list_meeting_recordings` |
-| `Mail.Read` | Delegated | No | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient` (the fallback), `outlook_read_thread`, `outlook_list_mail` |
+| `Mail.Read` | Delegated | No | `outlook_search_mail`, `outlook_read_mail`, `outlook_export_mail`, `outlook_browse_folders`, `outlook_find_recipient` (the fallback), `outlook_read_thread`, `outlook_list_mail` |
 | `People.Read` | Delegated | No | `outlook_find_recipient` |
 | `MailboxSettings.Read` | Delegated | No | `outlook_get_mailbox_settings` |
 | `Mail.ReadWrite` | Delegated | No | `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` |
@@ -309,7 +311,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `teams-recordings` | say whether a meeting was recorded and who may get at it | `teams_list_chats`, `teams_list_meeting_recordings` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | 1 |
 | `teams-meetings` | both of the above for one meeting | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | + both meeting permissions | 2 |
 | `teams` | every Teams tool | the nine of them | all eight | 3 |
-| `outlook-read` | find a message, read it in full, walk the folder tree, read a thread, list a folder in receipt order, and resolve a name to an address | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
+| `outlook-read` | find a message, read it in full, export it as an `.eml` file, walk the folder tree, read a thread, list a folder in receipt order, and resolve a name to an address | `outlook_search_mail`, `outlook_read_mail`, `outlook_export_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
 | `outlook-write` | the read surface, plus marking, filing and drafting | + `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | + `Mail.ReadWrite` | 0 |
 | `outlook-send` | the above, plus sending a draft the user can already read | + `outlook_send_draft` | + `Mail.Send`, `Mail.ReadBasic` | 0 |
 | `outlook-mailbox` | say what is quietly acting on the mailbox — the rules, the automatic reply, the categories | `outlook_get_mailbox_settings` | `User.Read`, `MailboxSettings.Read` | 0 |
@@ -344,6 +346,14 @@ forwarding-rule audit has nothing to do with reading one, and a calendar read ha
 with any of them. A single cumulative chain made `outlook-automate` require `Mail.Send`, which is
 the defect this shape exists to prevent. A deployment that wants two axes names the tools in
 `TOOLS_ENABLED`.
+
+**`outlook_export_mail` is the one tool on the mail axis that returns a file, and the only one that
+returns an attachment's bytes or a routing header.** Every other reader here projects a message
+into described fields, and `outlook_read_mail` leaves `internetMessageHeaders` and attachments out
+on purpose. An export cannot: the `.eml` Exchange stores is those parts. It costs no permission of
+its own — `Mail.Read` already covers `GET /me/messages/{id}/$value` — so it changes no consent
+screen and no sign-in, which is exactly why it is its own name in the table rather than a mode of
+the reader. A deployment that wants mail read but no mail files leaves it out of `TOOLS_ENABLED`.
 
 **The calendar axis carries `Calendars.Read.Shared` on its read tier, and that is why it is one
 ladder.** A calendar another person delegated arrives as a plain row of `GET /me/calendars`, and

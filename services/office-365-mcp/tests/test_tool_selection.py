@@ -305,6 +305,7 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
     "teams_list_meeting_recordings": {"meeting_uri": ("teams_list_chats",)},
     "outlook_read_mail": {"uri": ("outlook_search_mail",)},
+    "outlook_export_mail": {"uri": ("outlook_search_mail",)},
     "outlook_browse_folders": {"parent": ("outlook_browse_folders",)},
     "outlook_read_thread": {"uri": ("outlook_search_mail",)},
     "outlook_list_mail": {"folder_ref": ("outlook_browse_folders",)},
@@ -590,13 +591,13 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         3,
         10,
     ),
-    (ToolsPreset.OUTLOOK_READ, ("User.Read", "Mail.Read", "People.Read"), 0, 7),
+    (ToolsPreset.OUTLOOK_READ, ("User.Read", "Mail.Read", "People.Read"), 0, 8),
     (ToolsPreset.OUTLOOK_MAILBOX, ("User.Read", "MailboxSettings.Read"), 0, 2),
     (
         ToolsPreset.OUTLOOK_WRITE,
         ("User.Read", "Mail.Read", "People.Read", "Mail.ReadWrite"),
         0,
-        11,
+        12,
     ),
     (
         ToolsPreset.OUTLOOK_SEND,
@@ -609,7 +610,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Mail.ReadBasic",
         ),
         0,
-        12,
+        13,
     ),
     (
         ToolsPreset.OUTLOOK_AUTOMATE,

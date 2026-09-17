@@ -100,7 +100,11 @@ serviceAccount:
 volumes:
   - name: tmp
     emptyDir:
-      sizeLimit: 64Mi
+      # outlook_export_mail spools one message here while it streams, so the ceiling is a
+      # concurrency budget: MAX_EXPORT_BYTES (10 MiB) per export in flight. This is disk rather
+      # than `medium: Memory`, so it does not come out of the 384Mi limit above — but an emptyDir
+      # over its sizeLimit evicts the pod instead of failing the write, and 64Mi was six.
+      sizeLimit: 256Mi
 
 volumeMounts:
   - name: tmp
