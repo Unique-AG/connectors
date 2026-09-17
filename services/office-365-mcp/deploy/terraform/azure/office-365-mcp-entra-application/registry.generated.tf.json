@@ -81,6 +81,12 @@
           ]
         },
         {
+          "name": "outlook_export_mail",
+          "permissions": [
+            "Mail.Read"
+          ]
+        },
+        {
           "name": "outlook_browse_folders",
           "permissions": [
             "Mail.Read"
@@ -205,6 +211,7 @@
         "teams_list_meeting_recordings",
         "outlook_search_mail",
         "outlook_read_mail",
+        "outlook_export_mail",
         "outlook_browse_folders",
         "outlook_find_recipient",
         "outlook_read_thread",
@@ -267,6 +274,7 @@
         "outlook-read": [
           "outlook_search_mail",
           "outlook_read_mail",
+          "outlook_export_mail",
           "outlook_browse_folders",
           "outlook_find_recipient",
           "outlook_read_thread",
@@ -275,6 +283,7 @@
         "outlook-write": [
           "outlook_search_mail",
           "outlook_read_mail",
+          "outlook_export_mail",
           "outlook_browse_folders",
           "outlook_find_recipient",
           "outlook_read_thread",
@@ -287,6 +296,7 @@
         "outlook-send": [
           "outlook_search_mail",
           "outlook_read_mail",
+          "outlook_export_mail",
           "outlook_browse_folders",
           "outlook_find_recipient",
           "outlook_read_thread",

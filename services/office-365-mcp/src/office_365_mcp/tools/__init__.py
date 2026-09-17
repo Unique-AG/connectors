@@ -26,6 +26,7 @@ from office_365_mcp.tools import (
     outlook_disable_mail_rule,
     outlook_draft_mail,
     outlook_draft_reply,
+    outlook_export_mail,
     outlook_find_recipient,
     outlook_get_mailbox_settings,
     outlook_list_calendars,
@@ -134,6 +135,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     teams_list_meeting_recordings,
     outlook_search_mail,
     outlook_read_mail,
+    outlook_export_mail,
     outlook_browse_folders,
     outlook_find_recipient,
     outlook_read_thread,
@@ -206,6 +208,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
     "outlook-read": (
         "outlook_search_mail",
         "outlook_read_mail",
+        "outlook_export_mail",
         "outlook_browse_folders",
         "outlook_find_recipient",
         "outlook_read_thread",
@@ -214,6 +217,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
     "outlook-write": (
         "outlook_search_mail",
         "outlook_read_mail",
+        "outlook_export_mail",
         "outlook_browse_folders",
         "outlook_find_recipient",
         "outlook_read_thread",
@@ -226,6 +230,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
     "outlook-send": (
         "outlook_search_mail",
         "outlook_read_mail",
+        "outlook_export_mail",
         "outlook_browse_folders",
         "outlook_find_recipient",
         "outlook_read_thread",
