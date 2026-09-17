@@ -26,7 +26,6 @@ from office_365_mcp.tools.outlook_export_mail import (
 
 _IMMUTABLE_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 
-# The SDK re-encodes the id for the URL, and appends Graph's own media segment.
 _PATH = "/me/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D/$value"
 
 _HANDLE = MailMessageHandle(_IMMUTABLE_ID)
@@ -186,6 +185,18 @@ class TestTheFilenameIsSafeToPutInAUri:
         exported = await export_mail(client, handle=_HANDLE)
 
         assert _filename_of(exported) == expected
+
+    async def test_a_format_character_cannot_make_the_name_lie_about_itself(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """A right-to-left override renders everything after it backwards, so a subject of
+        `invoice<RLO>gpj.exe` shows in a file manager as `invoiceexe.jpg`. It is not URI syntax and
+        a reduction aimed only at URI syntax would keep it."""
+        _ = _exports(graph, _mime_with_subject("invoice\u202egpj.exe".encode()))
+
+        exported = await export_mail(client, handle=_HANDLE)
+
+        assert _filename_of(exported) == "invoice-gpj.exe.eml"
 
     async def test_it_falls_back_when_the_message_carries_no_subject_header(
         self, client: GraphServiceClient, graph: respx.MockRouter

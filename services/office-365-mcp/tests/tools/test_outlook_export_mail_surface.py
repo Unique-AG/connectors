@@ -38,7 +38,6 @@ _CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 _CLIENT_TOKEN = "synthetic-fastmcp-session-token"
 _OBO_TOKEN = "synthetic-obo-graph-token"
 
-# The id in the tool's own `GRAPH_CALL_EXAMPLE`, which is what this file calls with.
 _PATH = "/me/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D/$value"
 
 _MIME = (

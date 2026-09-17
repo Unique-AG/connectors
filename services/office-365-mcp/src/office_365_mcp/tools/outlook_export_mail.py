@@ -20,14 +20,19 @@ shorter file. It is a corrupt file that opens as a file, with the attachment tha
 the part that is gone. A refusal that names the size is something a caller can act on; a corrupt
 export is something they discover later. Graph publishes no ranged read of `$value` and no way to
 ask for the size in the same request, so the bytes are fetched before they are measured. The
-ceiling bounds what leaves this connector, not what crosses it.
+ceiling bounds what leaves this connector, not what crosses it. Ten MiB is measured on the MIME;
+the same bytes leave as base64 inside JSON, about 13.3 MiB on the wire. Exchange's own default
+ceiling is larger than that, so a message can legitimately exceed this one.
 
 **The filename is the message's own `Subject`, read out of the bytes already fetched.** A second
 Graph request for the subject would be a second permission check, a second failure mode, and a
 second answer that can disagree with the first. The header is right there, and the standard
 library decodes its RFC 2047 encoding. It is then reduced to a conservative character set, because
 the name becomes a `file:///` URI: a subject holding `/`, `?` or `#` otherwise lands in that URI as
-a path segment, a query and a fragment, and a subject of `..` lands as a traversal.
+a path segment, a query and a fragment, and a subject of `..` lands as a traversal. What survives
+the reduction is the Unicode word class, so a subject in any script keeps its own letters. What
+does not survive is that URI syntax and the control and formatting characters — a bidi override
+among them — that make a rendered filename lie about what it is.
 
 **`message/rfc822` is set by this module.** FastMCP's `File` derives the media type from a format
 string and would publish `.eml` as `application/eml`, which no mail client claims. There is no
@@ -64,38 +69,22 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
 }
 
-# Sent for the same reason `outlook_read_mail` sends it, and on the same evidence: Microsoft
-# documents this header as asking Graph to *answer* in immutable ids, and says nothing about
-# whether it also governs how a path id is read. Both readers send it so that one handle behaves
-# identically in either.
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
-# What the tool will hand back, measured on the MIME itself. The transport cost is higher: this
-# leaves as base64 inside a JSON response, which is four bytes out for every three in, so this
-# ceiling is about 13.3 MiB on the wire. Exchange's own default message ceiling is larger than
-# this, so a message can legitimately exceed it, and the refusal below says what to do then.
 MAX_EXPORT_BYTES = 10 * 1024 * 1024
 
 _MIME_TYPE = "message/rfc822"
 
 _EXTENSION = ".eml"
 
-# Everything else becomes a dash. `\w` is Unicode-aware, so a subject in any script keeps its own
-# letters and a person reads their own filename; what it excludes is what makes a name dangerous —
-# `/`, `\`, `?`, `#`, `%` and `:`, because the name is interpolated into a `file:///` URI, and the
-# control and formatting characters that make a name lie about itself.
 _UNSAFE_IN_A_FILENAME = re.compile(r"[^\w .-]+")
 
 _RUNS_OF_DASHES = re.compile(r"-{2,}")
 
-# Long enough for any subject worth reading, short enough to survive every filesystem this file
-# gets saved onto once a client writes it out.
 _MAX_FILENAME_CHARACTERS = 120
 
 _FALLBACK_FILENAME = "message"
 
-# Enough for the header block of any message, so the parse never walks a body it has no use for.
-# RFC 5321 bounds a single header line at 1000 octets, and a message may carry many.
 _MAX_HEADER_BYTES = 128 * 1024
 
 _DESCRIPTION = f"""\
@@ -191,14 +180,11 @@ def _filename(mime: bytes) -> str:
 
 
 def _subject_of(mime: bytes) -> str:
-    """The decoded `Subject` header, or an empty string when the message carries none this can
-    read.
+    """The decoded `Subject` header, or an empty string when there is none this can read.
 
-    Every failure is the same failure here. The bytes are a stranger's message, `email` reports a
-    malformed header as a defect on the value it returns rather than by raising, and the one
-    header it is asked for is one a message is allowed to omit entirely. So a parse that produces
-    no usable subject falls through to the fallback name rather than failing an export whose bytes
-    are already in hand.
+    The catch is broad on purpose: the bytes are a stranger's, a message may carry no `Subject` at
+    all, and `email` reports a malformed one as a defect on the value rather than by raising. No
+    failure to read a name is worth failing an export whose bytes are already in hand.
     """
     try:
         headers = BytesHeaderParser(policy=DEFAULT_MIME_POLICY).parsebytes(mime[:_MAX_HEADER_BYTES])
