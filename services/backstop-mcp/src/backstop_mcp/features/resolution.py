@@ -189,6 +189,10 @@ def collect_batch[T](
 
 
 # --- Elicitation (policy steps 2 and 4) -----------------------------------------------------
+# Handshake (2025-11-25): mid-call `elicitation/create`. On Streamable HTTP the form
+# must ride GET, not the open tools/call POST — see `elicit_from_client`.
+# Modern (2026-07-28): no back-channel. Return `InputRequiredResult`; the client
+# shows the form and retries `tools/call` with `input_responses`.
 
 
 class _ClientCapabilityChecker(Protocol):
@@ -201,12 +205,16 @@ class _RequestContext(Protocol):
 
 
 def input_required(outcome: object) -> TypeIs[InputRequiredResult]:
-    """True when this call must end so the client can show the form."""
+    """True when the tool must return now so a 2026-07-28 client can show the form."""
     return isinstance(outcome, InputRequiredResult)
 
 
 def asks_as_tool_result(ctx: Context) -> bool:
-    """True on 2026-07-28: that era has no elicit back-channel, so return `InputRequiredResult`."""
+    """True on 2026-07-28: no elicit back-channel, so return `InputRequiredResult`.
+
+    The client shows that form and calls the same tool again with `input_responses`.
+    Handshake stays on `elicit_from_client` instead.
+    """
     request = getattr(ctx, "request_context", None)
     version = getattr(request, "protocol_version", None)
     return version in MODERN_PROTOCOL_VERSIONS
@@ -215,7 +223,7 @@ def asks_as_tool_result(ctx: Context) -> bool:
 def _on_streamable_http() -> bool:
     """True for the `/mcp` POST that owns the open `tools/call`.
 
-    Handshake elicit must not ride that POST.
+    Handshake `elicitation/create` must not ride that POST (see `elicit_from_client`).
     """
     try:
         path = get_http_request().url.path.rstrip("/")
@@ -241,20 +249,30 @@ async def elicit_from_client[T](
     message: str,
     response_type: type[T] | list[str],
 ) -> AcceptedElicitation[T] | AcceptedElicitation[str] | DeclinedElicitation | CancelledElicitation:
-    """Mid-call elicit. On Streamable HTTP, send it on GET, not the open POST.
+    """Handshake mid-call elicit. On Streamable HTTP, send it on GET, not the open POST.
 
-    `ctx.elicit()` sets `related_request_id` to the current `tools/call`. On Streamable
-    HTTP that puts `elicitation/create` on the POST SSE; Inspector/Cursor wait for that
-    POST to finish, so the form appears only after timeout. `elicit_form` without
-    `related_request_id` uses the standalone GET stream instead. Tests and other
-    transports keep `ctx.elicit()`.
+    Handshake (`2025-11-25`) still uses `elicitation/create`. The bug was which HTTP
+    stream that request rode. `ctx.elicit()` always sets `related_request_id` to the
+    current `tools/call`. On Streamable HTTP (`/mcp`) that puts the form on the open
+    POST SSE. Inspector and Cursor wait for that POST to finish before they render
+    anything on it, so the picker only appeared after the 45s timeout — then as a
+    cancelled form.
+
+    Classic SSE never had this problem: its GET stays live, so a mid-call elicit is
+    visible immediately. We do not mount SSE; `/mcp` is the only transport.
+
+    On `/mcp` this does not call `ctx.elicit()`. It calls `session.elicit_form`
+    with no `related_request_id`. FastMCP then sends `elicitation/create` on the
+    standalone GET stream. The POST stays open waiting for the answer; the form
+    can show while the tool is still running. Tests and non-`/mcp` requests keep
+    `ctx.elicit()`.
     """
     if not _on_streamable_http():
         return await ctx.elicit(message=message, response_type=response_type)
 
     logger.info("resolution.elicit.standalone_stream")
     config = parse_elicit_response_type(response_type)
-    # Omit related_request_id so Streamable HTTP routes this onto GET, not the tools/call POST.
+    # No related_request_id → Streamable HTTP GET stream, not the tools/call POST.
     raw = await ctx.session.elicit_form(message, config.schema)
     if raw.action == "accept":
         return handle_elicit_accept(config, raw.content)
@@ -447,7 +465,8 @@ async def elicit_choice[T](
         _remember(ctx, key, chosen.key)
         return Resolved(value=chosen.value)
 
-    # Modern: picker is the tools/call result. Handshake: mid-call elicit (GET on /mcp).
+    # 2026-07-28: picker is this tools/call result; client retries with input_responses.
+    # Handshake: mid-call elicit (GET on /mcp) via elicit_from_client.
     if asks_as_tool_result(ctx):
         logger.info("resolution.elicit.input_required", extra=outcome_log)
         return InputRequiredResult(

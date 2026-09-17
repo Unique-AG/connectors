@@ -120,7 +120,8 @@ async def elicit_entity_deletion(
         logger.info("elicitation.entity_deletion.dismissed", extra={"action": "kept"})
         return EntityDeletion.DECLINED
 
-    # Modern: picker is the tools/call result. Handshake: mid-call elicit (GET on /mcp).
+    # 2026-07-28: picker is this tools/call result; client retries with input_responses.
+    # Handshake: mid-call elicit (GET on /mcp) via elicit_from_client.
     if asks_as_tool_result(ctx):
         logger.info("elicitation.entity_deletion.input_required")
         return InputRequiredResult(
