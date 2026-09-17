@@ -61,6 +61,10 @@ def _collect_models(annotation: object, seen: set[type[BaseModel]]) -> None:
 def _add_model(model: type[BaseModel], seen: set[type[BaseModel]]) -> None:
     if model in seen:
         return
+    # Delete tools also return MCP SDK protocol types (`InputRequiredResult`); those
+    # fields are not ours to describe, and FastMCP publishes `output_schema` from our models.
+    if not model.__module__.startswith("backstop_mcp"):
+        return
     seen.add(model)
     for field in model.model_fields.values():
         _collect_models(field.annotation, seen)
@@ -87,6 +91,7 @@ def test_the_walker_reaches_nested_payload_models() -> None:
         "CustomFieldGroupMemberResponse",
         "CustomFieldGroupParentResponse",
         "CustomFieldGroupResponse",
+        "DeletionNeedsConfirmationResponse",
         "EmailRecordResponse",
         "EmploymentLinkResponse",
         "OpportunityResponse",
@@ -107,6 +112,7 @@ def test_the_walker_reaches_nested_payload_models() -> None:
         "ResolvedCustomFieldValueResponse",
         "ResolvedPartyResponse",
     } <= names
+    assert "InputRequiredResult" not in names
 
 
 def test_every_tool_response_field_is_described() -> None:

@@ -96,10 +96,7 @@ class UpdateOrganizationCommand:
         relationships = omit_none_values(
             organization_relationships(new_organization_fields, owner=owner, omit_empty=False)
         )
-        # A to-many PATCH appends; `data: []` is the only clear. The replacement ids
-        # cannot go on this first PATCH — they would be added to the existing list.
-        # Clear here, then a second PATCH appends the new members when the list is
-        # non-empty.
+        # A to-many PATCH appends; `data: []` clears, then a second PATCH adds replacements.
         if new_organization_fields.replace_category_ids is not None:
             relationships["categories"] = relationship_data("contact-categories", ())
         if not attributes and not relationships:
@@ -115,9 +112,6 @@ class UpdateOrganizationCommand:
                 relationships=relationships or None,
             ),
         )
-        # Replacement members cannot go on the first PATCH: a to-many write
-        # appends, so they would sit on top of the uncleared list. This request
-        # runs only after `data: []` has cleared `categories`.
         if new_organization_fields.replace_category_ids:
             await self._client.patch(
                 path,

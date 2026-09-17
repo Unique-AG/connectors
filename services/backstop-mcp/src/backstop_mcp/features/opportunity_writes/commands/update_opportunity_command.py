@@ -134,9 +134,7 @@ class UpdateOpportunityCommand:
                 omit_empty=False,
             )
         )
-        # A to-many PATCH appends; `data: []` is the only clear. Replacing the notify
-        # list is therefore this PATCH (clear, plus any other fields) and, when the
-        # replacement is non-empty, a second PATCH that appends the new members.
+        # A to-many PATCH appends; `data: []` clears, then a second PATCH adds replacements.
         if replace_notify is not None:
             relationships["ccedUsers"] = relationship_data("system-users", ())
 

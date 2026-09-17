@@ -10,7 +10,6 @@ be needed.
 
 from backstop_mcp.features.elicitation_utils.elicit_entity_deletion import (
     CONFIRM_FIELD_DESCRIPTION,
-    CONFIRM_RETRY_MESSAGE,
     DELETE,
     DELETION_INPUT_KEY,
     DELETION_NOT_CONFIRMED,
@@ -18,8 +17,11 @@ from backstop_mcp.features.elicitation_utils.elicit_entity_deletion import (
     REFUSE_BULK_DELETE,
     DeletionChoice,
     DeletionElicitResult,
-    DeletionNeedsConfirmationResponse,
     elicit_entity_deletion,
+)
+from backstop_mcp.features.elicitation_utils.responses import (
+    CONFIRM_RETRY_MESSAGE,
+    DeletionNeedsConfirmationResponse,
 )
 
 __all__ = [

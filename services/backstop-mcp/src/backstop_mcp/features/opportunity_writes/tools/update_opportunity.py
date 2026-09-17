@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
     annotations=ToolAnnotations(
         read_only_hint=False,
         destructive_hint=True,
-        idempotent_hint=True,
+        idempotent_hint=False,
         open_world_hint=False,
     ),
     output_schema=published_output_schema(UpdatedOpportunityResponse),
