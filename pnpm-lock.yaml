@@ -194,8 +194,8 @@ catalogs:
       specifier: 5.0.0
       version: 5.0.0
     zod:
-      specifier: 4.5.4
-      version: 4.5.4
+      specifier: 4.6.5
+      version: 4.6.5
 
 overrides:
   esbuild: 0.28.2
@@ -237,7 +237,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
     devDependencies:
       '@nestjs/common':
         specifier: 'catalog:'
@@ -298,7 +298,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
     devDependencies:
       '@opentelemetry/instrumentation-pg':
         specifier: 'catalog:'
@@ -354,7 +354,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
-        version: 1.30.0(zod@4.5.4)
+        version: 1.30.0(zod@4.6.5)
       '@nestjs/schedule':
         specifier: 'catalog:'
         version: 6.1.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
@@ -366,7 +366,7 @@ importers:
         version: 6.0.0
       nestjs-zod:
         specifier: 'catalog:'
-        version: 5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.5.4)
+        version: 5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.6.5)
       reflect-metadata:
         specifier: 'catalog:'
         version: 0.2.2
@@ -378,7 +378,7 @@ importers:
         version: 1.2.0
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
     devDependencies:
       '@nestjs/common':
         specifier: 'catalog:'
@@ -451,13 +451,13 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
-        version: 1.30.0(zod@4.5.4)
+        version: 1.30.0(zod@4.6.5)
       path-to-regexp:
         specifier: 8.4.2
         version: 8.4.2
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
     devDependencies:
       '@nestjs/common':
         specifier: 'catalog:'
@@ -497,7 +497,7 @@ importers:
     dependencies:
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.5.4)
+        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.5)
       '@unique-ag/utils':
         specifier: workspace:*
         version: link:../utils
@@ -537,13 +537,13 @@ importers:
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.5.0)(@vitest/coverage-istanbul@5.0.0)(@vitest/coverage-v8@5.0.0)(vite@7.3.6(@types/node@26.5.0)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
 
   packages/unique-api:
     dependencies:
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.5.4)
+        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.5)
       '@unique-ag/utils':
         specifier: workspace:*
         version: link:../utils
@@ -564,7 +564,7 @@ importers:
         version: 8.10.2
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
     devDependencies:
       '@nestjs/common':
         specifier: 'catalog:'
@@ -623,7 +623,7 @@ importers:
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.5.0)(@vitest/coverage-istanbul@5.0.0)(@vitest/coverage-v8@5.0.0)(vite@7.3.6(@types/node@26.5.0)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
 
   services/confluence-connector:
     dependencies:
@@ -653,7 +653,7 @@ importers:
         version: 1.9.1
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.5.4)
+        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.5)
       '@unique-ag/instrumentation':
         specifier: workspace:*
         version: link:../../packages/instrumentation
@@ -713,7 +713,7 @@ importers:
         version: 8.10.2
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
     devDependencies:
       '@golevelup/ts-vitest':
         specifier: 4.0.0
@@ -795,7 +795,7 @@ importers:
         version: 1.9.1
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.5.4)
+        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.5)
       '@unique-ag/instrumentation':
         specifier: workspace:*
         version: link:../../packages/instrumentation
@@ -819,7 +819,7 @@ importers:
         version: 5.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(pino-http@11.0.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
         specifier: 'catalog:'
-        version: 5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.5.4)
+        version: 5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.6.5)
       pino:
         specifier: 'catalog:'
         version: 10.3.1
@@ -843,7 +843,7 @@ importers:
         version: 8.10.2
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
     devDependencies:
       '@nestjs/cli':
         specifier: 'catalog:'
@@ -907,7 +907,7 @@ importers:
         version: 3.0.7
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
-        version: 1.30.0(zod@4.5.4)
+        version: 1.30.0(zod@4.6.5)
       '@nestjs/cache-manager':
         specifier: 'catalog:'
         version: 3.1.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(cache-manager@7.2.9)(keyv@5.6.0)(rxjs@7.8.2)
@@ -940,7 +940,7 @@ importers:
         version: 0.74.0(@opentelemetry/api@1.9.1)
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.5.4)
+        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.5)
       '@unique-ag/aes-gcm-encryption':
         specifier: workspace:*
         version: link:../../packages/aes-gcm-encryption
@@ -1006,7 +1006,7 @@ importers:
         version: 5.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(pino-http@11.0.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
         specifier: 'catalog:'
-        version: 5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.5.4)
+        version: 5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.6.5)
       p-limit:
         specifier: 'catalog:'
         version: 7.3.2
@@ -1051,7 +1051,7 @@ importers:
         version: 5.1.0
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
     devDependencies:
       '@nestjs/cli':
         specifier: 'catalog:'
@@ -1157,7 +1157,7 @@ importers:
         version: 1.9.1
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.5.4)
+        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.5)
       '@unique-ag/instrumentation':
         specifier: workspace:*
         version: link:../../packages/instrumentation
@@ -1214,7 +1214,7 @@ importers:
         version: 8.10.2
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
     devDependencies:
       '@microsoft/microsoft-graph-types':
         specifier: 2.43.1
@@ -1281,7 +1281,7 @@ importers:
         version: 3.0.7
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
-        version: 1.30.0(zod@4.5.4)
+        version: 1.30.0(zod@4.6.5)
       '@nestjs/cache-manager':
         specifier: 'catalog:'
         version: 3.1.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(cache-manager@7.2.9)(keyv@5.6.0)(rxjs@7.8.2)
@@ -1311,7 +1311,7 @@ importers:
         version: 0.74.0(@opentelemetry/api@1.9.1)
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.5.4)
+        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.5)
       '@qfetch/qfetch':
         specifier: 0.1.0
         version: 0.1.0(@proventuslabs/retry-strategies@0.1.2)
@@ -1353,7 +1353,7 @@ importers:
         version: 5.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(pino-http@11.0.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
         specifier: 'catalog:'
-        version: 5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.5.4)
+        version: 5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.6.5)
       p-limit:
         specifier: 'catalog:'
         version: 7.3.2
@@ -1386,7 +1386,7 @@ importers:
         version: 1.2.0
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
     devDependencies:
       '@nestjs/cli':
         specifier: 'catalog:'
@@ -1477,7 +1477,7 @@ importers:
         version: 1.9.1
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.5.4)
+        version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.5)
       '@unique-ag/instrumentation':
         specifier: workspace:*
         version: link:../../packages/instrumentation
@@ -1501,7 +1501,7 @@ importers:
         version: 5.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(pino-http@11.0.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
         specifier: 'catalog:'
-        version: 5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.5.4)
+        version: 5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.6.5)
       pino:
         specifier: 'catalog:'
         version: 10.3.1
@@ -1525,7 +1525,7 @@ importers:
         version: 8.10.2
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.5
     devDependencies:
       '@nestjs/cli':
         specifier: 'catalog:'
@@ -6220,8 +6220,8 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
-  zod@4.5.4:
-    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
+  zod@4.6.5:
+    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
 
 snapshots:
 
@@ -6753,7 +6753,7 @@ snapshots:
 
   '@microsoft/tsdoc@0.16.0': {}
 
-  '@modelcontextprotocol/sdk@1.30.0(zod@4.5.4)':
+  '@modelcontextprotocol/sdk@1.30.0(zod@4.6.5)':
     dependencies:
       '@hono/node-server': 2.1.1(hono@4.13.7)
       ajv: 8.20.0
@@ -6770,8 +6770,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.5.4
-      zod-to-json-schema: 3.25.2(zod@4.5.4)
+      zod: 4.6.5
+      zod-to-json-schema: 3.25.2(zod@4.6.5)
     transitivePeerDependencies:
       - supports-color
 
@@ -7757,12 +7757,12 @@ snapshots:
 
   '@protobufjs/utf8@1.1.2': {}
 
-  '@proventuslabs/nestjs-zod@2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.5.4)':
+  '@proventuslabs/nestjs-zod@2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.5)':
     dependencies:
       '@nestjs/common': 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/config': 4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
       lodash: 4.18.1
-      zod: 4.5.4
+      zod: 4.6.5
 
   '@proventuslabs/retry-strategies@0.1.2': {}
 
@@ -9708,12 +9708,12 @@ snapshots:
       pino-http: 11.0.0
       rxjs: 7.8.2
 
-  nestjs-zod@5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.5.4):
+  nestjs-zod@5.5.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.6.5):
     dependencies:
       '@nestjs/common': 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       deepmerge: 4.3.1
       rxjs: 7.8.2
-      zod: 4.5.4
+      zod: 4.6.5
     optionalDependencies:
       '@nestjs/swagger': 11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)
 
@@ -10815,8 +10815,8 @@ snapshots:
 
   yoctocolors@2.2.0: {}
 
-  zod-to-json-schema@3.25.2(zod@4.5.4):
+  zod-to-json-schema@3.25.2(zod@4.6.5):
     dependencies:
-      zod: 4.5.4
+      zod: 4.6.5
 
-  zod@4.5.4: {}
+  zod@4.6.5: {}

@@ -6,16 +6,13 @@ const uniqueApiRootModuleOptionsSchema = z.object({
     .object({
       loggerContext: z
         .string()
-        .optional()
         .prefault(`UniqueApi`)
         .describe(`The logger context which will be present in package logs`),
       metricPrefix: z
         .string()
-        .optional()
         .prefault(`unique_api`)
         .describe(`The metrics prefix which will be present in all the metrics`),
     })
-    .optional()
     .prefault({
       loggerContext: `UniqueApi`,
       metricPrefix: `unique_api`,
