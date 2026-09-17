@@ -16,7 +16,7 @@ from tests.features.reports.conftest import make_run_report_query
 from tests.helpers import BASE_URL, recorded_params, tool_client
 from tests.server.tools.helpers import tool_model, tool_payload
 
-_REPORT_NAME = "2026 DRF Australia Registrants"
+_REPORT_NAME = "Quarterly Registrants"
 _AS_OF = date(2026, 8, 31)
 
 
@@ -63,7 +63,7 @@ class TestRunReportTool:
         base_url = tenant("rr-page")
         route = respx.get(f"{base_url}/reports").mock(
             return_value=_page(
-                {"Email": "bruce@btiadvisory.com", "Company Name": "BTI Advisory"},
+                {"Email": "first@example.com", "Company Name": "Example Advisory"},
             )
         )
 
@@ -92,7 +92,7 @@ class TestRunReportTool:
                 {"name": "Email", "title": "Email"},
                 {"name": "Company Name", "title": "Company Name"},
             ],
-            "rows": [{"Email": "bruce@btiadvisory.com", "Company Name": "BTI Advisory"}],
+            "rows": [{"Email": "first@example.com", "Company Name": "Example Advisory"}],
             "row_count": 1,
             "total": 15,
             "offset": 0,

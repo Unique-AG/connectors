@@ -298,3 +298,20 @@ ACTIVITY_SEARCH_BEAN_TOOLS: Final[dict[str, ActivitySearchBeanLookup]] = {
 }
 
 assert set(PAGE_SPECS) == set(BackstopUiPage)
+
+# The builder emits only the params named in `query_param_order`, so anything a spec carries
+# but leaves out of that tuple would vanish from the URL without failing a test.
+for _page, _spec in PAGE_SPECS.items():
+    if not _spec.buildable or _page == BackstopUiPage.ACTIVITY:
+        continue
+    _emitted = {name for name, _value in _spec.extra_query}
+    if _spec.uses_display:
+        _emitted.add("display")
+    if _spec.id_param is not None:
+        _emitted.add(_spec.id_param)
+    if _spec.tab_param is not None:
+        _emitted.add(_spec.tab_param)
+    assert _emitted <= set(_spec.query_param_order), (
+        f"{_page} emits {_emitted - set(_spec.query_param_order)} "
+        "but query_param_order would drop them"
+    )

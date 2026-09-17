@@ -99,6 +99,30 @@ class TestBuildBackstopLinks:
         assert "viewType" not in query_params(result.links[0].url)
 
     @pytest.mark.asyncio
+    async def test_reports_a_tab_this_page_does_not_have(self) -> None:
+        # Tab vocabulary is per-page: an opportunity has `activity`, not the party `activities`.
+        result = await build_backstop_links(
+            target=OpportunityLinkTarget(entity_id="5755163"),
+            tabs=("activities", "tasks"),
+            build_entity_link_util=BuildEntityLinkUtil(ui_base_url=UI_BASE),
+        )
+        assert isinstance(result, BackstopLinksResponse)
+        assert [link.label for link in result.links] == ["Tasks"]
+        assert result.unrecognized_tabs == ["activities"]
+
+    @pytest.mark.asyncio
+    async def test_product_summary_tab_is_recognized_as_omission(self) -> None:
+        result = await build_backstop_links(
+            target=ProductLinkTarget(entity_id="123456789"),
+            tabs=("summary",),
+            build_entity_link_util=BuildEntityLinkUtil(ui_base_url=UI_BASE),
+        )
+        assert isinstance(result, BackstopLinksResponse)
+        assert result.unrecognized_tabs == []
+        assert [link.label for link in result.links] == ["Summary"]
+        assert "viewType" not in query_params(result.links[0].url)
+
+    @pytest.mark.asyncio
     async def test_unset_ui_base_url_is_not_configured(self) -> None:
         result = await build_backstop_links(
             target=OrganizationLinkTarget(party_id="341764767"),

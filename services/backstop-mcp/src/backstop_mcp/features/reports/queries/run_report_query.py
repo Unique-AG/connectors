@@ -58,6 +58,10 @@ class RunReportQuery:
             )
             columns: tuple[ReportColumnResponse, ...] = ()
             rows: list[dict[str, object]] = []
+            # Backstop's offset counts the values it sent, not the ones we could read, so
+            # paging must advance by `consumed`. Advancing by len(rows) would re-request
+            # every dropped value's slot and duplicate rows for the rest of the report.
+            consumed = 0
             for report in page.items:
                 result = report.attributes.result
                 if result is None:
@@ -65,6 +69,7 @@ class RunReportQuery:
                 if not columns:
                     columns = self._columns(result.header)
                 for value in result.values:
+                    consumed += 1
                     row = self._row(value)
                     if row is None:
                         logger.warning("reports.row.unreadable", extra={"report_name": report_name})
@@ -73,8 +78,8 @@ class RunReportQuery:
             total = page.total_count
             row_count = len(rows)
             next_offset = (
-                offset + row_count
-                if total is not None and row_count > 0 and offset + row_count < total
+                offset + consumed
+                if total is not None and consumed > 0 and offset + consumed < total
                 else None
             )
             fetched = RunReportResponse(

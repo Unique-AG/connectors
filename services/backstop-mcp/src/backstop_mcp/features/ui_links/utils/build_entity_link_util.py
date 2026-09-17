@@ -56,7 +56,10 @@ class BuildEntityLinkUtil:
         )
         if layout_link is not None:
             links = [*links, layout_link]
-        return BackstopLinksResponse(links=links)
+        return BackstopLinksResponse(
+            links=links,
+            unrecognized_tabs=self._unrecognized_tabs(spec=spec, tabs=tabs),
+        )
 
     def canonical_url(self, *, target: BackstopLinkTarget) -> str | None:
         """The no-tab 'open this record' URL, or None when this deployment has no UI origin."""
@@ -72,6 +75,19 @@ class BuildEntityLinkUtil:
             activity_slug=resolved.activity_slug,
             tab=None,
         )
+
+    def _unrecognized_tabs(self, *, spec: UiPageSpec, tabs: Sequence[str] | None) -> list[str]:
+        """Requested tabs this page has no URL for, so the caller is not left guessing.
+
+        `summary` on a summary-by-omission page is recognized — it becomes the canonical URL.
+        """
+        if tabs is None:
+            return []
+        return [
+            tab
+            for tab in tabs
+            if tab not in spec.tabs and not (spec.summary_by_omission and tab == "summary")
+        ]
 
     def _tab_links(
         self,
@@ -131,13 +147,14 @@ class BuildEntityLinkUtil:
         if not spec.supports_layout or not layout_name or not view_entity_type:
             return None
         assert self._ui_base_url is not None
-        query = [
-            ("display", ""),
-            ("viewEntityType", view_entity_type),
-            ("entityId", entity_id),
-            ("layoutName", layout_name),
-        ]
-        assert [name for name, _value in query] == list(LAYOUT_QUERY_ORDER)
+        values = {
+            "display": "",
+            "viewEntityType": view_entity_type,
+            "entityId": entity_id,
+            "layoutName": layout_name,
+        }
+        assert set(values) == set(LAYOUT_QUERY_ORDER)
+        query = [(name, values[name]) for name in LAYOUT_QUERY_ORDER]
         return BackstopLinkResponse(
             label=layout_name,
             url=self._join(spec.template.format(ui_base=self._ui_base_url), query),

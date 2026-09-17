@@ -26,6 +26,15 @@ class BackstopLinksResponse(BaseModel):
     links: list[BackstopLinkResponse] = Field(
         description="Labeled URLs for the requested tabs and optional layout."
     )
+    unrecognized_tabs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Requested tab names this page does not have, so no URL was built for them. "
+            "Tab vocabulary is per-page (an opportunity has `activity`/`tasks`, a party has "
+            "`activities`/`task`). Do not retry with an invented name; omit `tabs` to see "
+            "every tab this page allows."
+        ),
+    )
 
 
 class UiBaseUrlNotConfiguredResponse(BaseModel):

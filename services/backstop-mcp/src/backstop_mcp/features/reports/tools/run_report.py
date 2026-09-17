@@ -118,6 +118,9 @@ async def run_report(
                 offset=offset,
             )
         except BackstopApiError as exc:
+            # An unknown report name is a 400 whose detail reads "... not found", not a 404.
+            # That wording is what the live instance returns; if Backstop rephrases it this
+            # stops matching and the error surfaces raw instead of as NotFoundResponse.
             if exc.status_code == HTTPStatus.BAD_REQUEST and "not found" in exc.detail.lower():
                 return NotFoundResponse(query=report_name, scope="reports")
             raise

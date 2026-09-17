@@ -11,7 +11,7 @@ from backstop_mcp.features.reports import RunReportResponse
 from tests.features.reports.conftest import make_run_report_query
 from tests.helpers import BASE_URL, recorded_params
 
-_REPORT_NAME = "2026 DRF Australia Registrants"
+_REPORT_NAME = "Quarterly Registrants"
 _AS_OF = date(2026, 8, 31)
 _REPORTS_URL = f"{BASE_URL}/reports"
 
@@ -85,12 +85,12 @@ class TestRunReportQuery:
         route = respx.get(_REPORTS_URL).mock(
             return_value=_report_page(
                 {
-                    "Email": "bruce@btiadvisory.com",
-                    "Company Name": "BTI Advisory",
+                    "Email": "first@example.com",
+                    "Company Name": "Example Advisory",
                 },
                 {
-                    "Email": "jessie.wu@cbussuper.com.au",
-                    "Company Name": "CBUS",
+                    "Email": "second@example.com",
+                    "Company Name": "Example Super",
                 },
             )
         )
@@ -113,8 +113,8 @@ class TestRunReportQuery:
             ("Company Name", "Company Name"),
         ]
         assert result.rows == (
-            {"Email": "bruce@btiadvisory.com", "Company Name": "BTI Advisory"},
-            {"Email": "jessie.wu@cbussuper.com.au", "Company Name": "CBUS"},
+            {"Email": "first@example.com", "Company Name": "Example Advisory"},
+            {"Email": "second@example.com", "Company Name": "Example Super"},
         )
         assert result.row_count == 2
         assert result.total == 15
@@ -165,6 +165,26 @@ class TestRunReportQuery:
 
         assert result.row_count == 1
         assert result.rows == ({"Email": "ok@example.com", "Company Name": "Ok"},)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_next_offset_counts_dropped_values_so_paging_does_not_repeat(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_REPORTS_URL).mock(
+            return_value=_report_page(
+                {"Email": "ok@example.com"},
+                extra_values=["not-a-row"],
+                total=15,
+            )
+        )
+
+        result = await _run(client, limit=2, offset=0)
+
+        # Backstop sent two values and we kept one; the next page starts after both, not
+        # after the single readable row, which would re-request the dropped value's slot.
+        assert result.row_count == 1
+        assert result.next_offset == 2
 
     @pytest.mark.asyncio
     @respx.mock

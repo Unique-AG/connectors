@@ -391,9 +391,13 @@ class BackstopConfig(BaseSettings):
     def effective_ui_base_url(self) -> str | None:
         """CRM UI origin to join `/backstop/...` onto, or None when this deploy has none.
 
-        An explicit `ui_base_url` always wins. Otherwise, a `base_url` whose host is not the
-        shared API host (`api.backstopsolutions.com`) *is* the tenant CRM host and is used as
-        the default. The shared API host is never rewritten into a UI host.
+        An explicit `ui_base_url` always wins. Otherwise a `base_url` whose host is not the
+        shared API host (`api.backstopsolutions.com`) is *assumed* to be the tenant CRM host,
+        because that is how a tenant-hosted deployment is configured and one deployment serves
+        one tenant. The assumption is deliberately broad: any other gateway host (a regional or
+        staging API endpoint) would also be treated as a UI origin and would emit links that do
+        not load. Set `BACKSTOP_UI_BASE_URL` explicitly on any deployment that is not
+        tenant-hosted. The shared API host is never rewritten into a UI host.
         """
         if self.ui_base_url is not None:
             return self.ui_base_url
