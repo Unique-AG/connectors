@@ -372,7 +372,11 @@ def relationship_to_one(
 
 
 def relationship_to_one(resource_type: str, resource_id: str | None) -> dict[str, object] | None:
-    """A to-one JSON:API relationship, or `None` to omit the key."""
+    """A to-one JSON:API relationship, or `None` so callers can `omit_none_values`.
+
+    Optional ids (`company_id`, `product_id`, …) are `str | None`. The overloads
+    narrow a missing id to `None` and a present id to the payload.
+    """
     if resource_id is None:
         return None
     return {"data": {"type": resource_type, "id": resource_id}}
