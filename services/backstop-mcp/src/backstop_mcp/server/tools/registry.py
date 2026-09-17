@@ -52,6 +52,7 @@ from backstop_mcp.features.org_people_writes.tools.delete_person import delete_p
 from backstop_mcp.features.org_people_writes.tools.end_employment import end_employment
 from backstop_mcp.features.org_people_writes.tools.update_organization import update_organization
 from backstop_mcp.features.org_people_writes.tools.update_person import update_person
+from backstop_mcp.features.reports.tools.run_report import run_report
 from backstop_mcp.features.system_users.tools.list_system_users import list_system_users
 from backstop_mcp.features.tasks.tools.get_tasks_for_party import get_tasks_for_party
 from backstop_mcp.features.ui_links.tools.build_backstop_links import build_backstop_links
@@ -100,4 +101,5 @@ TOOLS: tuple[ToolFunction, ...] = (
     end_employment,
     build_backstop_links,
     parse_backstop_link,
+    run_report,
 )
