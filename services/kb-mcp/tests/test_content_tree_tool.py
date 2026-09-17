@@ -115,6 +115,12 @@ def _make_mock_tree(*, snapshot: FakeSnapshot | None = None):
     return tree
 
 
+def _walk_filter(mock_tree):
+    """The admin half rides in the walk; `applied_filter` sees the LLM half."""
+    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
+    return kwargs["metadata_filter"]
+
+
 @pytest.fixture
 def applied_filter():
     """Records the merged filter, which now lands on the snapshot rather than
@@ -539,7 +545,8 @@ async def test_default_metadata_filter_excludes_user_memory_folder(applied_filte
             config=ContentTreeToolConfig(),
         )
 
-    assert applied_filter[-1] == expected_filter
+    assert _walk_filter(mock_tree) == expected_filter
+    assert applied_filter[-1] is None
 
 
 @pytest.mark.asyncio
@@ -557,21 +564,23 @@ async def test_admin_configured_metadata_filter_flows_through_to_service_calls(
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-tree")
         await content_tree(mode="tree", config=config)
-    assert applied_filter[-1] == custom_filter
+    assert _walk_filter(mock_tree) == custom_filter
 
     mock_tree = _make_mock_tree()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-list")
         await content_tree(mode="list", config=config)
-    assert applied_filter[-1] == custom_filter
+    assert _walk_filter(mock_tree) == custom_filter
 
     mock_tree = _make_mock_tree()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-search")
         await content_tree(mode="search", query="a.pdf", config=config)
-    assert applied_filter[-1] == custom_filter
+    assert _walk_filter(mock_tree) == custom_filter
+    # Must match the walk's filter exactly, or the fuzzy search resolves a
+    # second cache entry and silently pays for another whole walk.
     _, fuzzy_kwargs = mock_tree.search_visible_files_fuzzy_async.call_args
-    assert fuzzy_kwargs.get("metadata_filter") is None
+    assert fuzzy_kwargs["metadata_filter"] == _walk_filter(mock_tree)
 
 
 _DEFAULT_CONTENT_TREE_FILTER = {
@@ -592,7 +601,8 @@ async def test_llm_metadata_filter_ands_default_admin_filter(applied_filter):
             config=ContentTreeToolConfig(),
         )
 
-    assert applied_filter[-1] == {"and": [expected_llm, _DEFAULT_CONTENT_TREE_FILTER]}
+    assert _walk_filter(mock_tree) == _DEFAULT_CONTENT_TREE_FILTER
+    assert applied_filter[-1] == expected_llm
 
 
 @pytest.mark.asyncio
@@ -608,7 +618,8 @@ async def test_llm_metadata_filter_ands_admin_configured_filter(applied_filter):
             config=config,
         )
 
-    assert applied_filter[-1] == {"and": [expected_llm, custom_filter]}
+    assert _walk_filter(mock_tree) == custom_filter
+    assert applied_filter[-1] == expected_llm
 
 
 @pytest.mark.asyncio

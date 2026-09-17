@@ -76,6 +76,12 @@ def _make_mock_tree(*, snapshot: FakeSnapshot | None = None):
     return tree
 
 
+def _walk_filter(mock_tree):
+    """content_metadata has no LLM filter, so its whole filter rides in the walk."""
+    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
+    return kwargs["metadata_filter"]
+
+
 @pytest.fixture
 def applied_filter():
     """Records the merged filter, which now lands on the snapshot rather than
@@ -291,7 +297,7 @@ async def test_no_folder_ids_uses_the_admin_default_filter_unscoped(applied_filt
     ):
         await content_metadata(config=ContentMetadataToolConfig())
 
-    assert applied_filter[-1] == _DEFAULT_ADMIN_FILTER
+    assert _walk_filter(mock_tree) == _DEFAULT_ADMIN_FILTER
 
 
 @pytest.mark.asyncio
@@ -312,7 +318,7 @@ async def test_single_folder_id_with_subfolders_uses_scoped_walk(applied_filter)
     mock_cls.assert_called_once_with(
         company_id="company-1", user_id="user-1", root_scope_ids=("scope_a",)
     )
-    assert applied_filter[-1] == _DEFAULT_ADMIN_FILTER
+    assert _walk_filter(mock_tree) == _DEFAULT_ADMIN_FILTER
 
 
 @pytest.mark.asyncio
@@ -334,7 +340,7 @@ async def test_multiple_folder_ids_all_use_scoped_walk(applied_filter):
         user_id="user-1",
         root_scope_ids=("scope_a", "scope_b"),
     )
-    assert applied_filter[-1] == _DEFAULT_ADMIN_FILTER
+    assert _walk_filter(mock_tree) == _DEFAULT_ADMIN_FILTER
 
 
 @pytest.mark.asyncio
@@ -405,7 +411,7 @@ async def test_folder_path_resolves_to_scope_id_and_uses_scoped_walk(applied_fil
     mock_cls.assert_called_once_with(
         company_id="company-1", user_id="user-1", root_scope_ids=("scope_resolved",)
     )
-    assert applied_filter[-1] == _DEFAULT_ADMIN_FILTER
+    assert _walk_filter(mock_tree) == _DEFAULT_ADMIN_FILTER
 
 
 @pytest.mark.asyncio
@@ -515,7 +521,7 @@ async def test_without_subfolders_needs_no_folder_clause_in_the_filter(applied_f
             config=ContentMetadataToolConfig(),
         )
 
-    assert "['folderId']" not in str(applied_filter[-1])
+    assert "['folderId']" not in str(_walk_filter(mock_tree))
 
 
 @pytest.mark.asyncio
@@ -530,7 +536,7 @@ async def test_admin_configured_metadata_filter_is_the_base_for_folder_scoping(
     ):
         await content_metadata(config=config)
 
-    assert applied_filter[-1] == custom_filter
+    assert _walk_filter(mock_tree) == custom_filter
 
 
 @pytest.mark.asyncio

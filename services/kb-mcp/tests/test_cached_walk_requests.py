@@ -134,3 +134,22 @@ async def test_a_second_folder_does_walk_again(requests):
     await _list(_PDF_ONLY, "Archive")
 
     assert requests.total() > after_first
+
+
+async def test_search_resolves_the_same_walk_as_list(requests):
+    """The fuzzy search resolves the walk itself, so it must pass the same
+    admin filter — a mismatch silently costs a second whole walk."""
+    await _list(None, "Docs")
+    after_list = requests.total()
+
+    result = await content_tree(
+        mode="search",
+        folder_path="Docs",
+        query="report",
+        config=ContentTreeToolConfig(),
+    )
+
+    assert result.is_error is not True, result.content[0].text  # type: ignore[union-attr]
+    assert requests.total() == after_list, (
+        "search walked again; its metadata_filter differs from the list walk's"
+    )

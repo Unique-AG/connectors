@@ -493,12 +493,16 @@ async def content_tree(
         if refresh:
             tree_svc.invalidate_cache()
 
-        resolved_metadata_filter = merge_request_metadata_filter(
+        # Only the LLM's half varies, so only it stays out of the walk's
+        # cache key. The two AND together exactly as the merged filter did.
+        admin_metadata_filter = merge_request_metadata_filter(
             admin_metadata_filter=config.metadata_filter
             or DEFAULT_METADATA_FILTER_STATEMENT,
-            llm_metadata_filter=parsed_llm_filter,
         )
-        assert resolved_metadata_filter is not None
+        llm_only_metadata_filter = merge_request_metadata_filter(
+            admin_metadata_filter=None, llm_metadata_filter=parsed_llm_filter
+        )
+        assert admin_metadata_filter is not None
         wait = clamped_content_tree_timeout(timeout, kb_settings)
         # Walk one level past max_depth — otherwise a folder exactly at the
         # cutoff never gets its own contents visited and stays id-less.
@@ -508,7 +512,8 @@ async def content_tree(
 
         snapshot = await resolve_filtered_snapshot(
             tree_svc,
-            metadata_filter=resolved_metadata_filter,
+            walk_filter=admin_metadata_filter,
+            post_filter=llm_only_metadata_filter,
             max_depth=walk_depth,
             timeout=wait,
             max_concurrent_directory_listings=config.max_concurrent_scope_lookups,
@@ -594,15 +599,16 @@ async def content_tree(
             else config.default_case_sensitive
         )
         if snapshot.complete and not fallback_filtered:
-            # Score against the unfiltered walk every filter shares, uncapped,
-            # then apply the filter to the hits and cap after.
-            keep = uniqueql_predicate(resolved_metadata_filter)
+            # Must pass the walk's filter, or this resolves a second cache
+            # entry and silently pays for another whole walk.
+            keep = uniqueql_predicate(llm_only_metadata_filter)
             scored = await tree_svc.search_visible_files_fuzzy_async(
                 query,
                 limit=sys.maxsize,
                 min_score=effective_min_score,
                 match_on=effective_match_on,
                 case_sensitive=effective_case_sensitive,
+                metadata_filter=admin_metadata_filter,
                 max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
             )
             matches = [m for m in scored if keep(m.content_info)][:effective_limit]

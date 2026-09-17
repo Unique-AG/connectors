@@ -56,19 +56,20 @@ def test_no_filter_returns_the_snapshot_untouched():
 
 
 @pytest.mark.asyncio
-async def test_distinct_filters_share_one_unfiltered_walk():
-    """The whole point: the filter never reaches the walk, so it never
-    reaches the walk's cache key either."""
+async def test_distinct_post_filters_share_one_walk():
+    """The whole point: a varying filter never reaches the walk's cache key."""
     tree = MagicMock()
     tree.metadata_filter = None
     tree.resolve_visible_file_paths_via_folders_async = AsyncMock(
         return_value=_snapshot()
     )
+    admin = {"operator": "equals", "path": ["ownerId"], "value": "scope_a"}
 
-    async def _resolve(metadata_filter: dict[str, Any] | None) -> list[str]:
+    async def _resolve(post_filter: dict[str, Any] | None) -> list[str]:
         snapshot = await resolve_filtered_snapshot(
             tree,
-            metadata_filter=metadata_filter,
+            walk_filter=admin,
+            post_filter=post_filter,
             max_depth=None,
             timeout=None,
             max_concurrent_directory_listings=25,
@@ -80,5 +81,8 @@ async def test_distinct_filters_share_one_unfiltered_walk():
         {"operator": "equals", "path": ["mimeType"], "value": "text/plain"}
     ) == ["c_txt"]
 
-    for call in tree.resolve_visible_file_paths_via_folders_async.call_args_list:
-        assert "metadata_filter" not in call.kwargs
+    keys = {
+        call.kwargs["metadata_filter"]["value"]
+        for call in tree.resolve_visible_file_paths_via_folders_async.call_args_list
+    }
+    assert keys == {"scope_a"}, "a post filter leaked into the walk's cache key"

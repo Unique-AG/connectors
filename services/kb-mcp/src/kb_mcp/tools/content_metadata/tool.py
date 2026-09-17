@@ -257,9 +257,12 @@ async def content_metadata(
             or DEFAULT_METADATA_FILTER_STATEMENT,
         )
         wait = _clamped_timeout(timeout)
+        # All admin here — no LLM filter reaches this tool — so the whole thing
+        # rides in the walk and nothing is filtered in memory.
         snapshot = await resolve_filtered_snapshot(
             tree_svc,
-            metadata_filter=metadata_filter,
+            walk_filter=metadata_filter,
+            post_filter=None,
             max_depth=walk_depth if use_scoped_walk else None,
             timeout=wait,
             max_concurrent_directory_listings=config.max_concurrent_scope_lookups,

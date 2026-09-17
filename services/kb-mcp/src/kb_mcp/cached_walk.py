@@ -34,7 +34,11 @@ def uniqueql_predicate(
 def filter_snapshot(
     snapshot: FolderWalkSnapshot, metadata_filter: dict[str, Any] | None
 ) -> FolderWalkSnapshot:
-    """Drop files not matching ``metadata_filter``. Folders are never filtered."""
+    """Drop files not matching ``metadata_filter``. Folders are never filtered.
+
+    With no filter this is the cached snapshot itself, so callers must not
+    mutate what they get back.
+    """
     if not metadata_filter:
         return snapshot
     keep = uniqueql_predicate(metadata_filter)
@@ -48,22 +52,24 @@ def filter_snapshot(
 async def resolve_filtered_snapshot(
     tree_svc: ContentTree,
     *,
-    metadata_filter: dict[str, Any] | None,
+    walk_filter: dict[str, Any] | None,
+    post_filter: dict[str, Any] | None,
     max_depth: int | None,
     timeout: float | None,
     max_concurrent_directory_listings: int,
 ) -> FolderWalkSnapshot:
-    """Walk unfiltered, then apply ``metadata_filter`` to the cached snapshot.
+    """Split the filter by who varies it, since the walk cache is keyed by it.
 
-    The backend rejects ``parentId`` with ``metadataFilter``, so the walk costs
-    the same requests either way; keying its cache by filter just buys re-walks.
+    A constant ``walk_filter`` costs nothing there and is cached; a varying
+    ``post_filter`` would fragment the key, so it is applied in memory.
     """
     assert tree_svc.metadata_filter is None, (
         "tree must be unfiltered, or its filter is applied twice"
     )
     snapshot = await tree_svc.resolve_visible_file_paths_via_folders_async(
+        metadata_filter=walk_filter,
         max_depth=max_depth,
         timeout=timeout,
         max_concurrent_directory_listings=max_concurrent_directory_listings,
     )
-    return filter_snapshot(snapshot, metadata_filter)
+    return filter_snapshot(snapshot, post_filter)
