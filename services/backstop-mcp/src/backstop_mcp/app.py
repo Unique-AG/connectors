@@ -2,9 +2,7 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-import fastmcp
 from fastmcp import FastMCP
-from fastmcp.server.http import create_sse_app
 from mcp.server.transport_security import (
     DEFAULT_MAX_REQUEST_BODY_SIZE,
     RequestBodyLimitMiddleware,
@@ -28,11 +26,10 @@ from backstop_mcp.dependencies import (
     get_engine,
     get_session_factory,
 )
-from backstop_mcp.features.auth import BackstopOAuthProvider, cleanup_lifespan
+from backstop_mcp.features.auth import cleanup_lifespan
 from backstop_mcp.features.system_users import find_system_user_by_user_name
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
-from backstop_mcp.server.handshake_protocol import HandshakeOnlyProtocolMiddleware
 from backstop_mcp.server.instructions import INSTRUCTIONS
 from backstop_mcp.server.session_revoked import SessionRevokedToUnauthorizedMiddleware
 from backstop_mcp.server.tools import TOOLS
@@ -74,7 +71,6 @@ def create_app() -> Starlette:
         auth=auth_provider,
         lifespan=lifespan,
         instructions=INSTRUCTIONS,
-        middleware=[HandshakeOnlyProtocolMiddleware()],
     )
     for fn in TOOLS:
         mcp.add_tool(fn)
@@ -95,7 +91,7 @@ def create_app() -> Starlette:
     async def login_post(request: Request) -> Response:
         return await auth_provider.handle_login_post(request)
 
-    app = mcp.http_app(
+    return mcp.http_app(
         middleware=[
             # Same cap as StreamableHTTPSessionManager; FastMCP has no knob, so matching
             # avoids two limits that can drift. Also bounds the unauthenticated login POST.
@@ -107,26 +103,6 @@ def create_app() -> Starlette:
             # already recorded the JSON-RPC 200.
             Middleware(SessionRevokedToUnauthorizedMiddleware),
         ]
-    )
-    # FastMCP's http_app() is one transport. A second http_app(transport="sse") would
-    # re-enter lifespan and rewrite the OAuth resource to /sse; graft the SSE pair on.
-    _mount_sse(app, mcp, auth_provider)
-    return app
-
-
-def _mount_sse(app: Starlette, mcp: FastMCP, auth: BackstopOAuthProvider) -> None:
-    sse_app = create_sse_app(
-        server=mcp,
-        message_path=fastmcp.settings.message_path,
-        sse_path=fastmcp.settings.sse_path,
-        auth=auth,
-    )
-    auth.set_mcp_path(fastmcp.settings.streamable_http_path)
-
-    message_path = fastmcp.settings.message_path
-    sse_paths = {fastmcp.settings.sse_path, message_path, message_path.rstrip("/")}
-    app.router.routes.extend(
-        route for route in sse_app.routes if getattr(route, "path", None) in sse_paths
     )
 
 

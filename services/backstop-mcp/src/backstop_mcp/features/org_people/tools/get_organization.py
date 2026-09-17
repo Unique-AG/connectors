@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Sequence
 from typing import Annotated, Literal
 
@@ -21,15 +20,12 @@ from backstop_mcp.features.party_resolver import (
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import (
-    Ambiguous,
     NotFoundResponse,
     Resolved,
     elicit_if_ambiguous,
     input_required,
 )
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
-
-logger = logging.getLogger(__name__)
 
 type GetOrganizationResponse = (
     PartyAmbiguousResponse | NotFoundResponse | OrganizationResolvedResponse
@@ -182,31 +178,9 @@ async def get_organization(
         party_id=party_id,
         search=search,
     )
-    logger.info(
-        "get_organization.elicit.start",
-        extra={
-            "status": result.status,
-            **(
-                {
-                    "query": result.query,
-                    "scope": result.scope,
-                    "candidates": len(result.candidates),
-                }
-                if isinstance(result, Ambiguous)
-                else {}
-            ),
-        },
-    )
     result = await elicit_if_ambiguous(ctx, result)
     if input_required(result):
         return result
-    logger.info(
-        "get_organization.elicit.done",
-        extra={
-            "status": result.status,
-            **({"party_id": result.value.id} if isinstance(result, Resolved) else {}),
-        },
-    )
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 

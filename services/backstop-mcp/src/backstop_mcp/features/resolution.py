@@ -206,18 +206,17 @@ def input_required(outcome: object) -> TypeIs[InputRequiredResult]:
 
 
 def asks_as_tool_result(ctx: Context) -> bool:
-    """Whether to return the picker as the `tools/call` result instead of a mid-call elicit.
-
-    Only 2026-07-28 can serialize `InputRequiredResult`. Handshake Streamable HTTP still
-    uses `elicitation/create`, but on the GET stream — Inspector and Cursor buffer the
-    open POST and never show a form that rides it.
-    """
+    """True on 2026-07-28: that era has no elicit back-channel, so return `InputRequiredResult`."""
     request = getattr(ctx, "request_context", None)
     version = getattr(request, "protocol_version", None)
     return version in MODERN_PROTOCOL_VERSIONS
 
 
 def _on_streamable_http() -> bool:
+    """True for the `/mcp` POST that owns the open `tools/call`.
+
+    Handshake elicit must not ride that POST.
+    """
     try:
         path = get_http_request().url.path.rstrip("/")
     except Exception:
@@ -241,18 +240,21 @@ async def elicit_from_client[T](
     ctx: Context,
     message: str,
     response_type: type[T] | list[str],
-) -> (
-    AcceptedElicitation[T]
-    | AcceptedElicitation[str]
-    | DeclinedElicitation
-    | CancelledElicitation
-):
-    """Ask the client. Handshake Streamable HTTP elicit rides GET, not the open POST."""
+) -> AcceptedElicitation[T] | AcceptedElicitation[str] | DeclinedElicitation | CancelledElicitation:
+    """Mid-call elicit. On Streamable HTTP, send it on GET, not the open POST.
+
+    `ctx.elicit()` sets `related_request_id` to the current `tools/call`. On Streamable
+    HTTP that puts `elicitation/create` on the POST SSE; Inspector/Cursor wait for that
+    POST to finish, so the form appears only after timeout. `elicit_form` without
+    `related_request_id` uses the standalone GET stream instead. Tests and other
+    transports keep `ctx.elicit()`.
+    """
     if not _on_streamable_http():
         return await ctx.elicit(message=message, response_type=response_type)
 
     logger.info("resolution.elicit.standalone_stream")
     config = parse_elicit_response_type(response_type)
+    # Omit related_request_id so Streamable HTTP routes this onto GET, not the tools/call POST.
     raw = await ctx.session.elicit_form(message, config.schema)
     if raw.action == "accept":
         return handle_elicit_accept(config, raw.content)
@@ -445,6 +447,7 @@ async def elicit_choice[T](
         _remember(ctx, key, chosen.key)
         return Resolved(value=chosen.value)
 
+    # Modern: picker is the tools/call result. Handshake: mid-call elicit (GET on /mcp).
     if asks_as_tool_result(ctx):
         logger.info("resolution.elicit.input_required", extra=outcome_log)
         return InputRequiredResult(
