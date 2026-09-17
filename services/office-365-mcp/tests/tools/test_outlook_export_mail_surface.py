@@ -179,6 +179,34 @@ class TestTheExportOverARealClient:
 
         assert answer.structured_content is None
 
+    async def test_an_oversized_message_is_refused_in_this_tools_own_words(
+        self, reader: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        """The refusal has to cross `GraphAdviceMiddleware`, which rewords any failure whose cause
+        chain holds a `GraphFailure` and has no branch for a size refusal. Reworded, it becomes
+        "Microsoft 365 rejected this request", which is a lie about Graph and drops both of the
+        things a caller can still do about the message. The unit test of this refusal calls the
+        tool function directly and never crosses the middleware, so this is the only place that
+        claim is tested at all.
+        """
+        _ = graph.get(_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                content=b"x" * (exporter.MAX_EXPORT_BYTES + 1),
+                headers={"Content-Type": "application/octet-stream"},
+            )
+        )
+
+        with pytest.raises(ToolError) as refusal:
+            _ = await reader.call_tool(exporter.TOOL_NAME, dict(exporter.GRAPH_CALL_EXAMPLE))
+
+        assert str(exporter.MAX_EXPORT_BYTES) in str(refusal.value)
+        assert "outlook_read_mail" in str(refusal.value), "it names what still works"
+        assert "web_link" in str(refusal.value), "and how the user gets the file anyway"
+        assert "rejected this request" not in str(refusal.value), (
+            "the shared wording for an unrecognised Graph failure replaced this tool's own"
+        )
+
     async def test_a_handle_for_something_that_is_not_a_message_never_reaches_graph(
         self, reader: Client[FastMCPTransport], graph: respx.MockRouter
     ) -> None:

@@ -18,9 +18,23 @@ reading of the response is ours.
 `_MAX_ERROR_BODY_BYTES` bounds what is read off a failure before it is parsed: a Graph error is an
 OData document of a few hundred bytes, and anything past that is a gateway's, not Graph's. The
 point of this module is that no response size decides this process's memory, and an error response
-is a response. `_ERROR_MAP` restates the blanket entry every generated `$value` builder passes to
-the adapter, because `to_get_request_information()` is the only public half of that method and the
-error map lives in the other half.
+is a response. A bound on a JSON document is a hazard rather than a safeguard, though: a cut OData
+document is not a smaller one, it is invalid JSON, and handing the fragment to the SDK's parser
+turns Graph's own 404 into a `JSONDecodeError` that `graph_errors` cannot classify and the advice
+middleware cannot reword. So a body that hits the bound is not parsed at all: the status alone
+classifies it, which costs the OData `code` and keeps `GraphNotFound` a `GraphNotFound`.
+`_ERROR_MAP` restates the blanket entry every generated `$value` builder passes to the adapter,
+because `to_get_request_information()` is the only public half of that method and the error map
+lives in the other half.
+
+`Content-Length` counts the bytes on the wire and `aiter_bytes` yields decoded ones, so the two are
+the same number only while nothing is content-coded. The comparisons here are therefore split by
+which quantity each one is about: the ceiling is enforced against decoded bytes, because decoded
+bytes are what a caller holds, and the short-body check is made against
+`response.num_bytes_downloaded`, which is raw and so comparable with the header. A caller that
+needs the declared length to describe its own payload asks for `Accept-Encoding: identity`; the
+declared-length refusal is otherwise a floor rather than a measurement, and the ceiling against
+written bytes is what actually bounds memory.
 """
 
 from collections.abc import AsyncGenerator
@@ -50,6 +64,10 @@ _MAX_ERROR_BODY_BYTES = 64 * 1024
 
 _ERROR_MAP: dict[str, type[ParsableFactory[ODataError]]] = {"XXX": ODataError}
 
+_RECOMPUTED_PER_BODY = frozenset({"content-length"})
+
+_DESCRIBES_A_BODY_WORTH_PARSING = "content-type"
+
 
 @dataclass(frozen=True, slots=True)
 class Downloaded:
@@ -76,7 +94,9 @@ async def download_to_file(
 
     `max_bytes` is enforced twice: once against `Content-Length` before a byte is read, and again
     against the bytes actually written, because Graph sends chunked responses with no length and a
-    length header is the server's claim rather than a measurement.
+    length header is the server's claim rather than a measurement. The header is also a claim about
+    wire bytes, so under a content coding it is a floor on the decoded size rather than the decoded
+    size; the guard against written bytes is the one that cannot be understated.
 
     The `yield` is wrapped in `not_graph`: the `graph_step` block a caller opens around this call
     is still open while they use the file, and reading a 10 MiB file back to name it is not
@@ -109,7 +129,7 @@ async def download_to_file(
                     )
                 handle.write(chunk)
             handle.flush()
-            _refuse_short_body(response, size)
+            _refuse_short_body(response)
             with not_graph():
                 yield Downloaded(
                     path=Path(handle.name),
@@ -137,42 +157,61 @@ async def _raise_for_status(adapter: HttpxRequestAdapter, response: httpx.Respon
     if response.is_success or response.status_code == 304:
         return
     body = bytearray()
+    truncated = False
     async for chunk in response.aiter_bytes(_CHUNK_BYTES):
         body += chunk[: _MAX_ERROR_BODY_BYTES - len(body)]
         if len(body) >= _MAX_ERROR_BODY_BYTES:
+            truncated = True
             break
     span = trace.get_current_span()
     await adapter.throw_failed_responses(  # pyright: ignore[reportUnknownMemberType]
-        _rebuilt(response, bytes(body)), _ERROR_MAP, span, span
+        _rebuilt(response, bytes(body), parsable=not truncated), _ERROR_MAP, span, span
     )
 
 
-def _rebuilt(response: httpx.Response, body: bytes) -> httpx.Response:
-    """`response` with `body` already read. `Content-Length` is dropped: it describes what the
-    server said it would send, and httpx computes the header for the bytes actually held."""
+def _rebuilt(response: httpx.Response, body: bytes, *, parsable: bool) -> httpx.Response:
+    """`response` with `body` already read, as the SDK's classifier wants it.
+
+    `Content-Length` is always dropped: it describes what the server said it would send, and httpx
+    computes the header for the bytes actually held.
+
+    `parsable` is false when `body` is a fragment, and then the body and its `Content-Type` are
+    both dropped. Handing the SDK a cut OData document typed `application/json` is what raises
+    `JSONDecodeError`; handing it an empty one that is still typed is no better, because the parse
+    path answers a 403, a 404 and a 500 alike with `GraphUnavailable`. With neither, the classifier
+    falls to the status code, which is the whole of what a cut error body still says. The OData
+    `code` is lost, and that is the trade: a `GraphNotFound` without a code beats a stacktrace.
+    """
     return httpx.Response(
         response.status_code,
         headers=[
             (name, value)
             for name, value in response.headers.multi_items()
-            if name.lower() != "content-length"
+            if name.lower() not in _RECOMPUTED_PER_BODY
+            and (parsable or name.lower() != _DESCRIBES_A_BODY_WORTH_PARSING)
         ],
-        content=body,
+        content=body if parsable else b"",
         request=response.request,
     )
 
 
-def _refuse_short_body(response: httpx.Response, size: int) -> None:
+def _refuse_short_body(response: httpx.Response) -> None:
     """A body that stopped before the length the server declared is a truncated file.
 
     Only the streaming path can make this check. `send_primitive_async` returns `response.content`
     and never compares it with the header, so a short `$value` today becomes a `.eml` that opens
     and is missing its last attachment.
+
+    The comparison is against `num_bytes_downloaded` rather than against what was written, because
+    the header counts wire bytes and what was written is decoded. Comparing the two would call a
+    complete but expanding-coded response truncated, and answer a permanent failure with "retry
+    once".
     """
     declared = _declared_length(response)
-    if declared is not None and size < declared:
+    received = response.num_bytes_downloaded
+    if declared is not None and received < declared:
         raise GraphUnavailable(
-            f"Microsoft Graph sent {size} of the {declared} bytes it declared",
+            f"Microsoft Graph sent {received} of the {declared} bytes it declared",
             status=response.status_code,
             code=None,
             request_id=_header(response, "request-id"),
