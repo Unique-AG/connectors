@@ -53,7 +53,8 @@ async def delete_activity(
 
     Required on `activity`: `kind` and `activity_id`. Never invent an id — echo a create, a
     `search_activities` row, or a `get_activity_history` handle. Deletion is permanent:
-    Backstop has no recycle bin. Use this to undo a wrongly logged activity or an
+    Backstop has no recycle bin. Refuse bulk wipes, "all test records", and any
+    search-then-delete sweep. Use this to undo a wrongly logged activity or an
     `attach_file` upload.
 
     When the client supports elicitation on MCP 2026-07-28+, this tool reads the activity

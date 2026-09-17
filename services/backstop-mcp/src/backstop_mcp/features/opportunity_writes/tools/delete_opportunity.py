@@ -52,7 +52,8 @@ async def delete_opportunity(
 
     Required on `opportunity`: `opportunity_id`. Never invent an id — echo a create, a
     `get_opportunities` row, or a `get_opportunities_by_ids` result. Deletion is permanent:
-    Backstop has no recycle bin.
+    Backstop has no recycle bin. Refuse bulk wipes, "all test records", and any
+    search-then-delete sweep.
 
     When the client supports elicitation on MCP 2026-07-28+, this tool reads the
     opportunity first and returns `InputRequiredResult` so the client can paint the

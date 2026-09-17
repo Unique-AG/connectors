@@ -4,7 +4,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from backstop_mcp.features.elicitation_utils import CONFIRM_FIELD_DESCRIPTION
+from backstop_mcp.features.elicitation_utils import CONFIRM_FIELD_DESCRIPTION, REFUSE_BULK_DELETE
 from backstop_mcp.features.party_resolver import (
     PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
@@ -20,13 +20,14 @@ __all__ = [
 
 DELETE_ORGANIZATION_INPUT_DESCRIPTION = (
     "Required. The organization to hard-delete. Needs exactly one of `party_id` or "
-    "`search`, plus `search_type` (defaults to organizations). Deletion is permanent: "
-    "Backstop has no recycle bin, and contact-locations are deleted first "
-    "(`include=contactLocations`, never `include=locations`). The tool reads the record "
-    "and asks the user to confirm when the client can show a form (MCP 2026-07-28+). "
-    "On an older protocol it returns `needs_confirmation` so the model can ask in chat "
-    "and retry with `confirm=true`. When the client never advertised elicitation, it "
-    "deletes immediately. Never invent an id."
+    + "`search`, plus `search_type` (defaults to organizations). Deletion is permanent: "
+    + "Backstop has no recycle bin, and contact-locations are deleted first "
+    + "(`include=contactLocations`, never `include=locations`). The tool reads the record "
+    + "and asks the user to confirm when the client can show a form (MCP 2026-07-28+). "
+    + "On an older protocol it returns `needs_confirmation` so the model can ask in chat "
+    + "and retry with `confirm=true`. When the client never advertised elicitation, it "
+    + "deletes immediately. Never invent an id. "
+    + REFUSE_BULK_DELETE
 )
 
 _ORG_SEARCH_TYPE_DESCRIPTION = (

@@ -66,5 +66,10 @@ class TestInstructions:
         assert "cannot be set or cleared" in INSTRUCTIONS
         assert "CRM UI" in INSTRUCTIONS
         assert "delete_activity" in INSTRUCTIONS
+        assert "delete_person" in INSTRUCTIONS
+        assert "delete_organization" in INSTRUCTIONS
+        assert "delete_opportunity" in INSTRUCTIONS
         assert "no recycle bin" in INSTRUCTIONS
+        assert "all test records" in INSTRUCTIONS
+        assert "search-then-delete" in INSTRUCTIONS
         assert "update_activity" in INSTRUCTIONS

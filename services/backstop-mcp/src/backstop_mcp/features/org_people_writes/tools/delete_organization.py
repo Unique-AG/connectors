@@ -54,7 +54,8 @@ async def delete_organization(
 
     `search_type` plus exactly one of `party_id` or `search` — same identity as
     `update_organization`. Never invent an id. Deletion is permanent: Backstop has no
-    recycle bin. Locations are removed first (`include=contactLocations`, never
+    recycle bin. Refuse bulk wipes, "all test records", and any search-then-delete sweep.
+    Locations are removed first (`include=contactLocations`, never
     `include=locations`); deleting the organization without that cascade strands those
     addresses. `destructive_hint` is true because this hard-deletes the record.
 

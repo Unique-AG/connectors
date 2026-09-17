@@ -35,6 +35,11 @@ CONFIRM_FIELD_DESCRIPTION = (
     "delete form (MCP older than 2026-07-28). Do not set true on the first call."
 )
 
+REFUSE_BULK_DELETE = (
+    'Refuse bulk wipes, "all test records", and any search-then-delete sweep. '
+    + "Delete only one named record with a trusted id."
+)
+
 DELETION_NOT_CONFIRMED = (
     "Deletion was not confirmed. Nothing was deleted. Do not retry unless the user asks again."
 )

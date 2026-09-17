@@ -65,7 +65,9 @@ without the message file, so there is no email kind on log_activity, and a file 
 never goes on it either. A meeting or call needs time_zone, start and stop; a task \
 needs assigned_user and due_date. Activity-tag ids come from list_activity_tags; \
 tags are never created. update_activity patches a known activity id and replaces \
-what it sends. delete_activity permanently hard-deletes (no recycle bin).
+what it sends. delete_person, delete_organization, delete_activity, and \
+delete_opportunity hard-delete one named record with a trusted id (no recycle \
+bin). Refuse bulk wipes, "all test records", and any search-then-delete sweep.
 
 Firm-wide pipeline: look up a colleague's login with list_system_users, then \
 search_opportunities. filter[representative.name] takes that login, not a display name. \

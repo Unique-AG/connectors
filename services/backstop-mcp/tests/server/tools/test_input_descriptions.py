@@ -93,7 +93,12 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         "update_opportunity",
         "destructive_hint",
     ),
-    "delete_opportunity": ('"opportunity_id"', "permanent", "destructive_hint"),
+    "delete_opportunity": (
+        '"opportunity_id"',
+        "permanent",
+        "destructive_hint",
+        "all test records",
+    ),
     "update_custom_field_values": (
         '"definition_id"',
         '"entity_type"',
@@ -151,6 +156,7 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         "contactLocations",
         "permanent",
         "destructive_hint",
+        "all test records",
     ),
     "delete_organization": (
         '"party_id"',
@@ -158,6 +164,7 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         "contactLocations",
         "permanent",
         "destructive_hint",
+        "all test records",
     ),
     "end_employment": (
         '"party_id"',
@@ -166,7 +173,7 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         "current contact",
         "entityRelationshipType",
     ),
-    "delete_activity": ('"kind"', '"activity_id"', "permanent"),
+    "delete_activity": ('"kind"', '"activity_id"', "permanent", "all test records"),
     "attach_file": (
         '"kind"',
         '"search_type"',
