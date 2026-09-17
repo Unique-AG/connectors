@@ -8,6 +8,15 @@ choose meetings vs calls, so it is explicitly link-less.
 from dataclasses import dataclass
 from typing import Final, Literal
 
+from backstop_mcp.features.ui_links.inputs import (
+    BackstopLinkTarget,
+    CallLinkTarget,
+    DocumentLinkTarget,
+    EmailLinkTarget,
+    MeetingLinkTarget,
+    NoteLinkTarget,
+)
+
 type ActivityJspSlug = Literal["calls", "meetings", "notes", "documents"]
 
 
@@ -55,3 +64,30 @@ for _name, _mapping in ACTIVITY_KINDS.items():
         continue
     assert _mapping.slug is not None, f"{_name} is activities.jsp but has no slug"
     assert TARGET_KIND_TO_JSP_SLUG[_name.casefold()] == _mapping.slug
+
+
+def activity_link_target(
+    *,
+    activity_type: str | None,
+    entity_activity_details_id: str,
+) -> BackstopLinkTarget | None:
+    """Discriminated target for an activity type, or None when that type has no CRM page."""
+    if activity_type is None:
+        return None
+    mapping = ACTIVITY_KINDS.get(activity_type)
+    if mapping is None or mapping.page is None:
+        return None
+    if mapping.page == "email":
+        return EmailLinkTarget(entity_activity_details_id=entity_activity_details_id)
+    assert mapping.slug is not None, f"{activity_type} is activities.jsp but has no slug"
+    match ACTIVITY_JSP_SLUG_TO_KIND[mapping.slug]:
+        case "call":
+            return CallLinkTarget(entity_activity_details_id=entity_activity_details_id)
+        case "meeting":
+            return MeetingLinkTarget(entity_activity_details_id=entity_activity_details_id)
+        case "note":
+            return NoteLinkTarget(entity_activity_details_id=entity_activity_details_id)
+        case "document":
+            return DocumentLinkTarget(entity_activity_details_id=entity_activity_details_id)
+        case _:
+            return None

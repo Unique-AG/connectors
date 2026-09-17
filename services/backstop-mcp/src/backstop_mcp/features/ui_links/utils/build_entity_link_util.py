@@ -58,6 +58,22 @@ class BuildEntityLinkUtil:
             links = [*links, layout_link]
         return BackstopLinksResponse(links=links)
 
+    def canonical_url(self, *, target: BackstopLinkTarget, ui_base_url: str | None) -> str | None:
+        """The no-tab 'open this record' URL, or None when this deployment has no UI origin."""
+        if ui_base_url is None:
+            return None
+        resolved = BackstopLinkTargetDto.from_input(target)
+        spec = PAGE_SPECS[resolved.page]
+        if not spec.buildable:
+            return None
+        return self._format_url(
+            spec=spec,
+            ui_base_url=ui_base_url,
+            entity_id=resolved.entity_id,
+            activity_slug=resolved.activity_slug,
+            tab=None,
+        )
+
     def _tab_links(
         self,
         *,

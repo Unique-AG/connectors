@@ -25,6 +25,7 @@ from backstop_mcp.features.resolution import (
     elicit_if_ambiguous,
     input_required,
 )
+from backstop_mcp.features.ui_links import OrganizationLinkTarget, record_url
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 type GetOrganizationResponse = (
@@ -206,4 +207,5 @@ async def get_organization(
         as_of=AsOfResponse.from_attributes(organization),
         included=fetched.included,
         custom_field_values=fetched.custom_field_values,
+        url=record_url(OrganizationLinkTarget(party_id=party.id)),
     )

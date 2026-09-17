@@ -12,6 +12,7 @@ from backstop_mcp.features.opportunities.resource_utils.get_stage_id_to_name_map
     get_stage_id_to_name_map,
 )
 from backstop_mcp.features.opportunities.responses import OpportunityResponse
+from backstop_mcp.features.ui_links import OpportunityLinkTarget, record_url
 from backstop_mcp.utils import first_item
 
 
@@ -63,4 +64,5 @@ class MapOpportunityToResponseUtil:
             stage_id=stage_id,
             stage_history=stage_history,
             custom_field_values=tuple(custom_field_values),
+            url=record_url(OpportunityLinkTarget(entity_id=row.id)),
         )

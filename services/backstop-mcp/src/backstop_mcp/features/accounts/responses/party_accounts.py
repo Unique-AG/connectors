@@ -22,6 +22,7 @@ from backstop_mcp.features.party_resolver import (
     RESOLVED_PARTY_ECHO_DESCRIPTION,
     ResolvedPartyResponse,
 )
+from backstop_mcp.features.ui_links import AccountLinkTarget, record_url
 from backstop_mcp.models import OmitNoneModel
 
 _TABLE_CAVEAT = (
@@ -175,9 +176,17 @@ class HoldingRowResponse(OmitNoneModel):
             "publishes no number for it, which is a different answer."
         ),
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this account (no tab). Omitted when this deployment "
+            "has no UI origin. Echo it; never invent one. An account id is not a party id. "
+            "Call build_backstop_links for tabs."
+        ),
+    )
 
     @classmethod
-    def from_dto(cls, row: HoldingRowDto) -> Self:
+    def from_dto(cls, row: HoldingRowDto, *, url: str | None = None) -> Self:
         return cls(
             account_id=row.account_id,
             product_id=row.product_id,
@@ -200,6 +209,7 @@ class HoldingRowResponse(OmitNoneModel):
                 HoldingFigureErrorResponse(figure=error.figure, message=error.message)
                 for error in row.figure_errors
             ),
+            url=url,
         )
 
 
@@ -266,7 +276,13 @@ class PartyAccountsResolvedResponse(OmitNoneModel):
     def from_holdings(cls, listing: HoldingListingDto, *, resolved: ResolvedPartyResponse) -> Self:
         return cls(
             resolved=resolved,
-            holdings=tuple(HoldingRowResponse.from_dto(row) for row in listing.rows),
+            holdings=tuple(
+                HoldingRowResponse.from_dto(
+                    row,
+                    url=record_url(AccountLinkTarget(entity_id=row.account_id)),
+                )
+                for row in listing.rows
+            ),
             source=listing.source,
             data_caveat=(
                 _TABLE_CAVEAT

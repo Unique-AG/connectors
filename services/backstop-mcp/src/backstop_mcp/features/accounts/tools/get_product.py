@@ -32,6 +32,7 @@ from backstop_mcp.features.custom_fields import (
     get_custom_fields_service,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved, input_required
+from backstop_mcp.features.ui_links import ProductLinkTarget, record_url
 from backstop_mcp.models import published_output_schema
 
 type GetProductResponse = ProductAmbiguousResponse | NotFoundResponse | ProductResolvedResponse
@@ -52,6 +53,7 @@ async def _record(
         name=fetched.product.name,
         short_name=fetched.product.short_name,
         custom_field_values=values,
+        url=record_url(ProductLinkTarget(entity_id=fetched.product.id)),
     )
 
 

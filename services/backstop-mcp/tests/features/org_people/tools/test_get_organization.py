@@ -305,7 +305,48 @@ class TestGetOrganization:
         assert result.resolved == ResolvedPartyResponse(
             id="trusted-9", search_type="organizations", name="From Body"
         )
+        assert result.url is None
         assert quick.call_count == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_resolved_organization_carries_canonical_url(
+        self, client: BackstopClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "backstop_mcp.features.ui_links.dependencies.get_effective_ui_base_url",
+            lambda: "https://tenant.example.test",
+        )
+        respx.get(f"{BASE_URL}/organizations/trusted-9").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "organizations",
+                        "id": "trusted-9",
+                        "attributes": {"name": "From Body"},
+                    }
+                },
+            )
+        )
+
+        result = tool_model(
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="trusted-9",
+                search_type="organizations",
+                resolve_party_query=make_resolve_party_query(client),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
+            ),
+            OrganizationResolvedResponse,
+        )
+
+        assert result.url == (
+            "https://tenant.example.test/backstop/crm/ManageOrganization.action"
+            "?display=&party_id=trusted-9"
+        )
 
     @pytest.mark.asyncio
     @respx.mock

@@ -25,6 +25,7 @@ from backstop_mcp.features.resolution import (
     elicit_if_ambiguous,
     input_required,
 )
+from backstop_mcp.features.ui_links import PersonLinkTarget, record_url
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResolvedResponse
@@ -211,4 +212,5 @@ async def get_person(
         employments=person_query_result.employments,
         included=person_query_result.included,
         custom_field_values=person_query_result.custom_field_values,
+        url=record_url(PersonLinkTarget(party_id=party.id)),
     )
