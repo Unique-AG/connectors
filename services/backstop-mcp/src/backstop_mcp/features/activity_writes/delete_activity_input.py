@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from backstop_mcp.features.elicitation_utils import REFUSE_BULK_DELETE
 from backstop_mcp.models import NonEmptyStr
 
 __all__ = [
@@ -13,9 +14,10 @@ __all__ = [
 
 DELETE_ACTIVITY_INPUT_DESCRIPTION = (
     "Required. The activity to hard-delete. Needs `kind` and `activity_id` (create echo, "
-    "search row, or history handle). Never invent an id. Deletion is permanent: Backstop "
-    "has no recycle bin. The tool reads the record and asks the user to confirm when the "
-    "client can elicit; otherwise it deletes immediately."
+    + "search row, or history handle). Never invent an id. Deletion is permanent: Backstop "
+    + "has no recycle bin. The tool reads the record and asks the user to confirm when "
+    + "the client can elicit; otherwise it deletes immediately. "
+    + REFUSE_BULK_DELETE
 )
 
 

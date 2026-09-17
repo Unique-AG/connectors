@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.custom_fields import CustomFieldFilters
@@ -19,7 +19,12 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import (
+    NotFoundResponse,
+    Resolved,
+    elicit_if_ambiguous,
+    input_required,
+)
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResolvedResponse
@@ -132,7 +137,7 @@ async def get_person(
     ] = (),
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     get_person_query: GetPersonQuery = Depends(get_person_query_factory),
-) -> GetPersonResponse:
+) -> GetPersonResponse | InputRequiredResult:
     """Fetch one Backstop person by trusted Party ID or by name/email search.
 
     Never invent or guess a party_id. Only pass a party_id that was previously returned
@@ -146,7 +151,11 @@ async def get_person(
     Side-loads entityRelationships and their relationship types on the same GET (no extra round
     trip). `employments` lists every current and former organization link — always relay those
     entries; do not present a person as a current contact at an organization whose link has
-    `status="former"` unless they explicitly asked for historical contacts.
+    `status="former"` unless they explicitly asked for historical contacts. Key employee
+    is not on this record: `GET /people` omits `isKeyEmployee` even when the organization
+    roster is true. Read it on `get_people_for_party`. It cannot be written through these
+    tools — personal API tokens do not persist `isKeyRelationship`; set Key employee in
+    the CRM UI.
 
     Pass `include` to side-load related records on that same GET — addresses, the email address
     book, their organization, the representative. They come back under `included`, where a
@@ -174,6 +183,8 @@ async def get_person(
         search=search,
     )
     result = await elicit_if_ambiguous(ctx, result)
+    if input_required(result):
+        return result
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 

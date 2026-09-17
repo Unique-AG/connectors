@@ -1,4 +1,4 @@
-"""JSON:API envelopes for Backstop responses.
+"""JSON:API envelopes for Backstop responses, and the request bodies that match them.
 
 Pick the document by the shape of `data`:
 
@@ -12,7 +12,8 @@ Pick the document by the shape of `data`:
 """
 
 from collections.abc import Mapping, Sequence
-from typing import Annotated, ClassVar, Self
+from datetime import date, datetime
+from typing import Annotated, ClassVar, Self, overload
 
 from pydantic import (
     BaseModel,
@@ -344,3 +345,81 @@ class Included:
         Unreadable entries are dropped, same as `included_resource`.
         """
         return self._parse(self._raw, schema=schema)
+
+
+def omit_none_values(values: dict[str, object | None]) -> dict[str, object]:
+    return {key: value for key, value in values.items() if value is not None}
+
+
+def isoformat(value: date | datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat()
+
+
+@overload
+def relationship_to_one(resource_type: str, resource_id: None) -> None: ...
+
+
+@overload
+def relationship_to_one(resource_type: str, resource_id: str) -> dict[str, object]: ...
+
+
+@overload
+def relationship_to_one(
+    resource_type: str, resource_id: str | None
+) -> dict[str, object] | None: ...
+
+
+def relationship_to_one(resource_type: str, resource_id: str | None) -> dict[str, object] | None:
+    """A to-one JSON:API relationship, or `None` so callers can `omit_none_values`.
+
+    Optional ids (`company_id`, `product_id`, …) are `str | None`. The overloads
+    narrow a missing id to `None` and a present id to the payload.
+    """
+    if resource_id is None:
+        return None
+    return {"data": {"type": resource_type, "id": resource_id}}
+
+
+def relationship_data(resource_type: str, ids: tuple[str, ...] | None) -> dict[str, object] | None:
+    """JSON:API to-many relationship payload. `None` omits the key; `()` is an empty replace."""
+    if ids is None:
+        return None
+    return {"data": [{"type": resource_type, "id": item_id} for item_id in ids]}
+
+
+def json_api_create(
+    *,
+    resource_type: str,
+    attributes: dict[str, object],
+    relationships: dict[str, object] | None = None,
+    resource_id: str | None = None,
+) -> dict[str, object]:
+    data: dict[str, object] = {"type": resource_type}
+    if resource_id is not None:
+        data["id"] = resource_id
+    data["attributes"] = attributes
+    if relationships:
+        data["relationships"] = relationships
+    return {"data": data}
+
+
+def json_api_update(
+    *,
+    resource_type: str,
+    resource_id: str,
+    attributes: dict[str, object],
+    relationships: dict[str, object] | None = None,
+) -> dict[str, object]:
+    return json_api_create(
+        resource_type=resource_type,
+        resource_id=resource_id,
+        attributes=attributes,
+        relationships=relationships,
+    )
+
+
+def resource_pointer(*, resource_id: str, resource_type: str) -> dict[str, object]:
+    """A bulk-endpoint pointer. Plural resource name, never Bean casing."""
+    return {"resourceId": resource_id, "resourceType": resource_type}

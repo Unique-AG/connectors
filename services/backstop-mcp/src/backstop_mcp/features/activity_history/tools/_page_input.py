@@ -6,6 +6,7 @@ from datetime import date
 from typing import Annotated, ClassVar, Literal, Self
 
 from fastmcp import Context
+from mcp.types import InputRequiredResult
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from backstop_mcp.features.activity_history import (
@@ -26,7 +27,12 @@ from backstop_mcp.features.party_resolver import (
     require_path_segment,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import (
+    NotFoundResponse,
+    Resolved,
+    elicit_if_ambiguous,
+    input_required,
+)
 from backstop_mcp.models import NonEmptyStr
 
 logger = logging.getLogger(__name__)
@@ -227,7 +233,7 @@ async def extract_fetch_activity_history_args(
     request: ActivityHistoryFirstPageInput | ActivityHistoryNextPageInput,
     *,
     page_size: int,
-) -> FetchArgs | PartyAmbiguousResponse | NotFoundResponse:
+) -> FetchArgs | PartyAmbiguousResponse | NotFoundResponse | InputRequiredResult:
     """Turn a first/next page input into shared fetch inputs, or an unresolved party response.
 
     Pydantic already validates/discriminates the wire shape (`ActivityHistoryPageInput`). This
@@ -269,6 +275,8 @@ async def extract_fetch_activity_history_args(
                 search=search,
             )
             result = await elicit_if_ambiguous(ctx, result)
+            if input_required(result):
+                return result
             if not isinstance(result, Resolved):
                 logger.info(
                     "activity_history.args.unresolved",

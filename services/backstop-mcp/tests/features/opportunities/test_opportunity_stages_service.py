@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 import respx
+from fastmcp.exceptions import ToolError
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
 from backstop_mcp.features.opportunities import OpportunityStagesService
@@ -74,6 +75,33 @@ def _stage_resource(row: dict[str, object]) -> dict[str, object]:
     )
 
 
+def _two_type_stages_page() -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "data": [
+                {
+                    "id": "s-opp",
+                    "type": "opportunity-stages",
+                    "attributes": {"name": "Prospect", "closed": False},
+                    "relationships": {
+                        "opportunityTypes": {"data": [{"type": "entity-types", "id": "16"}]}
+                    },
+                },
+                {
+                    "id": "s-other",
+                    "type": "opportunity-stages",
+                    "attributes": {"name": "Other Pipe", "closed": False},
+                    "relationships": {
+                        "opportunityTypes": {"data": [{"type": "entity-types", "id": "99"}]}
+                    },
+                },
+            ],
+            "links": {"next": None},
+        },
+    )
+
+
 def _stages_response(*rows: dict[str, object]) -> httpx.Response:
     return httpx.Response(
         200,
@@ -126,9 +154,10 @@ class TestFetchingTheVocabulary:
     @pytest.mark.asyncio
     @respx.mock
     async def test_unmodelled_wire_attributes_do_not_surface(self, clients: ClientBuilder) -> None:
-        """`deletable`, `numberOfOpportunities` and `probability` are on the wire, not in scope.
+        """`deletable` and `numberOfOpportunities` are on the wire, not in scope.
 
         `extra="ignore"` dropping the wrong key is the failure mode worth catching.
+        `probability` is modelled: Closed omits the key and reads as None.
         """
         base_url = f"{BASE_URL}/stages-extra-attributes"
         respx.get(f"{base_url}/opportunity-stages").mock(
@@ -137,7 +166,58 @@ class TestFetchingTheVocabulary:
 
         stages = await _service(clients(base_url)).get_catalog()
 
-        assert set(stages["42482"].model_dump()) == {"id", "name", "closed", "sort_order"}
+        dumped = stages["42482"].model_dump()
+        assert "deletable" not in dumped
+        assert "numberOfOpportunities" not in dumped
+        assert dumped["probability"] == 0.3
+        assert stages["96018"].probability is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_opportunity_types_are_side_loaded(self, clients: ClientBuilder) -> None:
+        """Two entity types on the wire: a stage can be scoped to a subset of them."""
+        base_url = f"{BASE_URL}/stages-two-types"
+        route = respx.get(f"{base_url}/opportunity-stages").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "id": "s-opp",
+                            "type": "opportunity-stages",
+                            "attributes": {"name": "Prospect", "closed": False, "probability": 0.1},
+                            "relationships": {
+                                "opportunityTypes": {"data": [{"type": "entity-types", "id": "16"}]}
+                            },
+                        },
+                        {
+                            "id": "s-other",
+                            "type": "opportunity-stages",
+                            "attributes": {"name": "Other Pipe", "closed": False},
+                            "relationships": {
+                                "opportunityTypes": {"data": [{"type": "entity-types", "id": "99"}]}
+                            },
+                        },
+                    ],
+                    "included": [
+                        {
+                            "id": "16",
+                            "type": "entity-types",
+                            "attributes": {"name": "Opportunity"},
+                        },
+                        {"id": "99", "type": "entity-types", "attributes": {"name": "Other"}},
+                    ],
+                    "meta": {"totalResourceCount": 2},
+                    "links": {"next": None},
+                },
+            )
+        )
+
+        stages = await _service(clients(base_url)).get_catalog()
+
+        assert route.calls.last.request.url.params["include"] == "opportunityTypes"
+        assert stages["s-opp"].opportunity_type_ids == ("16",)
+        assert stages["s-other"].opportunity_type_ids == ("99",)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -153,6 +233,89 @@ class TestFetchingTheVocabulary:
         stages = await _service(clients(base_url)).get_catalog()
 
         assert list(stages) == ["1"]
+
+
+class TestFindByStageName:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_matches_casefold(self, clients: ClientBuilder) -> None:
+        base_url = f"{BASE_URL}/stages-find-name"
+        respx.get(f"{base_url}/opportunity-stages").mock(
+            return_value=_stages_response(*LIVE_STAGES)
+        )
+
+        stage = await _service(clients(base_url)).find_by_stage_name(name="idd")
+
+        assert stage.id == "42482"
+        assert stage.name == "IDD"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_rejects_an_unknown_name(self, clients: ClientBuilder) -> None:
+        base_url = f"{BASE_URL}/stages-find-unknown"
+        respx.get(f"{base_url}/opportunity-stages").mock(
+            return_value=_stages_response(*LIVE_STAGES)
+        )
+
+        with pytest.raises(ToolError, match="Available stages:.*IDD"):
+            await _service(clients(base_url)).find_by_stage_name(name="Not A Stage")
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_rejects_a_duplicate_name(self, clients: ClientBuilder) -> None:
+        base_url = f"{BASE_URL}/stages-find-dup"
+        respx.get(f"{base_url}/opportunity-stages").mock(
+            return_value=_stages_response(
+                {"id": "a", "name": "Prospect", "closed": False},
+                {"id": "b", "name": "Prospect", "closed": False},
+            )
+        )
+
+        with pytest.raises(ToolError, match="more than one stage"):
+            await _service(clients(base_url)).find_by_stage_name(name="Prospect")
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_scopes_to_entity_type(self, clients: ClientBuilder) -> None:
+        base_url = f"{BASE_URL}/stages-find-scope"
+        respx.get(f"{base_url}/opportunity-stages").mock(return_value=_two_type_stages_page())
+        service = _service(clients(base_url))
+
+        accepted = await service.find_by_stage_name(name="Prospect", entity_type_id="16")
+        assert accepted.id == "s-opp"
+        with pytest.raises(ToolError, match="entity type 16"):
+            await service.find_by_stage_name(name="Other Pipe", entity_type_id="16")
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_stage_with_no_type_ids_is_valid_for_every_type(
+        self, clients: ClientBuilder
+    ) -> None:
+        base_url = f"{BASE_URL}/stages-find-unscoped"
+        respx.get(f"{base_url}/opportunity-stages").mock(
+            return_value=_stages_response({"id": "s-all", "name": "Prospect", "closed": False})
+        )
+
+        stage = await _service(clients(base_url)).find_by_stage_name(
+            name="Prospect", entity_type_id="16"
+        )
+
+        assert stage.id == "s-all"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unknown_name_lists_only_stages_valid_for_the_entity_type(
+        self, clients: ClientBuilder
+    ) -> None:
+        base_url = f"{BASE_URL}/stages-find-available"
+        respx.get(f"{base_url}/opportunity-stages").mock(return_value=_two_type_stages_page())
+
+        with pytest.raises(ToolError, match="Available stages: Prospect") as raised:
+            await _service(clients(base_url)).find_by_stage_name(
+                name="Not A Stage", entity_type_id="16"
+            )
+
+        assert "Other Pipe" not in str(raised.value)
 
 
 class TestInMemoryTtl:

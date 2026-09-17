@@ -86,10 +86,27 @@ class OpportunityStageResponse(OmitNoneModel):
         default=None,
         description="Pipeline order of this stage, when Backstop publishes one.",
     )
+    probability: float | None = Field(
+        default=None,
+        description=(
+            "The stage's own likelihood as a fraction (0.3 is 30%). Backstop does not copy "
+            "this onto a deal — a deal's `probability` is set separately or left untouched."
+        ),
+    )
+    opportunity_type_ids: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Entity-type ids this stage applies to, from `include=opportunityTypes`. Empty "
+            "when the include did not arrive or the stage is valid for every type."
+        ),
+    )
 
     @classmethod
     def from_resource(
-        cls, resource: BackstopApiResource[OpportunityStageAttributes]
+        cls,
+        resource: BackstopApiResource[OpportunityStageAttributes],
+        *,
+        opportunity_type_ids: tuple[str, ...] = (),
     ) -> Self | None:
         name = resource.attributes.name
         if not name:
@@ -99,6 +116,8 @@ class OpportunityStageResponse(OmitNoneModel):
             name=name,
             closed=bool(resource.attributes.closed),
             sort_order=resource.attributes.sort_order,
+            probability=resource.attributes.probability,
+            opportunity_type_ids=opportunity_type_ids,
         )
 
 

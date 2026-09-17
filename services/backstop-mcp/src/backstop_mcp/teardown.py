@@ -56,11 +56,14 @@ from backstop_mcp.features.activity_writes import (
     get_update_note_command_factory,
     get_update_task_command_factory,
 )
+from backstop_mcp.features.contact_categories import get_list_contact_categories_query_factory
+from backstop_mcp.features.contact_sources import get_list_contact_sources_query_factory
 from backstop_mcp.features.custom_fields import (
     get_custom_field_groups_service,
     get_custom_fields_service,
+    get_update_custom_field_values_command_factory,
 )
-from backstop_mcp.features.data_hygiene import get_employment_index_factory
+from backstop_mcp.features.data_hygiene import get_employment_index_factory, get_employment_rules
 from backstop_mcp.features.opportunities import (
     get_map_opportunity_to_response_util_factory,
     get_opportunities_by_ids_query_factory,
@@ -69,10 +72,27 @@ from backstop_mcp.features.opportunities import (
     get_search_opportunities_query_factory,
     get_stage_history_query_factory,
 )
+from backstop_mcp.features.opportunity_writes import (
+    get_backfill_opportunity_stage_history_command_factory,
+    get_create_opportunity_command_factory,
+    get_delete_opportunity_command_factory,
+    get_update_opportunity_command_factory,
+)
 from backstop_mcp.features.org_people import (
     get_organization_query_factory,
     get_people_for_organization_query_factory,
     get_person_query_factory,
+)
+from backstop_mcp.features.org_people_writes import (
+    get_create_employment_command_factory,
+    get_create_organization_command_factory,
+    get_create_person_command_factory,
+    get_delete_party_with_locations_command_factory,
+    get_end_employment_command_factory,
+    get_entity_relationship_types_service_factory,
+    get_modify_contact_location_command_factory,
+    get_update_organization_command_factory,
+    get_update_person_command_factory,
 )
 from backstop_mcp.features.party_resolver import (
     get_party_name_query_factory,
@@ -121,12 +141,20 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_update_document_command_factory,
     get_delete_activity_command_factory,
     get_activity_tags_service,
+    get_list_contact_categories_query_factory,
+    get_list_contact_sources_query_factory,
     get_system_users_service,
     get_time_zones_service,
     get_custom_fields_service,
     get_custom_field_groups_service,
+    get_update_custom_field_values_command_factory,
     get_employment_index_factory,
+    get_employment_rules,
     get_opportunity_stages_service_factory,
+    get_update_opportunity_command_factory,
+    get_create_opportunity_command_factory,
+    get_delete_opportunity_command_factory,
+    get_backfill_opportunity_stage_history_command_factory,
     get_stage_history_query_factory,
     get_map_opportunity_to_response_util_factory,
     get_opportunities_query_factory,
@@ -138,6 +166,15 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_people_for_organization_query_factory,
     get_party_name_query_factory,
     get_resolve_party_query_factory,
+    get_modify_contact_location_command_factory,
+    get_create_person_command_factory,
+    get_create_organization_command_factory,
+    get_create_employment_command_factory,
+    get_update_person_command_factory,
+    get_update_organization_command_factory,
+    get_delete_party_with_locations_command_factory,
+    get_end_employment_command_factory,
+    get_entity_relationship_types_service_factory,
     get_accounts_for_product_query_factory,
     get_capital_flows_query_factory,
     get_holdings_query_factory,

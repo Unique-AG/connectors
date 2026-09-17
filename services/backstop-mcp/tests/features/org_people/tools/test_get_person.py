@@ -173,6 +173,41 @@ class TestGetPerson:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_publishes_is_key_employee(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("p9", "people", name="Jane Doe")),
+            )
+        )
+        respx.get(f"{BASE_URL}/people/p9").mock(
+            return_value=httpx.Response(
+                200,
+                json=_person_document(
+                    attributes={"name": "Jane Doe", "isKeyEmployee": True},
+                ),
+            )
+        )
+
+        result = tool_model(
+            await get_person(
+                ctx_never_elicit(),
+                search="Jane Doe",
+                resolve_party_query=make_resolve_party_query(client),
+                get_person_query=make_get_person_query(
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
+                ),
+            ),
+            PersonResolvedResponse,
+        )
+
+        assert result.person.is_key_employee is True
+        dumped = object_dict(tool_payload(result)["person"])
+        assert dumped["is_key_employee"] is True
+        assert "isKeyEmployee" not in dumped
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_undated_tie_at_the_same_org_breaks_toward_departed(
         self, client: BackstopClient
     ) -> None:
@@ -631,7 +666,57 @@ class TestGetPersonOmitsNullsFromTheWire:
 
         person = object_dict(payload["person"])
         assert "jobTitle" not in person
+        assert "job_title" not in person
         assert person["name"] == "Jane Doe"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_top_level_attributes_are_published_as_snake_case(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/people/p9").mock(
+            return_value=httpx.Response(
+                200,
+                json=_person_document(
+                    EMPLOYEE_TYPE,
+                    attributes={
+                        "name": "Jane Doe",
+                        "firstName": "Jane",
+                        "lastName": "Doe",
+                        "jobTitle": "Managing Director",
+                        "email": "jane@example.com",
+                        "isEmployee": False,
+                        "isKeyEmployee": True,
+                        "department": "",
+                        "modifiedTimestamp": "2023-01-01T00:00:00Z",
+                        "modifiedBy": "crm-admin",
+                    },
+                ),
+            )
+        )
+
+        payload = tool_payload(
+            await get_person(
+                ctx_never_elicit(),
+                party_id="p9",
+                resolve_party_query=make_resolve_party_query(client),
+                get_person_query=make_get_person_query(
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
+                ),
+            )
+        )
+
+        person = object_dict(payload["person"])
+        assert person["first_name"] == "Jane"
+        assert person["last_name"] == "Doe"
+        assert person["job_title"] == "Managing Director"
+        assert person["email"] == "jane@example.com"
+        assert person["is_employee"] is False
+        assert person["is_key_employee"] is True
+        assert "department" not in person
+        assert "firstName" not in person
+        assert "jobTitle" not in person
+        assert "isKeyEmployee" not in person
 
     @pytest.mark.asyncio
     @respx.mock

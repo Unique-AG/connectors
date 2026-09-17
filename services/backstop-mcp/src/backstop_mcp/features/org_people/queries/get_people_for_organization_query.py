@@ -54,7 +54,9 @@ class GetPeopleForOrganizationQuery:
             schema=EmployeeResource,
             params={
                 "include": EntityRelationshipInclude.for_employment(),
-                "fields[employees]": "name,jobTitle,email,phone,companyName,categories",
+                "fields[employees]": (
+                    "name,jobTitle,email,phone,companyName,categories,isKeyEmployee"
+                ),
             },
             max_records=None,
             page_size=100,

@@ -131,7 +131,16 @@ class TestDefinitionFromResource:
         assert definition.required is True
         assert definition.client_required is False
         assert definition.system_defined is False
+        assert definition.max_length is None
         assert definition.description == "Investor grade"
+
+    def test_maps_max_length(self) -> None:
+        definition = CustomFieldDefinitionDto.from_resource(
+            _definition_resource("1", maxLength=255)
+        )
+
+        assert definition is not None
+        assert definition.max_length == 255
 
     def test_missing_select_options_become_empty_list(self) -> None:
         definition = CustomFieldDefinitionDto.from_resource(_definition_resource("1"))
@@ -453,3 +462,17 @@ class TestJoinValuesCatalog:
         assert len(published) == 1
         assert published[0].field_type == "PERCENT"
         assert published[0].value == 0.3
+
+
+class TestIsOutsideCurrentOptions:
+    def test_unknown_option_is_outside_and_lists_current_texts(self) -> None:
+        service = CustomFieldsService.with_ttl_minutes(client=MagicMock(), ttl_minutes=60)
+        options = [{"label": "Direct"}, {"label": "Portal"}]
+
+        assert service.is_outside_current_options("NotARealOption", options) is True
+        assert service.current_option_texts(options) == ("Direct", "Portal")
+
+    def test_current_option_is_inside(self) -> None:
+        service = CustomFieldsService.with_ttl_minutes(client=MagicMock(), ttl_minutes=60)
+
+        assert service.is_outside_current_options("Direct", [{"label": "Direct"}]) is False

@@ -4,6 +4,7 @@ from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from backstop_mcp.features.bulk_writes import RecordOutcomeResponse
 from backstop_mcp.features.custom_fields.entity_types import CustomFieldEntityType
 from backstop_mcp.features.custom_fields.internal_dto import (
     CustomFieldDefinitionDto,
@@ -24,6 +25,7 @@ __all__ = [
     "ListCustomFieldGroupsResponse",
     "ListCustomFieldsResponse",
     "ResolvedCustomFieldValueResponse",
+    "UpdateCustomFieldValuesResponse",
 ]
 
 
@@ -347,4 +349,26 @@ class ListCustomFieldGroupsResponse(BaseModel):
             "membership is the definitions whose group_id matches this group. Groups with no "
             "matching definitions are still present with an empty membership list."
         )
+    )
+
+
+class UpdateCustomFieldValuesResponse(OmitNoneModel):
+    """Per-record outcomes of a custom-field bulk write. A `201` is not success."""
+
+    total_count: int = Field(description="How many values were sent.")
+    applied_count: int = Field(
+        description=(
+            "How many request rows came back with `status` `applied`. A `201` is not success; "
+            "compare this with `total_count`."
+        )
+    )
+    records: tuple[RecordOutcomeResponse, ...] = Field(
+        description="One outcome per request value, in request order."
+    )
+    warnings: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Messages Backstop returned that could not be attributed to a single request "
+            "row. Empty when every message landed on a record."
+        ),
     )

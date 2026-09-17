@@ -12,7 +12,7 @@ from typing import Annotated
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
@@ -31,7 +31,7 @@ from backstop_mcp.features.custom_fields import (
     CustomFieldsService,
     get_custom_fields_service,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, input_required
 from backstop_mcp.models import published_output_schema
 
 type GetProductResponse = ProductAmbiguousResponse | NotFoundResponse | ProductResolvedResponse
@@ -107,7 +107,7 @@ async def get_product(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     custom_fields: CustomFieldsService = Depends(get_custom_fields_service),
     get_product_query: GetProductQuery = Depends(get_product_query_factory),
-) -> GetProductResponse:
+) -> GetProductResponse | InputRequiredResult:
     """Product identity and custom-field values — Strategy, Domicile, Fee Structure, and the rest.
 
     Pass a trusted `product_id`, or `search` / `product` (short name or display name) for one
@@ -153,6 +153,8 @@ async def get_product(
 
     assert name is not None
     outcome = await resolve_product_query(ctx, client, query=name)
+    if input_required(outcome):
+        return outcome
     if not isinstance(outcome, Resolved):
         return ProductAmbiguousResponse.from_unresolved(outcome)
 

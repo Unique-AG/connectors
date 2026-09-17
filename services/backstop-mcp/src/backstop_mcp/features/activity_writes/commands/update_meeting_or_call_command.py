@@ -12,15 +12,18 @@ import logging
 from typing import Literal, assert_never
 from urllib.parse import quote
 
-from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
-from backstop_mcp.features.activity_writes.api_responses import MeetingOrCallAttributes
-from backstop_mcp.features.activity_writes.commands._json_api_utils import (
-    activity_base_attributes,
-    activity_tag_relationship,
+from backstop_mcp.backstop_client import (
+    BackstopApiSingleResourceDocument,
+    BackstopClient,
     isoformat,
     json_api_update,
     omit_none_values,
     relationship_data,
+)
+from backstop_mcp.features.activity_writes.api_responses import MeetingOrCallAttributes
+from backstop_mcp.features.activity_writes.commands._json_api_utils import (
+    activity_base_attributes,
+    activity_tag_relationship,
 )
 from backstop_mcp.features.activity_writes.commands.extract_collection import extract_collection
 from backstop_mcp.features.activity_writes.responses import UpdatedActivityResponse

@@ -333,6 +333,14 @@ mails the assignee — always write the flag explicitly. `isDraft` defaults to f
 `linkedResources` entry that repeats the parent is silently dropped, so filter it out
 rather than reporting a link that is not there.
 
+**5. Key employee cannot be written with an API token.** Org-roster `isKeyEmployee` is the
+projection of employment-row `isKeyRelationship`. A CRM UI session PATCH persists it;
+`Authorization: Basic` + `token: true` returns 200 and does not persist (POST with the
+attribute also echoes and does not land). Token GET omits `isKeyRelationship` even with
+sparse fields. Nested `PATCH /organizations/{id}/employees/{id}` is 500. Do not add an
+MCP write tool for it; read it on `GET /organizations/{id}/employees`
+(`get_people_for_party`) and tell operators to set Key employee in the CRM UI.
+
 Also before you pick a route:
 
 - Nested collection POSTs are not uniformly writable.

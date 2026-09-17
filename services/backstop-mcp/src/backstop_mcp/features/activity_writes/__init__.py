@@ -54,6 +54,7 @@ from backstop_mcp.features.activity_writes.log_activity_input import (
 from backstop_mcp.features.activity_writes.responses import (
     AttachedFileResponse,
     AttachFileResponse,
+    DeleteActivityResponse,
     DeletedActivityResponse,
     LogActivityResponse,
     LoggedActivityResponse,
@@ -77,6 +78,7 @@ __all__ = [
     "AuthorDto",
     "DeleteActivityCommand",
     "DeleteActivityInput",
+    "DeleteActivityResponse",
     "DeletedActivityResponse",
     "LogActivityCommand",
     "LogActivityInput",

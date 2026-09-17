@@ -61,6 +61,9 @@ def _collect_models(annotation: object, seen: set[type[BaseModel]]) -> None:
 def _add_model(model: type[BaseModel], seen: set[type[BaseModel]]) -> None:
     if model in seen:
         return
+    # FastMCP publishes `output_schema` from our models; anything else is not ours to describe.
+    if not model.__module__.startswith("backstop_mcp"):
+        return
     seen.add(model)
     for field in model.model_fields.values():
         _collect_models(field.annotation, seen)

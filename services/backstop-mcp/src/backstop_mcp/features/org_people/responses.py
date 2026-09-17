@@ -1,5 +1,6 @@
 """MCP-facing person and organization records, the people listing, and the tool wraps."""
 
+from datetime import date
 from typing import ClassVar, Literal, Self
 
 from pydantic import ConfigDict, Field
@@ -40,28 +41,78 @@ __all__ = [
 
 
 def _record_fields(attributes: PersonAttributes | OrganizationAttributes) -> dict[str, object]:
-    """Known fields under their own names, with the instance's own keys passed through.
+    """Modelled scalars under their published names, plus unrecognized instance keys.
 
     `passthrough()` comes first so a wire key that collides with a modelled one loses to the
-    modelled value rather than shadowing it.
+    modelled value rather than shadowing it. `regular_custom_field_values` stays for the
+    join, then is excluded from the tool payload.
     """
     return {
         **attributes.passthrough(),
-        "name": attributes.name,
-        "regular_custom_field_values": attributes.regular_custom_field_values,
-        "modified_timestamp": attributes.modified_timestamp,
-        "modified_by": attributes.modified_by,
+        **attributes.model_dump(),
     }
 
 
-class PersonRecordResponse(OmitNoneModel, ProvenanceAttributes):
-    """Person resource attributes; extras preserved for the tool payload."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
+class _PartyRecordFields(OmitNoneModel):
+    """Top-level scalars both person and organization records publish."""
 
     name: str | None = Field(
         default=None,
-        description="Display name as Backstop stores it, usually 'Last, First'.",
+        description="Display name as Backstop stores it.",
+    )
+    contact_description: str | None = Field(
+        default=None, description="Free-text description on this record."
+    )
+    created_timestamp: str | None = Field(
+        default=None, description="When this record was created, as Backstop stores it."
+    )
+    email: str | None = Field(default=None, description="Primary email.")
+    email2: str | None = Field(default=None, description="Second email.")
+    email3: str | None = Field(default=None, description="Third email.")
+    website: str | None = Field(default=None, description="Website.")
+    other_id: str | None = Field(default=None, description="External/other id.")
+    investable_assets: float | None = Field(default=None, description="Investable assets.")
+    landing_page_url: str | None = Field(default=None, description="Landing page URL.")
+    legal_name: str | None = Field(default=None, description="Legal name.")
+    sync_disabled: bool | None = Field(
+        default=None, description="Whether CRM sync is disabled for this record."
+    )
+    categories: tuple[str, ...] | None = Field(
+        default=None,
+        description="CRM categories on this record — investor type, role, or similar labels.",
+    )
+    categories_as_string: str | None = Field(
+        default=None,
+        description="Denormalized category list as a single string. Prefer `categories`.",
+    )
+    country: str | None = Field(
+        default=None, description="Country from the primary location, when Backstop copies it here."
+    )
+    city: str | None = Field(
+        default=None, description="City from the primary location, when Backstop copies it here."
+    )
+    postal_code: str | None = Field(
+        default=None,
+        description="Postal code from the primary location, when Backstop copies it here.",
+    )
+    state: str | None = Field(
+        default=None, description="State from the primary location, when Backstop copies it here."
+    )
+    fax: str | None = Field(
+        default=None, description="Fax from the primary location, when Backstop copies it here."
+    )
+    location_title: str | None = Field(
+        default=None, description="Title of the primary location, when Backstop copies it here."
+    )
+    primary_phone_number: str | None = Field(
+        default=None, description="Primary phone, when Backstop copies it onto this record."
+    )
+    phone: str | None = Field(
+        default=None, description="Phone from the primary location, when Backstop copies it here."
+    )
+    street_address: str | None = Field(
+        default=None,
+        description="Street address from the primary location, when Backstop copies it here.",
     )
     regular_custom_field_values: SkipJsonSchema[RegularCustomFieldValues] = Field(
         default_factory=list,
@@ -73,12 +124,51 @@ class PersonRecordResponse(OmitNoneModel, ProvenanceAttributes):
         ),
     )
 
+
+class PersonRecordResponse(_PartyRecordFields, ProvenanceAttributes):
+    """Person resource attributes; extras preserved for the tool payload."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
+
+    birthday: date | None = Field(default=None, description="Birthday, as YYYY-MM-DD.")
+    company_name: str | None = Field(default=None, description="Company-name text on the person.")
+    department: str | None = Field(default=None, description="Department.")
+    first_name: str | None = Field(default=None, description="First name.")
+    middle_name: str | None = Field(default=None, description="Middle name.")
+    last_name: str | None = Field(default=None, description="Last name.")
+    gender: str | None = Field(default=None, description="Gender as Backstop stores it.")
+    is_employee: bool | None = Field(
+        default=None,
+        description=(
+            "Whether this person is an employee of our firm (`isEmployee`). Distinct "
+            "from `is_key_employee`."
+        ),
+    )
+    is_key_employee: bool | None = Field(
+        default=None,
+        description=(
+            "Unreliable on this record: `GET /people` omits `isKeyEmployee` even when "
+            "the organization roster is true. Read it on `get_people_for_party`. "
+            "Cannot be written through these tools — personal API tokens do not persist "
+            "`isKeyRelationship`; set Key employee in the CRM UI. Distinct from "
+            "`is_employee`, which means employee of our firm."
+        ),
+    )
+    job_title: str | None = Field(default=None, description="Job title.")
+    mobile_phone: str | None = Field(default=None, description="Mobile phone.")
+    nick_name: str | None = Field(default=None, description="Nickname.")
+    prefix: str | None = Field(default=None, description="Name prefix / honorific.")
+    suffix: str | None = Field(default=None, description="Name suffix.")
+    salutation: str | None = Field(default=None, description="Salutation.")
+    pronunciation: str | None = Field(default=None, description="Pronunciation guide.")
+    spouse_name: str | None = Field(default=None, description="Spouse name.")
+
     @classmethod
     def from_attributes(cls, attributes: PersonAttributes) -> Self:
         return cls.model_validate(_record_fields(attributes))
 
 
-class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
+class OrganizationRecordResponse(_PartyRecordFields, ProvenanceAttributes):
     """Shape of an organization resource's `attributes` in `get_organization`'s response.
 
     `extra="allow"` so unrecognized Backstop fields survive on the typed payload, and so
@@ -88,19 +178,22 @@ class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
 
-    name: str | None = Field(
-        default=None,
-        description="Organization name as Backstop stores it.",
+    aliases: str | None = Field(default=None, description="Aliases string.")
+    date_founded: date | None = Field(default=None, description="Date founded, as YYYY-MM-DD.")
+    internal_organization: bool | None = Field(
+        default=None, description="Whether this is an internal organization."
     )
-    regular_custom_field_values: SkipJsonSchema[RegularCustomFieldValues] = Field(
-        default_factory=list,
-        alias="regularCustomFieldValues",
-        exclude=True,
+    matching_domains: tuple[str, ...] | None = Field(
+        default=None, description="Matching email domains on this organization."
+    )
+    number_of_employees: int | None = Field(
+        default=None,
         description=(
-            "Wire dump of regularCustomFieldValues used to resolve published "
-            "custom_field_values; omitted from the tool payload."
+            "Headcount on the organization record. This is not a roster — current staff "
+            "come from `get_people_for_party`."
         ),
     )
+    ria: bool | None = Field(default=None, description="Whether this organization is an RIA.")
 
     @classmethod
     def from_attributes(cls, attributes: OrganizationAttributes) -> Self:
@@ -142,6 +235,16 @@ class PersonAtOrganizationResponse(OmitNoneModel):
         default=None,
         description="CRM categories on this person — investor type, role, or similar labels.",
     )
+    is_key_employee: bool | None = Field(
+        default=None,
+        description=(
+            "Key employee at *this* organization, from "
+            "`GET /organizations/{id}/employees`. Not a person attribute, custom "
+            "field, or category. Absent when the row has no `/employees` card. "
+            "Cannot be written through these tools — personal API tokens do not persist "
+            "`isKeyRelationship`; set Key employee in the CRM UI."
+        ),
+    )
     employment: EmploymentLinkResponse = Field(
         description=(
             "Employment at *this* organization, from `EmploymentIndex`: `status` is `current` "
@@ -171,6 +274,7 @@ class PersonAtOrganizationResponse(OmitNoneModel):
             phone=card.phone,
             company_name=card.company_name,
             categories=card.categories,
+            is_key_employee=card.is_key_employee,
             employment=employment,
         )
 
@@ -243,10 +347,10 @@ class PersonResolvedResponse(OmitNoneModel):
     )
     person: PersonRecordResponse = Field(
         description=(
-            "The person's own Backstop attributes. Known keys (`name`, `modifiedTimestamp`, "
-            "`modifiedBy`) are documented; other keys are this instance's fields passed "
-            "through unchanged. Custom-field values are under `custom_field_values`, not on "
-            "this record."
+            "The person's own top-level Backstop attributes (name parts, emails, title, "
+            "phones, primary-location copies, `is_employee`, `is_key_employee`, and the "
+            "rest). Custom-field values are under `custom_field_values`, not on this "
+            "record. Unrecognized instance keys are passed through."
         )
     )
     resolved: ResolvedPartyResponse = Field(description=RESOLVED_PARTY_ECHO_DESCRIPTION)
@@ -298,10 +402,10 @@ class OrganizationResolvedResponse(OmitNoneModel):
     )
     organization: OrganizationRecordResponse = Field(
         description=(
-            "The organization's own Backstop attributes. Known keys (`name`, "
-            "`modifiedTimestamp`, `modifiedBy`) are documented; other keys are this "
-            "instance's fields passed through unchanged. Custom-field values are under "
-            "`custom_field_values`, not on this record."
+            "The organization's own top-level Backstop attributes (name, emails, "
+            "headcount, domains, primary-location copies, and the rest). Custom-field "
+            "values are under `custom_field_values`, not on this record. Unrecognized "
+            "instance keys are passed through. `number_of_employees` is not a roster."
         )
     )
     resolved: ResolvedPartyResponse = Field(description=RESOLVED_PARTY_ECHO_DESCRIPTION)

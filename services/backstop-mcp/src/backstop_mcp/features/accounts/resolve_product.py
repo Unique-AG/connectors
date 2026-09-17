@@ -34,6 +34,7 @@ from http import HTTPStatus
 from urllib.parse import quote
 
 from fastmcp import Context
+from mcp.types import InputRequiredResult
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
@@ -189,7 +190,7 @@ async def resolve_product(
     *,
     product_id: str | None = None,
     product: str | None = None,
-) -> ProductResolution:
+) -> ProductResolution | InputRequiredResult:
     """Resolve one product from a trusted id, a short name, or a name search.
 
     Exactly one of `product_id` or `product` must be set. A trusted id is one by-id request; a
@@ -214,7 +215,7 @@ async def resolve_product(
 
 async def resolve_product_query(
     ctx: Context, client: BackstopClient, *, query: str
-) -> ProductResolution:
+) -> ProductResolution | InputRequiredResult:
     """Resolve a product from one string that may be an id, a short name, or a display name.
 
     Digits are a by-id GET, then the catalog if that id is missing. Anything else is the

@@ -55,6 +55,21 @@ class TestInstructions:
         assert "no email kind on log_activity" in INSTRUCTIONS
         assert "list_activity_tags" in INSTRUCTIONS
         assert "tags are never created" in INSTRUCTIONS
+        assert "list_contact_sources" in INSTRUCTIONS
+        assert "contact_source_id" in INSTRUCTIONS
+        assert "list_contact_categories" in INSTRUCTIONS
+        assert "category_ids" in INSTRUCTIONS
+        assert "not a custom field" in INSTRUCTIONS
+        assert "is_key_employee" in INSTRUCTIONS
+        assert "isKeyEmployee" in INSTRUCTIONS
+        assert "isKeyRelationship" in INSTRUCTIONS
+        assert "cannot be set or cleared" in INSTRUCTIONS
+        assert "CRM UI" in INSTRUCTIONS
         assert "delete_activity" in INSTRUCTIONS
+        assert "delete_person" in INSTRUCTIONS
+        assert "delete_organization" in INSTRUCTIONS
+        assert "delete_opportunity" in INSTRUCTIONS
         assert "no recycle bin" in INSTRUCTIONS
+        assert "all test records" in INSTRUCTIONS
+        assert "search-then-delete" in INSTRUCTIONS
         assert "update_activity" in INSTRUCTIONS

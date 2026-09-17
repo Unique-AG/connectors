@@ -19,7 +19,7 @@ from typing import Annotated
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError
@@ -43,7 +43,12 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import (
+    NotFoundResponse,
+    Resolved,
+    elicit_if_ambiguous,
+    input_required,
+)
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -88,7 +93,7 @@ async def get_accounts_for_party(
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     get_party_name_query: GetPartyNameQuery = Depends(get_party_name_query_factory),
     get_holdings_query: GetHoldingsQuery = Depends(get_holdings_query_factory),
-) -> GetAccountsForPartyResponse:
+) -> GetAccountsForPartyResponse | InputRequiredResult:
     """What a person or organization holds: their accounts, with balances, across products.
 
     Required: `search_type` plus exactly one of `party_id` or `search`. A `party_id` without
@@ -124,6 +129,8 @@ async def get_accounts_for_party(
         search=search,
     )
     result = await elicit_if_ambiguous(ctx, result)
+    if input_required(result):
+        return result
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 

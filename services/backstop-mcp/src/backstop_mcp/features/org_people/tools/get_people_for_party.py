@@ -14,7 +14,7 @@ from typing import Annotated, Literal
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.org_people import (
@@ -31,7 +31,12 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import (
+    NotFoundResponse,
+    Resolved,
+    elicit_if_ambiguous,
+    input_required,
+)
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -94,7 +99,7 @@ async def get_people_for_party(
     get_people_for_organization_query: GetPeopleForOrganizationQuery = Depends(
         get_people_for_organization_query_factory
     ),
-) -> GetPeopleForPartyResponse:
+) -> GetPeopleForPartyResponse | InputRequiredResult:
     """List the people Backstop links to an organization, with employment status at that org.
 
     Pass a trusted `party_id` (from a prior resolve echo — never invent one) or `search`.
@@ -105,13 +110,17 @@ async def get_people_for_party(
     even when people are on file. Name and email come from `/employees` (same ids as people)
     side-loaded with employment relationships on that walk — not a fetch per person.
 
-    Each row is identity (`id` / `search_type` / name / email / `categories`) plus
-    `employment` from `EmploymentIndex` — `status` is `current` or `former` at this
-    organization. Default is current only. `/employees` does not list former staff; those
-    links are on the organization's `entityRelationships`. When they are omitted,
-    `former_omitted` and `include_former_hint` say so — pass `include_former=true` to
-    include them (contact fields may be absent). Call `get_person` with that row's `id`
-    and `search_type` for the full record.
+    Each row is identity (`id` / `search_type` / name / email / `categories` /
+    `is_key_employee`) plus `employment` from `EmploymentIndex` — `status` is `current`
+    or `former` at this organization. `is_key_employee` is org-scoped: it only appears
+    on this roster (`GET /organizations/{id}/employees`), not on `get_person`. It cannot
+    be set or cleared through these tools — personal API tokens do not persist
+    `isKeyRelationship`. Set Key employee in the CRM UI. Default is current only.
+    `/employees` does not list former staff; those links are on the organization's
+    `entityRelationships`.
+    When they are omitted, `former_omitted` and `include_former_hint` say so — pass
+    `include_former=true` to include them (contact fields may be absent). Call
+    `get_person` with that row's `id` and `search_type` for the full record.
     """
     if (party_id is None) == (search is None):
         raise ValueError("Exactly one of party_id or search must be provided")
@@ -122,6 +131,8 @@ async def get_people_for_party(
         search=search,
     )
     result = await elicit_if_ambiguous(ctx, result)
+    if input_required(result):
+        return result
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 

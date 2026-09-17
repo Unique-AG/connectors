@@ -79,6 +79,7 @@ class TestPeopleForOrganizationQuery:
                         "jobTitle": "Tax Director",
                         "email": "phil@example.com",
                         "categories": ["Investor", "Decision Maker"],
+                        "isKeyEmployee": True,
                     },
                 ),
                 included=[
@@ -101,11 +102,14 @@ class TestPeopleForOrganizationQuery:
         assert listing.people[0].name == "Glenn, Phil"
         assert listing.people[0].job_title == "Tax Director"
         assert listing.people[0].categories == ("Investor", "Decision Maker")
+        assert listing.people[0].is_key_employee is True
         assert listing.former_omitted == 0
         assert listing.people_omitted == 0
         query = dict(route.calls.last.request.url.params)
         assert query["include"] == "entityRelationships,entityRelationships.entityRelationshipType"
-        assert query["fields[employees]"] == "name,jobTitle,email,phone,companyName,categories"
+        assert query["fields[employees]"] == (
+            "name,jobTitle,email,phone,companyName,categories,isKeyEmployee"
+        )
         assert any(
             request.url.path.endswith("/entityRelationships")
             for request in recorded_requests(respx.calls)

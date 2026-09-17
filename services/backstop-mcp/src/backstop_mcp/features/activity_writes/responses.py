@@ -18,6 +18,7 @@ __all__ = [
     "ActivityBaseResponse",
     "AttachFileResponse",
     "AttachedFileResponse",
+    "DeleteActivityResponse",
     "DeletedActivityResponse",
     "LogActivityResponse",
     "LoggedActivityResponse",
@@ -127,6 +128,8 @@ class DeletedActivityResponse(ActivityBaseResponse):
         description="Always true: Backstop hard-deletes the record. There is no recycle bin.",
     )
 
+
+type DeleteActivityResponse = DeletedActivityResponse
 
 type LogActivityResponse = LoggedActivityResponse | PartyAmbiguousResponse | NotFoundResponse
 

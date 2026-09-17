@@ -6,7 +6,7 @@ from typing import Annotated
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.entity_types import SearchType
@@ -20,7 +20,12 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import (
+    NotFoundResponse,
+    Resolved,
+    elicit_if_ambiguous,
+    input_required,
+)
 from backstop_mcp.features.tasks import GetTasksForPartyQuery, TaskFilter, TasksResolvedResponse
 from backstop_mcp.features.tasks.dependencies import get_tasks_for_party_query_factory
 from backstop_mcp.models import published_output_schema
@@ -69,7 +74,7 @@ async def get_tasks_for_party(
     ] = "all",
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     get_tasks_for_party_query: GetTasksForPartyQuery = Depends(get_tasks_for_party_query_factory),
-) -> GetTasksForPartyResponse:
+) -> GetTasksForPartyResponse | InputRequiredResult:
     """List a party's CRM tasks.
 
     Required: `search_type` plus exactly one of `party_id` or `search`. A `party_id` without
@@ -87,6 +92,8 @@ async def get_tasks_for_party(
         search_type=search_type, party_id=party_id, search=search
     )
     result = await elicit_if_ambiguous(ctx, result)
+    if input_required(result):
+        return result
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value

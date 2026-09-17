@@ -1,7 +1,7 @@
 """Employment-index assembly: vocabulary, classification, and edge parsing.
 
 The scan and the type classification it rests on, fully parameterised. Tools do not call any of
-it directly — they go through `EmploymentIndexFactory`, which owns the employment vocabulary.
+it directly — they go through `EmploymentIndexFactory`, which consumes the employment vocabulary.
 List/org-contact tools should use that verdict to exclude departed people from "who do we contact
 at X" answers unless the user asked for historical contacts; a by-id person fetch returns the
 person with employment links rather than hiding the record.
@@ -29,7 +29,6 @@ from backstop_mcp.features.data_hygiene.internal_dto import (
     EmploymentEdgeDto,
     EmploymentRulesDto,
     EmploymentStatus,
-    TypeVocabularyDto,
 )
 from backstop_mcp.features.entity_types import normalize_entity_type
 
@@ -56,14 +55,15 @@ class _Person(BaseModel):
 
 
 class EmploymentIndexFactory:
-    """Owns the employment vocabulary and the clock; builds an `EmploymentIndex` per document.
+    """Consumes the employment vocabulary and the clock; builds an `EmploymentIndex` per document.
 
     The employment vocabulary is a constructor dependency and the relationship-type names arrive
     side-loaded on the caller's own GET, so building an index needs no client, no cache and no
     lock: it is synchronous, and every caller gets the same index for the same record.
 
-    Built via `from_vocabulary` by `get_employment_index_factory` in this feature's
-    `dependencies.py`.
+    Built with `rules` from `get_employment_rules()` by `get_employment_index_factory`.
+    `from_vocabulary` remains for tests and helpers that construct a factory without the
+    composition root.
     """
 
     def __init__(
@@ -74,6 +74,14 @@ class EmploymentIndexFactory:
     ) -> None:
         self._rules: EmploymentRulesDto = rules
         self._clock: Callable[[], date] = clock
+
+    def today(self) -> date:
+        """The date this factory calls `today` when deciding current vs. former.
+
+        A writer that wants to warn on the same boundary the read path uses must ask
+        here rather than calling `date.today()` and drifting from an injected clock.
+        """
+        return self._clock()
 
     @classmethod
     def from_vocabulary(
@@ -87,15 +95,11 @@ class EmploymentIndexFactory:
         """Build the factory from configured values, translating them into the feature's own
         type."""
         return cls(
-            rules=EmploymentRulesDto(
-                employment=TypeVocabularyDto(
-                    type_ids=frozenset(employment_type_ids),
-                    name_markers=frozenset(employment_type_markers),
-                ),
-                former=TypeVocabularyDto(
-                    type_ids=frozenset(former_type_ids),
-                    name_markers=frozenset(former_type_markers),
-                ),
+            rules=EmploymentRulesDto.from_vocabulary(
+                employment_type_ids=employment_type_ids,
+                employment_type_markers=employment_type_markers,
+                former_type_ids=former_type_ids,
+                former_type_markers=former_type_markers,
             ),
         )
 

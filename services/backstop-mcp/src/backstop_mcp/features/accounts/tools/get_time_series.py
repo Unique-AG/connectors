@@ -14,7 +14,7 @@ from typing import Annotated
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
@@ -29,7 +29,7 @@ from backstop_mcp.features.accounts import (
     resolve_product_query,
 )
 from backstop_mcp.features.accounts.dependencies import get_time_series_query_factory
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved, input_required
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ async def get_time_series(
     ] = None,
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     get_time_series_query: GetTimeSeriesQuery = Depends(get_time_series_query_factory),
-) -> GetTimeSeriesResponse:
+) -> GetTimeSeriesResponse | InputRequiredResult:
     """Dated points of one time series on one account or one product.
 
     Pass `entity_type`, a trusted `entity_id`, and `series`. Optional `start_date` / `end_date`
@@ -153,6 +153,8 @@ async def get_time_series(
     resolved_id = entity_id
     if entity_type == "products":
         outcome = await resolve_product_query(ctx, client, query=entity_id)
+        if input_required(outcome):
+            return outcome
         if not isinstance(outcome, Resolved):
             return ProductAmbiguousResponse.from_unresolved(outcome)
         resolved_id = outcome.value.id

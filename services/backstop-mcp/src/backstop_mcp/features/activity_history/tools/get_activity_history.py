@@ -17,7 +17,7 @@ import logging
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 
 from backstop_mcp.features.activity_history import (
     ActivityHistorySettings,
@@ -64,7 +64,7 @@ async def get_activity_history(
     get_activity_history_query: GetActivityHistoryQuery = Depends(
         get_activity_history_query_factory
     ),
-) -> GetActivityHistoryResponse:
+) -> GetActivityHistoryResponse | InputRequiredResult:
     """Party-scoped stream pages. Do not start here — always use `search_activities` first.
 
     Documented fallback when `search_activities` is unavailable (that primary is an undocumented

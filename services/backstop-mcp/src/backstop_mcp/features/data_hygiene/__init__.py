@@ -6,8 +6,8 @@ index (person or organization side-loads), `EmploymentLinkResponse` for the tool
 provenance.
 `EmploymentIndex` is the winner-per-pair fold the factory composes. It is exported because it is
 what `EmploymentIndexFactory.index` hands back — a package that publishes a method has to publish
-the type on its signature — not so that callers build one. `EmploymentIndexFactory` owns the
-vocabulary and the clock; construct the index through it.
+the type on its signature — not so that callers build one. `get_employment_rules` owns the
+tenant vocabulary; `EmploymentIndexFactory` consumes it (plus the clock) to build an index.
 """
 
 from backstop_mcp.features.data_hygiene.api_responses import (
@@ -18,7 +18,10 @@ from backstop_mcp.features.data_hygiene.api_responses import (
     ProvenanceAttributes,
     RelationshipTypeAttributes,
 )
-from backstop_mcp.features.data_hygiene.dependencies import get_employment_index_factory
+from backstop_mcp.features.data_hygiene.dependencies import (
+    get_employment_index_factory,
+    get_employment_rules,
+)
 from backstop_mcp.features.data_hygiene.employment_index import EmploymentIndex
 from backstop_mcp.features.data_hygiene.employment_index_factory import EmploymentIndexFactory
 from backstop_mcp.features.data_hygiene.internal_dto import (
@@ -61,5 +64,6 @@ __all__ = [
     "RelationshipTypeAttributes",
     "TypeVocabularyDto",
     "get_employment_index_factory",
+    "get_employment_rules",
     "project_entity_relationships",
 ]

@@ -3,13 +3,16 @@
 import logging
 from urllib.parse import quote
 
-from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiSingleResourceDocument,
+    BackstopClient,
+    json_api_update,
+    omit_none_values,
+)
 from backstop_mcp.features.activity_writes.api_responses import NoteAttributes
 from backstop_mcp.features.activity_writes.commands._json_api_utils import (
     activity_base_attributes,
     activity_tag_relationship,
-    json_api_update,
-    omit_none_values,
 )
 from backstop_mcp.features.activity_writes.commands.extract_collection import extract_collection
 from backstop_mcp.features.activity_writes.responses import UpdatedActivityResponse

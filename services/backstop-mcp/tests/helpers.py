@@ -8,7 +8,7 @@ so the concurrency gate and config injection under test are the real ones.
 import json
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, timedelta
 from typing import Protocol, cast
 
 import httpx
@@ -23,12 +23,15 @@ from backstop_mcp.backstop_client import (
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import retry_settings, transport_settings
 from backstop_mcp.features.activity_tags import ActivityTagsService
+from backstop_mcp.features.contact_categories import ListContactCategoriesQuery
+from backstop_mcp.features.contact_sources import ListContactSourcesQuery
 from backstop_mcp.features.custom_fields import CustomFieldGroupsService, CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
     EmploymentRulesDto,
     TypeVocabularyDto,
 )
+from backstop_mcp.features.opportunities import OpportunityStagesService
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.time_zones import TimeZonesService
 
@@ -117,12 +120,38 @@ def activity_tags_service(client: BackstopClient, *, ttl_minutes: int = 60) -> A
     return ActivityTagsService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
 
 
+def list_contact_sources_query(
+    client: BackstopClient, *, ttl_minutes: int = 60, caching_enabled: bool = True
+) -> ListContactSourcesQuery:
+    return ListContactSourcesQuery(
+        client=client,
+        ttl=timedelta(minutes=ttl_minutes),
+        caching_enabled=caching_enabled,
+    )
+
+
+def list_contact_categories_query(
+    client: BackstopClient, *, ttl_minutes: int = 60, caching_enabled: bool = True
+) -> ListContactCategoriesQuery:
+    return ListContactCategoriesQuery(
+        client=client,
+        ttl=timedelta(minutes=ttl_minutes),
+        caching_enabled=caching_enabled,
+    )
+
+
 def system_users_service(client: BackstopClient, *, ttl_minutes: int = 60) -> SystemUsersService:
     return SystemUsersService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
 
 
 def time_zones_service(client: BackstopClient, *, ttl_minutes: int = 60) -> TimeZonesService:
     return TimeZonesService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
+
+
+def opportunity_stages_service(
+    client: BackstopClient, *, ttl_minutes: int = 60
+) -> OpportunityStagesService:
+    return OpportunityStagesService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
 
 
 def custom_fields_service(

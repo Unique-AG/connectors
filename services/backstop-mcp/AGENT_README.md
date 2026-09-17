@@ -444,11 +444,28 @@ them if they ever show up).
 **DELETE has no body.** `client.delete(path)` — no dummy `*Attributes`, no `schema=` on a
 204. Pass `schema=` only when Backstop returns a body.
 
-**Elicitation is a capability, then a fetch.** `elicit_entity_deletion` takes a callback
-and runs it only after the client is known to support elicitation. Do not GET a preview
-for a prompt that will never be shown. Id spaces differ (`/entity-activity-details` is
-not `/emails` or `/tasks`) — use one parser that knows `kind`, and do not treat a 200
-from the wrong collection as the target record.
+**A bulk POST is read through `features/bulk_writes`.** Every `POST /bulk-*` answers `201`
+whether or not anything landed, so `BulkLoadSummaryAttributes`, `RecordOutcomeResponse` and
+the `bulk_record_outcomes` fold (error index → row, `successCount: 0` → whole batch failed,
+landed key → `applied`, leftover message → warning) live there once. A new bulk writer
+supplies the two things that are actually its own: the `match_key` its rows are identified by
+in Backstop's echo (a definition id; an `(opportunity_id, stage_id)` pair) and the document
+shape wrapping `attributes.records`. Do not copy the fold into the feature.
+
+**Never let `omit_none_values` eat a value the caller meant to clear.** It is for keys that
+are absent, not for keys that are null. Custom-field writes send `"value": null` explicitly —
+dropping the key posts a record with nothing to write, and Backstop still echoes the
+definition id back, so the fold above would have reported `applied` for a no-op.
+
+**Elicitation is a capability, then a fetch.** Gate on
+`client_supports_elicitation` before building a prompt: `elicit_entity_deletion`
+takes a callback so a tool does not GET a preview for a prompt that will never be
+shown. It returns `CONFIRMED`, `DECLINED` (declined, cancelled, timed out, or the
+prompt failed), or `NOT_AVAILABLE` when the client never advertised the capability
+— that last one still deletes. `ctx.elicit` carries `related_request_id`, so the
+form rides the originating call's stream. Every wait is bounded by
+`RESOLUTION_ELICIT_TIMEOUT_SECONDS`. Do not wait on `elicit_if_ambiguous` before a
+delete confirm — return the candidate list.
 
 **Do not premature-optimize a small catalog.** A linear scan of ~200 time zones is fine.
 Cache TTL stays off until a metric says otherwise. Index a roster by casefolded login

@@ -47,6 +47,7 @@ class TestGetPeopleForParty:
                                 "jobTitle": "Tax Director",
                                 "email": "phil@example.com",
                                 "categories": ["Investor", "Decision Maker"],
+                                "isKeyEmployee": True,
                             },
                         }
                     ],
@@ -86,6 +87,7 @@ class TestGetPeopleForParty:
         assert row.name == "Glenn, Phil"
         assert row.job_title == "Tax Director"
         assert row.categories == ("Investor", "Decision Maker")
+        assert row.is_key_employee is True
         assert row.employment.status == "current"
         assert row.employment.organization_id == _ORG
         assert result.former_omitted == 0

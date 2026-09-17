@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 from pydantic import BaseModel, ValidationError
 
@@ -10,6 +12,13 @@ from backstop_mcp.backstop_client import (
     OptionalBackstopApiResourceDocument,
     ResourceRef,
     included_resource,
+    isoformat,
+    json_api_create,
+    json_api_update,
+    omit_none_values,
+    relationship_data,
+    relationship_to_one,
+    resource_pointer,
 )
 
 
@@ -426,3 +435,47 @@ class TestIncludedResource:
 
         assert entry is not None
         assert entry.type is None
+
+
+class TestJsonApiRequestBodies:
+    def test_omit_none_values_drops_only_none(self) -> None:
+        assert omit_none_values({"name": "Deal", "description": None, "count": 0}) == {
+            "name": "Deal",
+            "count": 0,
+        }
+
+    def test_relationship_to_one_omits_a_missing_id(self) -> None:
+        assert relationship_to_one("products", None) is None
+        assert relationship_to_one("products", "1292283") == {
+            "data": {"type": "products", "id": "1292283"}
+        }
+
+    def test_relationship_data_none_omits_and_empty_tuple_clears(self) -> None:
+        assert relationship_data("system-users", None) is None
+        assert relationship_data("system-users", ()) == {"data": []}
+        assert relationship_data("system-users", ("2967455",)) == {
+            "data": [{"type": "system-users", "id": "2967455"}]
+        }
+
+    def test_json_api_update_is_create_plus_id(self) -> None:
+        assert json_api_update(
+            resource_type="opportunities",
+            resource_id="5755101",
+            attributes={"name": "Deal"},
+            relationships={"stage": {"data": {"type": "opportunity-stages", "id": "42482"}}},
+        ) == json_api_create(
+            resource_type="opportunities",
+            resource_id="5755101",
+            attributes={"name": "Deal"},
+            relationships={"stage": {"data": {"type": "opportunity-stages", "id": "42482"}}},
+        )
+
+    def test_resource_pointer_uses_plural_resource_type(self) -> None:
+        assert resource_pointer(resource_id="42482", resource_type="opportunity-stages") == {
+            "resourceId": "42482",
+            "resourceType": "opportunity-stages",
+        }
+
+    def test_isoformat_passes_none_through(self) -> None:
+        assert isoformat(None) is None
+        assert isoformat(date(2026, 9, 14)) == "2026-09-14"

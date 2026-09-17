@@ -6,7 +6,7 @@ from typing import Annotated
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.activity_writes import (
@@ -22,7 +22,7 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.features.system_users import SystemUserDto, get_current_caller_system_user
 from backstop_mcp.models import published_output_schema
 
@@ -44,7 +44,7 @@ async def log_activity(
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     log_activity_command: LogActivityCommand = Depends(get_log_activity_command_factory),
     caller: SystemUserDto = Depends(get_current_caller_system_user),
-) -> LogActivityResponse:
+) -> LogActivityResponse | InputRequiredResult:
     """Log a CRM note, meeting, call, or task.
 
     Required on `activity`: `kind`, `search_type`, and exactly one of `party_id` or `search`.
@@ -66,6 +66,8 @@ async def log_activity(
         search=activity.search,
     )
     result = await elicit_if_ambiguous(ctx, result)
+    if input_required(result):
+        return result
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value

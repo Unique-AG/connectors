@@ -19,18 +19,39 @@ from backstop_mcp.features.activity_writes.tools.attach_file import attach_file
 from backstop_mcp.features.activity_writes.tools.delete_activity import delete_activity
 from backstop_mcp.features.activity_writes.tools.log_activity import log_activity
 from backstop_mcp.features.activity_writes.tools.update_activity import update_activity
+from backstop_mcp.features.contact_categories.tools.list_contact_categories import (
+    list_contact_categories,
+)
+from backstop_mcp.features.contact_sources.tools.list_contact_sources import list_contact_sources
 from backstop_mcp.features.custom_fields.tools.list_custom_field_groups import (
     list_custom_field_groups,
 )
 from backstop_mcp.features.custom_fields.tools.list_custom_fields import list_custom_fields
+from backstop_mcp.features.custom_fields.tools.update_custom_field_values import (
+    update_custom_field_values,
+)
 from backstop_mcp.features.opportunities.tools.get_opportunities import get_opportunities
 from backstop_mcp.features.opportunities.tools.get_opportunities_by_ids import (
     get_opportunities_by_ids,
 )
 from backstop_mcp.features.opportunities.tools.search_opportunities import search_opportunities
+from backstop_mcp.features.opportunity_writes.tools.backfill_opportunity_stage_history import (
+    backfill_opportunity_stage_history,
+)
+from backstop_mcp.features.opportunity_writes.tools.create_opportunity import create_opportunity
+from backstop_mcp.features.opportunity_writes.tools.delete_opportunity import delete_opportunity
+from backstop_mcp.features.opportunity_writes.tools.update_opportunity import update_opportunity
 from backstop_mcp.features.org_people.tools.get_organization import get_organization
 from backstop_mcp.features.org_people.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.features.org_people.tools.get_person import get_person
+from backstop_mcp.features.org_people_writes.tools.create_employment import create_employment
+from backstop_mcp.features.org_people_writes.tools.create_organization import create_organization
+from backstop_mcp.features.org_people_writes.tools.create_person import create_person
+from backstop_mcp.features.org_people_writes.tools.delete_organization import delete_organization
+from backstop_mcp.features.org_people_writes.tools.delete_person import delete_person
+from backstop_mcp.features.org_people_writes.tools.end_employment import end_employment
+from backstop_mcp.features.org_people_writes.tools.update_organization import update_organization
+from backstop_mcp.features.org_people_writes.tools.update_person import update_person
 from backstop_mcp.features.system_users.tools.list_system_users import list_system_users
 from backstop_mcp.features.tasks.tools.get_tasks_for_party import get_tasks_for_party
 
@@ -42,6 +63,8 @@ TOOLS: tuple[ToolFunction, ...] = (
     list_custom_fields,
     list_custom_field_groups,
     list_activity_tags,
+    list_contact_categories,
+    list_contact_sources,
     list_system_users,
     get_activity_history,
     get_activity_detail,
@@ -60,4 +83,17 @@ TOOLS: tuple[ToolFunction, ...] = (
     attach_file,
     update_activity,
     delete_activity,
+    update_opportunity,
+    create_opportunity,
+    delete_opportunity,
+    backfill_opportunity_stage_history,
+    update_custom_field_values,
+    create_person,
+    create_organization,
+    create_employment,
+    update_person,
+    update_organization,
+    delete_person,
+    delete_organization,
+    end_employment,
 )

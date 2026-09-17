@@ -91,6 +91,7 @@ class OpportunityResourceAttributes(BaseModel):
     regular_custom_field_values: RegularCustomFieldValues = Field(
         default_factory=list, alias="regularCustomFieldValues"
     )
+    client_defined_entity_type: LenientInt = Field(default=None, alias="clientDefinedEntityType")
 
 
 OpportunityResource = BackstopApiResource[OpportunityResourceAttributes]
@@ -110,6 +111,7 @@ class OpportunityStageAttributes(BaseModel):
     name: StrippedStr | None = None
     sort_order: LenientInt = Field(default=None, alias="sortOrder")
     closed: LenientBool = None
+    probability: LenientFloat = None
 
 
 class SearchContactAttributes(BaseModel):
