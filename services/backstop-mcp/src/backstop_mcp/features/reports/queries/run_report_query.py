@@ -58,9 +58,8 @@ class RunReportQuery:
             )
             columns: tuple[ReportColumnResponse, ...] = ()
             rows: list[dict[str, object]] = []
-            # Backstop's offset counts the values it sent, not the ones we could read, so
-            # paging must advance by `consumed`. Advancing by len(rows) would re-request
-            # every dropped value's slot and duplicate rows for the rest of the report.
+            # Backstop's offset counts values it sent, not rows we could read; advancing by
+            # len(rows) would re-request each dropped slot and duplicate the rest.
             consumed = 0
             for report in page.items:
                 result = report.attributes.result
