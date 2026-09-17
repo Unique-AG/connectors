@@ -216,17 +216,6 @@ def _measured(
         status = _CANCELLED
         raise
     except Exception as error:
-        # SDK failures that are not `APIError` and carry no response to classify. `KiotaHTTPXError`
-        # reaches here as `RedirectError` (`kiota_http/middleware/redirect_handler.py:94`) or
-        # `ResponseError` (`kiota_http/httpx_request_adapter.py:602`). A bare `Exception` is what
-        # the parse-node registry raises when it meets a content type that has no parser
-        # (`kiota_abstractions/serialization/parse_node_factory_registry.py:48`). A gateway that
-        # answers `text/html` on a 500 produces exactly that, and no `error_map` can describe it.
-        #
-        # TRAP: the *exact* base class is the discriminator here, not `isinstance`, which matches
-        # every subclass too. Nothing in this service raises `Exception` itself, so any subclass
-        # reaching here is our own bug. `GraphUnavailable` always tells an operator to retry and
-        # blame Microsoft, the wrong message for our own bug.
         if not isinstance(error, KiotaHTTPXError) and type(error) is not Exception:
             raise
         status = _STATUS[GraphUnavailable]

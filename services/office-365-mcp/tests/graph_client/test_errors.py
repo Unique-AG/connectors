@@ -227,11 +227,9 @@ def test_a_cancelled_call_stays_cancelled_and_is_not_reported_as_a_graph_failure
         raise CancelledError("the client hung up")
 
 
-async def test_a_body_the_sdk_cannot_read_is_worded_rather_than_escaping_unworded(
+async def test_a_body_the_sdk_cannot_read_keeps_the_status_it_arrived_with(
     client: GraphServiceClient, graph: respx.MockRouter
 ) -> None:
-    """A gateway in front of Graph answering `text/html` on a 500. The parse-node registry raises
-    a bare `Exception` for a content type it has no parser for, so no `error_map` describes it."""
     graph.get("/me").mock(
         return_value=httpx.Response(
             500, text="<html>502 Bad Gateway</html>", headers={"content-type": "text/html"}
@@ -240,6 +238,15 @@ async def test_a_body_the_sdk_cannot_read_is_worded_rather_than_escaping_unworde
 
     with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
         _ = await client.me.get()
+
+    assert raised.value.status == 500
+    assert raised.value.code is None
+    assert "Microsoft Graph returned 500" in str(raised.value)
+
+
+def test_a_bare_exception_is_reported_as_an_answer_that_could_not_be_read() -> None:
+    with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
+        raise Exception("no parser for this content type")
 
     assert raised.value.status is None
     assert "could not read" in str(raised.value)
