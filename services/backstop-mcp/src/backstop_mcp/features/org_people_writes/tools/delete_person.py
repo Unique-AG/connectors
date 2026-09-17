@@ -5,11 +5,16 @@ from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
+from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
-from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.features.elicitation_utils import elicit_entity_deletion
+from backstop_mcp.features.elicitation_utils import (
+    DELETION_NOT_CONFIRMED,
+    EntityDeletion,
+    elicit_entity_deletion,
+)
 from backstop_mcp.features.org_people_writes import (
     DELETE_PERSON_INPUT_DESCRIPTION,
     DeletedPersonResponse,
@@ -48,7 +53,7 @@ async def delete_person(
     delete_party_with_locations_command: DeletePartyWithLocationsCommand = Depends(
         get_delete_party_with_locations_command_factory
     ),
-) -> DeletePersonResponse | InputRequiredResult:
+) -> DeletePersonResponse:
     """Permanently delete a CRM person and their contact-locations.
 
     `search_type` plus exactly one of `party_id` or `search` — same identity as
@@ -58,11 +63,8 @@ async def delete_person(
     `include=locations`); deleting the person without that cascade strands those
     addresses. `destructive_hint` is true because this hard-deletes the record.
 
-    When the client supports elicitation on MCP 2026-07-28+, this tool reads the person
-    first and returns `InputRequiredResult` so the client can paint the form. On an
-    older protocol that still advertised elicitation it returns `needs_confirmation`
-    — the model asks in chat and retries with `confirm=true`. When the client never
-    advertised elicitation, it deletes immediately.
+    When the client supports elicitation, this tool reads the person first and asks the
+    user to confirm before deleting. When the client cannot elicit, it deletes immediately.
 
     Call like: {"person": {"search_type": "people", "party_id": "<id from get_person>"}}
     """
@@ -80,16 +82,23 @@ async def delete_person(
         extra={"search_type": collection, "party_id": party.id},
     )
 
-    if not person.confirm:
+    async def prompt() -> str:
+        return await delete_party_with_locations_command.preview(
+            collection=collection, party_id=party.id
+        )
 
-        async def prompt() -> str:
-            return await delete_party_with_locations_command.preview(
-                collection=collection, party_id=party.id
-            )
-
-        gated = await elicit_entity_deletion(ctx, callback=prompt)
-        if gated is not None:
-            return gated
+    outcome = await elicit_entity_deletion(ctx, callback=prompt)
+    if outcome is EntityDeletion.DECLINED:
+        logger.info(
+            "org_people_writes.delete_person.not_confirmed",
+            extra={"search_type": collection, "party_id": party.id},
+        )
+        raise ToolError(DELETION_NOT_CONFIRMED)
+    if outcome is EntityDeletion.NOT_AVAILABLE:
+        logger.info(
+            "org_people_writes.delete_person.elicit.not_available",
+            extra={"search_type": collection, "party_id": party.id},
+        )
     deleted_location_ids = await delete_party_with_locations_command.run(
         collection=collection, party_id=party.id
     )

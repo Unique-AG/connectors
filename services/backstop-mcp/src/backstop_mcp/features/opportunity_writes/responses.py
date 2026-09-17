@@ -9,7 +9,6 @@ from typing import Literal
 from pydantic import Field
 
 from backstop_mcp.features.bulk_writes import RecordOutcomeResponse
-from backstop_mcp.features.elicitation_utils import DeletionNeedsConfirmationResponse
 from backstop_mcp.features.party_resolver import PartyAmbiguousResponse
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
@@ -124,7 +123,7 @@ class BackfillOpportunityStageHistoryResponse(OmitNoneModel):
     )
 
 
-type DeleteOpportunityResponse = DeletedOpportunityResponse | DeletionNeedsConfirmationResponse
+type DeleteOpportunityResponse = DeletedOpportunityResponse
 
 type CreateOpportunityResponse = (
     CreatedOpportunityResponse | PartyAmbiguousResponse | NotFoundResponse

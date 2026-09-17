@@ -6,13 +6,18 @@ from urllib.parse import quote
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
+from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
-from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller
-from backstop_mcp.features.elicitation_utils import elicit_entity_deletion
+from backstop_mcp.features.elicitation_utils import (
+    DELETION_NOT_CONFIRMED,
+    EntityDeletion,
+    elicit_entity_deletion,
+)
 from backstop_mcp.features.opportunities import OpportunityResourceAttributes
 from backstop_mcp.features.opportunity_writes import (
     DELETE_OPPORTUNITY_INPUT_DESCRIPTION,
@@ -47,7 +52,7 @@ async def delete_opportunity(
     delete_opportunity_command: DeleteOpportunityCommand = Depends(
         get_delete_opportunity_command_factory
     ),
-) -> DeleteOpportunityResponse | InputRequiredResult:
+) -> DeleteOpportunityResponse:
     """Permanently delete a CRM opportunity.
 
     Required on `opportunity`: `opportunity_id`. Never invent an id — echo a create, a
@@ -55,11 +60,9 @@ async def delete_opportunity(
     Backstop has no recycle bin. Refuse bulk wipes, "all test records", and any
     search-then-delete sweep.
 
-    When the client supports elicitation on MCP 2026-07-28+, this tool reads the
-    opportunity first and returns `InputRequiredResult` so the client can paint the
-    form. On an older protocol that still advertised elicitation it returns
-    `needs_confirmation` — the model asks in chat and retries with `confirm=true`.
-    When the client never advertised elicitation, it deletes immediately.
+    When the client supports elicitation, this tool reads the opportunity first and asks
+    the user to confirm before deleting. When the client cannot elicit, it deletes
+    immediately.
     `destructive_hint` is true because this hard-deletes the record.
 
     Call like: {"opportunity": {"opportunity_id": "<id from get_opportunities>"}}
@@ -69,14 +72,21 @@ async def delete_opportunity(
         extra={"opportunity_id": opportunity.opportunity_id},
     )
 
-    if not opportunity.confirm:
+    async def prompt() -> str:
+        return await _deletion_prompt(client=client, opportunity_id=opportunity.opportunity_id)
 
-        async def prompt() -> str:
-            return await _deletion_prompt(client=client, opportunity_id=opportunity.opportunity_id)
-
-        gated = await elicit_entity_deletion(ctx, callback=prompt)
-        if gated is not None:
-            return gated
+    outcome = await elicit_entity_deletion(ctx, callback=prompt)
+    if outcome is EntityDeletion.DECLINED:
+        logger.info(
+            "opportunity_writes.delete.not_confirmed",
+            extra={"opportunity_id": opportunity.opportunity_id},
+        )
+        raise ToolError(DELETION_NOT_CONFIRMED)
+    if outcome is EntityDeletion.NOT_AVAILABLE:
+        logger.info(
+            "opportunity_writes.delete.elicit.not_available",
+            extra={"opportunity_id": opportunity.opportunity_id},
+        )
     return await delete_opportunity_command.run(opportunity=opportunity)
 
 

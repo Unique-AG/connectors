@@ -11,7 +11,6 @@ from typing import ClassVar, Literal
 
 from pydantic import ConfigDict, Field
 
-from backstop_mcp.features.elicitation_utils import DeletionNeedsConfirmationResponse
 from backstop_mcp.features.org_people import OrganizationRecordResponse, PersonRecordResponse
 from backstop_mcp.features.party_resolver import PartyAmbiguousResponse
 from backstop_mcp.features.resolution import NotFoundResponse
@@ -197,12 +196,7 @@ class UpdatedOrganizationResponse(OmitNoneModel):
 
 type UpdatePersonResponse = UpdatedPersonResponse | PartyAmbiguousResponse | NotFoundResponse
 
-type DeletePersonResponse = (
-    DeletedPersonResponse
-    | DeletionNeedsConfirmationResponse
-    | PartyAmbiguousResponse
-    | NotFoundResponse
-)
+type DeletePersonResponse = DeletedPersonResponse | PartyAmbiguousResponse | NotFoundResponse
 
 
 class EntityRelationshipTypeResponse(OmitNoneModel):
@@ -275,10 +269,7 @@ type UpdateOrganizationResponse = (
 )
 
 type DeleteOrganizationResponse = (
-    DeletedOrganizationResponse
-    | DeletionNeedsConfirmationResponse
-    | PartyAmbiguousResponse
-    | NotFoundResponse
+    DeletedOrganizationResponse | PartyAmbiguousResponse | NotFoundResponse
 )
 
 type EndEmploymentResponse = EndedEmploymentResponse | PartyAmbiguousResponse | NotFoundResponse

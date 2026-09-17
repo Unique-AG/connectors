@@ -38,7 +38,6 @@ from tests.features.party_resolver.helpers import (
     ctx_accept,
     ctx_cancel,
     ctx_decline,
-    ctx_handshake_era,
     ctx_no_elicitation_capability,
     ctx_stalls,
     ctx_unsupported,
@@ -1255,14 +1254,6 @@ class TestElicitChoice:
         result = await elicit_choice(
             ctx_no_elicitation_capability(), ambiguous, prompt="Which one?"
         )
-
-        assert result is ambiguous
-
-    @pytest.mark.asyncio
-    async def test_handshake_era_skips_elicit_and_returns_candidates(self) -> None:
-        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
-
-        result = await elicit_choice(ctx_handshake_era(), ambiguous, prompt="Which one?")
 
         assert result is ambiguous
 

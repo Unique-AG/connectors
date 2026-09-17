@@ -1,24 +1,24 @@
-"""Classify a hard-delete elicit as a tool return, or `None` to proceed."""
+"""Classify a hard-delete elicit as CONFIRMED, NOT_AVAILABLE, or DECLINED."""
 
 import pytest
-from fastmcp.exceptions import ToolError
-from mcp.types import ElicitRequestFormParams, ElicitResult, InputRequiredResult
+from fastmcp.server.elicitation import AcceptedElicitation
 
 from backstop_mcp.features.elicitation_utils import (
-    CONFIRM_RETRY_MESSAGE,
     DELETE,
-    DELETION_INPUT_KEY,
-    DELETION_NOT_CONFIRMED,
     KEEP,
     DeletionChoice,
-    DeletionNeedsConfirmationResponse,
+    EntityDeletion,
     elicit_entity_deletion,
 )
 from tests.features.party_resolver.helpers import (
-    ctx_deletion_answer,
-    ctx_handshake_era,
-    ctx_never_elicit,
+    FakeContext,
+    as_context,
+    ctx_accept,
+    ctx_cancel,
+    ctx_decline,
     ctx_no_elicitation_capability,
+    ctx_stalls,
+    ctx_unsupported,
 )
 
 
@@ -34,13 +34,41 @@ class TestElicitEntityDeletion:
                 ctx_no_elicitation_capability(), "Delete this note?", callback=prompt
             )
 
+    async def test_choosing_delete_returns_confirmed(self) -> None:
+        assert (
+            await elicit_entity_deletion(
+                ctx_accept(DeletionChoice(choice=DELETE)), "Delete this note?"
+            )
+            is EntityDeletion.CONFIRMED
+        )
+
+    async def test_choosing_keep_returns_declined(self) -> None:
+        assert (
+            await elicit_entity_deletion(
+                ctx_accept(DeletionChoice(choice=KEEP)), "Delete this note?"
+            )
+            is EntityDeletion.DECLINED
+        )
+
     async def test_default_choice_is_keep(self) -> None:
         assert DeletionChoice().choice == KEEP
 
-    async def test_missing_capability_returns_none_without_asking(self) -> None:
+    async def test_dismissed_prompt_returns_declined(self) -> None:
+        assert (
+            await elicit_entity_deletion(ctx_decline(), "Delete this note?")
+            is EntityDeletion.DECLINED
+        )
+
+    async def test_cancelled_prompt_returns_declined(self) -> None:
+        assert (
+            await elicit_entity_deletion(ctx_cancel(), "Delete this note?")
+            is EntityDeletion.DECLINED
+        )
+
+    async def test_missing_capability_returns_not_available_without_eliciting(self) -> None:
         assert (
             await elicit_entity_deletion(ctx_no_elicitation_capability(), "Delete this note?")
-            is None
+            is EntityDeletion.NOT_AVAILABLE
         )
 
     async def test_missing_capability_does_not_run_the_callback(self) -> None:
@@ -52,102 +80,56 @@ class TestElicitEntityDeletion:
             return "Delete this note?"
 
         assert (
-            await elicit_entity_deletion(ctx_no_elicitation_capability(), callback=prompt) is None
+            await elicit_entity_deletion(ctx_no_elicitation_capability(), callback=prompt)
+            is EntityDeletion.NOT_AVAILABLE
         )
         assert called is False
-
-    async def test_handshake_era_returns_needs_confirmation(self) -> None:
-        outcome = await elicit_entity_deletion(ctx_handshake_era(), "Delete this note?")
-
-        assert isinstance(outcome, DeletionNeedsConfirmationResponse)
-        assert outcome.status == "needs_confirmation"
-        assert outcome.preview == "Delete this note?"
-        assert outcome.message == CONFIRM_RETRY_MESSAGE
-
-    async def test_handshake_era_runs_the_callback(self) -> None:
-        called = False
-
-        async def prompt() -> str:
-            nonlocal called
-            called = True
-            return "Permanently delete this note?"
-
-        outcome = await elicit_entity_deletion(ctx_handshake_era(), callback=prompt)
-
-        assert called is True
-        assert isinstance(outcome, DeletionNeedsConfirmationResponse)
-        assert outcome.preview == "Permanently delete this note?"
-
-    async def test_capable_client_returns_input_required(self) -> None:
-        outcome = await elicit_entity_deletion(ctx_never_elicit(), "Delete this note?")
-
-        assert isinstance(outcome, InputRequiredResult)
-        assert outcome.input_requests is not None
-        params = outcome.input_requests[DELETION_INPUT_KEY].params
-        assert isinstance(params, ElicitRequestFormParams)
-        assert params.message == "Delete this note?"
 
     async def test_callback_builds_the_prompt_once_elicitation_is_available(self) -> None:
-        called = False
+        captured: dict[str, object] = {}
 
         async def prompt() -> str:
-            nonlocal called
-            called = True
             return "Permanently delete this note?"
 
-        outcome = await elicit_entity_deletion(ctx_never_elicit(), callback=prompt)
+        async def elicit(
+            *, message: str, response_type: object
+        ) -> AcceptedElicitation[DeletionChoice]:
+            captured["message"] = message
+            captured["response_type"] = response_type
+            return AcceptedElicitation(data=DeletionChoice(choice=DELETE))
 
-        assert called is True
-        assert isinstance(outcome, InputRequiredResult)
-        assert outcome.input_requests is not None
-        params = outcome.input_requests[DELETION_INPUT_KEY].params
-        assert isinstance(params, ElicitRequestFormParams)
-        assert params.message == "Permanently delete this note?"
+        outcome = await elicit_entity_deletion(as_context(FakeContext(elicit)), callback=prompt)
 
-    async def test_retry_accepting_delete_returns_none(self) -> None:
+        assert outcome is EntityDeletion.CONFIRMED
+        assert captured["message"] == "Permanently delete this note?"
+        assert captured["response_type"] is DeletionChoice
+
+    async def test_timeout_returns_declined(self) -> None:
         assert (
-            await elicit_entity_deletion(
-                ctx_deletion_answer(ElicitResult(action="accept", content={"choice": DELETE})),
-                "Delete this note?",
-            )
-            is None
+            await elicit_entity_deletion(ctx_stalls(), "Delete this note?", timeout_seconds=0.05)
+            is EntityDeletion.DECLINED
         )
 
-    async def test_retry_keeping_the_record_raises(self) -> None:
-        with pytest.raises(ToolError, match="not confirmed") as raised:
-            await elicit_entity_deletion(
-                ctx_deletion_answer(ElicitResult(action="accept", content={"choice": KEEP})),
-                "Delete this note?",
-            )
-        assert DELETION_NOT_CONFIRMED in str(raised.value)
-
-    async def test_retry_declining_raises(self) -> None:
-        with pytest.raises(ToolError, match="not confirmed"):
-            await elicit_entity_deletion(
-                ctx_deletion_answer(ElicitResult(action="decline")),
-                "Delete this note?",
-            )
-
-    async def test_retry_cancelling_raises(self) -> None:
-        with pytest.raises(ToolError, match="not confirmed"):
-            await elicit_entity_deletion(
-                ctx_deletion_answer(ElicitResult(action="cancel")),
-                "Delete this note?",
-            )
-
-    async def test_retry_does_not_run_the_callback(self) -> None:
-        called = False
-
-        async def prompt() -> str:
-            nonlocal called
-            called = True
-            return "Delete this note?"
-
+    async def test_elicit_error_returns_declined(self) -> None:
         assert (
-            await elicit_entity_deletion(
-                ctx_deletion_answer(ElicitResult(action="accept", content={"choice": DELETE})),
-                callback=prompt,
-            )
-            is None
+            await elicit_entity_deletion(ctx_unsupported(), "Delete this note?")
+            is EntityDeletion.DECLINED
         )
-        assert called is False
+
+    async def test_prompt_is_passed_through_as_a_choice_dropdown(self) -> None:
+        captured: dict[str, object] = {}
+
+        async def elicit(
+            *, message: str, response_type: object
+        ) -> AcceptedElicitation[DeletionChoice]:
+            captured["message"] = message
+            captured["response_type"] = response_type
+            return AcceptedElicitation(data=DeletionChoice(choice=DELETE))
+
+        outcome = await elicit_entity_deletion(
+            as_context(FakeContext(elicit)), "Permanently delete this note?"
+        )
+
+        assert outcome is EntityDeletion.CONFIRMED
+        assert captured["message"] == "Permanently delete this note?"
+        assert captured["response_type"] is DeletionChoice

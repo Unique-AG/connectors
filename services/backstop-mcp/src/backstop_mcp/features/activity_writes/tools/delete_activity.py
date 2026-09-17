@@ -8,7 +8,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
-from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError
@@ -25,7 +25,11 @@ from backstop_mcp.features.activity_writes import (
     DeleteActivityResponse,
     get_delete_activity_command_factory,
 )
-from backstop_mcp.features.elicitation_utils import elicit_entity_deletion
+from backstop_mcp.features.elicitation_utils import (
+    DELETION_NOT_CONFIRMED,
+    EntityDeletion,
+    elicit_entity_deletion,
+)
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -48,7 +52,7 @@ async def delete_activity(
     activity: Annotated[DeleteActivityInput, Field(description=DELETE_ACTIVITY_INPUT_DESCRIPTION)],
     get_activity_detail_query: GetActivityDetailQuery = Depends(get_activity_detail_query_factory),
     delete_activity_command: DeleteActivityCommand = Depends(get_delete_activity_command_factory),
-) -> DeleteActivityResponse | InputRequiredResult:
+) -> DeleteActivityResponse:
     """Permanently delete a CRM note, meeting, call, task, email, or document.
 
     Required on `activity`: `kind` and `activity_id`. Never invent an id — echo a create, a
@@ -57,11 +61,8 @@ async def delete_activity(
     search-then-delete sweep. Use this to undo a wrongly logged activity or an
     `attach_file` upload.
 
-    When the client supports elicitation on MCP 2026-07-28+, this tool reads the activity
-    first and returns `InputRequiredResult` so the client can paint the form. On an
-    older protocol that still advertised elicitation it returns `needs_confirmation`
-    — the model asks in chat and retries with `confirm=true`. When the client never
-    advertised elicitation, it deletes immediately.
+    When the client supports elicitation, this tool reads the activity first and asks the
+    user to confirm before deleting. When the client cannot elicit, it deletes immediately.
 
     Call like: {"activity": {"kind": "note", "activity_id": "<id from a create echo>"}}
     """
@@ -70,16 +71,23 @@ async def delete_activity(
         extra={"kind": activity.kind, "activity_id": activity.activity_id},
     )
 
-    if not activity.confirm:
+    async def prompt() -> str:
+        return await _deletion_prompt(
+            activity=activity, get_activity_detail_query=get_activity_detail_query
+        )
 
-        async def prompt() -> str:
-            return await _deletion_prompt(
-                activity=activity, get_activity_detail_query=get_activity_detail_query
-            )
-
-        gated = await elicit_entity_deletion(ctx, callback=prompt)
-        if gated is not None:
-            return gated
+    outcome = await elicit_entity_deletion(ctx, callback=prompt)
+    if outcome is EntityDeletion.DECLINED:
+        logger.info(
+            "activity_writes.delete.not_confirmed",
+            extra={"kind": activity.kind, "activity_id": activity.activity_id},
+        )
+        raise ToolError(DELETION_NOT_CONFIRMED)
+    if outcome is EntityDeletion.NOT_AVAILABLE:
+        logger.info(
+            "activity_writes.delete.elicit.not_available",
+            extra={"kind": activity.kind, "activity_id": activity.activity_id},
+        )
     return await delete_activity_command.run(activity=activity)
 
 
