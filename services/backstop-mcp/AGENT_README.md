@@ -4,6 +4,7 @@ Read this before adding, changing, or refactoring a feature. Two references:
 
 - Reads: [`src/backstop_mcp/features/opportunities/`](src/backstop_mcp/features/opportunities/)
 - Writes: [`src/backstop_mcp/features/activity_writes/`](src/backstop_mcp/features/activity_writes/)
+- UI links (no HTTP): [`src/backstop_mcp/features/ui_links/`](src/backstop_mcp/features/ui_links/)
 
 When this file and a read feature disagree, opportunities wins. When this file and a write
 feature disagree, activity_writes wins. Do not invent a third shape.
@@ -70,6 +71,7 @@ features/<name>/
   dependencies.py          factories; @lru_cache only for process-wide services
   api_responses.py         *Attributes / wire resources — or api_responses/ if this grows
   responses.py             *Response published models — or responses/ if this grows
+  inputs.py                published tool input union when the feature has one
   internal_dto.py          only if you have real *Dto classes
   queries/
     __init__.py
@@ -95,7 +97,7 @@ the same names. Layering still matches the `api_responses*` / `responses*` prefi
 that folder unless the task is the rename. New features use `utils/`.
 
 Vocabulary modules keep those names: `api_responses*`, `internal_dto*`, `responses*`,
-`dependencies.py`, `entity_types.py`, `settings.py`. Every other logic file is named after
+`dependencies.py`, `entity_types.py`, `inputs.py`, `settings.py`. Every other logic file is named after
 the symbol it defines (`get_opportunities_query.py` → `GetOpportunitiesQuery`).
 `tests/test_layering.py` rule 6 enforces that.
 

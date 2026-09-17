@@ -1,17 +1,17 @@
 import pytest
 
 from backstop_mcp.features.ui_links import (
-    AccountLinkTargetDto,
-    BackstopLinkResponse,
-    BackstopLinkTargetDto,
+    AccountLinkTarget,
+    BackstopLinksResponse,
+    BackstopLinkTarget,
     BuildEntityLinkUtil,
-    OpportunityLinkTargetDto,
-    OrganizationLinkTargetDto,
+    OpportunityLinkTarget,
+    OrganizationLinkTarget,
     ParsedBackstopLinkResponse,
     ParseEntityLinkUtil,
-    PersonLinkTargetDto,
-    ProductLinkTargetDto,
-    TaskLinkTargetDto,
+    PersonLinkTarget,
+    ProductLinkTarget,
+    TaskLinkTarget,
     UiBaseUrlNotConfiguredResponse,
     UnrecognizedBackstopUrlResponse,
 )
@@ -62,7 +62,7 @@ def test_parser_does_not_require_ui_base_url() -> None:
 
 def test_builder_returns_not_configured_when_ui_base_url_is_unset() -> None:
     result = _BUILDER.run(
-        target=OrganizationLinkTargetDto(party_id="341764767"),
+        target=OrganizationLinkTarget(party_id="341764767"),
         ui_base_url=None,
     )
     assert isinstance(result, UiBaseUrlNotConfiguredResponse)
@@ -109,11 +109,11 @@ def test_task_preserves_view_only_and_workflow_task_id() -> None:
 
 def test_built_task_url_preserves_empty_workflow_task_id() -> None:
     result = _BUILDER.run(
-        target=TaskLinkTargetDto(task_id="2741757"),
+        target=TaskLinkTarget(task_id="2741757"),
         ui_base_url=UI_BASE,
         tabs=(),
     )
-    assert isinstance(result, BackstopLinkResponse)
+    assert isinstance(result, BackstopLinksResponse)
     parsed = _PARSER.run(url=result.links[0].url)
     assert isinstance(parsed, ParsedBackstopLinkResponse)
     assert parsed.workflow_task_id == ""
@@ -124,37 +124,37 @@ def test_built_task_url_preserves_empty_workflow_task_id() -> None:
     ("target", "tabs", "expected"),
     [
         (
-            OrganizationLinkTargetDto(party_id="341764767"),
+            OrganizationLinkTarget(party_id="341764767"),
             ("detail",),
             {"display": "", "party_id": "341764767", "viewType": "detail"},
         ),
         (
-            PersonLinkTargetDto(party_id="412345678"),
+            PersonLinkTarget(party_id="412345678"),
             ("detail",),
             {"display": "", "party_id": "412345678", "viewType": "detail"},
         ),
         (
-            ProductLinkTargetDto(entity_id="123456789"),
+            ProductLinkTarget(entity_id="123456789"),
             (),
             {"display": "", "entityId": "123456789"},
         ),
         (
-            AccountLinkTargetDto(entity_id="33578475"),
+            AccountLinkTarget(entity_id="33578475"),
             ("summary",),
             {"display": "", "entityId": "33578475", "acctViewType": "summary"},
         ),
         (
-            OpportunityLinkTargetDto(entity_id="5755163"),
+            OpportunityLinkTarget(entity_id="5755163"),
             ("activity",),
             {"display": "", "entityId": "5755163", "viewType": "activity"},
         ),
     ],
 )
 def test_standard_entity_params_include_empty_display(
-    target: BackstopLinkTargetDto, tabs: tuple[str, ...], expected: dict[str, str]
+    target: BackstopLinkTarget, tabs: tuple[str, ...], expected: dict[str, str]
 ) -> None:
     result = _BUILDER.run(target=target, ui_base_url=UI_BASE, tabs=tabs)
-    assert isinstance(result, BackstopLinkResponse)
+    assert isinstance(result, BackstopLinksResponse)
     assert query_params(result.links[0].url) == expected
 
 

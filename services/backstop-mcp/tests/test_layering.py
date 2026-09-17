@@ -53,7 +53,7 @@
    import `server.tools.registry` or a private `_`-prefixed sibling such as `_page_input`,
    and cannot reach past a feature package's `__init__`. `registry.py` under `server/tools`
    may import `features.<feature>.tools.get_*` / `list_*` / `search_*` / `log_*` / `attach_*`
-   / `update_*` / `delete_*` / `backfill_*` / `create_*` the same way.
+   / `update_*` / `delete_*` / `backfill_*` / `create_*` / `build_*` / `parse_*` the same way.
 
    Applies to the packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are
    not among them: they are groupings whose `__init__` is documentation, so `features.resolution`
@@ -81,7 +81,7 @@
    tree stays readable. Modules used to be named after a mechanism (`fetch.py`, `service.py`,
    `project.py`), so you had to open a file or grep for `def` to find anything. Vocabulary
    modules (`api_responses*`, `internal_dto*`, `responses*`, `entity_types.py`,
-   `includes/types.py`, `settings.py`, `dependencies.py`) keep their names;
+   `includes/types.py`, `settings.py`, `dependencies.py`, `inputs.py`) keep their names;
    `_`-prefixed modules are private shared utilities. `features/auth/` is out of
    scope; `features/resolution.py` is already exempt by name in rule 5.
 
@@ -250,7 +250,7 @@ def _is_server_tools_directory(directory: pathlib.Path) -> bool:
 
 def _is_feature_tool_module_import(module: str) -> bool:
     """A feature tool module (`get_*` / `list_*` / `search_*` / `log_*` / `attach_*` /
-    `update_*` / `delete_*` / `backfill_*` / `create_*`)."""
+    `update_*` / `delete_*` / `backfill_*` / `create_*` / `build_*` / `parse_*`)."""
     prefix = f"{_FEATURES_PREFIX}."
     if not module.startswith(prefix):
         return False
@@ -270,6 +270,8 @@ def _is_feature_tool_module_import(module: str) -> bool:
                 "backfill_",
                 "end_",
                 "create_",
+                "build_",
+                "parse_",
             )
         )
     )
@@ -295,10 +297,10 @@ def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, i
     `backstop_client` through those packages' `__init__`.
 
     Tool tests may import the tool module under test (`features.<pkg>.tools.get_*` / `list_*` /
-    `search_*` / `log_*` / `attach_*` / `update_*` / `delete_*` / `backfill_*` / `create_*`);
-    they still cannot import `server.tools.registry` or `_page_input`, and cannot reach past a
-    feature package's `__init__`. `registry.py` under `server/tools` may import those feature
-    tool modules.
+    `search_*` / `log_*` / `attach_*` / `update_*` / `delete_*` / `backfill_*` / `create_*` /
+    `build_*` / `parse_*`); they still cannot import `server.tools.registry` or `_page_input`,
+    and cannot reach past a feature package's `__init__`. `registry.py` under `server/tools`
+    may import those feature tool modules.
     """
     return [
         (module, line)
@@ -499,7 +501,7 @@ def _governed_model_layer_sources() -> list[pathlib.Path]:
 
 
 _LOGIC_NAME_VOCABULARY_FILES = frozenset(
-    {"dependencies.py", "entity_types.py", "resolution.py", "settings.py"}
+    {"dependencies.py", "entity_types.py", "inputs.py", "resolution.py", "settings.py"}
 )
 _LOGIC_NAME_VOCABULARY_PATHS = frozenset({pathlib.Path("includes") / "types.py"})
 

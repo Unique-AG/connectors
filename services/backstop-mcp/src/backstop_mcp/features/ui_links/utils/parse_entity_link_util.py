@@ -8,6 +8,7 @@ from backstop_mcp.features.ui_links.entity_types import (
     BackstopUiPage,
     UiPageSpec,
 )
+from backstop_mcp.features.ui_links.internal_dto import BackstopLinkTargetDto
 from backstop_mcp.features.ui_links.responses import (
     ParsedBackstopLinkResponse,
     ParseEntityLinkResult,
@@ -96,11 +97,15 @@ class ParseEntityLinkUtil:
         entity_kind = ACTIVITY_JSP_SLUG_TO_KIND.get(activity_slug)
         if entity_kind is None:
             return UnrecognizedBackstopUrlResponse()
-        return ParsedBackstopLinkResponse(
-            page=spec.page,
-            entity_kind=entity_kind,
-            entity_id=activity_id,
-            host_mismatch=self._host_mismatch(pasted_url, ui_base_url),
+        return self._parsed(
+            BackstopLinkTargetDto(
+                page=spec.page,
+                entity_id=activity_id,
+                entity_kind=entity_kind,
+                activity_slug=activity_slug,
+            ),
+            pasted_url=pasted_url,
+            ui_base_url=ui_base_url,
             suggested_tool=spec.suggested_tool,
             suggested_note=spec.suggested_note,
         )
@@ -120,11 +125,14 @@ class ParseEntityLinkUtil:
         lookup = (
             LANDING_RESOURCE_TYPE_TOOLS.get(resource_type) if resource_type is not None else None
         )
-        return ParsedBackstopLinkResponse(
-            page=spec.page,
-            entity_id=entity_id,
-            resource_type=resource_type,
-            host_mismatch=self._host_mismatch(pasted_url, ui_base_url),
+        return self._parsed(
+            BackstopLinkTargetDto(
+                page=spec.page,
+                entity_id=entity_id,
+                resource_type=resource_type,
+            ),
+            pasted_url=pasted_url,
+            ui_base_url=ui_base_url,
             suggested_tool=lookup.tool if lookup is not None else None,
             suggested_note=lookup.note if lookup is not None else None,
         )
@@ -159,18 +167,37 @@ class ParseEntityLinkUtil:
             if "workflowTaskId" in query:
                 workflow_task_id = query["workflowTaskId"]
 
-        return ParsedBackstopLinkResponse(
-            page=spec.page,
-            entity_kind=spec.entity_kind,
-            entity_id=entity_id,
-            tab=tab,
-            layout_name=layout_name if spec.supports_layout else None,
-            view_entity_type=view_entity_type if spec.supports_layout and layout_name else None,
-            view_only=view_only,
-            workflow_task_id=workflow_task_id,
-            host_mismatch=self._host_mismatch(pasted_url, ui_base_url),
+        return self._parsed(
+            BackstopLinkTargetDto(
+                page=spec.page,
+                entity_id=entity_id,
+                entity_kind=spec.entity_kind,
+                tab=tab,
+                layout_name=layout_name if spec.supports_layout else None,
+                view_entity_type=view_entity_type if spec.supports_layout and layout_name else None,
+                view_only=view_only,
+                workflow_task_id=workflow_task_id,
+            ),
+            pasted_url=pasted_url,
+            ui_base_url=ui_base_url,
             suggested_tool=spec.suggested_tool,
             suggested_note=spec.suggested_note,
+        )
+
+    def _parsed(
+        self,
+        dto: BackstopLinkTargetDto,
+        *,
+        pasted_url: str,
+        ui_base_url: str | None,
+        suggested_tool: str | None,
+        suggested_note: str | None,
+    ) -> ParsedBackstopLinkResponse:
+        return ParsedBackstopLinkResponse.from_dto(
+            dto,
+            host_mismatch=self._host_mismatch(pasted_url, ui_base_url),
+            suggested_tool=suggested_tool,
+            suggested_note=suggested_note,
         )
 
     def _host_mismatch(self, pasted_url: str, ui_base_url: str | None) -> bool:

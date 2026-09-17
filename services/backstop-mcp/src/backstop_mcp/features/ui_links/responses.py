@@ -1,41 +1,29 @@
 """Published builder and parser results. Misses are structured models, not exceptions."""
 
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import BaseModel, Field
 
 from backstop_mcp.features.ui_links.entity_types import BackstopUiPage
-from backstop_mcp.features.ui_links.internal_dto import (
-    AccountLinkTargetDto,
-    BackstopLinkTargetDto,
-    CallLinkTargetDto,
-    DocumentLinkTargetDto,
-    EmailLinkTargetDto,
-    MeetingLinkTargetDto,
-    NoteLinkTargetDto,
-    OpportunityLinkTargetDto,
-    OrganizationLinkTargetDto,
-    PersonLinkTargetDto,
-    ProductLinkTargetDto,
-    TaskLinkTargetDto,
-)
+from backstop_mcp.features.ui_links.inputs import BackstopLinkTarget
+from backstop_mcp.features.ui_links.internal_dto import BackstopLinkTargetDto
 
 
-class BackstopLabeledUrlResponse(BaseModel):
+class BackstopLinkResponse(BaseModel):
     """One labeled CRM UI URL."""
 
     label: str = Field(description="Tab, layout, or canonical label for this URL.")
     url: str = Field(description="Absolute CRM UI URL. Echo it; never invent one.")
 
 
-class BackstopLinkResponse(BaseModel):
+class BackstopLinksResponse(BaseModel):
     """Labeled CRM UI URLs for one target."""
 
     status: Literal["ok"] = Field(
         default="ok",
         description="Links were built. `links` may still be empty if no tab matched.",
     )
-    links: list[BackstopLabeledUrlResponse] = Field(
+    links: list[BackstopLinkResponse] = Field(
         description="Labeled URLs for the requested tabs and optional layout."
     )
 
@@ -119,33 +107,37 @@ class ParsedBackstopLinkResponse(BaseModel):
         ),
     )
 
-    def to_target(self) -> BackstopLinkTargetDto | None:
-        """Rebuild the discriminated target. LandingPageUrl has no buildable target."""
-        kind = self.entity_kind
-        entity_id = self.entity_id
-        if kind == "organization":
-            return OrganizationLinkTargetDto(party_id=entity_id)
-        if kind == "person":
-            return PersonLinkTargetDto(party_id=entity_id)
-        if kind == "account":
-            return AccountLinkTargetDto(entity_id=entity_id)
-        if kind == "product":
-            return ProductLinkTargetDto(entity_id=entity_id)
-        if kind == "opportunity":
-            return OpportunityLinkTargetDto(entity_id=entity_id)
-        if kind == "task":
-            return TaskLinkTargetDto(task_id=entity_id)
-        if kind == "email":
-            return EmailLinkTargetDto(entity_activity_details_id=entity_id)
-        if kind == "call":
-            return CallLinkTargetDto(entity_activity_details_id=entity_id)
-        if kind == "meeting":
-            return MeetingLinkTargetDto(entity_activity_details_id=entity_id)
-        if kind == "note":
-            return NoteLinkTargetDto(entity_activity_details_id=entity_id)
-        if kind == "document":
-            return DocumentLinkTargetDto(entity_activity_details_id=entity_id)
-        return None
+    @classmethod
+    def from_dto(
+        cls,
+        dto: BackstopLinkTargetDto,
+        *,
+        host_mismatch: bool,
+        suggested_tool: str | None,
+        suggested_note: str | None,
+    ) -> Self:
+        return cls(
+            page=dto.page,
+            entity_kind=dto.entity_kind,
+            entity_id=dto.entity_id,
+            tab=dto.tab,
+            layout_name=dto.layout_name,
+            view_entity_type=dto.view_entity_type,
+            resource_type=dto.resource_type,
+            view_only=dto.view_only,
+            workflow_task_id=dto.workflow_task_id,
+            host_mismatch=host_mismatch,
+            suggested_tool=suggested_tool,
+            suggested_note=suggested_note,
+        )
+
+    def to_target(self) -> BackstopLinkTarget | None:
+        """Rebuild the published target. LandingPageUrl has no buildable target."""
+        return BackstopLinkTargetDto(
+            page=self.page,
+            entity_id=self.entity_id,
+            entity_kind=self.entity_kind,
+        ).to_input()
 
 
 class UnrecognizedBackstopUrlResponse(BaseModel):
@@ -161,5 +153,5 @@ class UnrecognizedBackstopUrlResponse(BaseModel):
     )
 
 
-type BuildEntityLinkResult = BackstopLinkResponse | UiBaseUrlNotConfiguredResponse
+type BuildEntityLinkResult = BackstopLinksResponse | UiBaseUrlNotConfiguredResponse
 type ParseEntityLinkResult = ParsedBackstopLinkResponse | UnrecognizedBackstopUrlResponse

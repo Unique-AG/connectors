@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 from urllib.parse import urlencode
 
-from backstop_mcp.features.ui_links.activity_kinds import TARGET_KIND_TO_JSP_SLUG
 from backstop_mcp.features.ui_links.entity_types import (
     LAYOUT_QUERY_ORDER,
     PAGE_SPECS,
@@ -9,10 +8,11 @@ from backstop_mcp.features.ui_links.entity_types import (
     BackstopUiPage,
     UiPageSpec,
 )
+from backstop_mcp.features.ui_links.inputs import BackstopLinkTarget
 from backstop_mcp.features.ui_links.internal_dto import BackstopLinkTargetDto
 from backstop_mcp.features.ui_links.responses import (
-    BackstopLabeledUrlResponse,
     BackstopLinkResponse,
+    BackstopLinksResponse,
     BuildEntityLinkResult,
     UiBaseUrlNotConfiguredResponse,
 )
@@ -24,7 +24,7 @@ class BuildEntityLinkUtil:
     def run(
         self,
         *,
-        target: BackstopLinkTargetDto,
+        target: BackstopLinkTarget,
         ui_base_url: str | None,
         tabs: Sequence[str] | None = None,
         layout_name: str | None = None,
@@ -33,55 +33,30 @@ class BuildEntityLinkUtil:
         if ui_base_url is None:
             return UiBaseUrlNotConfiguredResponse()
 
-        page, entity_id, activity_slug = self._page_id_and_slug(target)
-        spec = PAGE_SPECS[page]
-        assert spec.buildable, f"page {page} is parser-only"
+        resolved = BackstopLinkTargetDto.from_input(target)
+        spec = PAGE_SPECS[resolved.page]
+        assert spec.buildable, f"page {resolved.page} is parser-only"
 
         links = [
-            BackstopLabeledUrlResponse(label=label, url=url)
+            BackstopLinkResponse(label=label, url=url)
             for label, url in self._tab_links(
                 spec=spec,
                 ui_base_url=ui_base_url,
-                entity_id=entity_id,
-                activity_slug=activity_slug,
+                entity_id=resolved.entity_id,
+                activity_slug=resolved.activity_slug,
                 tabs=tabs,
             )
         ]
         layout_link = self._layout_link(
             spec=spec,
             ui_base_url=ui_base_url,
-            entity_id=entity_id,
+            entity_id=resolved.entity_id,
             layout_name=layout_name,
             view_entity_type=view_entity_type,
         )
         if layout_link is not None:
             links = [*links, layout_link]
-        return BackstopLinkResponse(links=links)
-
-    def _page_id_and_slug(
-        self, target: BackstopLinkTargetDto
-    ) -> tuple[BackstopUiPage, str, str | None]:
-        match target.kind:
-            case "organization":
-                return BackstopUiPage.ORGANIZATION, target.party_id, None
-            case "person":
-                return BackstopUiPage.PERSON, target.party_id, None
-            case "account":
-                return BackstopUiPage.ACCOUNT, target.entity_id, None
-            case "product":
-                return BackstopUiPage.PRODUCT, target.entity_id, None
-            case "opportunity":
-                return BackstopUiPage.OPPORTUNITY, target.entity_id, None
-            case "task":
-                return BackstopUiPage.TASK, target.task_id, None
-            case "email":
-                return BackstopUiPage.EMAIL, target.entity_activity_details_id, None
-            case "call" | "meeting" | "note" | "document":
-                return (
-                    BackstopUiPage.ACTIVITY,
-                    target.entity_activity_details_id,
-                    TARGET_KIND_TO_JSP_SLUG[target.kind],
-                )
+        return BackstopLinksResponse(links=links)
 
     def _tab_links(
         self,
@@ -141,7 +116,7 @@ class BuildEntityLinkUtil:
         entity_id: str,
         layout_name: str | None,
         view_entity_type: str | None,
-    ) -> BackstopLabeledUrlResponse | None:
+    ) -> BackstopLinkResponse | None:
         if not spec.supports_layout or not layout_name or not view_entity_type:
             return None
         query = [
@@ -151,7 +126,7 @@ class BuildEntityLinkUtil:
             ("layoutName", layout_name),
         ]
         assert [name for name, _value in query] == list(LAYOUT_QUERY_ORDER)
-        return BackstopLabeledUrlResponse(
+        return BackstopLinkResponse(
             label=layout_name,
             url=self._join(spec.template.format(ui_base=ui_base_url), query),
         )
