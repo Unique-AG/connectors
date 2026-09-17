@@ -9,6 +9,7 @@ from pydantic import TypeAdapter
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.org_people_writes import (
+    UpdatedOrganizationResponse,
     UpdateOrganizationCommand,
     UpdateOrganizationInput,
     get_modify_contact_location_command_factory,
@@ -58,10 +59,11 @@ def _relationships(body: dict[str, object]) -> dict[str, object]:
     return object_dict(_data(body)["relationships"])
 
 
-def _org_document() -> httpx.Response:
+def _org_document(*, attributes: dict[str, object] | None = None) -> httpx.Response:
+    payload: dict[str, object] = {"name": "Acme"} if attributes is None else dict(attributes)
     return httpx.Response(
         200,
-        json={"data": {"id": _ID, "type": "organizations", "attributes": {"name": "Acme"}}},
+        json={"data": {"id": _ID, "type": "organizations", "attributes": payload}},
     )
 
 
@@ -105,3 +107,42 @@ class TestUpdateOrganizationCommand:
         assert object_dict(_relationships(replace_bodies[1])["categories"])["data"] == [
             {"type": "contact-categories", "id": "cat-2"}
         ]
+
+    @respx.mock
+    async def test_reread_publishes_top_level_fields_as_snake_case(
+        self, client: BackstopClient
+    ) -> None:
+        respx.patch(f"{BASE_URL}/organizations/{_ID}").mock(return_value=_org_document())
+        respx.get(f"{BASE_URL}/organizations/{_ID}").mock(
+            return_value=_org_document(
+                attributes={
+                    "name": "Northwind",
+                    "legalName": "Northwind Ltd",
+                    "website": "https://northwind.example",
+                    "numberOfEmployees": 12,
+                    "internalOrganization": False,
+                    "matchingDomains": ["northwind.example"],
+                    "email": "",
+                    "status": "active",
+                    "landingPageUrl": "https://northwind.example/about",
+                }
+            )
+        )
+
+        result = await make_command(client).run(
+            new_organization_fields=_update(website="https://northwind.example"), party_id=_ID
+        )
+
+        assert isinstance(result, UpdatedOrganizationResponse)
+        assert result.organization.name == "Northwind"
+        assert result.organization.legal_name == "Northwind Ltd"
+        assert result.organization.website == "https://northwind.example"
+        assert result.organization.number_of_employees == 12
+        assert result.organization.internal_organization is False
+        assert result.organization.matching_domains == ("northwind.example",)
+        assert result.organization.landing_page_url == "https://northwind.example/about"
+        dumped = result.organization.model_dump(exclude_none=True)
+        assert dumped["status"] == "active"
+        assert "email" not in dumped
+        assert "legalName" not in dumped
+        assert "numberOfEmployees" not in dumped

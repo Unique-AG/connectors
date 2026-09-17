@@ -169,9 +169,7 @@ class TestDeleteOrganization:
         assert party.call_count == 0
 
     @respx.mock
-    async def test_handshake_era_deletes_when_confirm_is_true(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_handshake_era_deletes_when_confirm_is_true(self, client: BackstopClient) -> None:
         _preview, location, party = _mock_cascade()
 
         result = tool_model(

@@ -146,7 +146,11 @@ async def get_person(
     Side-loads entityRelationships and their relationship types on the same GET (no extra round
     trip). `employments` lists every current and former organization link — always relay those
     entries; do not present a person as a current contact at an organization whose link has
-    `status="former"` unless they explicitly asked for historical contacts.
+    `status="former"` unless they explicitly asked for historical contacts. Key employee
+    is not on this record: `GET /people` omits `isKeyEmployee` even when the organization
+    roster is true. Read it on `get_people_for_party`. It cannot be written through these
+    tools — personal API tokens do not persist `isKeyRelationship`; set Key employee in
+    the CRM UI.
 
     Pass `include` to side-load related records on that same GET — addresses, the email address
     book, their organization, the representative. They come back under `included`, where a

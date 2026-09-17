@@ -44,3 +44,17 @@ def test_add_and_replace_category_ids_together_are_rejected() -> None:
                 "replace_category_ids": ["c2"],
             }
         )
+
+
+def test_accepts_multiple_locations() -> None:
+    parsed = _ADAPTER.validate_python(
+        {
+            "party_id": "1001",
+            "locations": [
+                {"location_title": "HQ", "city": "Chicago"},
+                {"location_title": "NY", "city": "New York"},
+            ],
+        }
+    )
+
+    assert [loc.location_title for loc in parsed.locations or ()] == ["HQ", "NY"]

@@ -60,13 +60,17 @@ def _relationships(body: dict[str, object]) -> dict[str, object]:
     return object_dict(_data(body)["relationships"])
 
 
-def _person_document(*, mobile_phone: str | None = None) -> httpx.Response:
-    attributes: dict[str, object] = {}
+def _person_document(
+    *,
+    mobile_phone: str | None = None,
+    attributes: dict[str, object] | None = None,
+) -> httpx.Response:
+    payload: dict[str, object] = {} if attributes is None else dict(attributes)
     if mobile_phone is not None:
-        attributes["mobilePhone"] = mobile_phone
+        payload["mobilePhone"] = mobile_phone
     return httpx.Response(
         200,
-        json={"data": {"id": _ID, "type": "people", "attributes": attributes}},
+        json={"data": {"id": _ID, "type": "people", "attributes": payload}},
     )
 
 
@@ -117,6 +121,46 @@ class TestUpdatePersonCommand:
 
         assert isinstance(result, UpdatedPersonResponse)
         assert result.mobile_phone == "555-0100"
+        assert result.person.mobile_phone == "555-0100"
+
+    @respx.mock
+    async def test_reread_publishes_top_level_fields_as_snake_case(
+        self, client: BackstopClient
+    ) -> None:
+        respx.patch(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
+        respx.get(f"{BASE_URL}/people/{_ID}").mock(
+            return_value=_person_document(
+                attributes={
+                    "name": "Doe, Jane",
+                    "firstName": "Jane",
+                    "lastName": "Doe",
+                    "jobTitle": "Managing Director",
+                    "email": "jane@example.com",
+                    "isEmployee": False,
+                    "isKeyEmployee": True,
+                    "department": "",
+                    "landingPageUrl": "https://example.com/jane",
+                }
+            )
+        )
+
+        result = await make_command(client).run(
+            person=_update(job_title="Managing Director"), party_id=_ID, search_type="people"
+        )
+
+        assert isinstance(result, UpdatedPersonResponse)
+        assert result.person.first_name == "Jane"
+        assert result.person.last_name == "Doe"
+        assert result.person.job_title == "Managing Director"
+        assert result.person.email == "jane@example.com"
+        assert result.person.is_employee is False
+        assert result.person.is_key_employee is True
+        assert result.person.landing_page_url == "https://example.com/jane"
+        dumped = result.person.model_dump(exclude_none=True)
+        assert "department" not in dumped
+        assert "firstName" not in dumped
+        assert "jobTitle" not in dumped
+        assert "isKeyEmployee" not in dumped
 
     @respx.mock
     async def test_add_categories_appends_and_replace_categories_clears_first(
@@ -180,14 +224,14 @@ class TestUpdatePersonCommand:
         result = await make_command(client).run(
             person=_update(
                 job_title="Managing Director",
-                location={"location_title": "Office", "city": "Chicago"},
+                locations=[{"location_title": "Office", "city": "Chicago"}],
             ),
             party_id=_ID,
             search_type="people",
         )
 
         assert location.call_count == 1
-        assert result.location_id == "loc-1"
+        assert result.location_ids == ("loc-1",)
         contact = object_dict(
             object_dict(
                 object_dict(_data(recorded_json_bodies(location)[0])["relationships"])["contact"]
@@ -205,11 +249,11 @@ class TestUpdatePersonCommand:
         )
 
         result = await make_command(client).run(
-            person=_update(delete_location_id="loc-9"), party_id=_ID, search_type="people"
+            person=_update(delete_location_ids=["loc-9"]), party_id=_ID, search_type="people"
         )
 
         assert deletion.call_count == 1
-        assert result.location_id is None
+        assert result.location_ids == ()
 
     @respx.mock
     async def test_patches_the_resolved_collection(self, client: BackstopClient) -> None:

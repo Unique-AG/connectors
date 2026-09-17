@@ -1,4 +1,4 @@
-"""`update_organization`: PATCH one organization and optionally edit a location."""
+"""`update_organization`: PATCH one organization and optionally edit postal addresses."""
 
 import logging
 from typing import Annotated
@@ -46,16 +46,19 @@ async def update_organization(
         get_update_organization_command_factory
     ),
 ) -> UpdateOrganizationResponse:
-    """Patch one CRM organization and, optionally, one of its postal addresses.
+    """Patch one CRM organization and, optionally, its postal addresses.
 
     `search_type` plus exactly one of `party_id` or `search` — same identity as
     `get_organization`. `name` cannot be cleared and is at most 50 characters. Custom
     fields go through `update_custom_field_values`. Email corrections go through `email` /
-    `email2` / `email3`; `contact-emails` has no write endpoint. Location ids come from
-    `get_organization` with `include=contactLocations`, not `include=locations`. Creating
-    an address is folded into this tool: `destructive_hint` is already true, which
-    over-warns rather than under-warns. Omit a field to leave it unchanged. Never invent
-    an id.
+    `email2` / `email3`; `contact-emails` has no write endpoint. Category ids come from
+    `list_contact_categories`. Location ids come from
+    `get_organization` with `include=contactLocations`, not `include=locations`.
+    `locations` creates or patches each address; `delete_location_ids` removes them.
+    Creating an address is folded into this tool: `destructive_hint` is already true, which
+    over-warns rather than under-warns. The response `organization` is the record READ
+    BACK — same top-level fields as `get_organization`. Omit a field to leave it
+    unchanged. Never invent an id.
 
     Call like: {"organization": {"search_type": "organizations",
     "party_id": "<id from get_organization>", "website": "https://example.com"}}

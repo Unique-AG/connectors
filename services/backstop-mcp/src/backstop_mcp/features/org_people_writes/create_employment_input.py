@@ -5,6 +5,10 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from backstop_mcp.features.org_people_writes._person_writable_fields import (
+    KEY_EMPLOYEE_NOT_WRITABLE_DESCRIPTION,
+    reject_key_employee_write,
+)
 from backstop_mcp.features.party_resolver import (
     PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
@@ -24,8 +28,9 @@ CREATE_EMPLOYMENT_INPUT_DESCRIPTION = (
     "is the same as `get_person`: exactly one of `party_id` or `search`, plus `search_type`. "
     "Organization identity is exactly one of `organization_id` or `organization_search`. "
     "There is no relationship-type parameter — the command resolves the employment type from "
-    "the catalog. One POST also creates the reverse mirror row (person→org and org→person). "
-    "Never invent an id."
+    "the catalog. `is_key_employee` cannot be written through the API (personal tokens do "
+    "not persist `isKeyRelationship`); set Key employee in the CRM UI. One POST also "
+    "creates the reverse mirror row (person→org and org→person). Never invent an id."
 )
 
 _PERSON_SEARCH_TYPE_DESCRIPTION = (
@@ -65,6 +70,15 @@ class CreateEmploymentInput(BaseModel):
     start_date: date = Field(
         description="Employment start date (YYYY-MM-DD). Written as `startDate`."
     )
+    is_key_employee: bool | None = Field(
+        default=None,
+        description=KEY_EMPLOYEE_NOT_WRITABLE_DESCRIPTION,
+    )
+
+    @field_validator("is_key_employee")
+    @classmethod
+    def _key_employee_is_not_writable(cls, value: bool | None) -> bool | None:
+        return reject_key_employee_write(value)
 
     @field_validator("party_id", "search", "organization_id", "organization_search", mode="before")
     @classmethod

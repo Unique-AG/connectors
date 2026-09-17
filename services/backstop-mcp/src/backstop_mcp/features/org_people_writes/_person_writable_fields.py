@@ -2,14 +2,17 @@
 
 from datetime import date
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from backstop_mcp.models import NonEmptyStr
 
 __all__ = [
     "GENDER_DESCRIPTION",
+    "KEY_EMPLOYEE_NOT_WRITABLE",
+    "KEY_EMPLOYEE_NOT_WRITABLE_DESCRIPTION",
     "LAST_NAME_DESCRIPTION",
     "_PersonWritableFields",
+    "reject_key_employee_write",
 ]
 
 LAST_NAME_DESCRIPTION = (
@@ -17,6 +20,23 @@ LAST_NAME_DESCRIPTION = (
     "(`Field lastName is required`)."
 )
 GENDER_DESCRIPTION = "Replacement gender."
+KEY_EMPLOYEE_NOT_WRITABLE = (
+    "is_key_employee cannot be written through the API. Personal API tokens do not "
+    "persist isKeyRelationship; set Key employee in the Backstop CRM UI. Read it on "
+    "get_people_for_party."
+)
+KEY_EMPLOYEE_NOT_WRITABLE_DESCRIPTION = (
+    "Not writable. Personal API tokens do not persist Key employee "
+    "(`isKeyRelationship` on the employment row / `isKeyEmployee` on the org roster). "
+    "Set it in the Backstop CRM UI. Read it on `get_people_for_party`. Distinct from "
+    "`is_employee`."
+)
+
+
+def reject_key_employee_write(value: bool | None) -> bool | None:
+    if value is not None:
+        raise ValueError(KEY_EMPLOYEE_NOT_WRITABLE)
+    return value
 
 
 class _PersonWritableFields(BaseModel):
@@ -70,8 +90,22 @@ class _PersonWritableFields(BaseModel):
     other_id: NonEmptyStr | None = Field(default=None, description="External/other id.")
     investable_assets: float | None = Field(default=None, description="Investable assets.")
     is_employee: bool | None = Field(
-        default=None, description="Whether this person is an employee."
+        default=None,
+        description=(
+            "Whether this person is an employee of our firm (`isEmployee`). "
+            "Distinct from `is_key_employee`."
+        ),
     )
+    is_key_employee: bool | None = Field(
+        default=None,
+        description=KEY_EMPLOYEE_NOT_WRITABLE_DESCRIPTION,
+    )
+
+    @field_validator("is_key_employee")
+    @classmethod
+    def _key_employee_is_not_writable(cls, value: bool | None) -> bool | None:
+        return reject_key_employee_write(value)
+
     company_id: NonEmptyStr | None = Field(
         default=None,
         description="Employer organization id. Never invent or guess.",

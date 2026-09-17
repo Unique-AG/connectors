@@ -37,11 +37,12 @@ async def create_person(
 
     `last_name` and `gender` are required. A repeated call creates a second record.
     `job_title` is at most 140 characters. Custom fields go through
-    `update_custom_field_values`. To change an existing person, use `update_person`.
+    `update_custom_field_values`. Category ids come from `list_contact_categories`.
+    To change an existing person, use `update_person`.
     `destructive_hint` is true because this writes a new CRM record.
 
     Call like: {"person": {"last_name": "Smith", "gender": "Female",
-    "category_ids": ["<contact-category id>"]}}
+    "category_ids": ["<id from list_contact_categories>"]}}
     """
     logger.info("org_people_writes.create_person.start")
     return await create_person_command.run(person=person)

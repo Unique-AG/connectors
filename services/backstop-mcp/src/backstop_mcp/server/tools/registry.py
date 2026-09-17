@@ -19,6 +19,9 @@ from backstop_mcp.features.activity_writes.tools.attach_file import attach_file
 from backstop_mcp.features.activity_writes.tools.delete_activity import delete_activity
 from backstop_mcp.features.activity_writes.tools.log_activity import log_activity
 from backstop_mcp.features.activity_writes.tools.update_activity import update_activity
+from backstop_mcp.features.contact_categories.tools.list_contact_categories import (
+    list_contact_categories,
+)
 from backstop_mcp.features.contact_sources.tools.list_contact_sources import list_contact_sources
 from backstop_mcp.features.custom_fields.tools.list_custom_field_groups import (
     list_custom_field_groups,
@@ -60,6 +63,7 @@ TOOLS: tuple[ToolFunction, ...] = (
     list_custom_fields,
     list_custom_field_groups,
     list_activity_tags,
+    list_contact_categories,
     list_contact_sources,
     list_system_users,
     get_activity_history,

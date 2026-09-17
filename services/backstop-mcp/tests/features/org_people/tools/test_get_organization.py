@@ -169,6 +169,53 @@ class TestGetOrganization:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_top_level_attributes_are_published_as_snake_case(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/organizations/o42").mock(
+            return_value=httpx.Response(
+                200,
+                json=_organization_document(
+                    attributes={
+                        "name": "Northwind",
+                        "legalName": "Northwind Ltd",
+                        "website": "https://northwind.example",
+                        "numberOfEmployees": 12,
+                        "internalOrganization": False,
+                        "matchingDomains": ["northwind.example"],
+                        "email": "",
+                        "status": "active",
+                        "modifiedTimestamp": "2025-03-01T10:00:00Z",
+                        "modifiedBy": "ops",
+                    }
+                ),
+            )
+        )
+
+        payload = tool_payload(
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="o42",
+                resolve_party_query=make_resolve_party_query(client),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
+            )
+        )
+
+        organization = object_dict(payload["organization"])
+        assert organization["legal_name"] == "Northwind Ltd"
+        assert organization["website"] == "https://northwind.example"
+        assert organization["number_of_employees"] == 12
+        assert organization["internal_organization"] is False
+        assert organization["matching_domains"] == ["northwind.example"]
+        assert organization["status"] == "active"
+        assert "email" not in organization
+        assert "legalName" not in organization
+        assert "numberOfEmployees" not in organization
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_ambiguous_search_returns_candidates_without_org_get(
         self, client: BackstopClient
     ) -> None:

@@ -24,8 +24,8 @@ CREATE_PERSON_INPUT_DESCRIPTION = (
 )
 
 _CATEGORY_IDS_DESCRIPTION = (
-    "Contact-category ids to assign on create. A new record has nothing to append to. "
-    "Never invent or guess."
+    "Contact-category ids from `list_contact_categories` to assign on create. A new "
+    "record has nothing to append to. Never invent or guess."
 )
 
 

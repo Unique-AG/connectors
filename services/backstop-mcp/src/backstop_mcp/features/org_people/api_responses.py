@@ -8,7 +8,7 @@ or a strict type would fail a whole record — or a whole page — over one unpa
 The published `PersonRecordResponse` / `OrganizationRecordResponse` still pass unrecognized
 Backstop fields through (`extra="allow"`), and `extra="ignore"` here would drop them before that
 happens. `_PartyAttributes` therefore keeps the resource's own `attributes` object as it arrived,
-and `passthrough()` hands back the keys that are not one of the known wire aliases.
+and `passthrough()` hands back the keys that are not one of the modelled wire aliases.
 """
 
 from collections.abc import Mapping, Sequence
@@ -25,8 +25,9 @@ from pydantic import (
 )
 
 from backstop_mcp.backstop_client import BackstopApiResource
+from backstop_mcp.dates import LenientDate
 from backstop_mcp.features.custom_fields import RegularCustomFieldValues
-from backstop_mcp.lenient import LenientStr
+from backstop_mcp.lenient import LenientBool, LenientFloat, LenientInt, LenientStr
 
 __all__ = [
     "EmployeeAttributes",
@@ -34,10 +35,6 @@ __all__ = [
     "OrganizationAttributes",
     "PersonAttributes",
 ]
-
-_KNOWN_WIRE_KEYS = frozenset(
-    {"name", "regularCustomFieldValues", "modifiedTimestamp", "modifiedBy"}
-)
 
 
 def _mapping_name(item: Mapping[object, object]) -> str | None:
@@ -64,14 +61,46 @@ def _extract_category_names(value: object) -> object:
     return tuple(names) or None
 
 
+def _string_tuple(value: object) -> object:
+    """Accept a list of strings; empty becomes None."""
+    if value is None:
+        return None
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return None
+    names = tuple(item.strip() for item in value if isinstance(item, str) and item.strip())
+    return names or None
+
+
 class _PartyAttributes(BaseModel):
-    """The attributes both party records share, plus the raw object they arrived in."""
+    """Scalars both party records share, plus the raw object they arrived in."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     # `validation_alias`, not `alias`: the camelCase spelling is what Backstop sends, and a
     # `model_dump` of anything built from this stays snake_case.
     name: LenientStr = None
+    contact_description: LenientStr = Field(default=None, validation_alias="contactDescription")
+    created_timestamp: LenientStr = Field(default=None, validation_alias="createdTimestamp")
+    email: LenientStr = None
+    email2: LenientStr = None
+    email3: LenientStr = None
+    website: LenientStr = None
+    other_id: LenientStr = Field(default=None, validation_alias="otherId")
+    investable_assets: LenientFloat = Field(default=None, validation_alias="investableAssets")
+    landing_page_url: LenientStr = Field(default=None, validation_alias="landingPageUrl")
+    legal_name: LenientStr = Field(default=None, validation_alias="legalName")
+    sync_disabled: LenientBool = Field(default=None, validation_alias="syncDisabled")
+    categories_as_string: LenientStr = Field(default=None, validation_alias="categoriesAsString")
+    categories: Annotated[tuple[str, ...] | None, BeforeValidator(_extract_category_names)] = None
+    country: LenientStr = None
+    city: LenientStr = None
+    postal_code: LenientStr = Field(default=None, validation_alias="postalCode")
+    state: LenientStr = None
+    fax: LenientStr = None
+    location_title: LenientStr = Field(default=None, validation_alias="locationTitle")
+    primary_phone_number: LenientStr = Field(default=None, validation_alias="primaryPhoneNumber")
+    phone: LenientStr = None
+    street_address: LenientStr = Field(default=None, validation_alias="streetAddress")
     regular_custom_field_values: RegularCustomFieldValues = Field(
         default_factory=list, validation_alias="regularCustomFieldValues"
     )
@@ -94,7 +123,17 @@ class _PartyAttributes(BaseModel):
 
     def passthrough(self) -> dict[str, object]:
         """Wire keys this feature does not model, for the published record to carry through."""
-        return {key: value for key, value in self._wire.items() if key not in _KNOWN_WIRE_KEYS}
+        return {key: value for key, value in self._wire.items() if key not in self._known_wire_keys}
+
+    @property
+    def _known_wire_keys(self) -> frozenset[str]:
+        keys: set[str] = set()
+        for name, field in type(self).model_fields.items():
+            keys.add(name)
+            alias = field.validation_alias
+            if isinstance(alias, str):
+                keys.add(alias)
+        return frozenset(keys)
 
 
 class PersonAttributes(_PartyAttributes):
@@ -102,11 +141,40 @@ class PersonAttributes(_PartyAttributes):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
+    birthday: LenientDate = None
+    company_name: LenientStr = Field(default=None, validation_alias="companyName")
+    department: LenientStr = None
+    first_name: LenientStr = Field(default=None, validation_alias="firstName")
+    middle_name: LenientStr = Field(default=None, validation_alias="middleName")
+    last_name: LenientStr = Field(default=None, validation_alias="lastName")
+    gender: LenientStr = None
+    is_employee: LenientBool = Field(default=None, validation_alias="isEmployee")
+    is_key_employee: LenientBool = Field(default=None, validation_alias="isKeyEmployee")
+    job_title: LenientStr = Field(default=None, validation_alias="jobTitle")
+    mobile_phone: LenientStr = Field(default=None, validation_alias="mobilePhone")
+    nick_name: LenientStr = Field(default=None, validation_alias="nickName")
+    prefix: LenientStr = None
+    suffix: LenientStr = None
+    salutation: LenientStr = None
+    pronunciation: LenientStr = None
+    spouse_name: LenientStr = Field(default=None, validation_alias="spouseName")
+
 
 class OrganizationAttributes(_PartyAttributes):
     """An `organizations` resource's `attributes`, as Backstop sends them."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    aliases: LenientStr = None
+    date_founded: LenientDate = Field(default=None, validation_alias="dateFounded")
+    internal_organization: LenientBool = Field(
+        default=None, validation_alias="internalOrganization"
+    )
+    matching_domains: Annotated[tuple[str, ...] | None, BeforeValidator(_string_tuple)] = Field(
+        default=None, validation_alias="matchingDomains"
+    )
+    number_of_employees: LenientInt = Field(default=None, validation_alias="numberOfEmployees")
+    ria: LenientBool = None
 
 
 class EmployeeAttributes(BaseModel):
@@ -125,6 +193,7 @@ class EmployeeAttributes(BaseModel):
     phone: LenientStr = None
     company_name: LenientStr = Field(default=None, validation_alias="companyName")
     categories: Annotated[tuple[str, ...] | None, BeforeValidator(_extract_category_names)] = None
+    is_key_employee: LenientBool = Field(default=None, validation_alias="isKeyEmployee")
 
 
 EmployeeResource = BackstopApiResource[EmployeeAttributes]

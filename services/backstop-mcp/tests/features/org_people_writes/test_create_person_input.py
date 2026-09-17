@@ -29,3 +29,10 @@ def test_missing_last_name_is_rejected() -> None:
 def test_missing_gender_is_rejected() -> None:
     with pytest.raises(ValidationError, match="gender"):
         _ADAPTER.validate_python({"last_name": "Smith"})
+
+
+def test_rejects_is_key_employee() -> None:
+    with pytest.raises(ValidationError, match="cannot be written"):
+        _ADAPTER.validate_python(
+            {"last_name": "Smith", "gender": "Female", "is_key_employee": True}
+        )

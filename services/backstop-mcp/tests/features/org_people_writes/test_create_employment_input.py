@@ -22,6 +22,19 @@ def test_accepts_trusted_ids() -> None:
     assert parsed.party_id == "p1"
     assert parsed.organization_id == "o1"
     assert parsed.start_date == date(2026, 1, 15)
+    assert parsed.is_key_employee is None
+
+
+def test_rejects_is_key_employee() -> None:
+    with pytest.raises(ValidationError, match="cannot be written"):
+        _ADAPTER.validate_python(
+            {
+                "party_id": "p1",
+                "organization_id": "o1",
+                "start_date": "2026-01-15",
+                "is_key_employee": True,
+            }
+        )
 
 
 def test_rejects_two_person_selectors() -> None:

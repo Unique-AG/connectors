@@ -290,6 +290,17 @@ class BackstopConfig(BaseSettings):
     # `BACKSTOP_CONTACT_SOURCE_CACHE_ENABLED=true` once its histograms say so.
     contact_source_cache_enabled: bool = False
 
+    # How long a fetched contact-category vocabulary stays usable before it is re-fetched.
+    # A few hundred rows on the instance this was built against; a category is added about
+    # as often as a contact source, so the same 24-hour default and cap apply.
+    # `list_contact_categories(refresh=true)` forces a refetch when a category is missing.
+    contact_category_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
+
+    # Whether the contact-category catalog is held between calls. Off by default: a few
+    # hundred rows is not expensive enough to justify the staleness. Set
+    # `BACKSTOP_CONTACT_CATEGORY_CACHE_ENABLED=true` once its histograms say so.
+    contact_category_cache_enabled: bool = False
+
     # How long a fetched activity-tag catalog stays usable before it is re-fetched. Tags change
     # rarely; the default is 24 hours. Capped at 24 hours so a stale catalog cannot sit for days
     # after a CRM admin adds a tag. `list_activity_tags(refresh=true)` forces a refetch when a

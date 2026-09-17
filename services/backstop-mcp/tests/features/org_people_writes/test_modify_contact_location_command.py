@@ -47,6 +47,19 @@ def _created_document(location_id: str) -> httpx.Response:
     )
 
 
+async def _run(
+    client: BackstopClient,
+    *,
+    locations: tuple[ContactLocationInput, ...] = (),
+    delete_location_ids: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    return await get_modify_contact_location_command_factory(client).run(
+        party_id=_PARTY_ID,
+        locations=locations,
+        delete_location_ids=delete_location_ids,
+    )
+
+
 class TestModifyContactLocationCommand:
     @respx.mock
     async def test_location_create_links_the_contact_as_type_contacts(
@@ -56,13 +69,12 @@ class TestModifyContactLocationCommand:
             return_value=_created_document("loc-1")
         )
 
-        location_id = await get_modify_contact_location_command_factory(client).run(
-            party_id=_PARTY_ID,
-            location=_LOCATION.validate_python({"location_title": "Office", "city": "Chicago"}),
-            delete_location_id=None,
+        location_ids = await _run(
+            client,
+            locations=(_LOCATION.validate_python({"location_title": "Office", "city": "Chicago"}),),
         )
 
-        assert location_id == "loc-1"
+        assert location_ids == ("loc-1",)
         body = recorded_json_bodies(route)[0]
         data = object_dict(body["data"])
         assert data["type"] == "contact-locations"
@@ -100,10 +112,9 @@ class TestModifyContactLocationCommand:
         )
 
         with pytest.raises(ToolError, match="already used"):
-            await get_modify_contact_location_command_factory(client).run(
-                party_id=_PARTY_ID,
-                location=_LOCATION.validate_python({"location_title": "Office"}),
-                delete_location_id=None,
+            await _run(
+                client,
+                locations=(_LOCATION.validate_python({"location_title": "Office"}),),
             )
 
     @respx.mock
@@ -113,15 +124,14 @@ class TestModifyContactLocationCommand:
             return_value=_created_document(_LOCATION_ID)
         )
 
-        location_id = await get_modify_contact_location_command_factory(client).run(
-            party_id=_PARTY_ID,
-            location=_LOCATION.validate_python(
-                {"location_id": _LOCATION_ID, "address": "1 Main St"}
+        location_ids = await _run(
+            client,
+            locations=(
+                _LOCATION.validate_python({"location_id": _LOCATION_ID, "address": "1 Main St"}),
             ),
-            delete_location_id=None,
         )
 
-        assert location_id == _LOCATION_ID
+        assert location_ids == (_LOCATION_ID,)
         assert create.call_count == 0
         assert patch.call_count == 1
         data = object_dict(recorded_json_bodies(patch)[0]["data"])
@@ -148,12 +158,13 @@ class TestModifyContactLocationCommand:
         )
 
         with pytest.raises(ToolError, match="already used"):
-            await get_modify_contact_location_command_factory(client).run(
-                party_id=_PARTY_ID,
-                location=_LOCATION.validate_python(
-                    {"location_id": _LOCATION_ID, "location_title": "Office"}
+            await _run(
+                client,
+                locations=(
+                    _LOCATION.validate_python(
+                        {"location_id": _LOCATION_ID, "location_title": "Office"}
+                    ),
                 ),
-                delete_location_id=None,
             )
 
     def test_an_over_length_location_title_is_rejected_by_the_input_model(self) -> None:
@@ -180,10 +191,9 @@ class TestModifyContactLocationCommand:
         )
 
         with pytest.raises(ToolError, match="parent party") as raised:
-            await get_modify_contact_location_command_factory(client).run(
-                party_id=_PARTY_ID,
-                location=_LOCATION.validate_python({"location_title": "Office"}),
-                delete_location_id=None,
+            await _run(
+                client,
+                locations=(_LOCATION.validate_python({"location_title": "Office"}),),
             )
 
         assert "created" in str(raised.value)
@@ -197,13 +207,9 @@ class TestModifyContactLocationCommand:
             return_value=httpx.Response(204, content=b"")
         )
 
-        location_id = await get_modify_contact_location_command_factory(client).run(
-            party_id=_PARTY_ID,
-            location=None,
-            delete_location_id=_LOCATION_ID,
-        )
+        location_ids = await _run(client, delete_location_ids=(_LOCATION_ID,))
 
-        assert location_id is None
+        assert location_ids == ()
         assert route.call_count == 1
         request = recorded_requests(route.calls)[0]
         assert request.content in (b"", b"null")
@@ -229,11 +235,49 @@ class TestModifyContactLocationCommand:
         )
 
         with pytest.raises(ToolError, match="parent party") as raised:
-            await get_modify_contact_location_command_factory(client).run(
-                party_id=_PARTY_ID,
-                location=None,
-                delete_location_id=_LOCATION_ID,
-            )
+            await _run(client, delete_location_ids=(_LOCATION_ID,))
 
         assert "location not found" not in str(raised.value).casefold()
         assert "missing location" in str(raised.value).casefold()
+
+    @respx.mock
+    async def test_creates_each_location_in_the_list(self, client: BackstopClient) -> None:
+        route = respx.post(f"{BASE_URL}/contact-locations").mock(
+            side_effect=[_created_document("loc-1"), _created_document("loc-2")]
+        )
+
+        location_ids = await _run(
+            client,
+            locations=(
+                _LOCATION.validate_python({"location_title": "Office"}),
+                _LOCATION.validate_python({"location_title": "Home"}),
+            ),
+        )
+
+        assert location_ids == ("loc-1", "loc-2")
+        assert route.call_count == 2
+        titles = [
+            object_dict(object_dict(body["data"])["attributes"])["locationTitle"]
+            for body in recorded_json_bodies(route)
+        ]
+        assert titles == ["Office", "Home"]
+
+    @respx.mock
+    async def test_deletes_run_before_creates(self, client: BackstopClient) -> None:
+        deletion = respx.delete(f"{BASE_URL}/contact-locations/{_LOCATION_ID}").mock(
+            return_value=httpx.Response(204, content=b"")
+        )
+        create = respx.post(f"{BASE_URL}/contact-locations").mock(
+            return_value=_created_document("loc-new")
+        )
+
+        location_ids = await _run(
+            client,
+            locations=(_LOCATION.validate_python({"location_title": "Office"}),),
+            delete_location_ids=(_LOCATION_ID,),
+        )
+
+        assert location_ids == ("loc-new",)
+        assert deletion.call_count == 1
+        assert create.call_count == 1
+        assert [request.method for request in recorded_requests(respx.calls)] == ["DELETE", "POST"]

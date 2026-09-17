@@ -12,10 +12,17 @@ Contact details (emails, locations, primary contact, the organization a person w
 get_person / get_organization with `include`. `representative` is our internal account owner, \
 not a way to reach the investor. Contact Source is a standard vocabulary, not a custom \
 field — ids come from list_contact_sources and go on update_person / update_organization \
-as `contact_source_id`. Retired email addresses are flagged — do not write to them. \
+as `contact_source_id`. Contact-category ids come from list_contact_categories and go on \
+create/update person and organization as `category_ids` / `add_category_ids` / \
+`replace_category_ids`. Retired email addresses are flagged — do not write to them. \
 People at an organization, with employment status and categories there: get_people_for_party. \
-`numberOfEmployees` on the organization record is not a roster. Custom-field values live on \
-the party (get_organization / get_person), not on get_people_for_party.
+`numberOfEmployees` on the organization record is not a roster. Key employee \
+(`is_key_employee` / `isKeyEmployee`) is org-scoped: it only appears on that roster, not \
+on get_person. It cannot be set or cleared through these tools — personal API tokens do \
+not persist `isKeyRelationship`. Set Key employee in the CRM UI. `update_person` and \
+`create_employment` reject `is_key_employee`. It is not a custom field, category, or \
+relationship type. Custom-field \
+values live on the party (get_organization / get_person), not on get_people_for_party.
 
 Holdings: get_accounts_for_party first (undocumented table-data; may 404 — that is not \
 "holds nothing"; the tool then falls back internally to the documented /accounts walk). \

@@ -80,6 +80,7 @@ class TestUpdateOrganization:
 
         assert result.id == _ID
         assert result.resource_type == "organizations"
+        assert result.organization.name == "Acme"
         assert route.call_count == 1
         attributes = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
         assert attributes == {"website": "https://example.com"}

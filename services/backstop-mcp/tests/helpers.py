@@ -23,6 +23,7 @@ from backstop_mcp.backstop_client import (
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import retry_settings, transport_settings
 from backstop_mcp.features.activity_tags import ActivityTagsService
+from backstop_mcp.features.contact_categories import ListContactCategoriesQuery
 from backstop_mcp.features.contact_sources import ListContactSourcesQuery
 from backstop_mcp.features.custom_fields import CustomFieldGroupsService, CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
@@ -123,6 +124,16 @@ def list_contact_sources_query(
     client: BackstopClient, *, ttl_minutes: int = 60, caching_enabled: bool = True
 ) -> ListContactSourcesQuery:
     return ListContactSourcesQuery(
+        client=client,
+        ttl=timedelta(minutes=ttl_minutes),
+        caching_enabled=caching_enabled,
+    )
+
+
+def list_contact_categories_query(
+    client: BackstopClient, *, ttl_minutes: int = 60, caching_enabled: bool = True
+) -> ListContactCategoriesQuery:
+    return ListContactCategoriesQuery(
         client=client,
         ttl=timedelta(minutes=ttl_minutes),
         caching_enabled=caching_enabled,

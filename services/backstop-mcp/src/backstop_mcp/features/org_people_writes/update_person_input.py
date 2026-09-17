@@ -21,7 +21,12 @@ from backstop_mcp.features.org_people_writes._person_writable_fields import (
     LAST_NAME_DESCRIPTION,
     _PersonWritableFields,
 )
-from backstop_mcp.features.org_people_writes.contact_location_input import ContactLocationInput
+from backstop_mcp.features.org_people_writes.contact_location_input import (
+    DELETE_LOCATION_IDS_DESCRIPTION,
+    LOCATIONS_DESCRIPTION,
+    ContactLocationInput,
+    reject_location_write_conflicts,
+)
 from backstop_mcp.features.party_resolver import (
     PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
@@ -86,32 +91,29 @@ class UpdatePersonInput(_UpdatePersonIdentity, _PersonWritableFields):
         default=None,
         min_length=1,
         description=(
-            "Contact-category ids to append. One PATCH; Backstop appends to-many "
-            "relationships. Cannot be combined with `replace_category_ids`. To clear, "
-            "use `replace_category_ids=[]`."
+            "Contact-category ids from `list_contact_categories` to append. One PATCH; "
+            "Backstop appends to-many relationships. Cannot be combined with "
+            "`replace_category_ids`. To clear, use `replace_category_ids=[]`."
         ),
     )
     replace_category_ids: tuple[str, ...] | None = Field(
         default=None,
         description=(
-            "Set the categories to exactly these ids. Two PATCHes (clear, then add) "
-            "because a to-many PATCH appends and `data: []` is the only clear. An empty "
-            "tuple clears. Cannot be combined with `add_category_ids`. There is no way "
-            "to remove a single member."
+            "Set the categories to exactly these ids from `list_contact_categories`. "
+            "Two PATCHes (clear, then add) because a to-many PATCH appends and "
+            "`data: []` is the only clear. An empty tuple clears. Cannot be combined "
+            "with `add_category_ids`. There is no way to remove a single member."
         ),
     )
-    location: ContactLocationInput | None = Field(
+    locations: tuple[ContactLocationInput, ...] | None = Field(
         default=None,
-        description=(
-            "Create or patch one postal address. Omit `location_id` to create "
-            + "(`location_title` required, unique on the party). Pass `location_id` to "
-            + "patch. "
-            + _LOCATION_ID_HINT
-        ),
+        min_length=1,
+        description=LOCATIONS_DESCRIPTION,
     )
-    delete_location_id: NonEmptyStr | None = Field(
+    delete_location_ids: tuple[NonEmptyStr, ...] | None = Field(
         default=None,
-        description="Hard-delete this `contact-locations` id. " + _LOCATION_ID_HINT,
+        min_length=1,
+        description=DELETE_LOCATION_IDS_DESCRIPTION,
     )
 
     # `mode="before"` runs only when the key is present, so an explicit null is told
@@ -136,4 +138,11 @@ class UpdatePersonInput(_UpdatePersonIdentity, _PersonWritableFields):
     def _category_fields_are_exclusive(self) -> Self:
         if self.add_category_ids is not None and self.replace_category_ids is not None:
             raise ValueError("Set add_category_ids or replace_category_ids, not both")
+        return self
+
+    @model_validator(mode="after")
+    def _location_writes_do_not_conflict(self) -> Self:
+        reject_location_write_conflicts(
+            locations=self.locations, delete_location_ids=self.delete_location_ids
+        )
         return self

@@ -85,7 +85,11 @@ def _current_catalog() -> httpx.Response:
     )
 
 
-def _relationship_document(*, status: int = 200, start_date: str | None = None) -> httpx.Response:
+def _relationship_document(
+    *,
+    status: int = 200,
+    start_date: str | None = None,
+) -> httpx.Response:
     attributes: dict[str, object] = {}
     if start_date is not None:
         attributes["startDate"] = start_date
@@ -168,6 +172,7 @@ class TestCreateEmploymentCommand:
         await _run(client)
 
         assert _attributes(recorded_json_bodies(route)[0])["startDate"] == _START.isoformat()
+        assert "isKeyRelationship" not in _attributes(recorded_json_bodies(route)[0])
 
     @respx.mock
     async def test_employment_type_is_resolved_from_the_catalog_not_hardcoded(

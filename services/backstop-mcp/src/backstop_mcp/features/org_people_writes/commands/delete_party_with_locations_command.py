@@ -149,8 +149,7 @@ class DeletePartyWithLocationsCommand:
             try:
                 await self._modify_contact_location_command.run(
                     party_id=party_id,
-                    location=None,
-                    delete_location_id=location_id,
+                    delete_location_ids=(location_id,),
                 )
             except ToolError as exc:
                 failures.append(f"{location_id}: {exc}")

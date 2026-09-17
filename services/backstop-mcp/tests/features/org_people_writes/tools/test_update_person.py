@@ -77,6 +77,7 @@ class TestUpdatePerson:
         assert result.id == _ID
         assert result.resource_type == "people"
         assert result.mobile_phone == "555-0100"
+        assert result.person.mobile_phone == "555-0100"
         assert route.call_count == 1
         attributes = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
         assert attributes == {"jobTitle": "Managing Director"}

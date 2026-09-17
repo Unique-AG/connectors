@@ -4,6 +4,7 @@ from typing import Annotated, ClassVar
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from backstop_mcp.dates import LenientDate
+from backstop_mcp.lenient import LenientBool
 
 __all__ = [
     "CleanStr",
@@ -79,6 +80,7 @@ class EntityRelationshipAttributes(BaseModel):
     end_date: LenientDate = Field(default=None, alias="endDate")
     start_date: LenientDate = Field(default=None, alias="startDate")
     created_timestamp: LenientDate = Field(default=None, alias="createdTimestamp")
+    is_key_relationship: LenientBool = Field(default=None, alias="isKeyRelationship")
     source_entity: EntityRefAttributes | None = Field(default=None, alias="sourceEntity")
     destination_entity: EntityRefAttributes | None = Field(default=None, alias="destinationEntity")
 

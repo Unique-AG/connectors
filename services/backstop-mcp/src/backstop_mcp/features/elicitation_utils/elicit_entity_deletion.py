@@ -78,9 +78,7 @@ class DeletionNeedsConfirmationResponse(OmitNoneModel):
         default=CONFIRM_RETRY_MESSAGE,
         description="What the model should tell the user, including how to retry.",
     )
-    preview: str = Field(
-        description="The delete confirmation text the form would have shown."
-    )
+    preview: str = Field(description="The delete confirmation text the form would have shown.")
 
 
 type DeletionElicitResult = InputRequiredResult | DeletionNeedsConfirmationResponse

@@ -1,7 +1,7 @@
 """PATCH `/organizations/{id}`, then optional `/contact-locations` writes.
 
-No re-read, unlike `update_person`: Backstop rewrites phone numbers, and an organization
-has no phone attribute here.
+Re-reads the organization so the tool can publish the same top-level scalars as
+`get_organization`.
 """
 
 import logging
@@ -16,6 +16,7 @@ from backstop_mcp.backstop_client import (
     omit_none_values,
     relationship_data,
 )
+from backstop_mcp.features.org_people import OrganizationAttributes, OrganizationRecordResponse
 from backstop_mcp.features.org_people_writes.api_responses import OrganizationWriteAttributes
 from backstop_mcp.features.org_people_writes.commands._contact_attributes import (
     organization_attributes,
@@ -33,7 +34,8 @@ from backstop_mcp.features.system_users import SystemUsersService
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
 
-_Document = BackstopApiSingleResourceDocument[OrganizationWriteAttributes]
+_PatchDocument = BackstopApiSingleResourceDocument[OrganizationWriteAttributes]
+_ReadDocument = BackstopApiSingleResourceDocument[OrganizationAttributes]
 _RESOURCE_TYPE = "organizations"
 
 
@@ -62,20 +64,26 @@ class UpdateOrganizationCommand:
                 new_organization_fields.owner_login
             )
             await self._patch(new_organization_fields, party_id=party_id, owner=owner)
-            location_id = await self._modify_contact_location_command.run(
+            location_ids = await self._modify_contact_location_command.run(
                 party_id=party_id,
-                location=new_organization_fields.location,
-                delete_location_id=new_organization_fields.delete_location_id,
+                locations=new_organization_fields.locations or (),
+                delete_location_ids=new_organization_fields.delete_location_ids or (),
             )
+            written = await self._read(party_id)
             logger.info(
                 "org_people_writes.organization.updated",
-                extra={"id": party_id, "location_id": location_id},
+                extra={"id": party_id, "location_ids": location_ids},
             )
             return UpdatedOrganizationResponse(
                 id=party_id,
                 resource_type=_RESOURCE_TYPE,
-                location_id=location_id,
+                organization=OrganizationRecordResponse.from_attributes(written.data.attributes),
+                location_ids=location_ids,
             )
+
+    async def _read(self, party_id: str) -> _ReadDocument:
+        path = f"/{_RESOURCE_TYPE}/{quote(party_id, safe='')}"
+        return await self._client.get(path, schema=_ReadDocument)
 
     async def _patch(
         self,
@@ -99,7 +107,7 @@ class UpdateOrganizationCommand:
         path = f"/{_RESOURCE_TYPE}/{quote(party_id, safe='')}"
         await self._client.patch(
             path,
-            schema=_Document,
+            schema=_PatchDocument,
             json=json_api_update(
                 resource_type=_RESOURCE_TYPE,
                 resource_id=party_id,
@@ -113,7 +121,7 @@ class UpdateOrganizationCommand:
         if new_organization_fields.replace_category_ids:
             await self._client.patch(
                 path,
-                schema=_Document,
+                schema=_PatchDocument,
                 json=json_api_update(
                     resource_type=_RESOURCE_TYPE,
                     resource_id=party_id,

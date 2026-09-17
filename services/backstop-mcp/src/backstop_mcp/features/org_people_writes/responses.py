@@ -1,8 +1,9 @@
 """Published party-write responses.
 
-A write reports the id, the resource type, and only the extra fields a measured trap
-requires: the phone Backstop stored (it rewrites numbers), and a location id when one
-was created or updated.
+A write reports the id, the resource type, and the extra fields a measured trap
+requires: the phone Backstop stored (it rewrites numbers), and location ids when
+addresses were created or updated. Person and organization PATCHes also echo the
+re-read record — same top-level scalars as `get_person` / `get_organization`.
 """
 
 from datetime import date
@@ -11,6 +12,7 @@ from typing import ClassVar, Literal
 from pydantic import ConfigDict, Field
 
 from backstop_mcp.features.elicitation_utils import DeletionNeedsConfirmationResponse
+from backstop_mcp.features.org_people import OrganizationRecordResponse, PersonRecordResponse
 from backstop_mcp.features.party_resolver import PartyAmbiguousResponse
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
@@ -126,26 +128,34 @@ class DeletedOrganizationResponse(OmitNoneModel):
 
 
 class UpdatedPersonResponse(OmitNoneModel):
-    """A person after a PATCH, with the phone Backstop actually stored."""
+    """A person after a PATCH, with the record and phone Backstop actually stored."""
 
     id: str = Field(description="Backstop id of the person. Echo it; never invent one.")
     resource_type: Literal["people", "contacts", "employees"] = Field(
         default="people",
         description="Collection this PATCH targeted: `people`, `contacts`, or `employees`.",
     )
+    person: PersonRecordResponse = Field(
+        description=(
+            "The person record READ BACK after the write. Same top-level fields as "
+            "`get_person` (`first_name`, `job_title`, `is_key_employee`, emails, "
+            "location copies, …). Custom fields stay on `get_person` / "
+            "`update_custom_field_values`."
+        ),
+    )
     mobile_phone: str | None = Field(
         default=None,
         description=(
             "Mobile phone READ BACK after the write. Backstop normalizes numbers "
             "(e.g. `+1 555 0100` is stored as `555-0100`); this is the stored value, "
-            "not the requested one."
+            "not the requested one. Also on `person.mobile_phone`."
         ),
     )
-    location_id: str | None = Field(
-        default=None,
+    location_ids: tuple[str, ...] = Field(
+        default=(),
         description=(
-            "Backstop `contact-locations` id created or updated on this call. Echo it "
-            "as `location.location_id`. From `get_person` with "
+            "Backstop `contact-locations` ids created or updated on this call. Echo them "
+            "as `locations[].location_id`. From `get_person` with "
             "`include=contactLocations` — not `include=locations`."
         ),
     )
@@ -156,18 +166,26 @@ class UpdatedPersonResponse(OmitNoneModel):
 
 
 class UpdatedOrganizationResponse(OmitNoneModel):
-    """An organization after a PATCH."""
+    """An organization after a PATCH, with the record Backstop actually stored."""
 
     id: str = Field(description="Backstop id of the organization. Echo it; never invent one.")
     resource_type: Literal["organizations"] = Field(
         default="organizations",
         description="Always `organizations`.",
     )
-    location_id: str | None = Field(
-        default=None,
+    organization: OrganizationRecordResponse = Field(
         description=(
-            "Backstop `contact-locations` id created or updated on this call. Echo it "
-            "as `location.location_id`. From `get_organization` with "
+            "The organization record READ BACK after the write. Same top-level fields "
+            "as `get_organization` (`name`, `legal_name`, `website`, "
+            "`number_of_employees`, location copies, …). Custom fields stay on "
+            "`get_organization` / `update_custom_field_values`."
+        ),
+    )
+    location_ids: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Backstop `contact-locations` ids created or updated on this call. Echo them "
+            "as `locations[].location_id`. From `get_organization` with "
             "`include=contactLocations` — not `include=locations`."
         ),
     )

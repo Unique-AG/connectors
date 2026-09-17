@@ -150,9 +150,7 @@ class TestDeleteActivity:
         assert route.call_count == 0
 
     @respx.mock
-    async def test_handshake_era_deletes_when_confirm_is_true(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_handshake_era_deletes_when_confirm_is_true(self, client: BackstopClient) -> None:
         route = respx.delete(f"{BASE_URL}/notes/{_NOTE_ID}").mock(return_value=httpx.Response(204))
 
         result = tool_model(

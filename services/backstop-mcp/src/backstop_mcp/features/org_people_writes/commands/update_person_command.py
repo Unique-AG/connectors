@@ -12,6 +12,7 @@ from backstop_mcp.backstop_client import (
     omit_none_values,
     relationship_data,
 )
+from backstop_mcp.features.org_people import PersonAttributes, PersonRecordResponse
 from backstop_mcp.features.org_people_writes.api_responses import PersonWriteAttributes
 from backstop_mcp.features.org_people_writes.commands._contact_attributes import (
     person_attributes,
@@ -30,7 +31,8 @@ from backstop_mcp.features.system_users import SystemUsersService
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
 
-_Document = BackstopApiSingleResourceDocument[PersonWriteAttributes]
+_PatchDocument = BackstopApiSingleResourceDocument[PersonWriteAttributes]
+_ReadDocument = BackstopApiSingleResourceDocument[PersonAttributes]
 
 
 class UpdatePersonCommand:
@@ -57,26 +59,28 @@ class UpdatePersonCommand:
             span.set_attribute("search_type", search_type)
             owner = await self._system_users_service.resolve_relationship(person.owner_login)
             await self._patch(person, party_id=party_id, search_type=search_type, owner=owner)
-            location_id = await self._modify_contact_location_command.run(
+            location_ids = await self._modify_contact_location_command.run(
                 party_id=party_id,
-                location=person.location,
-                delete_location_id=person.delete_location_id,
+                locations=person.locations or (),
+                delete_location_ids=person.delete_location_ids or (),
             )
             written = await self._read(party_id, search_type=search_type)
+            record = PersonRecordResponse.from_attributes(written.data.attributes)
             logger.info(
                 "org_people_writes.person.updated",
-                extra={"id": party_id, "search_type": search_type, "location_id": location_id},
+                extra={"id": party_id, "search_type": search_type, "location_ids": location_ids},
             )
             return UpdatedPersonResponse(
                 id=party_id,
                 resource_type=search_type,
-                mobile_phone=written.data.attributes.mobile_phone,
-                location_id=location_id,
+                person=record,
+                mobile_phone=record.mobile_phone,
+                location_ids=location_ids,
             )
 
-    async def _read(self, party_id: str, *, search_type: PersonCollection) -> _Document:
+    async def _read(self, party_id: str, *, search_type: PersonCollection) -> _ReadDocument:
         path = f"/{search_type}/{quote(party_id, safe='')}"
-        return await self._client.get(path, schema=_Document)
+        return await self._client.get(path, schema=_ReadDocument)
 
     async def _patch(
         self,
@@ -98,7 +102,7 @@ class UpdatePersonCommand:
         path = f"/{search_type}/{quote(party_id, safe='')}"
         await self._client.patch(
             path,
-            schema=_Document,
+            schema=_PatchDocument,
             json=json_api_update(
                 resource_type=search_type,
                 resource_id=party_id,
@@ -109,7 +113,7 @@ class UpdatePersonCommand:
         if person.replace_category_ids:
             await self._client.patch(
                 path,
-                schema=_Document,
+                schema=_PatchDocument,
                 json=json_api_update(
                     resource_type=search_type,
                     resource_id=party_id,

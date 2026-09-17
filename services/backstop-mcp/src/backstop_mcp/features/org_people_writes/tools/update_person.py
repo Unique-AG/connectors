@@ -1,4 +1,4 @@
-"""`update_person`: PATCH one person and optionally edit a location."""
+"""`update_person`: PATCH one person and optionally edit postal addresses."""
 
 import logging
 from typing import Annotated
@@ -45,15 +45,21 @@ async def update_person(
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     update_person_command: UpdatePersonCommand = Depends(get_update_person_command_factory),
 ) -> UpdatePersonResponse:
-    """Patch one CRM person and, optionally, one of their postal addresses.
+    """Patch one CRM person and, optionally, their postal addresses.
 
     `search_type` plus exactly one of `party_id` or `search` — same identity as `get_person`.
     `last_name` cannot be cleared. `job_title` is at most 140 characters. Custom fields go
     through `update_custom_field_values`. Email corrections go through `email` / `email2` /
-    `email3`; `contact-emails` has no write endpoint. Location ids come from `get_person`
-    with `include=contactLocations`, not `include=locations`. Creating an address is folded
+    `email3`; `contact-emails` has no write endpoint. Category ids come from
+    `list_contact_categories`. Location ids come from `get_person`
+    with `include=contactLocations`, not `include=locations`. `locations` creates or patches
+    each address; `delete_location_ids` removes them. Creating an address is folded
     into this tool: `destructive_hint` is already true, which over-warns rather than
-    under-warns. Omit a field to leave it unchanged. Never invent an id.
+    under-warns. `is_key_employee` cannot be written through these tools — personal API
+    tokens do not persist `isKeyRelationship`; set Key employee in the CRM UI.
+    `PATCH /people` ignores `isKeyEmployee`.
+    The response `person` is the record READ BACK — same top-level fields as `get_person`.
+    Omit a field to leave it unchanged. Never invent an id.
 
     Call like: {"person": {"search_type": "people", "party_id": "<id from get_person>",
     "job_title": "Managing Director"}}

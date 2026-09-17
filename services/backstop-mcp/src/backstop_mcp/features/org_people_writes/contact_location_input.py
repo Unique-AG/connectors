@@ -9,6 +9,9 @@ from backstop_mcp.models import NonEmptyStr
 
 __all__ = [
     "ContactLocationInput",
+    "DELETE_LOCATION_IDS_DESCRIPTION",
+    "LOCATIONS_DESCRIPTION",
+    "reject_location_write_conflicts",
 ]
 
 _INCLUDE_HINT = (
@@ -83,3 +86,40 @@ class ContactLocationInput(BaseModel):
         if not has_change:
             raise ValueError("Pass at least one location field to change")
         return self
+
+
+LOCATIONS_DESCRIPTION = (
+    "Postal addresses to create or patch. The party keeps a list — pass one object per "
+    + "address. Omit `location_id` to create (`location_title` required, unique on the "
+    + "party). Pass `location_id` to patch. "
+    + _INCLUDE_HINT
+    + " Cannot patch and delete the same id."
+)
+DELETE_LOCATION_IDS_DESCRIPTION = (
+    "Hard-delete these `contact-locations` ids. Deletes run before creates so a title "
+    + "can be reused on the same call. "
+    + _INCLUDE_HINT
+)
+
+
+def reject_location_write_conflicts(
+    *,
+    locations: tuple[ContactLocationInput, ...] | None,
+    delete_location_ids: tuple[str, ...] | None,
+) -> None:
+    """Reject overlapping or duplicate location ids in one write."""
+    patched = tuple(loc.location_id for loc in (locations or ()) if loc.location_id is not None)
+    if len(patched) != len(set(patched)):
+        raise ValueError("locations location_id values must be unique")
+    deleted = delete_location_ids or ()
+    if len(deleted) != len(set(deleted)):
+        raise ValueError("delete_location_ids must be unique")
+    if set(patched) & set(deleted):
+        raise ValueError("Cannot patch and delete the same location_id")
+    created_titles = tuple(
+        loc.location_title.casefold()
+        for loc in (locations or ())
+        if loc.location_id is None and loc.location_title is not None
+    )
+    if len(created_titles) != len(set(created_titles)):
+        raise ValueError("location_title must be unique on the party")
