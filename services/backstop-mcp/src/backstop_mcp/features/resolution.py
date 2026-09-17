@@ -414,11 +414,7 @@ type ToCandidateResponse[T, CandidateT] = Callable[[Candidate[T]], CandidateT]
 type ToResolvedResponse[T, ResolvedT] = Callable[[T], ResolvedT]
 
 
-def unresolved_response[
-    T,
-    CandidateT: CandidateResponse,
-    AmbiguousT: AmbiguousResponse[Any],
-](
+def unresolved_response[T, CandidateT: CandidateResponse, AmbiguousT: AmbiguousResponse[Any]](
     result: Unresolved[T],
     *,
     ambiguous_model: type[AmbiguousT],
