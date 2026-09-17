@@ -6,7 +6,7 @@ from typing import Annotated
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.org_people_writes import (
@@ -21,7 +21,7 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ async def end_employment(
     employment: Annotated[EndEmploymentInput, Field(description=END_EMPLOYMENT_INPUT_DESCRIPTION)],
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     end_employment_command: EndEmploymentCommand = Depends(get_end_employment_command_factory),
-) -> EndEmploymentResponse:
+) -> EndEmploymentResponse | InputRequiredResult:
     """End one CRM employment by writing `endDate` on the relationship.
 
     Person identity is the same as `get_person`. Organization identity is exactly one of
@@ -60,6 +60,8 @@ async def end_employment(
         search=employment.search,
     )
     person_result = await elicit_if_ambiguous(ctx, person_result)
+    if input_required(person_result):
+        return person_result
     if not isinstance(person_result, Resolved):
         return unresolved_party_response(person_result)
     organization_result = await resolve_party_query.run(
@@ -68,6 +70,8 @@ async def end_employment(
         search=employment.organization_search,
     )
     organization_result = await elicit_if_ambiguous(ctx, organization_result)
+    if input_required(organization_result):
+        return organization_result
     if not isinstance(organization_result, Resolved):
         return unresolved_party_response(organization_result)
     person = person_result.value

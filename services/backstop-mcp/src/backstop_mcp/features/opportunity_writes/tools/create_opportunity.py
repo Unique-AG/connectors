@@ -6,7 +6,7 @@ from typing import Annotated
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.opportunity_writes import (
@@ -21,7 +21,7 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ async def create_opportunity(
     create_opportunity_command: CreateOpportunityCommand = Depends(
         get_create_opportunity_command_factory
     ),
-) -> CreateOpportunityResponse:
+) -> CreateOpportunityResponse | InputRequiredResult:
     """Create one CRM opportunity.
 
     `name`, `currency_code`, `is_erisa`, and the investor identity are required. Investor
@@ -66,6 +66,8 @@ async def create_opportunity(
         search=opportunity.search,
     )
     investor_result = await elicit_if_ambiguous(ctx, investor_result)
+    if input_required(investor_result):
+        return investor_result
     if not isinstance(investor_result, Resolved):
         return unresolved_party_response(investor_result)
     investor = investor_result.value

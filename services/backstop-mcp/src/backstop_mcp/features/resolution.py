@@ -23,15 +23,30 @@ The policy itself:
 """
 
 import asyncio
+import json
 import logging
 from collections import Counter
-from collections.abc import Callable, Sequence
-from typing import Annotated, Any, ClassVar, Literal, Protocol, cast
+from collections.abc import Callable, Mapping, Sequence
+from typing import Annotated, Any, ClassVar, Literal, Protocol, TypeIs, cast, overload
 
+import fastmcp
 from fastmcp import Context
-from fastmcp.server.elicitation import AcceptedElicitation
+from fastmcp.server.dependencies import get_http_request
+from fastmcp.server.elicitation import (
+    AcceptedElicitation,
+    handle_elicit_accept,
+    parse_elicit_response_type,
+)
 from mcp.server.elicitation import CancelledElicitation, DeclinedElicitation
-from mcp.types import ClientCapabilities, ElicitationCapability
+from mcp.types import (
+    ClientCapabilities,
+    ElicitationCapability,
+    ElicitRequest,
+    ElicitRequestFormParams,
+    ElicitResult,
+    InputRequiredResult,
+)
+from mcp.types.version import MODERN_PROTOCOL_VERSIONS
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.dependencies import get_resolution_config
@@ -185,6 +200,67 @@ class _RequestContext(Protocol):
     def session(self) -> _ClientCapabilityChecker: ...
 
 
+def input_required(outcome: object) -> TypeIs[InputRequiredResult]:
+    """True when this call must end so the client can show the form."""
+    return isinstance(outcome, InputRequiredResult)
+
+
+def asks_as_tool_result(ctx: Context) -> bool:
+    """Whether to return the picker as the `tools/call` result instead of a mid-call elicit.
+
+    Only 2026-07-28 can serialize `InputRequiredResult`. Handshake Streamable HTTP still
+    uses `elicitation/create`, but on the GET stream — Inspector and Cursor buffer the
+    open POST and never show a form that rides it.
+    """
+    request = getattr(ctx, "request_context", None)
+    version = getattr(request, "protocol_version", None)
+    return version in MODERN_PROTOCOL_VERSIONS
+
+
+def _on_streamable_http() -> bool:
+    try:
+        path = get_http_request().url.path.rstrip("/")
+    except Exception:
+        return False
+    return path == fastmcp.settings.streamable_http_path.rstrip("/")
+
+
+@overload
+async def elicit_from_client[T](
+    ctx: Context, message: str, response_type: type[T]
+) -> AcceptedElicitation[T] | DeclinedElicitation | CancelledElicitation: ...
+
+
+@overload
+async def elicit_from_client(
+    ctx: Context, message: str, response_type: list[str]
+) -> AcceptedElicitation[str] | DeclinedElicitation | CancelledElicitation: ...
+
+
+async def elicit_from_client[T](
+    ctx: Context,
+    message: str,
+    response_type: type[T] | list[str],
+) -> (
+    AcceptedElicitation[T]
+    | AcceptedElicitation[str]
+    | DeclinedElicitation
+    | CancelledElicitation
+):
+    """Ask the client. Handshake Streamable HTTP elicit rides GET, not the open POST."""
+    if not _on_streamable_http():
+        return await ctx.elicit(message=message, response_type=response_type)
+
+    logger.info("resolution.elicit.standalone_stream")
+    config = parse_elicit_response_type(response_type)
+    raw = await ctx.session.elicit_form(message, config.schema)
+    if raw.action == "accept":
+        return handle_elicit_accept(config, raw.content)
+    if raw.action == "decline":
+        return DeclinedElicitation()
+    return CancelledElicitation()
+
+
 def client_supports_elicitation(ctx: Context) -> bool:
     """Whether the connected client advertised the elicitation capability.
 
@@ -227,13 +303,86 @@ def _unique_labels[T](candidates: Sequence[Candidate[T]]) -> dict[str, Candidate
     }
 
 
+_ASK = "resolve"
+_CHOSEN_ATTR = "_resolution_chosen"
+
+
+def _ask_key[T](ambiguous: Ambiguous[T]) -> str:
+    return f"{_ASK}:{ambiguous.scope}:{ambiguous.query}"
+
+
+def _remember[T](ctx: Context, key: str, candidate_key: str) -> None:
+    remembered = getattr(ctx, _CHOSEN_ATTR, None)
+    if not isinstance(remembered, dict):
+        remembered = {}
+        setattr(ctx, _CHOSEN_ATTR, remembered)
+    remembered[key] = candidate_key
+
+
+def _str_map(raw: object) -> dict[str, str]:
+    if not isinstance(raw, Mapping):
+        return {}
+    recalled: dict[str, str] = {}
+    for key, value in cast("Mapping[object, object]", raw).items():
+        if isinstance(key, str) and isinstance(value, str):
+            recalled[key] = value
+    return recalled
+
+
+def _remembered(ctx: Context) -> dict[str, str]:
+    return _str_map(getattr(ctx, _CHOSEN_ATTR, None))
+
+
+def _state_chosen(ctx: Context) -> dict[str, str]:
+    raw = getattr(ctx, "request_state", None)
+    if not isinstance(raw, str) or not raw:
+        return {}
+    try:
+        parsed = cast("object", json.loads(raw))
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(parsed, Mapping):
+        return {}
+    return _str_map(cast("Mapping[object, object]", parsed).get("chosen"))
+
+
+def _resolved_by_key[T](ambiguous: Ambiguous[T], candidate_key: str) -> Resolution[T]:
+    for candidate in ambiguous.candidates:
+        if candidate.key == candidate_key:
+            return Resolved(value=candidate.value)
+    return ambiguous
+
+
+def _apply_elicit_result[T](
+    ambiguous: Ambiguous[T],
+    by_label: dict[str, Candidate[T]],
+    result: AcceptedElicitation[str] | DeclinedElicitation | CancelledElicitation,
+    outcome_log: dict[str, object],
+) -> Resolution[T]:
+    if isinstance(result, AcceptedElicitation):
+        chosen = by_label.get(result.data)
+        if chosen is None:
+            logger.warning("resolution.elicit.unknown_choice", extra=outcome_log)
+            return ambiguous
+        return Resolved(value=chosen.value)
+    assert isinstance(result, (DeclinedElicitation, CancelledElicitation))
+    logger.info(
+        "resolution.elicit.dismissed",
+        extra={
+            **outcome_log,
+            "action": "declined" if isinstance(result, DeclinedElicitation) else "cancelled",
+        },
+    )
+    return ambiguous
+
+
 async def elicit_choice[T](
     ctx: Context,
     ambiguous: Ambiguous[T],
     *,
     prompt: str,
     timeout_seconds: float | None = None,
-) -> Resolution[T]:
+) -> Resolution[T] | InputRequiredResult:
     """Ask the user to pick one candidate, degrading to `ambiguous` if that isn't possible.
 
     Returns the original `Ambiguous` unchanged whenever a user-visible choice can't be
@@ -259,6 +408,10 @@ async def elicit_choice[T](
         "scope": ambiguous.scope,
         "candidates": len(ambiguous.candidates),
     }
+    key = _ask_key(ambiguous)
+    prior = {**_state_chosen(ctx), **_remembered(ctx)}
+    if key in prior:
+        return _resolved_by_key(ambiguous, prior[key])
 
     if not client_supports_elicitation(ctx):
         logger.info(
@@ -268,12 +421,47 @@ async def elicit_choice[T](
         return ambiguous
 
     by_label = _unique_labels(ambiguous.candidates)
+    config = parse_elicit_response_type(list(by_label))
+    responses = getattr(ctx, "input_responses", None)
+    answered: object = None
+    if isinstance(responses, Mapping):
+        answered = cast("Mapping[object, object]", responses).get(key)
+    if isinstance(answered, ElicitResult):
+        if answered.action != "accept":
+            logger.info(
+                "resolution.elicit.dismissed",
+                extra={**outcome_log, "action": answered.action},
+            )
+            return ambiguous
+        try:
+            accepted = handle_elicit_accept(config, answered.content)
+        except Exception as exc:
+            logger.warning("resolution.elicit.degraded", extra={**outcome_log, "error": str(exc)})
+            return ambiguous
+        chosen = by_label.get(cast("str", accepted.data))
+        if chosen is None:
+            logger.warning("resolution.elicit.unknown_choice", extra=outcome_log)
+            return ambiguous
+        _remember(ctx, key, chosen.key)
+        return Resolved(value=chosen.value)
+
+    if asks_as_tool_result(ctx):
+        logger.info("resolution.elicit.input_required", extra=outcome_log)
+        return InputRequiredResult(
+            input_requests={
+                key: ElicitRequest(
+                    params=ElicitRequestFormParams(message=prompt, requested_schema=config.schema)
+                )
+            },
+            request_state=json.dumps({"chosen": prior}),
+        )
+
     try:
         # Only this deadline is swallowed. A `CancelledError` from the caller's own scope is a
         # `BaseException`, so it keeps propagating and the tool still aborts when the client
         # gives up on the whole call.
         async with asyncio.timeout(timeout_seconds):
-            result = await ctx.elicit(message=prompt, response_type=list(by_label))
+            result = await elicit_from_client(ctx, prompt, list(by_label))
     except TimeoutError:
         logger.warning(
             "resolution.elicit.timed_out",
@@ -284,25 +472,12 @@ async def elicit_choice[T](
         logger.warning("resolution.elicit.degraded", extra={**outcome_log, "error": str(exc)})
         return ambiguous
 
-    if isinstance(result, AcceptedElicitation):
-        chosen = by_label.get(result.data)
-        if chosen is None:
-            logger.warning("resolution.elicit.unknown_choice", extra=outcome_log)
-            return ambiguous
-        return Resolved(value=chosen.value)
-
-    assert isinstance(result, (DeclinedElicitation, CancelledElicitation))
-    logger.info(
-        "resolution.elicit.dismissed",
-        extra={
-            **outcome_log,
-            "action": "declined" if isinstance(result, DeclinedElicitation) else "cancelled",
-        },
-    )
-    return ambiguous
+    return _apply_elicit_result(ambiguous, by_label, result, outcome_log)
 
 
-async def elicit_if_ambiguous[T](ctx: Context, outcome: Resolution[T]) -> Resolution[T]:
+async def elicit_if_ambiguous[T](
+    ctx: Context, outcome: Resolution[T]
+) -> Resolution[T] | InputRequiredResult:
     """Policy step 2: several matches on a single call → ask; otherwise leave the outcome."""
     if not isinstance(outcome, Ambiguous):
         return outcome

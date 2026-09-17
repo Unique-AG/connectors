@@ -7,7 +7,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.elicitation_utils import (
@@ -31,7 +31,7 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import Resolved
+from backstop_mcp.features.resolution import Resolved, input_required
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ async def delete_person(
     delete_party_with_locations_command: DeletePartyWithLocationsCommand = Depends(
         get_delete_party_with_locations_command_factory
     ),
-) -> DeletePersonResponse:
+) -> DeletePersonResponse | InputRequiredResult:
     """Permanently delete a CRM person and their contact-locations.
 
     `search_type` plus exactly one of `party_id` or `search` — same identity as
@@ -88,6 +88,8 @@ async def delete_person(
         )
 
     outcome = await elicit_entity_deletion(ctx, callback=prompt)
+    if input_required(outcome):
+        return outcome
     if outcome is EntityDeletion.DECLINED:
         logger.info(
             "org_people_writes.delete_person.not_confirmed",

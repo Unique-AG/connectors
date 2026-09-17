@@ -2,17 +2,26 @@
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from enum import StrEnum
-from typing import Literal
+from typing import Literal, cast
 
 from fastmcp import Context
-from fastmcp.server.elicitation import AcceptedElicitation
+from fastmcp.server.elicitation import (
+    AcceptedElicitation,
+    handle_elicit_accept,
+    parse_elicit_response_type,
+)
 from mcp.server.elicitation import CancelledElicitation
+from mcp.types import ElicitRequest, ElicitRequestFormParams, ElicitResult, InputRequiredResult
 from pydantic import BaseModel, Field
 
 from backstop_mcp.dependencies import get_resolution_config
-from backstop_mcp.features.resolution import client_supports_elicitation
+from backstop_mcp.features.resolution import (
+    asks_as_tool_result,
+    client_supports_elicitation,
+    elicit_from_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +56,16 @@ class DeletionChoice(BaseModel):
     )
 
 
+_ASK = "entity_deletion"
+
+
 async def elicit_entity_deletion(
     ctx: Context,
     prompt: str | None = None,
     *,
     callback: DeletionPromptCallback | None = None,
     timeout_seconds: float | None = None,
-) -> EntityDeletion:
+) -> EntityDeletion | InputRequiredResult:
     """Prompt for a hard delete. The tool formats the message; this only classifies the answer.
 
     Pass either `prompt` or `callback`, not both. `callback` runs only after the client is
@@ -85,9 +97,43 @@ async def elicit_entity_deletion(
         assert prompt is not None
         message = prompt
 
+    config = parse_elicit_response_type(DeletionChoice)
+    responses = getattr(ctx, "input_responses", None)
+    answered: object = None
+    if isinstance(responses, Mapping):
+        answered = cast("Mapping[object, object]", responses).get(_ASK)
+    if isinstance(answered, ElicitResult):
+        if answered.action != "accept":
+            logger.info(
+                "elicitation.entity_deletion.dismissed",
+                extra={"action": answered.action},
+            )
+            return EntityDeletion.DECLINED
+        try:
+            accepted = handle_elicit_accept(config, answered.content)
+        except Exception as exc:
+            logger.warning("elicitation.entity_deletion.degraded", extra={"error": str(exc)})
+            return EntityDeletion.DECLINED
+        data = cast("object", accepted.data)
+        if isinstance(data, DeletionChoice) and data.choice == DELETE:
+            return EntityDeletion.CONFIRMED
+        logger.info("elicitation.entity_deletion.dismissed", extra={"action": "kept"})
+        return EntityDeletion.DECLINED
+
+    if asks_as_tool_result(ctx):
+        logger.info("elicitation.entity_deletion.input_required")
+        return InputRequiredResult(
+            input_requests={
+                _ASK: ElicitRequest(
+                    params=ElicitRequestFormParams(message=message, requested_schema=config.schema)
+                )
+            },
+            request_state=_ASK,
+        )
+
     try:
         async with asyncio.timeout(timeout_seconds):
-            result = await ctx.elicit(message=message, response_type=DeletionChoice)
+            result = await elicit_from_client(ctx, message, DeletionChoice)
     except TimeoutError:
         logger.warning(
             "elicitation.entity_deletion.timed_out",
@@ -98,9 +144,9 @@ async def elicit_entity_deletion(
         logger.warning("elicitation.entity_deletion.degraded", extra={"error": str(exc)})
         return EntityDeletion.DECLINED
 
+    if isinstance(result, AcceptedElicitation) and result.data.choice == DELETE:
+        return EntityDeletion.CONFIRMED
     if isinstance(result, AcceptedElicitation):
-        if result.data.choice == DELETE:
-            return EntityDeletion.CONFIRMED
         logger.info("elicitation.entity_deletion.dismissed", extra={"action": "kept"})
         return EntityDeletion.DECLINED
 

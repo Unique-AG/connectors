@@ -8,7 +8,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError
@@ -30,6 +30,7 @@ from backstop_mcp.features.elicitation_utils import (
     EntityDeletion,
     elicit_entity_deletion,
 )
+from backstop_mcp.features.resolution import input_required
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ async def delete_activity(
     activity: Annotated[DeleteActivityInput, Field(description=DELETE_ACTIVITY_INPUT_DESCRIPTION)],
     get_activity_detail_query: GetActivityDetailQuery = Depends(get_activity_detail_query_factory),
     delete_activity_command: DeleteActivityCommand = Depends(get_delete_activity_command_factory),
-) -> DeleteActivityResponse:
+) -> DeleteActivityResponse | InputRequiredResult:
     """Permanently delete a CRM note, meeting, call, task, email, or document.
 
     Required on `activity`: `kind` and `activity_id`. Never invent an id — echo a create, a
@@ -77,6 +78,8 @@ async def delete_activity(
         )
 
     outcome = await elicit_entity_deletion(ctx, callback=prompt)
+    if input_required(outcome):
+        return outcome
     if outcome is EntityDeletion.DECLINED:
         logger.info(
             "activity_writes.delete.not_confirmed",

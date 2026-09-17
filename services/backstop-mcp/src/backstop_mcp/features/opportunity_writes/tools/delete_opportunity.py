@@ -8,7 +8,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
@@ -26,6 +26,7 @@ from backstop_mcp.features.opportunity_writes import (
     DeleteOpportunityResponse,
     get_delete_opportunity_command_factory,
 )
+from backstop_mcp.features.resolution import input_required
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ async def delete_opportunity(
     delete_opportunity_command: DeleteOpportunityCommand = Depends(
         get_delete_opportunity_command_factory
     ),
-) -> DeleteOpportunityResponse:
+) -> DeleteOpportunityResponse | InputRequiredResult:
     """Permanently delete a CRM opportunity.
 
     Required on `opportunity`: `opportunity_id`. Never invent an id — echo a create, a
@@ -76,6 +77,8 @@ async def delete_opportunity(
         return await _deletion_prompt(client=client, opportunity_id=opportunity.opportunity_id)
 
     outcome = await elicit_entity_deletion(ctx, callback=prompt)
+    if input_required(outcome):
+        return outcome
     if outcome is EntityDeletion.DECLINED:
         logger.info(
             "opportunity_writes.delete.not_confirmed",

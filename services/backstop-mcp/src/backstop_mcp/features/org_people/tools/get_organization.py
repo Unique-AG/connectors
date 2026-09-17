@@ -1,10 +1,11 @@
+import logging
 from collections.abc import Sequence
 from typing import Annotated, Literal
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.custom_fields import CustomFieldFilters
@@ -19,8 +20,16 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import (
+    Ambiguous,
+    NotFoundResponse,
+    Resolved,
+    elicit_if_ambiguous,
+    input_required,
+)
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
+
+logger = logging.getLogger(__name__)
 
 type GetOrganizationResponse = (
     PartyAmbiguousResponse | NotFoundResponse | OrganizationResolvedResponse
@@ -135,7 +144,7 @@ async def get_organization(
     ] = (),
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     get_organization_query: GetOrganizationQuery = Depends(get_organization_query_factory),
-) -> GetOrganizationResponse:
+) -> GetOrganizationResponse | InputRequiredResult:
     """Fetch one Backstop organization by trusted Party ID or by name/email search.
 
     Never invent or guess a party_id. Only pass a party_id that was previously returned
@@ -173,7 +182,31 @@ async def get_organization(
         party_id=party_id,
         search=search,
     )
+    logger.info(
+        "get_organization.elicit.start",
+        extra={
+            "status": result.status,
+            **(
+                {
+                    "query": result.query,
+                    "scope": result.scope,
+                    "candidates": len(result.candidates),
+                }
+                if isinstance(result, Ambiguous)
+                else {}
+            ),
+        },
+    )
     result = await elicit_if_ambiguous(ctx, result)
+    if input_required(result):
+        return result
+    logger.info(
+        "get_organization.elicit.done",
+        extra={
+            "status": result.status,
+            **({"party_id": result.value.id} if isinstance(result, Resolved) else {}),
+        },
+    )
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 

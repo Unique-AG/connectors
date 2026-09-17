@@ -6,7 +6,7 @@ from typing import Annotated
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.activity_writes import (
@@ -23,7 +23,7 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.features.system_users import SystemUserDto, get_current_caller_system_user
 from backstop_mcp.models import published_output_schema
 
@@ -45,7 +45,7 @@ async def attach_file(
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     attach_file_command: AttachFileCommand = Depends(get_attach_file_command_factory),
     caller: SystemUserDto = Depends(get_current_caller_system_user),
-) -> AttachFileResponse:
+) -> AttachFileResponse | InputRequiredResult:
     """Attach a document or import a real `.msg`/`.eml` email against a party.
 
     Required on `activity`: `kind`, `search_type`, `file_name`, `content` (standard base64
@@ -72,6 +72,8 @@ async def attach_file(
         search=activity.search,
     )
     result = await elicit_if_ambiguous(ctx, result)
+    if input_required(result):
+        return result
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value

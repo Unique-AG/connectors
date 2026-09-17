@@ -14,7 +14,7 @@ from typing import Annotated, Literal
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.org_people import (
@@ -31,7 +31,12 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import (
+    NotFoundResponse,
+    Resolved,
+    elicit_if_ambiguous,
+    input_required,
+)
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -94,7 +99,7 @@ async def get_people_for_party(
     get_people_for_organization_query: GetPeopleForOrganizationQuery = Depends(
         get_people_for_organization_query_factory
     ),
-) -> GetPeopleForPartyResponse:
+) -> GetPeopleForPartyResponse | InputRequiredResult:
     """List the people Backstop links to an organization, with employment status at that org.
 
     Pass a trusted `party_id` (from a prior resolve echo — never invent one) or `search`.
@@ -126,6 +131,8 @@ async def get_people_for_party(
         search=search,
     )
     result = await elicit_if_ambiguous(ctx, result)
+    if input_required(result):
+        return result
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
 

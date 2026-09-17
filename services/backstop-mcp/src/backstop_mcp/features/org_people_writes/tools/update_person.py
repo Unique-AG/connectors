@@ -6,7 +6,7 @@ from typing import Annotated
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.org_people_writes import (
@@ -24,7 +24,7 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ async def update_person(
     person: Annotated[UpdatePersonInput, Field(description=UPDATE_PERSON_INPUT_DESCRIPTION)],
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     update_person_command: UpdatePersonCommand = Depends(get_update_person_command_factory),
-) -> UpdatePersonResponse:
+) -> UpdatePersonResponse | InputRequiredResult:
     """Patch one CRM person and, optionally, their postal addresses.
 
     `search_type` plus exactly one of `party_id` or `search` — same identity as `get_person`.
@@ -70,6 +70,8 @@ async def update_person(
         search=person.search,
     )
     result = await elicit_if_ambiguous(ctx, result)
+    if input_required(result):
+        return result
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value

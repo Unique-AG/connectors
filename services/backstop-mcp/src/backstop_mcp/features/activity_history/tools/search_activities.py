@@ -13,7 +13,7 @@ from typing import Annotated, Literal
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from mcp.types import ToolAnnotations
+from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopRateLimitError
@@ -36,7 +36,7 @@ from backstop_mcp.features.party_resolver import (
     get_resolve_party_query_factory,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous
+from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -274,7 +274,7 @@ async def search_activities(
     ] = None,
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     search_activities_query: SearchActivitiesQuery = Depends(get_search_activities_query_factory),
-) -> GetSearchActivitiesResponse:
+) -> GetSearchActivitiesResponse | InputRequiredResult:
     """Search activities firm-wide or for one party: meetings, calls, notes, emails, documents.
 
     Always start here when the question has a date window. Pass `start_date` and `end_date`;
@@ -327,6 +327,8 @@ async def search_activities(
             search_type=search_type, party_id=party_id, search=search
         )
         outcome = await elicit_if_ambiguous(ctx, outcome)
+        if input_required(outcome):
+            return outcome
         if not isinstance(outcome, Resolved):
             return unresolved_party_response(outcome)
         resolved_party = ResolvedPartyResponse.from_party(outcome.value)
