@@ -364,9 +364,16 @@ def _accepting(media_type: str) -> HeadersCollection:
 
     The generated builder adds its own `Accept` with `try_add`, which does not overwrite, so this
     one is what goes on the wire.
+
+    It also refuses a content coding. The ceiling is enforced against `Content-Length` before any
+    body is read, and under `gzip` that header counts compressed bytes rather than the transcript
+    the ceiling is about — so the guard would measure one quantity and claim another. A transcript
+    is text and compresses well, so this costs real bandwidth; the alternative is a bound that
+    under-fires by whatever the coding happened to save.
     """
     headers = HeadersCollection()
     headers.add("Accept", media_type)
+    headers.add(*_NO_CONTENT_CODING)
     return headers
 
 
@@ -441,6 +448,8 @@ _SPEAKER_ATTRIBUTION_REFUSED = "SpeakerAttributionNotAllowed"
 
 _ATTRIBUTED_FORMAT = "text/vtt"
 _UNATTRIBUTED_FORMAT = "application/vnd.microsoft.graph.transcript+text"
+
+_NO_CONTENT_CODING = ("Accept-Encoding", "identity")
 
 _TIMESTAMP = r"-?(?:\d+:)?\d{1,2}:\d{1,2}[.,]\d{1,3}"
 _CUE_TIMING = re.compile(rf"^(?P<start>{_TIMESTAMP})\s*-->\s*(?P<end>{_TIMESTAMP})")
