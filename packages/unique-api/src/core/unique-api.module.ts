@@ -182,7 +182,7 @@ const createCoreProviders = (): Provider[] => {
         options: UniqueApiRootModuleOptions,
         bottleneckFactory: BottleneckFactory,
       ) => {
-        const loggerContext = options.observability?.loggerContext ?? 'UniqueApi';
+        const loggerContext = options.observability.loggerContext;
         const logger = new Logger(loggerContext);
 
         return new UniqueApiClientFactoryImpl(logger, metricsInstance, bottleneckFactory);
