@@ -37,6 +37,7 @@ from unique_mcp import (
 )
 from unique_toolkit.experimental.components.content_tree import ContentTree
 
+from kb_mcp.cached_walk import resolve_filtered_snapshot
 from kb_mcp.correlation import correlation_id
 from kb_mcp.scoped_walk import ScopedContentTree
 from kb_mcp.settings import get_settings
@@ -256,7 +257,8 @@ async def content_metadata(
             or DEFAULT_METADATA_FILTER_STATEMENT,
         )
         wait = _clamped_timeout(timeout)
-        snapshot = await tree_svc.resolve_visible_file_paths_via_folders_async(
+        snapshot = await resolve_filtered_snapshot(
+            tree_svc,
             metadata_filter=metadata_filter,
             max_depth=walk_depth if use_scoped_walk else None,
             timeout=wait,

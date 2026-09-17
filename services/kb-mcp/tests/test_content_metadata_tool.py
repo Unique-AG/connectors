@@ -5,12 +5,14 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastmcp.tools import ToolResult
 from pydantic import SecretStr
 
+from kb_mcp import cached_walk
 from kb_mcp.tools.content_metadata import ContentMetadataToolConfig, content_metadata
 from kb_mcp.tools.content_metadata.tool import _clamped_timeout, _flatten_metadata_value
 from kb_mcp.tools.content_tree import cache as ct_cache
@@ -61,15 +63,32 @@ def _make_content_info(content_id: str, metadata: dict | None = None):
 @dataclass
 class FakeSnapshot:
     files: list[tuple[MagicMock, PurePosixPath]] = field(default_factory=list)
+    folder_paths: list[PurePosixPath] = field(default_factory=list)
     complete: bool = True
 
 
 def _make_mock_tree(*, snapshot: FakeSnapshot | None = None):
     tree = MagicMock()
+    tree.metadata_filter = None
     tree.resolve_visible_file_paths_via_folders_async = AsyncMock(
         return_value=snapshot or FakeSnapshot()
     )
     return tree
+
+
+@pytest.fixture
+def applied_filter():
+    """Records the merged filter, which now lands on the snapshot rather than
+    on the walk call — the walk is deliberately kept filter-free and shared."""
+    seen: list[Any] = []
+    real = cached_walk.filter_snapshot
+
+    def spy(snapshot: Any, metadata_filter: Any) -> Any:
+        seen.append(metadata_filter)
+        return real(snapshot, metadata_filter)
+
+    with patch.object(cached_walk, "filter_snapshot", spy):
+        yield seen
 
 
 def _files(*metadata_dicts: dict) -> list[tuple[MagicMock, PurePosixPath]]:
@@ -265,19 +284,18 @@ async def test_empty_snapshot_returns_empty_list():
 
 
 @pytest.mark.asyncio
-async def test_no_folder_ids_uses_the_admin_default_filter_unscoped():
+async def test_no_folder_ids_uses_the_admin_default_filter_unscoped(applied_filter):
     mock_tree = _make_mock_tree()
     with patch(
         "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
     ):
         await content_metadata(config=ContentMetadataToolConfig())
 
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == _DEFAULT_ADMIN_FILTER
+    assert applied_filter[-1] == _DEFAULT_ADMIN_FILTER
 
 
 @pytest.mark.asyncio
-async def test_single_folder_id_with_subfolders_uses_scoped_walk():
+async def test_single_folder_id_with_subfolders_uses_scoped_walk(applied_filter):
     """A single folder_id (the common case) walks only that folder's
     subtree via ScopedContentTree instead of the whole knowledge base —
     folder scoping happens through the walk root, so only the admin filter
@@ -294,12 +312,11 @@ async def test_single_folder_id_with_subfolders_uses_scoped_walk():
     mock_cls.assert_called_once_with(
         company_id="company-1", user_id="user-1", root_scope_ids=("scope_a",)
     )
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == _DEFAULT_ADMIN_FILTER
+    assert applied_filter[-1] == _DEFAULT_ADMIN_FILTER
 
 
 @pytest.mark.asyncio
-async def test_multiple_folder_ids_all_use_scoped_walk():
+async def test_multiple_folder_ids_all_use_scoped_walk(applied_filter):
     """Any number of folder_ids can each root their own scoped walk — no
     fallback to the old unscoped-walk-then-filter path just because there's
     more than one."""
@@ -317,8 +334,7 @@ async def test_multiple_folder_ids_all_use_scoped_walk():
         user_id="user-1",
         root_scope_ids=("scope_a", "scope_b"),
     )
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == _DEFAULT_ADMIN_FILTER
+    assert applied_filter[-1] == _DEFAULT_ADMIN_FILTER
 
 
 @pytest.mark.asyncio
@@ -365,7 +381,7 @@ async def test_without_subfolders_scopes_the_walk_at_depth_one():
 
 
 @pytest.mark.asyncio
-async def test_folder_path_resolves_to_scope_id_and_uses_scoped_walk():
+async def test_folder_path_resolves_to_scope_id_and_uses_scoped_walk(applied_filter):
     mock_tree = _make_mock_tree()
     resolve = AsyncMock(return_value="scope_resolved")
     with (
@@ -389,8 +405,7 @@ async def test_folder_path_resolves_to_scope_id_and_uses_scoped_walk():
     mock_cls.assert_called_once_with(
         company_id="company-1", user_id="user-1", root_scope_ids=("scope_resolved",)
     )
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == _DEFAULT_ADMIN_FILTER
+    assert applied_filter[-1] == _DEFAULT_ADMIN_FILTER
 
 
 @pytest.mark.asyncio
@@ -487,7 +502,7 @@ async def test_folder_ids_and_folder_paths_together_errors_without_calling_servi
 
 
 @pytest.mark.asyncio
-async def test_without_subfolders_needs_no_folder_clause_in_the_filter():
+async def test_without_subfolders_needs_no_folder_clause_in_the_filter(applied_filter):
     """The walk is rooted and depth-capped, so the folder scope is already
     expressed by where it walks — repeating it as a filter clause is redundant."""
     mock_tree = _make_mock_tree()
@@ -500,12 +515,13 @@ async def test_without_subfolders_needs_no_folder_clause_in_the_filter():
             config=ContentMetadataToolConfig(),
         )
 
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert "['folderId']" not in str(kwargs["metadata_filter"])
+    assert "['folderId']" not in str(applied_filter[-1])
 
 
 @pytest.mark.asyncio
-async def test_admin_configured_metadata_filter_is_the_base_for_folder_scoping():
+async def test_admin_configured_metadata_filter_is_the_base_for_folder_scoping(
+    applied_filter,
+):
     custom_filter = {"operator": "equals", "path": ["type"], "value": "pdf"}
     config = ContentMetadataToolConfig(metadata_filter=custom_filter)
     mock_tree = _make_mock_tree()
@@ -514,8 +530,7 @@ async def test_admin_configured_metadata_filter_is_the_base_for_folder_scoping()
     ):
         await content_metadata(config=config)
 
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == custom_filter
+    assert applied_filter[-1] == custom_filter
 
 
 @pytest.mark.asyncio

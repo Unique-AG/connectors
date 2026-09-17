@@ -7,6 +7,7 @@
 """
 
 import logging
+import sys
 from collections.abc import Sequence
 from typing import Annotated, Literal
 
@@ -30,6 +31,7 @@ from unique_toolkit.experimental.components.content_tree.schemas import (
     FolderWalkSnapshot,
 )
 
+from kb_mcp.cached_walk import resolve_filtered_snapshot, uniqueql_predicate
 from kb_mcp.correlation import correlation_id
 from kb_mcp.references import (
     METADATA_FILTER_EMPTY_RETRY_HINT,
@@ -504,7 +506,8 @@ async def content_tree(
         if mode == "tree":
             walk_depth = max_depth if max_depth is None else max_depth + 1
 
-        snapshot = await tree_svc.resolve_visible_file_paths_via_folders_async(
+        snapshot = await resolve_filtered_snapshot(
+            tree_svc,
             metadata_filter=resolved_metadata_filter,
             max_depth=walk_depth,
             timeout=wait,
@@ -591,15 +594,18 @@ async def content_tree(
             else config.default_case_sensitive
         )
         if snapshot.complete and not fallback_filtered:
-            matches = await tree_svc.search_visible_files_fuzzy_async(
+            # Score against the unfiltered walk every filter shares, uncapped,
+            # then apply the filter to the hits and cap after.
+            keep = uniqueql_predicate(resolved_metadata_filter)
+            scored = await tree_svc.search_visible_files_fuzzy_async(
                 query,
-                limit=effective_limit,
+                limit=sys.maxsize,
                 min_score=effective_min_score,
                 match_on=effective_match_on,
                 case_sensitive=effective_case_sensitive,
-                metadata_filter=resolved_metadata_filter,
                 max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
             )
+            matches = [m for m in scored if keep(m.content_info)][:effective_limit]
         else:
             # The service's own fuzzy search re-walks and would ignore a snapshot
             # narrowed by the folder_path fallback, so match over the rows here.
