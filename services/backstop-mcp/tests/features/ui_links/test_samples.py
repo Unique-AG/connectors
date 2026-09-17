@@ -82,43 +82,43 @@ def test_task_sample_matches_path_and_query_exactly() -> None:
             OrganizationLinkTarget(party_id="341764767"),
             ("summary",),
             "https://tenant.example.test/backstop/crm/ManageOrganization.action"
-            "?display=&party_id=341764767&viewType=summary",
+            + "?display=&party_id=341764767&viewType=summary",
         ),
         (
             OrganizationLinkTarget(party_id="341764767"),
             ("detail",),
             "https://tenant.example.test/backstop/crm/ManageOrganization.action"
-            "?display=&party_id=341764767&viewType=detail",
+            + "?display=&party_id=341764767&viewType=detail",
         ),
         (
             PersonLinkTarget(party_id="412345678"),
             ("detail",),
             "https://tenant.example.test/backstop/crm/ManagePerson.action"
-            "?display=&party_id=412345678&viewType=detail",
+            + "?display=&party_id=412345678&viewType=detail",
         ),
         (
             ProductLinkTarget(entity_id="123456789"),
             (),
             "https://tenant.example.test/backstop/fundaccounting/portfolio/ManageHedgeFund.action"
-            "?display=&entityId=123456789",
+            + "?display=&entityId=123456789",
         ),
         (
             ProductLinkTarget(entity_id="123456789"),
             ("accounts",),
             "https://tenant.example.test/backstop/fundaccounting/portfolio/ManageHedgeFund.action"
-            "?display=&entityId=123456789&viewType=accounts",
+            + "?display=&entityId=123456789&viewType=accounts",
         ),
         (
             AccountLinkTarget(entity_id="33578475"),
             ("summary",),
             "https://tenant.example.test/backstop/fundaccounting/ManageAccount.action"
-            "?display=&entityId=33578475&acctViewType=summary",
+            + "?display=&entityId=33578475&acctViewType=summary",
         ),
         (
             OpportunityLinkTarget(entity_id="5755163"),
             ("activity",),
             "https://tenant.example.test/backstop/crm/Opportunity.action"
-            "?display=&entityId=5755163&viewType=activity",
+            + "?display=&entityId=5755163&viewType=activity",
         ),
     ],
 )
