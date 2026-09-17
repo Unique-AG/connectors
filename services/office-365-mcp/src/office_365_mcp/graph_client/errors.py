@@ -220,8 +220,10 @@ def _measured(
         # reaches here as `RedirectError` (`kiota_http/middleware/redirect_handler.py:94`) or
         # `ResponseError` (`kiota_http/httpx_request_adapter.py:602`). A bare `Exception` is what
         # the parse-node registry raises when it meets a content type that has no parser
-        # (`kiota_abstractions/serialization/parse_node_factory_registry.py:48`). A gateway that
-        # answers `text/html` on a 500 produces exactly that, and no `error_map` can describe it.
+        # (`kiota_abstractions/serialization/parse_node_factory_registry.py:48`), which reaches
+        # here from a success body, not a failed one: since `kiota_http` 1.12.1
+        # `throw_failed_responses` catches it on the error path and re-raises an `APIError`
+        # carrying the status, so a `text/html` gateway page on a 500 is classified by `_classify`.
         #
         # TRAP: the *exact* base class is the discriminator here, not `isinstance`, which matches
         # every subclass too. Nothing in this service raises `Exception` itself, so any subclass
