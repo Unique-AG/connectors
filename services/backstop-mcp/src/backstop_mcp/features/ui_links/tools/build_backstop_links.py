@@ -11,10 +11,7 @@ from backstop_mcp.features.ui_links import (
     BuildEntityLinkResult,
     BuildEntityLinkUtil,
 )
-from backstop_mcp.features.ui_links.dependencies import (
-    get_build_entity_link_util_factory,
-    get_effective_ui_base_url,
-)
+from backstop_mcp.features.ui_links.dependencies import get_build_entity_link_util_factory
 from backstop_mcp.models import published_output_schema
 
 
@@ -70,7 +67,6 @@ async def build_backstop_links(
         ),
     ] = None,
     build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
-    ui_base_url: str | None = Depends(get_effective_ui_base_url),
 ) -> BuildEntityLinkResult:
     """Build labeled Backstop CRM UI URLs for one already-resolved record.
 
@@ -90,7 +86,6 @@ async def build_backstop_links(
     """
     return build_entity_link_util.run(
         target=target,
-        ui_base_url=ui_base_url,
         tabs=tabs,
         layout_name=layout_name,
         view_entity_type=view_entity_type,

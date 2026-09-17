@@ -13,6 +13,10 @@ from backstop_mcp.features.activity_history.queries import (
     SearchActivitiesQuery,
 )
 from backstop_mcp.features.activity_history.settings import ActivityHistorySettings
+from backstop_mcp.features.ui_links import (
+    BuildEntityLinkUtil,
+    get_build_entity_link_util_factory,
+)
 
 
 @lru_cache(maxsize=1)
@@ -27,8 +31,9 @@ def get_activity_history_settings() -> ActivityHistorySettings:
 @lru_cache(maxsize=1)
 def get_activity_detail_query_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> GetActivityDetailQuery:
-    return GetActivityDetailQuery(client=client)
+    return GetActivityDetailQuery(client=client, build_entity_link_util=build_entity_link_util)
 
 
 @lru_cache(maxsize=1)

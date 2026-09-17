@@ -31,6 +31,7 @@ from backstop_mcp.features.activity_writes import (
     get_log_task_command_factory,
 )
 from backstop_mcp.features.party_resolver import ResolvedPartyDto
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import (
     BASE_URL,
     client_factory,
@@ -178,14 +179,23 @@ def _task(**overrides: object) -> LogActivityInput:
     )
 
 
-def make_command(client: BackstopClient) -> LogActivityCommand:
+def make_command(
+    client: BackstopClient,
+    *,
+    build_entity_link_util: BuildEntityLinkUtil | None = None,
+) -> LogActivityCommand:
+    util = build_entity_link_util or BuildEntityLinkUtil(ui_base_url=None)
     return get_log_activity_command_factory(
-        log_note_command=get_log_note_command_factory(client),
+        log_note_command=get_log_note_command_factory(client, build_entity_link_util=util),
         log_meeting_or_call_command=get_log_meeting_or_call_command_factory(
-            client, time_zones_service=time_zones_service(client)
+            client,
+            time_zones_service=time_zones_service(client),
+            build_entity_link_util=util,
         ),
         log_task_command=get_log_task_command_factory(
-            client, system_users_service=system_users_service(client)
+            client,
+            system_users_service=system_users_service(client),
+            build_entity_link_util=util,
         ),
     )
 
@@ -208,6 +218,7 @@ class TestLogActivityCommandDispatch:
         assert result.kind == "note"
         assert result.id == _NOTE_ID
         assert result.resource_type == "notes"
+        assert result.url is None
         assert nested.call_count == 0
         assert route.call_count == 1
         body = recorded_json_bodies(route)[0]
@@ -220,6 +231,17 @@ class TestLogActivityCommandDispatch:
             "resourceLink": f"/people/{_PARTY_ID}",
         }
         assert "linkedResources" not in attributes
+
+    @respx.mock
+    async def test_note_confirmation_carries_canonical_url(self, client: BackstopClient) -> None:
+        respx.post(f"{BASE_URL}/notes").mock(return_value=_created("notes", _NOTE_ID))
+
+        result = await make_command(
+            client,
+            build_entity_link_util=BuildEntityLinkUtil(ui_base_url="https://tenant.example.test"),
+        ).run(activity=_note(), party_id=_PARTY_ID, author=_AUTHOR)
+
+        assert result.url == ("https://tenant.example.test/backstop/activities.jsp/notes/76280387")
 
     @respx.mock
     async def test_note_sends_the_author_as_a_relationship_not_an_attribute(

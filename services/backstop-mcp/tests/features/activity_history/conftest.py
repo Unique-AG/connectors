@@ -8,6 +8,7 @@ from backstop_mcp.features.activity_history import (
     GetActivityHistoryQuery,
     SearchActivitiesQuery,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import client_factory, credential
 
 
@@ -19,7 +20,9 @@ async def client() -> AsyncGenerator[BackstopClient]:
 
 
 def make_get_activity_detail_query(client: BackstopClient) -> GetActivityDetailQuery:
-    return GetActivityDetailQuery(client=client)
+    return GetActivityDetailQuery(
+        client=client, build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None)
+    )
 
 
 def make_get_activity_history_query(client: BackstopClient) -> GetActivityHistoryQuery:

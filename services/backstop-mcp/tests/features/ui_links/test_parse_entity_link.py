@@ -1,9 +1,13 @@
+import json
+from urllib.parse import quote
+
 import pytest
 
 from backstop_mcp.features.ui_links import (
     AccountLinkTarget,
     BackstopLinksResponse,
     BackstopLinkTarget,
+    BackstopUiPage,
     BuildEntityLinkUtil,
     OpportunityLinkTarget,
     OrganizationLinkTarget,
@@ -17,8 +21,8 @@ from backstop_mcp.features.ui_links import (
 )
 from tests.features.ui_links.conftest import UI_BASE, query_params
 
-_BUILDER = BuildEntityLinkUtil()
-_PARSER = ParseEntityLinkUtil()
+_BUILDER = BuildEntityLinkUtil(ui_base_url=UI_BASE)
+_PARSER = ParseEntityLinkUtil(ui_base_url=None)
 
 
 def test_non_backstop_url_is_unrecognized() -> None:
@@ -45,7 +49,7 @@ def test_email_page_without_summary_id_is_unrecognized() -> None:
 
 def test_host_mismatch_is_reported_and_the_url_is_still_parsed() -> None:
     url = "https://other.example.test/backstop/crm/ManageOrganization.action?party_id=341764767"
-    parsed = _PARSER.run(url=url, ui_base_url=UI_BASE)
+    parsed = ParseEntityLinkUtil(ui_base_url=UI_BASE).run(url=url)
     assert isinstance(parsed, ParsedBackstopLinkResponse)
     assert parsed.host_mismatch is True
     assert parsed.entity_id == "341764767"
@@ -61,9 +65,8 @@ def test_parser_does_not_require_ui_base_url() -> None:
 
 
 def test_builder_returns_not_configured_when_ui_base_url_is_unset() -> None:
-    result = _BUILDER.run(
+    result = BuildEntityLinkUtil(ui_base_url=None).run(
         target=OrganizationLinkTarget(party_id="341764767"),
-        ui_base_url=None,
     )
     assert isinstance(result, UiBaseUrlNotConfiguredResponse)
     assert result.message == "UI base URL is not configured for this deployment"
@@ -78,7 +81,7 @@ def test_fragment_query_is_accepted() -> None:
 
 
 def test_unknown_fragment_page_does_not_raise() -> None:
-    parsed = _PARSER.run(url=f"{UI_BASE}/backstop/crm/ActivitySearch.action#foo=bar")
+    parsed = _PARSER.run(url=f"{UI_BASE}/backstop/crm/UnknownPage.action#foo=bar")
     assert isinstance(parsed, UnrecognizedBackstopUrlResponse)
 
 
@@ -110,7 +113,6 @@ def test_task_preserves_view_only_and_workflow_task_id() -> None:
 def test_built_task_url_preserves_empty_workflow_task_id() -> None:
     result = _BUILDER.run(
         target=TaskLinkTarget(task_id="2741757"),
-        ui_base_url=UI_BASE,
         tabs=(),
     )
     assert isinstance(result, BackstopLinksResponse)
@@ -153,7 +155,7 @@ def test_built_task_url_preserves_empty_workflow_task_id() -> None:
 def test_standard_entity_params_include_empty_display(
     target: BackstopLinkTarget, tabs: tuple[str, ...], expected: dict[str, str]
 ) -> None:
-    result = _BUILDER.run(target=target, ui_base_url=UI_BASE, tabs=tabs)
+    result = _BUILDER.run(target=target, tabs=tabs)
     assert isinstance(result, BackstopLinksResponse)
     assert query_params(result.links[0].url) == expected
 
@@ -213,3 +215,115 @@ def test_landing_account_keeps_party_scoped_tool_with_note() -> None:
     assert isinstance(parsed, ParsedBackstopLinkResponse)
     assert parsed.suggested_tool == "get_accounts_for_party"
     assert parsed.suggested_note == "This is an account id, not a party id."
+
+
+_NBSP = "\u00a0"
+
+
+def _activity_search_url(related: list[dict[str, object]]) -> str:
+    payload = json.dumps(related, separators=(",", ":"), ensure_ascii=False)
+    fragment = f"/?inheritRelationships=true&selectedRelatedToUrl={quote(payload, safe='')}"
+    return f"{UI_BASE}/backstop/search/ActivitySearch.action#{fragment}"
+
+
+def test_activity_search_nbsp_name_yields_the_party() -> None:
+    parsed = _PARSER.run(
+        url=_activity_search_url(
+            [
+                {
+                    "entityType": "PartyBean",
+                    "name": f"Nicu{_NBSP}Test{_NBSP}Advisors{_NBSP}LLC",
+                    "firstSystemDefinedType": "OrganizationBean",
+                    "id": "341764767",
+                    "type": "OrganizationBean",
+                }
+            ]
+        )
+    )
+    assert isinstance(parsed, ParsedBackstopLinkResponse)
+    assert parsed.page == BackstopUiPage.ACTIVITY_SEARCH
+    assert parsed.entity_id == "341764767"
+    assert parsed.entity_kind == "organization"
+    assert parsed.suggested_tool == "get_organization"
+    assert parsed.to_target() == OrganizationLinkTarget(party_id="341764767")
+
+
+def test_activity_search_regular_spaces_in_name_are_accepted() -> None:
+    parsed = _PARSER.run(
+        url=_activity_search_url(
+            [
+                {
+                    "entityType": "PartyBean",
+                    "name": "Nicu Test Advisors LLC",
+                    "firstSystemDefinedType": "OrganizationBean",
+                    "id": "341764767",
+                    "type": "OrganizationBean",
+                }
+            ]
+        )
+    )
+    assert isinstance(parsed, ParsedBackstopLinkResponse)
+    assert parsed.entity_id == "341764767"
+    assert parsed.entity_kind == "organization"
+
+
+@pytest.mark.parametrize(
+    ("bean", "kind", "tool"),
+    [
+        ("PersonBean", "person", "get_person"),
+        ("ContactBean", "person", "get_person"),
+        ("EmployeeBean", "person", "get_person"),
+    ],
+)
+def test_activity_search_person_beans_suggest_get_person(bean: str, kind: str, tool: str) -> None:
+    parsed = _PARSER.run(
+        url=_activity_search_url(
+            [
+                {
+                    "entityType": "PartyBean",
+                    "name": "Jane Doe",
+                    "firstSystemDefinedType": bean,
+                    "id": "412345678",
+                    "type": bean,
+                }
+            ]
+        )
+    )
+    assert isinstance(parsed, ParsedBackstopLinkResponse)
+    assert parsed.entity_kind == kind
+    assert parsed.suggested_tool == tool
+    assert parsed.to_target() == PersonLinkTarget(party_id="412345678")
+
+
+def test_activity_search_without_related_is_unrecognized() -> None:
+    parsed = _PARSER.run(
+        url=f"{UI_BASE}/backstop/search/ActivitySearch.action#/?inheritRelationships=true"
+    )
+    assert isinstance(parsed, UnrecognizedBackstopUrlResponse)
+
+
+def test_activity_search_malformed_related_is_unrecognized() -> None:
+    parsed = _PARSER.run(
+        url=(
+            f"{UI_BASE}/backstop/search/ActivitySearch.action" + "#/?selectedRelatedToUrl=not-json"
+        )
+    )
+    assert isinstance(parsed, UnrecognizedBackstopUrlResponse)
+
+
+def test_activity_search_empty_related_is_unrecognized() -> None:
+    parsed = _PARSER.run(url=_activity_search_url([]))
+    assert isinstance(parsed, UnrecognizedBackstopUrlResponse)
+
+
+def test_activity_search_unknown_bean_still_yields_the_id() -> None:
+    parsed = _PARSER.run(
+        url=_activity_search_url(
+            [{"id": "99", "type": "UnknownBean", "name": "X", "entityType": "PartyBean"}]
+        )
+    )
+    assert isinstance(parsed, ParsedBackstopLinkResponse)
+    assert parsed.entity_id == "99"
+    assert parsed.entity_kind is None
+    assert parsed.suggested_tool is None
+    assert parsed.to_target() is None

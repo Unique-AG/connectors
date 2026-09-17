@@ -17,6 +17,7 @@ class BackstopUiPage(StrEnum):
     EMAIL = "crm/collaboration/DisplayEmailMessage.action"
     TASK = "crm/Task.action"
     LANDING = "utility/LandingPageUrl.action"
+    ACTIVITY_SEARCH = "search/ActivitySearch.action"
     ACTIVITY = "activities.jsp"
 
 
@@ -32,6 +33,14 @@ class LandingSuggestedLookup:
 
     tool: str | None
     note: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ActivitySearchBeanLookup:
+    """Party kind and tool for an ActivitySearch `type` / `firstSystemDefinedType` bean."""
+
+    entity_kind: str
+    tool: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,6 +203,23 @@ PAGE_SPECS: Final[dict[BackstopUiPage, UiPageSpec]] = {
         suggested_note=TASK_SUGGESTED_NOTE,
         canonical_label="Open",
     ),
+    BackstopUiPage.ACTIVITY_SEARCH: UiPageSpec(
+        page=BackstopUiPage.ACTIVITY_SEARCH,
+        template=_action_template(BackstopUiPage.ACTIVITY_SEARCH),
+        id_param=None,
+        tab_param=None,
+        tabs=(),
+        extra_query=(),
+        query_param_order=(),
+        uses_display=False,
+        summary_by_omission=False,
+        buildable=False,
+        supports_layout=False,
+        entity_kind=None,
+        suggested_tool=None,
+        suggested_note=None,
+        canonical_label="Open",
+    ),
     BackstopUiPage.LANDING: UiPageSpec(
         page=BackstopUiPage.LANDING,
         template=_action_template(BackstopUiPage.LANDING),
@@ -263,6 +289,12 @@ LANDING_RESOURCE_TYPE_TOOLS: Final[dict[str, LandingSuggestedLookup]] = {
     "accounts": LandingSuggestedLookup("get_accounts_for_party", ACCOUNT_SUGGESTED_NOTE),
     "opportunities": LandingSuggestedLookup("get_opportunities_by_ids"),
     "tasks": LandingSuggestedLookup(None, TASK_SUGGESTED_NOTE),
+}
+ACTIVITY_SEARCH_BEAN_TOOLS: Final[dict[str, ActivitySearchBeanLookup]] = {
+    "OrganizationBean": ActivitySearchBeanLookup("organization", "get_organization"),
+    "PersonBean": ActivitySearchBeanLookup("person", "get_person"),
+    "ContactBean": ActivitySearchBeanLookup("person", "get_person"),
+    "EmployeeBean": ActivitySearchBeanLookup("person", "get_person"),
 }
 
 assert set(PAGE_SPECS) == set(BackstopUiPage)

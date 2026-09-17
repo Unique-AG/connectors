@@ -21,16 +21,18 @@ from backstop_mcp.features.ui_links.responses import (
 class BuildEntityLinkUtil:
     """Build labeled CRM UI URLs from a discriminated target and an optional tab/layout."""
 
+    def __init__(self, *, ui_base_url: str | None) -> None:
+        self._ui_base_url: str | None = ui_base_url
+
     def run(
         self,
         *,
         target: BackstopLinkTarget,
-        ui_base_url: str | None,
         tabs: Sequence[str] | None = None,
         layout_name: str | None = None,
         view_entity_type: str | None = None,
     ) -> BuildEntityLinkResult:
-        if ui_base_url is None:
+        if self._ui_base_url is None:
             return UiBaseUrlNotConfiguredResponse()
 
         resolved = BackstopLinkTargetDto.from_input(target)
@@ -41,7 +43,6 @@ class BuildEntityLinkUtil:
             BackstopLinkResponse(label=label, url=url)
             for label, url in self._tab_links(
                 spec=spec,
-                ui_base_url=ui_base_url,
                 entity_id=resolved.entity_id,
                 activity_slug=resolved.activity_slug,
                 tabs=tabs,
@@ -49,7 +50,6 @@ class BuildEntityLinkUtil:
         ]
         layout_link = self._layout_link(
             spec=spec,
-            ui_base_url=ui_base_url,
             entity_id=resolved.entity_id,
             layout_name=layout_name,
             view_entity_type=view_entity_type,
@@ -58,9 +58,9 @@ class BuildEntityLinkUtil:
             links = [*links, layout_link]
         return BackstopLinksResponse(links=links)
 
-    def canonical_url(self, *, target: BackstopLinkTarget, ui_base_url: str | None) -> str | None:
+    def canonical_url(self, *, target: BackstopLinkTarget) -> str | None:
         """The no-tab 'open this record' URL, or None when this deployment has no UI origin."""
-        if ui_base_url is None:
+        if self._ui_base_url is None:
             return None
         resolved = BackstopLinkTargetDto.from_input(target)
         spec = PAGE_SPECS[resolved.page]
@@ -68,7 +68,6 @@ class BuildEntityLinkUtil:
             return None
         return self._format_url(
             spec=spec,
-            ui_base_url=ui_base_url,
             entity_id=resolved.entity_id,
             activity_slug=resolved.activity_slug,
             tab=None,
@@ -78,7 +77,6 @@ class BuildEntityLinkUtil:
         self,
         *,
         spec: UiPageSpec,
-        ui_base_url: str,
         entity_id: str,
         activity_slug: str | None,
         tabs: Sequence[str] | None,
@@ -99,7 +97,6 @@ class BuildEntityLinkUtil:
                     spec.canonical_label,
                     self._format_url(
                         spec=spec,
-                        ui_base_url=ui_base_url,
                         entity_id=entity_id,
                         activity_slug=activity_slug,
                         tab=None,
@@ -115,7 +112,6 @@ class BuildEntityLinkUtil:
                     TAB_LABELS.get(tab, tab),
                     self._format_url(
                         spec=spec,
-                        ui_base_url=ui_base_url,
                         entity_id=entity_id,
                         activity_slug=activity_slug,
                         tab=tab,
@@ -128,13 +124,13 @@ class BuildEntityLinkUtil:
         self,
         *,
         spec: UiPageSpec,
-        ui_base_url: str,
         entity_id: str,
         layout_name: str | None,
         view_entity_type: str | None,
     ) -> BackstopLinkResponse | None:
         if not spec.supports_layout or not layout_name or not view_entity_type:
             return None
+        assert self._ui_base_url is not None
         query = [
             ("display", ""),
             ("viewEntityType", view_entity_type),
@@ -144,21 +140,21 @@ class BuildEntityLinkUtil:
         assert [name for name, _value in query] == list(LAYOUT_QUERY_ORDER)
         return BackstopLinkResponse(
             label=layout_name,
-            url=self._join(spec.template.format(ui_base=ui_base_url), query),
+            url=self._join(spec.template.format(ui_base=self._ui_base_url), query),
         )
 
     def _format_url(
         self,
         *,
         spec: UiPageSpec,
-        ui_base_url: str,
         entity_id: str,
         activity_slug: str | None,
         tab: str | None,
     ) -> str:
+        assert self._ui_base_url is not None
         if spec.page == BackstopUiPage.ACTIVITY:
             assert activity_slug is not None, "activity links need a jsp kind slug"
-            return spec.template.format(ui_base=ui_base_url, kind=activity_slug, id=entity_id)
+            return spec.template.format(ui_base=self._ui_base_url, kind=activity_slug, id=entity_id)
 
         values: dict[str, str] = {}
         if spec.uses_display:
@@ -172,7 +168,7 @@ class BuildEntityLinkUtil:
             assert not (spec.summary_by_omission and tab == "summary")
             values[spec.tab_param] = tab
         query = [(name, values[name]) for name in spec.query_param_order if name in values]
-        return self._join(spec.template.format(ui_base=ui_base_url), query)
+        return self._join(spec.template.format(ui_base=self._ui_base_url), query)
 
     def _join(self, base: str, query: Sequence[tuple[str, str]]) -> str:
         encoded = urlencode(list(query))

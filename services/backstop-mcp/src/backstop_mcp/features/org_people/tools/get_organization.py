@@ -25,7 +25,11 @@ from backstop_mcp.features.resolution import (
     elicit_if_ambiguous,
     input_required,
 )
-from backstop_mcp.features.ui_links import OrganizationLinkTarget, record_url
+from backstop_mcp.features.ui_links import (
+    BuildEntityLinkUtil,
+    OrganizationLinkTarget,
+    get_build_entity_link_util_factory,
+)
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 type GetOrganizationResponse = (
@@ -141,6 +145,7 @@ async def get_organization(
     ] = (),
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     get_organization_query: GetOrganizationQuery = Depends(get_organization_query_factory),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> GetOrganizationResponse | InputRequiredResult:
     """Fetch one Backstop organization by trusted Party ID or by name/email search.
 
@@ -207,5 +212,5 @@ async def get_organization(
         as_of=AsOfResponse.from_attributes(organization),
         included=fetched.included,
         custom_field_values=fetched.custom_field_values,
-        url=record_url(OrganizationLinkTarget(party_id=party.id)),
+        url=build_entity_link_util.canonical_url(target=OrganizationLinkTarget(party_id=party.id)),
     )

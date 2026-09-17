@@ -1,8 +1,8 @@
 """Normalized page + id the builder and parser share. Not published."""
 
-from typing import Self
+from typing import ClassVar, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.features.ui_links.activity_kinds import TARGET_KIND_TO_JSP_SLUG
 from backstop_mcp.features.ui_links.entity_types import BackstopUiPage
@@ -20,6 +20,17 @@ from backstop_mcp.features.ui_links.inputs import (
     ProductLinkTarget,
     TaskLinkTarget,
 )
+from backstop_mcp.models import CoercedId
+
+
+class ActivitySearchRelatedDto(BaseModel):
+    """One `selectedRelatedToUrl` row. Extra keys (`name`, `entityType`) are ignored."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", frozen=True)
+
+    id: CoercedId
+    type: str | None = None
+    first_system_defined_type: str | None = Field(default=None, alias="firstSystemDefinedType")
 
 
 class BackstopLinkTargetDto(BaseModel):

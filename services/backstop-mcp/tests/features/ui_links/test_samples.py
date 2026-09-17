@@ -24,12 +24,12 @@ from backstop_mcp.features.ui_links import (
 )
 from tests.features.ui_links.conftest import UI_BASE, path_and_query
 
-_BUILDER = BuildEntityLinkUtil()
-_PARSER = ParseEntityLinkUtil()
+_BUILDER = BuildEntityLinkUtil(ui_base_url=UI_BASE)
+_PARSER = ParseEntityLinkUtil(ui_base_url=UI_BASE)
 
 
 def _only_url(target: BackstopLinkTarget, tabs: tuple[str, ...] = ()) -> str:
-    result = _BUILDER.run(target=target, ui_base_url=UI_BASE, tabs=tabs)
+    result = _BUILDER.run(target=target, tabs=tabs)
     assert isinstance(result, BackstopLinksResponse)
     assert len(result.links) == 1
     return result.links[0].url
@@ -162,7 +162,6 @@ def test_layout_samples_match_path_and_query_exactly(
 ) -> None:
     result = _BUILDER.run(
         target=target,
-        ui_base_url=UI_BASE,
         tabs=(),
         layout_name=layout_name,
         view_entity_type=view_entity_type,
@@ -182,7 +181,6 @@ def test_layout_link_from_custom_field_definition_response() -> None:
     assert definition.layout_name is not None
     result = _BUILDER.run(
         target=OpportunityLinkTarget(entity_id="5755163"),
-        ui_base_url=UI_BASE,
         tabs=(),
         layout_name=definition.layout_name,
         view_entity_type=definition.entity_type,
@@ -193,6 +191,23 @@ def test_layout_link_from_custom_field_definition_response() -> None:
         == "/backstop/crm/Opportunity.action?display=&viewEntityType=OpportunityBean"
         + "&entityId=5755163&layoutName=Master+Pipeline"
     )
+
+
+def test_activity_search_sample_parses_party_id_from_fragment() -> None:
+    url = (
+        f"{UI_BASE}/backstop/search/ActivitySearch.action#/?inheritRelationships=true"
+        + "&selectedRelatedToUrl=%5B%7B%22entityType%22%3A%22PartyBean%22%2C%22name%22%3A"
+        + "%22Nicu%C2%A0Test%C2%A0Advisors%C2%A0LLC%22%2C%22firstSystemDefinedType%22%3A"
+        + "%22OrganizationBean%22%2C%22id%22%3A%22341764767%22%2C%22type%22%3A"
+        + "%22OrganizationBean%22%7D%5D"
+    )
+    parsed = _PARSER.run(url=url)
+    assert isinstance(parsed, ParsedBackstopLinkResponse)
+    assert parsed.page.value == "search/ActivitySearch.action"
+    assert parsed.entity_id == "341764767"
+    assert parsed.entity_kind == "organization"
+    assert parsed.suggested_tool == "get_organization"
+    assert parsed.to_target() == OrganizationLinkTarget(party_id="341764767")
 
 
 def test_landing_sample_parses_resource_type_and_entity_id() -> None:

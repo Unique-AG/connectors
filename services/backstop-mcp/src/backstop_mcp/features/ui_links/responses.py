@@ -55,7 +55,8 @@ class ParsedBackstopLinkResponse(BaseModel):
         default=None,
         description=(
             "Target kind (organization, person, account, product, opportunity, task, "
-            "email, call, meeting, note, document). Omitted for LandingPageUrl."
+            "email, call, meeting, note, document). Omitted for LandingPageUrl and "
+            "for an ActivitySearch row whose bean is not a known party kind."
         ),
     )
     entity_id: str = Field(description="Id the URL points at. Echo it; never invent one.")

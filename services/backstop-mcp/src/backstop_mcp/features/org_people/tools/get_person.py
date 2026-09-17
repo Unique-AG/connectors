@@ -25,7 +25,11 @@ from backstop_mcp.features.resolution import (
     elicit_if_ambiguous,
     input_required,
 )
-from backstop_mcp.features.ui_links import PersonLinkTarget, record_url
+from backstop_mcp.features.ui_links import (
+    BuildEntityLinkUtil,
+    PersonLinkTarget,
+    get_build_entity_link_util_factory,
+)
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResolvedResponse
@@ -138,6 +142,7 @@ async def get_person(
     ] = (),
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     get_person_query: GetPersonQuery = Depends(get_person_query_factory),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> GetPersonResponse | InputRequiredResult:
     """Fetch one Backstop person by trusted Party ID or by name/email search.
 
@@ -212,5 +217,5 @@ async def get_person(
         employments=person_query_result.employments,
         included=person_query_result.included,
         custom_field_values=person_query_result.custom_field_values,
-        url=record_url(PersonLinkTarget(party_id=party.id)),
+        url=build_entity_link_util.canonical_url(target=PersonLinkTarget(party_id=party.id)),
     )

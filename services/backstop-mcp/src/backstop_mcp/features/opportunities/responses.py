@@ -293,7 +293,7 @@ class OpportunityResponse(OmitNoneModel):
         stage_id: str | None,
         stage_history: tuple[StageChangeResponse, ...],
         custom_field_values: tuple[ResolvedCustomFieldValueResponse, ...],
-        url: str | None = None,
+        url: str | None,
     ) -> Self:
         """Project one `opportunities` resource, naming its current stage and its history.
 

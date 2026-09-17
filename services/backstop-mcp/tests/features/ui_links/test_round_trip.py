@@ -25,8 +25,8 @@ from backstop_mcp.features.ui_links import (
 )
 from tests.features.ui_links.conftest import UI_BASE, query_params
 
-_BUILDER = BuildEntityLinkUtil()
-_PARSER = ParseEntityLinkUtil()
+_BUILDER = BuildEntityLinkUtil(ui_base_url=UI_BASE)
+_PARSER = ParseEntityLinkUtil(ui_base_url=UI_BASE)
 
 _PAGE_TARGETS: tuple[tuple[BackstopLinkTarget, BackstopUiPage], ...] = (
     (OrganizationLinkTarget(party_id="341764767"), BackstopUiPage.ORGANIZATION),
@@ -57,7 +57,6 @@ def _build(
 ) -> BackstopLinksResponse:
     result = _BUILDER.run(
         target=target,
-        ui_base_url=UI_BASE,
         tabs=tabs,
         layout_name=layout_name,
         view_entity_type=view_entity_type,
@@ -67,7 +66,7 @@ def _build(
 
 
 def _parse(url: str) -> ParsedBackstopLinkResponse:
-    parsed = _PARSER.run(url=url, ui_base_url=UI_BASE)
+    parsed = _PARSER.run(url=url)
     assert isinstance(parsed, ParsedBackstopLinkResponse)
     return parsed
 

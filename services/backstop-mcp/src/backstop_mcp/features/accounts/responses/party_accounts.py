@@ -6,6 +6,7 @@ reads is composed here, because phrasing is a wire concern and the fetch layer s
 opinion about it.
 """
 
+from collections.abc import Mapping
 from datetime import date
 from typing import Literal, Self
 
@@ -22,7 +23,6 @@ from backstop_mcp.features.party_resolver import (
     RESOLVED_PARTY_ECHO_DESCRIPTION,
     ResolvedPartyResponse,
 )
-from backstop_mcp.features.ui_links import AccountLinkTarget, record_url
 from backstop_mcp.models import OmitNoneModel
 
 _TABLE_CAVEAT = (
@@ -186,7 +186,7 @@ class HoldingRowResponse(OmitNoneModel):
     )
 
     @classmethod
-    def from_dto(cls, row: HoldingRowDto, *, url: str | None = None) -> Self:
+    def from_dto(cls, row: HoldingRowDto, *, url: str | None) -> Self:
         return cls(
             account_id=row.account_id,
             product_id=row.product_id,
@@ -273,14 +273,17 @@ class PartyAccountsResolvedResponse(OmitNoneModel):
     )
 
     @classmethod
-    def from_holdings(cls, listing: HoldingListingDto, *, resolved: ResolvedPartyResponse) -> Self:
+    def from_holdings(
+        cls,
+        listing: HoldingListingDto,
+        *,
+        resolved: ResolvedPartyResponse,
+        urls: Mapping[str, str | None],
+    ) -> Self:
         return cls(
             resolved=resolved,
             holdings=tuple(
-                HoldingRowResponse.from_dto(
-                    row,
-                    url=record_url(AccountLinkTarget(entity_id=row.account_id)),
-                )
+                HoldingRowResponse.from_dto(row, url=urls.get(row.account_id))
                 for row in listing.rows
             ),
             source=listing.source,

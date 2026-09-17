@@ -15,6 +15,7 @@ from backstop_mcp.features.org_people_writes import (
     get_create_person_command_factory,
 )
 from backstop_mcp.features.org_people_writes.tools.create_person import create_person
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.helpers import (
     BASE_URL,
@@ -38,7 +39,9 @@ async def client() -> AsyncGenerator[BackstopClient]:
 
 def make_command(client: BackstopClient) -> CreatePersonCommand:
     return get_create_person_command_factory(
-        client, system_users_service=system_users_service(client)
+        client,
+        system_users_service=system_users_service(client),
+        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
     )
 
 

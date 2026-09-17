@@ -652,7 +652,7 @@ class ActivityDetailResponse(OmitNoneModel):
         detail: ActivityDetailDto,
         specifics: MeetingSpecificsDto | None,
         attendees: tuple[AttendeeDto, ...],
-        url: str | None = None,
+        url: str | None,
     ) -> Self:
         """Convert the fetched parts to the tool's wire shape. Pure: no HTTP.
 

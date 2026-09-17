@@ -1,7 +1,9 @@
 """CRM UI link grammar: build and parse Backstop `.action` / `activities.jsp` URLs.
 
-No HTTP. Callers pass an already-resolved UI origin (`BackstopConfig.effective_ui_base_url`).
-When that origin is missing, the builder returns a structured miss rather than guessing a host.
+No HTTP. Both utils are constructed with the already-resolved UI origin
+(`BackstopConfig.effective_ui_base_url`). When that origin is missing, the builder
+returns a structured miss rather than guessing a host; the parser still reads the
+pasted URL and just cannot report a host mismatch.
 """
 
 from backstop_mcp.features.ui_links.activity_kinds import (
@@ -14,7 +16,6 @@ from backstop_mcp.features.ui_links.activity_kinds import (
 from backstop_mcp.features.ui_links.dependencies import (
     get_build_entity_link_util_factory,
     get_parse_entity_link_util_factory,
-    record_url,
 )
 from backstop_mcp.features.ui_links.entity_types import (
     PAGE_SPECS,
@@ -78,5 +79,4 @@ __all__ = [
     "UnrecognizedBackstopUrlResponse",
     "get_build_entity_link_util_factory",
     "get_parse_entity_link_util_factory",
-    "record_url",
 ]

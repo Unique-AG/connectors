@@ -379,6 +379,25 @@ type OpportunityGroupBy = Literal["stage", "product", "period", "party"]
 Export them from `queries/__init__.py` and the feature `__init__`. Split to a types file
 only when the set is no longer small.
 
+**CRM UI URLs.** `features/ui_links/` owns the grammar. Both utils take `ui_base_url` in
+`__init__` (the cached factories bind `BackstopConfig.effective_ui_base_url`); `run` /
+`canonical_url` do not take an origin. Commands and queries that publish a record `url`
+take `BuildEntityLinkUtil` as a constructor argument. Their factories inject it with
+`Depends(get_build_entity_link_util_factory)`. Tools that have no query/command
+(`get_person`, `get_product`, `get_accounts_for_party`) Depends the util the same way.
+
+DTOs, attributes, and responses never build URLs. They take `url` as a constructor
+argument. Holdings rows are the list-row exception: `from_holdings` takes
+`urls: Mapping[str, str | None]` keyed by account id. Search rows pass `url=None`
+explicitly when the published model has the field.
+
+`canonical_url` is the no-tab open link. Tabs and layouts are a `build_backstop_links`
+call. When the origin is unset, `url` is `None` — never invent a host from the API
+base. Email attach confirmations stay url-less: the `/emails` id is not a CRM
+`summaryId`. `ActivitySearch.action` is parser-only until a live NBSP check; do not
+emit it. Tests call factories as functions, so they pass
+`BuildEntityLinkUtil(ui_base_url=...)` themselves; `Depends` is not resolved.
+
 ---
 
 ## Write tools and commands

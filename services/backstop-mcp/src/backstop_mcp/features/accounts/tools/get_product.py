@@ -32,7 +32,11 @@ from backstop_mcp.features.custom_fields import (
     get_custom_fields_service,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved, input_required
-from backstop_mcp.features.ui_links import ProductLinkTarget, record_url
+from backstop_mcp.features.ui_links import (
+    BuildEntityLinkUtil,
+    ProductLinkTarget,
+    get_build_entity_link_util_factory,
+)
 from backstop_mcp.models import published_output_schema
 
 type GetProductResponse = ProductAmbiguousResponse | NotFoundResponse | ProductResolvedResponse
@@ -43,6 +47,7 @@ async def _record(
     fetched: ProductFetchDto,
     *,
     names: Sequence[str],
+    url: str | None,
 ) -> ProductRecordResponse:
     values = await custom_fields.join_values(
         fetched.stored_custom_field_values,
@@ -53,7 +58,7 @@ async def _record(
         name=fetched.product.name,
         short_name=fetched.product.short_name,
         custom_field_values=values,
-        url=record_url(ProductLinkTarget(entity_id=fetched.product.id)),
+        url=url,
     )
 
 
@@ -109,6 +114,7 @@ async def get_product(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     custom_fields: CustomFieldsService = Depends(get_custom_fields_service),
     get_product_query: GetProductQuery = Depends(get_product_query_factory),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> GetProductResponse | InputRequiredResult:
     """Product identity and custom-field values — Strategy, Domicile, Fee Structure, and the rest.
 
@@ -136,7 +142,17 @@ async def get_product(
         # Concurrently: the catalog is ~72 rows and each row is a catalog join, so a sequential
         # comprehension is 72 awaits in a row for work that has no ordering between rows.
         products = await asyncio.gather(
-            *(_record(custom_fields, item, names=custom_field_names) for item in catalog.products)
+            *(
+                _record(
+                    custom_fields,
+                    item,
+                    names=custom_field_names,
+                    url=build_entity_link_util.canonical_url(
+                        target=ProductLinkTarget(entity_id=item.product.id)
+                    ),
+                )
+                for item in catalog.products
+            )
         )
         return ProductResolvedResponse(
             products=tuple(products), scan_truncated=catalog.scan_truncated
@@ -149,6 +165,7 @@ async def get_product(
         return await _by_trusted_id(
             custom_fields,
             get_product_query,
+            build_entity_link_util,
             product_id=product_id,
             names=custom_field_names,
         )
@@ -165,13 +182,23 @@ async def get_product(
         custom_fields.load_catalog(),
     )
     return ProductResolvedResponse(
-        products=(await _record(custom_fields, item, names=custom_field_names),)
+        products=(
+            await _record(
+                custom_fields,
+                item,
+                names=custom_field_names,
+                url=build_entity_link_util.canonical_url(
+                    target=ProductLinkTarget(entity_id=item.product.id)
+                ),
+            ),
+        )
     )
 
 
 async def _by_trusted_id(
     custom_fields: CustomFieldsService,
     get_product_query: GetProductQuery,
+    build_entity_link_util: BuildEntityLinkUtil,
     *,
     product_id: str,
     names: Sequence[str],
@@ -191,4 +218,15 @@ async def _by_trusted_id(
         if exc.status_code != HTTPStatus.NOT_FOUND:
             raise
         return NotFoundResponse(query=product_id, scope="products")
-    return ProductResolvedResponse(products=(await _record(custom_fields, item, names=names),))
+    return ProductResolvedResponse(
+        products=(
+            await _record(
+                custom_fields,
+                item,
+                names=names,
+                url=build_entity_link_util.canonical_url(
+                    target=ProductLinkTarget(entity_id=item.product.id)
+                ),
+            ),
+        )
+    )

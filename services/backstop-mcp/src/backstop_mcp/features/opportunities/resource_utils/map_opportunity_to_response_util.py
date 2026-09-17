@@ -12,7 +12,6 @@ from backstop_mcp.features.opportunities.resource_utils.get_stage_id_to_name_map
     get_stage_id_to_name_map,
 )
 from backstop_mcp.features.opportunities.responses import OpportunityResponse
-from backstop_mcp.features.ui_links import OpportunityLinkTarget, record_url
 from backstop_mcp.utils import first_item
 
 
@@ -37,6 +36,7 @@ class MapOpportunityToResponseUtil:
         api_include_resources: Sequence[dict[str, object]],
         custom_fields_filters: CustomFieldFilters,
         include_stage_history: bool = True,
+        url: str | None,
     ) -> OpportunityResponse:
         stage_id = first_item(row.related_ids("stage"))
 
@@ -64,5 +64,5 @@ class MapOpportunityToResponseUtil:
             stage_id=stage_id,
             stage_history=stage_history,
             custom_field_values=tuple(custom_field_values),
-            url=record_url(OpportunityLinkTarget(entity_id=row.id)),
+            url=url,
         )

@@ -49,6 +49,11 @@ from backstop_mcp.features.resolution import (
     elicit_if_ambiguous,
     input_required,
 )
+from backstop_mcp.features.ui_links import (
+    AccountLinkTarget,
+    BuildEntityLinkUtil,
+    get_build_entity_link_util_factory,
+)
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -93,6 +98,7 @@ async def get_accounts_for_party(
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     get_party_name_query: GetPartyNameQuery = Depends(get_party_name_query_factory),
     get_holdings_query: GetHoldingsQuery = Depends(get_holdings_query_factory),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> GetAccountsForPartyResponse | InputRequiredResult:
     """What a person or organization holds: their accounts, with balances, across products.
 
@@ -167,7 +173,14 @@ async def get_accounts_for_party(
         },
     )
     return PartyAccountsResolvedResponse.from_holdings(
-        listing, resolved=ResolvedPartyResponse.from_party(party)
+        listing,
+        resolved=ResolvedPartyResponse.from_party(party),
+        urls={
+            row.account_id: build_entity_link_util.canonical_url(
+                target=AccountLinkTarget(entity_id=row.account_id)
+            )
+            for row in listing.rows
+        },
     )
 
 

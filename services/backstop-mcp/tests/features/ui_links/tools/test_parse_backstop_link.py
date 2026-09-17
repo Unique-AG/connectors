@@ -22,8 +22,7 @@ class TestParseBackstopLink:
                 f"{UI_BASE}/backstop/crm/ManageOrganization.action"
                 + "?display=&party_id=341764767&viewType=summary"
             ),
-            parse_entity_link_util=ParseEntityLinkUtil(),
-            ui_base_url=UI_BASE,
+            parse_entity_link_util=ParseEntityLinkUtil(ui_base_url=UI_BASE),
         )
         assert isinstance(result, ParsedBackstopLinkResponse)
         assert result.status == "ok"
@@ -38,8 +37,7 @@ class TestParseBackstopLink:
     async def test_junk_is_unrecognized(self) -> None:
         result = await parse_backstop_link(
             url="https://example.test/other",
-            parse_entity_link_util=ParseEntityLinkUtil(),
-            ui_base_url=UI_BASE,
+            parse_entity_link_util=ParseEntityLinkUtil(ui_base_url=UI_BASE),
         )
         assert isinstance(result, UnrecognizedBackstopUrlResponse)
         assert result.status == "unrecognized"
@@ -48,8 +46,7 @@ class TestParseBackstopLink:
     async def test_mismatched_host_is_reported_and_still_parsed(self) -> None:
         result = await parse_backstop_link(
             url="https://other.example.test/backstop/crm/ManageOrganization.action?party_id=341764767",
-            parse_entity_link_util=ParseEntityLinkUtil(),
-            ui_base_url=UI_BASE,
+            parse_entity_link_util=ParseEntityLinkUtil(ui_base_url=UI_BASE),
         )
         assert isinstance(result, ParsedBackstopLinkResponse)
         assert result.host_mismatch is True
@@ -60,8 +57,7 @@ class TestParseBackstopLink:
     async def test_parses_without_ui_base_url(self) -> None:
         result = await parse_backstop_link(
             url=f"{UI_BASE}/backstop/crm/ManageOrganization.action?party_id=341764767",
-            parse_entity_link_util=ParseEntityLinkUtil(),
-            ui_base_url=None,
+            parse_entity_link_util=ParseEntityLinkUtil(ui_base_url=None),
         )
         assert isinstance(result, ParsedBackstopLinkResponse)
         assert result.host_mismatch is False
@@ -69,11 +65,28 @@ class TestParseBackstopLink:
         assert result.suggested_tool == "get_organization"
 
     @pytest.mark.asyncio
+    async def test_parses_an_activity_search_fragment(self) -> None:
+        result = await parse_backstop_link(
+            url=(
+                f"{UI_BASE}/backstop/search/ActivitySearch.action#/?inheritRelationships=true"
+                + "&selectedRelatedToUrl=%5B%7B%22entityType%22%3A%22PartyBean%22%2C"
+                + "%22name%22%3A%22Nicu%20Test%22%2C%22firstSystemDefinedType%22%3A"
+                + "%22OrganizationBean%22%2C%22id%22%3A%22341764767%22%2C%22type%22%3A"
+                + "%22OrganizationBean%22%7D%5D"
+            ),
+            parse_entity_link_util=ParseEntityLinkUtil(ui_base_url=UI_BASE),
+        )
+        assert isinstance(result, ParsedBackstopLinkResponse)
+        assert result.page == BackstopUiPage.ACTIVITY_SEARCH
+        assert result.entity_id == "341764767"
+        assert result.entity_kind == "organization"
+        assert result.suggested_tool == "get_organization"
+
+    @pytest.mark.asyncio
     async def test_task_does_not_suggest_get_tasks_for_party(self) -> None:
         result = await parse_backstop_link(
             url=f"{UI_BASE}/backstop/crm/Task.action?taskId=2741757",
-            parse_entity_link_util=ParseEntityLinkUtil(),
-            ui_base_url=UI_BASE,
+            parse_entity_link_util=ParseEntityLinkUtil(ui_base_url=UI_BASE),
         )
         assert isinstance(result, ParsedBackstopLinkResponse)
         assert result.suggested_tool is None
