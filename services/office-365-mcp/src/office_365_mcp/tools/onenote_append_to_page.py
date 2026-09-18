@@ -55,9 +55,10 @@ has no content store, and offering one would let a model attach whatever it chos
 NOT SAFE TO RETRY BLINDLY: if it times out, Microsoft may already hold the append, and calling \
 it again with the same `body_html` adds a second copy of it to the page. On a timeout, read the \
 page first with onenote_read_page and look for the block you meant to add; call this tool again \
-only when that block is not there. This tool answers with the page as Microsoft holds it right \
-after the write, and the `last_modified_at` in that answer is Microsoft's own record of this \
-write, not a time this connector guessed.\
+only when that block is not there. This tool answers with the page as Microsoft's page index \
+holds it right after the write. That index lags an edit by minutes, so `last_modified_at` and \
+`title` in the answer can still show the values from before this write while onenote_read_page \
+already returns the appended block.\
 """
 
 _NOT_A_PAGE_HANDLE = (

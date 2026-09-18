@@ -53,7 +53,9 @@ Find pages across the signed-in user's OneNote notebooks, or inside one section.
 to search every page of every notebook the user owns and every notebook shared with them. Pass a \
 section's `uri` from an onenote_list_notebooks result as `section` to search only that one \
 section's pages. `title_contains` keeps only the pages whose TITLE holds this text, compared \
-without regard to case. It matches the title alone. Microsoft Graph has no full-text search over \
+without regard to case. It matches the title alone. A page created or renamed in the last \
+minutes can be missed, because Microsoft's page index lags an edit and holds an empty title \
+until it catches up. Microsoft Graph has no full-text search over \
 the words inside a OneNote page for a work or school account, so no value here reaches what a \
 page says, only what it is called. Leave `title_contains` out to list pages instead of searching \
 for one. Rows come back newest change first, and there is no way to ask for a different order. \
@@ -189,7 +191,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 max_length=_MAX_TITLE_FRAGMENT_CHARACTERS,
                 description=(
                     "Keep only the pages whose TITLE contains this text, compared without "
-                    + "regard to case. This matches the title alone. Microsoft Graph has no "
+                    + "regard to case. This matches the title alone, and a page created or "
+                    + "renamed in the last minutes can be missed, because Microsoft's page index "
+                    + "lags an edit and holds an empty title until it catches up. Microsoft Graph "
+                    + "has no "
                     + "full-text search over what a OneNote page says for a work or school "
                     + "account, so no value here reaches the words inside a page, only its "
                     + "title. Omit it to list pages instead of searching for one."

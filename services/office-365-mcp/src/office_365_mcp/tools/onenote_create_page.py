@@ -73,8 +73,10 @@ the model pointed it, into a page written under this user's name. To add more co
 that already exists — including one this call just created — use onenote_append_to_page \
 instead; it cannot attach a file either. If this call times out, do not simply call it again: \
 Microsoft may already have created the page before the response was lost, and calling again \
-writes a second, duplicate page. List the section's pages with onenote_list_pages first, and \
-only call this again once you have confirmed the page is not already there. The answer's \
+writes a second, duplicate page. List the section's pages with onenote_list_pages first: a page \
+created moments ago is listed at once but can show an empty title for minutes, so judge by \
+`created_at` and the count rather than by title, and call this again only once you have \
+confirmed the page is not there. The answer's \
 `title` is what Microsoft actually stored, read back off its response rather than echoed from \
 the argument — read it to the user so they know what the page is really called.\
 """

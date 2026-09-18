@@ -40,7 +40,12 @@ class PageSummary(BaseModel):
         )
     )
     title: str | None = Field(
-        description="The page title as Microsoft stores it. Null when the page has none."
+        description=(
+            "The page title as Microsoft's page index holds it. Null when the page has none. "
+            + "That index lags a create or an edit by minutes, sometimes many, so a page written "
+            + "recently can come back with an empty title here while its HTML, from "
+            + "onenote_read_page, already carries the right one."
+        )
     )
     created_at: datetime | None = Field(
         description=(
@@ -50,7 +55,9 @@ class PageSummary(BaseModel):
     last_modified_at: datetime | None = Field(
         description=(
             "When the page last changed, as Graph reported it. Null when Graph recorded none. A "
-            + "listing of pages orders by this field, newest change first."
+            + "listing of pages orders by this field, newest change first. Microsoft's page "
+            + "index lags an edit by minutes, so a page written moments ago can still show the "
+            + "earlier value here."
         )
     )
     web_url: str | None = Field(
