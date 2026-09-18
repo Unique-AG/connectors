@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.2...office-365-mcp@0.2.3) (2026-09-18)
+
+
+### Bug Fixes
+
+* **office-365-mcp:** allow egress to sharepoint.com and svc.ms ([#1073](https://github.com/Unique-AG/connectors/issues/1073)) ([b3fd819](https://github.com/Unique-AG/connectors/commit/b3fd81969f2f4ce1d68cf196f5802fe5dc4b7269))
+
 ## [0.2.2](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.1...office-365-mcp@0.2.2) (2026-09-18)
 
 
