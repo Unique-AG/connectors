@@ -16,7 +16,7 @@ dependencies = [
     # `microsoft-kiota-*` (the HTTP middleware pipeline) and `azure-core` (the credential
     # protocol the SDK authenticates with) all arrive transitively and are pinned in uv.lock.
     "msgraph-sdk==1.62.0",
-    "uvicorn[standard]==0.52.4",
+    "uvicorn[standard]==0.53.0",
     # fastmcp already depends on starlette; declared here because app.py imports Starlette,
     # Middleware, Request and JSONResponse directly to assemble the ASGI app.
     "starlette==1.6.0",
