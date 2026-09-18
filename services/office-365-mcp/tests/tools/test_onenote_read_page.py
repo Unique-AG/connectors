@@ -345,7 +345,7 @@ class TestHowItDeclaresItself:
         assert "onenote_create_page" in described
         assert "onenote_append_to_page" in described
         assert "1 MB" in described
-        assert "graph.microsoft.com" in described
+        assert "opens only with this connector's own sign-in token" in described
         assert "This tool converts nothing" in described
 
     async def test_it_takes_one_argument_and_it_is_the_page_handle(
