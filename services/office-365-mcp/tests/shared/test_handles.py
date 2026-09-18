@@ -388,3 +388,73 @@ class TestTheCalendarHandleGrammar:
         uri = handles.EventHandle(_CALENDAR_ID, _EVENT_ID).uri
 
         assert handles.transcript_handle(uri) is None
+
+
+_ONENOTE_SECTION_ID = (
+    "1-11111111-1111-4111-8111-111111111111!100-22222222-2222-4222-8222-222222222222"
+)
+_ONENOTE_PAGE_ID = "0-33333333-3333-4333-8333-333333333333!101-44444444-4444-4444-8444-444444444444"
+
+
+class TestTheOnenoteHandleGrammar:
+    """A OneNote id carries `!` and `-`, and `!` is the character a plain path segment cannot
+    carry unescaped, so the round trip has to survive it."""
+
+    def test_a_section_handle_round_trips_an_id_carrying_an_exclamation_mark(self) -> None:
+        handle = handles.OnenoteSectionHandle(_ONENOTE_SECTION_ID)
+
+        assert "%21" in handle.uri
+        assert handles.onenote_section_handle(handle.uri) == handle
+
+    def test_a_page_handle_round_trips_an_id_carrying_an_exclamation_mark(self) -> None:
+        handle = handles.OnenotePageHandle(_ONENOTE_PAGE_ID)
+
+        assert "%21" in handle.uri
+        assert handles.onenote_page_handle(handle.uri) == handle
+
+    def test_an_unencoded_id_still_parses(self) -> None:
+        parsed = handles.onenote_page_handle(f"onenote:///pages/{_ONENOTE_PAGE_ID}")
+
+        assert parsed == handles.OnenotePageHandle(_ONENOTE_PAGE_ID)
+
+    def test_a_blank_segment_is_not_a_handle(self) -> None:
+        assert handles.onenote_section_handle("onenote:///sections/%20") is None
+        assert handles.onenote_page_handle("onenote:///pages/%20") is None
+
+    def test_a_section_handle_is_not_a_page_handle(self) -> None:
+        section = handles.OnenoteSectionHandle(_ONENOTE_SECTION_ID)
+
+        assert handles.onenote_page_handle(section.uri) is None
+
+    def test_a_page_handle_is_not_a_section_handle(self) -> None:
+        page = handles.OnenotePageHandle(_ONENOTE_PAGE_ID)
+
+        assert handles.onenote_section_handle(page.uri) is None
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            f"sharepoint:///files/{_ONENOTE_SECTION_ID}/{_ONENOTE_PAGE_ID}",
+            f"outlook:///messages/{_ONENOTE_PAGE_ID}",
+            _ONENOTE_SECTION_ID,
+            "Q3 Planning Notes",
+            f"https://graph.microsoft.com/v1.0/me/onenote/sections/{_ONENOTE_SECTION_ID}",
+            "",
+        ],
+    )
+    def test_it_refuses_everything_that_is_not_a_section_handle(self, uri: str) -> None:
+        assert handles.onenote_section_handle(uri) is None
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            f"sharepoint:///folders/{_ONENOTE_SECTION_ID}/{_ONENOTE_PAGE_ID}",
+            f"outlook:///folders/{_ONENOTE_SECTION_ID}",
+            _ONENOTE_PAGE_ID,
+            "Q3 Planning Notes",
+            f"https://graph.microsoft.com/v1.0/me/onenote/pages/{_ONENOTE_PAGE_ID}",
+            "",
+        ],
+    )
+    def test_it_refuses_everything_that_is_not_a_page_handle(self, uri: str) -> None:
+        assert handles.onenote_page_handle(uri) is None

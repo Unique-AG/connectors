@@ -20,6 +20,11 @@ from fastmcp import FastMCP
 from office_365_mcp.shared.seam import ToolAdvice, graph_scope
 from office_365_mcp.tools import (
     get_me,
+    onenote_append_to_page,
+    onenote_create_page,
+    onenote_list_notebooks,
+    onenote_list_pages,
+    onenote_read_page,
     outlook_browse_folders,
     outlook_create_event,
     outlook_create_event_on_behalf,
@@ -157,6 +162,11 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     sharepoint_search_files,
     sharepoint_browse_folder,
     sharepoint_read_file,
+    onenote_list_notebooks,
+    onenote_list_pages,
+    onenote_read_page,
+    onenote_create_page,
+    onenote_append_to_page,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -271,6 +281,14 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "sharepoint_search_files",
         "sharepoint_browse_folder",
         "sharepoint_read_file",
+    ),
+    "onenote-read": ("onenote_list_notebooks", "onenote_list_pages", "onenote_read_page"),
+    "onenote-write": (
+        "onenote_list_notebooks",
+        "onenote_list_pages",
+        "onenote_read_page",
+        "onenote_create_page",
+        "onenote_append_to_page",
     ),
 }
 

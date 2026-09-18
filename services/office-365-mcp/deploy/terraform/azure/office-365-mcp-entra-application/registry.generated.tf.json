@@ -208,6 +208,36 @@
           "permissions": [
             "Files.Read.All"
           ]
+        },
+        {
+          "name": "onenote_list_notebooks",
+          "permissions": [
+            "Notes.Read"
+          ]
+        },
+        {
+          "name": "onenote_list_pages",
+          "permissions": [
+            "Notes.Read"
+          ]
+        },
+        {
+          "name": "onenote_read_page",
+          "permissions": [
+            "Notes.Read"
+          ]
+        },
+        {
+          "name": "onenote_create_page",
+          "permissions": [
+            "Notes.Create"
+          ]
+        },
+        {
+          "name": "onenote_append_to_page",
+          "permissions": [
+            "Notes.ReadWrite"
+          ]
         }
       ],
       "tool_names": [
@@ -242,7 +272,12 @@
         "outlook_create_event_on_behalf",
         "sharepoint_search_files",
         "sharepoint_browse_folder",
-        "sharepoint_read_file"
+        "sharepoint_read_file",
+        "onenote_list_notebooks",
+        "onenote_list_pages",
+        "onenote_read_page",
+        "onenote_create_page",
+        "onenote_append_to_page"
       ],
       "always_on": "get_me",
       "presets": {
@@ -352,6 +387,18 @@
           "sharepoint_search_files",
           "sharepoint_browse_folder",
           "sharepoint_read_file"
+        ],
+        "onenote-read": [
+          "onenote_list_notebooks",
+          "onenote_list_pages",
+          "onenote_read_page"
+        ],
+        "onenote-write": [
+          "onenote_list_notebooks",
+          "onenote_list_pages",
+          "onenote_read_page",
+          "onenote_create_page",
+          "onenote_append_to_page"
         ]
       },
       "requestable_permissions": [
@@ -374,7 +421,10 @@
         "Calendars.Read.Shared",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
-        "Files.Read.All"
+        "Files.Read.All",
+        "Notes.Read",
+        "Notes.Create",
+        "Notes.ReadWrite"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -396,7 +446,10 @@
         "Calendars.Read.Shared": false,
         "Calendars.ReadWrite": false,
         "Calendars.ReadWrite.Shared": false,
-        "Files.Read.All": true
+        "Files.Read.All": true,
+        "Notes.Read": false,
+        "Notes.Create": false,
+        "Notes.ReadWrite": false
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",

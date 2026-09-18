@@ -58,6 +58,9 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Calendars.ReadWrite": False,
     "Calendars.ReadWrite.Shared": False,
     "Files.Read.All": True,
+    "Notes.Read": False,
+    "Notes.Create": False,
+    "Notes.ReadWrite": False,
 }
 
 _LABEL_WIDTH = 17

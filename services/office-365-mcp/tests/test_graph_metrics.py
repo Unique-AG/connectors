@@ -778,6 +778,14 @@ GRAPH_STEPS = frozenset(
         "calendar_events",
         "calendar_event",
         "create_event",
+        "notebooks",
+        "sections",
+        "section_groups",
+        "pages",
+        "page",
+        "page_content",
+        "create_page",
+        "append_content",
     }
 )
 

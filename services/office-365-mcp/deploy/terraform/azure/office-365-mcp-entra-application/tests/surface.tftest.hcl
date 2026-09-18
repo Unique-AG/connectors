@@ -38,6 +38,9 @@ mock_provider "azuread" {
         "Calendars.ReadWrite"              = "b3333333-3333-3333-3333-333333333333"
         "Calendars.ReadWrite.Shared"       = "b4444444-4444-4444-4444-444444444444"
         "Files.Read.All"                   = "c1111111-1111-1111-1111-111111111111"
+        "Notes.Read"                       = "d1111111-1111-1111-1111-111111111111"
+        "Notes.Create"                     = "d2222222-2222-2222-2222-222222222222"
+        "Notes.ReadWrite"                  = "d3333333-3333-3333-3333-333333333333"
       }
     }
   }
@@ -314,6 +317,38 @@ run "preset_sharepoint_read" {
   assert {
     condition     = local.admin_consent == ["Files.Read.All"]
     error_message = "reading a file costs no permission beyond the one the search already needs; this composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_onenote_read" {
+  variables {
+    tools_preset = "onenote-read"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read"
+    error_message = "onenote-read composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == []
+    error_message = "every delegated Notes.* permission Microsoft publishes needs no administrator, so onenote-read asks for none; this composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_onenote_write" {
+  variables {
+    tools_preset = "onenote-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite"
+    error_message = "onenote-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == []
+    error_message = "every delegated Notes.* permission Microsoft publishes needs no administrator, so onenote-write asks for none even with three of them; this composed ${join(",", local.admin_consent)}"
   }
 }
 
