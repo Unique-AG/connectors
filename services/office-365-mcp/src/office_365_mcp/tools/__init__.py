@@ -266,7 +266,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_create_event",
         "outlook_create_event_on_behalf",
     ),
-    "sharepoint-search": ("sharepoint_search_files",),
+    "sharepoint-search": ("sharepoint_search_files", "sharepoint_browse_folder"),
     "sharepoint-read": (
         "sharepoint_search_files",
         "sharepoint_browse_folder",

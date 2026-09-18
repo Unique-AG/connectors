@@ -9,6 +9,7 @@ from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
+from office_365_mcp.shared.handles import DriveFolderHandle, drive_folder_handle
 from office_365_mcp.tools import sharepoint_search_files
 
 from .conftest import chat_hit, search_response
@@ -24,6 +25,7 @@ def _file_hit(
     name: str | None = "Budget 2026.xlsx",
     drive_id: str | None = _DRIVE_ID,
     is_folder: bool = False,
+    parent_id: str | None = "01SYNTHETICPARENT01",
 ) -> dict[str, object]:
     resource: dict[str, object] = {
         "@odata.type": "#microsoft.graph.driveItem",
@@ -42,11 +44,14 @@ def _file_hit(
             "mimeType": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         }
     if drive_id is not None:
-        resource["parentReference"] = {
+        parent: dict[str, object] = {
             "driveId": drive_id,
             "driveType": "documentLibrary",
             "path": "/drive/root:/Reports/2026",
         }
+        if parent_id is not None:
+            parent["id"] = parent_id
+        resource["parentReference"] = parent
     return {"hitId": item_id, "rank": 1, "summary": "synthetic snippet", "resource": resource}
 
 
@@ -68,6 +73,42 @@ def _matching(graph: respx.MockRouter, *hits: dict[str, object], more: bool = Fa
             200, json=search_response(list(hits), more_results_available=more)
         )
     )
+
+
+class TestReachingTheFolderAroundAHit:
+    async def test_a_hit_carries_the_handle_of_the_folder_that_holds_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([_file_hit()]))
+        )
+
+        answer = await sharepoint_search_files.sharepoint_search_files(
+            client, query="budget", offset=0, limit=25
+        )
+
+        row = answer.files[0]
+        assert row.parent_uri == DriveFolderHandle(_DRIVE_ID, "01SYNTHETICPARENT01").uri, (
+            "a search returns no folders, so the parent handle is the only route into a "
+            "SharePoint folder"
+        )
+        assert drive_folder_handle(row.parent_uri or "") is not None, (
+            "sharepoint_browse_folder must accept it verbatim"
+        )
+
+    async def test_a_hit_graph_reports_no_parent_for_has_none_rather_than_a_broken_handle(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([_file_hit(parent_id=None)]))
+        )
+
+        answer = await sharepoint_search_files.sharepoint_search_files(
+            client, query="budget", offset=0, limit=25
+        )
+
+        assert answer.files[0].parent_uri is None
+        assert answer.files[0].uri, "the row itself is still addressable"
 
 
 class TestTheQueryItSends:

@@ -112,6 +112,15 @@ class DriveItemSummary(BaseModel):
         )
     )
 
+    parent_uri: str | None = Field(
+        description=(
+            "The handle of the folder that holds this item. Pass it to sharepoint_browse_folder to "
+            + "see everything else in the same folder. This is the way to reach a SharePoint "
+            + "folder: a search finds files, and this field turns a file into the folder around "
+            + "it. Null only when Graph reported no parent, which happens for the root of a drive."
+        )
+    )
+
     @classmethod
     def from_item(cls, item: DriveItem) -> Self | None:
         parent = item.parent_reference
@@ -124,8 +133,10 @@ class DriveItemSummary(BaseModel):
             if is_folder
             else DriveFileHandle(drive_id, item.id)
         )
+        parent_id = parent.id if parent is not None else None
         return cls(
             uri=handle.uri,
+            parent_uri=None if parent_id is None else DriveFolderHandle(drive_id, parent_id).uri,
             name=item.name,
             is_folder=is_folder,
             size=item.size,
