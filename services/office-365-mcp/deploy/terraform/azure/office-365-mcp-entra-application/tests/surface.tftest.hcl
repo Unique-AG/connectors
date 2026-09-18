@@ -37,6 +37,7 @@ mock_provider "azuread" {
         "Calendars.Read.Shared"            = "b2222222-2222-2222-2222-222222222222"
         "Calendars.ReadWrite"              = "b3333333-3333-3333-3333-333333333333"
         "Calendars.ReadWrite.Shared"       = "b4444444-4444-4444-4444-444444444444"
+        "Files.Read.All"                   = "c1111111-1111-1111-1111-111111111111"
       }
     }
   }
@@ -281,6 +282,38 @@ run "preset_outlook_calendar_delegate" {
   assert {
     condition     = length(local.admin_consent) == 0
     error_message = "every delegated Calendars permission is AdminConsentRequired: No, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_search" {
+  variables {
+    tools_preset = "sharepoint-search"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Files.Read.All"
+    error_message = "sharepoint-search composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All"]
+    error_message = "the Microsoft Search API takes no permission below Files.Read.All for driveItem, and that one needs an administrator; this composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_read" {
+  variables {
+    tools_preset = "sharepoint-read"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Files.Read.All"
+    error_message = "sharepoint-read composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All"]
+    error_message = "reading a file costs no permission beyond the one the search already needs; this composed ${join(",", local.admin_consent)}"
   }
 }
 

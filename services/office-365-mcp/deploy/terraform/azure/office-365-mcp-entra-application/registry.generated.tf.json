@@ -190,6 +190,24 @@
             "Calendars.Read.Shared",
             "Calendars.ReadWrite.Shared"
           ]
+        },
+        {
+          "name": "sharepoint_search_files",
+          "permissions": [
+            "Files.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_browse_folder",
+          "permissions": [
+            "Files.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_read_file",
+          "permissions": [
+            "Files.Read.All"
+          ]
         }
       ],
       "tool_names": [
@@ -221,7 +239,10 @@
         "outlook_list_events",
         "outlook_read_event",
         "outlook_create_event",
-        "outlook_create_event_on_behalf"
+        "outlook_create_event_on_behalf",
+        "sharepoint_search_files",
+        "sharepoint_browse_folder",
+        "sharepoint_read_file"
       ],
       "always_on": "get_me",
       "presets": {
@@ -322,6 +343,15 @@
           "outlook_read_event",
           "outlook_create_event",
           "outlook_create_event_on_behalf"
+        ],
+        "sharepoint-search": [
+          "sharepoint_search_files",
+          "sharepoint_browse_folder"
+        ],
+        "sharepoint-read": [
+          "sharepoint_search_files",
+          "sharepoint_browse_folder",
+          "sharepoint_read_file"
         ]
       },
       "requestable_permissions": [
@@ -343,7 +373,8 @@
         "Calendars.Read",
         "Calendars.Read.Shared",
         "Calendars.ReadWrite",
-        "Calendars.ReadWrite.Shared"
+        "Calendars.ReadWrite.Shared",
+        "Files.Read.All"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -364,7 +395,8 @@
         "Calendars.Read": false,
         "Calendars.Read.Shared": false,
         "Calendars.ReadWrite": false,
-        "Calendars.ReadWrite.Shared": false
+        "Calendars.ReadWrite.Shared": false,
+        "Files.Read.All": true
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",
