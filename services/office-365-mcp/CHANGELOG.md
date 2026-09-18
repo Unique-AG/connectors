@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.2](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.1...office-365-mcp@0.2.2) (2026-09-18)
+
+
+### Features
+
+* **office-365-mcp:** add SharePoint and OneDrive file tools ([#1048](https://github.com/Unique-AG/connectors/issues/1048)) ([cd8fef2](https://github.com/Unique-AG/connectors/commit/cd8fef23e179de7541fc133c3d26eb5a03b9e004))
+
+
+### Dependencies
+
+* pin lxml to 6.1.3, bump kiota ([#1050](https://github.com/Unique-AG/connectors/issues/1050)) ([122c820](https://github.com/Unique-AG/connectors/commit/122c820f8a4a0e150318d4c58c587bd4cd0b8919))
+
 ## [0.2.1](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.0...office-365-mcp@0.2.1) (2026-09-17)
 
 
