@@ -6,13 +6,16 @@ import inspect
 import logging
 import weakref
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastmcp.server.providers.filesystem_discovery import import_module_from_file
 from fastmcp.tools import ToolResult
 from pydantic import SecretStr
+from unique_toolkit.content.schemas import ContentInfo
 from unique_toolkit.content.smart_rules import parse_uniqueql
 from unique_toolkit.experimental.components.content_tree.schemas import (
     FolderWalkSnapshot,
@@ -24,6 +27,7 @@ from unique_toolkit.experimental.resources.feature_flags._ttl_cache import (
     AsyncTTLCache,
 )
 
+from kb_mcp import cached_walk
 from kb_mcp.references import (
     INVALID_METADATA_FILTER_MESSAGE,
     METADATA_FILTER_ARG_DESCRIPTION,
@@ -105,11 +109,33 @@ class FakeSnapshot:
 
 def _make_mock_tree(*, snapshot: FakeSnapshot | None = None):
     tree = MagicMock()
+    tree.metadata_filter = None
     tree.resolve_visible_file_paths_via_folders_async = AsyncMock(
         return_value=snapshot or FakeSnapshot()
     )
     tree.search_visible_files_fuzzy_async = AsyncMock(return_value=[])
     return tree
+
+
+def _walk_filter(mock_tree):
+    """The admin half rides in the walk; `applied_filter` sees the LLM half."""
+    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
+    return kwargs["metadata_filter"]
+
+
+@pytest.fixture
+def applied_filter():
+    """Records the merged filter, which now lands on the snapshot rather than
+    on the walk call — the walk is deliberately kept filter-free and shared."""
+    seen: list[Any] = []
+    real = cached_walk.filter_snapshot
+
+    def spy(snapshot: Any, metadata_filter: Any) -> Any:
+        seen.append(metadata_filter)
+        return real(snapshot, metadata_filter)
+
+    with patch.object(cached_walk, "filter_snapshot", spy):
+        yield seen
 
 
 @pytest.fixture(autouse=True)
@@ -134,6 +160,7 @@ def test_metadata_filter_arg_uses_locked_field_description():
 def _make_dispatch_probe_tree():
     """A tree whose three views return distinguishable output."""
     tree = MagicMock()
+    tree.metadata_filter = None
     tree.resolve_visible_file_paths_via_folders_async = AsyncMock(
         return_value=FakeSnapshot(
             files=[
@@ -505,7 +532,7 @@ async def test_refresh_reuses_cached_instance_then_invalidates():
 
 
 @pytest.mark.asyncio
-async def test_default_metadata_filter_excludes_user_memory_folder():
+async def test_default_metadata_filter_excludes_user_memory_folder(applied_filter):
     """With no config override, the admin default filter (excluding the
     system-generated user-memory folder) is what reaches the service calls."""
     mock_tree = _make_mock_tree()
@@ -520,13 +547,14 @@ async def test_default_metadata_filter_excludes_user_memory_folder():
             config=ContentTreeToolConfig(),
         )
 
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == expected_filter
+    assert _walk_filter(mock_tree) == expected_filter
+    assert applied_filter[-1] is None
 
 
 @pytest.mark.asyncio
 async def test_admin_configured_metadata_filter_flows_through_to_service_calls(
     identity,
+    applied_filter,
 ):
     """Admins can override metadata_filter via ContentTreeToolConfig; the
     override (not the default) must reach the underlying ContentTree calls
@@ -538,24 +566,23 @@ async def test_admin_configured_metadata_filter_flows_through_to_service_calls(
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-tree")
         await content_tree(mode="tree", config=config)
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == custom_filter
+    assert _walk_filter(mock_tree) == custom_filter
 
     mock_tree = _make_mock_tree()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-list")
         await content_tree(mode="list", config=config)
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == custom_filter
+    assert _walk_filter(mock_tree) == custom_filter
 
     mock_tree = _make_mock_tree()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-search")
         await content_tree(mode="search", query="a.pdf", config=config)
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == custom_filter
+    assert _walk_filter(mock_tree) == custom_filter
+    # Must match the walk's filter exactly, or the fuzzy search resolves a
+    # second cache entry and silently pays for another whole walk.
     _, fuzzy_kwargs = mock_tree.search_visible_files_fuzzy_async.call_args
-    assert fuzzy_kwargs["metadata_filter"] == custom_filter
+    assert fuzzy_kwargs["metadata_filter"] == _walk_filter(mock_tree)
 
 
 _DEFAULT_CONTENT_TREE_FILTER = {
@@ -566,7 +593,7 @@ _DEFAULT_CONTENT_TREE_FILTER = {
 
 
 @pytest.mark.asyncio
-async def test_llm_metadata_filter_ands_default_admin_filter():
+async def test_llm_metadata_filter_ands_default_admin_filter(applied_filter):
     mock_tree = _make_mock_tree()
     expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
@@ -576,14 +603,12 @@ async def test_llm_metadata_filter_ands_default_admin_filter():
             config=ContentTreeToolConfig(),
         )
 
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == {
-        "and": [expected_llm, _DEFAULT_CONTENT_TREE_FILTER]
-    }
+    assert _walk_filter(mock_tree) == _DEFAULT_CONTENT_TREE_FILTER
+    assert applied_filter[-1] == expected_llm
 
 
 @pytest.mark.asyncio
-async def test_llm_metadata_filter_ands_admin_configured_filter():
+async def test_llm_metadata_filter_ands_admin_configured_filter(applied_filter):
     custom_filter = {"operator": "equals", "path": ["type"], "value": "pdf"}
     config = ContentTreeToolConfig(metadata_filter=custom_filter)
     expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
@@ -595,8 +620,8 @@ async def test_llm_metadata_filter_ands_admin_configured_filter():
             config=config,
         )
 
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == {"and": [expected_llm, custom_filter]}
+    assert _walk_filter(mock_tree) == custom_filter
+    assert applied_filter[-1] == expected_llm
 
 
 @pytest.mark.asyncio
@@ -1178,3 +1203,98 @@ async def test_tree_mode_caps_files_and_says_it_truncated():
 
     text = result.content[0].text  # type: ignore[union-attr]
     assert "first 2 of 5" in text
+
+
+@pytest.mark.asyncio
+async def test_search_does_not_filter_files_it_then_discards(applied_filter):
+    """Search re-derives its hits from the fuzzy scorer and never reads the
+    snapshot's files, so filtering them is a full pass over the corpus."""
+    mock_tree = _make_mock_tree()
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        await content_tree(
+            mode="search",
+            query="a.pdf",
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
+            config=ContentTreeToolConfig(),
+        )
+
+    assert applied_filter[-1] is None
+    _, fuzzy_kwargs = mock_tree.search_visible_files_fuzzy_async.call_args
+    assert fuzzy_kwargs["metadata_filter"] == _walk_filter(mock_tree)
+
+
+_PDF_ONLY_FILTER = {
+    "operator": "equals",
+    "path": ["mimeType"],
+    "value": "application/pdf",
+}
+
+
+def _real_content(content_id: str, key: str, mime_type: str) -> ContentInfo:
+    """A real ContentInfo — a MagicMock dumps to an empty record, which makes
+    every UniqueQL filter a silent no-op and the assertion meaningless."""
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    return ContentInfo(
+        id=content_id,
+        object="content",
+        key=key,
+        byteSize=1,
+        mimeType=mime_type,
+        ownerId="scope_a",
+        createdAt=now,
+        updatedAt=now,
+    )
+
+
+def _real_fuzzy_match(info: ContentInfo, score: float):
+    match = MagicMock()
+    match.path_segments = [info.key]
+    match.score = score
+    match.content_info = info
+    return match
+
+
+@pytest.mark.asyncio
+async def test_search_drops_fuzzy_hits_the_llm_filter_excludes():
+    """The fast path filters the scorer's hits, not the snapshot."""
+    pdf = _real_content("c_pdf", "report.pdf", "application/pdf")
+    txt = _real_content("c_txt", "report.txt", "text/plain")
+    mock_tree = _make_mock_tree()
+    mock_tree.search_visible_files_fuzzy_async = AsyncMock(
+        return_value=[_real_fuzzy_match(pdf, 0.9), _real_fuzzy_match(txt, 0.9)]
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="search",
+            query="report",
+            metadata_filter=_PDF_ONLY_FILTER,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "c_pdf" in text
+    assert "c_txt" not in text
+
+
+@pytest.mark.asyncio
+async def test_incomplete_search_still_applies_the_llm_filter():
+    """The fallback branch is the only one reading snapshot.files, and search
+    resolves that snapshot unfiltered — so it has to filter its own rows."""
+    pdf = _real_content("c_pdf", "report.pdf", "application/pdf")
+    txt = _real_content("c_txt", "report.txt", "text/plain")
+    snapshot = FakeSnapshot(
+        files=[(pdf, PurePosixPath("report.pdf")), (txt, PurePosixPath("report.txt"))],
+        complete=False,
+    )
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="search",
+            query="report",
+            metadata_filter=_PDF_ONLY_FILTER,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "c_pdf" in text
+    assert "c_txt" not in text

@@ -7,6 +7,7 @@
 """
 
 import logging
+import sys
 from collections.abc import Sequence
 from typing import Annotated, Literal
 
@@ -30,6 +31,7 @@ from unique_toolkit.experimental.components.content_tree.schemas import (
     FolderWalkSnapshot,
 )
 
+from kb_mcp.cached_walk import resolve_filtered_snapshot, uniqueql_predicate
 from kb_mcp.correlation import correlation_id
 from kb_mcp.references import (
     METADATA_FILTER_EMPTY_RETRY_HINT,
@@ -491,21 +493,32 @@ async def content_tree(
         if refresh:
             tree_svc.invalidate_cache()
 
-        resolved_metadata_filter = merge_request_metadata_filter(
+        # Only the LLM's half varies, so only it stays out of the walk's
+        # cache key. The two AND together exactly as the merged filter did.
+        admin_metadata_filter = merge_request_metadata_filter(
             admin_metadata_filter=config.metadata_filter
             or DEFAULT_METADATA_FILTER_STATEMENT,
-            llm_metadata_filter=parsed_llm_filter,
         )
-        assert resolved_metadata_filter is not None
+        llm_only_metadata_filter = merge_request_metadata_filter(
+            admin_metadata_filter=None, llm_metadata_filter=parsed_llm_filter
+        )
+        assert admin_metadata_filter is not None
         wait = clamped_content_tree_timeout(timeout, kb_settings)
         # Walk one level past max_depth — otherwise a folder exactly at the
         # cutoff never gets its own contents visited and stays id-less.
         walk_depth = None
+        snapshot_post_filter = llm_only_metadata_filter
         if mode == "tree":
             walk_depth = max_depth if max_depth is None else max_depth + 1
+        elif mode == "search":
+            # Search re-derives its hits from the fuzzy scorer and never reads
+            # these files, so filtering them is a pass it would discard.
+            snapshot_post_filter = None
 
-        snapshot = await tree_svc.resolve_visible_file_paths_via_folders_async(
-            metadata_filter=resolved_metadata_filter,
+        snapshot = await resolve_filtered_snapshot(
+            tree_svc,
+            walk_filter=admin_metadata_filter,
+            post_filter=snapshot_post_filter,
             max_depth=walk_depth,
             timeout=wait,
             max_concurrent_directory_listings=config.max_concurrent_scope_lookups,
@@ -590,21 +603,25 @@ async def content_tree(
             if case_sensitive is not None
             else config.default_case_sensitive
         )
+        keep = uniqueql_predicate(llm_only_metadata_filter)
         if snapshot.complete and not fallback_filtered:
-            matches = await tree_svc.search_visible_files_fuzzy_async(
+            # Must pass the walk's filter, or this resolves a second cache
+            # entry and silently pays for another whole walk.
+            scored = await tree_svc.search_visible_files_fuzzy_async(
                 query,
-                limit=effective_limit,
+                limit=sys.maxsize if llm_only_metadata_filter else effective_limit,
                 min_score=effective_min_score,
                 match_on=effective_match_on,
                 case_sensitive=effective_case_sensitive,
-                metadata_filter=resolved_metadata_filter,
+                metadata_filter=admin_metadata_filter,
                 max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
             )
+            matches = [m for m in scored if keep(m.content_info)][:effective_limit]
         else:
             # The service's own fuzzy search re-walks and would ignore a snapshot
             # narrowed by the folder_path fallback, so match over the rows here.
             matches = _substring_matches(
-                snapshot.files,
+                [(info, path) for info, path in snapshot.files if keep(info)],
                 query=query,
                 limit=effective_limit,
                 min_score=effective_min_score,
