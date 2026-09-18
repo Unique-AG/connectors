@@ -164,6 +164,14 @@ networkPolicy:
           - matchName: login.microsoftonline.com
           - matchName: graph.microsoft.com
           - matchPattern: "*.microsoft.com"
+          # A drive item's /content redirects here for the actual bytes, to a host that is
+          # neither graph.microsoft.com nor under *.microsoft.com, and a different one per
+          # request (seen live: a tenant sharepoint.com site and a region-coded *.svc.ms media
+          # host). Without these, sharepoint_read_file connect-times-out on every file, every
+          # time — Cilium drops the SYN rather than refusing it, so it looks like Graph itself
+          # is unreachable.
+          - matchPattern: "*.sharepoint.com"
+          - matchPattern: "*.svc.ms"
         toPorts:
           - ports:
               - port: "443"
