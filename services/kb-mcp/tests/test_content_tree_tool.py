@@ -1201,3 +1201,21 @@ async def test_tree_mode_caps_files_and_says_it_truncated():
 
     text = result.content[0].text  # type: ignore[union-attr]
     assert "first 2 of 5" in text
+
+
+@pytest.mark.asyncio
+async def test_search_does_not_filter_files_it_then_discards(applied_filter):
+    """Search re-derives its hits from the fuzzy scorer and never reads the
+    snapshot's files, so filtering them is a full pass over the corpus."""
+    mock_tree = _make_mock_tree()
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        await content_tree(
+            mode="search",
+            query="a.pdf",
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
+            config=ContentTreeToolConfig(),
+        )
+
+    assert applied_filter[-1] is None
+    _, fuzzy_kwargs = mock_tree.search_visible_files_fuzzy_async.call_args
+    assert fuzzy_kwargs["metadata_filter"] == _walk_filter(mock_tree)

@@ -507,13 +507,18 @@ async def content_tree(
         # Walk one level past max_depth — otherwise a folder exactly at the
         # cutoff never gets its own contents visited and stays id-less.
         walk_depth = None
+        snapshot_post_filter = llm_only_metadata_filter
         if mode == "tree":
             walk_depth = max_depth if max_depth is None else max_depth + 1
+        elif mode == "search":
+            # Search re-derives its hits from the fuzzy scorer and never reads
+            # these files, so filtering them is a pass it would discard.
+            snapshot_post_filter = None
 
         snapshot = await resolve_filtered_snapshot(
             tree_svc,
             walk_filter=admin_metadata_filter,
-            post_filter=llm_only_metadata_filter,
+            post_filter=snapshot_post_filter,
             max_depth=walk_depth,
             timeout=wait,
             max_concurrent_directory_listings=config.max_concurrent_scope_lookups,
@@ -598,13 +603,13 @@ async def content_tree(
             if case_sensitive is not None
             else config.default_case_sensitive
         )
+        keep = uniqueql_predicate(llm_only_metadata_filter)
         if snapshot.complete and not fallback_filtered:
             # Must pass the walk's filter, or this resolves a second cache
             # entry and silently pays for another whole walk.
-            keep = uniqueql_predicate(llm_only_metadata_filter)
             scored = await tree_svc.search_visible_files_fuzzy_async(
                 query,
-                limit=sys.maxsize,
+                limit=sys.maxsize if llm_only_metadata_filter else effective_limit,
                 min_score=effective_min_score,
                 match_on=effective_match_on,
                 case_sensitive=effective_case_sensitive,
@@ -616,7 +621,7 @@ async def content_tree(
             # The service's own fuzzy search re-walks and would ignore a snapshot
             # narrowed by the folder_path fallback, so match over the rows here.
             matches = _substring_matches(
-                snapshot.files,
+                [(info, path) for info, path in snapshot.files if keep(info)],
                 query=query,
                 limit=effective_limit,
                 min_score=effective_min_score,

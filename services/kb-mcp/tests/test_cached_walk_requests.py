@@ -1,8 +1,5 @@
-"""Ticket 6, counted rather than timed: a second filter must not re-walk.
-
-Drives the real ``content_tree`` against the real ``ContentTree`` with only
-``unique_sdk`` faked, so it counts requests the backend would have served.
-"""
+"""Counted, not timed: drives the real tool with only ``unique_sdk`` faked, so
+it asserts on requests the backend would have served."""
 
 from __future__ import annotations
 

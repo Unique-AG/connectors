@@ -58,11 +58,8 @@ async def resolve_filtered_snapshot(
     timeout: float | None,
     max_concurrent_directory_listings: int,
 ) -> FolderWalkSnapshot:
-    """Split the filter by who varies it, since the walk cache is keyed by it.
-
-    A constant ``walk_filter`` costs nothing there and is cached; a varying
-    ``post_filter`` would fragment the key, so it is applied in memory.
-    """
+    """Split the filter by who varies it, since the walk cache is keyed by it:
+    a constant ``walk_filter`` is cached, a varying ``post_filter`` would not be."""
     assert tree_svc.metadata_filter is None, (
         "tree must be unfiltered, or its filter is applied twice"
     )
