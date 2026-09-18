@@ -44,19 +44,19 @@ MAX_CALENDARS = 200
 _CalendarsQuery = CalendarsRequestBuilder.CalendarsRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Lists every calendar the signed-in user's mailbox reaches — their own, and any calendar another \
-person delegated or shared with them — before naming a specific calendar in another tool. \
-outlook_list_events lists what is on a calendar; this tool lists the calendars themselves and \
-returns no events.
+Lists every calendar the signed-in user's mailbox reaches, the user's own and any calendar \
+another person shares or delegates. outlook_list_events lists what is on a calendar. This tool \
+lists the calendars, with no events.
 
 Notes:
-- Pass a row's `uri` as `calendar_ref` to outlook_list_events, and to \
-outlook_create_event_on_behalf where this deployment runs it.
-- A delegated calendar is named after its owner, not the signed-in user: check `is_mine` and \
-`can_edit` before treating a row as the user's own or as writable.
-- On a calendar where `can_edit` and `can_view_private_items` are both false, rows return \
-stripped — `subject` holds the display form of `show_as`, `preview` is empty, and \
-`attendee_count` is 0 — report only the time and note the rest is unreadable.
+- Pass a row's `uri` as `calendar_ref` to outlook_list_events. If this deployment runs \
+outlook_create_event_on_behalf, pass the same `uri` to it too.
+- A delegated calendar is named after its owner, and not after the signed-in user. Before you \
+treat a row as the user's own or as writable, make sure that `is_mine` and `can_edit` are true.
+- On a calendar where `can_edit` and `can_view_private_items` are both false, the calendar \
+service returns stripped rows. In a stripped row, `subject` holds the display form of \
+`show_as`, `preview` is empty, and `attendee_count` is 0. For a stripped row, report only the \
+time. Say that you cannot read the rest of the row.
 """
 
 
@@ -65,18 +65,19 @@ class Calendars(BaseModel):
 
     calendars: list[CalendarSummary] = Field(
         description=(
-            "The calendars this mailbox reaches, in Graph's own order — not a ranking. Read "
-            + "`is_default` for the primary calendar rather than assuming it comes first. Empty "
-            + "means Graph reported no calendar at all, which does not happen for a licensed "
-            + "mailbox and signals an unconsented permission instead."
+            "These are the calendars that this mailbox reaches, in the order that Graph "
+            + "returns, not in a ranked order. Read `is_default` to find the primary calendar. "
+            + "Do not assume that it is first in the list. An empty list means that Graph "
+            + "reported no calendar at all. This does not happen for a licensed mailbox. An "
+            + "empty list is a sign of a permission that the tenant did not grant."
         )
     )
     capped: bool = Field(
         description=(
-            f"True when this listing stopped at {MAX_CALENDARS} calendars with more still on "
-            + "offer, so a calendar the user named may be missing from `calendars` rather than "
-            + "absent from the mailbox. False whenever the listing ran out on its own, however "
-            + "few calendars it held."
+            f"True means that the listing stopped at {MAX_CALENDARS} calendars, with more "
+            + "calendars still available. A calendar that the user named can be missing from "
+            + "`calendars`, even when it is still in the mailbox. False means that the listing "
+            + "read every calendar, however few the mailbox holds."
         )
     )
 

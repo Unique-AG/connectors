@@ -104,17 +104,18 @@ _AUDIENCE_TO_WRITE: Mapping[ExternalAudience, ExternalAudienceScope] = {
 }
 
 _DESCRIPTION = """\
-Turn the signed-in user's automatic reply (out of office) on for a fixed window, or off, for \
-setting or clearing an out-of-office message.
+This tool turns the automatic reply (out of office) of the signed-in user on for a fixed \
+window, or off, to set or clear an out-of-office message.
 
 Notes:
-- `status: "scheduled"` requires both `start` and `end`; a reply with no end date is not \
-offered here at all, because it answers every future sender long after this call is forgotten.
-- Omitting `internal_message` or `external_message` keeps the text already in the mailbox and \
-re-sends it — read the answer rather than assuming an omitted message means none.
-- While on, everyone who emails this user gets a reply back automatically, disclosed to \
-whoever writes, including strangers and spam — treat dates away, a deputy's address, or a \
-phone number in the text as published.
+- `status: "scheduled"` requires both `start` and `end`. This tool does not offer a reply \
+with no end date at all, because it answers every future sender long after anyone remembers \
+this call.
+- If you omit `internal_message` or `external_message`, this tool keeps the text already in \
+the mailbox and resends it. Read the answer rather than assuming an omitted message means none.
+- While the reply is on, everyone who emails this user gets a reply back automatically, \
+disclosed to whoever writes, including strangers and spam senders. Treat dates away, a \
+deputy's address, or a phone number in the text as public.
 """
 
 _NO_WINDOW = (
@@ -132,16 +133,16 @@ class ReplyMoment(BaseModel):
 
     date_time: str | None = Field(
         description=(
-            "The moment, in Graph's combined `{date}T{time}` format with no offset — read it "
+            "The moment, in Graph's combined `{date}T{time}` format with no offset. Read it "
             + "against `time_zone`. Null when Microsoft recorded none. This is what Microsoft "
-            + "stored, which is not always what was sent: Exchange can convert it, and the "
-            + "converted value is the one the mailbox acts on."
+            + "stored, which does not always match what the request sent. Exchange can "
+            + "convert it, and the converted value is the one that the mailbox acts on."
         )
     )
     time_zone: str | None = Field(
         description=(
-            "The zone `date_time` is expressed in, usually `UTC`. Never assume it: a window "
-            + "read in the wrong zone is off by hours."
+            "The zone that `date_time` is expressed in, usually `UTC`. Never assume it. A "
+            + "window read in the wrong zone is off by hours."
         )
     )
 
@@ -164,9 +165,9 @@ class AutomaticReplyReport(BaseModel):
         description=(
             "`disabled`: nothing is sent. `scheduled`: senders are answered between "
             + "`scheduled_start` and `scheduled_end`. `alwaysEnabled`: every sender is "
-            + "answered with no end date — this tool cannot set that value, so it means the "
-            + "mailbox already held it. Null when Microsoft reported no status. Anything but "
-            + "`disabled` means the messages below go out to people."
+            + "answered with no end date. This tool cannot set that value, so it here means "
+            + "that the mailbox already held it. Null when Microsoft reported no status. "
+            + "Anything other than `disabled` means that the messages below go out to people."
         )
     )
     external_audience: ExternalAudience | None = Field(
@@ -179,32 +180,34 @@ class AutomaticReplyReport(BaseModel):
     )
     scheduled_start: ReplyMoment | None = Field(
         description=(
-            "When the reply starts, read back from Microsoft's response rather than the "
-            + "`start` argument — Exchange can convert to a different moment, and this is the "
-            + "one the mailbox acts on. Null when Microsoft reported none. Meaningless unless "
-            + "`status` is `scheduled`: a date on a `disabled` reply is leftover, not evidence."
+            "When the reply starts, read back from Microsoft's response rather than from the "
+            + "`start` argument. Exchange can convert to a different moment, and this is the "
+            + "one that the mailbox acts on. Null when Microsoft reported none. This field is "
+            + "meaningless unless `status` is `scheduled`. A date on a `disabled` reply is "
+            + "leftover, not evidence."
         )
     )
     scheduled_end: ReplyMoment | None = Field(
         description=(
             "When the reply stops, on the same terms as `scheduled_start`. This is the whole "
-            + "of what stops an automatic reply on its own — nothing else expires it."
+            + "of what stops an automatic reply on its own. Nothing else expires it."
         )
     )
     internal_message: str | None = Field(
         description=(
             "The reply now sent to senders inside this organization, as Microsoft stored it: "
-            + "usually HTML, not the plain text that was sent. Null when the mailbox holds "
-            + "none. A value here that nobody passed in this call is text the mailbox already "
-            + "held, sent again automatically — say so, instead of presenting it as new."
+            + "usually HTML, not the plain text that the request sent. Null when the mailbox "
+            + "holds none. A value here that nobody passed in this call is text that the "
+            + "mailbox already held, sent again automatically. Say so, instead of presenting "
+            + "it as new."
         )
     )
     external_message: str | None = Field(
         description=(
             "The reply now sent to senders outside this organization, subject to "
             + "`external_audience`. Null when the mailbox holds none. Read it for what it "
-            + "discloses to strangers — dates away from home, a deputy's address, a phone "
-            + "number — not only for whether a reply is on."
+            + "discloses to strangers, not only for whether a reply is on. Examples include "
+            + "dates away from home, a deputy's address, and a phone number."
         )
     )
 
@@ -371,8 +374,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "`scheduled` switches the automatic reply on between `start` and `end`, "
                     + "both of which are then required. `disabled` switches it off, and is the "
-                    + "only way to stop one through this connector. Microsoft's `alwaysEnabled` "
-                    + "— an automatic reply with no end date — is not offered here."
+                    + "only way to stop one through this connector. This tool does not offer "
+                    + "Microsoft's `alwaysEnabled`, an automatic reply with no end date."
                 )
             ),
         ],
@@ -382,7 +385,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "When the reply starts, as an ISO-8601 date-time without an offset, for "
                     + "example `2026-09-01T08:00:00`. Read against `time_zone`. Required with "
-                    + "`scheduled`; Microsoft accepts a future range only. Omitting it keeps "
+                    + "`scheduled`. Microsoft accepts a future range only. Omitting it keeps "
                     + "whatever dates the mailbox already had."
                 )
             ),
@@ -401,10 +404,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 description=(
-                    "The zone `start` and `end` are expressed in: a Windows or IANA name such "
-                    + "as `UTC`, `W. Europe Standard Time`, or `Europe/Zurich`. Defaults to "
-                    + "`UTC`, so a local time passed without this is written as a UTC time and "
-                    + "the user is away at the wrong hours."
+                    "The zone that `start` and `end` are expressed in: a Windows or IANA name "
+                    + "such as `UTC`, `W. Europe Standard Time`, or `Europe/Zurich`. Defaults "
+                    + "to `UTC`. Without this argument, this tool treats a local time as a UTC "
+                    + "time, and the user is away at the wrong hours."
                 )
             ),
         ] = "UTC",
@@ -413,9 +416,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "The text sent automatically to senders inside the organization. Plain "
-                    + "text or HTML; Outlook stores and shows it as HTML. Omit to keep the "
-                    + "text the mailbox already holds, which is then re-sent to everyone who "
-                    + "writes."
+                    + "text or HTML. Outlook stores and shows it as HTML. Omit this argument "
+                    + "to keep the text that the mailbox already holds, which this tool then "
+                    + "resends to everyone who writes."
                 )
             ),
         ] = None,
@@ -424,8 +427,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "The text sent automatically to senders outside the organization, as far "
-                    + "as `external_audience` allows. Omit to keep the text already in the "
-                    + "mailbox."
+                    + "as `external_audience` allows. Omit this argument to keep the text "
+                    + "already in the mailbox."
                 )
             ),
         ] = None,
@@ -434,8 +437,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Who outside the organization is answered at all: `none`, `contactsOnly`, "
-                    + "or `all`. Omit to keep what the mailbox is already set to, which can "
-                    + "well be `all`."
+                    + "or `all`. Omit this argument to keep what the mailbox is already set "
+                    + "to, which can well be `all`."
                 )
             ),
         ] = None,

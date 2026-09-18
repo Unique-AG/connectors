@@ -39,16 +39,18 @@ _MEGABYTE = 1024 * 1024
 _DEFAULT_MEDIA_TYPE = "application/octet-stream"
 
 _DESCRIPTION = f"""\
-Return one file's content from OneDrive or SharePoint, in its original format, or as a \
-Microsoft-converted PDF when `convert_to` is set, for retrieving or reading a file already \
-located by sharepoint_search_files or sharepoint_browse_folder. `sharepoint_browse_folder` \
-lists a folder's own contents; this tool refuses a folder handle outright because a folder has \
-no content to read.
+This tool returns the content of one file from OneDrive or SharePoint. By default, this tool \
+returns the file in its original format. If you set `convert_to`, this tool returns the file as \
+a PDF that Microsoft converts. You can use this tool to read a file that \
+sharepoint_search_files or sharepoint_browse_folder already located. The tool \
+`sharepoint_browse_folder` lists the contents of a folder. This tool refuses a folder handle, \
+because a folder has no content to read.
 
 Notes:
 - This tool converts nothing itself and does not turn a document into text. A Word file comes \
 back as a Word file. Set `convert_to` to `pdf` for text you can read.
-- A file above {MAX_BYTES // _MEGABYTE} MB is refused; the whole file travels in one message.
+- This tool refuses a file above {MAX_BYTES // _MEGABYTE} MB. The whole file travels in one \
+message.
 """
 
 _NOT_A_FILE_HANDLE = (
@@ -255,8 +257,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "sharepoint_search_files hit or a sharepoint_browse_folder row: "
                     + "sharepoint:///files/{drive_id}/{item_id}. A folder handle, "
                     + "sharepoint:///folders/{drive_id}/{item_id}, is not a file handle, and "
-                    + "neither is a web address. Never construct one: a file id alone, without "
-                    + "its drive id, reaches nothing."
+                    + "neither is a web address. Do not construct a handle yourself. A file id "
+                    + "alone, without its drive id, reaches nothing."
                 ),
             ),
         ],
@@ -264,12 +266,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Literal["pdf"] | None,
             Field(
                 description=(
-                    "Convert the file to PDF before returning it. Leave unset for the file's "
-                    + "own format, the default. Microsoft converts: doc, docx, dot, dotx, eml, "
-                    + "epub, htm, html, md, msg, odp, ods, odt, pps, ppsx, ppt, pptx, rtf, tif, "
-                    + "tiff, xls, xlsm, xlsx — a file already a PDF is not on that list and "
-                    + "needs no conversion, and conversion can still fail for a file that is on "
-                    + "it."
+                    "The value `pdf` converts the file to PDF before this tool returns it. "
+                    + "Leave this parameter unset to get the file's own format, which is the "
+                    + "default. Microsoft converts these formats: doc, docx, dot, dotx, eml, "
+                    + "epub, htm, html, md, msg, odp, ods, and odt. It also converts these "
+                    + "formats: pps, ppsx, ppt, pptx, rtf, tif, tiff, xls, xlsm, and xlsx. A "
+                    + "file that is already a PDF is not on that list, and needs no "
+                    + "conversion. Conversion can still fail for a file that is on the list."
                 )
             ),
         ] = None,

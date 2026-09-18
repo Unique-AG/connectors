@@ -42,19 +42,21 @@ _SITE_FIELD = "SPSiteURL"
 MAX_SITES = 10
 
 _DESCRIPTION = """\
-Search the files and folders the signed-in user can see across OneDrive and SharePoint, ranked \
-by Microsoft's search index rather than by name or date, for finding a file or folder by name or \
-by the words inside it. `sharepoint_browse_folder` lists everything sitting directly in one \
-named folder, including items outside the search index — use it instead when the user names a \
-specific folder and wants everything in it.
+This tool searches the files and folders that the signed-in user can see across OneDrive and \
+SharePoint. It sorts matches by the Microsoft search index, not by file name or date. This tool \
+finds a file or a folder by its name or by the words inside it. The tool \
+`sharepoint_browse_folder` lists every item directly inside one named folder, and this includes \
+items that are outside the search index. If the user names a specific folder and wants every \
+item in it, use `sharepoint_browse_folder` instead.
 
 Notes:
-- Every argument beyond `query` narrows the result with AND; each one only ever shrinks the \
-answer.
-- Results have no sort order; `modified_after` and `modified_before` bound the window without \
-ranking it, so they are not a way to ask for the newest file.
-- Put the earlier date in `modified_after` and the later one in `modified_before`; a reversed \
-pair matches nothing.
+- Every argument other than `query` narrows the result with AND. Each such argument only makes \
+the result smaller.
+- The matches have no sort order. `modified_after` and `modified_before` set the limits of a \
+time window, and they do not rank the matches inside it. You cannot use them to find the newest \
+file.
+- Put the earlier date in `modified_after`, and put the later date in `modified_before`. A \
+reversed pair of dates matches nothing.
 """
 
 _WINDOW_RUNS_BACKWARDS = (
@@ -77,14 +79,14 @@ class SiteMatches(BaseModel):
 
     url: str = Field(
         description=(
-            "The site's web address. Pass it back as `path` to search only this site; it is "
-            + "already in the shape `path` expects."
+            "The site's web address. Pass it back as `path` to search only this site. It is "
+            + "already in the shape that `path` expects."
         )
     )
     match_count: int = Field(
         description=(
-            "How many matches sit on this site, counted across every match — not only the ones "
-            + "on this page."
+            "This is the count of matches on this site. It counts every match, not only the "
+            + "matches on this page."
         )
     )
 
@@ -94,26 +96,29 @@ class FileSearchResults(BaseModel):
 
     files: list[DriveItemSummary] = Field(
         description=(
-            "The files and folders that matched, on this page. Empty means no match on this "
-            + "page, not proof the file doesn't exist elsewhere. A row Graph reported with no "
-            + "drive is dropped, because this tool cannot address it again."
+            "These are the files and folders that matched, on this page. An empty list means "
+            + "that no file matched on this page. It does not mean that the file does not "
+            + "exist elsewhere. This tool drops a hit that Graph reports with no drive, "
+            + "because this tool cannot address that hit again."
         )
     )
     sites: list[SiteMatches] = Field(
         description=(
-            "The sites the matches sit on, ranked by match count and counted across every "
-            + "match, not only this page — so it shows where the answer lives before paging "
-            + "through it. Empty when every match is in the user's own OneDrive, or when the "
-            + "organization's search settings disable grouping; never a sign the matches have "
+            "These are the sites where the matches are located, ranked by the number of "
+            + "matches on each site. This count covers every match, not only the matches on "
+            + "this page. This list shows where the result is concentrated, before you page "
+            + "through more matches. This list is empty when every match is in the signed-in "
+            + "user's own OneDrive. This list is also empty when the organization's search "
+            + "settings disable grouping. An empty list is never a sign that the matches have "
             + "no site."
         )
     )
     next_offset: int | None = Field(
         description=(
-            "The offset that reaches the next page, or null when the page cannot advance "
-            + "further — either no more results exist, or none of this page's hits could "
-            + "advance past. Do not request this same offset again either way. It counts "
-            + "Graph's hits, not the rows this tool returned."
+            "This is the offset that reaches the next page. It is null when the page cannot "
+            + "advance further. Either no more hits exist, or none of the hits on this page "
+            + "can advance further. Do not request this same offset again either way. It "
+            + "counts the hits that Graph returns, not the matches that this tool returns."
         )
     )
 
@@ -263,8 +268,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Words to find, matched against the file name and the text inside the file. "
                     + "Every word must appear, in any order. Quote words that must sit together, "
-                    + '`"budget review"`, to match only that exact phrase. A search operator here '
-                    + "is read as plain text, not obeyed."
+                    + '`"budget review"`, to match only that exact phrase. The tool reads a '
+                    + "search operator here as plain text and does not obey it."
                 ),
             ),
         ],
@@ -275,7 +280,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Only files with this extension, written on its own with no dot and no "
                     + "star, for example `docx`, `pdf` or `xlsx`. A folder has no extension, so "
-                    + "this also drops every folder from the answer."
+                    + "this also drops every folder from the matches."
                 ),
             ),
         ] = None,
@@ -284,13 +289,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only items under this address: the full web address of a SharePoint site "
-                    + "or folder, for example `https://contoso.sharepoint.com/sites/Finance`. "
-                    + "Take it from a returned row's `web_url`, or from the user — a bare site "
-                    + "or folder name matches nothing here, silently. A site address is the "
-                    + "host, then `/sites/` or `/teams/`, then the site name; keep more of the "
-                    + "address to scope to one folder instead. A personal OneDrive lives on the "
-                    + "`-my` host, and a SharePoint site does not."
+                    "This is the full web address of a SharePoint site or a folder, for "
+                    + "example `https://contoso.sharepoint.com/sites/Finance`. Take it from a "
+                    + "returned row's `web_url`, or from the user. A bare site name or folder "
+                    + "name matches nothing here, silently. A site address is the host, then "
+                    + "`/sites/` or `/teams/`, then the site name. To scope to one folder, keep "
+                    + "more of the address. A personal OneDrive uses the `-my` host, and a "
+                    + "SharePoint site does not."
                 ),
             ),
         ] = None,
@@ -299,9 +304,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Only items last changed at or after this point. A date, `2026-03-04`, "
-                    + "opens at the first instant of that whole UTC day; a moment, "
-                    + "`2026-03-04T09:00:00Z`, opens at the exact second named, and a moment "
-                    + "with no time zone is read as UTC."
+                    + "opens at the first instant of that whole UTC day. A moment, "
+                    + "`2026-03-04T09:00:00Z`, opens at the exact second named. The tool reads "
+                    + "a moment with no time zone as UTC."
                 )
             ),
         ] = None,
@@ -311,7 +316,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Only items last changed at or before this point, inclusive, in the same "
                     + "two shapes as `modified_after`. A date closes at the end of that whole "
-                    + "UTC day, so the same date in both bounds spans exactly that one day; a "
+                    + "UTC day. So the same date in both bounds spans exactly that one day. A "
                     + "moment closes at the second named."
                 )
             ),
@@ -321,8 +326,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 ge=0,
                 description=(
-                    "How many results to skip, for paging. Start at 0; pass the previous "
-                    + "answer's `next_offset` to reach the next page."
+                    "How many matches to skip, for paging. Start at 0. To reach the next page, "
+                    + "pass the `next_offset` value from the earlier page."
                 ),
             ),
         ] = 0,
@@ -332,8 +337,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_RESULTS,
                 description=(
-                    "How many results one page holds. The default is 25 and the most is "
-                    + f"{MAX_RESULTS}."
+                    "How many matches one page holds. The default value is 25, and the "
+                    + f"maximum value is {MAX_RESULTS}."
                 ),
             ),
         ] = 25,

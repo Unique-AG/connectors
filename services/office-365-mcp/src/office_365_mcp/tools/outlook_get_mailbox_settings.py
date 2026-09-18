@@ -133,16 +133,16 @@ type AutoReplyStatus = Literal["disabled", "alwaysEnabled", "scheduled"]
 type ExternalAudience = Literal["none", "contactsOnly", "all"]
 
 _DESCRIPTION = """\
-Show what quietly acts on the signed-in user's mailbox — the inbox rules, the automatic reply, \
+Shows what quietly acts on the signed-in user's mailbox — the inbox rules, the automatic reply, \
 and the categories — for "is something forwarding my mail?", "am I still out of office?", and \
 "which rules move my mail".
 
 Notes:
-- Cannot see Exchange mailbox-level forwarding, which Microsoft Graph does not publish anywhere; \
-an empty rule list, or rules that forward nothing, is not evidence the mailbox is not being \
-forwarded.
+- Cannot see Exchange mailbox-level forwarding, which Microsoft Graph does not publish \
+anywhere. An empty rule list, or rules that forward nothing, does not prove that nobody \
+forwards this mailbox's mail.
 - Reports what each rule does, never which mail it targets — a forwarding rule can act on \
-everything or on one sender's mail; Outlook shows which.
+everything or on one sender's mail. Outlook shows which.
 - Each rule reports what it does as named fields — `forwards_to`, `redirects_to`, \
 `moves_to_folder`, and the rest — never as a nested action object.
 """
@@ -157,23 +157,23 @@ class InboxRule(BaseModel):
 
     uri: str = Field(
         description=(
-            "This rule's handle, `outlook:///rules/{id}`, naming this exact rule for a later "
-            + "answer. No tool here can change or delete a rule — do that in Outlook or the "
+            "This rule's handle, `outlook:///rules/{id}`, names this exact rule for a later "
+            + "answer. No tool here can change or delete a rule. Do that in Outlook or the "
             + "Exchange admin center."
         )
     )
     display_name: str | None = Field(
         description=(
-            "The rule's name, chosen by whoever created it — a label, not a description: a rule "
-            + "called `Newsletters` can still forward mail out of the organization. Null when "
-            + "Graph recorded none."
+            "The rule's name, chosen by whoever created it — a label, not a description. A "
+            + "rule called `Newsletters` can still forward mail out of the organization. Null "
+            + "when Graph recorded none."
         )
     )
     is_enabled: bool | None = Field(
         description=(
-            "Whether the rule runs. False means it exists but currently does nothing — not that "
-            + "it is gone, since re-enabling it takes one click — so a disabled forwarding rule "
-            + "is still worth reporting. Null when Graph did not say."
+            "Whether the rule runs. False means it exists but currently does nothing. It is "
+            + "not gone, because re-enabling it takes one click. So report a disabled "
+            + "forwarding rule too. Null when Graph did not say."
         )
     )
     sequence: int | None = Field(
@@ -184,31 +184,32 @@ class InboxRule(BaseModel):
     is_read_only: bool | None = Field(
         description=(
             "True for a rule the rules API cannot modify, usually one written by another client "
-            + "or an administrator; it still runs. Null when Graph did not say."
+            + "or an administrator. It still runs. Null when Graph did not say."
         )
     )
     has_error: bool | None = Field(
         description=(
             "True when Microsoft 365 marked the rule broken, commonly because it names a folder "
-            + "or an address that no longer exists; a rule in error may do only part of what its "
-            + "actions describe. Null when Graph did not say."
+            + "or an address that no longer exists. A rule in error can do only part of what "
+            + "its actions describe. Null when Graph did not say."
         )
     )
     forwards_to: list[str] = Field(
         description=(
             "Addresses this rule forwards a copy of the message to — the field this tool exists "
-            + "for: an address outside the user's own domain means copies of their mail leave "
+            + "for. An address outside the user's own domain means copies of their mail leave "
             + "the organization automatically. Each entry is the SMTP address Graph recorded, or "
-            + "the display name when it recorded none. Empty means this rule forwards nothing; "
-            + "it says nothing about other rules, or about mailbox-level forwarding, which this "
+            + "the display name when it recorded none. Empty means this rule forwards nothing. "
+            + "It says nothing about other rules, or about mailbox-level forwarding, which this "
             + "tool cannot see at all."
         )
     )
     redirects_to: list[str] = Field(
         description=(
             "Addresses this rule redirects the message to. A redirect preserves the original "
-            + "sender, so a reply goes back to them rather than to this user — harder to notice "
-            + "than a forward, not less serious. Read it the same way as `forwards_to`."
+            + "sender, so a reply goes back to them rather than to this user. This is harder to "
+            + "notice than a forward, but it is not less serious. Read it the same way as "
+            + "`forwards_to`."
         )
     )
     forward_as_attachment_to: list[str] = Field(
@@ -220,16 +221,17 @@ class InboxRule(BaseModel):
     moves_to_folder: str | None = Field(
         description=(
             "The Graph id of the folder this rule moves the message to. Null when the rule "
-            + "moves nothing. Opaque on its own — outlook_browse_folders reports id and name "
-            + "together, so browse there to identify it. A rule that files mail out of the Inbox "
-            + "is why a message can look like it never arrived."
+            + "moves nothing. It is opaque on its own. outlook_browse_folders reports id and "
+            + "name together. Browse there to identify it. A rule that files mail out of the "
+            + "Inbox is why a message can look like it never arrived."
         )
     )
     deletes: bool | None = Field(
         description=(
-            "True when the rule deletes the message — either moving it to Deleted Items, where "
-            + "it can still be found, or permanently, where it cannot; this field does not "
-            + "distinguish the two. Null when Graph reported neither."
+            "True when the rule deletes the message. It can move the message to Deleted Items, "
+            + "where the user can still find it. Or it can delete the message permanently, "
+            + "where nobody can find it again. This field does not distinguish the two. Null "
+            + "when Graph reported neither."
         )
     )
     marks_as_read: bool | None = Field(
@@ -241,7 +243,7 @@ class InboxRule(BaseModel):
     stops_processing_more_rules: bool | None = Field(
         description=(
             "True when Outlook never evaluates a rule with a higher `sequence` for a message "
-            + "this one matched — so a rule further down the list can look active yet never run "
+            + "this one matched. So a rule further down the list can look active, yet never run "
             + "for mail this one already handled. Null when Graph did not say."
         )
     )
@@ -276,13 +278,13 @@ class ScheduledMoment(BaseModel):
 
     date_time: str | None = Field(
         description=(
-            "The moment, in Graph's combined `{date}T{time}` spelling with no offset — read it "
+            "The moment, in Graph's combined `{date}T{time}` spelling with no offset. Read it "
             + "together with `time_zone`. Null when Graph recorded none."
         )
     )
     time_zone: str | None = Field(
         description=(
-            "The zone `date_time` is expressed in, usually `UTC`. Never assume it — a schedule "
+            "The zone `date_time` is expressed in, usually `UTC`. Never assume it. A schedule "
             + "read in the wrong zone reports an expired auto-reply as still live."
         )
     )
@@ -307,7 +309,7 @@ class AutomaticReply(BaseModel):
     )
     external_audience: ExternalAudience | None = Field(
         description=(
-            "Who outside this organization receives `external_reply_message`: `none` for "
+            "Who outside this organization receives `external_reply_message`. `none` for "
             + "nobody (colleagues only), `contactsOnly` for senders in the user's contacts, "
             + "`all` for every outside sender including strangers and spam. Null when Graph did "
             + "not say."
@@ -315,8 +317,8 @@ class AutomaticReply(BaseModel):
     )
     scheduled_start: ScheduledMoment | None = Field(
         description=(
-            "When a `scheduled` reply starts. Meaningless unless `status` is `scheduled` — a "
-            + "past date on a `disabled` reply is leftover, not evidence."
+            "When a `scheduled` reply starts. It is meaningless unless `status` is `scheduled`. "
+            + "A past date on a `disabled` reply is leftover, not evidence."
         )
     )
     scheduled_end: ScheduledMoment | None = Field(
@@ -334,9 +336,9 @@ class AutomaticReply(BaseModel):
     external_reply_message: str | None = Field(
         description=(
             "The reply sent to senders outside this organization, subject to "
-            + "`external_audience`. Read it for what it gives away — dates away, a deputy's "
-            + "address, a phone number — not only for whether a reply is on. Null when none is "
-            + "set."
+            + "`external_audience`. Read it for what it gives away. Examples are dates away, a "
+            + "deputy's address, or a phone number. This matters beyond whether a reply is on. "
+            + "Null when none is set."
         )
     )
 
@@ -370,27 +372,27 @@ class MailboxSettingsReport(BaseModel):
     covers_mailbox_level_forwarding: Literal[False] = Field(
         default=False,
         description=(
-            "ALWAYS false. Exchange mailbox-level forwarding — set with "
+            "This is always false. Exchange mailbox-level forwarding — set with "
             + "`Set-Mailbox -ForwardingSmtpAddress` or the Forwarding box in the Exchange admin "
-            + "center — is invisible to every endpoint this connector can call; "
+            + "center — is invisible to every endpoint this connector can call. "
             + "`mailboxSettings` has no forwarding property. So an empty `rules` list, or rules "
-            + "that forward nothing, is not evidence this mailbox isn't being forwarded — say "
-            + "that to the user rather than reassuring them. Ruling it out needs the Exchange "
+            + "that forward nothing, does not prove that nobody forwards this mailbox's mail. "
+            + "Say that to the user. Do not reassure them. To rule it out, use the Exchange "
             + "admin center or `Get-Mailbox | Select ForwardingSmtpAddress, ForwardingAddress`."
         ),
     )
     rules: list[InboxRule] | None = Field(
         description=(
-            "The Inbox rules, in the order Graph returned them — read `sequence` for the order "
+            "The Inbox rules, in the order Graph returned them. Read `sequence` for the order "
             + "they run in. Null when `include` did not ask for them. Empty means no inbox "
-            + "rules exist; see `covers_mailbox_level_forwarding` before reading that as nothing "
-            + "touching this mail."
+            + "rules exist. Before you treat an empty list as nothing that touches this mail, "
+            + "see `covers_mailbox_level_forwarding` too."
         )
     )
     rules_capped: bool | None = Field(
         description=(
             f"True when more than {MAX_RULES} rules were on offer and the listing stopped, so "
-            + "`rules` is missing some — practically always false, since Exchange caps a "
+            + "`rules` is missing some. This is practically always false, since Exchange caps a "
             + "mailbox's rules well below that. Null when `include` did not ask for rules."
         )
     )
@@ -404,8 +406,8 @@ class MailboxSettingsReport(BaseModel):
     categories: list[str] | None = Field(
         description=(
             "The display names of the categories this mailbox can tag mail with — free strings "
-            + "with no fixed vocabulary, so a category named `Confidential` or `Done` means "
-            + "whatever its owner meant by it. Null when `include` did not ask for them; empty "
+            + "with no fixed vocabulary. So a category named `Confidential` or `Done` means "
+            + "whatever its owner meant by it. Null when `include` did not ask for them. Empty "
             + "means the mailbox has none."
         )
     )
@@ -551,11 +553,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Include,
             Field(
                 description=(
-                    "Which of the three to read, one Graph call each: `all` reads every one, "
+                    "Which of the three to read, one Graph call each. `all` reads every one. "
                     + '`rules` reads only the inbox rules — the answer to "is something '
-                    + 'forwarding my mail" — `replies` reads only the automatic reply, and '
-                    + "`categories` reads only the category names. Whatever is not asked for "
-                    + "comes back null, never empty."
+                    + 'forwarding my mail". `replies` reads only the automatic reply. '
+                    + "`categories` reads only the category names. Whatever the caller does not "
+                    + "ask for comes back null, never empty."
                 )
             ),
         ] = "all",

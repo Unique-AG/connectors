@@ -45,11 +45,12 @@ _ChildrenQuery = ChildrenRequestBuilder.ChildrenRequestBuilderGetQueryParameters
 _DriveQuery = DriveRequestBuilder.DriveRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-List everything that sits directly inside one folder in OneDrive or SharePoint, one level only, \
-never its subfolders, for walking a specific folder's contents. `sharepoint_search_files` finds \
-files by name or content across the whole of OneDrive and SharePoint but reaches indexed \
-content only; use this tool instead when the user names one folder and wants everything in it, \
-indexed or not.\
+This tool lists every item directly inside one folder in OneDrive or SharePoint. It lists one \
+level only, and does not list items inside subfolders. You can use this tool to look through \
+the contents of a specific folder. The tool `sharepoint_search_files` finds files by name or by \
+content, across all of OneDrive and SharePoint. But it reaches only content that is in the \
+search index. If the user names one folder and wants everything in it, indexed or not, use \
+this tool instead.\
 """
 
 _NOT_A_FOLDER_HANDLE = (
@@ -67,18 +68,18 @@ class DriveFolderLevel(BaseModel):
     items: list[DriveItemSummary] = Field(
         description=(
             "The files and folders directly inside the folder, in the order Microsoft returned "
-            + "them. A folder entry here can hold further items that are not included; call "
-            + "this tool again with that entry's `uri` to reach them. Empty means the folder "
-            + "holds nothing. An item Graph reported with no drive is left out, because it "
-            + "cannot be addressed again."
+            + "them. A folder entry here can hold further items that are not included. Call "
+            + "this tool again with that entry's `uri` to reach them. An empty list means that "
+            + "the folder holds nothing. This tool leaves out an item that Graph reports with "
+            + "no drive, because this tool cannot address that item again."
         )
     )
     capped: bool = Field(
         description=(
-            "True when `limit` stopped the list before this level was exhausted; raise "
-            + "`limit` to get more of it. False when the level ended on its own. It says "
-            + "nothing about items nested inside a returned folder — this call never looks "
-            + "inside them."
+            "When `limit` stops the list before this level ends, this value is true. To get "
+            + "more of the list, raise `limit`. When the level ends on its own, this value is "
+            + "false. This value says nothing about the items inside a folder that this call "
+            + "returned. This call never looks inside such a folder."
         )
     )
 
@@ -153,8 +154,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The folder to look inside, as the `uri` an earlier sharepoint_browse_folder "
-                    + "or sharepoint_search_files result reported: "
+                    "This is the folder to look inside, as the `uri` value that an earlier "
+                    + "sharepoint_browse_folder or sharepoint_search_files result reported: "
                     + "sharepoint:///folders/{drive_id}/{item_id}. Omit it to browse the top of "
                     + "the signed-in user's own OneDrive. A folder's display name, a path, and a "
                     + "web address are not valid here."
@@ -167,8 +168,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_ITEMS,
                 description=(
-                    f"How many items to return from this level, at most {MAX_ITEMS}. It bounds "
-                    + "this level only — raising it never reaches items inside a nested folder."
+                    f"How many items to return from this level, at most {MAX_ITEMS}. This "
+                    + "limit applies to this level only. If you raise it, this tool still does "
+                    + "not reach items inside a nested folder."
                 ),
             ),
         ] = 50,

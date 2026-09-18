@@ -110,17 +110,18 @@ _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Send a draft that outlook_draft_mail or outlook_draft_reply created in the signed-in user's own \
-Drafts folder, putting it on the wire under the user's own address.
+This tool sends a draft from the signed-in user's own Drafts folder, created by \
+outlook_draft_mail or outlook_draft_reply, onto the wire under the user's own address.
 
 Notes:
-- This cannot be undone: this connector has no recall or unsend, and nothing here reaches a \
-message once it is in somebody else's mailbox.
-- It asks the person to confirm the send before it happens, and sends nothing unless they \
-agree — read them the recipients, subject, and body the drafting tool answered with first.
-- Only a handle of the drafts family (`outlook:///drafts/{id}`) is accepted; a message handle \
-from outlook_search_mail, outlook_list_mail, or outlook_read_thread is refused, and a message \
-that was already sent is refused rather than sent again.
+- This action cannot be undone. This connector has no recall or unsend function, and nothing \
+here reaches a message once it is in somebody else's mailbox.
+- This tool asks the person to approve the send before it happens, and it sends nothing \
+unless the person agrees. Before you ask, read them the recipients, subject, and body that \
+the drafting tool answered with.
+- This tool accepts only a handle of the drafts family (`outlook:///drafts/{id}`). It refuses \
+a message handle from outlook_search_mail, outlook_list_mail, or outlook_read_thread, and it \
+refuses a message that is already sent rather than sending it again.
 """
 
 _NOT_A_DRAFT_HANDLE = (
@@ -179,17 +180,17 @@ class MailSent(BaseModel):
 
     to: list[MailAddress] = Field(
         description=(
-            "Who the message was sent to, read off Microsoft's copy of the draft immediately "
+            "Who received the message, read off Microsoft's copy of the draft immediately "
             + "before the send rather than echoed from the request. This is the record of who "
-            + "now has the mail — repeat it to the user in full. It cannot be changed, and "
-            + "delivery cannot be recalled by this connector."
+            + "now has the mail. Repeat it to the user in full. Nobody can change it, and "
+            + "this connector cannot recall delivery."
         )
     )
     cc: list[MailAddress] = Field(
         description=(
-            "Who was copied, read the same way and just as impossible to recall — everyone "
-            + "here has the mail too. Empty when Graph held none. No blind copy is reported, "
-            + "because no tool in this connector puts one on a draft."
+            "Who received a copy, read the same way as `to` and just as impossible to "
+            + "recall. Everyone here has the mail too. Empty when Graph held none. This tool "
+            + "reports no blind copy, because no tool in this connector puts one on a draft."
         )
     )
     subject: str | None = Field(
@@ -201,9 +202,9 @@ class MailSent(BaseModel):
     sent_at: str = Field(
         description=(
             "When Microsoft accepted the send, ISO-8601 in UTC, clocked by this connector at "
-            + "the moment the request was accepted — Microsoft answers a send with an empty "
-            + "body, so this is within seconds rather than exact. The send it timestamps "
-            + "cannot be recalled."
+            + "the moment it accepted the request. Microsoft answers a send with an empty "
+            + "body, so this time is within seconds rather than exact. Nobody can recall the "
+            + "send that this field timestamps."
         )
     )
 
@@ -353,11 +354,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The draft to send: the `uri` outlook_draft_mail or outlook_draft_reply "
-                    + "answered with. This is the only argument there is, and nothing here can "
-                    + "change the recipients, the subject, the body, or anything else about the "
-                    + "message. Passing a handle asks the person for confirmation — it does not "
-                    + "send on its own, and a refusal leaves the draft where it is."
+                    "The draft to send: the `uri` that outlook_draft_mail or "
+                    + "outlook_draft_reply answered with. This is the only argument there is, "
+                    + "and nothing here can change the recipients, the subject, the body, or "
+                    + "anything else about the message. Passing a handle asks the person for "
+                    + "approval. It does not send on its own, and a refusal leaves the draft "
+                    + "where it is."
                 ),
             ),
         ],

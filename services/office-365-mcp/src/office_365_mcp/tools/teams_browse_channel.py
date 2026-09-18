@@ -49,13 +49,13 @@ MAX_POSTS = 50
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Reads one Teams channel's posts in full, each with its newest replies, ordered by reply-chain \
-activity rather than post date — read each post's `created_at` before trusting the order. Use it \
-to see what is in a channel. It has no date filter and no keyword search: use \
+This tool reads one Teams channel's posts in full, each with its newest replies, ordered by \
+reply-chain activity rather than post date. Read each post's `created_at` before you trust the \
+order. This tool shows what is in a channel. It has no date filter and no keyword search. Use \
 teams_search_messages for a keyword, a person, or any date bound.
 
 Notes:
-- One call is one request against the channel; raise `limit` rather than calling again.\
+- One call is one request against the channel. Raise `limit` rather than calling again.\
 """
 
 
@@ -63,30 +63,32 @@ class ChannelPosts(BaseModel):
     messages: list[TeamsMessage] = Field(
         description=(
             "Posts and their replies, in thread order: each root post's replies follow it "
-            + "directly, oldest first, carrying `reply_to_id` for their parent. Each message is "
-            + "complete — same shape and text as `teams_read_message` returns — so no second "
-            + f"read is needed. Only the newest {MAX_REPLIES_PER_POST} replies per post come "
-            + "back; older ones are unreachable here, and browsing again returns the same newest "
-            + "window. For a reply outside that window, report `teams_search_messages`' snippet "
-            + "with its sender and date, and stop looking — this connector has no route to its "
-            + "full text."
+            + "directly, oldest first, and carry `reply_to_id` for their parent. Each message is "
+            + "complete: it has the same shape and text that `teams_read_message` returns, so "
+            + f"this tool needs no second read. Only the newest {MAX_REPLIES_PER_POST} replies "
+            + "per post come back. Older replies are unreachable here, and browsing again "
+            + "returns the same newest window. For a reply outside that window, report the "
+            + "`teams_search_messages` snippet with its sender and date. Then stop looking. This "
+            + "connector has no route to the full text."
         )
     )
     more_posts_in_channel: bool | None = Field(
         description=(
-            "Whether Microsoft's own cursor (`@odata.nextLink`) shows posts beyond this page, "
-            + "reported only when `include_window_completeness` was set — otherwise null. True: "
-            + f"more posts exist; raise `limit` (up to {MAX_POSTS}) or use teams_search_messages "
-            + "with `sent_before` to reach further back. False: this window was the whole "
-            + "channel, subject to `limit` and the per-post reply cap. A short page alone does "
-            + "not mean the channel ran out — check this field instead."
+            "This tool reports whether Microsoft's own cursor (`@odata.nextLink`) shows posts "
+            + "beyond this page, but only when `include_window_completeness` is set. Otherwise, "
+            + "this field is null. True means more posts exist. Raise `limit` (up to "
+            + f"{MAX_POSTS}) or use teams_search_messages with `sent_before` to reach further "
+            + "back. False means this window was the whole channel, subject to `limit` and the "
+            + "per-post reply cap. A short page alone does not mean the channel ran out. Make "
+            + "sure that you rely on this field, not on page length, for the answer."
         )
     )
     posts_cut_to_limit: bool | None = Field(
         description=(
-            "Whether Microsoft's page held more posts than `limit` and this answer was cut to "
-            + "it, or null if `include_window_completeness` was not set. Rarely true; raise "
-            + f"`limit` (up to {MAX_POSTS}) to get the cut posts in the next call."
+            "True when Microsoft's page held more posts than `limit`, so this tool cut the "
+            + "answer to fit. This field is null when `include_window_completeness` is not set. "
+            + f"This is rarely true. Raise `limit` (up to {MAX_POSTS}) to get the cut posts in "
+            + "the next call."
         )
     )
 
@@ -197,9 +199,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The channel to read, exactly as teams_list_channels or "
-                    + "teams_search_messages reported it. Opaque — copy it, do not build it from "
-                    + "a channel name. A channel id alone does not address a channel; always pass "
-                    + "it with `team_id`."
+                    + "teams_search_messages reported it. This id is opaque. Copy it. Do not "
+                    + "build it from a channel name. A channel id alone does not address a "
+                    + "channel. Always pass it with `team_id`."
                 ),
             ),
         ],
@@ -218,9 +220,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool,
             Field(
                 description=(
-                    "Populate `more_posts_in_channel` and `posts_cut_to_limit`, both null "
-                    + "otherwise. Set it when a short answer could mean either the whole channel "
-                    + "or a page cut short."
+                    "This populates `more_posts_in_channel` and `posts_cut_to_limit`. Otherwise, "
+                    + "both fields are null. When a short answer can mean either the whole "
+                    + "channel or a page cut short, set it."
                 )
             ),
         ] = False,

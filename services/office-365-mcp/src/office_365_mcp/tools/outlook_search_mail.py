@@ -53,16 +53,16 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 MAX_RESULTS = 50
 
 _DESCRIPTION = """\
-Search the signed-in user's own mailbox by keyword, sender, recipient, subject, or attachment \
+Searches the signed-in user's own mailbox by keyword, sender, recipient, subject, or attachment \
 file name for "find the mail where…" questions and anything about a person. outlook_list_mail \
-is the sibling for a folder's newest mail in receipt order, including drafts; use it for a plain \
-date window or when order matters.
+is the sibling for a folder's newest mail in receipt order, including drafts. For a plain date \
+window, or when order matters, use it instead.
 
 Notes:
-- Needs at least one of `query`, `sender`, `recipient`, `to`, `subject`, or `attachment_name`; \
-`received_after`/`received_before` narrow that criterion but never substitute for one, and all \
-given criteria must match (AND).
-- `received_before` must fall on or after `received_after`; a reversed pair returns nothing.
+- Needs at least one of `query`, `sender`, `recipient`, `to`, `subject`, or `attachment_name`. \
+`received_after` and `received_before` narrow that criterion but never substitute for one, and \
+all given criteria must match (AND).
+- `received_before` must fall on or after `received_after`. A reversed pair returns nothing.
 - Searches only the signed-in user's own mailbox, never a shared or delegated one.
 """
 
@@ -75,14 +75,14 @@ class MailSearchResults(BaseModel):
             "The matches, in the index's own order — not receipt or send order, and not "
             + "necessarily newest first. Empty means the index found nothing, not that the "
             + "mailbox holds nothing: a search reaches indexed content only. Pass a hit's `uri` "
-            + "to outlook_read_mail for the full message; the `uri` keeps working after the "
+            + "to outlook_read_mail for the full message. The `uri` continues to work after the "
             + "message is later moved, renamed, or refiled."
         )
     )
     more_may_exist: bool = Field(
         description=(
-            "True when the answer fills `limit`, meaning more matches likely exist; there is no "
-            + "match count to report. Raise `limit` to see more — calling again with the same "
+            "True means the answer fills `limit`, so more matches can exist. There is no match "
+            + "count to report. Raise `limit` to see more. Calling again with the same "
             + "arguments returns the same page, not the next one."
         )
     )
@@ -261,11 +261,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Words to find in the subject, the body, or an attachment's text; every word "
-                    + "must appear, in any order. Quote a run to require adjacency: "
-                    + '`"purchase order"` matches only side by side, `purchase order` matches '
-                    + "both words anywhere. Search operators in this text are read literally, "
-                    + "never executed as commands."
+                    "Words to find in the subject, the body, or an attachment's text. Every "
+                    + "word must appear, in any order. Quote a run to require adjacency. "
+                    + '`"purchase order"` matches only side by side. `purchase order` matches '
+                    + "both words anywhere. This tool reads search operators in this text "
+                    + "literally, and never executes them as commands."
                 ),
             ),
         ] = None,
@@ -274,10 +274,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only mail from this person, by address, alias, or display name; Exchange "
-                    + "expands a name to the address it knows, so a first name usually works. Put "
-                    + "a name here rather than in `query`, which also matches mail that merely "
-                    + "mentions them."
+                    "Only mail from this person, by address, alias, or display name. Exchange "
+                    + "expands a name to the address it knows, so a first name usually works. "
+                    + "Put a name here rather than in `query`, which also matches mail that "
+                    + "merely mentions them."
                 ),
             ),
         ] = None,
@@ -288,7 +288,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Only mail this person appears on anywhere — as sender, or as a To, Cc, or "
                     + "Bcc recipient. On the user's own mailbox that is nearly every message, so "
-                    + 'it is the wrong argument for "addressed to me"; use `to` for that and '
+                    + 'it is the wrong argument for "addressed to me". Use `to` for that and '
                     + "`sender` for mail from them."
                 ),
             ),
@@ -299,7 +299,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "Only mail addressed directly to this person on the To line, not Cc, Bcc, or "
-                    + 'mail they merely sent. This is the argument for "addressed to me" — pass '
+                    + 'mail they merely sent. This is the argument for "addressed to me". Pass '
                     + "the signed-in user's own address from get_me. Takes an address, alias, or "
                     + "display name, as `sender` does."
                 ),
@@ -311,7 +311,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "Only mail whose subject carries these words. Narrower than `query`, which "
-                    + "also reads the body; prefer this when the user quoted a subject."
+                    + "also reads the body. If the user quoted a subject, prefer this field."
                 ),
             ),
         ] = None,
@@ -320,12 +320,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only mail carrying an attachment whose file name matches, for example "
-                    + "`budget_2026.xlsx`; no other argument reaches a file name. Matching is by "
-                    + "word, not substring: `budget.xlsx` also finds `2017 budget.xlsx`, but a "
-                    + "fragment such as `budg` matches nothing rather than a prefix. This is not "
-                    + "a has-any-attachment switch — read the `has_attachments` output field for "
-                    + "that instead."
+                    "Only mail with an attachment whose file name matches, for example "
+                    + "`budget_2026.xlsx`. No other argument reaches a file name. The match "
+                    + "works by word, not by substring. `budget.xlsx` also finds "
+                    + "`2017 budget.xlsx`. But a fragment such as `budg` matches nothing, rather "
+                    + "than a prefix. This is not a has-any-attachment switch. Read the "
+                    + "`has_attachments` output field for that instead."
                 ),
             ),
         ] = None,
@@ -334,7 +334,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Only mail received on or after this point. A date (`2026-03-04`) covers "
-                    + "that whole UTC day from its first instant; a moment "
+                    + "that whole UTC day from its first instant. A moment "
                     + "(`2026-03-04T09:00:00Z`) opens at the exact second named, and one with no "
                     + "time zone is read as UTC."
                 )
@@ -357,7 +357,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_RESULTS,
                 description=(
                     f"How many messages to return, at most {MAX_RESULTS}. One Graph request, so "
-                    + "this is the whole window rather than a first page — raise it instead of "
+                    + "this is the whole window rather than a first page. Raise it instead of "
                     + "calling again with the same criteria."
                 ),
             ),

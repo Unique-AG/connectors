@@ -30,17 +30,17 @@ MAX_TEAMS = 200
 
 _DESCRIPTION = """\
 Lists the teams the signed-in user belongs to, in no particular order, as the starting point for \
-any question about a team or a channel. It does not cover chats, group chats, or meeting chats — \
-the other surface entirely — use teams_list_chats for those.\
+any question about a team or a channel. It does not cover chats, group chats, or meeting chats, \
+which are an entirely separate surface. Use teams_list_chats for those instead.\
 """
 
 
 class TeamSummary(BaseModel):
     team_id: str = Field(
         description=(
-            "The team's Graph id. Pass it to teams_list_channels, and match it against the "
-            + "`team_id` teams_search_messages reports on channel messages. Opaque — copy it "
-            + "verbatim, never build one from a name."
+            "The team's Graph id. Pass it to teams_list_channels. Match it against the "
+            + "`team_id` that teams_search_messages reports on channel messages. This id is "
+            + "opaque. Copy it verbatim. Never build one from a name."
         )
     )
     display_name: str | None = Field(
@@ -71,7 +71,7 @@ class TeamList(BaseModel):
     teams: list[TeamSummary] = Field(
         description=(
             "The user's teams, in no particular order — Microsoft Graph applies none to this "
-            + "collection. A full window can mean more teams exist; a shorter one is the "
+            + "collection. A full window can mean more teams exist. A shorter one is the "
             + "complete list."
         )
     )
@@ -105,8 +105,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_TEAMS,
                 description=(
                     f"Teams to return, 1–{MAX_TEAMS}. The result is already the whole answer for "
-                    + "this call: repeating it with the same `limit` returns the same teams, not "
-                    + "the next page — raise `limit` to see more."
+                    + "this call. Repeating it with the same `limit` returns the same teams, not "
+                    + "the next page. Raise `limit` to see more."
                 ),
             ),
         ] = 50,

@@ -503,7 +503,7 @@ class TestHowItDeclaresItself:
         parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "no attachment" in lowered
+        assert "or an attachment argument" in lowered
 
         # This fact is about interpreting `mode: "forward"`, so it lives on that argument now
         # rather than in the tool-level description.
@@ -516,8 +516,7 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "no reply-all" in lowered
-        assert "no cc, no bcc" in lowered
+        assert "neither mode offers reply-all, cc, bcc" in lowered
 
     def test_the_known_issue_the_second_write_exists_for_is_cited(self) -> None:
         """The fill looks removable until you know Microsoft drops the comment, so the citation is

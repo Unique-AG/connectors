@@ -82,15 +82,15 @@ _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
 Lists the newest messages of one mail folder in the signed-in user's mailbox, newest received \
-first, for reading a folder's recent, unread, or date-windowed mail in filing order. \
+first. This suits a folder's recent, unread, or date-windowed mail, in filing order. \
 outlook_search_mail is the sibling for relevance-ranked search across mailbox content — not \
 receipt order — and its index does not reach unsent drafts.
 
 Notes:
 - Pass exactly one of `folder` or `folder_ref`, never both.
 - Lists only mail filed directly in the folder, not its subfolders.
-- To bound a past window, set both `received_after` and `received_before`: rows come back \
-newest first, so `received_after` alone spends `limit` on newer mail before ever reaching an \
+- To bound a past window, set both `received_after` and `received_before`. Rows come back \
+newest first. So `received_after` alone spends `limit` on newer mail before it reaches an \
 older window.
 """
 
@@ -150,19 +150,19 @@ class FolderMessages(BaseModel):
     messages: list[MailSummary] = Field(
         description=(
             "The rows for this call, one per message. Pass a row's `uri` to outlook_read_mail "
-            + "for the full message; the `uri` keeps working after the message is later moved, "
-            + "renamed, or refiled."
+            + "for the full message. The `uri` continues to work after the message is later "
+            + "moved, renamed, or refiled."
         )
     )
     capped: bool = Field(
         description=(
-            "True when more of the folder, or the window `received_after`/`received_before` "
-            + "opened, remains beyond what this call returned — either `limit` was reached, or "
-            + "`unread_only`/`from_address` discarded enough non-matching mail to stop early. To "
-            + "reach further into a capped window, narrow `received_before`; raising "
-            + "`received_after` only drops rows this call never reached. False means every match "
-            + "already came back. Compare against `total_items` and `unread_items` to see how "
-            + "much of the folder this call reached."
+            "True means more of the folder remains beyond what this call returned. It can also "
+            + "mean more of the window that `received_after` and `received_before` opened "
+            + "remains. Either `limit` was reached, or `unread_only` or `from_address` discarded "
+            + "enough non-matching mail to stop the search early. To reach further into a capped "
+            + "window, narrow `received_before`. A higher `received_after` only drops rows this "
+            + "call never reached. False means every match already came back. Compare against "
+            + "`total_items` and `unread_items` to see how much of the folder this call reached."
         )
     )
 
@@ -407,10 +407,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool,
             Field(
                 description=(
-                    "Keep only messages Graph reports as unread; every returned row is checked, "
-                    + "not merely requested. Without a date bound, this can reach `capped` "
-                    + "before finding much unread mail in a busy folder — pair with a date bound "
-                    + "to avoid that."
+                    "Keeps only messages Graph reports as unread. This tool makes sure that "
+                    + "every returned row is unread. It does not merely ask Graph for unread "
+                    + "mail. Without a date bound, this can reach `capped` before it finds much "
+                    + "unread mail in a busy folder. Pair `unread_only` with a date bound to "
+                    + "avoid that."
                 )
             ),
         ] = False,
@@ -419,7 +420,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Only messages received at or after this point. A date (`2026-03-04`) opens "
-                    + "at the first instant of that whole UTC day; a moment "
+                    + "at the first instant of that whole UTC day. A moment "
                     + "(`2026-03-04T09:00:00Z`) opens at the exact second named, and a moment "
                     + "with no time zone is read as UTC."
                 )
@@ -431,7 +432,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Only messages received at or before this point, inclusive, in the same two "
                     + "shapes as `received_after`. A date closes at the end of that whole UTC "
-                    + "day, so the same date in both bounds spans exactly that one day; a moment "
+                    + "day, so the same date in both bounds spans exactly that one day. A moment "
                     + "closes at the second named."
                 )
             ),
@@ -443,9 +444,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Only messages from this sender, as one SMTP address — never a display name "
                     + "and never a list. A display name (`Bob Vance`) matches nothing and comes "
-                    + "back as an empty page, not an error; resolve one with "
+                    + "back as an empty page, not an error. Resolve one with "
                     + "outlook_find_recipient first. Without a date bound, a rare sender in a "
-                    + "busy folder can reach `capped` before enough matches are found. For a "
+                    + "busy folder can reach `capped` before it finds enough matches. For a "
                     + "sender's display name, or mail that only mentions them, use "
                     + "outlook_search_mail."
                 ),
@@ -458,7 +459,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_RESULTS,
                 description=(
                     f"How many messages to return, at most {MAX_RESULTS}. The result is already "
-                    + "the whole answer for this call, not a first page: calling again with the "
+                    + "the whole answer for this call, not a first page. Calling again with the "
                     + "same arguments returns the same rows, not more. Raise `limit`, or narrow "
                     + "the date window, to get more."
                 ),

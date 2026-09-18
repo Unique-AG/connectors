@@ -56,14 +56,14 @@ type _AnchorQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryP
 type _ThreadQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Read every message of one conversation held in the signed-in user's mailbox, oldest first, \
-starting from any one message of it — for "what happened in this thread" or "did I ever reply". \
-outlook_read_mail is the sibling for one message alone; use this tool when the whole \
-conversation matters.
+Reads every message of one conversation held in the signed-in user's mailbox, oldest first. It \
+starts from any one message of the conversation. This answers "what happened in this thread" \
+or "did I ever reply". outlook_read_mail is the sibling for one message alone. When the whole \
+conversation matters, use this tool.
 
 Notes:
-- Searches every folder holding a copy of the conversation, including Sent Items, not just the \
-anchor message's folder.
+- Searches every folder that holds a copy of the conversation, including Sent Items, not just \
+the anchor message's folder.
 """
 
 _BAD_HANDLE = (
@@ -101,10 +101,10 @@ class MailThread(BaseModel):
     )
     complete: bool = Field(
         description=(
-            "False when more of the conversation remained in this mailbox when the fixed cap "
-            + "was reached, so the oldest part of the thread can be missing. True means every "
-            + "message this mailbox holds for the conversation is here — not necessarily every "
-            + "message of the conversation."
+            "False when more of the conversation remained in this mailbox after the tool "
+            + "reached the fixed cap. So the oldest part of the thread can be missing. True "
+            + "means every message this mailbox holds for the conversation is here — not "
+            + "necessarily every message of the conversation."
         )
     )
     searched_scope: str = Field(
@@ -221,7 +221,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The `uri` of any one message of the thread, exactly as outlook_search_mail "
-                    + "or outlook_list_mail reported it; a subject line, an address, or an "
+                    + "or outlook_list_mail reported it. A subject line, an address, or an "
                     + "Outlook web link is never one. Any message of the conversation reaches "
                     + "the same thread, so the newest hit is as good as the oldest."
                 ),

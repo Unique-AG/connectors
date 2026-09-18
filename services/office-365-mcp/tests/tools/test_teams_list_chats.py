@@ -327,8 +327,8 @@ class TestWhatTheCallerIsTold:
         description = chats.ChatSummary.model_fields["meeting_uri"].description
 
         assert description is not None
-        assert "Null when the chat carries no join URL" in description
-        assert "the only route from conversation to meeting" in description, (
+        assert "is null when the chat carries no join URL" in description
+        assert "the only route from a conversation to its meeting" in description, (
             "the populated case says what it is a route to, and its being the only one is what "
             + "makes a null a dead end rather than an invitation to try something else"
         )
@@ -339,7 +339,7 @@ class TestWhatTheCallerIsTold:
         description = chats.ChatSummary.model_fields["chat_id"].description
 
         assert description is not None
-        assert "cannot be assembled into one" in description
+        assert "no handle can be built from it" in description
         assert "message_id" not in description, (
             "naming what a handle is missing is a recipe for assembling one, and this tool has no "
             + "message id to hand a model that follows it"

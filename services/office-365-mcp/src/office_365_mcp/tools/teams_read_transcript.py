@@ -48,14 +48,14 @@ MAX_TURNS = 500
 
 _DESCRIPTION = """\
 Returns one Teams meeting transcript's spoken turns, timestamped and speaker-attributed, from \
-the `uri` teams_list_meeting_transcripts reports, for what was actually said or decided. \
-teams_read_message is the other reader and takes a different handle; `meeting_uri` is not \
-valid for either.
+the `uri` teams_list_meeting_transcripts reports, for what was said or decided. \
+teams_read_message is the other reader, and it takes a different handle. `meeting_uri` is not \
+valid for either tool.
 
 Notes:
 - If `speaker_attribution` comes back false, every `speaker` is null and a `speaker` filter \
 matches nothing.
-- Pass `from_seconds` before `to_seconds`; a window that runs backwards matches nothing.
+- Pass `from_seconds` before `to_seconds`. A window that runs backwards matches nothing.
 """
 
 _NOT_A_TRANSCRIPT_HANDLE = (
@@ -96,9 +96,10 @@ class TranscriptTurn(BaseModel):
     )
     start_seconds: float = Field(
         description=(
-            "Turn start in seconds from transcription start — not wall-clock, and not an offset "
-            "from meeting start. Can be negative. Add to the `started_at` "
-            "teams_list_meeting_transcripts reported for this transcript for an absolute time."
+            "Turn start in seconds from transcription start, not wall-clock time and not an "
+            "offset from meeting start. This value can be negative. Add it to the `started_at` "
+            "value that teams_list_meeting_transcripts reported for this transcript, to get an "
+            "absolute time."
         )
     )
     end_seconds: float = Field(description="Turn end, same scale as `start_seconds`.")
@@ -338,8 +339,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_TURNS,
                 description=(
-                    f"Turns to return, at most {MAX_TURNS}. The whole transcript is fetched "
-                    "regardless, so a wide `limit` is cheaper than paging."
+                    f"Turns to return, at most {MAX_TURNS}. This tool fetches the whole "
+                    "transcript regardless, so a wide `limit` costs less than paging."
                 ),
             ),
         ] = 200,
@@ -347,8 +348,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             float | None,
             Field(
                 description=(
-                    "Only turns overlapping at or after this moment, in seconds from "
-                    "transcription start. Inclusive; negative is legal."
+                    "Only turns that overlap at or after this moment, in seconds from "
+                    "transcription start. This bound is inclusive. A negative value is legal."
                 )
             ),
         ] = None,
@@ -356,8 +357,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             float | None,
             Field(
                 description=(
-                    "Only turns overlapping at or before this moment, in the same units as "
-                    "`from_seconds`. Inclusive; pair with `from_seconds` to read one stretch."
+                    "Only turns that overlap at or before this moment, in the same units as "
+                    "`from_seconds`. This bound is inclusive. Pair it with `from_seconds` to "
+                    "read one stretch."
                 )
             ),
         ] = None,
@@ -367,7 +369,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "Only turns whose speaker name contains this substring, case-insensitive. "
-                    "Omit entirely to read every speaker; a blank value is invalid."
+                    "Omit this parameter to read every speaker. A blank value is invalid."
                 ),
             ),
         ] = None,

@@ -380,9 +380,7 @@ class TestTheSchemaItPublishes:
         tool = await mcp.get_tool(lister.TOOL_NAME)
 
         assert tool is not None, "register left the tool off the server"
-        assert "outlook_create_event_on_behalf where this deployment runs it" in (
-            tool.description or ""
-        )
+        assert "If this deployment runs outlook_create_event_on_behalf" in (tool.description or "")
 
     async def test_every_field_of_the_answer_says_what_it_is(
         self, transport: httpx.AsyncClient

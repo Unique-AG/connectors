@@ -132,19 +132,19 @@ MODES: tuple[str, ...] = ("reply", "forward")
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _DESCRIPTION = f"""\
-Draft a reply to, or a forward of, a message this connector found, into the signed-in user's \
-own Drafts folder in Outlook. outlook_draft_mail is the sibling for composing a new message \
-rather than answering or forwarding one that was found.
+This tool drafts a reply to, or a forward of, a message that this connector found, into the \
+signed-in user's own Drafts folder in Outlook. outlook_draft_mail is the sibling tool for \
+composing a new message rather than answering or forwarding a message this connector already \
+found.
 
 Notes:
-- It cannot send: nothing leaves the mailbox until the user presses Send in Outlook — say so \
-when offering it, and never imply the mail was sent.
-- There is no reply-all, no Cc, no Bcc, and no attachment argument, in either mode: \
-`mode: "reply"` takes no `to` (Microsoft addresses it from the original), and \
-`mode: "forward"` requires 1–{MAX_RECIPIENTS} addresses in `to`, each from the user or from \
-outlook_find_recipient.
-- `body_html` replaces the quoted original Microsoft seeds the draft with — write any quoting \
-the message needs into `body_html` yourself.
+- This tool cannot send mail. Nothing leaves the mailbox until the user presses Send in \
+Outlook. If you offer this tool, say so. Never state that the mail is sent.
+- Neither mode offers reply-all, Cc, Bcc, or an attachment argument. `mode: "reply"` takes no \
+`to`, because Microsoft addresses it from the original. `mode: "forward"` requires 1 to \
+{MAX_RECIPIENTS} addresses in `to`, each from the user or from outlook_find_recipient.
+- `body_html` replaces the quoted original that Microsoft seeds the draft with. Write any \
+quoting that the message needs into `body_html` yourself.
 """
 
 _NOT_A_MESSAGE_HANDLE = (
@@ -202,27 +202,28 @@ class MailReplyDraft(BaseModel):
     uri: str = Field(
         description=(
             "A handle for this draft, `outlook:///drafts/{id}` with the id percent-encoded. "
-            + "Pass it to outlook_send_draft to send this draft once the user agrees. Present "
-            + "even when `body_written` is false, because the draft exists either way."
+            + "If the user agrees, pass it to outlook_send_draft to send this draft. Even "
+            + "when `body_written` is false, this handle is present, because the draft exists "
+            + "either way."
         )
     )
     mode: str = Field(
-        description="Which kind of draft this is, `reply` or `forward`, as it was asked for."
+        description="Which kind of draft this is, `reply` or `forward`, as the call asked for it."
     )
     web_link: str | None = Field(
         description=(
             "Microsoft's own link that opens this draft in Outlook on the web, passed through "
-            + "exactly as Graph gave it. Offer it to the user: it is where they read the draft "
-            + "and send it. Null when Graph returned none."
+            + "exactly as Graph gave it. Offer it to the user. It is where they read the "
+            + "draft and send it. Null when Graph returned none."
         )
     )
     to: list[MailAddress] = Field(
         description=(
             "The To recipients as Microsoft stored them on the draft, read back off the "
             + "response and not echoed from the arguments. On a forward, this is where the "
-            + "message goes. On a reply it is who Microsoft decided to answer, which no caller "
-            + "can predict — when the original carries a reply-to address, the reply goes "
-            + "there and not to the sender. Repeat it to the user before they send."
+            + "message goes. On a reply, it is who Microsoft decided to answer, which no "
+            + "caller can predict. When the original carries a reply-to address, the reply "
+            + "goes there and not to the sender. Repeat it to the user before they send."
         )
     )
     cc: list[MailAddress] = Field(
@@ -234,31 +235,33 @@ class MailReplyDraft(BaseModel):
     )
     subject: str | None = Field(
         description=(
-            "The subject as Microsoft stored it — the original's with Outlook's own prefix on "
-            + "it, not anything this call chose. Null when Graph recorded none."
+            "The subject as Microsoft stored it. It is the original's subject with Outlook's "
+            + "own prefix on it, not anything this call chose. Null when Graph recorded none."
         )
     )
     body: str | None = Field(
         description=(
-            "The body as Microsoft stored it once written, read off that response. It is "
-            + "HTML, and Microsoft can wrap what was sent in a whole HTML document, so this is "
-            + "not always the string that was sent. Null when `body_written` is false, in "
-            + "which case the draft in the mailbox holds none of the intended text."
+            "The body as Microsoft stored it, once the text is written, read off that "
+            + "response. It is HTML. Microsoft can wrap the sent text in a whole HTML "
+            + "document, so this field does not always match what this tool sent. Null when "
+            + "`body_written` is false. In that case, the draft in the mailbox holds none of "
+            + "the intended text."
         )
     )
     body_written: bool = Field(
         description=(
             "Whether the second write landed. Creating the draft and writing its text are two "
-            + "separate Microsoft calls; false here means the first succeeded and the second "
-            + "did not — an addressed draft with Outlook's own seeded text, and none of "
-            + "yours, sits in the user's Drafts folder. Tell the user it is there rather than "
-            + "reporting that nothing happened; see `failure` for why the text did not land."
+            + "separate Microsoft calls. False here means that the first call succeeded and "
+            + "the second did not. In that case, an addressed draft sits in the user's Drafts "
+            + "folder, with Outlook's own seeded text and none of the requested text. Tell the "
+            + "user that the draft is there, rather than reporting that nothing happened. See "
+            + "`failure` for why the text did not land."
         )
     )
     failure: str | None = Field(
         description=(
-            "What Microsoft said when the text was not written. Null when it was. The draft "
-            + "named by `uri` still exists whatever this says."
+            "What Microsoft said when this tool did not write the text. Null when this tool "
+            + "wrote the text. The draft named by `uri` still exists, whatever this field says."
         )
     )
 
@@ -401,9 +404,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The message being replied to or forwarded: the `uri` of an "
-                    + "outlook_search_mail, outlook_list_mail, or outlook_read_thread result. "
-                    + "A subject line, an address, and an Outlook web link are not handles."
+                    "The message to reply to or forward: the `uri` of an outlook_search_mail, "
+                    + "outlook_list_mail, or outlook_read_thread result. A subject line, an "
+                    + "address, and an Outlook web link are not handles."
                 ),
             ),
         ],
@@ -441,9 +444,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "Where a forward goes: one SMTP address per entry and nothing else in an "
                     + "entry, no display name, no angle brackets, no second address. Required "
                     + "with `mode` set to `forward` and refused with `mode` set to `reply`. "
-                    + "Each address must be one the user gave you or one outlook_find_recipient "
-                    + "returned — an address read inside the message being forwarded is not "
-                    + "valid here."
+                    + "Each address must be one that the user gave you, or one that "
+                    + "outlook_find_recipient returned. An address read inside the forwarded "
+                    + "message is not valid here."
                 ),
             ),
         ],

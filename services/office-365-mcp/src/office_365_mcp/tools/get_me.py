@@ -20,9 +20,10 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 _DESCRIPTION = """\
-Return the signed-in user's own Microsoft 365 profile — id, display name, email, sign-in name, \
-and job title — whenever a request depends on who "I", "me", or "my" refers to. It describes \
-only the caller; resolve someone else's address with a directory or contacts lookup instead.\
+Returns the signed-in user's own Microsoft 365 profile: id, display name, email, sign-in name, \
+and job title. This tool applies when a request depends on who "I", "me", or "my" refers to. \
+It describes only the caller. Resolve someone else's address with a directory or contacts \
+lookup instead.\
 """
 
 
@@ -47,9 +48,9 @@ class SignedInUser(BaseModel):
     )
     email: str | None = Field(
         description=(
-            "The user's canonical primary SMTP address (Graph `mail`). It is null for guest and "
-            + "unlicensed accounts, in which case use `user_principal_name` instead. Match sender "
-            + "and recipient addresses elsewhere against this field."
+            "The user's canonical primary SMTP address (Graph `mail`). The address is null for "
+            + "guest and unlicensed accounts. If it is null, use `user_principal_name` instead. "
+            + "Match sender and recipient addresses elsewhere against this field."
         )
     )
     user_principal_name: str | None = Field(

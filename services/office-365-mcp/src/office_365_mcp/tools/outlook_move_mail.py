@@ -124,15 +124,15 @@ _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 
 _DESCRIPTION = f"""\
-Move up to {MAX_MESSAGES} messages in the signed-in user's mailbox into another folder — also \
-how this connector deletes mail, since there is no delete tool.
+This tool moves up to {MAX_MESSAGES} messages into another folder in the mailbox of the \
+signed-in user, the only way this connector erases mail.
 
 Notes:
 - Pass exactly one of `destination` or `folder_ref`, never both.
-- Moving to `deleteditems` is what "delete this mail" means here; the message stays \
-recoverable in Deleted Items, since this server has no permanent-delete operation.
+- A move to `deleteditems` is what "delete this mail" means here. The message stays \
+recoverable in Deleted Items, because this server has no permanent-erase operation.
 - `message_refs` takes the `uri` of an outlook_search_mail, outlook_list_mail, or \
-outlook_read_thread result; a subject line, an email address, an Outlook web link, and a bare \
+outlook_read_thread result. A subject line, an email address, an Outlook web link, and a bare \
 message id are not handles.
 """
 
@@ -192,32 +192,33 @@ class MovedMessage(BaseModel):
 
     uri: str = Field(
         description=(
-            "The handle this call was given for the message. Once `moved` is true, it "
-            + "addresses nothing — keep it only to say which message this row is about, and "
-            + "never pass it to another tool."
+            "The handle that the request gave for this message. Once `moved` is true, it "
+            + "addresses nothing. Keep it only to identify which message this row is about. "
+            + "Never pass it to another tool."
         )
     )
     new_uri: str | None = Field(
         description=(
             "The message's handle in its new folder, read from Microsoft's response rather "
             + "than carried over from the request. Null when the move failed, in which case "
-            + "`uri` still addresses the message. Once set, this is the only handle for the "
-            + "message from now on: `uri`, and every earlier handle for it from a search, "
-            + "listing, or thread read, is dead."
+            + "`uri` still addresses the message. Once set, this handle is the only one for "
+            + "the message from now on. `uri` and every earlier handle for it, from a search, "
+            + "a listing, or a thread read, are now dead."
         )
     )
     moved: bool = Field(
         description=(
-            "Whether Microsoft moved this one message. Each message is moved by its own "
-            + "request, so this is per message, not per call — false here beside true on "
-            + "another row means part of the batch moved and the rest did not."
+            "Whether Microsoft moved this one message. Microsoft moves each message by its "
+            + "own request, so this result is per message, not per call. False here beside "
+            + "true on another row means that part of the batch moved and the rest did not."
         )
     )
     error: str | None = Field(
         description=(
-            "What Microsoft said about this message when it did not move. Null when it did. "
-            + "A not-found here is most often a handle that was already stale — find the "
-            + "message again and move the handle that search returns instead of retrying this one."
+            "What Microsoft said about this message when it did not move. Null when the "
+            + "message moved. A not-found error here is most often a handle that was already "
+            + "stale. Find the message again. Then move the handle that the search returns, "
+            + "rather than retrying this one."
         )
     )
 
@@ -227,27 +228,28 @@ class MailMoved(BaseModel):
 
     destination: str = Field(
         description=(
-            "The folder the messages were moved into: the well-known name that was asked for, "
-            + "or the folder's name as Outlook shows it when `folder_ref` was used."
+            "The folder that the messages moved into. This is the well-known name that the "
+            + "call asked for, or the folder's name as Outlook shows it when the call used "
+            + "`folder_ref`."
         )
     )
     messages: list[MovedMessage] = Field(
         description=(
-            "One row per handle in `message_refs`, in that order. Each says whether that "
-            + "message moved and, when it did, the new handle that replaces every older one "
-            + "for it."
+            "One row exists per handle in `message_refs`, in that order. Each says whether "
+            + "that message moved and, when it did, the new handle that replaces every older "
+            + "one for it."
         )
     )
     moved_count: int = Field(
         description=(
-            "How many of `messages` moved. Nothing rolls back if a later message fails, so "
-            + "this is what actually happened to the mailbox, not an all-or-nothing outcome."
+            "How many of `messages` moved. If a later message fails, nothing rolls back, so "
+            + "this count is what happened to the mailbox, not an all-or-nothing outcome."
         )
     )
     failed_count: int = Field(
         description=(
-            "How many did not move. Read `messages` for which ones — these counts alone "
-            + "don't say."
+            "How many messages did not move. Read `messages` for which ones. These counts "
+            + "alone do not say."
         )
     )
 
@@ -454,9 +456,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 max_length=MAX_MESSAGES,
                 description=(
                     "The messages to move: `uri` values from an outlook_search_mail, "
-                    + "outlook_list_mail, or outlook_read_thread result. One to "
-                    + f"{MAX_MESSAGES} per call. Every handle is checked before any message "
-                    + "moves, so a batch with a bad value in it moves nothing."
+                    + "outlook_list_mail, or outlook_read_thread result. This tool accepts one "
+                    + f"to {MAX_MESSAGES} per call. This tool makes sure that every handle is "
+                    + "valid before it moves any message, so a batch with a bad value moves "
+                    + "nothing."
                 ),
             ),
         ],
@@ -467,8 +470,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "Which well-known folder to move into, by Microsoft's own "
                     + "locale-independent name: `inbox`, `sentitems`, `drafts`, `archive`, "
                     + "`deleteditems`, `junkemail`, or `clutter`. Every other folder, including "
-                    + "every folder the user made, is reached with `folder_ref` instead. A "
-                    + "folder's own name is not accepted here. Alternative to `folder_ref`."
+                    + "every folder the user made, needs `folder_ref` instead. A folder's own "
+                    + "name is not accepted here. Alternative to `folder_ref`."
                 )
             ),
         ] = None,
@@ -477,12 +480,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The folder to move into, as the opaque handle an outlook_browse_folders "
-                    + "result reported for it in `uri`: `outlook:///folders/{id}`. A folder's "
-                    + "display name is not valid here. The folder is read before anything "
-                    + "moves, and a hidden folder or a search folder is refused: mail filed "
-                    + "into either disappears from the user's view, though it is not deleted. "
-                    + "Alternative to `destination`."
+                    "The folder to move into, as the opaque handle that an "
+                    + "outlook_browse_folders result reported for it in `uri`: "
+                    + "`outlook:///folders/{id}`. A folder's display name is not valid here. "
+                    + "This tool reads the folder before anything moves. It refuses a hidden "
+                    + "folder or a search folder. Mail filed into either disappears from the "
+                    + "user's view, though it is not erased. Alternative to `destination`."
                 ),
             ),
         ] = None,

@@ -1733,12 +1733,12 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "as that person" in lowered
+        assert "as another person" in lowered
         assert "nothing here can recall it" in lowered
 
         organizer = (CreatedEventOnBehalf.model_fields["organizer"].description or "").casefold()
         assert "organizer" in organizer
-        assert "no property of the event names them" in organizer
+        assert "no property of the event names the delegate" in organizer
 
     async def test_the_description_says_a_person_is_asked_before_anything_is_created(
         self, transport: httpx.AsyncClient
@@ -1746,9 +1746,9 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "confirms with the user before creating anything" in lowered
-        assert "every single time" in lowered
-        assert "creates nothing unless they agree" in lowered
+        assert "asks the user to agree before it creates anything" in lowered
+        assert "every time" in lowered
+        assert "creates nothing unless the user agrees" in lowered
 
     async def test_the_description_sends_the_users_own_calendar_to_the_other_create(
         self, transport: httpx.AsyncClient

@@ -246,9 +246,9 @@ class TestTheOrganiserOnlyConstraint:
         assert access["enum"] == ["you_are_the_organizer", "organizer_only", "unknown"]
         assert access["type"] == "string"
         assert "$ref" not in access
-        assert "the recording exists, it is not missing" in str(access["description"]), (
-            "the enum names the three; only the prose says an unreachable one still exists"
-        )
+        assert "This is not a missing recording. The recording exists." in str(
+            access["description"]
+        ), "the enum names the three; only the prose says an unreachable one still exists"
 
     async def test_the_caller_is_not_looked_up_when_there_is_nothing_to_say_about(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -381,7 +381,7 @@ class TestTheKindsOfAbsence:
         ]
         assert status["type"] == "string"
         assert "$ref" not in status
-        assert "retrying will not help" in str(status["description"]), (
+        assert "A retry does not help." in str(status["description"]), (
             "the enum says what the values are; the prose still has to say what to do with them"
         )
 
@@ -520,13 +520,13 @@ class TestScopingToOneOccurrence:
             "and even the largest limit is answered in full, so nothing here reads as an end"
         )
         described = str(lister.MeetingRecordings.model_fields["recordings"].description)
-        assert "Fewer than `limit` means none remain." in described
+        assert "Fewer rows than `limit` means none remain." in described
 
     async def test_the_order_is_promised_over_what_was_read_and_not_over_the_meeting(self) -> None:
         described = str(lister.MeetingRecordings.model_fields["recordings"].description)
 
         assert str(meetings.MAX_ARTIFACT_SCAN) in described
-        assert "the latest of what was read" in described
+        assert "the latest of what this tool read" in described
         assert "The order is over the whole collection" not in described
 
     async def test_a_limit_above_the_ceiling_is_a_programming_error(

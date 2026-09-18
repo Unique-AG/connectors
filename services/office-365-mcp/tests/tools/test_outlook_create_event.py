@@ -1796,8 +1796,11 @@ class TestTheSchemaItPublishes:
         described = cast(
             "str", _object(_object(parameters["properties"])["online_meeting"])["description"]
         )
-        assert "refuses, naming them, before anybody is asked to confirm" in described
-        assert "when Teams is not among them" in described
+        assert (
+            "this tool refuses and names the allowed providers, before it asks anybody to agree"
+            in described
+        )
+        assert "If Teams is not among them" in described
 
     async def test_neither_switch_is_on_unless_it_is_asked_for(
         self, transport: httpx.AsyncClient
@@ -1854,7 +1857,7 @@ class TestHowItDeclaresItself:
         attendees = cast(
             "str", _object(_object(parameters["properties"])["attendees"])["description"]
         )
-        assert "nobody is mailed about" in attendees.casefold()
+        assert "no one mailed about it" in attendees.casefold()
 
     async def test_the_description_names_what_it_cannot_do_and_where_to_go_instead(
         self, transport: httpx.AsyncClient
@@ -1867,14 +1870,14 @@ class TestHowItDeclaresItself:
         assert "no way to hide the list from them" in lowered
         assert "default calendar" in lowered
         assert (
-            "outlook_create_event_on_behalf is the tool for a calendar somebody else shared"
+            "outlook_create_event_on_behalf is the tool for a calendar that somebody else shared"
             in lowered
         )
 
         body_html = cast(
             "str", _object(_object(parameters["properties"])["body_html"])["description"]
         )
-        assert "attached to this event" in body_html.casefold()
+        assert "attach anything to this event" in body_html.casefold()
         assert "attached file" in body_html.casefold()
 
     async def test_the_description_says_what_to_do_when_the_call_times_out(
@@ -1902,8 +1905,8 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "confirms with the user before creating anything" in lowered
-        assert "creates nothing unless they agree" in lowered
+        assert "asks the user to agree before it creates anything" in lowered
+        assert "creates nothing unless the user agrees" in lowered
 
     async def test_the_description_says_the_stored_attendees_are_the_ones_to_read_back(
         self, transport: httpx.AsyncClient

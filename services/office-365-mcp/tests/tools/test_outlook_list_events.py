@@ -1081,9 +1081,9 @@ class TestTheSchemaItPublishes:
         described = EventTime.model_fields["iso"].description
 
         assert described is not None
-        assert "the one to compare, to sort on and to quote" in described
-        assert "in a zone west of UTC it names the day before" in described
-        assert "read `local` for the date such a row covers" in described
+        assert "the value to compare, to sort on, and to quote" in described
+        assert "In a zone west of UTC, this value names the day before" in described
+        assert "Read `local` for the date that such a row covers" in described
 
     async def test_the_zone_argument_says_which_way_an_etc_gmt_key_runs(
         self, transport: httpx.AsyncClient

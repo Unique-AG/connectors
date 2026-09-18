@@ -47,18 +47,18 @@ type ChatKind = Literal["oneOnOne", "group", "meeting"]
 type _ChatsQuery = ChatsRequestBuilder.ChatsRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Lists the signed-in user's Teams chats — one-to-one, group, and meeting — newest last-message \
-first, for seeing who is in a conversation, when it was last active, or reaching a meeting's \
-`meeting_uri` for its transcripts and recordings. It does not cover channel activity: \
-teams_browse_channel walks one channel, and teams_search_messages searches message text across \
-chats and channels.
+This tool lists the signed-in user's Teams chats: one-to-one chats, group chats, and meeting \
+chats, newest last message first. The result shows who is in a conversation, when it was last \
+active, and a meeting's `meeting_uri` for its transcripts and recordings. This tool does not \
+cover channel activity. teams_browse_channel walks one channel, and teams_search_messages \
+searches message text across chats and channels.
 
 Notes:
-- To find a meeting's `meeting_uri`, set `chat_type="meeting"` and, if known, `topic_contains`; \
-there is no direct filter on `meeting_uri` itself.
-- `chat_type` and `topic_contains` filter chats already fetched, so the search runs until it \
-collects `limit` matches rather than stopping after `limit` rows; check `capped` before concluding \
-no such chat exists.\
+- To find a meeting's `meeting_uri`, set `chat_type="meeting"` and, if you know it, \
+`topic_contains`. No filter exists for `meeting_uri` itself.
+- `chat_type` and `topic_contains` filter chats already fetched, so the search continues until \
+it collects `limit` matches, not `limit` rows. Before you conclude that no such chat exists, \
+make sure that `capped` is false.\
 """
 
 
@@ -87,9 +87,9 @@ class ChatMember(BaseModel):
 class ChatSummary(BaseModel):
     chat_id: str = Field(
         description=(
-            "Graph's id for this chat, for example `19:...@thread.v2`. Not a `teams:///` handle "
-            + "and cannot be assembled into one — teams_read_message needs a `uri` a search or "
-            + "browse result reported."
+            "Graph's id for this chat, for example `19:...@thread.v2`. It is not a `teams:///` "
+            + "handle, and no handle can be built from it. teams_read_message needs the `uri` "
+            + "that a search or browse result reports."
         )
     )
     chat_type: str = Field(
@@ -105,10 +105,11 @@ class ChatSummary(BaseModel):
     )
     meeting_uri: str | None = Field(
         description=(
-            "A handle for the Teams meeting behind this chat, the only route from conversation to "
-            + "meeting — pass it verbatim to teams_list_meeting_transcripts to check whether the "
-            + "meeting was transcribed. Null when the chat carries no join URL, in which case that "
-            + "meeting's transcripts are unreachable from this connector."
+            "A handle for the Teams meeting behind this chat. It is the only route from a "
+            + "conversation to its meeting. Pass it verbatim to teams_list_meeting_transcripts to "
+            + "make sure that the meeting was transcribed. This value is null when the chat "
+            + "carries no join URL. In that case, this connector cannot reach the meeting's "
+            + "transcripts."
         )
     )
     last_message_at: datetime | None = Field(
@@ -122,10 +123,11 @@ class ChatSummary(BaseModel):
     )
     members: list[ChatMember] | None = Field(
         description=(
-            "Who is in the chat, returned only for unnamed chats — named chats show `topic` "
-            + "instead, and this field is null there. Match a member by `display_name`, or by "
-            + "`email` when `include_member_emails` is set; no member here carries a `user_id`, so "
-            + "none can be compared against get_me's `user_id`."
+            "Who is in the chat, returned only for unnamed chats. Named chats show `topic` "
+            + "instead, and this field is null there. If `include_member_emails` is set, match a "
+            + "member by `display_name` or by `email`. Otherwise, match by `display_name` only. "
+            + "No member here carries a `user_id`, so none can be matched against get_me's "
+            + "`user_id`."
         )
     )
     members_may_be_incomplete: bool = Field(
@@ -161,17 +163,18 @@ class ChatSummary(BaseModel):
 class ChatList(BaseModel):
     chats: list[ChatSummary] = Field(
         description=(
-            "The chats matching the request. The notes-to-self chat is usually the oneOnOne chat "
-            + "whose only member is the user; confirm with get_me."
+            "The chats that match the request. The notes-to-self chat is usually the oneOnOne "
+            + "chat whose only member is the user. Make sure that this is correct by calling "
+            + "get_me."
         )
     )
     capped: bool = Field(
         description=(
-            "True when the walk stopped after collecting `limit` matches, so chats might remain "
-            + "beyond what this call reached — with `chat_type` or `topic_contains` set, this "
-            + "means more could still match. False means the entire chat list was walked: every "
-            + "match already came back, so a short or empty list is the complete answer, not "
-            + "evidence to look further."
+            "True when the walk stopped after it collected `limit` matches. Chats can still "
+            + "remain beyond what this call reached. If `chat_type` or `topic_contains` is set, "
+            + "more chats can still match. False means the walk covered the entire chat list, and "
+            + "every match already came back. A short or empty list is then the complete answer, "
+            + "not a reason to look further."
         )
     )
 
@@ -264,8 +267,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Only chats of this kind: `meeting`, `oneOnOne`, or `group`. Use `meeting` to "
-                    + "find a meeting's chat, since it is the only kind carrying a `meeting_uri`. "
-                    + "Omit it for every kind."
+                    + "find a meeting's chat, since it is the only kind that carries a "
+                    + "`meeting_uri`. Omit it for every kind."
                 )
             ),
         ] = None,
@@ -287,8 +290,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_CHATS,
                 description=(
                     f"How many chats to return, at most {MAX_CHATS}. The result is already the "
-                    + "full answer for this call; calling again with the same arguments returns "
-                    + "the same chats, not more — raise `limit` to see further back."
+                    + "full answer for this call. Calling it again with the same arguments "
+                    + "returns the same chats, not more. Raise `limit` to see further back."
                 ),
             ),
         ] = 25,

@@ -67,12 +67,13 @@ ContentAccess = Literal["you_are_the_organizer", "organizer_only", "unknown"]
 
 _DESCRIPTION = """\
 Lists a Teams meeting's recordings, newest first, from the `meeting_uri` teams_list_chats \
-reports, to learn whether a meeting was recorded, how long it ran, and who can download it — \
-no video is returned or reachable here; for the words, call teams_list_meeting_transcripts.
+reports. It reports whether a meeting was recorded, how long it ran, and who can download it. \
+This tool returns no video, and none is reachable here. teams_list_meeting_transcripts \
+reports the words instead.
 
 Notes:
-- Read `status` before deciding: `not_ready` means wait, not "the call was not recorded".
-- An `organizer_only` recording exists but is out of reach: never report it as missing.\
+- Read `status` before you decide: `not_ready` means wait, not "the call was not recorded".
+- An `organizer_only` recording exists but is out of reach. Never report it as missing.\
 """
 
 # Local, not shared with teams_list_meeting_transcripts: `tests/test_layering.py` rule 4 forbids it.
@@ -88,13 +89,14 @@ _NOT_A_MEETING_HANDLE = (
 
 class RecordingSummary(BaseModel):
     recording_id: str = Field(
-        description="Recording's Graph id; opaque, and no tool here accepts it as an input."
+        description="Recording's Graph id. This id is opaque, and no tool here accepts it as "
+        + "an input."
     )
     started_at: datetime | None = Field(
         description=(
             "When recording began (Graph `createdDateTime`), not the meeting's start, or null "
-            + "if Microsoft did not report one. For a recurring series, distinguishes one "
-            + "occurrence from another."
+            + "if Microsoft did not report one. For a recurring series, this timestamp "
+            + "distinguishes one occurrence from another."
         )
     )
     ended_at: datetime | None = Field(
@@ -112,30 +114,31 @@ class RecordingSummary(BaseModel):
     )
     content_access: ContentAccess = Field(
         description=(
-            "Whether the signed-in user can download this recording — not about this connector, "
-            + "which has no video. One of:\n"
-            + "- `you_are_the_organizer` — the user is the organizer; Microsoft permits download "
-            + "via Teams or SharePoint (not here), unless an admin has blocked it tenant-wide.\n"
+            "Whether the signed-in user can download this recording. This is not about this "
+            + "connector, which has no video. One of:\n"
+            + "- `you_are_the_organizer` — the user is the organizer. Microsoft permits "
+            + "download via Teams or SharePoint, but not here, unless an admin blocks it "
+            + "tenant-wide.\n"
             + "- `organizer_only` — the user is not the organizer. Microsoft: 'Meeting "
-            + "participants don't have permission to download meeting recordings' unless admin "
-            + "unblocks them. This is NOT a missing recording: the recording exists, it is not "
-            + "missing, only the video is out of reach.\n"
+            + "participants don't have permission to download meeting recordings' unless an "
+            + "admin unblocks them. This is not a missing recording. The recording exists. "
+            + "Only the video is out of reach.\n"
             + "- `unknown` — Microsoft named no organizer, so this cannot be determined."
         )
     )
     organizer_user_id: str | None = Field(
         description=(
-            "Organizer's Entra object id, or null if Microsoft named no organizer. Ask this "
-            + "person when `content_access` is `organizer_only`; Microsoft leaves the "
-            + "organizer's display name null here, so this id is all there is. Comparable with "
-            + "`get_me`'s `user_id`."
+            "Organizer's Entra object id, or null if Microsoft named no organizer. When "
+            + "`content_access` is `organizer_only`, ask this person. Microsoft leaves the "
+            + "organizer's display name null here, so this id is all there is. Comparable "
+            + "with `get_me`'s `user_id`."
         )
     )
     content_correlation_id: str | None = Field(
         description=(
-            "Links this recording to its transcript, or null if Microsoft assigned none. Pass "
-            + "to teams_list_meeting_transcripts as `content_correlation_id`, for the same "
-            + "meeting, to read the matching transcript."
+            "This id links this recording to its transcript, or null if Microsoft assigned "
+            + "none. Pass it to teams_list_meeting_transcripts as `content_correlation_id`, "
+            + "for the same meeting, to read the matching transcript."
         )
     )
 
@@ -157,28 +160,29 @@ class RecordingSummary(BaseModel):
 class MeetingRecordings(BaseModel):
     status: RecordingStatus = Field(
         description=(
-            "What was found and what to do next:\n"
-            + "- `available` — recordings are listed with durations and access.\n"
-            + "- `not_ready` — nothing has arrived yet; wait and call again. Not the same as "
-            + "`not_recorded`: a meeting that demonstrably ended is never reported this way, "
-            + "however far in the future a recurring series runs. This is inferred, since "
-            + "Microsoft publishes no availability SLA.\n"
-            + "- `not_recorded` — the meeting is over and was not recorded; retrying will not "
-            + "help.\n"
-            + "- `meeting_not_found` — no meeting this user can see matched the join URL; do not "
-            + "retry or rebuild the handle."
+            "What this tool found, and what to do next:\n"
+            + "- `available` — this tool lists the recordings with durations and access.\n"
+            + "- `not_ready` — nothing exists yet, and more can still arrive. Wait, then call "
+            + "again. This is not the same as `not_recorded`. This tool never reports "
+            + "`not_ready` for a meeting that demonstrably ended, however far in the future a "
+            + "recurring series runs. This rule is inferred, because Microsoft publishes no "
+            + "availability SLA.\n"
+            + "- `not_recorded` — the meeting is over, and it was not recorded. A retry does "
+            + "not help.\n"
+            + "- `meeting_not_found` — no meeting that this user can see matched the join "
+            + "URL. Do not retry or rebuild the handle."
         )
     )
     meeting_id: str | None = Field(
         description=(
-            "Resolved meeting's Graph id, or null if `status` is `meeting_not_found`; opaque, no "
-            + "tool here accepts it as input."
+            "Resolved meeting's Graph id, or null if `status` is `meeting_not_found`. This id "
+            + "is opaque, and no tool here accepts it as input."
         )
     )
     subject: str | None = Field(
         description=(
-            "Meeting subject as Microsoft holds it, or null if none is set. Confirms this is the "
-            + "right meeting; can differ from the chat topic."
+            "Meeting subject as Microsoft holds it, or null if none is set. You can compare it "
+            + "to make sure that this is the right meeting. It can differ from the chat topic."
         )
     )
     meeting_type: str | None = Field(
@@ -198,19 +202,20 @@ class MeetingRecordings(BaseModel):
     )
     recordings: list[RecordingSummary] = Field(
         description=(
-            "The meeting's recordings. Ordered over up to "
-            + f"{MAX_ARTIFACT_SCAN} read before `limit` cuts them, not over one page of "
-            + "Microsoft's answer: past that cap the first entry is the latest of what was read, "
-            + "not the meeting's latest. As many rows as `limit` means older recordings may "
-            + "remain — raise `limit` to reach further, within that cap. Fewer than `limit` "
-            + "means none remain. Set `include_scan_completeness` to learn whether the read "
-            + "reached the end. Empty for every status other than `available`."
+            "The meeting's recordings. This tool reads up to "
+            + f"{MAX_ARTIFACT_SCAN} recordings and sorts them before `limit` cuts the list, "
+            + "not just one page of Microsoft's answer. Past that cap, the first entry is the "
+            + "latest of what this tool read, not the meeting's latest. If as many rows as "
+            + "`limit` come back, older recordings can remain. Raise `limit` to reach "
+            + "further, within that cap. Fewer rows than `limit` means none remain. Set "
+            + "`include_scan_completeness` to learn whether the read reached the end. This "
+            + "list is empty for every status other than `available`."
         )
     )
     scan_incomplete: bool | None = Field(
         description=(
-            "Whether the read stopped at the scan cap (true) or reached the end (false); null "
-            + "unless `include_scan_completeness` was set."
+            "Whether the read stopped at the scan cap (true) or reached the end (false). This "
+            + "value is null unless `include_scan_completeness` was set."
         )
     )
 
@@ -321,7 +326,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The meeting handle from teams_list_chats: `teams:///meetings/{join_web_url}`. "
-                    + "Copy verbatim; a `teams:///transcripts/...` handle is not valid here."
+                    + "Copy it verbatim. A `teams:///transcripts/...` handle is not valid here."
                 ),
             ),
         ],
@@ -331,9 +336,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_RECORDINGS,
                 description=(
-                    f"How many recordings to return, at most {MAX_RECORDINGS}. All are read up "
-                    + f"to {MAX_ARTIFACT_SCAN} and sorted before this cuts them; raising `limit` "
-                    + "returns more only within that read."
+                    f"How many recordings to return, at most {MAX_RECORDINGS}. This tool reads "
+                    + f"up to {MAX_ARTIFACT_SCAN} and sorts them before this cuts the list. If "
+                    + "you raise `limit`, you get more results, but only within that read."
                 ),
             ),
         ] = 20,
@@ -341,7 +346,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool,
             Field(
                 description=(
-                    "Return whether the read reached the end of the meeting's recordings, as "
+                    "Set this to true to learn whether the read reached the end, as "
                     + "`scan_incomplete`."
                 )
             ),

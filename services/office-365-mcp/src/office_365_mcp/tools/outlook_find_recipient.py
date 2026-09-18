@@ -112,12 +112,12 @@ _WORD = re.compile(r"[^\W_]+")
 _NEVER = datetime.min.replace(tzinfo=UTC)
 
 _DESCRIPTION = """\
-Before addressing a draft to a guess, resolve a person's name, alias, or partial address to the \
-address they send from and how confidently it matches.
+Resolves a person's name, alias, or partial address to the address they send from. It also \
+reports how confidently the address matches. So the user does not address a draft to a guess.
 
 Notes:
-- Never choose a candidate automatically — return them for the user to confirm, especially any \
-marked `ambiguous` or graded `fuzzy`.
+- Never choose a candidate automatically. Return them for the user to choose from, especially \
+any marked `ambiguous` or graded `fuzzy`.
 """
 
 _NO_QUERY = (
@@ -132,9 +132,9 @@ class RecipientCandidate(BaseModel):
 
     address: str = Field(
         description=(
-            "The SMTP address to put on a draft. Taken from the address list Microsoft returns "
-            + "for the person, never from their sign-in name. A guest's sign-in name carries "
-            + "`#EXT#` and bounces, while this address delivers."
+            "The SMTP address to put on a draft. It comes from the address list Microsoft "
+            + "returns for the person, never from their sign-in name. A guest's sign-in name "
+            + "carries `#EXT#` and bounces, while this address delivers."
         )
     )
     display_name: str | None = Field(
@@ -151,7 +151,7 @@ class RecipientCandidate(BaseModel):
             + "sign-in name. `token` — every word of the query is a whole word of the name or of "
             + "the address's local part. `fuzzy` — Microsoft matched it for a reason this tool "
             + "cannot determine, for example `tiler` against Tyler. Never draft to a `fuzzy` row "
-            + "without confirming with the user."
+            + "without asking the user first."
         )
     )
     kind: RecipientKind | None = Field(
@@ -164,8 +164,8 @@ class RecipientCandidate(BaseModel):
     )
     external: bool | None = Field(
         description=(
-            "True when the address's domain differs from the signed-in user's own. Worth saying "
-            + "out loud before a draft goes out. Null when the signed-in user has no address to "
+            "True when the address's domain differs from the signed-in user's own. Tell the "
+            + "user this before a draft goes out. Null when the signed-in user has no address to "
             + "compare against, or the candidate's has no domain."
         )
     )
@@ -186,7 +186,7 @@ class RecipientCandidate(BaseModel):
             + "from their mailbox and the directory. `mailbox` is a fallback over the messages "
             + "this user exchanged, and whoever sent the mail wrote its display names. A sender "
             + "chooses their own name, so a `mailbox` row can carry one person's name beside "
-            + "another person's address. Confirm a `mailbox` row against a human."
+            + "another person's address. Make sure that a human reviews a `mailbox` row."
         )
     )
     ever_corresponded: bool = Field(
@@ -203,18 +203,18 @@ class RecipientCandidates(BaseModel):
 
     outcome: Outcome = Field(
         description=(
-            "`match` when at least one candidate came back; `no_match` when neither index held "
-            + "anybody — never proof the person does not exist. Reasons include: the two never "
-            + "corresponded, the person is off this user's relevance list, an information "
-            + "barrier separates them, the person is hidden from the address list, or they "
-            + "joined too recently to be indexed. Ask the user for the address rather than "
-            + "reporting that no such person exists."
+            "`match` when at least one candidate came back. `no_match` when neither index held "
+            + "anybody. This is never proof the person does not exist. Reasons include: the two "
+            + "never corresponded, the person is off this user's relevance list, or an "
+            + "information barrier separates them. Other reasons: the person is hidden from the "
+            + "address list, or they joined too recently to appear in the index. Ask the user "
+            + "for the address. Do not report that no such person exists."
         )
     )
     query: str = Field(
         description=(
             "The query exactly as it was sent. So a reader can quote a `no_match` back to the "
-            + "user, and correct a spelling, without guessing what was asked."
+            + "user, and correct a spelling, without guessing what the user asked."
         )
     )
     candidates: list[RecipientCandidate] = Field(
@@ -226,9 +226,9 @@ class RecipientCandidates(BaseModel):
     )
     ambiguous: bool = Field(
         description=(
-            "True when more than one candidate shares the best `match_kind`, so the answer names "
-            + "no single person. Put the choice to the user, rather than resolving it. Two people "
-            + "of one name is the ordinary case, not the strange one."
+            "True when more than one candidate shares the best `match_kind`, so the answer "
+            + "names no single person. Put the choice to the user, rather than resolving it. "
+            + "Two people of one name are the ordinary case, not the strange one."
         )
     )
 
@@ -531,7 +531,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=2,
                 description=(
                     "The person to resolve — a name, first name, alias, or partial address — "
-                    + "passed exactly as the user wrote it; a query tidied up first grades a row "
+                    + "passed exactly as the user wrote it. A query tidied up first grades a row "
                     + "against text nobody typed."
                 ),
             ),
