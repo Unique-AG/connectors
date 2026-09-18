@@ -164,6 +164,8 @@ networkPolicy:
           - matchName: login.microsoftonline.com
           - matchName: graph.microsoft.com
           - matchPattern: "*.microsoft.com"
+          - matchPattern: "*.sharepoint.com"
+          - matchPattern: "*.svc.ms"
         toPorts:
           - ports:
               - port: "443"
