@@ -78,14 +78,14 @@ _FILTER_IGNORED = (
 TranscriptStatus = Literal["available", "not_ready", "not_transcribed", "meeting_not_found"]
 
 _DESCRIPTION = """\
-List a Teams meeting's transcripts, from the `meeting_uri` teams_list_chats reports. Call it to \
-learn whether a meeting was transcribed. teams_read_transcript returns the words. Read `status` \
-first: `not_ready` means wait, `not_transcribed` means none. To pick one occurrence out of a \
-recurring series, pass `content_correlation_id` from a teams_list_meeting_recordings row: that \
-one Microsoft 365 \
-applies itself, and it is the route from a recording to the words of the same call. A tenant \
-switch can block transcripts and never recordings, so try teams_list_meeting_recordings on \
-refusal. Returns `status` and each transcript's `uri` and times. \
+Lists a Teams meeting's transcripts, newest first, from the `meeting_uri` teams_list_chats \
+reports, to learn whether a meeting was transcribed. teams_list_meeting_recordings is the \
+sibling for whether the call was recorded: a tenant switch can block transcripts here (403) \
+while recordings still succeed, never the reverse, so retry there on refusal.
+
+Notes:
+- Read `status` before calling teams_read_transcript: `not_ready` means wait, `not_transcribed` \
+means none.\
 """
 
 _NOT_A_MEETING_HANDLE = (
@@ -106,13 +106,18 @@ class TranscriptSummary(BaseModel):
     )
     started_at: datetime | None = Field(
         description=(
-            "Transcription start. For recurring meetings, distinguishes one occurrence from "
-            + "another."
+            "Transcription start, or null if Microsoft did not report one. For recurring "
+            + "meetings, distinguishes one occurrence from another."
         )
     )
-    ended_at: datetime | None = Field(description="Transcription end.")
+    ended_at: datetime | None = Field(
+        description="Transcription end, or null on the same terms as `started_at`."
+    )
     content_correlation_id: str | None = Field(
-        description="Microsoft's id linking this transcript to the recording of the same call."
+        description=(
+            "Microsoft's id linking this transcript to the recording of the same call, or null "
+            + "if Microsoft assigned none."
+        )
     )
 
     @classmethod
@@ -130,26 +135,29 @@ class TranscriptSummary(BaseModel):
 class MeetingTranscripts(BaseModel):
     status: TranscriptStatus = Field(
         description=(
-            "What was found and what to do next. One of:\n"
+            "What was found and what to do next:\n"
             + "- `available` — transcripts are listed, newest first.\n"
             + "- `not_ready` — nothing is there yet and something may still arrive. Wait and "
             + "call again later. This is NOT 'there is no transcript'. A meeting that "
             + "demonstrably ended is never reported this way, however far in the future a "
             + "recurring series runs. This is inferred. Microsoft publishes no availability "
             + "SLA.\n"
-            + "- `not_transcribed` — the meeting is over. Nothing is there. Nothing is expected. "
-            + "Retrying will not change this.\n"
-            + "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
-            + "see. Do not retry and do not rebuild the handle.\n"
-            + "A refusal is about this user, not about the meeting: a participant can be refused "
-            + "where the organizer succeeds."
+            + "- `not_transcribed` — the meeting is over and nothing was transcribed; retrying "
+            + "will not change this.\n"
+            + "- `meeting_not_found` — no meeting this user can see matched the join URL; do not "
+            + "retry or rebuild the handle.\n"
+            + "A refusal reflects this user, not the meeting: a participant can be refused where "
+            + "the organizer succeeds."
         )
     )
     meeting_id: str | None = Field(
         description="Resolved meeting's Graph id, or null if `status` is `meeting_not_found`."
     )
     subject: str | None = Field(
-        description="Meeting subject as Microsoft holds it. Confirms this is the right meeting."
+        description=(
+            "Meeting subject as Microsoft holds it, or null if none is set. Confirms this is the "
+            + "right meeting."
+        )
     )
     meeting_type: str | None = Field(
         description=(
@@ -159,31 +167,28 @@ class MeetingTranscripts(BaseModel):
     )
     started_at: datetime | None = Field(
         description=(
-            "Meeting start. For recurring series, Microsoft's single value for the whole series."
+            "Meeting start, or null if Microsoft reported none. For a recurring series, "
+            + "Microsoft's single value for the whole series, not the occurrence read here."
         )
     )
-    ended_at: datetime | None = Field(description="Meeting end (same caveat as `started_at`).")
+    ended_at: datetime | None = Field(
+        description="Meeting end, or null on the same terms as `started_at`."
+    )
     transcripts: list[TranscriptSummary] = Field(
         description=(
-            "The meeting's transcripts, newest first. The order is over "
-            + f"every transcript this call read (up to {MAX_ARTIFACT_SCAN}), not over one page of "
-            + "Microsoft's answer. For meetings with fewer transcripts than that cap — all but "
-            + "series recorded daily for most of a year — the first entry is the meeting's "
-            + "latest. Past the cap the first entry is the latest of what was READ. Microsoft "
-            + "returns this collection in its own order and offers no `$orderby`. Set "
-            + "`include_scan_completeness` to learn if the read reached the end. As many as "
-            + "`limit` "
-            + "means the meeting can hold older ones. Fewer means it holds no more than was "
-            + "read. Empty for every status other than `available`."
+            "The meeting's transcripts. Ordered over up to "
+            + f"{MAX_ARTIFACT_SCAN} read before `limit` cuts them, not over one page of "
+            + "Microsoft's answer: past that cap the first entry is the latest of what was read, "
+            + "not the meeting's latest. As many rows as `limit` means older transcripts may "
+            + "remain — raise `limit` to reach further, within that cap. Fewer than `limit` "
+            + "means none remain. Set `include_scan_completeness` to learn whether the read "
+            + "reached the end. Empty for every status other than `available`."
         )
     )
     scan_incomplete: bool | None = Field(
         description=(
-            f"Whether read stopped at {MAX_ARTIFACT_SCAN} transcripts (true), read all (false), or "
-            + "null if not requested. Set only when `include_scan_completeness` is true. True "
-            + "means "
-            + "transcripts ordered over those read, not all. False means order and absence are "
-            + "exact."
+            "Whether the read stopped at the scan cap (true) or reached the end (false); null "
+            + "unless `include_scan_completeness` was set."
         )
     )
 
@@ -290,8 +295,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Meeting handle from teams_list_chats: teams:///meetings/{join_web_url}. Copy "
-                    + "verbatim."
+                    "The meeting handle from teams_list_chats: `teams:///meetings/{join_web_url}`. "
+                    + "Copy verbatim; a `teams:///transcripts/...` handle is not valid here."
                 ),
             ),
         ],
@@ -300,15 +305,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only the transcript(s) Microsoft paired with one particular call. Copy the "
-                    + "value verbatim out of a teams_list_meeting_recordings row, which is where "
-                    + "it comes from: it is Microsoft's own link between a recording and the "
-                    + 'transcript of the SAME call, so this is how "get me the words of that '
-                    + '47-minute recording" is asked. Do not construct one. This is the only '
-                    + "bound Microsoft 365 applies itself here, so on a recurring series it beats "
-                    + "reading every row's `started_at` for picking one occurrence out. Usually "
-                    + "one transcript, but not promised: Microsoft's own documented response "
-                    + "shows several sharing one pairing id, so treat the answer as a list."
+                    "Match one occurrence of a recurring meeting to its transcript, copied "
+                    + "verbatim from a teams_list_meeting_recordings row. Microsoft applies this "
+                    + "filter itself, so it beats matching each row's `started_at` yourself. Can "
+                    + "return more than one transcript sharing that id."
                 ),
             ),
         ] = None,
@@ -318,11 +318,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_TRANSCRIPTS,
                 description=(
-                    f"How many transcripts to return. Default 20, maximum {MAX_TRANSCRIPTS}. These "
-                    + "are the NEWEST that many of the meeting. All transcripts are read (up to "
-                    + f"{MAX_ARTIFACT_SCAN}, the call's whole cost) and ordered before this cuts "
-                    + "them. Past that cap they are the newest OF THE ONES READ, not the meeting's "
-                    + "newest."
+                    f"How many transcripts to return, at most {MAX_TRANSCRIPTS}. All are read up "
+                    + f"to {MAX_ARTIFACT_SCAN} and sorted before this cuts them; raising `limit` "
+                    + "returns more only within that read."
                 ),
             ),
         ] = 20,
@@ -330,8 +328,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool,
             Field(
                 description=(
-                    "Report whether read reached the end of transcripts, as `scan_incomplete`. Off "
-                    + "by default."
+                    "Return whether the read reached the end of the meeting's transcripts, as "
+                    + "`scan_incomplete`."
                 )
             ),
         ] = False,

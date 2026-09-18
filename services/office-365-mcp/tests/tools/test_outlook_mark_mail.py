@@ -490,6 +490,6 @@ class TestHowItDeclaresItself:
         tool = await _registered(transport)
 
         described = tool.description or ""
-        assert "CHANGES THE MAILBOX" in described
-        assert "cannot undo it" in described
+        assert "in the signed-in user's own mailbox" in described
+        assert "The change is immediate and cannot be undone" in described
         assert "Outlook" in described

@@ -466,7 +466,7 @@ class TestTheHandleItMints:
         assert "teams_browse_channel" in described, (
             "the one tool that can, when the reply is recent"
         )
-        assert f"only the newest {MAX_REPLIES_PER_POST} replies" in described, (
+        assert f"just the newest {MAX_REPLIES_PER_POST} replies" in described, (
             "and where it stops, in the number the browser actually applies rather than in prose "
             + "of its own"
         )

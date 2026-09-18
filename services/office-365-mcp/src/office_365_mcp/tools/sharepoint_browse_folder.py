@@ -45,16 +45,11 @@ _ChildrenQuery = ChildrenRequestBuilder.ChildrenRequestBuilderGetQueryParameters
 _DriveQuery = DriveRequestBuilder.DriveRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Browse ONE level of a folder in OneDrive or SharePoint, and get a handle for every file and \
-folder in it. Omit `folder` to see the top of the signed-in user's own OneDrive. Pass a \
-folder's `uri` back as `folder` to look inside that folder. One call returns one level. It is \
-not the whole folder tree, and it is not an inventory of the drive. Microsoft returns only what \
-sits directly inside the folder asked about. A folder in the answer can hold more files and \
-folders, and this call does not return them. To reach them, call this tool again with that \
-folder's `uri`. Each row says whether it is a file or a folder, and gives its name, its size, \
-when it last changed, and its handle. No file content comes back here. Use sharepoint_read_file \
-to read a file. Use sharepoint_search_files to find a file by its name, or by the words inside \
-it.\
+List everything that sits directly inside one folder in OneDrive or SharePoint, one level only, \
+never its subfolders, for walking a specific folder's contents. `sharepoint_search_files` finds \
+files by name or content across the whole of OneDrive and SharePoint but reaches indexed \
+content only; use this tool instead when the user names one folder and wants everything in it, \
+indexed or not.\
 """
 
 _NOT_A_FOLDER_HANDLE = (
@@ -71,21 +66,19 @@ class DriveFolderLevel(BaseModel):
 
     items: list[DriveItemSummary] = Field(
         description=(
-            "The files and folders that sit directly inside the folder asked about, in the order "
-            + "Microsoft returned them. This is one level, and never the whole tree. A folder in "
-            + "this list can hold more items, and those items are not here. Call this tool again "
-            + "with that folder's `uri` to reach them. An empty list means the folder holds "
-            + "nothing. Microsoft sometimes returns an item without saying which drive holds it. "
-            + "This connector cannot address such an item again, so it leaves the item out "
-            + "instead of giving a handle that fails."
+            "The files and folders directly inside the folder, in the order Microsoft returned "
+            + "them. A folder entry here can hold further items that are not included; call "
+            + "this tool again with that entry's `uri` to reach them. Empty means the folder "
+            + "holds nothing. An item Graph reported with no drive is left out, because it "
+            + "cannot be addressed again."
         )
     )
     capped: bool = Field(
         description=(
-            "True when `limit` stopped the listing while Microsoft still had more of THIS level "
-            + "to give. Ask again with a higher `limit` to get more of it. False when the level "
-            + "ended on its own, however few items came back. It says nothing about the folders "
-            + "inside this level, because this call never looks inside them."
+            "True when `limit` stopped the list before this level was exhausted; raise "
+            + "`limit` to get more of it. False when the level ended on its own. It says "
+            + "nothing about items nested inside a returned folder — this call never looks "
+            + "inside them."
         )
     )
 
@@ -160,10 +153,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The folder to look inside, as the `uri` of an earlier result: "
-                    + "sharepoint:///folders/{driveId}/{itemId}. Omit it to browse the top of "
-                    + "the signed-in user's own OneDrive, which is where a walk starts. A folder "
-                    + "name is not a handle, and neither is a path nor a web address."
+                    "The folder to look inside, as the `uri` an earlier sharepoint_browse_folder "
+                    + "or sharepoint_search_files result reported: "
+                    + "sharepoint:///folders/{drive_id}/{item_id}. Omit it to browse the top of "
+                    + "the signed-in user's own OneDrive. A folder's display name, a path, and a "
+                    + "web address are not valid here."
                 ),
             ),
         ] = None,
@@ -173,10 +167,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_ITEMS,
                 description=(
-                    f"How many items to return from this one level, at most {MAX_ITEMS}. Paging "
-                    + "happens inside the call, and `capped` says whether this limit stopped it. "
-                    + "It bounds one level only. A higher value never reaches the items inside a "
-                    + "folder in the answer."
+                    f"How many items to return from this level, at most {MAX_ITEMS}. It bounds "
+                    + "this level only — raising it never reaches items inside a nested folder."
                 ),
             ),
         ] = 50,

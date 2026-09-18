@@ -86,19 +86,15 @@ _RULE_FIELDS: tuple[str, ...] = (
 _RuleQuery = MessageRuleItemRequestBuilder.MessageRuleItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Turn ONE existing inbox rule of the signed-in user's mailbox OFF. THIS CHANGES THE MAILBOX: the \
-rule stops acting on incoming mail immediately, on every device. Use it for "stop that rule \
-forwarding my mail" and "why does my mail get filed, turn that off". `rule_ref` is the `uri` of \
-a rule as outlook_get_mailbox_settings reports it, copied verbatim. That tool is where a rule \
-handle comes from, and nothing else mints one. This tool can ONLY disable: it cannot enable a \
-rule, and it cannot create one. `enabled` accepts the single value false, so switching a rule \
-back on is not expressible here at all. That is on purpose, because an inbox rule can forward or \
-redirect mail out of the organization, and re-arming one needs no other permission. Re-enabling \
-a rule is one click in Outlook (Settings, Mail, Rules), and the user does it there. The answer \
-reports what the rule did before it was disabled: its name and the addresses it forwarded \
-or redirected to, the folder it moved mail to, whether it deleted. Read those back to the user, \
-instead of only confirming that it is off. A rule Microsoft marks read-only cannot be changed \
-through this API, and is refused.\
+Turn one existing inbox rule of the signed-in user's mailbox off, immediately and on every \
+device, for "stop that rule forwarding my mail" or "why does my mail get filed, turn that off".
+
+Notes:
+- This tool can only disable: `enabled` accepts the single value false, so it cannot enable a \
+rule or create one — re-enabling is one click in Outlook (Settings, Mail, Rules).
+- `rule_ref` is the `uri` of a rule as outlook_get_mailbox_settings reports it; nothing else \
+mints one.
+- A rule Microsoft marks read-only cannot be changed through this API and is refused.
 """
 
 _NOT_A_RULE_HANDLE = (
@@ -133,71 +129,68 @@ class DisabledRule(BaseModel):
 
     uri: str = Field(
         description=(
-            "The handle this answer is about, exactly as it was passed in, so a later answer can "
-            + "be about the same rule."
+            "The handle this answer is about, exactly as it was passed in, so a later answer "
+            + "can be about the same rule."
         )
     )
     display_name: str | None = Field(
         description=(
-            "The rule's name, chosen by whoever created it. It is a label and not a description: "
-            + "a rule called `Newsletters` can forward mail out of the organization, so read the "
-            + "action fields below and never this. Null when Microsoft recorded no name."
+            "The rule's name, chosen by whoever created it. It is a label, not a description "
+            + "— a rule called `Newsletters` can forward mail out of the organization, so read "
+            + "the action fields below instead. Null when Microsoft recorded no name."
         )
     )
     was_enabled: bool | None = Field(
         description=(
-            "Whether the rule was active before this call, read when it was fetched. False means "
-            + "it was already off and this call changed nothing, which is worth saying out loud "
-            + "rather than reporting a change that did not happen. Null when Microsoft did not "
-            + "say."
+            "Whether the rule was active before this call, read when it was fetched. Null "
+            + "when Microsoft did not say. False means it was already off and this call "
+            + "changed nothing — worth saying rather than reporting a change that did not happen."
         )
     )
     is_enabled: bool | None = Field(
         description=(
-            "Whether Microsoft 365 now reports the rule as running, read off its own answer to "
-            + "the write rather than off the argument. Anything but false here means Microsoft "
-            + "disagrees that the rule was disabled, and that is the answer. Null when Microsoft "
-            + "returned no rule to read it off."
+            "Whether Microsoft 365 now reports the rule as running, read off its own response "
+            + "to the write rather than the argument. Null when Microsoft returned no rule to "
+            + "read it off. Anything but false here means Microsoft disagrees that the rule "
+            + "was disabled."
         )
     )
     forwarded_to: list[str] = Field(
         description=(
-            "Addresses this rule forwarded a copy of each matching message to. An address here "
-            + "outside the user's own domain means copies of their mail left the organization "
-            + "automatically. That is worth reporting even now the rule is off: it says what "
-            + "already happened, and the rule is one click from running again. Each entry is the "
-            + "SMTP address Microsoft recorded, or the display name when it recorded no address. "
-            + "Empty means this rule forwarded nothing."
+            "Addresses this rule forwarded a copy of each matching message to. Empty means "
+            + "this rule forwarded nothing. Each entry is the SMTP address Microsoft recorded, "
+            + "or the display name when it recorded no address. An address outside the user's "
+            + "own domain means copies of their mail left the organization automatically, "
+            + "which already happened even though the rule is now off."
         )
     )
     redirected_to: list[str] = Field(
         description=(
             "Addresses this rule redirected each matching message to. A redirect passes the "
-            + "message on with the original sender preserved, so replies go to whoever wrote it "
-            + "rather than to this user — harder to notice than a forward, not less serious."
+            + "message on with the original sender preserved, so replies go to whoever wrote "
+            + "it rather than to this user — harder to notice than a forward, not less serious."
         )
     )
     forwarded_as_attachment_to: list[str] = Field(
         description=(
-            "Addresses this rule forwarded each matching message to as an attachment. The whole "
-            + "original message travels, headers included, so read it exactly as `forwarded_to`."
+            "Addresses this rule forwarded each matching message to as an attachment. The "
+            + "whole original message travels, headers included, so read it exactly as "
+            + "`forwarded_to`."
         )
     )
     moved_to_folder: str | None = Field(
         description=(
-            "The Graph id of the folder this rule moved matching mail to, exactly as Microsoft "
-            + "gave it. Opaque, and nothing here turns it into a folder name — "
-            + "outlook_browse_folders reports id and name together. Null when the rule moved "
-            + "nothing. A rule that filed mail out of the Inbox is why a user says a message "
-            + "never arrived."
+            "The Graph id of the folder this rule moved matching mail to. Null when the rule "
+            + "moved nothing. Opaque — outlook_browse_folders reports id and name together to "
+            + "turn this into a folder name."
         )
     )
     deleted: bool | None = Field(
         description=(
             "True when the rule deleted matching messages: either Microsoft's `delete`, which "
-            + "moves them to Deleted Items where they can still be found, or `permanentDelete`, "
-            + "which does not. This field does not distinguish the two. Null when Microsoft "
-            + "reported neither."
+            + "moves them to Deleted Items where they can still be found, or "
+            + "`permanentDelete`, which does not — this field does not distinguish the two. "
+            + "Null when Microsoft reported neither."
         )
     )
 
@@ -308,10 +301,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 description=(
-                    "The rule to turn off, as the `uri` outlook_get_mailbox_settings reports on "
-                    + "each rule, verbatim. Call that tool with include=rules to list the "
-                    + "mailbox's rules and their handles. One rule per call: there is no batch, "
-                    + "so turning off two rules is two calls whose answers are read separately."
+                    "The rule to turn off: the `uri` outlook_get_mailbox_settings reports on "
+                    + "each rule. Call that tool with include=rules to list the mailbox's "
+                    + "rules and their handles. One rule per call — there is no batch."
                 )
             ),
         ],
@@ -319,10 +311,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Literal[False],
             Field(
                 description=(
-                    "Always false, and false is the only value this argument has. It is written "
-                    + "out rather than assumed so that a call reads as what it does. There is no "
-                    + "true: this tool cannot switch a rule on, and cannot create one. To turn a "
-                    + "rule back on, the user does it in Outlook under Settings, Mail, Rules."
+                    "Always false — written out rather than assumed so that a call reads as "
+                    + "what it does."
                 )
             ),
         ],

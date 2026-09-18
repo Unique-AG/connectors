@@ -60,12 +60,14 @@ _FILTER_IGNORED = (
 )
 
 _DESCRIPTION = """\
-List one team's channels. Pass the `team_id` from teams_list_my_teams. Then hand `team_id` and \
-`channel_id` together to teams_browse_channel. A channel id alone addresses nothing, and every \
-team has a `General`. Pass `membership_type` for "the private channels" or "the shared ones"; \
-omit it for all of them. No message text comes back here: teams_browse_channel reads the posts. A \
-channel missing from the list is one the signed-in user cannot access, not one the team lacks. \
-Returns each channel's id, name, description, membership type, and creation date.\
+Lists the channels of one team the signed-in user can access, in no particular order, for finding \
+a channel's `channel_id` before browsing or searching it. It carries no message text — \
+teams_browse_channel reads the posts, and teams_search_messages finds one by content.
+
+Notes:
+- A channel missing from the list is one the signed-in user cannot access, not one the team \
+lacks.
+- A channel id alone addresses nothing; pass it together with `team_id` to teams_browse_channel.\
 """
 
 
@@ -73,12 +75,9 @@ class ChannelSummary(BaseModel):
     channel_id: str = Field(
         description=(
             "The channel's Graph id, for example `19:...@thread.tacv2`. Pass it with its "
-            + "`team_id` to "
-            + "teams_browse_channel. It is also the id teams_search_messages reports as "
-            + "`channel_id` on "
-            + "a "
-            + "channel message. This id is opaque — copy it rather than constructing one from "
-            + "a name."
+            + "`team_id` to teams_browse_channel, and match it against the `channel_id` "
+            + "teams_search_messages reports on a channel message. Opaque — copy it rather than "
+            + "constructing one from a name."
         )
     )
     display_name: str | None = Field(
@@ -92,9 +91,8 @@ class ChannelSummary(BaseModel):
     )
     membership_type: str | None = Field(
         description=(
-            "`standard` for all team members, `private` for a member-list channel, or `shared` "
-            + "for a channel shared with other teams. Null for a type that Microsoft adds after "
-            + "this code. Channels the user is not a member of do not appear."
+            "One of `standard`, `private`, or `shared`, or null for a type Microsoft adds after "
+            + "this connector. Channels the user is not a member of do not appear."
         )
     )
     created_at: datetime | None = Field(
@@ -117,9 +115,9 @@ class ChannelSummary(BaseModel):
 class ChannelList(BaseModel):
     channels: list[ChannelSummary] = Field(
         description=(
-            "Channels the user can access. As many as `limit` can mean more exist. Fewer is all "
-            + "of them. No cursor. Raise `limit` (up to "
-            + f"{MAX_CHANNELS}). Microsoft Graph does not order this collection."
+            "Channels the user can access, in no particular order — Microsoft Graph applies none "
+            + "to this collection. A full window can mean more channels exist; a shorter one is "
+            + "the complete list."
         )
     )
 
@@ -203,12 +201,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ChannelMembership | None,
             Field(
                 description=(
-                    "Only channels of this kind: `standard` for the ones every team member is in, "
-                    + "`private` for a member-list channel, or `shared` for one shared with other "
-                    + "teams. The same three words each row reports in `membership_type`, so an "
-                    + "answer can be narrowed with a value read straight out of an earlier one. "
-                    + "Microsoft 365 applies this, so it does not spend the window on channels "
-                    + "that were then discarded. Omit it for every kind, which is the usual call."
+                    "Only channels of this kind: `standard` for the ones every team member is "
+                    + "in, `private` for a member-list channel, or `shared` for one shared with "
+                    + "other teams — the same value each row reports in `membership_type`. Omit "
+                    + "it for every kind."
                 )
             ),
         ] = None,
@@ -218,9 +214,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_CHANNELS,
                 description=(
-                    "How many channels to return. Default 50, maximum "
-                    + f"{MAX_CHANNELS}. Microsoft Graph applies no page size. This is the "
-                    + "window applied while paging."
+                    f"How many channels to return, at most {MAX_CHANNELS}. The result is "
+                    + "already the whole answer for this call: repeating it with the same "
+                    + "`limit` returns the same channels, not the next page — raise `limit` to "
+                    + "see more."
                 ),
             ),
         ] = 50,

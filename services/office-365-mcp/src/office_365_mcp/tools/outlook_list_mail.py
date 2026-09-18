@@ -81,23 +81,17 @@ _FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQuery
 _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-List the newest messages of ONE mail folder in the signed-in user's mailbox, newest received \
-first. This is the exhaustive, ordered half of mail reading: it walks the folder itself, so "the \
-last ten mails", "what arrived since Monday" and "what is still unread" belong here. \
-outlook_search_mail is the other half: index-backed, in Microsoft's own order, which is not \
-receipt order. It takes the same two date bounds, so a window is not what decides between them — \
-use it for "find the mail where…", and this one for anything about recency, for a window with \
-nothing to search for, and when unsent drafts matter, which its index does not reach. \
-`received_after` and `received_before` bound receipt date at either end, and both of those days \
-are covered whole, so "the mail from March" and "what came in on Tuesday" are each one call. Bound \
-a past window at BOTH ends: rows come newest first, so `received_after` alone spends `limit` on \
-everything newer than the window before reaching it. Name a well-known folder with `folder` \
-(`inbox`, `sentitems`, `drafts`, `archive`, `deleteditems`, `junkemail`, `clutter`), or any other \
-folder with `folder_ref`, the `uri` of an outlook_browse_folders result. Pass one or the other, \
-never both. This tool lists only mail filed directly in that folder, never its subfolders. Rows \
-carry metadata and a short preview. Pass a row's `uri` to outlook_read_mail for what the message \
-says. The folder's own item and unread counts come back beside the rows. These counts show whether \
-"that is all of them" or "that is the first slice". \
+Lists the newest messages of one mail folder in the signed-in user's mailbox, newest received \
+first, for reading a folder's recent, unread, or date-windowed mail in filing order. \
+outlook_search_mail is the sibling for relevance-ranked search across mailbox content — not \
+receipt order — and its index does not reach unsent drafts.
+
+Notes:
+- Pass exactly one of `folder` or `folder_ref`, never both.
+- Lists only mail filed directly in the folder, not its subfolders.
+- To bound a past window, set both `received_after` and `received_before`: rows come back \
+newest first, so `received_after` alone spends `limit` on newer mail before ever reaching an \
+older window.
 """
 
 _BOTH_FOLDERS = (
@@ -137,50 +131,38 @@ class FolderMessages(BaseModel):
 
     folder_name: str | None = Field(
         description=(
-            "The folder's name as Outlook shows it, for example `Inbox`. It comes from the "
-            + "mailbox, so it is in the mailbox's own language, whichever name or handle the "
-            + "caller asked for. Null when Graph recorded none."
+            "The folder's display name as Outlook shows it, in the mailbox's own language. Null "
+            + "when Graph did not report one."
         )
     )
     total_items: int | None = Field(
         description=(
-            "How many items the folder holds, read off the folder itself rather than counted "
-            + "here. This is the count Microsoft recommends over counting a folder's messages. "
-            + "Microsoft warns that counting messages directly can incur significant latency. It "
-            + "counts items of every type, so it bounds the messages in this folder rather than "
-            + "counting them. It also excludes the subfolders this tool does not list either. "
-            + "Null when Graph did not say."
+            "How many items of every kind the folder holds — an upper bound on its messages, "
+            + "not a count of them. Null when Graph did not report it."
         )
     )
     unread_items: int | None = Field(
         description=(
-            "How many of `total_items` are unread, on the same terms: items of every type, so an "
-            + "upper bound rather than a count. This is what makes the length of `messages` mean "
-            + "something. Twenty-five unread rows against an `unread_items` of 70 says roughly 45 "
-            + "more unread messages exist that this call did not reach. Three rows with `capped` "
-            + "false says those three are all there are. Null when Graph did not say."
+            "How many of `total_items` are unread, on the same terms: an upper bound, not an "
+            + "exact message count. Null when Graph did not report it."
         )
     )
     messages: list[MailSummary] = Field(
         description=(
-            "The messages, newest received first — Exchange's own order on `received_at`, not an "
-            + "index's ranking and not the order they were sent. This tool lists only mail filed "
-            + "directly in this folder. A subfolder's mail stays in that subfolder, and a listing "
-            + "of that subfolder reaches it. Each row's `uri` survives even after the mailbox "
-            + "files the message elsewhere, so a reader can read it later."
+            "The rows for this call, one per message. Pass a row's `uri` to outlook_read_mail "
+            + "for the full message; the `uri` keeps working after the message is later moved, "
+            + "renamed, or refiled."
         )
     )
     capped: bool = Field(
         description=(
-            "True when this call stopped with more of the folder still on offer. Either `limit` "
-            + "filled up, or the internal scan limit ran out while `unread_only` discarded read "
-            + "messages. A higher `limit`, or a narrower window, returns more. Narrow it at the "
-            + "NEWEST end: rows arrive newest first, so `received_before` is what drops mail this "
-            + "answer already spent `limit` on, where raising `received_after` only drops the rows "
-            + "that were never reached. False means the folder, or the window the two bounds "
-            + "opened, ran out on its own. So what came back is all of it, however few rows that "
-            + "is. Read it against `unread_items` and `total_items`, which say how much was there "
-            + "to begin with."
+            "True when more of the folder, or the window `received_after`/`received_before` "
+            + "opened, remains beyond what this call returned — either `limit` was reached, or "
+            + "`unread_only`/`from_address` discarded enough non-matching mail to stop early. To "
+            + "reach further into a capped window, narrow `received_before`; raising "
+            + "`received_after` only drops rows this call never reached. False means every match "
+            + "already came back. Compare against `total_items` and `unread_items` to see how "
+            + "much of the folder this call reached."
         )
     )
 
@@ -402,11 +384,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             WellKnownFolder,
             Field(
                 description=(
-                    "Which well-known folder to list, by Microsoft's own locale-independent name, "
-                    + "so `inbox` reaches the Inbox of a mailbox in any language. Use `folder_ref` "
-                    + "instead for every other folder, including every folder the user made. This "
-                    + "tool does not accept a folder's own name here. When the call includes "
-                    + "`folder_ref`, omit this entirely."
+                    "Which well-known folder to list, by Microsoft's locale-independent name: "
+                    + "`inbox`, `sentitems`, `drafts`, `archive`, `deleteditems`, `junkemail`, "
+                    + "or `clutter`. Alternative to `folder_ref`, which is required for any "
+                    + "other folder, including one the user made."
                 )
             ),
         ] = DEFAULT_FOLDER,
@@ -415,10 +396,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The folder to list, as the `uri` of an outlook_browse_folders result: "
-                    + "outlook:///folders/{id}. Use it for anything the well-known names do not "
-                    + "cover. Alternative to `folder`, never a companion to it. A folder name, a "
-                    + "well-known name and a message handle are none of them folder handles."
+                    "The folder to list, as the opaque handle an outlook_browse_folders result "
+                    + "reported in its `uri`: `outlook:///folders/{id}`. A folder's display "
+                    + "name, a well-known folder name, and a message's own handle are not valid "
+                    + "here. Alternative to `folder`."
                 ),
             ),
         ] = None,
@@ -426,14 +407,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool,
             Field(
                 description=(
-                    "Keep only the messages Microsoft reports as unread. Every returned row is "
-                    + "checked here, so no read message reaches the answer. Whether Exchange also "
-                    + "does the discarding depends on the dates: with a date bound it can, and a "
-                    + "folder of thousands still fills `limit`; without one, this call reads the "
-                    + "newest mail and discards as it goes, so a folder holding few unread among "
-                    + "many can exhaust its internal scan first. `capped` says when that "
-                    + "happened. Compare what comes back with `unread_items`, for how much this "
-                    + "call reached."
+                    "Keep only messages Graph reports as unread; every returned row is checked, "
+                    + "not merely requested. Without a date bound, this can reach `capped` "
+                    + "before finding much unread mail in a busy folder — pair with a date bound "
+                    + "to avoid that."
                 )
             ),
         ] = False,
@@ -441,14 +418,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | datetime | None,
             Field(
                 description=(
-                    "Only messages received on or after this point, inclusive. Two shapes: a "
-                    + "date, `2026-03-04`, which opens at the first instant of that whole UTC "
-                    + "day; or a moment, `2026-03-04T09:00:00Z`, which opens at the second it "
-                    + "names. A moment carrying no zone is read as UTC, so a user's early morning "
-                    + "or late evening can fall on the neighbouring UTC day either way. Alone, it "
-                    + 'leaves the window open at the newest end, which is what "since Monday" '
-                    + "asks for. For a window that has already closed, pair it with "
-                    + "`received_before`."
+                    "Only messages received at or after this point. A date (`2026-03-04`) opens "
+                    + "at the first instant of that whole UTC day; a moment "
+                    + "(`2026-03-04T09:00:00Z`) opens at the exact second named, and a moment "
+                    + "with no time zone is read as UTC."
                 )
             ),
         ] = None,
@@ -456,15 +429,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | datetime | None,
             Field(
                 description=(
-                    "Only messages received on or before this point, inclusive, in the same two "
-                    + "shapes `received_after` takes. A date closes at the END of that UTC day, "
-                    + "so the whole of it is inside the bound and the same date in both bounds "
-                    + "lists that one day; a moment closes at the second it names. Pass it for "
-                    + 'any window that has already closed — "the mail from March", "what came in '
-                    + 'last week", "everything older than five days" — because the rows arrive '
-                    + "newest first: `received_after` alone reaches such a window only after "
-                    + "spending `limit` on everything newer than it, and reports that as `capped` "
-                    + "rather than as an error."
+                    "Only messages received at or before this point, inclusive, in the same two "
+                    + "shapes as `received_after`. A date closes at the end of that whole UTC "
+                    + "day, so the same date in both bounds spans exactly that one day; a moment "
+                    + "closes at the second named."
                 )
             ),
         ] = None,
@@ -473,16 +441,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only messages from this sender, by SMTP address — one address, never a "
-                    + "display name and never a list. `bob@vance.example` works; `Bob Vance` is "
-                    + 'refused, because it would match nothing and read as "no mail from Bob". '
-                    + "Call outlook_find_recipient to turn a name into an address. Matching is "
-                    + "case-insensitive, as SMTP addresses are. Pair it with a date bound when "
-                    + "the question has one: with a date, Microsoft 365 does the discarding, so a "
-                    + "quiet sender is found in a busy folder; without one, this call reads the "
-                    + "newest mail and discards as it goes, so it can stop early and say `capped`. "
-                    + "For the sender's name, mail merely mentioning them, or mail they only "
-                    + "received, use outlook_search_mail."
+                    "Only messages from this sender, as one SMTP address — never a display name "
+                    + "and never a list. A display name (`Bob Vance`) matches nothing and comes "
+                    + "back as an empty page, not an error; resolve one with "
+                    + "outlook_find_recipient first. Without a date bound, a rare sender in a "
+                    + "busy folder can reach `capped` before enough matches are found. For a "
+                    + "sender's display name, or mail that only mentions them, use "
+                    + "outlook_search_mail."
                 ),
             ),
         ] = None,
@@ -492,10 +457,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_RESULTS,
                 description=(
-                    f"How many messages to return, at most {MAX_RESULTS}. They are the newest "
-                    + "that many of the folder, or of the window the two date bounds open. Paging "
-                    + "happens inside the call, so this is the whole answer rather than a first "
-                    + "page: raise it rather than calling again with the same arguments."
+                    f"How many messages to return, at most {MAX_RESULTS}. The result is already "
+                    + "the whole answer for this call, not a first page: calling again with the "
+                    + "same arguments returns the same rows, not more. Raise `limit`, or narrow "
+                    + "the date window, to get more."
                 ),
             ),
         ] = 25,

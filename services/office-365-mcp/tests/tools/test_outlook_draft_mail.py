@@ -342,7 +342,7 @@ class TestHowItDeclaresItself:
         description = tool.description or ""
         lowered = description.casefold()
         assert "cannot send" in lowered
-        assert "attaches a file" in lowered
+        assert "cannot attach a file" in lowered
         assert "bcc" in lowered
         assert "outlook_find_recipient" in description
 

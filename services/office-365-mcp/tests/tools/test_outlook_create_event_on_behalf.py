@@ -1734,9 +1734,11 @@ class TestHowItDeclaresItself:
 
         lowered = (tool.description or "").casefold()
         assert "as that person" in lowered
-        assert "organizer" in lowered
-        assert "nothing in the event" in lowered
-        assert "cannot recall" in lowered
+        assert "nothing here can recall it" in lowered
+
+        organizer = (CreatedEventOnBehalf.model_fields["organizer"].description or "").casefold()
+        assert "organizer" in organizer
+        assert "no property of the event names them" in organizer
 
     async def test_the_description_says_a_person_is_asked_before_anything_is_created(
         self, transport: httpx.AsyncClient
@@ -1744,18 +1746,23 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "confirm before it creates anything" in lowered
+        assert "confirms with the user before creating anything" in lowered
+        assert "every single time" in lowered
         assert "creates nothing unless they agree" in lowered
 
     async def test_the_description_sends_the_users_own_calendar_to_the_other_create(
         self, transport: httpx.AsyncClient
     ) -> None:
-        _parameters, tool = await _registered(transport)
+        parameters, tool = await _registered(transport)
 
         description = tool.description or ""
-        assert "outlook_create_event for the user's own calendar" in description
-        assert "outlook_list_calendars" in description
-        assert "`can_edit`" in description
+        assert "outlook_create_event is the tool for the user's own calendar" in description
+
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        calendar_ref = cast("Mapping[str, object]", properties["calendar_ref"])
+        calendar_ref_description = cast("str", calendar_ref["description"])
+        assert "outlook_list_calendars" in calendar_ref_description
+        assert "`can_edit`" in calendar_ref_description
 
     @pytest.mark.parametrize(
         "caution",
@@ -1764,9 +1771,18 @@ class TestHowItDeclaresItself:
     async def test_the_description_carries_the_cautions_a_create_needs(
         self, transport: httpx.AsyncClient, caution: str
     ) -> None:
-        _parameters, tool = await _registered(transport)
+        parameters, tool = await _registered(transport)
 
-        assert caution in (tool.description or "").casefold()
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        body_html = cast("Mapping[str, object]", properties["body_html"])
+        starts_at = cast("Mapping[str, object]", properties["starts_at"])
+        surfaces = [
+            tool.description or "",
+            cast("str", body_html["description"]),
+            cast("str", starts_at["description"]),
+        ]
+
+        assert any(caution in surface.casefold() for surface in surfaces)
 
     def test_its_not_found_advice_sends_the_caller_back_to_the_calendar_listing(self) -> None:
         assert "outlook_list_calendars" in creator.GRAPH_NOT_FOUND

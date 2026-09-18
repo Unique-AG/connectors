@@ -495,16 +495,20 @@ class TestHowItDeclaresItself:
 
         lowered = (tool.description or "").casefold()
         assert "cannot send" in lowered
-        assert "sends the draft themselves from outlook" in lowered
+        assert "the user presses send in outlook" in lowered
 
     async def test_the_description_says_a_forward_brings_the_attachments_this_tool_cannot_add(
         self, transport: httpx.AsyncClient
     ) -> None:
-        _parameters, tool = await _registered(transport)
+        parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
         assert "no attachment" in lowered
-        assert "carries the original message's own attachments" in lowered
+
+        # This fact is about interpreting `mode: "forward"`, so it lives on that argument now
+        # rather than in the tool-level description.
+        mode_description = cast("str", _properties(parameters)["mode"]["description"])
+        assert "carries the original's own attachments" in mode_description.casefold()
 
     async def test_the_description_rules_out_reply_all_and_the_copy_fields(
         self, transport: httpx.AsyncClient
@@ -513,7 +517,7 @@ class TestHowItDeclaresItself:
 
         lowered = (tool.description or "").casefold()
         assert "no reply-all" in lowered
-        assert "no cc and no bcc" in lowered
+        assert "no cc, no bcc" in lowered
 
     def test_the_known_issue_the_second_write_exists_for_is_cited(self) -> None:
         """The fill looks removable until you know Microsoft drops the comment, so the citation is

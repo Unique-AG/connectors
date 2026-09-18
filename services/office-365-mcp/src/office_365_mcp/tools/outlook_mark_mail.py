@@ -91,19 +91,17 @@ _FLAG_STATUS: Mapping[bool, FollowupFlagStatus] = {
 }
 
 _DESCRIPTION = f"""\
-Change how up to {MAX_MESSAGES} messages are marked in the signed-in user's own mailbox. You \
-can change three things: read or unread state, the follow-up flag, and the importance Outlook \
-shows for each message. THIS CHANGES THE MAILBOX. The change is immediate, and this connector \
-cannot undo it. No tool here restores a previous state. The user sees the change in Outlook on \
-every device. An unread count moves, a flag appears in or leaves the follow-up list, and an \
-importance marker changes. If `flagged` is set to false, this also erases the follow-up dates \
-that Outlook stored with the flag. Pass at least one of `is_read`, `flagged` and `importance`. \
-Every value given applies to every message named, so one call makes one change to one set of \
-messages. `message_refs` takes the `uri` value from a tool result, copied exactly. A subject \
-line, an email address and an Outlook web link are not handles. Each message is written and \
-reported separately. Read the rows, not only the call result: some can succeed while others \
-fail. This tool cannot change what a message says. There is no way here to alter a subject, a \
-body or a recipient.\
+Change read/unread state, the follow-up flag, or importance on up to {MAX_MESSAGES} messages in \
+the signed-in user's own mailbox — for marking mail read, flagging it for follow-up, or \
+resetting its importance marker.
+
+Notes:
+- Pass at least one of `is_read`, `flagged`, and `importance`; setting `flagged` to false also \
+discards the follow-up dates (start, due, completed) Outlook stored with the flag.
+- `message_refs` takes the `uri` value from a tool result, copied exactly; a subject line, an \
+email address, and an Outlook web link are not handles.
+- The change is immediate and cannot be undone; each message is written and reported on its \
+own row, so read the rows rather than only the counts.
 """
 
 _NOTHING_TO_CHANGE = (
@@ -141,48 +139,40 @@ class MarkedMessage(BaseModel):
     )
     changed: bool = Field(
         description=(
-            "True when Microsoft 365 accepted the change to this message. False means it did "
-            + "not, and `failure` states what Microsoft answered. The other messages in the same "
-            + "call are unaffected either way, so a false here is not evidence about any other "
-            + "row. A true means only that Microsoft accepted the request. What the message now "
-            + "holds is in the three fields below, read back from Microsoft's own answer."
+            "Whether Microsoft 365 accepted the write for this message. False means `failure` "
+            + "states why; the other rows in the same call are unaffected either way. True means "
+            + "only that the request was accepted — what changed is in `is_read`, `flag_status`, "
+            + "and `importance` below, read back from Microsoft's own response."
         )
     )
     is_read: bool | None = Field(
         description=(
-            "Whether Microsoft 365 now reports the message as read. This value comes from the "
-            + "response to this write, not from what the call asked for. A value here that "
-            + "differs from the `is_read` argument means Exchange disagreed, and that is the "
-            + "answer. Null when the message was not changed, or when Microsoft returned no "
-            + "message to read the value from."
+            "Whether Microsoft 365 now reports the message as read, read back from the response "
+            + "to this write rather than the `is_read` argument. Null when the message was not "
+            + "changed. A value here that differs from the argument means Exchange disagreed — "
+            + "trust this field over the request."
         )
     )
     flag_status: str | None = Field(
         description=(
-            "The follow-up status Microsoft 365 now reports, exactly as Microsoft states it: "
-            + "`flagged`, `notFlagged` or `complete`. This tool reports Microsoft's own "
-            + "three-value property instead of the true or false value the call asked for, "
-            + "because `complete` is neither one. A message whose follow-up is finished is not "
-            + "flagged, and is not left unflagged either. Null when the message was not changed, "
-            + "or when Microsoft returned no flag."
+            "The follow-up status Microsoft 365 now reports: `flagged`, `notFlagged`, or "
+            + "`complete`. Null when the message was not changed. Read back as this three-value "
+            + "enum rather than the `flagged` true/false argument, because a follow-up marked "
+            + "finished reads as `complete` — neither flagged nor unflagged."
         )
     )
     importance: str | None = Field(
         description=(
-            "The importance Microsoft 365 now reports: `low`, `normal` or `high`. This value is "
-            + "read from Microsoft's response to this write. Null when the message was not "
-            + "changed, or when Microsoft returned none."
+            "The importance Microsoft 365 now reports: `low`, `normal`, or `high`, read from "
+            + "the response to this write. Null when the message was not changed."
         )
     )
     failure: str | None = Field(
         description=(
             "Why this message was not changed, as Microsoft 365 stated it, with the request id "
-            + "when one came. Null when the change succeeded. A 404 here means the write did "
-            + "not happen, not that the message never existed. Microsoft answers 'it was "
-            + "deleted', 'it never existed' and 'you cannot touch it' with the same one status, "
-            + "and does not say which one it meant. So this field reports only that the message "
-            + "was not marked. The handle can simply be older than the mailbox. Search or list "
-            + "again, and use the handle that comes back instead of this one."
+            + "when one came. Null when the change succeeded. A 404 here does not distinguish a "
+            + "deleted message, one that never existed, or a permission refusal — the handle may "
+            + "simply be stale. Search or list again and use the handle that comes back."
         )
     )
 
@@ -192,9 +182,8 @@ class MarkedMail(BaseModel):
 
     messages: list[MarkedMessage] = Field(
         description=(
-            "One row per handle passed in, in that order. This is the answer: a call over "
-            + "several messages has no single outcome. A summary of 'it worked' loses the "
-            + "messages that did not."
+            "One row per handle in `message_refs`, in that order — a batch has no single "
+            + "outcome, so read the rows rather than a summary."
         )
     )
     changed_count: int = Field(
@@ -202,8 +191,7 @@ class MarkedMail(BaseModel):
     )
     failed_count: int = Field(
         description=(
-            "How many it refused. Both counts are here so a partial result is clear at a "
-            + "glance. Neither replaces reading the rows, which say which messages those were."
+            "How many it refused. Read `messages` for which ones — these counts alone don't say."
         )
     )
 
@@ -366,13 +354,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_MESSAGES,
                 description=(
-                    "The messages to change, as the `uri` values from tool results, copied "
-                    + "exactly. outlook_search_mail, outlook_list_mail, outlook_read_mail and "
-                    + "outlook_read_thread each report one per message. At most "
-                    + f"{MAX_MESSAGES} per call. This is a bound on the tool, not a page size: "
-                    + "to mark more, read the rows this call returns, then make another call "
-                    + "with the next handles. Every entry is checked before anything is "
-                    + "written, so one bad handle refuses the whole call and changes nothing."
+                    "The messages to change: `uri` values from an outlook_search_mail, "
+                    + "outlook_list_mail, outlook_read_mail, or outlook_read_thread result. Up "
+                    + f"to {MAX_MESSAGES} per call — this bounds the tool, not a page: to mark "
+                    + "more, read this call's rows first, then call again with the next "
+                    + "handles. Every entry is checked before anything is written, so one "
+                    + "invalid handle refuses the whole call."
                 ),
             ),
         ],
@@ -380,10 +367,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool | None,
             Field(
                 description=(
-                    "True marks the messages read, false marks them unread. Omit this argument "
-                    + "to leave read state alone. This is not a toggle, and there is no value "
-                    + "that means 'whatever it was'. The user's unread count moves in Outlook on "
-                    + "every device the moment this write lands."
+                    "True marks the messages read, false marks them unread. Omit this "
+                    + "argument to leave read state alone."
                 )
             ),
         ] = None,
@@ -391,12 +376,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool | None,
             Field(
                 description=(
-                    "True flags the messages for follow-up, false clears the flag. Omit to leave "
-                    + "flags alone. Setting and clearing a flag are not opposites: Outlook keeps "
-                    + "start, due and completed dates with a flag, and this tool cannot read or "
-                    + "set them. Clearing the flag discards those three dates. A message whose "
-                    + "follow-up was marked complete reads back as `complete`, not as either "
-                    + "true or false."
+                    "True flags the messages for follow-up, false clears the flag. Omit to "
+                    + "leave the flag alone. A follow-up marked complete reads back in the "
+                    + "result as `flag_status: complete`, not as true or false."
                 )
             ),
         ] = None,
@@ -404,11 +386,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             MailImportance | None,
             Field(
                 description=(
-                    "The importance Outlook shows against the messages. Omit this argument to "
-                    + "leave it alone. This write rewrites the marker on the sender's original "
-                    + "message, so a `low` value on a message the sender sent as `high` is not "
-                    + "a private note. It cannot be told apart later from how the message "
-                    + "arrived."
+                    "The importance Outlook shows for the messages: `low`, `normal`, or "
+                    + "`high`. Omit to leave it alone. This rewrites the marker on the "
+                    + "sender's original message — it cannot later be told apart from how the "
+                    + "message actually arrived."
                 )
             ),
         ] = None,

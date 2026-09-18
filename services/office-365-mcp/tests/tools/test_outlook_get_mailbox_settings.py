@@ -529,16 +529,16 @@ class TestWhatItCannotSee:
 
         assert field.description is not None
         assert "Set-Mailbox -ForwardingSmtpAddress" in field.description
-        assert "is NOT" in field.description
-        assert "not being forwarded" in field.description
+        assert "is not evidence" in field.description
+        assert "isn't being forwarded" in field.description
 
     def test_the_tool_description_names_the_blind_spot_too(self) -> None:
         """A caller choosing this tool reads the description before any field, so the limit is
         stated where the choice is made as well as where the answer arrives."""
         description = settings_tool._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
 
-        assert "CANNOT see Exchange mailbox-level forwarding" in description
-        assert 'never "this mailbox is not being forwarded"' in description
+        assert "Cannot see Exchange mailbox-level forwarding" in description
+        assert "is not evidence the mailbox is not being forwarded" in description
 
 
 class TestPaging:

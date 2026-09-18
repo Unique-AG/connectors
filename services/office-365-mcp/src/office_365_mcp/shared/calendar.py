@@ -160,10 +160,10 @@ class EventTime(BaseModel):
         description=(
             "The same instant as an ISO-8601 timestamp with an offset, in the zone that was asked "
             + "for. This value is the one to compare, to sort on and to quote. On an all-day "
-            + "event it is a UTC midnight moved into this zone, so it names a time of day and "
-            + "sometimes a neighboring date: read `local` for the date such a row covers. Null "
-            + "when Graph named a zone that this connector cannot resolve, which happens for "
-            + "Windows zone names: `local` and `time_zone` still say what Microsoft holds."
+            + "event it is a UTC midnight moved into this zone, so in a zone west of UTC it names "
+            + "the day before: read `local` for the date such a row covers. Null when Graph named "
+            + "a zone that this connector cannot resolve, which happens for Windows zone names: "
+            + "`local` and `time_zone` still say what Microsoft holds."
         )
     )
 

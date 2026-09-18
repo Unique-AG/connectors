@@ -55,12 +55,18 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "release"}
 MAX_RESULTS = 50
 
 _DESCRIPTION = """\
-Search every Teams message the signed-in user can see, by keyword, sender, mention, date, \
-attachment or read state. Use it for "find the message where…" and for every date-bounded \
-question, including one about a named channel — teams_browse_channel has no date filter. Search \
-takes no chat or channel scope: read `channel_id` on each hit to see where it came from. At least \
-one criterion is required and all are ANDed. Hits carry metadata and Microsoft's `summary` snippet \
-only — pass a hit's `uri` to teams_read_message for the actual words.\
+Searches every Teams message the signed-in user can see by keyword, sender, mention, date, \
+attachment, or read state, in no guaranteed order, for "find the message where…" and any \
+date-bounded question. teams_browse_channel is the sibling for reading one channel's posts \
+directly; it has no date filter, so use this tool whenever a date bound is involved, including \
+for a named channel.
+
+Notes:
+- At least one of the search criteria is required; every criterion given is ANDed together.
+- It takes no chat or channel scope — every chat and channel the user can see is searched; read \
+`channel_id` or `chat_id` on each hit to see where it came from.
+- A hit carries metadata and Microsoft's `summary` snippet only, never the message body — pass \
+its `uri` to teams_read_message for the actual words.\
 """
 
 
@@ -72,23 +78,15 @@ class MessageHit(BaseModel):
             "A handle for this exact message, for example "
             + "`teams:///chats/{chatId}/messages/{messageId}` or "
             + "`teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}`, with each id "
-            + "percent-encoded. Pass it verbatim to teams_read_message. This search returns no "
-            + "message "
-            + "body, so it is the only route to the full text, the attachments and the mentions. "
-            + "Null in the rare case where Graph returned a hit with neither a chat nor a channel "
-            + "identity, which cannot be addressed at all. "
-            + "One handle here can fail to read: Microsoft "
-            + "addresses a reply in a channel thread under its parent post and its search index "
-            + "does not say which post that is, so a hit that is a reply gets the root-post form "
-            + "above, and teams_read_message can answer that it did not read the message. "
-            + "teams_browse_channel "
-            + "is the "
-            + "only tool that emits a reply's own handle, and it reaches only the newest "
-            + f"{MAX_REPLIES_PER_POST} replies of each post on the channel's first page, following "
-            + "no cursor further back. If "
-            + "the reply is not in that window, there is no route to its full text, and browsing "
-            + "again returns the same window: report this `summary` with the sender and date "
-            + "here, say this tool did not retrieve the full text, and stop looking."
+            + "percent-encoded. Pass it verbatim to teams_read_message, the only route to the "
+            + "full text, the attachments and the mentions. Null when a hit carries "
+            + "neither a chat nor a channel identity, which is unaddressable. When the hit is a "
+            + "reply, this handle addresses its parent post instead — teams_read_message then "
+            + "reports it could not read the message. Only teams_browse_channel emits a reply's "
+            + f"own handle, reaching just the newest {MAX_REPLIES_PER_POST} replies of each post "
+            + "with no further cursor; outside that window there is no route to its full text, "
+            + "and browsing again returns the same window — report this `summary` with the "
+            + "sender and date, and stop looking."
         )
     )
     message_id: str = Field(
@@ -114,25 +112,23 @@ class MessageHit(BaseModel):
     )
     summary: str | None = Field(
         description=(
-            "Microsoft's own snippet of the matching text, truncated with `...` where it was cut. "
-            + "This is the ONLY message content this search returns — Graph's search projection "
-            + "has no body — so do not quote it as the whole message or infer from its absence. "
-            + "Read `uri` for the real text."
+            "Microsoft's own snippet of the matching text, truncated with `...` where it was "
+            + "cut. Not the full message: do not quote it as the whole message or infer from "
+            + "its absence — see `uri`."
         )
     )
     sender: MessageSender = Field(description="Who sent the message.")
     created_at: datetime | None = Field(
         description=(
-            "When sent. Compare this to order results: Graph does not sort message search."
+            "When sent. Compare this across hits to order them — Graph applies no sort of its "
+            + "own to message search."
         )
     )
     last_modified_at: datetime | None = Field(
         description=(
-            "When the message was last modified. Microsoft counts adding or removing a reaction "
-            + "as a modification, so a difference from `created_at` is not evidence of an edit — "
-            + "teams_read_message reports `last_edited_at`, which is the property behind Teams' "
-            + "own "
-            + "'Edited' flag and is what to read when an edit is the question."
+            "When the message was last modified — Microsoft counts a reaction change as a "
+            + "modification, so a difference from `created_at` is not evidence of an edit. "
+            + "teams_read_message's `last_edited_at` is what backs Teams' own 'Edited' flag."
         )
     )
     importance: str | None = Field(
@@ -140,8 +136,8 @@ class MessageHit(BaseModel):
     )
     web_url: str | None = Field(
         description=(
-            "A link that opens the message in Microsoft Teams. Populated for channel messages and "
-            + "null for chat messages, which Graph gives no such link — use `uri` to read those."
+            "A link that opens the message in Microsoft Teams. Populated for channel messages; "
+            + "null for chat messages — use `uri` for those instead."
         )
     )
 
@@ -183,20 +179,17 @@ class MessageHit(BaseModel):
 class MessageSearchResults(BaseModel):
     messages: list[MessageHit] = Field(
         description=(
-            "Matching messages on this page, from ANY participant — not only the signed-in "
-            + "user's own. Every chat and channel the user can see was searched, and nothing "
-            + "narrows a search to one of them. Messages with no sender are dropped: Graph names "
-            + 'no author on a system message ("Ada joined") or on a deleted one, so a message '
-            + "absent here is not a message that does not exist."
+            "Matching messages on this page. Messages with no sender are dropped — Graph names "
+            + 'no author on a system message ("Ada joined") or a deleted one — so a message '
+            + "absent here is not proof it does not exist."
         )
     )
     next_offset: int | None = Field(
         description=(
-            "The offset that reaches the next page of results, or null when the page cannot "
-            + "advance further. Null means either no more results exist, or the page held no hits "
-            + "to advance past even though Graph said more can exist — in both cases, do not use "
-            + "this offset again. It counts Graph's hits, not the messages this tool returned, "
-            + "because offsets index Graph's unfiltered results."
+            "The offset that reaches the next page, or null when it cannot advance further — "
+            + "either no more results exist, or the page held no hits to advance past even "
+            + "though Graph said more remain; do not reuse this offset either way. It counts "
+            + "Graph's hits, not the messages this tool returned."
         )
     )
 
@@ -351,11 +344,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Keywords to find. Every word must appear anywhere in any order. They are not "
-                    + 'matched as phrases unless quoted. Quote terms for adjacency: `"release '
-                    + 'notes"` matches only side by side, `release notes` matches anywhere. '
-                    + "Search operators are searched as text, not interpreted. Use the other "
-                    + "parameters for filtering."
+                    "Keywords to find; every word must appear, in any order, unless quoted for "
+                    + 'adjacency — `"release notes"` matches only side by side, `release notes` '
+                    + "matches anywhere. Any search-operator syntax is matched as literal text, "
+                    + "not interpreted; use the other parameters to filter instead."
                 ),
             ),
         ] = None,
@@ -393,11 +385,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | datetime | None,
             Field(
                 description=(
-                    "Only messages sent on or after this point, inclusive. Two shapes: a date, "
-                    + "`2026-03-04`, for a bound on the day; or a moment, "
-                    + '`2026-03-04T09:00:00Z`, to bound within one — a moment for "since this '
-                    + 'morning\'s stand-up", a date for "since Monday". A moment carrying no '
-                    + "zone is read as UTC. Applied by the index at no extra cost."
+                    "Only messages sent at or after this point, inclusive. A date (`2026-03-04`) "
+                    + "bounds the whole day; a moment (`2026-03-04T09:00:00Z`) bounds the exact "
+                    + "second, and a moment with no time zone is read as UTC."
                 )
             ),
         ] = None,
@@ -405,10 +395,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | datetime | None,
             Field(
                 description=(
-                    "Only messages sent on or before this point, inclusive, in the same two "
-                    + "shapes `sent_after` takes. A moment bounds the second it names, so pass "
-                    + "one for the closing edge of part of a day; a date bounds the day it names. "
-                    + "A moment carrying no zone is read as UTC."
+                    "Only messages sent at or before this point, inclusive, in the same two "
+                    + "shapes as `sent_after`. A moment bounds the exact second; a date bounds "
+                    + "the whole day."
                 )
             ),
         ] = None,
@@ -443,7 +432,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 ge=1,
                 le=MAX_RESULTS,
-                description=("Results per page. Default 25, maximum " + f"{MAX_RESULTS}."),
+                description=f"Results per page, at most {MAX_RESULTS}.",
             ),
         ] = 25,
         client: GraphServiceClient = graph,

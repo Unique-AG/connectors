@@ -53,11 +53,10 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
 _DESCRIPTION = """\
-Read one Teams message in full: the whole text, sender, @-mentions, attachments, and edit or \
+Reads one Teams message in full: the whole text, sender, @-mentions, attachments, and edit or \
 delete status. Call it on the `uri` of a teams_search_messages hit whenever the answer depends on \
 what somebody actually said — a hit carries a snippet and no message body. A message \
-teams_browse_channel returned is already complete and needs no read. `uri` must be a handle a tool \
-result carried. No name, chat topic, or Teams link becomes one.\
+teams_browse_channel returned is already complete and needs no read.\
 """
 
 _BAD_HANDLE = (

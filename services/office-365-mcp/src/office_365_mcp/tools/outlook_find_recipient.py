@@ -112,14 +112,12 @@ _WORD = re.compile(r"[^\W_]+")
 _NEVER = datetime.min.replace(tzinfo=UTC)
 
 _DESCRIPTION = """\
-Before addressing a draft to a guess, resolve a person's name to the email address they send \
-from. This tool answers with candidates for a human to confirm. It never gives an address to \
-send to unprompted, and never a row to pick because it came first. Microsoft's person index \
-matches fuzzily, so `tiler` returns Tyler: read `match_kind` on every row, and treat `ambiguous` \
-as "ask the user which one". An empty answer means this user's index holds nobody by that name. \
-That is not the same as saying the person does not exist. It returns each candidate's address, \
-display name, match kind, type, whether they are outside the user's own domain, job title, and \
-department.\
+Before addressing a draft to a guess, resolve a person's name, alias, or partial address to the \
+address they send from and how confidently it matches.
+
+Notes:
+- Never choose a candidate automatically — return them for the user to confirm, especially any \
+marked `ambiguous` or graded `fuzzy`.
 """
 
 _NO_QUERY = (
@@ -148,12 +146,12 @@ class RecipientCandidate(BaseModel):
     )
     match_kind: MatchKind = Field(
         description=(
-            "How this row compares with the query as it was sent, computed here and not by "
-            + "Microsoft. `exact`: the query is the whole display name, the whole address, its "
-            + "local part or the sign-in name. `token`: every word of the query is a whole word "
-            + "of the name or of the address's local part. `fuzzy`: Microsoft matched it and "
-            + "nothing about the row says why — `tiler` lands here against Tyler. Never draft to "
-            + "a `fuzzy` row without asking."
+            "How this row compares with the query, computed here rather than by Microsoft. "
+            + "`exact` — the query is the whole display name, address, its local part, or the "
+            + "sign-in name. `token` — every word of the query is a whole word of the name or of "
+            + "the address's local part. `fuzzy` — Microsoft matched it for a reason this tool "
+            + "cannot determine, for example `tiler` against Tyler. Never draft to a `fuzzy` row "
+            + "without confirming with the user."
         )
     )
     kind: RecipientKind | None = Field(
@@ -205,14 +203,12 @@ class RecipientCandidates(BaseModel):
 
     outcome: Outcome = Field(
         description=(
-            "`match` when at least one candidate came back, `no_match` when neither index held "
-            + "anybody. `no_match` is not proof the person does not exist. It means they are not "
-            + "in this user's index. At least five reasons can explain that. First, the two "
-            + "never corresponded. Second, the person is not on this user's relevance list. "
-            + "Third, an information barrier separates them. Fourth, the person is hidden from "
-            + "the address list. Fifth, they joined too recently for the index to include them. "
-            + "Say that, rather than reporting that no such person exists, and ask the user for "
-            + "the address."
+            "`match` when at least one candidate came back; `no_match` when neither index held "
+            + "anybody — never proof the person does not exist. Reasons include: the two never "
+            + "corresponded, the person is off this user's relevance list, an information "
+            + "barrier separates them, the person is hidden from the address list, or they "
+            + "joined too recently to be indexed. Ask the user for the address rather than "
+            + "reporting that no such person exists."
         )
     )
     query: str = Field(
@@ -534,9 +530,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=2,
                 description=(
-                    "The person to resolve: a name, a first name, an alias or a partial address. "
-                    + "Pass what the user actually wrote. The answer grades every row against "
-                    + "this exact text, so a query you tidied up first grades a row you invented."
+                    "The person to resolve — a name, first name, alias, or partial address — "
+                    + "passed exactly as the user wrote it; a query tidied up first grades a row "
+                    + "against text nobody typed."
                 ),
             ),
         ],

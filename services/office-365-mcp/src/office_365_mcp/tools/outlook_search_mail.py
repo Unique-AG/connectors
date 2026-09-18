@@ -53,24 +53,17 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 MAX_RESULTS = 50
 
 _DESCRIPTION = """\
-Search the signed-in user's own mailbox by keyword, sender, recipient, subject or attachment \
-file name, within a receipt-date window when the question has one. Use it for "find the mail \
-where…" and for anything about a person. The tool needs at least one criterion, and combines all \
-given criteria with AND, so each one narrows the answer. Pick the recipient argument \
-deliberately: `to` is the To line only, which is what "addressed to me" means, while `recipient` \
-also matches Cc, Bcc and mail the person sent — on the user's own mailbox that is nearly \
-everything. `attachment_name` is the only way to reach a file's name; `query` does not read it. \
-`received_after` and `received_before` bound receipt date at either end, and both of those days \
-are covered whole, so "the invoice mail from March" is one call. They narrow a search rather than \
-standing in for one: at least one criterion is still required, because a window on its own is \
-outlook_list_mail's question. There is no sort here, inside a window or outside one. Microsoft's \
-index returns its own order, so a window does not make an answer "the newest". Hits carry \
-metadata and a short preview only. Pass a hit's `uri` to outlook_read_mail for what the message \
-actually says. Use outlook_list_mail instead for a date range with nothing to search for, for \
-"the newest" and anything else about receipt order, and when unsent drafts matter: the index \
-behind this tool does not reach drafts in Deleted Items, so a window here can return fewer \
-messages than the same window on outlook_list_mail, never more. This tool searches only this \
-user's mailbox, never a shared one.\
+Search the signed-in user's own mailbox by keyword, sender, recipient, subject, or attachment \
+file name for "find the mail where…" questions and anything about a person. outlook_list_mail \
+is the sibling for a folder's newest mail in receipt order, including drafts; use it for a plain \
+date window or when order matters.
+
+Notes:
+- Needs at least one of `query`, `sender`, `recipient`, `to`, `subject`, or `attachment_name`; \
+`received_after`/`received_before` narrow that criterion but never substitute for one, and all \
+given criteria must match (AND).
+- `received_before` must fall on or after `received_after`; a reversed pair returns nothing.
+- Searches only the signed-in user's own mailbox, never a shared or delegated one.
 """
 
 
@@ -79,17 +72,18 @@ class MailSearchResults(BaseModel):
 
     messages: list[MailSummary] = Field(
         description=(
-            "The matches, ordered by send date, which is the order Microsoft's index returns. "
-            + "Empty means the index matched nothing. This does not mean the mailbox holds "
-            + "nothing, because a search reaches indexed content only."
+            "The matches, in the index's own order — not receipt or send order, and not "
+            + "necessarily newest first. Empty means the index found nothing, not that the "
+            + "mailbox holds nothing: a search reaches indexed content only. Pass a hit's `uri` "
+            + "to outlook_read_mail for the full message; the `uri` keeps working after the "
+            + "message is later moved, renamed, or refiled."
         )
     )
     more_may_exist: bool = Field(
         description=(
-            "When the answer fills `limit`, this is true, and a higher `limit` can return more "
-            + "matches. There is no match count to report. Graph publishes none for a mail "
-            + "search, and any number reported here is only this page's size, mislabeled as a "
-            + "total."
+            "True when the answer fills `limit`, meaning more matches likely exist; there is no "
+            + "match count to report. Raise `limit` to see more — calling again with the same "
+            + "arguments returns the same page, not the next one."
         )
     )
 
@@ -267,11 +261,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Words to find in the subject, the body or an attachment's text. Every word "
+                    "Words to find in the subject, the body, or an attachment's text; every word "
                     + "must appear, in any order. Quote a run to require adjacency: "
                     + '`"purchase order"` matches only side by side, `purchase order` matches '
-                    + "both words anywhere. This tool treats search operators as plain text. It "
-                    + "does not act on them as commands."
+                    + "both words anywhere. Search operators in this text are read literally, "
+                    + "never executed as commands."
                 ),
             ),
         ] = None,
@@ -280,10 +274,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only mail from this person, by address, alias or display name. Exchange "
-                    + "expands a name to the address it knows, so a first name usually works. Do "
-                    + "not put the person's name in `query` instead: `query` also matches mail "
-                    + "that merely mentions them."
+                    "Only mail from this person, by address, alias, or display name; Exchange "
+                    + "expands a name to the address it knows, so a first name usually works. Put "
+                    + "a name here rather than in `query`, which also matches mail that merely "
+                    + "mentions them."
                 ),
             ),
         ] = None,
@@ -292,11 +286,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only mail this person was on ANYWHERE — as the sender, or as a To, Cc or "
-                    + 'Bcc recipient. That width makes it the wrong argument for "mail addressed '
-                    + "to me\": on the user's own mailbox nearly every message has them on it "
-                    + "somewhere, so this matches nearly everything. Use `to` for that, `sender` "
-                    + 'for "mail from them", and this one for "anything involving Dana".'
+                    "Only mail this person appears on anywhere — as sender, or as a To, Cc, or "
+                    + "Bcc recipient. On the user's own mailbox that is nearly every message, so "
+                    + 'it is the wrong argument for "addressed to me"; use `to` for that and '
+                    + "`sender` for mail from them."
                 ),
             ),
         ] = None,
@@ -305,11 +298,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only mail addressed directly to this person, on the To line — not Cc, not "
-                    + 'Bcc, and not mail they merely sent. This is the argument for "mail '
-                    + "addressed to me\", with the signed-in user's own address from get_me: it "
-                    + "separates the mail written to them from the mail they were copied on. "
-                    + "Takes an address, alias or display name, as `sender` does."
+                    "Only mail addressed directly to this person on the To line, not Cc, Bcc, or "
+                    + 'mail they merely sent. This is the argument for "addressed to me" — pass '
+                    + "the signed-in user's own address from get_me. Takes an address, alias, or "
+                    + "display name, as `sender` does."
                 ),
             ),
         ] = None,
@@ -319,7 +311,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "Only mail whose subject carries these words. Narrower than `query`, which "
-                    + "reads the body too, and the better choice when the user quoted a subject."
+                    + "also reads the body; prefer this when the user quoted a subject."
                 ),
             ),
         ] = None,
@@ -328,16 +320,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only mail carrying an attachment whose FILE NAME matches, for example "
-                    + "`budget_2026.xlsx`. Attachment file names are reachable by no other "
-                    + "argument here: `query` reads the sender, the subject and the body text, "
-                    + "and a file's name is in none of them. Pass the name whole and as the user "
-                    + "wrote it. Matching is on the words of the name rather than the name "
-                    + "itself, so `budget.xlsx` also finds `2017 budget.xlsx`, while a fragment "
-                    + "such as `budg` finds neither — this tool sends `*` as a literal, so a "
-                    + "partial name silently returns nothing instead of matching a prefix. This "
-                    + "is not a has-any-attachment switch: every row already reports "
-                    + "`has_attachments`, so read that field rather than inventing a name here."
+                    "Only mail carrying an attachment whose file name matches, for example "
+                    + "`budget_2026.xlsx`; no other argument reaches a file name. Matching is by "
+                    + "word, not substring: `budget.xlsx` also finds `2017 budget.xlsx`, but a "
+                    + "fragment such as `budg` matches nothing rather than a prefix. This is not "
+                    + "a has-any-attachment switch — read the `has_attachments` output field for "
+                    + "that instead."
                 ),
             ),
         ] = None,
@@ -345,15 +333,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | datetime | None,
             Field(
                 description=(
-                    "Only mail received on or after this point, inclusive. Two shapes: a date, "
-                    + "`2026-03-04`, which is that whole UTC day from its first instant; or a "
-                    + "moment, `2026-03-04T09:00:00Z`, which is the second it names. A moment "
-                    + "carrying no zone is read as UTC, so a user's early morning or late evening "
-                    + "can fall on the neighbouring UTC day. This narrows the criteria and does "
-                    + "not stand in for one: a criterion is still required, and a window with "
-                    + "nothing to search for is outlook_list_mail's question. It does not order "
-                    + "the answer either — hits come back in the index's own order inside a "
-                    + "window exactly as outside one, so this is not a way to ask for the newest."
+                    "Only mail received on or after this point. A date (`2026-03-04`) covers "
+                    + "that whole UTC day from its first instant; a moment "
+                    + "(`2026-03-04T09:00:00Z`) opens at the exact second named, and one with no "
+                    + "time zone is read as UTC."
                 )
             ),
         ] = None,
@@ -362,14 +345,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Only mail received on or before this point, inclusive, in the same two "
-                    + "shapes `received_after` takes. A date closes at the END of that UTC day, "
-                    + "so the whole of it is inside the bound and the same date in both bounds "
-                    + "searches that one day; a moment closes at the second it names. Pair it "
-                    + 'with `received_after` for a window that has closed — "the invoice mail '
-                    + 'from March", "what Dana sent last week". Like `received_after` it narrows '
-                    + "a search rather than being one, and it sorts nothing: for "
-                    + "recency or receipt order, and for the drafts this index does not reach, "
-                    + "use outlook_list_mail."
+                    + "shapes as `received_after`. A date closes at the end of that UTC day, so "
+                    + "the same date in both bounds searches exactly that one day."
                 )
             ),
         ] = None,
@@ -380,7 +357,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_RESULTS,
                 description=(
                     f"How many messages to return, at most {MAX_RESULTS}. One Graph request, so "
-                    + "this is the whole window rather than a first page: raise it rather than "
+                    + "this is the whole window rather than a first page — raise it instead of "
                     + "calling again with the same criteria."
                 ),
             ),

@@ -327,8 +327,8 @@ class TestWhatTheCallerIsTold:
         description = chats.ChatSummary.model_fields["meeting_uri"].description
 
         assert description is not None
-        assert "Null when no join URL exists" in description
-        assert "The only route from conversation to meeting" in description, (
+        assert "Null when the chat carries no join URL" in description
+        assert "the only route from conversation to meeting" in description, (
             "the populated case says what it is a route to, and its being the only one is what "
             + "makes a null a dead end rather than an invitation to try something else"
         )

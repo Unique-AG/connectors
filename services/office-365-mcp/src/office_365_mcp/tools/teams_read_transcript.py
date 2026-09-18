@@ -47,13 +47,15 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 MAX_TURNS = 500
 
 _DESCRIPTION = """\
-Return a Teams meeting transcript's spoken turns, timestamped and speaker-attributed, from the \
-`uri` teams_list_meeting_transcripts reports. Call it for what was actually said or decided. \
-teams_read_message is the other reader and takes a different handle, and a `meeting_uri` is not \
-one. \
-When `speaker_attribution` is false, every `speaker` is null, and a `speaker` filter matches \
-nothing. Before you report that somebody did not speak, read that flag. Returns turns with \
-speaker, seconds, and text.\
+Returns one Teams meeting transcript's spoken turns, timestamped and speaker-attributed, from \
+the `uri` teams_list_meeting_transcripts reports, for what was actually said or decided. \
+teams_read_message is the other reader and takes a different handle; `meeting_uri` is not \
+valid for either.
+
+Notes:
+- If `speaker_attribution` comes back false, every `speaker` is null and a `speaker` filter \
+matches nothing.
+- Pass `from_seconds` before `to_seconds`; a window that runs backwards matches nothing.
 """
 
 _NOT_A_TRANSCRIPT_HANDLE = (
@@ -88,19 +90,19 @@ GRAPH_NOT_FOUND = (
 class TranscriptTurn(BaseModel):
     speaker: str | None = Field(
         description=(
-            "Who spoke. Null if transcript has no speaker attribution or Microsoft did not name "
-            "this turn."
+            "Who spoke, or null if the transcript has no speaker attribution or Microsoft did "
+            "not name this turn."
         )
     )
     start_seconds: float = Field(
         description=(
             "Turn start in seconds from transcription start — not wall-clock, and not an offset "
-            "from meeting start. Can be negative. Add it to the transcript's `started_at` for an "
-            "absolute time."
+            "from meeting start. Can be negative. Add to the `started_at` "
+            "teams_list_meeting_transcripts reported for this transcript for an absolute time."
         )
     )
-    end_seconds: float = Field(description="Turn end, same scale.")
-    text: str = Field(description="Spoken words without cue markup.")
+    end_seconds: float = Field(description="Turn end, same scale as `start_seconds`.")
+    text: str = Field(description="Spoken words, with cue markup stripped.")
 
     @classmethod
     def from_block(cls, block: str, *, attributed: bool) -> Self | None:
@@ -129,24 +131,24 @@ class TranscriptTurn(BaseModel):
 
 class Transcript(BaseModel):
     uri: str = Field(description="The handle used to read this, echoed back.")
-    meeting_id: str = Field(description="Meeting id.")
+    meeting_id: str = Field(description="Meeting Graph id.")
     transcript_id: str = Field(description="Transcript Graph id.")
     speaker_attribution: bool = Field(
         description=(
-            "True if speakers named. False if tenant turned speaker names off. All `speaker` "
-            "values null when false. Do not guess who spoke from content."
+            "True if speakers are named, false if the tenant disabled speaker names — every "
+            "`speaker` is null when false. Do not infer who spoke from a turn's content."
         )
     )
     turns: list[TranscriptTurn] = Field(
         description=(
-            "Matching turns (or all turns if no filter). Empty means none matched, not that the "
-            "meeting was silent."
+            "Matching turns, or all turns if no filter was passed. Empty means nothing matched, "
+            "not that the meeting was silent."
         )
     )
     next_offset: int | None = Field(
         description=(
-            "Offset for next page of matching turns, or null if this is the last page. Pass the "
-            "same filters. A page with `next_offset` set is not the whole meeting."
+            "Offset for the next page of matching turns, or null if this is the last page. Pass "
+            "it back as `offset`, with the same filters, to continue."
         )
     )
 
@@ -314,9 +316,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The transcript from teams_list_meeting_transcripts: "
-                    "teams:///transcripts/{meeting_id}/{transcript_id}. A `meeting_uri` is not "
-                    "readable here."
+                    "The transcript handle from teams_list_meeting_transcripts: "
+                    "`teams:///transcripts/{meeting_id}/{transcript_id}`. A `meeting_uri` is not "
+                    "valid here."
                 ),
             ),
         ],
@@ -325,7 +327,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 ge=0,
                 description=(
-                    "Turns to skip. Start at 0. Pass the previous response's `next_offset` to "
+                    "Turns to skip, starting at 0. Pass the previous response's `next_offset` to "
                     "continue."
                 ),
             ),
@@ -336,8 +338,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_TURNS,
                 description=(
-                    f"Turns to return (default 200, max {MAX_TURNS}). Whole transcript fetches "
-                    "either way. A wider limit is cheaper than paging."
+                    f"Turns to return, at most {MAX_TURNS}. The whole transcript is fetched "
+                    "regardless, so a wide `limit` is cheaper than paging."
                 ),
             ),
         ] = 200,
@@ -345,8 +347,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             float | None,
             Field(
                 description=(
-                    "Only turns from this moment (seconds from transcription start). Inclusive, "
-                    "matched by overlap. Negative is legal. Narrows answer, not call."
+                    "Only turns overlapping at or after this moment, in seconds from "
+                    "transcription start. Inclusive; negative is legal."
                 )
             ),
         ] = None,
@@ -354,8 +356,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             float | None,
             Field(
                 description=(
-                    "Only turns until this moment. Inclusive, matched by overlap. Pair with "
-                    "`from_seconds` to read one stretch."
+                    "Only turns overlapping at or before this moment, in the same units as "
+                    "`from_seconds`. Inclusive; pair with `from_seconds` to read one stretch."
                 )
             ),
         ] = None,
@@ -364,9 +366,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only turns whose speaker's name contains this (substring, case-insensitive). "
-                    "**If `speaker_attribution` is false this matches NOTHING** — every turn's "
-                    "`speaker` is null. Omit to read all speakers."
+                    "Only turns whose speaker name contains this substring, case-insensitive. "
+                    "Omit entirely to read every speaker; a blank value is invalid."
                 ),
             ),
         ] = None,

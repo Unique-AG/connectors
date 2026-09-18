@@ -79,21 +79,18 @@ MAX_BODY_CHARACTERS = 25000
 _EventQuery = EventItemRequestBuilder.EventItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Read one event of the signed-in user's mailbox in full: what the invitation says, everyone who was \
-invited, what each of them answered, and the two zones the event was created in. Whenever the \
-answer depends on what a meeting is about, or on who accepted it, call this tool on the `uri` of \
-an outlook_list_events row. A row carries a short preview, which on an invitation is usually a \
-joining block rather than a word the organizer wrote. It also carries one response, the calendar \
-owner's. `attendees` here is where one named person's answer is. This tool never returns an \
-attachment's contents. On a calendar the signed-in user does not own, treat a `private` or a \
-`confidential` event as somebody else's business: say that it exists and at what time, and do not \
-relay its subject or its body. On one calendar whose `can_edit` and `can_view_private_items` were \
-both false, an event came back with `subject` holding the display form of its own `show_as` \
-(`Tentative` for `tentative`), a null `body`, an empty `attendees` list and the signed-in \
-user as `organizer`. For an event of that shape on a calendar whose `can_edit` and \
-`can_view_private_items` are both false, report the time and say the rest was not readable. \
-`uri` must be a handle a tool result carried. No subject, meeting link, or Outlook web link \
-becomes one.\
+Reads one event of the signed-in user's mailbox in full, given the `uri` of an \
+outlook_list_events row: the invitation body, every attendee and what each answered, and the \
+two zones the event was created in.
+
+Notes:
+- On a calendar the signed-in user does not own, an event whose `sensitivity` is `private` or \
+`confidential` is the owner's business — report that it exists and at what time, never its \
+subject or body.
+- When the calendar's `can_edit` and `can_view_private_items` are both false, the event returns \
+stripped: `subject` holds the display form of `show_as`, `body` is null, `attendees` is empty, \
+and `organizer` names the signed-in user regardless of who organized it — report only the time \
+and say the rest was not readable.
 """
 
 _BAD_HANDLE = (
@@ -151,23 +148,19 @@ class CalendarEvent(EventSummary):
     )
     body_is_plain_text: bool = Field(
         description=(
-            "True when Graph confirmed the plain-text conversion this tool asked for, by reporting "
-            + "the body it returned as text. False means `body` is HTML — tags, entities, style "
-            + "and script blocks and all. Read it as markup, not as the words the organizer typed. "
-            + "This tool separates neither, because no hand-rolled stripper tells them apart "
-            + "reliably. Microsoft documents that this operation returns event bodies in HTML "
-            + "only, whatever the request asked for. So this field reports what the response "
-            + "said, never what the request preferred."
+            "True when Graph confirmed the plain-text conversion this tool asked for. False "
+            + "means `body` is HTML — tags, entities, style and script blocks included — to be "
+            + "read as markup rather than as the organizer's own words. This reports what the "
+            + "response actually returned, never what the request preferred."
         )
     )
     body_truncated: bool = Field(
         description=(
-            f"True when the body was longer than {MAX_BODY_CHARACTERS} characters and `body` is "
-            + "the first of them, from the top. There is no second call that returns the rest. "
-            + "This connector cannot page an event body. A second call returns the same head "
-            + "again. Conclude nothing about the part this tool cut. While this is true, 'the "
-            + "agenda does not mention it' and 'the dial-in is not in there' are unsupportable. "
-            + "And the honest answer names the event and says it was too long to read in full."
+            f"True when the body was longer than {MAX_BODY_CHARACTERS} characters and `body` "
+            + "holds only the first of them; there is no second call that returns the rest, "
+            + "since this connector cannot page an event body. While this is true, conclude "
+            + "nothing about the cut part — 'the agenda does not mention it' is unsupportable; "
+            + "say instead that the event was too long to read in full."
         )
     )
     body_characters: int = Field(

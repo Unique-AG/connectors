@@ -111,21 +111,16 @@ _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParam
 
 _DESCRIPTION = """\
 Send a draft that outlook_draft_mail or outlook_draft_reply created in the signed-in user's own \
-Drafts folder. THIS PUTS MAIL ON THE WIRE: it is delivered from the user's own address, in their \
-name, and IT CANNOT BE UNDONE. This connector has no recall and no unsend, and nothing here \
-reaches a message once it is in somebody else's mailbox. This tool asks the person at the other \
-end to confirm the send before it happens, and sends nothing unless they agree, so calling it is \
-a request rather than an instruction. Read them the recipients, the subject and the body that the \
-drafting tool answered with first, so the question they are asked is not the first they hear of \
-it. It takes one argument, the \
-draft's own handle, and NOTHING it is given can change the message. There is no recipient, \
-subject, body or attachment argument here, so what goes out is exactly what the user can already \
-open in Outlook. Only a handle of the drafts family is accepted: a message handle from \
-outlook_search_mail, outlook_list_mail or outlook_read_thread is refused, and no message id, \
-subject line or Outlook web link becomes a draft handle. A message that was already sent is \
-refused rather than sent again. This tool answers with the recipients and subject that Microsoft \
-held for the draft at the moment it went, which is the only record of what left the mailbox. \
-Repeat it to the user.\
+Drafts folder, putting it on the wire under the user's own address.
+
+Notes:
+- This cannot be undone: this connector has no recall or unsend, and nothing here reaches a \
+message once it is in somebody else's mailbox.
+- It asks the person to confirm the send before it happens, and sends nothing unless they \
+agree — read them the recipients, subject, and body the drafting tool answered with first.
+- Only a handle of the drafts family (`outlook:///drafts/{id}`) is accepted; a message handle \
+from outlook_search_mail, outlook_list_mail, or outlook_read_thread is refused, and a message \
+that was already sent is refused rather than sent again.
 """
 
 _NOT_A_DRAFT_HANDLE = (
@@ -185,33 +180,30 @@ class MailSent(BaseModel):
     to: list[MailAddress] = Field(
         description=(
             "Who the message was sent to, read off Microsoft's copy of the draft immediately "
-            + "before the send rather than echoed from anything this call was told. This is the "
-            + "record of who now has the mail, so repeat it to the user in full. It cannot be "
-            + "changed and the send CANNOT BE RECALLED by this connector: there is no unsend "
-            + "here, and nothing in this server reaches a message once it is in a recipient's "
-            + "mailbox."
+            + "before the send rather than echoed from the request. This is the record of who "
+            + "now has the mail — repeat it to the user in full. It cannot be changed, and "
+            + "delivery cannot be recalled by this connector."
         )
     )
     cc: list[MailAddress] = Field(
         description=(
-            "Who was copied, read the same way and as impossible to recall: everyone here has the "
-            + "mail too. Empty when Graph held none. No blind copy is reported and none can be — "
-            + "no tool in this connector puts one on a draft."
+            "Who was copied, read the same way and just as impossible to recall — everyone "
+            + "here has the mail too. Empty when Graph held none. No blind copy is reported, "
+            + "because no tool in this connector puts one on a draft."
         )
     )
     subject: str | None = Field(
         description=(
-            "The subject Microsoft held for the draft when it went, which is what the recipients "
-            + "see in their inbox. Null when the draft carried none."
+            "The subject Microsoft held for the draft when it went, which is what the "
+            + "recipients see in their inbox. Null when the draft carried none."
         )
     )
     sent_at: str = Field(
         description=(
-            "When Microsoft accepted the send, ISO-8601 in UTC, clocked by this connector at the "
-            + "moment the request was accepted — Microsoft answers a send with an empty body, so "
-            + "there is no timestamp of its own to report and this is within seconds rather than "
-            + "exact. Delivery is Microsoft's from here on and there is no way back: the send "
-            + "cannot be recalled, unsent or canceled by this connector."
+            "When Microsoft accepted the send, ISO-8601 in UTC, clocked by this connector at "
+            + "the moment the request was accepted — Microsoft answers a send with an empty "
+            + "body, so this is within seconds rather than exact. The send it timestamps "
+            + "cannot be recalled."
         )
     )
 
@@ -361,15 +353,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The draft to send, as the `uri` outlook_draft_mail or outlook_draft_reply "
-                    + "answered with, verbatim: outlook:///drafts/{draft_id}. That is the only "
-                    + "shape this accepts, and it is the only argument there is. Nothing here "
-                    + "can change the recipients, the subject, the body or anything else about "
-                    + "the message, so what is sent is the draft the user can already read in "
-                    + "Outlook. A message handle from a search, a listing or a thread is refused: "
-                    + "mail somebody else wrote is not this user's to send. Passing a handle "
-                    + "here asks the person for confirmation. It does not send on its own, and a "
-                    + "refusal leaves the draft where it is. The send cannot be undone."
+                    "The draft to send: the `uri` outlook_draft_mail or outlook_draft_reply "
+                    + "answered with. This is the only argument there is, and nothing here can "
+                    + "change the recipients, the subject, the body, or anything else about the "
+                    + "message. Passing a handle asks the person for confirmation — it does not "
+                    + "send on its own, and a refusal leaves the draft where it is."
                 ),
             ),
         ],

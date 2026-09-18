@@ -44,23 +44,19 @@ MAX_CALENDARS = 200
 _CalendarsQuery = CalendarsRequestBuilder.CalendarsRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-List every calendar in the signed-in user's mailbox: their own, and every calendar another person \
-shared or delegated to them. This is the inventory to read before naming anybody's calendar, \
-because the `uri` of a row here is what outlook_list_events takes as `calendar_ref`, and nothing \
-else names a calendar. When this deployment also runs outlook_create_event_on_behalf, that tool \
-takes the same `uri`. A calendar another person delegated arrives as a row named after THAT \
-PERSON, with `is_mine` false and `can_edit` true, so a row called `Alex Wilber` is Alex' own \
-primary calendar as this mailbox sees it. `is_mine` is this connector's own comparison of the \
-owner's address against the signed-in user's two addresses, because Microsoft publishes no \
-sharing flag on a calendar in v1.0: null there means unknown and never false. Read `can_edit` \
-before offering to write to a calendar, because false means a create on it fails whatever else \
-is right about it. Read `can_view_private_items` too: false means the owner's private items \
-are not legible here, so an answer drawn from that calendar is thinner than it looks rather than \
-complete. On one calendar where it and `can_edit` were both false, every row arrived with an \
-empty `preview`, `attendee_count` 0 and `subject` holding the display form of its own `show_as` \
-(`Tentative` for `tentative`). On a calendar with those two flags, a row of that shape has no \
-readable subject: give its time and say so. This tool returns no events. Use \
-outlook_list_events for what sits on a calendar.\
+Lists every calendar the signed-in user's mailbox reaches — their own, and any calendar another \
+person delegated or shared with them — before naming a specific calendar in another tool. \
+outlook_list_events lists what is on a calendar; this tool lists the calendars themselves and \
+returns no events.
+
+Notes:
+- Pass a row's `uri` as `calendar_ref` to outlook_list_events, and to \
+outlook_create_event_on_behalf where this deployment runs it.
+- A delegated calendar is named after its owner, not the signed-in user: check `is_mine` and \
+`can_edit` before treating a row as the user's own or as writable.
+- On a calendar where `can_edit` and `can_view_private_items` are both false, rows return \
+stripped — `subject` holds the display form of `show_as`, `preview` is empty, and \
+`attendee_count` is 0 — report only the time and note the rest is unreadable.
 """
 
 
@@ -69,18 +65,18 @@ class Calendars(BaseModel):
 
     calendars: list[CalendarSummary] = Field(
         description=(
-            "The calendars this mailbox reaches, in Graph's own order. That order is not a "
-            + "ranking, and the primary calendar is not promised to be first: read `is_default` "
-            + "instead. Empty means Graph reported no calendar at all, which does not happen for "
-            + "a licensed mailbox and points at a permission the tenant left unconsented."
+            "The calendars this mailbox reaches, in Graph's own order — not a ranking. Read "
+            + "`is_default` for the primary calendar rather than assuming it comes first. Empty "
+            + "means Graph reported no calendar at all, which does not happen for a licensed "
+            + "mailbox and signals an unconsented permission instead."
         )
     )
     capped: bool = Field(
         description=(
-            f"True when this listing stopped at {MAX_CALENDARS} calendars with Graph still "
-            + "offering more. So a calendar the user named is possibly missing from `calendars` "
-            + "rather than absent from the mailbox. False whenever the listing ran out on its "
-            + "own, however few calendars it held."
+            f"True when this listing stopped at {MAX_CALENDARS} calendars with more still on "
+            + "offer, so a calendar the user named may be missing from `calendars` rather than "
+            + "absent from the mailbox. False whenever the listing ran out on its own, however "
+            + "few calendars it held."
         )
     )
 
