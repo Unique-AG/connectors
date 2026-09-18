@@ -144,26 +144,28 @@ class EventTime(BaseModel):
 
     local: str = Field(
         description=(
-            "The wall-clock time Microsoft holds for this event, exactly as Graph wrote it and "
-            + "with no offset in it. Read it together with `time_zone`: on its own it says nothing "
-            + "about which instant it is."
+            "This is the wall-clock time that Microsoft holds for this event, exactly as Graph "
+            + "wrote it, with no offset in it. Read this value together with `time_zone`. On "
+            + "its own, this value says nothing about which instant it is."
         )
     )
     time_zone: str | None = Field(
         description=(
-            "The name of the zone `local` is stated in, exactly as Graph wrote it. It is either an "
-            + "IANA name such as `Europe/Zurich` or a Windows name such as `W. Europe Standard "
-            + "Time`, because Microsoft accepts and returns both. Null when Graph named none."
+            "This is the name of the zone in which `local` is stated, exactly as Graph wrote "
+            + "it. This is either an IANA name, such as `Europe/Zurich`, or a Windows name, such "
+            + "as `W. Europe Standard Time`. Microsoft accepts and returns both kinds of name. "
+            + "This field is null when Graph named none."
         )
     )
     iso: str | None = Field(
         description=(
-            "The same instant as an ISO-8601 timestamp with an offset, in the zone that was asked "
-            + "for. This value is the one to compare, to sort on and to quote. On an all-day "
-            + "event it is a UTC midnight moved into this zone, so it names a time of day and "
-            + "sometimes a neighboring date: read `local` for the date such a row covers. Null "
-            + "when Graph named a zone that this connector cannot resolve, which happens for "
-            + "Windows zone names: `local` and `time_zone` still say what Microsoft holds."
+            "This is the same instant as an ISO-8601 timestamp with an offset, in the zone that "
+            + "this call requested. This is the value to compare, to sort on, and to quote. On "
+            + "an all-day event, this value is a UTC midnight moved into this zone. In a zone "
+            + "west of UTC, this value names the day before the event. Read `local` for the "
+            + "date that such a row covers. This field is null when Graph named a zone that "
+            + "this connector cannot resolve. This happens for a Windows zone name. `local` and "
+            + "`time_zone` still say what Microsoft holds."
         )
     )
 
@@ -241,70 +243,74 @@ class CalendarSummary(BaseModel):
 
     uri: str = Field(
         description=(
-            "A handle for this exact calendar. Pass it verbatim wherever a tool takes a "
-            + "`calendar_ref`. A calendar id stays the same for as long as the calendar exists, so "
-            + "this handle does not expire on its own."
+            "This is a handle for this exact calendar. Pass this handle, verbatim, wherever a "
+            + "tool takes a `calendar_ref`. A calendar id stays the same for as long as the "
+            + "calendar exists, so this handle does not expire on its own."
         )
     )
     name: str | None = Field(
         description=(
-            "The calendar's name. A calendar that another person shared is named after that "
-            + "person, not after a folder. Null when Graph recorded none."
+            "This is the calendar's name. A calendar that another person shared is named after "
+            + "that person, and not after a folder. This field is null when Graph recorded none."
         )
     )
     owner: MailAddress | None = Field(
         description=(
-            "Whose calendar this is. On a delegated calendar this is the other person, and it is "
-            + "the only property that says so. Null when Graph recorded no owner."
+            "This says whose calendar this is. On a delegated calendar, this is the other "
+            + "person, and this is the only field that says so. This field is null when Graph "
+            + "recorded no owner."
         )
     )
     is_mine: bool | None = Field(
         description=(
-            "Whether the owner is the signed-in user, compared on the address without regard to "
-            + "case. Null when this answer was composed without reading the signed-in user, or "
-            + "when Graph recorded no owner: null means unknown and never false."
+            "This says whether the owner is the signed-in user, compared on the address without "
+            + "regard to case. This field is null when this answer did not read the signed-in "
+            + "user, or when Graph recorded no owner. Null means unknown, and never false."
         )
     )
     can_edit: bool | None = Field(
         description=(
-            "Whether the signed-in user can write to this calendar. False on a calendar shared "
-            + "read-only, where a create fails whatever else is right about it."
+            "This says whether the signed-in user can write to this calendar. This field is "
+            + "false on a calendar shared read-only, where a create fails, whatever else is "
+            + "right about it."
         )
     )
     can_view_private_items: bool | None = Field(
         description=(
-            "Whether the signed-in user sees the details of items the owner marked private. On "
-            + "one calendar where this and `can_edit` were both false, every row arrived stripped "
-            + "even though its `sensitivity` was `normal`: an empty `preview`, `attendee_count` "
-            + "0, and `subject` holding the display form of its own `show_as` (`Tentative` for "
-            + "`tentative`). The two flags alone do not say a row was stripped; on a calendar "
-            + "with both false, a row of that shape does."
+            "This says whether the signed-in user sees the details of items that the owner "
+            + "marked private. On one calendar where this field and `can_edit` were both false, "
+            + "every row arrived stripped, even though its `sensitivity` was `normal`. A "
+            + "stripped row has an empty `preview` and `attendee_count` 0. A stripped row's "
+            + "`subject` field holds the display form of its own `show_as`, for example "
+            + "`Tentative` for `tentative`. These two flags alone do not say that a row was "
+            + "stripped. On a calendar with both flags false, a row of that shape is stripped."
         )
     )
     is_default: bool | None = Field(
         description=(
-            "Whether this is the mailbox's primary calendar, which is the one a create writes to "
-            + "when no calendar is named."
+            "This says whether this is the mailbox's primary calendar. A create writes to the "
+            + "primary calendar when no calendar is named."
         )
     )
     tracks_responses: bool | None = Field(
         description=(
-            "Whether this calendar tallies the responses of the people invited to its events. "
-            + "False on a calendar Outlook does not track, where an attendee's response never "
-            + "reaches the row."
+            "This says whether this calendar tallies the responses of the people invited to its "
+            + "events. This field is false on a calendar that Outlook does not track, where an "
+            + "attendee's response never reaches the row."
         )
     )
     online_meeting_providers: list[str] = Field(
         description=(
-            "Which online-meeting providers this calendar accepts, in Microsoft's own spelling: "
-            + "`teamsForBusiness`, `skypeForBusiness`, `skypeForConsumer` or `unknown`. Empty when "
-            + "Graph named none, which is not proof that none works."
+            "These are the online-meeting providers that this calendar accepts, in Microsoft's "
+            + "own spelling: `teamsForBusiness`, `skypeForBusiness`, `skypeForConsumer`, or "
+            + "`unknown`. This list is empty when Graph named none. An empty list is not proof "
+            + "that no provider works."
         )
     )
     default_online_meeting_provider: str | None = Field(
         description=(
-            "The provider a new online meeting on this calendar uses, in Microsoft's own "
-            + "spelling. Null when Graph named none."
+            "This is the provider that a new online meeting on this calendar uses, in "
+            + "Microsoft's own spelling. This field is null when Graph named none."
         )
     )
 
@@ -342,34 +348,37 @@ class EventAttendee(BaseModel):
 
     name: str | None = Field(
         description=(
-            "The display name Microsoft holds for the attendee. Null when Graph recorded none."
+            "This is the display name that Microsoft holds for the attendee. This field is null "
+            + "when Graph recorded none."
         )
     )
     address: str | None = Field(
         description=(
-            "The SMTP address of the attendee. This address is the value to compare and to quote. "
-            + "Null when Graph recorded none."
+            "This is the SMTP address of the attendee. This is the value to compare and to "
+            + "quote. This field is null when Graph recorded none."
         )
     )
     kind: str | None = Field(
         description=(
-            "What kind of attendee this is, in Microsoft's own spelling: `required`, `optional` or "
-            + "`resource`. A `resource` is a room or equipment mailbox that was invited as an "
-            + "attendee rather than typed into the location. Null when Graph did not say."
+            "This says what kind of attendee this is, in Microsoft's own spelling: `required`, "
+            + "`optional`, or `resource`. A `resource` is a room or an equipment mailbox, "
+            + "invited as an attendee rather than typed into the location. This field is null "
+            + "when Graph did not say."
         )
     )
     response: str | None = Field(
         description=(
-            "What the attendee answered, in Microsoft's own spelling: `none`, `organizer`, "
-            + "`tentativelyAccepted`, `accepted`, `declined` or `notResponded`. Microsoft "
-            + "documents `none` and `notResponded` as the same fact seen from two sides, so treat "
-            + "them alike. Null when Graph did not say."
+            "This is what the attendee answered, in Microsoft's own spelling: `none`, "
+            + "`organizer`, `tentativelyAccepted`, `accepted`, `declined`, or `notResponded`. "
+            + "Treat `none` and `notResponded` alike, because Microsoft documents them as the "
+            + "same fact. This field is null when Graph did not say."
         )
     )
     responded_at: str | None = Field(
         description=(
-            "When the attendee answered, ISO-8601 in UTC. Null when nobody answered yet: Graph "
-            + "fills the year 1 in that case, and this connector reports null instead."
+            "This is when the attendee answered, in ISO-8601 format in UTC. This field is null "
+            + "when nobody answered yet. Graph fills in the year 1 in that case, and this "
+            + "connector reports null instead."
         )
     )
 
@@ -396,128 +405,142 @@ class EventSummary(BaseModel):
 
     uri: str = Field(
         description=(
-            "A handle for this exact event, carrying both the calendar it lives in and its own id, "
-            + "each percent-encoded. Pass it verbatim to the reader. An event id belongs to one "
-            + "mailbox and one calendar, so neither half addresses anything on its own."
+            "This is a handle for this exact event, with the calendar it lives in and its own "
+            + "id, each percent-encoded. Pass this handle, verbatim, to the reader. An event id "
+            + "belongs to one mailbox and one calendar, so neither half addresses anything alone."
         )
     )
     subject: str | None = Field(
         description=(
-            "The subject line. Null when the event was created without one. On one calendar whose "
-            + "`can_edit` and `can_view_private_items` were both false, this held the display "
-            + "form of the row's own `show_as` (`Tentative` for `tentative`, `Free` for `free`) "
-            + "instead of anything the organizer wrote."
+            "This is the subject line. This field is null when the event was created without "
+            + "one. On one calendar whose `can_edit` and `can_view_private_items` were both "
+            + "false, this field held the display form of the row's own `show_as`. For example, "
+            + "this field held `Tentative` for `tentative` and `Free` for `free`. This field did "
+            + "not hold anything the organizer wrote."
         )
     )
     preview: str | None = Field(
         description=(
-            "A short plain-text preview of the event body, exactly as long as Microsoft made it. "
-            + "On an invitation this is often a joining block rather than what the organizer "
-            + "wrote. If the preview does not answer the question, that is not evidence that the "
-            + "body does not either. Null when Graph held none."
+            "This is a short plain-text preview of the event body, exactly as long as Microsoft "
+            + "made it. On an invitation, this is often a joining block, rather than what the "
+            + "organizer wrote. If this preview does not answer the question, that is not proof "
+            + "that the body does not either. This field is null when Graph held none."
         )
     )
     start: EventTime | None = Field(
-        description="When the event starts. Null when Graph stated no start."
+        description=(
+            "This is when the event starts. This field is null when Graph stated no start."
+        )
     )
-    end: EventTime | None = Field(description="When the event ends. Null when Graph stated no end.")
+    end: EventTime | None = Field(
+        description="This is when the event ends. This field is null when Graph stated no end."
+    )
     all_day: bool | None = Field(
         description=(
-            "Whether this is an all-day event. An all-day event runs from midnight to midnight, so "
-            + "its end is the midnight after the last day it covers. When this is true, take the "
-            + "date from `start.local` and never from `start.iso`."
+            "This says whether this is an all-day event. An all-day event runs from midnight to "
+            + "midnight, so its end is the midnight after the last day it covers. When this "
+            + "field is true, take the date from `start.local`, and never from `start.iso`."
         )
     )
     cancelled: bool | None = Field(
         description=(
-            "Whether the organizer canceled the event. A canceled event stays in the calendar "
-            + "until somebody removes it, so a row is canceled and listed at the same time."
+            "This says whether the organizer canceled the event. A canceled event stays in the "
+            + "calendar until somebody removes it. A row can be canceled and still listed, at "
+            + "the same time."
         )
     )
     kind: str | None = Field(
         description=(
-            "What this row is, in Microsoft's own spelling: `singleInstance`, `occurrence` or "
-            + "`exception`. An `occurrence` is one date of a recurring series, and an `exception` "
-            + "is one date of a series that somebody changed. Null when Graph did not say."
+            "This says what this row is, in Microsoft's own spelling: `singleInstance`, "
+            + "`occurrence`, or `exception`. An `occurrence` is one date of a recurring series. "
+            + "An `exception` is one date of a series that somebody changed. This field is null "
+            + "when Graph did not say."
         )
     )
     in_series: bool = Field(
         description=(
-            "Whether this row belongs to a recurring series. A weekly meeting is one row per week, "
-            + "and every one of them has this set."
+            "This says whether this row belongs to a recurring series. A weekly meeting is one "
+            + "row for each week, and every one of these rows has this field set."
         )
     )
     sensitivity: str | None = Field(
         description=(
-            "How the owner classified the event, in Microsoft's own spelling: `normal`, "
-            + "`personal`, `private` or `confidential`. Null when Graph did not say."
+            "This says how the owner classified the event, in Microsoft's own spelling: "
+            + "`normal`, `personal`, `private`, or `confidential`. This field is null when Graph "
+            + "did not say."
         )
     )
     show_as: str | None = Field(
         description=(
-            "How the event shows in the owner's free-busy view, in Microsoft's own spelling: "
-            + "`free`, `tentative`, `busy`, `oof`, `workingElsewhere` or `unknown`. Null when "
-            + "Graph did not say."
+            "This says how the event shows in the owner's free-busy view, in Microsoft's own "
+            + "spelling: `free`, `tentative`, `busy`, `oof`, `workingElsewhere`, or `unknown`. "
+            + "This field is null when Graph did not say."
         )
     )
     location: str | None = Field(
         description=(
-            "The location as one line of text, exactly as Microsoft holds it. It is whatever "
-            + "somebody typed, so it names a room, a city, a URL, or nothing recognizable. Null "
-            + "when the event carries none."
+            "This is the location as one line of text, exactly as Microsoft holds it. This is "
+            + "whatever somebody typed, and it can name a room, a city, a URL, or nothing "
+            + "recognizable. This field is null when the event carries none."
         )
     )
     is_online_meeting: bool | None = Field(
-        description="Whether the event carries an online meeting. Null when Graph did not say."
+        description=(
+            "This says whether the event carries an online meeting. This field is null when "
+            + "Graph did not say."
+        )
     )
     join_url: str | None = Field(
         description=(
-            "The link that joins the online meeting, from Graph's `onlineMeeting.joinUrl` and "
-            + "never from `onlineMeetingUrl`, which Microsoft says will be deprecated. Null when "
-            + "the event has no online meeting, and also when Graph withheld the joining details."
+            "This is the link that joins the online meeting, from Graph's "
+            + "`onlineMeeting.joinUrl` and never from `onlineMeetingUrl`. Microsoft says that it "
+            + "will deprecate `onlineMeetingUrl`. This field is null when the event has no "
+            + "online meeting. This field is also null when Graph withheld the joining details."
         )
     )
     organizer: MailAddress | None = Field(
         description=(
-            "Who organized the event. On an event created on somebody else's behalf, this is that "
-            + "person and no property names the delegate. On one calendar whose `can_edit` and "
-            + "`can_view_private_items` were both false, this named the signed-in user on every "
-            + "row, and one of the rows that matched by time a meeting on the user's own calendar "
-            + "named somebody else there. On a calendar whose `can_edit` and "
-            + "`can_view_private_items` are both false, a row whose `preview` is empty, whose "
-            + "`attendee_count` is 0 and whose `subject` is the display form of its own `show_as` "
-            + "has an unconfirmed organizer: do not report this name as who called the meeting. "
-            + "Null when Graph recorded no organizer."
+            "This says who organized the event. On an event created on somebody else's behalf, "
+            + "this is that person, and no property names the delegate. On one calendar whose "
+            + "`can_edit` and `can_view_private_items` were both false, this field named the "
+            + "signed-in user on every row. One of these rows matched, by time, a meeting on the "
+            + "user's own calendar that named somebody else there. On a calendar whose "
+            + "`can_edit` and `can_view_private_items` are both false, a row can have an empty "
+            + "`preview` and `attendee_count` 0. That row's `subject` field can also hold the "
+            + "display form of its own `show_as`. For a row of that shape, do not report this "
+            + "field as who called the meeting. This field is null when Graph recorded no "
+            + "organizer."
         )
     )
     owner_is_organizer: bool | None = Field(
         description=(
-            "Whether the OWNER of the calendar this row was read from is the organizer of this "
-            + "event. On a delegated calendar that is the other person and never the signed-in "
-            + "user. Microsoft sets it for an event a delegate organized on the owner's behalf as "
-            + "well, so it never says who did the organizing. Null when Graph did not say."
+            "This says whether the OWNER of the calendar that this row came from is the "
+            + "organizer of this event. On a delegated calendar, that owner is the other "
+            + "person, and never the signed-in user. Microsoft also sets this field for an "
+            + "event that a delegate organized on the owner's behalf. So this field never says "
+            + "who actually did the organizing. This field is null when Graph did not say."
         )
     )
     owner_response: str | None = Field(
         description=(
-            "What the OWNER of the calendar this row was read from answered, in Microsoft's own "
-            + "spelling. On a delegated calendar this is the other person's answer and never the "
-            + "signed-in user's. Read `attendees` for one named person's answer. Null when Graph "
-            + "did not say."
+            "This is what the OWNER of the calendar that this row came from answered, in "
+            + "Microsoft's own spelling. On a delegated calendar, this is the answer of the "
+            + "other person, and never of the signed-in user. Read `attendees` for the answer "
+            + "of one named person. This field is null when Graph did not say."
         )
     )
     attendee_count: int = Field(
         description=(
-            "How many attendees Graph holds for the event, the organizer included when Microsoft "
-            + "lists them. Zero means Graph listed none: an appointment with nobody invited looks "
-            + "like that, and so did every row of one calendar whose `can_edit` and "
-            + "`can_view_private_items` were both false."
+            "This is how many attendees Graph holds for the event, the organizer included when "
+            + "Microsoft lists them. Zero means that Graph listed no attendee. An appointment "
+            + "with nobody invited looks like this. Every row of one calendar whose `can_edit` "
+            + "and `can_view_private_items` were both false also looked like this."
         )
     )
     web_link: str | None = Field(
         description=(
-            "Graph's own link that opens the event in Outlook on the web, passed through exactly "
-            + "as Graph gave it. This connector never assembles or repairs it."
+            "This is Graph's own link that opens the event in Outlook on the web, exactly as "
+            + "Graph gave it. This connector never builds or repairs this link."
         )
     )
 

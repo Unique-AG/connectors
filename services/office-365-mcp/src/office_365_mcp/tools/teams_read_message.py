@@ -53,11 +53,11 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
 _DESCRIPTION = """\
-Read one Teams message in full: the whole text, sender, @-mentions, attachments, and edit or \
-delete status. Call it on the `uri` of a teams_search_messages hit whenever the answer depends on \
-what somebody actually said — a hit carries a snippet and no message body. A message \
-teams_browse_channel returned is already complete and needs no read. `uri` must be a handle a tool \
-result carried. No name, chat topic, or Teams link becomes one.\
+This tool reads one Teams message in full: the whole text, sender, @-mentions, attachments, and \
+edit or delete status. This tool takes the `uri` of a teams_search_messages hit. A hit carries \
+only a snippet, never the message body, so this tool gives the answer when it depends on what \
+somebody actually said. A message that teams_browse_channel returned is already complete and \
+needs no read.\
 """
 
 _BAD_HANDLE = (
@@ -178,7 +178,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle a tool result carried, verbatim. Exactly three shapes are "
+                    "The handle that a tool result carried, verbatim. Exactly three shapes are "
                     + "readable:\n"
                     + "  teams:///chats/{chat_id}/messages/{message_id}\n"
                     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}\n"

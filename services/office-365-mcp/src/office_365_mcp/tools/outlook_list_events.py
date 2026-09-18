@@ -78,43 +78,12 @@ _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 _EventsQuery = CalendarViewRequestBuilder.CalendarViewRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-List what is on ONE calendar between two dates, earliest start first. This reads Microsoft's \
-calendar view, so a recurring series arrives as one row per occurrence inside the window: a weekly \
-stand-up over three weeks is three rows, each with its own date and its own handle. `starts_on` \
-and `ends_on` each take a date or a moment: a date covers that whole day, a moment opens or closes \
-partway through one, and a moment with no offset is read in `time_zone`. Each row states its time \
-three \
-ways: Graph's own wall-clock text, Graph's own zone name, and `iso`, the same instant in \
-`time_zone`. `time_zone` defaults to UTC and takes an IANA name such as `Europe/Zurich`. A wrong \
-zone does not fail here. It answers the right meetings at the wrong hours. So pass the user's own \
-zone for any question about a time of day, and quote `iso` rather than `local`, the wall-clock \
-text, except on a row whose `all_day` is true, where `iso` is a UTC midnight moved into \
-`time_zone`, so in a zone west of UTC it names the day before. Take the date of an all-day row \
-from `local`. \
-Without `calendar_ref` this lists the signed-in user's own primary calendar. Pass `calendar_ref`, \
-the `uri` of an outlook_list_calendars row, for a calendar somebody shared. For "my next pricing \
-review", pass `subject_contains="pricing"` and set `starts_on` to today: the rows are in start \
-order, so the earliest match is the first one. If nothing matched and `capped` is false, that \
-window holds no such row, so widen `ends_on` and ask again. This tool never picks a row for the \
-user. Report the matches and \
-let the user choose which one is meant. `owner_response` is the answer of the person who OWNS the \
-calendar, so on a shared calendar it is that person's answer and never the signed-in user's. On a \
-calendar the user does not own, a row whose `sensitivity` is `private` or `confidential` is the \
-owner's private business: say that something is on at that time, and do not relay its subject or \
-its preview. One calendar whose `can_edit` and `can_view_private_items` were both false returned \
-stripped rows: `subject` holding the display form of its own `show_as` (`Tentative` for \
-`tentative`), an empty `preview` and `location`, `attendee_count` 0, and `organizer` naming the \
-signed-in user on every row, all with `sensitivity` still `normal`. The two flags alone do not \
-say a row was stripped. On a calendar whose `can_edit` and `can_view_private_items` are both \
-false, a row of that shape has no readable subject, preview, location or attendee count: report \
-its time, its `show_as` and its `cancelled` flag, and say the rest was not readable. A canceled \
-event stays in a calendar until somebody \
-removes it, so this tool lists those rows with `cancelled` true rather than hiding them. Read that \
-field before telling anybody a meeting is on, or pass `cancelled=false` to drop them — worth doing \
-over a wide window, where cancelled rows otherwise spend `limit`. Pass \
-`owner_response="accepted"` for "the meetings I said yes to" and `"notResponded"` for the \
-invitations still owed an answer. Pass a row's `uri` to outlook_read_event for the full body and \
-the attendee list.\
+Lists the occurrences on ONE calendar within a date window, earliest start first, and expands \
+each recurring series into one row for each occurrence.
+
+Notes:
+- `ends_on` must not fall before `starts_on`. Both arguments take a date or a moment. A bare \
+date covers its whole day.
 """
 
 _ENDS_BEFORE_STARTS = (
@@ -151,22 +120,23 @@ class EventWindow(BaseModel):
 
     starts_at: str = Field(
         description=(
-            "The first instant of the window, ISO-8601 with an offset. It is midnight at the "
-            + "start of `starts_on` in `time_zone`. Graph reads the offset in this value and "
-            + "nothing else, so this is the bound that was really asked for."
+            "This is the first instant of the window, in ISO-8601 format with an offset. It is "
+            + "midnight at the start of `starts_on`, in the zone that `time_zone` names. This is "
+            + "the exact bound that this call sent to Microsoft."
         )
     )
     ends_at: str = Field(
         description=(
-            "The last instant of the window, ISO-8601 with an offset. It is midnight at the start "
-            + "of the day AFTER `ends_on`, which is what makes the whole of `ends_on` fall inside "
-            + "the window. An event starting exactly at this instant belongs to the next window."
+            "This is the last instant of the window, in ISO-8601 format with an offset. It is "
+            + "midnight at the start of the day AFTER `ends_on`. This is what puts the whole of "
+            + "`ends_on` inside the window. An event that starts at exactly this instant belongs "
+            + "to the next window."
         )
     )
     time_zone: str = Field(
         description=(
-            "The zone both bounds carry and the zone every row's `iso` is stated in, as the caller "
-            + "named it. Quote it beside any time this answer is reported in."
+            "Both bounds and every row's `iso` value use this zone, exactly as the caller named "
+            + "it. Quote it beside any time in this answer."
         )
     )
 
@@ -176,40 +146,49 @@ class CalendarEvents(BaseModel):
 
     calendar: CalendarSummary = Field(
         description=(
-            "The calendar these rows came from, read before them. `owner` says whose calendar it "
-            + "is and `can_view_private_items` says whether its private items are legible here. "
-            + "`is_mine` is null in this answer: this tool reads no `/me`, so it cannot tell "
-            + "whether the owner is the signed-in user. Read `owner` instead, or call "
-            + "outlook_list_calendars, which does answer it."
+            "This is the calendar that these rows come from. This tool reads the calendar "
+            + "before it reads the rows. `owner` names whose calendar this is. "
+            + "`can_view_private_items` says whether this tool can read its private items. "
+            + "`is_mine` is null in this answer, because this call does not read `/me`. Call "
+            + "outlook_list_calendars to find `is_mine`. When `can_edit` and "
+            + "`can_view_private_items` are both false, rows arrive stripped. In a stripped row, "
+            + "`subject` holds the display form of `show_as`. `preview`, `location`, and "
+            + "`attendee_count` come back empty or zero. `organizer` names the signed-in user, "
+            + "regardless of who organized the event. For a row of that shape, report only the "
+            + "time, `show_as`, and `cancelled`. Say that you cannot read the rest of the row."
         )
     )
     window: EventWindow = Field(
         description=(
-            "The exact range Microsoft was asked for. Report it whenever the answer is used to "
-            + "say what somebody has on: a window in the wrong zone answers a different question "
-            + "correctly."
+            "This is the exact range that this call sent to Microsoft. Report this range "
+            + "whenever you use the answer to say what somebody has on their calendar. A window "
+            + "in the wrong zone gives a correct answer to the wrong question."
         )
     )
     events: list[EventSummary] = Field(
         description=(
-            "The occurrences inside the window, earliest start first. One row per date of a "
-            + "recurring series, never the series itself, so `in_series` set on several rows with "
-            + "the same subject is one meeting repeating and not several meetings. A canceled "
-            + "event is listed with `cancelled` set. Empty when nothing is on in this window, or "
-            + "when nothing in it matched the narrowing arguments this call passed. Read `capped` "
-            + "before reporting an empty list as nothing being on."
+            "These are the occurrences inside the window, with the earliest start first. One row "
+            + "shows one date of a recurring series, and never the whole series. When `in_series` "
+            + "is true on several rows with the same subject, this means one meeting that "
+            + "repeats, not several meetings. A canceled event still appears in this list, with "
+            + "`cancelled` set to true rather than removed from it. On a calendar that the "
+            + "signed-in user does not own, a row whose `sensitivity` is `private` or "
+            + "`confidential` belongs to the owner. For a private or confidential row, report "
+            + "only that something is on then. Do not report the subject or `preview` of that "
+            + "row. Pass a row's `uri` to outlook_read_event to read the full body and attendee "
+            + "list. An empty list means that nothing matched inside this window. Read `capped` "
+            + "before you treat an empty list as nothing on the calendar."
         )
     )
     capped: bool = Field(
         description=(
-            "True when this call stopped with more of the window still on offer. Either `limit` "
-            + "filled up, or the internal scan ran out while `owner_response` discarded rows. "
-            + "`cancelled` and `subject_contains` cannot cause it: Microsoft applies those two "
-            + "inside the query, so a row they exclude never reaches this call and never spends "
-            + "`limit`. A higher `limit` or a narrower window returns more. False means the "
-            + "window itself ran out, so what came back is everything in it that matched, "
-            + "however few rows that is. So an empty list with `capped` false is the answer that "
-            + "nothing is on."
+            "True means that this call stopped with more of the window still available. This "
+            + "happens either because `limit` filled up, or because `owner_response` discarded "
+            + "rows before the call reached them. `cancelled` and `subject_contains` never cause "
+            + "this, because a row that they exclude never reaches the call. To get more rows, "
+            + "raise `limit` or narrow the window. False means that this call returned everything "
+            + "in the window that matched, however few rows that is. An empty list with `capped` "
+            + "false is the answer that nothing is on then."
         )
     )
 
@@ -348,13 +327,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | datetime,
             Field(
                 description=(
-                    "Where the window opens, inclusive. Two shapes: a date, `2026-03-02`, which "
-                    + "opens at that day's midnight in `time_zone` and covers the whole day; or a "
-                    + 'moment, `2026-03-02T13:00:00`, to open partway through one — for "what is '
-                    + 'on this afternoon". A moment with no offset is read in `time_zone`, not in '
-                    + "UTC, because that argument is what says which zone the caller means; a "
-                    + "moment carrying its own offset keeps it. For anything about what is coming "
-                    + "up, this is today."
+                    "This is where the window opens, and this bound is inside the window. A "
+                    + "date, such as `2026-03-02`, opens at midnight of that day in `time_zone`, "
+                    + "and covers the whole day. A moment, such as `2026-03-02T13:00:00`, opens "
+                    + "partway through the day. A moment with no offset is read in `time_zone`. "
+                    + "A moment with its own offset keeps that offset. For a question about "
+                    + "future events, this bound is today's date."
                 )
             ),
         ],
@@ -362,15 +340,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | datetime,
             Field(
                 description=(
-                    "Where the window closes, inclusive, in the same two shapes `starts_on` "
-                    + "takes. A date covers the whole of that day, so the same date in both "
-                    + "arguments lists that one day; a moment closes at the second it names, and "
-                    + "an occurrence starting exactly then belongs to the next window. Any width "
-                    + "Microsoft accepts is allowed, but a calendar view expands every recurring "
-                    + "series into one row per occurrence and the rows come back earliest first, "
-                    + "so a window far wider than `limit` answers with the START of the window "
-                    + "rather than a summary of it. `capped` says when that happened. For a long "
-                    + "stretch, ask one window at a time and say which window each answer covers."
+                    "This is where the window closes, and this bound is inside the window, in "
+                    + "the same forms as `starts_on`. A date covers the whole of that day, so "
+                    + "the same date in both bounds lists that one day. A moment closes at the "
+                    + "exact second that it names. An occurrence that starts at exactly that "
+                    + "second belongs to the next window. A window that is much wider than "
+                    + "`limit` returns only its earliest events, not a summary of the whole "
+                    + "span. `capped` says when this happens. For a long stretch of time, ask "
+                    + "for one window at a time."
                 )
             ),
         ],
@@ -379,13 +356,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Which zone the window and every reported time are stated in, as an IANA name "
-                    + "such as `Europe/Zurich`, `America/New_York` or `UTC`. Pass the user's own "
-                    + "zone whenever the question is about a time of day: the default answers in "
-                    + "UTC, which is the right meetings at the wrong hours for most of the world. "
-                    + "A Windows zone name such as `W. Europe Standard Time` is refused here. "
-                    + "`Etc/GMT+2` is a real key that means two hours BEHIND UTC, so name a place "
-                    + "such as `Europe/Berlin` instead."
+                    "This is the zone for the window and for every time in this answer, as an "
+                    + "IANA name such as `Europe/Zurich`, `America/New_York`, or `UTC`. If the "
+                    + "question is about a time of day, pass the zone of the user. The default "
+                    + "zone is UTC, and it reports the correct meetings at the wrong hour of "
+                    + "day. This tool refuses a Windows zone name, such as `W. Europe Standard "
+                    + "Time`. `Etc/GMT+2` is a real key, and it means two hours BEHIND UTC. "
+                    + "Name a place, such as `Europe/Berlin`, instead of an `Etc/GMT` key."
                 ),
             ),
         ] = DEFAULT_TIME_ZONE,
@@ -394,11 +371,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Which calendar to list, as the `uri` of an outlook_list_calendars result: "
-                    + "outlook:///calendars/{id}. Omit it for the signed-in user's own primary "
-                    + "calendar, which is what almost every question is about. Pass it for a "
-                    + "calendar somebody shared, which outlook_list_calendars lists as a row named "
-                    + "after its owner."
+                    "This is the calendar to list, as the `uri` field of an "
+                    + "outlook_list_calendars row, for example `outlook:///calendars/{id}`. "
+                    + "Omit this parameter to list the signed-in user's own primary calendar. "
+                    + "Pass this parameter for a calendar that another person shared. "
+                    + "outlook_list_calendars lists a shared calendar as a row named after its "
+                    + "owner."
                 ),
             ),
         ] = None,
@@ -407,17 +385,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=MIN_FRAGMENT_CHARACTERS,
                 description=(
-                    "Keep only the events whose subject contains this text, compared without "
-                    + "regard to case, as a substring. Microsoft applies it inside the query "
-                    + "rather than this connector applying it to the rows that came back, so it "
-                    + "narrows the window itself: a fragment matching two meetings of a busy month "
-                    + "returns those two, and cannot exhaust the call before `limit` fills. The "
-                    + "comparison ignores case, which is Microsoft's own behaviour here and was "
-                    + "verified against the live service. It is "
-                    + "a substring and not a word search, so `pricing` keeps `Quarterly pricing "
-                    + "review` and also a `Repricing` nobody meant, and a two-word fragment misses "
-                    + "any subject that spells those words apart. Beside `cancelled` or "
-                    + "`owner_response` it narrows further: a row has to satisfy all of them."
+                    "Keep only the events whose subject contains this text. This is a match on "
+                    + "a substring, and not a search on whole words. For example, `pricing` "
+                    + "matches `Quarterly pricing review` and also `Repricing`. A fragment of "
+                    + "two words does not match a subject that spells those words apart. When "
+                    + "you use this parameter together with `cancelled` and `owner_response`, a "
+                    + "row must match all of them."
                 ),
             ),
         ] = None,
@@ -425,18 +398,15 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool | None,
             Field(
                 description=(
-                    "Narrow by whether the occurrence was called off. Omitting this argument, "
-                    + "which is the usual call, lists BOTH — a cancelled event stays in the "
-                    + "calendar until somebody removes it, and hiding it by default would answer "
-                    + '"nothing is on" for a day that had a meeting until this morning. `false` '
-                    + 'DROPS the cancelled rows, which is what "what is actually happening on '
-                    + "Thursday\" asks for and is the argument's main use: over a wide window the "
-                    + "earliest rows can be all cancelled clutter, and `limit` is spent on them. "
-                    + '`true` returns only the cancelled ones, for "did anything get called '
-                    + 'off". Microsoft applies this inside the query, so a dropped row never '
-                    + "reaches this call and never spends `limit`. The two sides partition the "
-                    + "window exactly: every occurrence Microsoft returns states this flag, so no "
-                    + "row falls outside both."
+                    "Use this parameter to narrow by whether the occurrence was cancelled. If "
+                    + "you omit this parameter, the answer lists both cancelled and live "
+                    + "events. A cancelled event stays on the calendar until somebody removes "
+                    + "it. If cancelled events are hidden by default, a meeting cancelled this "
+                    + "morning disappears from today's list. This is why the default value "
+                    + "includes cancelled events. Set this parameter to `false` to drop "
+                    + "cancelled rows. This is useful over a wide window, where cancelled rows "
+                    + "in the earliest results can use up `limit` before live events. Set this "
+                    + "parameter to `true` to return only the cancelled rows."
                 )
             ),
         ] = None,
@@ -444,20 +414,16 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             OwnerResponse | None,
             Field(
                 description=(
-                    "Keep only the events the calendar's OWNER answered this way: `accepted`, "
-                    + "`tentativelyAccepted`, `declined` or `notResponded`. This is the field "
-                    + 'that answers "only my accepted meetings" — `show_as` does not, because a '
-                    + "busy block is not an acceptance. Without `calendar_ref` the owner is the "
-                    + 'signed-in user, which is most calls, so `accepted` reads as "meetings I '
-                    + 'said yes to" and `notResponded` as "invitations I still owe an answer '
-                    + "to\". On a calendar somebody shared, it is THAT person's answer and never "
-                    + "the signed-in user's. Unlike `cancelled` and `subject_contains`, this "
-                    + "one is applied to the rows this call read rather than inside Microsoft's "
-                    + "query, so on a busy calendar a rare answer can exhaust the call before "
-                    + "`limit` fills: `capped` says when that happened. A row Microsoft recorded "
-                    + "none of these four answers on is dropped. Use "
-                    + '`owner_is_organizer` on the rows for "meetings the owner called", which '
-                    + "is a different question and has no value here."
+                    "Keep only the events that the calendar's OWNER answered this way: "
+                    + "`accepted`, `tentativelyAccepted`, `declined`, or `notResponded`. "
+                    + "`show_as` does not answer this question, because a busy block is not an "
+                    + "acceptance. Without `calendar_ref`, the owner is the signed-in user. In "
+                    + "that case, `accepted` means a meeting that the user agreed to, and "
+                    + "`notResponded` means an invitation still owed an answer. On a shared "
+                    + "calendar, this is the answer of that owner, and never of the signed-in "
+                    + "user. This parameter drops a row with none of these four values "
+                    + "recorded. Use `owner_is_organizer` for meetings that the owner called. "
+                    + "This is a different question, and this field does not answer it."
                 )
             ),
         ] = None,
@@ -467,10 +433,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_RESULTS,
                 description=(
-                    f"How many events to return, at most {MAX_RESULTS}. They are the earliest that "
-                    + "many of the window. Paging happens inside the call, so this is the whole "
-                    + "answer rather than a first page: raise it rather than calling again with "
-                    + "the same arguments."
+                    f"This is how many events this call returns, at most {MAX_RESULTS}. These "
+                    + "are the earliest events of that number in the window. Paging happens "
+                    + "inside the call, so this is the full answer, and not only a first page "
+                    + "of it. Raise this value to get more events. Do not call this tool again "
+                    + "with the same arguments."
                 ),
             ),
         ] = 25,

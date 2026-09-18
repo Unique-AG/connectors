@@ -248,7 +248,7 @@ class TestTheKindsOfAbsence:
         ]
         assert status["type"] == "string"
         assert "$ref" not in status
-        assert "Retrying will not change this" in str(status["description"]), (
+        assert "A retry does not change this." in str(status["description"]), (
             "the enum says what the values are; the prose still has to say what to do with them"
         )
 
@@ -519,14 +519,14 @@ class TestScopingToOneOccurrence:
             "and even the largest limit is answered in full, so nothing here reads as an end"
         )
         described = str(lister.MeetingTranscripts.model_fields["transcripts"].description)
-        assert "Fewer means it holds no more than was read." in described
+        assert "Fewer rows than `limit` means none remain." in described
 
     async def test_the_order_is_promised_over_what_was_read_and_not_over_the_meeting(self) -> None:
         described = str(lister.MeetingTranscripts.model_fields["transcripts"].description)
 
         assert str(meetings.MAX_ARTIFACT_SCAN) in described
-        assert "The order is over every transcript this call read" in described
-        assert "not over one page of Microsoft's answer" in described
+        assert "the latest of what this tool read" in described
+        assert "not just one page of Microsoft's answer" in described
         assert "The order is over the whole collection" not in described
 
     async def test_a_limit_above_the_ceiling_is_a_programming_error(

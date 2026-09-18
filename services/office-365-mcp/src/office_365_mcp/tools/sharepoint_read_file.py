@@ -39,17 +39,18 @@ _MEGABYTE = 1024 * 1024
 _DEFAULT_MEDIA_TYPE = "application/octet-stream"
 
 _DESCRIPTION = f"""\
-Read one file from OneDrive or SharePoint and return the file itself. Pass the `file` handle from \
-a sharepoint_search_files hit or a sharepoint_browse_folder row. The file comes back in its \
-original format, exactly as Microsoft stores it. This tool converts nothing and it reads nothing \
-out of the file. It does not turn a document into text. A Word file comes back as a Word file. A \
-PowerPoint file comes back as a PowerPoint file. Open the file yourself after this tool returns \
-it, or give it to the user. To read what a document says, set `convert_to` to `pdf`: Microsoft \
-then converts the file on its own servers and sends a PDF, which carries the text that a Word or \
-PowerPoint file hides inside a zip archive. This connector still converts nothing itself. A \
-folder has no content: browse a folder with sharepoint_browse_folder. A file above \
-{MAX_BYTES // _MEGABYTE} MB is refused, because the whole \
-file travels in one message.\
+This tool returns the content of one file from OneDrive or SharePoint. By default, this tool \
+returns the file in its original format. If you set `convert_to`, this tool returns the file as \
+a PDF that Microsoft converts. You can use this tool to read a file that \
+sharepoint_search_files or sharepoint_browse_folder already located. The tool \
+`sharepoint_browse_folder` lists the contents of a folder. This tool refuses a folder handle, \
+because a folder has no content to read.
+
+Notes:
+- This tool converts nothing itself and does not turn a document into text. A Word file comes \
+back as a Word file. Set `convert_to` to `pdf` for text you can read.
+- This tool refuses a file above {MAX_BYTES // _MEGABYTE} MB. The whole file travels in one \
+message.
 """
 
 _NOT_A_FILE_HANDLE = (
@@ -252,12 +253,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle of the file to read. Take the `uri` of a sharepoint_search_files "
-                    + "hit or of a sharepoint_browse_folder row, and copy it word for word. The "
-                    + "shape is sharepoint:///files/{drive_id}/{item_id}. A folder handle, which "
-                    + "looks like sharepoint:///folders/{drive_id}/{item_id}, is not a file "
-                    + "handle. A web address from a browser is not a handle. Never build a handle "
-                    + "yourself: the drive id is part of it, and a file id alone reaches nothing."
+                    "The handle of the file to read, exactly as the `uri` of a "
+                    + "sharepoint_search_files hit or a sharepoint_browse_folder row: "
+                    + "sharepoint:///files/{drive_id}/{item_id}. A folder handle, "
+                    + "sharepoint:///folders/{drive_id}/{item_id}, is not a file handle, and "
+                    + "neither is a web address. Do not construct a handle yourself. A file id "
+                    + "alone, without its drive id, reaches nothing."
                 ),
             ),
         ],
@@ -265,16 +266,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Literal["pdf"] | None,
             Field(
                 description=(
-                    "Ask Microsoft to convert the file to PDF before it is sent. Leave it out to "
-                    + "get the file in its own format, which is the default. Microsoft does the "
-                    + "conversion on its own servers; this connector never converts anything. Set "
-                    + "it to `pdf` when you need to read what a document says, because a Word, "
-                    + "PowerPoint or Excel file is a zip archive that you cannot read, and a PDF "
-                    + "carries the text. Microsoft converts these file types: doc, docx, dot, "
-                    + "dotx, eml, epub, htm, html, md, msg, odp, ods, odt, pps, ppsx, ppt, pptx, "
-                    + "rtf, tif, tiff, xls, xlsm and xlsx. A file that is already a PDF is not on "
-                    + "that list, so read it with no conversion. Microsoft says not every file "
-                    + "can be converted, so a conversion can fail for a file that is on the list."
+                    "The value `pdf` converts the file to PDF before this tool returns it. "
+                    + "Leave this parameter unset to get the file's own format, which is the "
+                    + "default. Microsoft converts these formats: doc, docx, dot, dotx, eml, "
+                    + "epub, htm, html, md, msg, odp, ods, and odt. It also converts these "
+                    + "formats: pps, ppsx, ppt, pptx, rtf, tif, tiff, xls, xlsm, and xlsx. A "
+                    + "file that is already a PDF is not on that list, and needs no "
+                    + "conversion. Conversion can still fail for a file that is on the list."
                 )
             ),
         ] = None,

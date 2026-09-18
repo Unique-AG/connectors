@@ -936,7 +936,7 @@ class TestTheToolsThisServerAdvertises:
 
         assert "Every word must appear" in description
         assert "any order" in description
-        assert "not matched as phrases unless quoted" in description
+        assert "unless quoted for adjacency" in description
         assert '"release notes"' in description, "the phrase syntax needs an example to be usable"
 
     async def test_teams_search_messages_bounds_its_page_where_microsoft_documents_it(
@@ -1031,10 +1031,10 @@ class TestTheToolsThisServerAdvertises:
         assert schema.get("required") == ["uri"]
         assert "teams:///transcripts/{meeting_id}/{transcript_id}" in handle
         assert "teams_list_meeting_transcripts" in handle, "the one tool that mints this shape"
-        assert "`meeting_uri` is not readable here" in handle, "the handle a model reaches for"
+        assert "`meeting_uri` is not valid here" in handle, "the handle a model reaches for"
         assert "teams_list_meeting_transcripts" in description
         assert "teams_read_message" in description, "the two readers must not be confusable"
-        assert "a `meeting_uri` is not one" in description
+        assert "`meeting_uri` is not valid for either" in description
 
     async def test_teams_read_transcript_narrows_by_seconds_and_by_speaker_in_its_own_schema(
         self, mcp_client: Client[FastMCPTransport]
@@ -1092,15 +1092,14 @@ class TestTheToolsThisServerAdvertises:
         across the tenant, so the tool makes exactly one and `limit` is the entire window."""
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_browse_channel"].description
-        limit = _object(_properties(tools["teams_browse_channel"].input_schema)["limit"])
         posts = _object(_properties(tools["teams_browse_channel"].output_schema)["messages"])
         assert description is not None
 
         assert "One call is one request" in description
-        assert "raise `limit` rather than calling again" in description, (
+        assert "Raise `limit` rather than calling again" in description, (
             "where it stops: the window widens, it never pages deeper"
         )
-        assert "one request against the channel" in str(limit["description"])
+        assert "one request against the channel" in description
         assert "browsing again returns the same newest" in str(posts["description"]), (
             "the reply window is a dead end, not a first page"
         )
@@ -1134,13 +1133,13 @@ class TestTheToolsThisServerAdvertises:
             assert f"`{value}`" in description, f"{value} decides whether to call this tool at all"
         assert "`not_ready` means wait" in description
         not_ready_bullet = (
-            "`not_ready` — nothing is there yet and something may still arrive. Wait and call "
-            + "again later. This is NOT 'there is no transcript'."
+            "`not_ready` — nothing is there yet, and more can still arrive. Wait, then call "
+            + "again later. This is not the same as no transcript."
         )
         assert not_ready_bullet in taught, (
             "the wait and its negative, on the bullet for the status they are about"
         )
-        assert "Retrying will not change this" in taught, "and the one that means stop says so"
+        assert "A retry does not change this" in taught, "and the one that means stop says so"
         assert "no availability SLA" in rendered, "the inference has to be admitted as one"
         assert "recurring" in str(meeting_type["description"])
         assert "started_at" in str(meeting_type["description"])
@@ -1181,7 +1180,7 @@ class TestTheToolsThisServerAdvertises:
         )
         taught = str(status["description"])
 
-        assert "demonstrably ended is never reported this way" in taught
+        assert "never reports `not_ready` for a meeting that demonstrably ended" in taught
         assert "however far in the future a recurring series runs" in taught, (
             "the series' own end date is what the verdict must not be read off"
         )
@@ -1240,7 +1239,7 @@ class TestTheToolsThisServerAdvertises:
         assert description is not None
         rendered = description + json.dumps(tools["teams_list_meeting_recordings"].output_schema)
 
-        assert "no video is returned or reachable here" in description
+        assert "This tool returns no video, and none is reachable here" in description
         assert "teams_list_meeting_transcripts" in description, (
             "where a question about content goes"
         )
@@ -1258,10 +1257,10 @@ class TestTheToolsThisServerAdvertises:
         assert "Meeting participants don't have permission to download meeting recordings" in (
             rendered
         )
-        assert "unless admin unblocks them" in rendered
+        assert "unless an admin unblocks them" in rendered
         assert "An `organizer_only` recording exists but is out of reach" in description
-        assert "never report it as missing" in description
-        assert "This is NOT a missing recording" in rendered
+        assert "Never report it as missing" in description
+        assert "This is not a missing recording" in rendered
         assert "organizer_user_id" in rendered, "who to ask for it"
         assert "you_are_the_organizer" in rendered and "organizer_only" in rendered
         assert "Meeting participants don't have permission" in json.dumps(
@@ -1289,9 +1288,9 @@ class TestTheToolsThisServerAdvertises:
             assert f"`{value}`" in taught, value
         assert "`not_ready` means wait" in description
         assert 'not "the call was not recorded"' in description
-        assert "Wait and retry" in taught
-        assert "NOT 'the call was not recorded'" in taught
-        assert "Retrying will not help" in taught
+        assert "Wait, then call again" in taught
+        assert "not the same as `not_recorded`" in taught
+        assert "A retry does not help" in taught
         assert "no availability SLA" in taught, "the inference has to be admitted as one"
         assert "recurring" in rendered and "started_at" in rendered
         assert "publishes no duration field" in rendered, "the duration is derived, and says so"
@@ -1331,8 +1330,8 @@ class TestTheToolsThisServerAdvertises:
         rendered = str(limit.get("description")) + str(listed.get("description"))
 
         assert str(meetings.MAX_ARTIFACT_SCAN) in rendered, "the cap is named where it binds"
-        assert "the newest OF THE ONES READ" in str(limit.get("description"))
-        assert "the latest of what was READ" in str(listed.get("description"))
+        assert "you get more results, but only within that read" in str(limit.get("description"))
+        assert "the latest of what this tool read" in str(listed.get("description"))
         assert "so asking for 3 gives the 3 latest" not in rendered, (
             "the overstatement: past the cap those 3 are the newest of what was read"
         )
@@ -1345,9 +1344,12 @@ class TestTheToolsThisServerAdvertises:
         transcripts_description = tools["teams_list_meeting_transcripts"].description
         assert recordings_description is not None and transcripts_description is not None
 
-        assert "can block transcripts and never recordings" in transcripts_description
-        assert "try teams_list_meeting_recordings on refusal" in transcripts_description
-        assert "for the words, call teams_list_meeting_transcripts" in recordings_description
+        assert "recordings still succeed, and the reverse never happens" in transcripts_description
+        assert (
+            "When this tool refuses access, teams_list_meeting_recordings can succeed instead"
+            in transcripts_description
+        )
+        assert "teams_list_meeting_transcripts reports the words instead" in recordings_description
         assert "refus" not in recordings_description, (
             "a model reading this one has already chosen recordings; a fallback here is noise"
         )

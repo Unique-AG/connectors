@@ -444,7 +444,7 @@ class TestTheHandleItMints:
         assert described is not None
 
         assert "teams_read_message" in described
-        assert "only route to the full text, the attachments and the mentions" in described
+        assert "only route to the full text, the attachments, and the mentions" in described
         assert "no tool on this server takes it as an argument" not in described
         assert "no route from here to the message body" not in described
 
@@ -452,7 +452,7 @@ class TestTheHandleItMints:
         described = teams_search_messages.MessageHit.model_fields["summary"].description
         assert described is not None
 
-        assert "or infer from its absence" in described
+        assert "Do not infer anything from its absence" in described
 
     def test_the_advice_for_a_reply_hit_stops_rather_than_pointing_back_at_browsing(self) -> None:
         """A hit on a channel reply carries the root-post shape, which Graph 404s.
@@ -466,11 +466,11 @@ class TestTheHandleItMints:
         assert "teams_browse_channel" in described, (
             "the one tool that can, when the reply is recent"
         )
-        assert f"only the newest {MAX_REPLIES_PER_POST} replies" in described, (
+        assert f"just the newest {MAX_REPLIES_PER_POST} replies" in described, (
             "and where it stops, in the number the browser actually applies rather than in prose "
             + "of its own"
         )
-        assert "no route to its full text" in described
+        assert "no route to the full text" in described
         assert "browsing again returns the same window" in described
         assert "stop looking" in described
 
