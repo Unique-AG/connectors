@@ -6,6 +6,7 @@ import inspect
 import logging
 import weakref
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -14,6 +15,7 @@ import pytest
 from fastmcp.server.providers.filesystem_discovery import import_module_from_file
 from fastmcp.tools import ToolResult
 from pydantic import SecretStr
+from unique_toolkit.content.schemas import ContentInfo
 from unique_toolkit.content.smart_rules import parse_uniqueql
 from unique_toolkit.experimental.components.content_tree.schemas import (
     FolderWalkSnapshot,
@@ -1219,3 +1221,80 @@ async def test_search_does_not_filter_files_it_then_discards(applied_filter):
     assert applied_filter[-1] is None
     _, fuzzy_kwargs = mock_tree.search_visible_files_fuzzy_async.call_args
     assert fuzzy_kwargs["metadata_filter"] == _walk_filter(mock_tree)
+
+
+_PDF_ONLY_FILTER = {
+    "operator": "equals",
+    "path": ["mimeType"],
+    "value": "application/pdf",
+}
+
+
+def _real_content(content_id: str, key: str, mime_type: str) -> ContentInfo:
+    """A real ContentInfo — a MagicMock dumps to an empty record, which makes
+    every UniqueQL filter a silent no-op and the assertion meaningless."""
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    return ContentInfo(
+        id=content_id,
+        object="content",
+        key=key,
+        byteSize=1,
+        mimeType=mime_type,
+        ownerId="scope_a",
+        createdAt=now,
+        updatedAt=now,
+    )
+
+
+def _real_fuzzy_match(info: ContentInfo, score: float):
+    match = MagicMock()
+    match.path_segments = [info.key]
+    match.score = score
+    match.content_info = info
+    return match
+
+
+@pytest.mark.asyncio
+async def test_search_drops_fuzzy_hits_the_llm_filter_excludes():
+    """The fast path filters the scorer's hits, not the snapshot."""
+    pdf = _real_content("c_pdf", "report.pdf", "application/pdf")
+    txt = _real_content("c_txt", "report.txt", "text/plain")
+    mock_tree = _make_mock_tree()
+    mock_tree.search_visible_files_fuzzy_async = AsyncMock(
+        return_value=[_real_fuzzy_match(pdf, 0.9), _real_fuzzy_match(txt, 0.9)]
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="search",
+            query="report",
+            metadata_filter=_PDF_ONLY_FILTER,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "c_pdf" in text
+    assert "c_txt" not in text
+
+
+@pytest.mark.asyncio
+async def test_incomplete_search_still_applies_the_llm_filter():
+    """The fallback branch is the only one reading snapshot.files, and search
+    resolves that snapshot unfiltered — so it has to filter its own rows."""
+    pdf = _real_content("c_pdf", "report.pdf", "application/pdf")
+    txt = _real_content("c_txt", "report.txt", "text/plain")
+    snapshot = FakeSnapshot(
+        files=[(pdf, PurePosixPath("report.pdf")), (txt, PurePosixPath("report.txt"))],
+        complete=False,
+    )
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="search",
+            query="report",
+            metadata_filter=_PDF_ONLY_FILTER,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "c_pdf" in text
+    assert "c_txt" not in text
