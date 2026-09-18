@@ -14,7 +14,7 @@ dependencies = [
     "opentelemetry-sdk==1.44.0",
     "opentelemetry-exporter-prometheus==0.65b0",
     "opentelemetry-instrumentation-asgi==0.65b0",
-    "sqlalchemy[asyncio]==2.0.52",
+    "sqlalchemy[asyncio]==2.0.53",
     "asyncpg==0.31.0",
     "alembic==1.20.0",
     "cryptography==50.0.1",
