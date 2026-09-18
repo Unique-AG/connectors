@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.6.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.1...outlook-semantic-mcp@3.6.2) (2026-09-18)
+
+
+### Dependencies
+
+* bump node in /services/confluence-connector/deploy ([#996](https://github.com/Unique-AG/connectors/issues/996)) ([0b051f4](https://github.com/Unique-AG/connectors/commit/0b051f4a54096b2b91e9e5f2bea8e41d52444855))
+* **outlook-semantic-mcp,teams-mcp:** run migrations without pnpm ([#1034](https://github.com/Unique-AG/connectors/issues/1034)) ([5c95c51](https://github.com/Unique-AG/connectors/commit/5c95c515336437d4e7da95cdb4a1fe927f6e499e))
+* remove pnpm from the Node runtime images ([#1035](https://github.com/Unique-AG/connectors/issues/1035)) ([5ad580a](https://github.com/Unique-AG/connectors/commit/5ad580abb79f72f60d4e68a461c301c816692fcd))
+
 ## [3.6.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.0...outlook-semantic-mcp@3.6.1) (2026-09-15)
 
 
