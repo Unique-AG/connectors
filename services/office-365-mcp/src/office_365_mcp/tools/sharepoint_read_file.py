@@ -16,7 +16,7 @@ from msgraph.generated.models.drive_item import DriveItem
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.files import ITEM_FIELDS
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -120,39 +120,52 @@ async def sharepoint_read_file(
     if handle is None:
         raise ToolError(_NOT_A_FILE_HANDLE)
 
-    item = await _item(client, handle)
-    assert item is not None, "Graph answered a drive item read with no item"
-    if item.folder is not None:
-        raise ToolError(_is_a_folder(handle))
-    if item.file is None:
-        raise ToolError(_NOT_A_PLAIN_FILE)
-    if item.size is None:
-        raise ToolError(_NO_SIZE)
-    if item.size > MAX_BYTES:
-        raise ToolError(_too_large(size=item.size, web_url=item.web_url))
+    fetched = await _fetched(client, handle, convert_to=convert_to)
+    if isinstance(fetched, str):
+        raise ToolError(fetched)
+    return fetched
 
-    content = await _content(client, handle, convert_to=convert_to)
-    if content is None and item.size > 0:
-        raise ToolError(_NOTHING_CAME_BACK)
-    body = content or b""
-    if len(body) > MAX_BYTES:
-        raise ToolError(_too_large(size=len(body), web_url=item.web_url))
-    if convert_to is None:
-        return _FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
-    return _FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE)
+
+async def _fetched(
+    client: GraphServiceClient, handle: DriveFileHandle, *, convert_to: ConvertTo | None
+) -> File | str:
+    with graph_errors(TOOL_NAME):
+        with graph_step(STEP_ITEM):
+            item = await _item(client, handle)
+
+        assert item is not None, "Graph answered a drive item read with no item"
+        if item.folder is not None:
+            return _is_a_folder(handle)
+        if item.file is None:
+            return _NOT_A_PLAIN_FILE
+        if item.size is None:
+            return _NO_SIZE
+        if item.size > MAX_BYTES:
+            return _too_large(size=item.size, web_url=item.web_url)
+
+        with graph_step(STEP_CONTENT):
+            content = await _content(client, handle, convert_to=convert_to)
+
+        if content is None and item.size > 0:
+            return _NOTHING_CAME_BACK
+        body = content or b""
+        if len(body) > MAX_BYTES:
+            return _too_large(size=len(body), web_url=item.web_url)
+        if convert_to is None:
+            return _FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
+        return _FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE)
 
 
 async def _item(client: GraphServiceClient, handle: DriveFileHandle) -> DriveItem | None:
-    with graph_errors(TOOL_NAME, step=STEP_ITEM):
-        return await (
-            client.drives.by_drive_id(handle.drive_id)
-            .items.by_drive_item_id(handle.item_id)
-            .get(
-                request_configuration=RequestConfiguration[_ItemQuery](
-                    query_parameters=_ItemQuery(select=list(ITEM_FIELDS))
-                )
+    return await (
+        client.drives.by_drive_id(handle.drive_id)
+        .items.by_drive_item_id(handle.item_id)
+        .get(
+            request_configuration=RequestConfiguration[_ItemQuery](
+                query_parameters=_ItemQuery(select=list(ITEM_FIELDS))
             )
         )
+    )
 
 
 async def _content(
@@ -161,14 +174,13 @@ async def _content(
     content = (
         client.drives.by_drive_id(handle.drive_id).items.by_drive_item_id(handle.item_id).content
     )
-    with graph_errors(TOOL_NAME, step=STEP_CONTENT):
-        if convert_to is None:
-            return await content.get()
-        return await content.get(
-            request_configuration=RequestConfiguration[_ContentQuery](
-                query_parameters=_ContentQuery(format=convert_to)
-            )
+    if convert_to is None:
+        return await content.get()
+    return await content.get(
+        request_configuration=RequestConfiguration[_ContentQuery](
+            query_parameters=_ContentQuery(format=convert_to)
         )
+    )
 
 
 def _converted_name(name: str | None) -> str | None:

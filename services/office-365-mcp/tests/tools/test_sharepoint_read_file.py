@@ -14,7 +14,11 @@ from prometheus_client import generate_latest
 from unique_toolkit.monitoring import REGISTRY
 
 from office_365_mcp.config import AppConfig
-from office_365_mcp.graph_client import GRAPH_STEPS_TOTAL, GraphNotFound
+from office_365_mcp.graph_client import (
+    GRAPH_OPERATIONS_TOTAL,
+    GRAPH_STEPS_TOTAL,
+    GraphNotFound,
+)
 from office_365_mcp.metrics import configure_metrics
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
 from office_365_mcp.tools import sharepoint_read_file as reader
@@ -360,6 +364,21 @@ class TestWhatItCounts:
                 _value(GRAPH_STEPS_TOTAL, operation=reader.TOOL_NAME, step=step, status="ok")
                 == counted + 1
             ), step
+
+    @pytest.mark.usefixtures("item", "content")
+    async def test_one_call_of_this_tool_is_one_graph_operation(
+        self, client: GraphServiceClient
+    ) -> None:
+        before = _value(GRAPH_OPERATIONS_TOTAL, operation=reader.TOOL_NAME, status="ok")
+
+        _ = await _read(client)
+
+        assert (
+            _value(GRAPH_OPERATIONS_TOTAL, operation=reader.TOOL_NAME, status="ok") == before + 1
+        ), (
+            "an operation is one tool call and a step is one Graph call; counting the two Graph "
+            "calls as two operations reads every dashboard's operation rate as a call rate"
+        )
 
 
 class TestHowItDeclaresItself:
