@@ -231,7 +231,15 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "SharePoint site or of a folder, for example "
                     + "`https://contoso.sharepoint.com/sites/Finance`. Take the address from the "
                     + "`web_url` of a row this tool returned, or from the user. A site name or a "
-                    + "folder name on its own does not work here."
+                    + "folder name on its own does not work here. To scope to the whole site that "
+                    + "a file sits on, cut its `web_url` after the site name: a SharePoint site "
+                    + "address is the host, then `/sites/` or `/teams/`, then the site name, and "
+                    + "those two are the only forms SharePoint uses. Keep more of the address to "
+                    + "scope to one folder. A space may be written as a space or as `%20`, and a "
+                    + "trailing slash makes no difference. The host also separates the two "
+                    + "places: a personal OneDrive lives on the `-my` host, and SharePoint sites "
+                    + "live on the host without it, so the bare host alone keeps one and drops "
+                    + "the other."
                 ),
             ),
         ] = None,
