@@ -1,10 +1,11 @@
 """The handle grammar: every shape this connector mints, the parser, and the speller.
 
-Three schemes, one per product. `teams:///` addresses Microsoft Teams, `outlook:///` addresses a
-mailbox, and `sharepoint:///` addresses a file or a folder in OneDrive or SharePoint. If a mail
-shape used the Teams scheme, it has to answer `MessageHandle.permission` below, and that answer
-reaches `teams_read_message`'s declared permissions and, from there, the consent screen of every
-`teams` deployment. The scheme is the cheapest place to keep the products apart.
+Four schemes, one per product. `teams:///` addresses Microsoft Teams, `outlook:///` addresses a
+mailbox, `sharepoint:///` addresses a file or a folder in OneDrive or SharePoint, and `onenote:///`
+addresses a OneNote section or page. If a mail shape used the Teams scheme, it has to answer
+`MessageHandle.permission` below, and that answer reaches `teams_read_message`'s declared
+permissions and, from there, the consent screen of every `teams` deployment. The scheme is the
+cheapest place to keep the products apart.
 
 This is the only module that spells or parses these URIs. tests/test_layering.py enforces that.
 A second speller does not look like a disagreement. It looks like a handle that one tool produced
@@ -200,6 +201,24 @@ class DriveFolderHandle:
         return f"sharepoint:///folders/{_segment(self.drive_id)}/{_segment(self.item_id)}"
 
 
+@dataclass(frozen=True, slots=True)
+class OnenoteSectionHandle:
+    section_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"onenote:///sections/{_segment(self.section_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class OnenotePageHandle:
+    page_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"onenote:///pages/{_segment(self.page_id)}"
+
+
 # Ids are matched as "anything but a separator", because the spellers above percent-encode each one.
 _CHAT_HANDLE = re.compile(r"\Ateams:///chats/([^/]+)/messages/([^/]+)\Z")
 _CHANNEL_HANDLE = re.compile(r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)\Z")
@@ -216,6 +235,8 @@ _CALENDAR_HANDLE = re.compile(r"\Aoutlook:///calendars/([^/]+)\Z")
 _EVENT_HANDLE = re.compile(r"\Aoutlook:///events/([^/]+)/([^/]+)\Z")
 _DRIVE_FILE_HANDLE = re.compile(r"\Asharepoint:///files/([^/]+)/([^/]+)\Z")
 _DRIVE_FOLDER_HANDLE = re.compile(r"\Asharepoint:///folders/([^/]+)/([^/]+)\Z")
+_ONENOTE_SECTION_HANDLE = re.compile(r"\Aonenote:///sections/([^/]+)\Z")
+_ONENOTE_PAGE_HANDLE = re.compile(r"\Aonenote:///pages/([^/]+)\Z")
 
 
 def message_handle(uri: str) -> MessageHandle | None:
@@ -307,6 +328,16 @@ def drive_file_handle(uri: str) -> DriveFileHandle | None:
 def drive_folder_handle(uri: str) -> DriveFolderHandle | None:
     ids = _two_ids(_DRIVE_FOLDER_HANDLE, uri)
     return None if ids is None else DriveFolderHandle(*ids)
+
+
+def onenote_section_handle(uri: str) -> OnenoteSectionHandle | None:
+    section_id = _single_id(_ONENOTE_SECTION_HANDLE, uri)
+    return None if section_id is None else OnenoteSectionHandle(section_id)
+
+
+def onenote_page_handle(uri: str) -> OnenotePageHandle | None:
+    page_id = _single_id(_ONENOTE_PAGE_HANDLE, uri)
+    return None if page_id is None else OnenotePageHandle(page_id)
 
 
 def meeting_uri_for(join_web_url: str | None) -> str | None:

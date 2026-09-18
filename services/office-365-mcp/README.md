@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes thirty-two
+Users sign in with their own Microsoft account and the server acts as them. It exposes thirty-seven
 MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
 most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
 channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
@@ -33,7 +33,13 @@ somebody delegated, under that person's name; and `sharepoint_search_files`, whi
 user can already open, in their OneDrive or on any SharePoint site and names the sites its
 matches sit on; and `sharepoint_browse_folder`,
 which lists one level of one folder; and `sharepoint_read_file`, which returns one file as
-Microsoft stores it, or asks Microsoft to convert a document to PDF first,
+Microsoft stores it, or asks Microsoft to convert a document to PDF first; and
+`onenote_list_notebooks`, every notebook the signed-in user owns or one shared with them, and each
+one's sections with the section groups they sit in; and `onenote_list_pages`, the newest pages of one section or of
+every notebook the user owns or has shared with them, matched on title alone; and `onenote_read_page`, one of those
+pages as the HTML Microsoft stores it; and `onenote_create_page`, which writes a brand-new page
+into a section or the user's default notebook; and `onenote_append_to_page`, which adds HTML to
+the end of a page that already exists,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -103,8 +109,8 @@ at all**, taking its own frozen `GraphSettings` instead of reading config; that 
 tool file is one in name only; that **no tool module imports another tool module**, which is what
 independent means and is the rule the whole layout exists for; that **only `create_app` constructs a
 config**, so nothing downstream can quietly re-read the environment and disagree with the app it
-runs in; that **`shared/handles.py` is the only module that builds or parses a `teams:///`, `outlook:///`
-or `sharepoint:///` URI** (showing the shape to a model in a description, an `examples=` or a
+runs in; that **`shared/handles.py` is the only module that builds or parses a `teams:///`, `outlook:///`,
+`sharepoint:///` or `onenote:///` URI** (showing the shape to a model in a description, an `examples=` or a
 refusal is prose and is not that); and that **a package is entered through its `__init__`** — `graph_client/`, `server/` and
 `tools/` each publish an `__all__`, and `shared/` deliberately does not, being a grouping whose
 modules are the units and whose consumers say which one they depend on at the import line.
@@ -173,6 +179,9 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Calendars.ReadWrite` | Delegated | No | `outlook_create_event` |
 | `Calendars.ReadWrite.Shared` | Delegated | No | `outlook_create_event_on_behalf` |
 | `Files.Read.All` | Delegated | **Yes** | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_read_file` |
+| `Notes.Read` | Delegated | No | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page` |
+| `Notes.Create` | Delegated | No | `onenote_create_page` |
+| `Notes.ReadWrite` | Delegated | No | `onenote_append_to_page` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -289,6 +298,14 @@ inside the search, and a user therefore gets back only files they can already op
 lets the connector ask about any file; it does not let a user read a file they could not read
 before.
 
+**Every delegated `Notes.*` permission Microsoft publishes needs no administrator.**
+`onenote_list_notebooks` declares `Notes.Read`, even though Microsoft's list-notebooks table
+names `Notes.Create` as the least-privileged permission there, because `Notes.Create` also grants
+creating pages, notebooks and sections, and a read-only preset must not put a write grant on its
+consent screen. `onenote_create_page` declares `Notes.Create` and `onenote_append_to_page`
+declares `Notes.ReadWrite`, each the least-privileged permission Microsoft documents for its own
+request.
+
 **State.** Every token is a reference token re-validated on each request. State location decides
 whether a restart or second replica causes loss. FastMCP defaults to an encrypted file tree in
 process home. This service uses Postgres. The store creates table oauth_kv on first use. The
@@ -332,6 +349,8 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `outlook-calendar-delegate` | the above, plus creating an event on a calendar somebody delegated, as that person | + `outlook_create_event_on_behalf` | + `Calendars.ReadWrite.Shared` | 0 |
 | `sharepoint-search` | find a file in the user's OneDrive or on a SharePoint site, and say where it is | `sharepoint_search_files` | `User.Read`, `Files.Read.All` | 1 |
 | `sharepoint-read` | the above, plus listing one level of a folder and returning one file itself, or the PDF Microsoft converts it to | + `sharepoint_browse_folder`, `sharepoint_read_file` | `User.Read`, `Files.Read.All` | 1 |
+| `onenote-read` | list every notebook and its sections, and find or read a page | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page` | `User.Read`, `Notes.Read` | 0 |
+| `onenote-write` | the above, plus creating a page and appending to one that already exists | + `onenote_create_page`, `onenote_append_to_page` | + `Notes.Create`, `Notes.ReadWrite` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
@@ -348,8 +367,8 @@ tool of another product on the day it lands, put that tool's permission on the c
 every `teams` deployment, and cost every signed-in user a fresh sign-in — with no edit for anyone
 to review. `tests/test_tool_selection.py` refuses a derived preset, and refuses a registered tool
 that no preset names. The names carry a product axis from the
-start: the `outlook-*` and then the `sharepoint-*` rows joined the table as those tools landed, and
-no name already in it had to be re-cut.
+start: the `outlook-*` and then the `sharepoint-*` and then the `onenote-*` rows joined the table
+as those tools landed, and no name already in it had to be re-cut.
 
 **Microsoft Graph cannot turn a document into text, so this connector does not pretend to.**
 There is no endpoint for it. The complete method list of the file resource has none, in the stable
@@ -359,6 +378,19 @@ PDF, run on Microsoft's own servers, and the tool exposes that as `convert_to`. 
 goal is to read what a document says: a Word or PowerPoint file is a zip archive a reader cannot
 use, and the PDF carries the text. This connector converts nothing itself, in either case. A live
 run against the test tenant on 2026-09-16 returned a 966 KB PDF from a 6.4 MB PowerPoint file.
+
+**OneNote has no full-text search through Microsoft Graph for a work or school account.**
+`$search` is absent from the OneNote query-options table, so `onenote_list_pages` filters on the
+title alone; it cannot see what a page's body says. A page comes back as the HTML Microsoft
+stores, with any image or file reference inside it pointing at Graph and opening only with this
+connector's own sign-in token, and this connector converts none of it. The two write tools are
+additive, ask nobody to confirm because a page in the user's own notebook reaches no one else, and
+send `no_retry()` because a retried create or append duplicates content. `onenote_create_page`
+sends the page as `text/html` through a hand-built request, because the SDK's generated `post`
+would send JSON, which OneNote rejects. `onenote_append_to_page` goes through the SDK's
+`onenotePatchContent` action, whose enum values kiota serialises as `Append`/`After` where
+Microsoft's own examples spell them `append`/`after`; that spelling has not yet been exercised
+against a live tenant.
 
 **The Outlook rows are three axes, not one ladder.** Mail content goes `outlook-read` →
 `outlook-write` → `outlook-send`, each row adding one permission to the row above. Mailbox

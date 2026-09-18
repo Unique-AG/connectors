@@ -551,7 +551,7 @@ def _object(value: object) -> dict[str, object]:
 # token tool-shaped. Written out rather than derived from TOOL_NAMES on purpose: a derived
 # pattern could not tell prose naming a tool that does not exist — a typo — from prose naming
 # one this deployment merely left out, and the first is the failure worth catching.
-_TOOL_MENTION = re.compile(r"\b(?:get|teams|outlook)_[a-z]+(?:_[a-z]+)*\b")
+_TOOL_MENTION = re.compile(r"\b(?:get|teams|outlook|onenote)_[a-z]+(?:_[a-z]+)*\b")
 
 
 def _described(schema: Mapping[str, object] | None) -> list[str]:
@@ -673,6 +673,8 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_disable_mail_rule",
         "outlook_create_event",
         "outlook_create_event_on_behalf",
+        "onenote_create_page",
+        "onenote_append_to_page",
     }
 )
 

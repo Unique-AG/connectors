@@ -326,6 +326,8 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "outlook_read_event": {"uri": ("outlook_list_events",)},
     "outlook_create_event_on_behalf": {"calendar_ref": ("outlook_list_calendars",)},
     "sharepoint_read_file": {"file": ("sharepoint_search_files", "sharepoint_browse_folder")},
+    "onenote_read_page": {"page": ("onenote_list_pages",)},
+    "onenote_append_to_page": {"page": ("onenote_list_pages", "onenote_create_page")},
 }
 
 
@@ -369,6 +371,9 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
         {"subject", "starts_at", "ends_at", "time_zone", "attendees"}
     ),
     "sharepoint_search_files": frozenset({"query"}),
+    "onenote_list_pages": frozenset({"title_contains"}),
+    "onenote_create_page": frozenset({"title", "body_html"}),
+    "onenote_append_to_page": frozenset({"body_html"}),
 }
 
 
@@ -645,6 +650,13 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     ),
     (ToolsPreset.SHAREPOINT_SEARCH, ("User.Read", "Files.Read.All"), 1, 3),
     (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 4),
+    (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read"), 0, 4),
+    (
+        ToolsPreset.ONENOTE_WRITE,
+        ("User.Read", "Notes.Read", "Notes.Create", "Notes.ReadWrite"),
+        0,
+        6,
+    ),
 )
 
 
