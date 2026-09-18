@@ -75,6 +75,65 @@ def _matching(graph: respx.MockRouter, *hits: dict[str, object], more: bool = Fa
     )
 
 
+def _grouped_by_site(buckets: list[tuple[str, int]]) -> dict[str, object]:
+    payload = search_response([_file_hit()])
+    responses = cast("list[dict[str, object]]", payload["value"])
+    container = cast("list[dict[str, object]]", responses[0]["hitsContainers"])[0]
+    container["aggregations"] = [
+        {"field": "SPSiteURL", "buckets": [{"key": u, "count": c} for u, c in buckets]}
+    ]
+    return payload
+
+
+class TestWhichSitesHoldTheMatches:
+    async def test_it_asks_microsoft_to_group_the_matches_by_site(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([_file_hit()]))
+        )
+
+        _ = await sharepoint_search_files.sharepoint_search_files(
+            client, query="report", offset=0, limit=25
+        )
+
+        asked = cast("list[dict[str, object]]", _request(route)["aggregations"])
+        assert [a["field"] for a in asked] == ["SPSiteURL"], (
+            "siteId, webUrl and SPWebUrl are accepted and then silently grouped nothing"
+        )
+
+    async def test_the_sites_come_back_largest_first_with_the_address_path_wants(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        payload = _grouped_by_site(
+            [(_SITE, 209), ("https://contoso.sharepoint.invalid/sites/BugBash", 20)]
+        )
+        _ = graph.post("/search/query").mock(return_value=httpx.Response(200, json=payload))
+
+        answer = await sharepoint_search_files.sharepoint_search_files(
+            client, query="report", offset=0, limit=25
+        )
+
+        assert [(s.url, s.match_count) for s in answer.sites] == [
+            (_SITE, 209),
+            ("https://contoso.sharepoint.invalid/sites/BugBash", 20),
+        ]
+
+    async def test_no_grouping_is_an_empty_list_rather_than_a_failure(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([_file_hit()]))
+        )
+
+        answer = await sharepoint_search_files.sharepoint_search_files(
+            client, query="report", offset=0, limit=25
+        )
+
+        assert answer.sites == [], "Graph drops an aggregation it cannot make and still answers 200"
+        assert answer.files, "the matches still come back"
+
+
 class TestReachingTheFolderAroundAHit:
     async def test_a_hit_carries_the_handle_of_the_folder_that_holds_it(
         self, client: GraphServiceClient, graph: respx.MockRouter

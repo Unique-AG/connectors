@@ -30,7 +30,8 @@ and `outlook_list_events`, what sits on one of those calendars between two dates
 `outlook_create_event`, which puts one event on the user's own calendar and sends the
 invitations as it does; and `outlook_create_event_on_behalf`, which does the same on a calendar
 somebody delegated, under that person's name; and `sharepoint_search_files`, which finds a file the
-user can already open, in their OneDrive or on any SharePoint site; and `sharepoint_browse_folder`,
+user can already open, in their OneDrive or on any SharePoint site and names the sites its
+matches sit on; and `sharepoint_browse_folder`,
 which lists one level of one folder; and `sharepoint_read_file`, which returns one file as
 Microsoft stores it, or asks Microsoft to convert a document to PDF first,
 and more land in later PRs, stacked on top of this one, one tool per PR.

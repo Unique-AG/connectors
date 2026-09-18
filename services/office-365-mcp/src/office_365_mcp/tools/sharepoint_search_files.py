@@ -5,6 +5,11 @@ from typing import Annotated
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from msgraph.generated.models.aggregation_option import AggregationOption
+from msgraph.generated.models.bucket_aggregation_definition import BucketAggregationDefinition
+from msgraph.generated.models.bucket_aggregation_sort_property import (
+    BucketAggregationSortProperty,
+)
 from msgraph.generated.models.drive_item import DriveItem
 from msgraph.generated.models.entity_type import EntityType
 from msgraph.generated.models.search_hit import SearchHit
@@ -32,6 +37,10 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "budget"}
 
 MAX_RESULTS = 50
 
+_SITE_FIELD = "SPSiteURL"
+
+MAX_SITES = 10
+
 _DESCRIPTION = """\
 Search the files and folders the signed-in user can see in OneDrive and in SharePoint. Use it for \
 "find the file about…" and for every question that names a document. `query` is required. The \
@@ -42,7 +51,10 @@ days is covered whole, so "the budget file I touched in March" is one call. Ther
 here, inside a window or outside one. Microsoft's index returns its own order, so a date window \
 does not make an answer "the newest". Each row names a file or a folder and carries no file \
 content: pass a row's `uri` to sharepoint_read_file to get the file itself, and to \
-sharepoint_browse_folder to list what is in a folder. Use sharepoint_browse_folder instead when \
+sharepoint_browse_folder to list what is in a folder. Every answer also names the sites the \
+matches sit on, with a count for each, so a wide search tells you where the answer lives. \
+When one site is the right one, search again with that site's address as `path`. \
+Use sharepoint_browse_folder instead when \
 the user names one folder and wants everything in it, because a search reaches indexed content \
 only and a browse reaches every item.\
 """
@@ -62,8 +74,25 @@ _NOTHING_TO_SEARCH_FOR = (
 )
 
 
+class SiteMatches(BaseModel):
+    """One site, and how many of the matches sit on it."""
+
+    url: str = Field(
+        description=(
+            "The web address of the site. Pass it back as `path` to search this site only. It is "
+            + "already in the form `path` wants, so use it word for word."
+        )
+    )
+    match_count: int = Field(
+        description=(
+            "How many matches sit on this site. This counts every match, not only the ones on "
+            + "this page, so it says how much is there before you ask for it."
+        )
+    )
+
+
 class FileSearchResults(BaseModel):
-    """One page of matches, and the offset that reaches the next page."""
+    """One page of matches, the sites they sit on, and the offset that reaches the next page."""
 
     files: list[DriveItemSummary] = Field(
         description=(
@@ -71,6 +100,16 @@ class FileSearchResults(BaseModel):
             + "nothing. A search reads indexed content only, so an empty answer is not proof that "
             + "no such file exists. A row that Graph returned no drive for is dropped, because "
             + "this tool cannot address it again."
+        )
+    )
+    sites: list[SiteMatches] = Field(
+        description=(
+            "The sites the matches sit on, with the most matches first. Microsoft counts these "
+            + "across every match, so this says where the answer lives before you page through "
+            + "it. Use it to narrow: show the user these sites, then search again with one site's "
+            + "`url` as `path`. Empty when every match is in the user's own OneDrive, or when "
+            + "Microsoft grouped nothing, which some organisations cause by changing their search "
+            + "settings. Empty never means the matches have no site."
         )
     )
     next_offset: int | None = Field(
@@ -116,6 +155,17 @@ async def sharepoint_search_files(
                 query=SearchQuery(query_string=asked),
                 from_=offset,
                 size=limit,
+                aggregations=[
+                    AggregationOption(
+                        field=_SITE_FIELD,
+                        size=MAX_SITES,
+                        bucket_definition=BucketAggregationDefinition(
+                            sort_by=BucketAggregationSortProperty.Count,
+                            is_descending=True,
+                            minimum_count=0,
+                        ),
+                    )
+                ],
             )
         ]
     )
@@ -129,8 +179,23 @@ async def sharepoint_search_files(
 
     return FileSearchResults(
         files=[item for item in (_from_hit(hit) for hit in hits) if item is not None],
+        sites=_sites(container),
         next_offset=offset + len(hits) if more_to_come and hits else None,
     )
+
+
+def _sites(container: SearchHitsContainer | None) -> list[SiteMatches]:
+    if container is None:
+        return []
+    for aggregation in container.aggregations or []:
+        if aggregation.field != _SITE_FIELD:
+            continue
+        return [
+            SiteMatches(url=bucket.key, match_count=bucket.count)
+            for bucket in aggregation.buckets or []
+            if bucket.key is not None and bucket.count is not None
+        ]
+    return []
 
 
 def _from_hit(hit: SearchHit) -> DriveItemSummary | None:
