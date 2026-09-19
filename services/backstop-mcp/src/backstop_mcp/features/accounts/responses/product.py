@@ -36,6 +36,14 @@ class ProductRecordResponse(OmitNoneModel):
             "catalog could not be loaded. Slice with custom_field_names rather than fetching again."
         ),
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this product (no tab). Omitted when this deployment "
+            "has no UI origin. Echo it; never invent one. Call build_backstop_links for "
+            "tabs or a layout."
+        ),
+    )
 
 
 class ProductResolvedResponse(OmitNoneModel):

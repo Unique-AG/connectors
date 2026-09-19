@@ -16,6 +16,17 @@ from backstop_mcp.features.party_resolver import PartyAmbiguousResponse
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
 
+_PERSON_URL_DESCRIPTION = (
+    "Canonical CRM UI URL for this person (no tab). Omitted when this deployment "
+    "has no UI origin. Echo it; never invent one. Call build_backstop_links for "
+    "tabs or a layout."
+)
+_ORGANIZATION_URL_DESCRIPTION = (
+    "Canonical CRM UI URL for this organization (no tab). Omitted when this "
+    "deployment has no UI origin. Echo it; never invent one. Call "
+    "build_backstop_links for tabs or a layout."
+)
+
 __all__ = [
     "CreateEmploymentResponse",
     "CreatedEmploymentResponse",
@@ -59,6 +70,7 @@ class CreatedPersonResponse(OmitNoneModel):
         default=(),
         description="Silent-failure notes. Empty when the write landed as asked.",
     )
+    url: str | None = Field(default=None, description=_PERSON_URL_DESCRIPTION)
 
 
 class CreatedOrganizationResponse(OmitNoneModel):
@@ -79,6 +91,7 @@ class CreatedOrganizationResponse(OmitNoneModel):
         default=(),
         description="Silent-failure notes. Empty when the write landed as asked.",
     )
+    url: str | None = Field(default=None, description=_ORGANIZATION_URL_DESCRIPTION)
 
 
 class DeletedPersonResponse(OmitNoneModel):
@@ -162,6 +175,7 @@ class UpdatedPersonResponse(OmitNoneModel):
         default=(),
         description="Silent-failure notes. Empty when the write landed as asked.",
     )
+    url: str | None = Field(default=None, description=_PERSON_URL_DESCRIPTION)
 
 
 class UpdatedOrganizationResponse(OmitNoneModel):
@@ -192,6 +206,7 @@ class UpdatedOrganizationResponse(OmitNoneModel):
         default=(),
         description="Silent-failure notes. Empty when the write landed as asked.",
     )
+    url: str | None = Field(default=None, description=_ORGANIZATION_URL_DESCRIPTION)
 
 
 type UpdatePersonResponse = UpdatedPersonResponse | PartyAmbiguousResponse | NotFoundResponse

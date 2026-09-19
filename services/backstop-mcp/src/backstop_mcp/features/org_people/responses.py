@@ -385,6 +385,14 @@ class PersonResolvedResponse(OmitNoneModel):
             "Slice with the custom_field_* filters rather than fetching again."
         ),
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this person (no tab). Omitted when this deployment "
+            "has no UI origin. Echo it; never invent one. Call build_backstop_links for "
+            "tabs or a layout."
+        ),
+    )
 
 
 class OrganizationResolvedResponse(OmitNoneModel):
@@ -430,6 +438,14 @@ class OrganizationResolvedResponse(OmitNoneModel):
             "layout, group, type, and value). Fields may belong to the organization or to the "
             "shared party catalog. Empty when the record has none or the catalog could not be "
             "loaded. Slice with the custom_field_* filters rather than fetching again."
+        ),
+    )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this organization (no tab). Omitted when this "
+            "deployment has no UI origin. Echo it; never invent one. Call "
+            "build_backstop_links for tabs or a layout."
         ),
     )
 

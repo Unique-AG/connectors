@@ -24,6 +24,7 @@ from backstop_mcp.features.activity_writes.commands._json_api_utils import (
 from backstop_mcp.features.activity_writes.log_activity_input import TaskActivityInput
 from backstop_mcp.features.activity_writes.responses import LoggedTaskResponse
 from backstop_mcp.features.system_users import SystemUsersService
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, TaskLinkTarget
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +34,16 @@ _TaskDocument = BackstopApiSingleResourceDocument[TaskAttributes]
 class LogTaskCommand:
     """Create a task via `POST /tasks`."""
 
-    def __init__(self, *, client: BackstopClient, system_users_service: SystemUsersService) -> None:
+    def __init__(
+        self,
+        *,
+        client: BackstopClient,
+        system_users_service: SystemUsersService,
+        build_entity_link_util: BuildEntityLinkUtil,
+    ) -> None:
         self._client: BackstopClient = client
         self._system_users_service: SystemUsersService = system_users_service
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(
         self,
@@ -83,4 +91,7 @@ class LogTaskCommand:
             id=document.data.id,
             title=activity.title,
             send_notification=activity.send_notification,
+            url=self._build_entity_link_util.canonical_url(
+                target=TaskLinkTarget(task_id=document.data.id),
+            ),
         )

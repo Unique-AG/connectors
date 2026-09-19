@@ -73,3 +73,35 @@ class TestInstructions:
         assert "all test records" in INSTRUCTIONS
         assert "search-then-delete" in INSTRUCTIONS
         assert "update_activity" in INSTRUCTIONS
+
+    def test_state_the_party_identity_model_before_any_tool(self) -> None:
+        """`party_id` + `search_type` is the precondition of half the tools; say it once, first."""
+        assert "`party_id` alone is rejected" in INSTRUCTIONS
+        assert "two separate arguments" in INSTRUCTIONS
+        assert "a contacts or employees id is not a people id" in INSTRUCTIONS
+        assert "candidates" in INSTRUCTIONS
+        assert "not_found" in INSTRUCTIONS
+        assert INSTRUCTIONS.index("`party_id` alone is rejected") < INSTRUCTIONS.index("get_person")
+
+    def test_carry_the_write_and_auxiliary_tools(self) -> None:
+        for tool in (
+            "create_person",
+            "create_organization",
+            "create_employment",
+            "end_employment",
+            "update_person",
+            "update_organization",
+            "create_opportunity",
+            "update_opportunity",
+            "update_custom_field_values",
+            "list_custom_field_groups",
+            "run_report",
+            "build_backstop_links",
+            "parse_backstop_link",
+        ):
+            assert tool in INSTRUCTIONS, tool
+        assert "only way to move a stage" in INSTRUCTIONS
+        assert "a repeated call makes a second record" in INSTRUCTIONS
+        assert "`records[].status`" in INSTRUCTIONS
+        assert "no endpoint that lists reports" in INSTRUCTIONS
+        assert "Never hand-write a Backstop URL" in INSTRUCTIONS

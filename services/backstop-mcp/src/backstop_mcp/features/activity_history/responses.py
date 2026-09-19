@@ -634,6 +634,15 @@ class ActivityDetailResponse(OmitNoneModel):
             "search_activities publishes `attachments_count` only. Empty when there are none."
         ),
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this activity. Omitted when this deployment has no "
+            "UI origin, or when the activity kind has no CRM page. Echo it; never invent "
+            "one. Built from the `/entity-activity-details` id, not a history email "
+            "`activity_id`."
+        ),
+    )
 
     @classmethod
     def from_detail(
@@ -643,6 +652,7 @@ class ActivityDetailResponse(OmitNoneModel):
         detail: ActivityDetailDto,
         specifics: MeetingSpecificsDto | None,
         attendees: tuple[AttendeeDto, ...],
+        url: str | None,
     ) -> Self:
         """Convert the fetched parts to the tool's wire shape. Pure: no HTTP.
 
@@ -665,6 +675,7 @@ class ActivityDetailResponse(OmitNoneModel):
                 ActivityAttachmentResponse(id=item.id, name=item.name)
                 for item in detail.attachments
             ),
+            url=url,
         )
 
 

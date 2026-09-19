@@ -70,9 +70,12 @@ class TestBackstopConfigDefaults:
         # BACKSTOP_BASE_URL may be set in the developer's local .env (loaded by other modules
         # under test); clear it so this test only asserts on this class's own field defaults.
         monkeypatch.delenv("BACKSTOP_BASE_URL", raising=False)
+        monkeypatch.delenv("BACKSTOP_UI_BASE_URL", raising=False)
         config = BackstopConfig()
 
         assert config.base_url == "https://api.backstopsolutions.com"
+        assert config.ui_base_url is None
+        assert config.effective_ui_base_url is None
         assert config.default_timeout_seconds == 30.0
         assert config.reports_timeout_seconds == 120.0
         assert config.max_concurrent_requests_per_user == 5
@@ -118,6 +121,38 @@ class TestBackstopConfigDefaults:
 
         with pytest.raises(ValidationError):
             BackstopConfig()
+
+    def test_ui_base_url_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BACKSTOP_UI_BASE_URL", "https://tenant.example.test/")
+
+        config = BackstopConfig()
+
+        assert config.ui_base_url == "https://tenant.example.test"
+        assert config.effective_ui_base_url == "https://tenant.example.test"
+
+    def test_effective_ui_base_url_falls_back_to_tenant_api_host(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("BACKSTOP_UI_BASE_URL", raising=False)
+        monkeypatch.setenv("BACKSTOP_BASE_URL", "https://tenant.example.test")
+
+        assert BackstopConfig().effective_ui_base_url == "https://tenant.example.test"
+
+    def test_effective_ui_base_url_does_not_guess_the_shared_api_host(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("BACKSTOP_UI_BASE_URL", raising=False)
+        monkeypatch.setenv("BACKSTOP_BASE_URL", "https://api.backstopsolutions.com")
+
+        assert BackstopConfig().effective_ui_base_url is None
+
+    def test_explicit_ui_base_url_wins_over_tenant_base_url(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("BACKSTOP_BASE_URL", "https://tenant.example.test")
+        monkeypatch.setenv("BACKSTOP_UI_BASE_URL", "https://crm.example.test")
+
+        assert BackstopConfig().effective_ui_base_url == "https://crm.example.test"
 
     def test_env_vars_override_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKSTOP_DEFAULT_TIMEOUT_SECONDS", "45.5")

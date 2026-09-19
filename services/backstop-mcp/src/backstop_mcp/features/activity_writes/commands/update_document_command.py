@@ -17,6 +17,7 @@ from backstop_mcp.features.activity_writes.commands._json_api_utils import (
 from backstop_mcp.features.activity_writes.commands.extract_collection import extract_collection
 from backstop_mcp.features.activity_writes.responses import UpdatedActivityResponse
 from backstop_mcp.features.activity_writes.update_activity_input import UpdateDocumentInput
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, DocumentLinkTarget
 from backstop_mcp.utils import parse_activity_handle
 
 logger = logging.getLogger(__name__)
@@ -27,8 +28,14 @@ _Document = BackstopApiSingleResourceDocument[DocumentAttributes]
 class UpdateDocumentCommand:
     """Update document metadata via `PATCH /documents/{id}`."""
 
-    def __init__(self, *, client: BackstopClient) -> None:
+    def __init__(
+        self,
+        *,
+        client: BackstopClient,
+        build_entity_link_util: BuildEntityLinkUtil,
+    ) -> None:
         self._client: BackstopClient = client
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, activity: UpdateDocumentInput) -> UpdatedActivityResponse:
         handle = parse_activity_handle(activity.activity_id)
@@ -43,4 +50,10 @@ class UpdateDocumentCommand:
         )
         document = await self._client.patch(path, schema=_Document, json=payload)
         logger.info("activity_writes.document.updated", extra={"id": document.data.id})
-        return UpdatedActivityResponse(id=document.data.id, resource_type="documents")
+        return UpdatedActivityResponse(
+            id=document.data.id,
+            resource_type="documents",
+            url=self._build_entity_link_util.canonical_url(
+                target=DocumentLinkTarget(entity_activity_details_id=document.data.id),
+            ),
+        )

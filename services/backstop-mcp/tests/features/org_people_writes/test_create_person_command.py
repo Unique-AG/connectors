@@ -15,6 +15,7 @@ from backstop_mcp.features.org_people_writes import (
     CreatePersonInput,
     get_create_person_command_factory,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import (
     BASE_URL,
     client_factory,
@@ -40,9 +41,15 @@ def _create(**payload: object) -> CreatePersonInput:
     return _PERSON.validate_python({"last_name": "Smith", "gender": "Female", **payload})
 
 
-def make_command(client: BackstopClient) -> CreatePersonCommand:
+def make_command(
+    client: BackstopClient,
+    *,
+    build_entity_link_util: BuildEntityLinkUtil | None = None,
+) -> CreatePersonCommand:
     return get_create_person_command_factory(
-        client, system_users_service=system_users_service(client)
+        client,
+        system_users_service=system_users_service(client),
+        build_entity_link_util=build_entity_link_util or BuildEntityLinkUtil(ui_base_url=None),
     )
 
 
@@ -139,6 +146,21 @@ class TestCreatePersonCommand:
         assert result.resource_type == "people"
         assert result.name == "Smith"
         assert result.mobile_phone == "555-0100"
+        assert result.url is None
+
+    @respx.mock
+    async def test_confirmation_carries_canonical_url(self, client: BackstopClient) -> None:
+        respx.post(f"{BASE_URL}/people").mock(return_value=_person_document(status=201))
+        respx.get(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
+
+        result = await make_command(
+            client,
+            build_entity_link_util=BuildEntityLinkUtil(ui_base_url="https://tenant.example.test"),
+        ).run(person=_create())
+
+        assert result.url == (
+            "https://tenant.example.test/backstop/crm/ManagePerson.action?display=&party_id=9001"
+        )
 
     @respx.mock
     async def test_unknown_owner_login_does_not_post(self, client: BackstopClient) -> None:

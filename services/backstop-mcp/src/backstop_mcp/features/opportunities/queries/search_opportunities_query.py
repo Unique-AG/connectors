@@ -106,6 +106,7 @@ class SearchOpportunitiesQuery:
                     api_include_resources=pages.included,
                     custom_fields_filters=CustomFieldFilters(),
                     include_stage_history=False,
+                    url=None,
                 )
                 investor = InvestorFromOpportunityResponse.from_included(
                     included.first(

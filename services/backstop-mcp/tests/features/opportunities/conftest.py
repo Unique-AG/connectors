@@ -13,6 +13,7 @@ from backstop_mcp.features.opportunities import (
     OpportunityStagesService,
     SearchOpportunitiesQuery,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import client_factory, credential, custom_fields_service
 
 VOCABULARY: dict[str, OpportunityStageResponse] = {
@@ -55,6 +56,7 @@ def make_get_opportunities_query(client: BackstopClient) -> GetOpportunitiesQuer
             client, custom_fields=custom_fields
         ),
         custom_fields_service=custom_fields,
+        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
     )
 
 
@@ -66,6 +68,7 @@ def make_get_opportunities_by_ids_query(client: BackstopClient) -> GetOpportunit
             client, custom_fields=custom_fields
         ),
         custom_fields_service=custom_fields,
+        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
     )
 
 

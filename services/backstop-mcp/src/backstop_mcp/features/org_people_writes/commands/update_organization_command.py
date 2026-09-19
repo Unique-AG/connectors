@@ -30,6 +30,7 @@ from backstop_mcp.features.org_people_writes.update_organization_input import (
     UpdateOrganizationInput,
 )
 from backstop_mcp.features.system_users import SystemUsersService
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -48,12 +49,14 @@ class UpdateOrganizationCommand:
         client: BackstopClient,
         system_users_service: SystemUsersService,
         modify_contact_location_command: ModifyContactLocationCommand,
+        build_entity_link_util: BuildEntityLinkUtil,
     ) -> None:
         self._client: BackstopClient = client
         self._system_users_service: SystemUsersService = system_users_service
         self._modify_contact_location_command: ModifyContactLocationCommand = (
             modify_contact_location_command
         )
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(
         self, *, new_organization_fields: UpdateOrganizationInput, party_id: str
@@ -79,6 +82,9 @@ class UpdateOrganizationCommand:
                 resource_type=_RESOURCE_TYPE,
                 organization=OrganizationRecordResponse.from_attributes(written.data.attributes),
                 location_ids=location_ids,
+                url=self._build_entity_link_util.canonical_url(
+                    target=OrganizationLinkTarget(party_id=party_id)
+                ),
             )
 
     async def _read(self, party_id: str) -> _ReadDocument:

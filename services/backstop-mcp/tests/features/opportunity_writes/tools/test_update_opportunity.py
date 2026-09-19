@@ -15,6 +15,7 @@ from backstop_mcp.features.opportunity_writes import (
     get_update_opportunity_command_factory,
 )
 from backstop_mcp.features.opportunity_writes.tools.update_opportunity import update_opportunity
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.helpers import (
     BASE_URL,
@@ -43,6 +44,7 @@ def make_command(client: BackstopClient) -> UpdateOpportunityCommand:
         client,
         opportunity_stages_service=opportunity_stages_service(client),
         system_users_service=system_users_service(client),
+        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
     )
 
 

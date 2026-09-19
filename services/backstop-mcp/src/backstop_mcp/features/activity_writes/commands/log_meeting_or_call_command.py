@@ -39,6 +39,7 @@ from backstop_mcp.features.activity_writes.responses import (
 )
 from backstop_mcp.features.system_users import system_user_relationship
 from backstop_mcp.features.time_zones import TimeZonesService
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, CallLinkTarget, MeetingLinkTarget
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +52,16 @@ type _MeetingOrCallInput = MeetingActivityInput | CallActivityInput
 class LogMeetingOrCallCommand:
     """Create a meeting or call via top-level `POST /meeting-or-calls`."""
 
-    def __init__(self, *, client: BackstopClient, time_zones_service: TimeZonesService) -> None:
+    def __init__(
+        self,
+        *,
+        client: BackstopClient,
+        time_zones_service: TimeZonesService,
+        build_entity_link_util: BuildEntityLinkUtil,
+    ) -> None:
         self._client: BackstopClient = client
         self._time_zones_service: TimeZonesService = time_zones_service
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(
         self,
@@ -104,6 +112,9 @@ class LogMeetingOrCallCommand:
                     id=resource.id,
                     title=activity.title,
                     time_zone=time_zone,
+                    url=self._build_entity_link_util.canonical_url(
+                        target=MeetingLinkTarget(entity_activity_details_id=resource.id),
+                    ),
                 )
             case "call":
                 return LoggedCallResponse(
@@ -111,6 +122,9 @@ class LogMeetingOrCallCommand:
                     title=activity.title,
                     meeting_type=activity.direction,
                     time_zone=time_zone,
+                    url=self._build_entity_link_util.canonical_url(
+                        target=CallLinkTarget(entity_activity_details_id=resource.id),
+                    ),
                 )
             case _:
                 assert_never(activity.kind)

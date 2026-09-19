@@ -18,6 +18,7 @@ from backstop_mcp.features.party_resolver import (
     PartyCandidateResponse,
     ResolvedPartyResponse,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.models import CoercedId
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_TYPE,
@@ -39,6 +40,7 @@ from tests.server.tools.helpers import object_dict, object_list, tool_model, too
 
 _INDEX = build_employment_index_factory()
 _EMPTY_DEFINITIONS: dict[str, object] = {"data": [], "links": {"next": None}}
+_NO_UI_LINKS = BuildEntityLinkUtil(ui_base_url=None)
 
 
 @pytest.fixture(autouse=True)
@@ -142,6 +144,7 @@ class TestGetPerson:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PersonResolvedResponse,
         )
@@ -197,6 +200,7 @@ class TestGetPerson:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PersonResolvedResponse,
         )
@@ -233,6 +237,7 @@ class TestGetPerson:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PersonResolvedResponse,
         )
@@ -280,6 +285,7 @@ class TestGetPerson:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PersonResolvedResponse,
         )
@@ -323,6 +329,7 @@ class TestGetPerson:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PersonResolvedResponse,
         )
@@ -358,6 +365,7 @@ class TestGetPerson:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PartyAmbiguousResponse,
         )
@@ -411,6 +419,7 @@ class TestGetPerson:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PersonResolvedResponse,
         )
@@ -454,6 +463,7 @@ class TestGetPersonIncludes:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PersonResolvedResponse,
         )
@@ -511,6 +521,7 @@ class TestGetPersonIncludes:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PersonResolvedResponse,
         )
@@ -544,6 +555,7 @@ class TestGetPersonIncludes:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -609,6 +621,7 @@ class TestGetPersonIncludes:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PersonResolvedResponse,
         )
@@ -661,6 +674,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -703,6 +717,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -749,6 +764,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -777,6 +793,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -809,6 +826,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -869,6 +887,7 @@ class TestGetPersonCustomFields:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -897,6 +916,7 @@ class TestGetPersonCustomFields:
                 get_person_query=make_get_person_query(
                     client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
         assert [

@@ -20,6 +20,8 @@ env:
   PORT: "8000"
   # PUBLIC_BASE_URL must be the externally-reachable OAuth issuer URL (set in overlay).
   # BACKSTOP_BASE_URL defaults to https://api.backstopsolutions.com inside the app.
+  # BACKSTOP_UI_BASE_URL is the CRM UI origin for deep links. Unset: no links, unless
+  # BACKSTOP_BASE_URL is already the tenant CRM host (not api.backstopsolutions.com).
 
   # In-memory catalog caches, one flag per feature. A catalog is a small instance-wide
   # `{id: dto}` map (custom-field definitions and groups, activity tags, system users,

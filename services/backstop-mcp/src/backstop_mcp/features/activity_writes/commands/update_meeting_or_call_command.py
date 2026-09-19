@@ -32,6 +32,7 @@ from backstop_mcp.features.activity_writes.update_activity_input import (
     UpdateMeetingInput,
 )
 from backstop_mcp.features.time_zones import TimeZonesService
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, CallLinkTarget, MeetingLinkTarget
 from backstop_mcp.utils import parse_activity_handle
 
 logger = logging.getLogger(__name__)
@@ -45,9 +46,16 @@ type _MeetingOrCallUpdate = UpdateMeetingInput | UpdateCallInput
 class UpdateMeetingOrCallCommand:
     """Update a meeting or call via `PATCH /meeting-or-calls/{id}`."""
 
-    def __init__(self, *, client: BackstopClient, time_zones_service: TimeZonesService) -> None:
+    def __init__(
+        self,
+        *,
+        client: BackstopClient,
+        time_zones_service: TimeZonesService,
+        build_entity_link_util: BuildEntityLinkUtil,
+    ) -> None:
         self._client: BackstopClient = client
         self._time_zones_service: TimeZonesService = time_zones_service
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, activity: _MeetingOrCallUpdate) -> UpdatedActivityResponse:
         handle = parse_activity_handle(activity.activity_id)
@@ -74,7 +82,18 @@ class UpdateMeetingOrCallCommand:
             "activity_writes.meeting_or_call.updated",
             extra={"id": document.data.id, "kind": activity.kind},
         )
-        return UpdatedActivityResponse(id=document.data.id, resource_type="meeting-or-calls")
+        target = (
+            MeetingLinkTarget(entity_activity_details_id=document.data.id)
+            if activity.kind == "meeting"
+            else CallLinkTarget(entity_activity_details_id=document.data.id)
+        )
+        return UpdatedActivityResponse(
+            id=document.data.id,
+            resource_type="meeting-or-calls",
+            url=self._build_entity_link_util.canonical_url(
+                target=target,
+            ),
+        )
 
     def _meeting_type(self, activity: _MeetingOrCallUpdate) -> _MeetingType | None:
         """The replacement `type`, or `None` to leave the record's own type alone."""
