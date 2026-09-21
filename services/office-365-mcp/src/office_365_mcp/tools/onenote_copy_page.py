@@ -51,7 +51,7 @@ TOOL_NAME = "onenote_copy_page"
 STEP_COPY_PAGE = "copy_page"
 STEP_PAGE = "page"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Create",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read", "Notes.Create")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "page": "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF",

@@ -193,7 +193,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Calendars.ReadWrite` | Delegated | No | `outlook_create_event` |
 | `Calendars.ReadWrite.Shared` | Delegated | No | `outlook_create_event_on_behalf` |
 | `Files.Read.All` | Delegated | **Yes** | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_read_file` |
-| `Notes.Read` | Delegated | No | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections`, `onenote_get_operation` |
+| `Notes.Read` | Delegated | No | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections`, `onenote_get_operation`, `onenote_copy_page` |
 | `Notes.Create` | Delegated | No | `onenote_create_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook` |
 | `Notes.ReadWrite` | Delegated | No | `onenote_append_to_page`, `onenote_edit_page`, `onenote_rename_page`, `onenote_delete_page` |
 
@@ -329,6 +329,8 @@ preset. The three creation tools,
 `onenote_create_notebook`, `onenote_create_section` and `onenote_create_section_group`, and the
 three copy tools, `onenote_copy_page`, `onenote_copy_section` and `onenote_copy_notebook`, declare
 `Notes.Create`, the least-privileged permission Microsoft documents for each of those requests.
+`onenote_copy_page` declares `Notes.Read` as well: before it puts a copy into a shared notebook to
+a person, it reads the page's title, and Microsoft documents no page read under `Notes.Create`.
 `onenote_edit_page`, `onenote_rename_page` and `onenote_delete_page` declare `Notes.ReadWrite`,
 because Microsoft names no narrower permission for `onenotePatchContent` or for deleting a page.
 

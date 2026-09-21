@@ -957,7 +957,7 @@ class TestHowRegisterWiresThePendingAnswer:
 
 class TestHowItDeclaresItself:
     def test_the_permission_is_notes_create(self) -> None:
-        assert copier.GRAPH_PERMISSIONS == ("Notes.Create",)
+        assert copier.GRAPH_PERMISSIONS == ("Notes.Read", "Notes.Create")
 
     def test_the_call_example_is_a_page_and_a_section_handle(self) -> None:
         assert set(copier.GRAPH_CALL_EXAMPLE) == {"page", "to_section"}

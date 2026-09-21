@@ -302,6 +302,7 @@
         {
           "name": "onenote_copy_page",
           "permissions": [
+            "Notes.Read",
             "Notes.Create"
           ]
         },
