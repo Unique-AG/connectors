@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.10](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.9...teams-mcp@0.4.10) (2026-09-21)
+
+
+### Dependencies
+
+* bump node in /services/*/deploy ([#1061](https://github.com/Unique-AG/connectors/issues/1061)) ([900cf1d](https://github.com/Unique-AG/connectors/commit/900cf1da2c09c5ccf86724b16472405d7c4e8c11))
+
 ## [0.4.9](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.8...teams-mcp@0.4.9) (2026-09-17)
 
 
