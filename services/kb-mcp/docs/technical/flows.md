@@ -3,7 +3,7 @@
 
 ## Connection
 
-An MCP client authenticates once, through kb-mcp's own OAuth proxy. kb-mcp is a public PKCE client
+An MCP client authenticates once, through `kb-mcp`'s own OAuth proxy. `kb-mcp` is a public PKCE client
 of Zitadel and holds no client secret.
 
 ```mermaid
@@ -28,7 +28,7 @@ sequenceDiagram
     C->>K: GET /mcp (token)
 ```
 
-Tokens are encrypted with `ENCRYPTION_KEY` before they reach Postgres. The access token kb-mcp
+Tokens are encrypted with `ENCRYPTION_KEY` before they reach Postgres. The access token `kb-mcp`
 returns is its own, signed with `ZITADEL_JWT_SIGNING_KEY`. Zitadel never sees that key.
 
 ## Tool Call

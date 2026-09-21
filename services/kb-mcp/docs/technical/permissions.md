@@ -1,17 +1,17 @@
 <!-- confluence-page-id: 2744614980 -->
 <!-- confluence-space-key: PUBDOC -->
 
-kb-mcp has no access of its own. It authenticates the caller against Zitadel, then passes that
+`kb-mcp` has no access of its own. It authenticates the caller against Zitadel, then passes that
 identity to the Unique API on every call. The Unique API enforces it. A `search`, `content_tree`,
 `content_metadata`, or `read_file` result therefore only ever contains knowledge-base content the
 calling user could already open in the web app.
 
-This is why kb-mcp requests no knowledge-base scopes: there are none to request. It holds no
+This is why `kb-mcp` requests no knowledge-base scopes: there are none to request. It holds no
 service-wide credential that could read another user's content.
 
 ## Zitadel Scopes
 
-kb-mcp requests three scopes, all identity-only.
+`kb-mcp` requests three scopes, all identity-only.
 
 | Scope | Purpose |
 |---|---|
@@ -27,7 +27,7 @@ honoured.
 ## How a Call Is Scoped
 
 Identity is resolved per call from the OIDC session, never from a tool argument. An MCP client
-cannot ask kb-mcp to act as somebody else.
+cannot ask `kb-mcp` to act as somebody else.
 
 On top of that identity, four filters are combined with `AND` before the query reaches the Unique
 API:

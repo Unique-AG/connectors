@@ -22,17 +22,17 @@ If you get signed out, the assistant will say the knowledge base is unavailable 
 connect again.
 
 Don't see the knowledge base as an option at all? Someone has to turn it on first: an admin adds
-the connector (an org admin, for Claude; whoever manages your Unique AI setup, for Unique AI), it
-needs to be enabled for the space you're using, and the individual tool can be switched off
-separately from the rest. Ask your IT admin if it's missing.
+the connector (an org admin, for Claude; whoever manages your Unique AI setup, for Unique AI), and
+in Unique AI it also needs to be enabled for the space you're using. Individual tools can be
+restricted too, but only from the Unique AI admin side; there's no equivalent for Claude yet. Ask
+your IT admin if it's missing.
 
-Using a different assistant, such as Claude or Cursor, instead of Unique AI? See
-[Connecting Clients](./connecting.md).
+Using Claude or Cursor instead? See [Connecting Clients](./connecting.md).
 
 ## Disconnecting
 
 Remove the connector from your client's own settings (for Unique AI, ask your tenant admin) to
-end the session. There's nothing left behind afterwards: kb-mcp never stored what you searched or
+end the session. There's nothing left behind afterwards: `kb-mcp` never stored what you searched or
 read, so disconnecting doesn't "clean up" anything, it just ends access.
 
 ## What you can see
@@ -53,13 +53,17 @@ works far better than the same question with no location. Subfolders are include
 If you're not sure where something lives, ask what folders you can see first. That gives the
 assistant the layout, so its next search lands closer to what you need.
 
+You can narrow by more than folder, too: by file type ("just the PDFs"), or by any metadata your
+organisation tags documents with, like a department or a status. Ask what's available to filter on
+if you're not sure what your documents are tagged with.
+
 Answers come with citations. If you want to read the full document rather than the summary, just
 ask to see the source.
 
 !!! note "If you get nothing back"
     An empty result usually means one of three things: the content isn't in the knowledge base, you
     don't have access to it, or the search was scoped too narrowly. Ask the assistant to try again
-    without the folder restriction. It will tell you if a filter was the cause.
+    with a more permissive filter, or none at all. It will tell you if a filter was the cause.
 
 ## Limits worth knowing
 
@@ -75,4 +79,4 @@ knowledge base comes back weak. You'll get more out of it by narrowing to a fold
 
 ## Related documentation
 
-- [Overview](./README.md): what kb-mcp is and how it fits together
+- [Overview](./README.md): what `kb-mcp` is and how it fits together

@@ -3,7 +3,7 @@
 
 ## Tools
 
-kb-mcp advertises up to four MCP tools on `/mcp`. `KB_MCP_ENABLED_TOOLS` (env) or
+`kb-mcp` advertises up to four MCP tools on `/mcp`. `KB_MCP_ENABLED_TOOLS` (env) or
 `mcpConfig.enabledTools` (Helm) narrows the set; unset means all four. A restart is required.
 
 Each tool also carries an admin configuration set in the Unique admin UI, not through environment
@@ -12,11 +12,12 @@ variables. Admin values are the floor: a caller may narrow them, never widen the
 
 ### `search`
 
-Semantic and internal search over the knowledge base.
+Semantic and internal search over the knowledge base: finds relevant passages by meaning, not
+just keyword matches, and returns them as citation-ready chunks.
 
 | Argument | Purpose |
 |---|---|
-| `search_string` | The query |
+| `search_string` | The natural-language question or phrase to search for |
 | `folder_ids`, `include_subfolders` | Restrict to folders; subfolders included by default |
 | `metadata_filter` | UniqueQL narrowing, AND-ed with the admin filter |
 | `limit`, `score_threshold` | Override the admin defaults for this call |
@@ -53,22 +54,10 @@ filter excluding `user-memory` folders.
     finishes it. Truncated means the walk finished and `mode='tree'` capped the result at `limit`;
     calling again returns the same thing, raise `limit` or narrow `folder_path` instead.
 
-The walk can outlast one call. `KB_MCP_WALK_TIMEOUT_SECONDS` (default `30`) is when a
-partial tree is returned rather than blocking; the walk continues, so a follow-up is usually
-instant. `KB_MCP_WALK_MAX_TIMEOUT_SECONDS` (default `45`) caps what a caller may request.
-Keep it under the MCP client's own budget, typically 60s.
-
-Responses are cached in memory per pod, keyed on company, user, and the requested folder scope, so
-a folder-scoped walk and an unscoped one never share an entry: `KB_MCP_TREE_CACHE_TTL_SECONDS`
-(default `600`), `KB_MCP_TREE_CACHE_MAX_ENTRIES` (default `24`, across all callers and folder
-scopes). A caller's own `metadata_filter` no longer forces a second walk: only the admin filter is
-baked into the cached walk, the caller's is applied to it afterward. `refresh=true` bypasses the
-cache for the caller's next call, at the cost of a slower (~20s) refetch. This cache is shared with
-`content_metadata`, below.
-
-!!! note "Multi-replica staleness"
-    Because the cache is per pod, a change can take up to the TTL to appear. Lower the TTL if that
-    matters more than cache-hit rate.
+Results are cached briefly (`KB_MCP_TREE_CACHE_TTL_SECONDS`, default `600`) to keep repeat calls
+fast; a change can take up to that long to show up. If the user reports files just added or
+changed, call again with `refresh=true` instead of waiting it out. See
+[Flows](./flows.md) for how the cache and the admin filter interact.
 
 ### `content_metadata`
 
@@ -86,10 +75,11 @@ Returns every known field with its distinct values, e.g. `[{"department": ["Lega
 
 Exhaustive by design: every known field and value in scope, not a sample, with no pagination yet.
 Eight system fields (`key`, `title`, `folderId`, `mimeType`, `companyId`, `contentId`,
-`validAsOf`, `folderIdPath`) are excluded by default since they're not something a caller would
-filter on; admin-configurable. Unlike `search` and `content_tree`, it takes no caller
-`metadata_filter`: only the admin one applies, since the tool exists to discover what a filter
-could say, not to apply one.
+`validAsOf`, `folderIdPath`) are excluded from the catalog by default, admin-configurable. They're
+all valid to filter on too (`search` and `content_tree` already take a folder or a mimetype
+directly); the catalog exists to surface the less obvious, organisation-specific metadata instead.
+Unlike `search` and `content_tree`, it takes no caller `metadata_filter`: only the admin one
+applies, since the tool exists to discover what a filter could say, not to apply one.
 
 Shares `content_tree`'s walk and cache entirely, described above: both tools are just different
 views over the same visible-file snapshot.

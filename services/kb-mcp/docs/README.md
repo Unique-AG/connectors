@@ -30,7 +30,7 @@ under the calling user's own permissions, so `search`, `content_tree`, `content_
 `read_file` only ever return knowledge-base content that user could already see.
 
 **Processing:** Synchronous. Each tool call queries the Unique API and returns immediately.
-`content_tree`'s folder/file listing is the only thing kb-mcp caches, in-memory and per pod;
+`content_tree` and `content_metadata` share one cached folder/file walk, in-memory and per pod;
 search results and file content are never cached.
 
 ## Tools
@@ -66,5 +66,5 @@ Which tools are advertised on `/mcp` is configurable per deployment
 
 - [Model Context Protocol specification](https://modelcontextprotocol.io/)
 - [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)
-- [`unique-mcp` on PyPI](https://pypi.org/project/unique-mcp/)
-- [`unique-toolkit` on PyPI](https://pypi.org/project/unique-toolkit/)
+- [`unique-mcp` on GitHub](https://github.com/Unique-AG/ai/tree/main/unique_mcp)
+- [`unique-toolkit` on GitHub](https://github.com/Unique-AG/ai/tree/main/unique_toolkit)
