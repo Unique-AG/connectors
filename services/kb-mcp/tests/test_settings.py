@@ -84,19 +84,19 @@ def test_storage_rejects_ephemeral_flag_with_durable_pair(monkeypatch):
 
 def test_content_tree_timeout_defaults_and_env_override(monkeypatch):
     get_settings.cache_clear()
-    assert get_settings().content_tree_timeout_seconds == 30.0
-    assert get_settings().content_tree_max_timeout_seconds == 45.0
+    assert get_settings().walk_timeout_seconds == 30.0
+    assert get_settings().walk_max_timeout_seconds == 45.0
 
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS", "20")
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS", "25")
+    monkeypatch.setenv("KB_MCP_WALK_TIMEOUT_SECONDS", "20")
+    monkeypatch.setenv("KB_MCP_WALK_MAX_TIMEOUT_SECONDS", "25")
     get_settings.cache_clear()
-    assert get_settings().content_tree_timeout_seconds == 20.0
-    assert get_settings().content_tree_max_timeout_seconds == 25.0
+    assert get_settings().walk_timeout_seconds == 20.0
+    assert get_settings().walk_max_timeout_seconds == 25.0
 
 
 def test_content_tree_timeout_rejects_default_above_max(monkeypatch):
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS", "30")
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS", "20")
+    monkeypatch.setenv("KB_MCP_WALK_TIMEOUT_SECONDS", "30")
+    monkeypatch.setenv("KB_MCP_WALK_MAX_TIMEOUT_SECONDS", "20")
     get_settings.cache_clear()
 
     with pytest.raises(ValidationError, match="must not exceed"):
@@ -122,7 +122,9 @@ def test_enabled_tools_parses_comma_list(monkeypatch):
     get_settings.cache_clear()
     settings = get_settings()
     assert settings.enabled_tools == frozenset({"search", "read_file"})
-    assert settings.disabled_tool_names() == frozenset({"content_tree"})
+    assert settings.disabled_tool_names() == frozenset(
+        {"content_tree", "content_metadata"}
+    )
 
 
 def test_enabled_tools_rejects_unknown_name(monkeypatch):
@@ -143,3 +145,27 @@ def test_scope_lookup_concurrency_env_override(monkeypatch):
     monkeypatch.setenv("KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY", "3")
     get_settings.cache_clear()
     assert get_settings().scope_lookup_concurrency == 3
+
+
+def test_clamped_walk_timeout_uses_default_then_ceiling():
+    settings = Settings()
+    assert settings.clamped_walk_timeout(None) == 30.0
+    assert settings.clamped_walk_timeout(12.0) == 12.0
+    assert settings.clamped_walk_timeout(300.0) == 45.0
+    assert settings.clamped_walk_timeout(-1.0) == 0.0
+
+
+def test_clamped_walk_timeout_follows_configured_values(monkeypatch):
+    monkeypatch.setenv("KB_MCP_WALK_TIMEOUT_SECONDS", "20")
+    monkeypatch.setenv("KB_MCP_WALK_MAX_TIMEOUT_SECONDS", "25")
+    settings = Settings()
+    assert settings.clamped_walk_timeout(None) == 20.0
+    assert settings.clamped_walk_timeout(40.0) == 25.0
+
+
+def test_walk_env_names_apply(monkeypatch):
+    monkeypatch.setenv("KB_MCP_WALK_TIMEOUT_SECONDS", "11")
+    monkeypatch.setenv("KB_MCP_TREE_CACHE_MAX_ENTRIES", "7")
+    settings = Settings()
+    assert settings.walk_timeout_seconds == 11.0
+    assert settings.tree_cache_max_entries == 7

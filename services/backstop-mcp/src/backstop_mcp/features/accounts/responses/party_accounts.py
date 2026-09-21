@@ -6,6 +6,7 @@ reads is composed here, because phrasing is a wire concern and the fetch layer s
 opinion about it.
 """
 
+from collections.abc import Mapping
 from datetime import date
 from typing import Literal, Self
 
@@ -175,9 +176,17 @@ class HoldingRowResponse(OmitNoneModel):
             "publishes no number for it, which is a different answer."
         ),
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this account (no tab). Omitted when this deployment "
+            "has no UI origin. Echo it; never invent one. An account id is not a party id. "
+            "Call build_backstop_links for tabs."
+        ),
+    )
 
     @classmethod
-    def from_dto(cls, row: HoldingRowDto) -> Self:
+    def from_dto(cls, row: HoldingRowDto, *, url: str | None) -> Self:
         return cls(
             account_id=row.account_id,
             product_id=row.product_id,
@@ -200,6 +209,7 @@ class HoldingRowResponse(OmitNoneModel):
                 HoldingFigureErrorResponse(figure=error.figure, message=error.message)
                 for error in row.figure_errors
             ),
+            url=url,
         )
 
 
@@ -263,10 +273,19 @@ class PartyAccountsResolvedResponse(OmitNoneModel):
     )
 
     @classmethod
-    def from_holdings(cls, listing: HoldingListingDto, *, resolved: ResolvedPartyResponse) -> Self:
+    def from_holdings(
+        cls,
+        listing: HoldingListingDto,
+        *,
+        resolved: ResolvedPartyResponse,
+        urls: Mapping[str, str | None],
+    ) -> Self:
         return cls(
             resolved=resolved,
-            holdings=tuple(HoldingRowResponse.from_dto(row) for row in listing.rows),
+            holdings=tuple(
+                HoldingRowResponse.from_dto(row, url=urls.get(row.account_id))
+                for row in listing.rows
+            ),
             source=listing.source,
             data_caveat=(
                 _TABLE_CAVEAT

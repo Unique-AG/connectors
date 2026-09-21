@@ -69,6 +69,6 @@ def test_apply_enabled_tools_disables_hidden_names(monkeypatch):
     mcp = MagicMock()
     apply_enabled_tools(mcp, get_settings())
     mcp.disable.assert_called_once_with(
-        names={"content_tree"},
+        names={"content_tree", "content_metadata"},
         components={"tool"},
     )

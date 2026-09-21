@@ -29,20 +29,18 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 MAX_TEAMS = 200
 
 _DESCRIPTION = """\
-List the teams the signed-in user belongs to. Start here for any question about a team or a \
-channel. `team_id` is what teams_list_channels needs, and a channel id alone addresses nothing. \
-For chats, group chats, and meeting chats — the other surface entirely — use teams_list_chats. \
-Returns each team's id, name, description, and archived flag. Fewer than `limit` means the end \
-of the list.\
+Lists the teams the signed-in user belongs to, in no particular order, as the starting point for \
+any question about a team or a channel. It does not cover chats, group chats, or meeting chats, \
+which are an entirely separate surface. Use teams_list_chats for those instead.\
 """
 
 
 class TeamSummary(BaseModel):
     team_id: str = Field(
         description=(
-            "The team's Graph id. This is what teams_list_channels takes, and the same id "
-            + "teams_search_messages reports on channel messages. Opaque—copy it verbatim, never "
-            + "build one from a name."
+            "The team's Graph id. Pass it to teams_list_channels. Match it against the "
+            + "`team_id` that teams_search_messages reports on channel messages. This id is "
+            + "opaque. Copy it verbatim. Never build one from a name."
         )
     )
     display_name: str | None = Field(
@@ -72,9 +70,9 @@ class TeamSummary(BaseModel):
 class TeamList(BaseModel):
     teams: list[TeamSummary] = Field(
         description=(
-            "Your teams. A full window (`limit` teams) can mean more exist. Teams beyond a "
-            + "full window are arbitrary, not ranked by importance. A short window means the "
-            + f"end of the list. Raise `limit` (up to {MAX_TEAMS}) to see more."
+            "The user's teams, in no particular order — Microsoft Graph applies none to this "
+            + "collection. A full window can mean more teams exist. A shorter one is the "
+            + "complete list."
         )
     )
 
@@ -106,9 +104,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_TEAMS,
                 description=(
-                    f"Teams to return, 1–{MAX_TEAMS}. Default 50. Microsoft Graph applies no page "
-                    + "size to this collection. This is a window this connector applies while "
-                    + "paging. Shorter than `limit` means the end of the list."
+                    f"Teams to return, 1–{MAX_TEAMS}. The result is already the whole answer for "
+                    + "this call. Repeating it with the same `limit` returns the same teams, not "
+                    + "the next page. Raise `limit` to see more."
                 ),
             ),
         ] = 50,

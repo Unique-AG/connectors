@@ -30,6 +30,7 @@ from backstop_mcp.features.opportunity_writes.create_opportunity_input import (
 )
 from backstop_mcp.features.opportunity_writes.responses import CreatedOpportunityResponse
 from backstop_mcp.features.system_users import SystemUsersService
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
 from backstop_mcp.utils import first_item
 
 logger = logging.getLogger(__name__)
@@ -48,10 +49,12 @@ class CreateOpportunityCommand:
         client: BackstopClient,
         opportunity_stages_service: OpportunityStagesService,
         system_users_service: SystemUsersService,
+        build_entity_link_util: BuildEntityLinkUtil,
     ) -> None:
         self._client: BackstopClient = client
         self._opportunity_stages_service: OpportunityStagesService = opportunity_stages_service
         self._system_users_service: SystemUsersService = system_users_service
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(
         self, *, opportunity: CreateOpportunityInput, investor_id: str
@@ -112,6 +115,9 @@ class CreateOpportunityCommand:
                 stage=stage_name,
                 stage_id=stage_id,
                 warnings=warnings,
+                url=self._build_entity_link_util.canonical_url(
+                    target=OpportunityLinkTarget(entity_id=created_id),
+                ),
             )
 
     def _stage_from_document(

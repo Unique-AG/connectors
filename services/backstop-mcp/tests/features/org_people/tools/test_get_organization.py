@@ -23,6 +23,7 @@ from backstop_mcp.features.party_resolver import (
     ResolvedPartyResponse,
 )
 from backstop_mcp.features.resolution import NotFoundResponse
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.models import CoercedId
 from tests.features.org_people.conftest import make_get_organization_query
 from tests.features.party_resolver.helpers import (
@@ -43,6 +44,7 @@ from tests.server.tools.helpers import (
 )
 
 _EMPTY_DEFINITIONS: dict[str, object] = {"data": [], "links": {"next": None}}
+_NO_UI_LINKS = BuildEntityLinkUtil(ui_base_url=None)
 
 
 @pytest.fixture(autouse=True)
@@ -144,6 +146,7 @@ class TestGetOrganization:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             OrganizationResolvedResponse,
         )
@@ -200,6 +203,7 @@ class TestGetOrganization:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -241,6 +245,7 @@ class TestGetOrganization:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PartyAmbiguousResponse,
         )
@@ -296,6 +301,7 @@ class TestGetOrganization:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             OrganizationResolvedResponse,
         )
@@ -305,7 +311,47 @@ class TestGetOrganization:
         assert result.resolved == ResolvedPartyResponse(
             id="trusted-9", search_type="organizations", name="From Body"
         )
+        assert result.url is None
         assert quick.call_count == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_resolved_organization_carries_canonical_url(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/organizations/trusted-9").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "organizations",
+                        "id": "trusted-9",
+                        "attributes": {"name": "From Body"},
+                    }
+                },
+            )
+        )
+
+        result = tool_model(
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="trusted-9",
+                search_type="organizations",
+                resolve_party_query=make_resolve_party_query(client),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
+                build_entity_link_util=BuildEntityLinkUtil(
+                    ui_base_url="https://tenant.example.test"
+                ),
+            ),
+            OrganizationResolvedResponse,
+        )
+
+        assert result.url == (
+            "https://tenant.example.test/backstop/crm/ManageOrganization.action"
+            "?display=&party_id=trusted-9"
+        )
 
     @pytest.mark.asyncio
     @respx.mock
@@ -337,6 +383,7 @@ class TestGetOrganization:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             OrganizationResolvedResponse,
         )
@@ -358,6 +405,7 @@ class TestGetOrganization:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
 
     @pytest.mark.asyncio
@@ -383,6 +431,7 @@ class TestGetOrganization:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
 
         assert exc_info.value.path == "/organizations/trusted-9"
@@ -410,6 +459,7 @@ class TestGetOrganization:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             GetOrganizationResponse,
         )
@@ -455,6 +505,7 @@ class TestGetOrganization:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             OrganizationResolvedResponse,
         )
@@ -501,6 +552,7 @@ class TestGetOrganizationIncludes:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             OrganizationResolvedResponse,
         )
@@ -548,6 +600,7 @@ class TestGetOrganizationIncludes:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -606,6 +659,7 @@ class TestGetOrganizationIncludes:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             OrganizationResolvedResponse,
         )
@@ -670,6 +724,7 @@ class TestGetOrganizationIncludes:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             OrganizationResolvedResponse,
         )
@@ -707,6 +762,7 @@ class TestGetOrganizationIncludes:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -733,6 +789,7 @@ class TestGetOrganizationIncludes:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -765,6 +822,7 @@ class TestGetOrganizationIncludes:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -806,6 +864,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -843,6 +902,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -872,6 +932,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -898,6 +959,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -1040,6 +1102,7 @@ async def _organization_custom_fields(
             party_id="o42",
             resolve_party_query=make_resolve_party_query(client),
             get_organization_query=make_get_organization_query(client, custom_fields=catalog),
+            build_entity_link_util=_NO_UI_LINKS,
             custom_field_tabs=custom_field_tabs,
             custom_field_groups=custom_field_groups,
             custom_field_group_ids=custom_field_group_ids,
@@ -1275,6 +1338,7 @@ class TestGetOrganizationCustomFields:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             )
         )
 
@@ -1308,6 +1372,7 @@ class TestGetOrganizationCustomFields:
                 get_organization_query=make_get_organization_query(
                     client, custom_fields=_catalog(client)
                 ),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             OrganizationResolvedResponse,
         )

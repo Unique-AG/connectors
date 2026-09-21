@@ -21,9 +21,17 @@ from unique_toolkit.content.smart_rules import (
     uniqueql_to_dict,
 )
 
-from kb_mcp.references import INVALID_METADATA_FILTER_MESSAGE
+from kb_mcp.common.references import INVALID_METADATA_FILTER_MESSAGE
 
 type RawOrParsedUniqueQL = UniqueQL | Mapping[str, Any] | None
+
+# Not a field default: UniqueQLField serialises to dict|None against a
+# string|null schema, which breaks admin-UI rendering.
+DEFAULT_METADATA_FILTER_STATEMENT = Statement(
+    operator=Operator.NOT_CONTAINS,
+    path=["folderIdPath"],
+    value="user-memory",
+)
 
 
 def _folder_ids_clause(

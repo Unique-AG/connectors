@@ -16,7 +16,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden
-from office_365_mcp.shared.calendar import SUMMARY_FIELDS
+from office_365_mcp.shared.calendar import SUMMARY_FIELDS, EventTime
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle, MailMessageHandle
 from office_365_mcp.tools import outlook_list_events as lister
 
@@ -1074,21 +1074,16 @@ class TestTheSchemaItPublishes:
             "an argument with no server-side route silently under-returns, which is unrecoverable"
         )
 
-    async def test_the_description_sends_a_model_to_local_for_an_all_day_row(
-        self, transport: httpx.AsyncClient
-    ) -> None:
+    def test_the_description_sends_a_model_to_local_for_an_all_day_row(self) -> None:
         """Graph holds an all-day event at midnight UTC, so `iso` names the day before only west
-        of UTC; the description says so rather than claim `iso` carries no date at all."""
-        mcp: FastMCP = FastMCP(name="schema-under-test")
-        lister.register(mcp, transport)
+        of UTC; this now lives on the `iso` field itself rather than the tool description, which
+        says so rather than claim `iso` carries no date at all."""
+        described = EventTime.model_fields["iso"].description
 
-        tool = await mcp.get_tool(lister.TOOL_NAME)
-
-        assert tool is not None, "register left the tool off the server"
-        described = tool.description or ""
-        assert "rather than `local`, the wall-clock text" in described
-        assert "in a zone west of UTC it names the day before" in described
-        assert "Take the date of an all-day row from `local`" in described
+        assert described is not None
+        assert "the value to compare, to sort on, and to quote" in described
+        assert "In a zone west of UTC, this value names the day before" in described
+        assert "Read `local` for the date that such a row covers" in described
 
     async def test_the_zone_argument_says_which_way_an_etc_gmt_key_runs(
         self, transport: httpx.AsyncClient

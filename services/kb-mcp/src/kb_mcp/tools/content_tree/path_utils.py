@@ -9,7 +9,7 @@ from unique_toolkit.experimental.components.content_tree.schemas import (
     PathTrieNode,
 )
 
-from kb_mcp.references import scope_ids_from_folder_id_path
+from kb_mcp.common.references import scope_ids_from_folder_id_path
 
 # Toolkit sentinel for content with no folderIdPath. Strip from labels only;
 # other callers rely on the literal value.
@@ -42,7 +42,7 @@ def display_path(path: PathLike) -> str:
     """Join path segments for display labels.
 
     Drops the orphan-folder sentinel and strips ``[`` / ``]`` so folder names
-    like ``[SM]`` cannot break the outer ``[label](url)`` markdown wrapper.
+    like ``[ORG]`` cannot break the outer ``[label](url)`` markdown wrapper.
     """
     return "/".join(display_path_segments(path))
 

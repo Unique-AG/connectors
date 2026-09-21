@@ -124,20 +124,16 @@ _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 
 _DESCRIPTION = f"""\
-Move messages in the signed-in user's mailbox into another folder, up to {MAX_MESSAGES} at a \
-time. THIS IS ALSO HOW THIS CONNECTOR DELETES: there is no delete tool, and moving a message to \
-`deleteditems` is what "delete this mail" means here. That form is reversible: the message is in \
-Deleted Items and the user can put it back. This server has no way to delete a message \
-permanently, by design, so never report a message as gone for good. Name the destination with \
-`destination` for a well-known folder (`inbox`, `sentitems`, `drafts`, `archive`, `deleteditems`, \
-`junkemail`, `clutter`), or with `folder_ref`, the `uri` of an outlook_browse_folders result, for \
-any other folder, including every folder the user made. Pass exactly one of the two. A folder's \
-own name is not accepted: browse for its handle instead. EVERY HANDLE FOR A MOVED MESSAGE DIES \
-WITH THE MOVE: Microsoft performs a move as a new copy in the destination, plus removal of the \
-original. So each result carries that message's new `uri`. The handle passed in must never be \
-used again, and neither must any other handle for that message reported earlier in this \
-conversation. Each message is moved by its own request and reported on its own, so a batch where \
-some moved and some did not says exactly which.\
+This tool moves up to {MAX_MESSAGES} messages into another folder in the mailbox of the \
+signed-in user, the only way this connector erases mail.
+
+Notes:
+- Pass exactly one of `destination` or `folder_ref`, never both.
+- A move to `deleteditems` is what "delete this mail" means here. The message stays \
+recoverable in Deleted Items, because this server has no permanent-erase operation.
+- `message_refs` takes the `uri` of an outlook_search_mail, outlook_list_mail, or \
+outlook_read_thread result. A subject line, an email address, an Outlook web link, and a bare \
+message id are not handles.
 """
 
 _BOTH_DESTINATIONS = (
@@ -196,36 +192,33 @@ class MovedMessage(BaseModel):
 
     uri: str = Field(
         description=(
-            "The handle this call was given for the message. Once `moved` is true, it addresses "
-            + "nothing. Keep it only to say which message this row is about, and never pass it "
-            + "to another tool."
+            "The handle that the request gave for this message. Once `moved` is true, it "
+            + "addresses nothing. Keep it only to identify which message this row is about. "
+            + "Never pass it to another tool."
         )
     )
     new_uri: str | None = Field(
         description=(
-            "The message's handle in its new folder, read from Microsoft's own answer to the "
-            + "move, not carried over from the request. This is the ONLY handle for this "
-            + "message from now on. The one in `uri` is dead. So is every handle for this "
-            + "message that a search, a listing or a thread read reported earlier in this "
-            + "conversation: Microsoft performs a move as a new copy in the destination, plus "
-            + "removal of the original. Null when the move failed. In that case, the message "
-            + "did not move, and `uri` still addresses it."
+            "The message's handle in its new folder, read from Microsoft's response rather "
+            + "than carried over from the request. Null when the move failed, in which case "
+            + "`uri` still addresses the message. Once set, this handle is the only one for "
+            + "the message from now on. `uri` and every earlier handle for it, from a search, "
+            + "a listing, or a thread read, are now dead."
         )
     )
     moved: bool = Field(
         description=(
-            "Whether Microsoft moved this one message. Each message is moved by its own "
-            + "request, so this result is per message, not per call. False here beside true on "
-            + "another row means part of the batch moved, and the rest did not."
+            "Whether Microsoft moved this one message. Microsoft moves each message by its "
+            + "own request, so this result is per message, not per call. False here beside "
+            + "true on another row means that part of the batch moved and the rest did not."
         )
     )
     error: str | None = Field(
         description=(
-            "What Microsoft said about this message when it did not move, and null when it did. "
-            + "A not-found here is most often a handle that was already stale: a message this "
-            + "conversation moved earlier, or one Outlook filed itself through a rule or "
-            + "retention policy. Finding the message again and moving the handle that search "
-            + "returns is the recovery. Retrying this handle is not."
+            "What Microsoft said about this message when it did not move. Null when the "
+            + "message moved. A not-found error here is most often a handle that was already "
+            + "stale. Find the message again. Then move the handle that the search returns, "
+            + "rather than retrying this one."
         )
     )
 
@@ -235,29 +228,28 @@ class MailMoved(BaseModel):
 
     destination: str = Field(
         description=(
-            "The folder the messages were moved into: the well-known name that was asked for, or "
-            + "the folder's name as Outlook shows it when `folder_ref` was used."
+            "The folder that the messages moved into. This is the well-known name that the "
+            + "call asked for, or the folder's name as Outlook shows it when the call used "
+            + "`folder_ref`."
         )
     )
     messages: list[MovedMessage] = Field(
         description=(
-            "One row per handle in `message_refs`, in the order they were given. Each says "
-            + "whether that message moved and, when it did, the new handle that replaces every "
-            + "older one for it."
+            "One row exists per handle in `message_refs`, in that order. Each says whether "
+            + "that message moved and, when it did, the new handle that replaces every older "
+            + "one for it."
         )
     )
     moved_count: int = Field(
         description=(
-            "How many of `messages` moved. The messages counted here already moved, and nothing "
-            + "rolls back if a later one fails. So this count is what actually happened to the "
-            + "mailbox."
+            "How many of `messages` moved. If a later message fails, nothing rolls back, so "
+            + "this count is what happened to the mailbox, not an all-or-nothing outcome."
         )
     )
     failed_count: int = Field(
         description=(
-            "How many did not move. Above zero beside a `moved_count` above zero is a partial "
-            + "move: part of the batch is in the destination and the rest is where it was. Read "
-            + "the rows for which is which rather than repeating the whole batch."
+            "How many messages did not move. Read `messages` for which ones. These counts "
+            + "alone do not say."
         )
     )
 
@@ -463,12 +455,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_MESSAGES,
                 description=(
-                    "The messages to move, as the `uri` of an outlook_search_mail, "
-                    + "outlook_list_mail or outlook_read_thread result, verbatim: "
-                    + f"outlook:///messages/{{id}}. One to {MAX_MESSAGES} per call. Every handle "
-                    + "is checked before any message moves, so a batch with a bad value in it "
-                    + "moves nothing. Each one is dead once its message moves. Take the "
-                    + "replacement out of that row's `new_uri`."
+                    "The messages to move: `uri` values from an outlook_search_mail, "
+                    + "outlook_list_mail, or outlook_read_thread result. This tool accepts one "
+                    + f"to {MAX_MESSAGES} per call. This tool makes sure that every handle is "
+                    + "valid before it moves any message, so a batch with a bad value moves "
+                    + "nothing."
                 ),
             ),
         ],
@@ -477,12 +468,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Which well-known folder to move into, by Microsoft's own "
-                    + "locale-independent name, so `deleteditems` reaches Deleted Items in a "
-                    + "mailbox of any language. `deleteditems` is how a message is removed here, "
-                    + "and the user can restore it from there. Every other folder, including "
-                    + "every folder the user made, is reached with `folder_ref` instead. A "
-                    + "folder's own name is not accepted here. Pass this or `folder_ref`, never "
-                    + "both and never neither."
+                    + "locale-independent name: `inbox`, `sentitems`, `drafts`, `archive`, "
+                    + "`deleteditems`, `junkemail`, or `clutter`. Every other folder, including "
+                    + "every folder the user made, needs `folder_ref` instead. A folder's own "
+                    + "name is not accepted here. Alternative to `folder_ref`."
                 )
             ),
         ] = None,
@@ -491,12 +480,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The folder to move into, as the `uri` of an outlook_browse_folders result: "
-                    + "outlook:///folders/{id}. Use it for anything the well-known names do not "
-                    + "cover. The folder is read before anything moves, and a hidden folder or a "
-                    + "search folder is refused: mail filed into either disappears from the "
-                    + "user's view, though it is not deleted. Alternative to `destination`, "
-                    + "never a companion to it."
+                    "The folder to move into, as the opaque handle that an "
+                    + "outlook_browse_folders result reported for it in `uri`: "
+                    + "`outlook:///folders/{id}`. A folder's display name is not valid here. "
+                    + "This tool reads the folder before anything moves. It refuses a hidden "
+                    + "folder or a search folder. Mail filed into either disappears from the "
+                    + "user's view, though it is not erased. Alternative to `destination`."
                 ),
             ),
         ] = None,

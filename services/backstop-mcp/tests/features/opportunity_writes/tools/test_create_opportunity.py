@@ -15,6 +15,7 @@ from backstop_mcp.features.opportunity_writes import (
     get_create_opportunity_command_factory,
 )
 from backstop_mcp.features.opportunity_writes.tools.create_opportunity import create_opportunity
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.features.opportunity_writes.test_update_opportunity_command import VOCABULARY
 from tests.features.party_resolver.helpers import ctx_never_elicit, make_resolve_party_query
@@ -46,6 +47,7 @@ def make_command(client: BackstopClient) -> CreateOpportunityCommand:
         client,
         opportunity_stages_service=opportunity_stages_service(client),
         system_users_service=system_users_service(client),
+        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
     )
 
 

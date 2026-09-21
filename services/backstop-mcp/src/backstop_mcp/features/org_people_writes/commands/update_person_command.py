@@ -27,6 +27,7 @@ from backstop_mcp.features.org_people_writes.commands.modify_contact_location_co
 from backstop_mcp.features.org_people_writes.responses import UpdatedPersonResponse
 from backstop_mcp.features.org_people_writes.update_person_input import UpdatePersonInput
 from backstop_mcp.features.system_users import SystemUsersService
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -44,12 +45,14 @@ class UpdatePersonCommand:
         client: BackstopClient,
         system_users_service: SystemUsersService,
         modify_contact_location_command: ModifyContactLocationCommand,
+        build_entity_link_util: BuildEntityLinkUtil,
     ) -> None:
         self._client: BackstopClient = client
         self._system_users_service: SystemUsersService = system_users_service
         self._modify_contact_location_command: ModifyContactLocationCommand = (
             modify_contact_location_command
         )
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(
         self, *, person: UpdatePersonInput, party_id: str, search_type: PersonCollection
@@ -76,6 +79,9 @@ class UpdatePersonCommand:
                 person=record,
                 mobile_phone=record.mobile_phone,
                 location_ids=location_ids,
+                url=self._build_entity_link_util.canonical_url(
+                    target=PersonLinkTarget(party_id=party_id)
+                ),
             )
 
     async def _read(self, party_id: str, *, search_type: PersonCollection) -> _ReadDocument:

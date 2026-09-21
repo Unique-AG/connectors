@@ -19,6 +19,7 @@ from backstop_mcp.features.org_people_writes.commands._contact_attributes import
 from backstop_mcp.features.org_people_writes.create_person_input import CreatePersonInput
 from backstop_mcp.features.org_people_writes.responses import CreatedPersonResponse
 from backstop_mcp.features.system_users import SystemUsersService
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -35,9 +36,11 @@ class CreatePersonCommand:
         *,
         client: BackstopClient,
         system_users_service: SystemUsersService,
+        build_entity_link_util: BuildEntityLinkUtil,
     ) -> None:
         self._client: BackstopClient = client
         self._system_users_service: SystemUsersService = system_users_service
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, person: CreatePersonInput) -> CreatedPersonResponse:
         with _tracer.start_as_current_span("org_people_writes.command.create_person"):
@@ -65,4 +68,7 @@ class CreatePersonCommand:
                 resource_type=_RESOURCE_TYPE,
                 name=written.data.attributes.name,
                 mobile_phone=written.data.attributes.mobile_phone,
+                url=self._build_entity_link_util.canonical_url(
+                    target=PersonLinkTarget(party_id=created_id)
+                ),
             )

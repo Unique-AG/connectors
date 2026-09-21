@@ -100,7 +100,7 @@ serviceAccount:
 volumes:
   - name: tmp
     emptyDir:
-      sizeLimit: 64Mi
+      sizeLimit: 1Gi # 100 MiB per in-flight transcript read, so ten at once
 
 volumeMounts:
   - name: tmp
@@ -164,6 +164,8 @@ networkPolicy:
           - matchName: login.microsoftonline.com
           - matchName: graph.microsoft.com
           - matchPattern: "*.microsoft.com"
+          - matchPattern: "*.sharepoint.com"
+          - matchPattern: "*.svc.ms"
         toPorts:
           - ports:
               - port: "443"

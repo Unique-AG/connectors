@@ -16,6 +16,7 @@ from backstop_mcp.features.org_people_writes import (
     get_update_organization_command_factory,
 )
 from backstop_mcp.features.org_people_writes.tools.update_organization import update_organization
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import ctx_never_elicit, make_resolve_party_query
 from tests.helpers import (
@@ -43,6 +44,7 @@ def make_command(client: BackstopClient) -> UpdateOrganizationCommand:
         client,
         system_users_service=system_users_service(client),
         modify_contact_location_command=get_modify_contact_location_command_factory(client),
+        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
     )
 
 

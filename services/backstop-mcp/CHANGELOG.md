@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.0.7](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.6...backstop-mcp@0.0.7) (2026-09-21)
+
+
+### Dependencies
+
+* bump uvicorn[standard] in /services/* ([#1067](https://github.com/Unique-AG/connectors/issues/1067)) ([3b93279](https://github.com/Unique-AG/connectors/commit/3b93279c15e729feb9c62ce807134fd762f86432))
+
+## [0.0.6](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.5...backstop-mcp@0.0.6) (2026-09-21)
+
+
+### Features
+
+* **backstop-mcp,ci,mcp-credential-auth,with-intelligence-mcp:** add OAuth and WI sessions ([#986](https://github.com/Unique-AG/connectors/issues/986)) ([ef85dca](https://github.com/Unique-AG/connectors/commit/ef85dcaa9acb3cd18b989552756984b4c53af8da))
+* **backstop-mcp,main:** add opportunity, party, and custom-field write tools ([#1039](https://github.com/Unique-AG/connectors/issues/1039)) ([fc4723c](https://github.com/Unique-AG/connectors/commit/fc4723c6854a45e45c206ab1b1fbf780178236eb))
+* **backstop-mcp:** add CRM deep links and run_report ([#1058](https://github.com/Unique-AG/connectors/issues/1058)) ([3e95ba7](https://github.com/Unique-AG/connectors/commit/3e95ba70b7738e67a419d5f57ef1aa2c5b07b8f0))
+
+
+### Bug Fixes
+
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** align the Python image build layouts ([#1038](https://github.com/Unique-AG/connectors/issues/1038)) ([ecdffb6](https://github.com/Unique-AG/connectors/commit/ecdffb656c2f9ed98217c2f4215b33bb9751efd9))
+* **backstop-mcp:** remove the trailing comma CodeQL cannot parse ([#1051](https://github.com/Unique-AG/connectors/issues/1051)) ([afaffb9](https://github.com/Unique-AG/connectors/commit/afaffb9897e2abf30eddcd15e1bbacdb6257b77d))
+
+
+### Dependencies
+
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** remove pip from the Python images ([#1033](https://github.com/Unique-AG/connectors/issues/1033)) ([3c0c51f](https://github.com/Unique-AG/connectors/commit/3c0c51f0feb886f41fcc7c6728cea9c040e30741))
+* bump alembic in /services/backstop-mcp ([#1005](https://github.com/Unique-AG/connectors/issues/1005)) ([2448752](https://github.com/Unique-AG/connectors/commit/2448752f98b386e9f14334a2f247d6e1d5d461d3))
+* bump alembic in /services/backstop-mcp ([#1029](https://github.com/Unique-AG/connectors/issues/1029)) ([3956589](https://github.com/Unique-AG/connectors/commit/3956589ff84c8bed9234ab4a3873876e09992844))
+* bump basedpyright in /packages/mcp-credential-auth ([#1026](https://github.com/Unique-AG/connectors/issues/1026)) ([61f0ddd](https://github.com/Unique-AG/connectors/commit/61f0dddee8a171e7d8f0398c5f23ada73f7a8b2f))
+* bump mcp in /services/backstop-mcp ([#1024](https://github.com/Unique-AG/connectors/issues/1024)) ([f0f626f](https://github.com/Unique-AG/connectors/commit/f0f626fda57d873a783d7eac16e67e23f3393c02))
+* bump ruff in /packages/mcp-credential-auth ([#1028](https://github.com/Unique-AG/connectors/issues/1028)) ([bb44f5a](https://github.com/Unique-AG/connectors/commit/bb44f5a5fce11f7022bb67d12f647a25336dddb4))
+* bump sqlalchemy[asyncio] in /services/backstop-mcp ([#1066](https://github.com/Unique-AG/connectors/issues/1066)) ([298cff0](https://github.com/Unique-AG/connectors/commit/298cff01b18b4b175b186a70f9e8993e627c0446))
+* bump starlette in /services/backstop-mcp ([#1007](https://github.com/Unique-AG/connectors/issues/1007)) ([5f680b5](https://github.com/Unique-AG/connectors/commit/5f680b52b18891b35875a04d37acd0ad2e5ab49b))
+* bump unique-mcp in /services/backstop-mcp ([#1030](https://github.com/Unique-AG/connectors/issues/1030)) ([1573360](https://github.com/Unique-AG/connectors/commit/1573360b00cdcaaf3911375e24654730efe0f503))
+* pin lxml to 6.1.3, bump kiota ([#1050](https://github.com/Unique-AG/connectors/issues/1050)) ([122c820](https://github.com/Unique-AG/connectors/commit/122c820f8a4a0e150318d4c58c587bd4cd0b8919))
+
 ## [0.0.5](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.4...backstop-mcp@0.0.5) (2026-09-14)
 
 

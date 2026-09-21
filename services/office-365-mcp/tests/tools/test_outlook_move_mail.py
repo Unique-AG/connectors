@@ -318,9 +318,11 @@ class TestTheHandlesItHandsBack:
         described = mover.MovedMessage.model_fields["new_uri"].description
 
         assert described is not None
-        assert "ONLY handle" in described
-        assert "dead" in described
-        assert "earlier in this conversation" in described
+        assert "the only one for the message from now on" in described
+        assert "are now dead" in described
+        assert (
+            "every earlier handle for it, from a search, a listing, or a thread read" in described
+        )
 
 
 class TestWhenPartOfTheBatchFails:
@@ -694,15 +696,24 @@ class TestWhatItSaysAboutItself:
         described = mover._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
 
         assert "deleteditems" in described
-        assert "there is no delete tool" in described
-        assert "Deleted Items and the user can put it back" in described
-        assert "permanently, by design" in described
+        assert "the only way this connector erases mail" in described
+        assert "stays recoverable in Deleted Items" in described
+        assert "no permanent-erase operation" in described
 
     def test_the_description_warns_that_the_handles_passed_in_die(self) -> None:
-        described = mover._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
+        """The old top-level warning that a moved message kills every handle for it now lives on
+        the two result fields it actually describes: `uri` says the passed-in handle stops
+        addressing anything and must not be reused, `new_uri` says every earlier handle for the
+        message is dead too."""
+        uri_described = mover.MovedMessage.model_fields["uri"].description
+        new_uri_described = mover.MovedMessage.model_fields["new_uri"].description
 
-        assert "DIES WITH THE MOVE" in described
-        assert "must never be used again" in described
+        assert uri_described is not None
+        assert "it addresses nothing" in uri_described
+        assert "Never pass it to another tool" in uri_described
+
+        assert new_uri_described is not None
+        assert "are now dead" in new_uri_described
 
     def test_a_stale_handle_is_answered_with_both_recoveries(self) -> None:
         """A 404 here is not the default "check you copied the id" advice: both arguments that can

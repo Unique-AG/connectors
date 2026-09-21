@@ -20,6 +20,7 @@ from backstop_mcp.features.activity_writes.commands._json_api_utils import (
 from backstop_mcp.features.activity_writes.internal_dto import AuthorDto
 from backstop_mcp.features.activity_writes.responses import AttachedFileResponse
 from backstop_mcp.features.system_users import system_user_relationship
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, DocumentLinkTarget
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +30,14 @@ _DocumentDocument = BackstopApiSingleResourceDocument[DocumentAttributes]
 class AttachDocumentCommand:
     """Create a document via `POST /documents` with gzip+base64 `data`."""
 
-    def __init__(self, *, client: BackstopClient) -> None:
+    def __init__(
+        self,
+        *,
+        client: BackstopClient,
+        build_entity_link_util: BuildEntityLinkUtil,
+    ) -> None:
         self._client: BackstopClient = client
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(
         self,
@@ -71,4 +78,10 @@ class AttachDocumentCommand:
             "activity_writes.document.created",
             extra={"id": document.data.id, "party_id": party_id},
         )
-        return AttachedFileResponse(id=document.data.id, kind="document")
+        return AttachedFileResponse(
+            id=document.data.id,
+            kind="document",
+            url=self._build_entity_link_util.canonical_url(
+                target=DocumentLinkTarget(entity_activity_details_id=document.data.id),
+            ),
+        )

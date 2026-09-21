@@ -46,13 +46,21 @@ from office_365_mcp.graph_client import (
     graph_step,
 )
 from office_365_mcp.metrics import configure_metrics
+from office_365_mcp.shared.handles import TranscriptHandle
+from office_365_mcp.tools import teams_read_transcript as transcript_reader
 from office_365_mcp.tools.outlook_send_draft import a_person_agrees, send_draft
+from office_365_mcp.tools.teams_read_transcript import STEP_ATTRIBUTED, teams_read_transcript
+from office_365_mcp.tools.teams_read_transcript import TOOL_NAME as TRANSCRIPT_TOOL
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
 CALLER_TOKEN = "synthetic-graph-access-token"
 
 _CHATS_PATH = "/me/chats"
+
+_TRANSCRIPT_MEETING = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
+_TRANSCRIPT_ID = "MSMjMCMjSYNTHETIC0002"
+_TRANSCRIPT_PATH = f"/me/onlineMeetings/{_TRANSCRIPT_MEETING}/transcripts/{_TRANSCRIPT_ID}/content"
 _ME = {"id": "00000000-0000-4000-8000-000000000001", "displayName": "Ada Lovelace"}
 
 
@@ -206,6 +214,48 @@ class TestAGraphCallIsCountedAndTimed:
             _ = await client.me.get()
 
         assert _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="forbidden") == before + 1
+
+    async def test_a_transcript_over_the_ceiling_is_counted_under_its_own_status(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Two dashboard queries exclude `too_large`, and nothing else pins that status."""
+        monkeypatch.setattr(transcript_reader, "MAX_TRANSCRIPT_BYTES", 64)
+        _ = graph.get(_TRANSCRIPT_PATH).mock(
+            return_value=httpx.Response(
+                200, content=b"x" * 65, headers={"Content-Type": "text/vtt"}
+            )
+        )
+        before = _value(GRAPH_OPERATIONS_TOTAL, operation=TRANSCRIPT_TOOL, status="too_large")
+        stepped = _value(
+            GRAPH_STEPS_TOTAL, operation=TRANSCRIPT_TOOL, step=STEP_ATTRIBUTED, status="too_large"
+        )
+
+        with pytest.raises(ToolError):
+            _ = await teams_read_transcript(
+                client,
+                transport,
+                handle=TranscriptHandle(_TRANSCRIPT_MEETING, _TRANSCRIPT_ID),
+                offset=0,
+                limit=20,
+            )
+
+        assert (
+            _value(GRAPH_OPERATIONS_TOTAL, operation=TRANSCRIPT_TOOL, status="too_large")
+            == before + 1
+        ), "the refusal was not counted as a size refusal, so the dashboard excludes nothing"
+        assert (
+            _value(
+                GRAPH_STEPS_TOTAL,
+                operation=TRANSCRIPT_TOOL,
+                step=STEP_ATTRIBUTED,
+                status="too_large",
+            )
+            == stepped + 1
+        )
 
     async def test_a_person_declining_a_send_is_not_counted_as_a_graph_error(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1089,10 +1139,14 @@ class TestTheDashboardDecidesAboutEveryStatusTheCodeCanEmit:
     """`cancelled` is why this exists. The dashboard half of a status is a set of negative filters
     spelled `status!~"ok|not_found"`, and a status nobody added to one counts as a failure by
     default: right for a status that *is* a failure, wrong for an MCP client hanging up.
+
+    `too_large` is here for the same reason `not_found` is: an answer above this connector's
+    ceiling is the connector declining correctly, on a request Graph served without complaint.
+    Paged onto an operator at three in the morning it is a long meeting, not an outage.
     """
 
     def test_every_error_query_excludes_the_statuses_that_are_not_failures(self) -> None:
-        not_failures = {"ok", "not_found", "cancelled"}
+        not_failures = {"ok", "not_found", "cancelled", "too_large"}
         assert not_failures <= GRAPH_STATUSES, "this test names a status errors.py cannot emit"
         counted_as_failures = {
             (panel.get("title"), query)

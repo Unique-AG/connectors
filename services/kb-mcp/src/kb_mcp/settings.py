@@ -22,7 +22,7 @@ from unique_mcp.util.find_env_file import find_env_file
 # main.py also loads this into the process env for libraries that bypass Settings.
 ENV_FILE: Path | None = find_env_file(filenames=["kb_mcp.env", ".env"], required=False)
 
-KNOWN_MCP_TOOLS = frozenset({"search", "content_tree", "read_file"})
+KNOWN_MCP_TOOLS = frozenset({"search", "content_tree", "read_file", "content_metadata"})
 
 
 class Settings(BaseSettings):
@@ -71,38 +71,45 @@ class Settings(BaseSettings):
         description=("DEV ONLY. Per-pod storage that loses all sessions on restart."),
     )
 
-    # ── Content-tree cache ──
-    content_tree_cache_ttl_seconds: int = Field(
+    # ── Folder-walk cache (shared by content_tree and content_metadata) ──
+    tree_cache_ttl_seconds: int = Field(
         default=600,
         ge=1,
         description="Seconds a cached ContentTree stays valid.",
-        validation_alias="KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS",
+        validation_alias="KB_MCP_TREE_CACHE_TTL_SECONDS",
     )
-    content_tree_cache_max_entries: int = Field(
+    # TODO [proschu2/ean]: shared across callers and keyed by folder scope, so
+    # one caller browsing many folders evicts others. Sizing needs real numbers.
+    tree_cache_max_entries: int = Field(
         default=24,
-        description="Max cached ContentTree entries (one per company+user).",
-        validation_alias="KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES",
+        description=(
+            "Max cached ContentTree entries, across all callers. One entry per "
+            "company+user+folder scope, so a caller browsing several folders "
+            "holds several."
+        ),
+        validation_alias="KB_MCP_TREE_CACHE_MAX_ENTRIES",
     )
 
-    # ── Content-tree wait (not a toolkit cache key) ──
-    content_tree_timeout_seconds: float = Field(
+    # ── Folder-walk wait (not a toolkit cache key) ──
+    walk_timeout_seconds: float = Field(
         default=30.0,
         ge=0,
         description=(
-            "Default seconds content_tree waits before returning a partial "
-            "tree. The walk keeps running; a follow-up call is usually instant."
+            "Default seconds content_tree and content_metadata wait before "
+            "returning a partial result. The walk keeps running; a follow-up "
+            "call is usually instant."
         ),
-        validation_alias="KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS",
+        validation_alias="KB_MCP_WALK_TIMEOUT_SECONDS",
     )
-    content_tree_max_timeout_seconds: float = Field(
+    walk_max_timeout_seconds: float = Field(
         default=45.0,
         ge=0,
         description=(
-            "Ceiling on content_tree timeout. Must stay below the MCP client's "
-            "own budget (~60s) or an LLM-supplied value silently disables the "
-            "partial-tree guarantee."
+            "Ceiling on the content_tree and content_metadata timeout. Must "
+            "stay below the MCP client's own budget (~60s) or an LLM-supplied "
+            "value silently disables the partial-result guarantee."
         ),
-        validation_alias="KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS",
+        validation_alias="KB_MCP_WALK_MAX_TIMEOUT_SECONDS",
     )
 
     # ── Search scope lookups ──
@@ -198,12 +205,17 @@ class Settings(BaseSettings):
             return None
         return str(self.frontend_base_url).rstrip("/")
 
+    def clamped_walk_timeout(self, requested: float | None) -> float:
+        """Seconds a folder-walk tool waits, bounded by the configured ceiling."""
+        raw = self.walk_timeout_seconds if requested is None else requested
+        return min(max(0.0, raw), self.walk_max_timeout_seconds)
+
     @model_validator(mode="after")
-    def _content_tree_timeout_is_within_max(self) -> Settings:
-        if self.content_tree_timeout_seconds > self.content_tree_max_timeout_seconds:
+    def _walk_timeout_is_within_max(self) -> Settings:
+        if self.walk_timeout_seconds > self.walk_max_timeout_seconds:
             raise ValueError(
-                "KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS must not exceed "
-                "KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS"
+                "KB_MCP_WALK_TIMEOUT_SECONDS must not exceed "
+                "KB_MCP_WALK_MAX_TIMEOUT_SECONDS"
             )
         return self
 

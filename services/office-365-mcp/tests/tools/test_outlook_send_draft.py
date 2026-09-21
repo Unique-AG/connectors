@@ -853,6 +853,6 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "confirm the send" in lowered
-        assert "sends nothing unless they agree" in lowered
+        assert "asks the person to approve the send" in lowered
+        assert "sends nothing unless the person agrees" in lowered
         assert "outlook_draft_mail" in lowered

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from unique_toolkit.content.schemas import Content, ContentChunk, ContentMetadata
 
-from kb_mcp.references import MIME_TYPE_TEXT_PLAIN
+from kb_mcp.common.references import MIME_TYPE_TEXT_PLAIN
 from kb_mcp.tools.search.scope_resolver import resolve_scope_ids
 
 pytestmark = pytest.mark.ai

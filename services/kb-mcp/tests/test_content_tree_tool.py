@@ -6,13 +6,16 @@ import inspect
 import logging
 import weakref
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastmcp.server.providers.filesystem_discovery import import_module_from_file
 from fastmcp.tools import ToolResult
 from pydantic import SecretStr
+from unique_toolkit.content.schemas import ContentInfo
 from unique_toolkit.content.smart_rules import parse_uniqueql
 from unique_toolkit.experimental.components.content_tree.schemas import (
     FolderWalkSnapshot,
@@ -24,7 +27,9 @@ from unique_toolkit.experimental.resources.feature_flags._ttl_cache import (
     AsyncTTLCache,
 )
 
-from kb_mcp.references import (
+from kb_mcp.common import cached_walk
+from kb_mcp.common import tree_cache as ct_cache
+from kb_mcp.common.references import (
     INVALID_METADATA_FILTER_MESSAGE,
     METADATA_FILTER_ARG_DESCRIPTION,
     METADATA_FILTER_EMPTY_RETRY_HINT,
@@ -32,16 +37,14 @@ from kb_mcp.references import (
     UNIQUEQL_EQUALS_PDF_WRAPPED,
     MetadataFilterArgument,
 )
+from kb_mcp.common.tree_cache import expire_idle_trees
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_tree import (
     ContentTreeToolConfig,
     MatchTarget,
     content_tree,
 )
-from kb_mcp.tools.content_tree import cache as ct_cache
 from kb_mcp.tools.content_tree import tool as ct_module
-from kb_mcp.tools.content_tree.cache import expire_idle_trees
-from kb_mcp.tools.content_tree.tool import clamped_content_tree_timeout
 
 pytestmark = pytest.mark.ai
 
@@ -105,11 +108,33 @@ class FakeSnapshot:
 
 def _make_mock_tree(*, snapshot: FakeSnapshot | None = None):
     tree = MagicMock()
+    tree.metadata_filter = None
     tree.resolve_visible_file_paths_via_folders_async = AsyncMock(
         return_value=snapshot or FakeSnapshot()
     )
     tree.search_visible_files_fuzzy_async = AsyncMock(return_value=[])
     return tree
+
+
+def _walk_filter(mock_tree):
+    """The admin half rides in the walk; `applied_filter` sees the LLM half."""
+    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
+    return kwargs["metadata_filter"]
+
+
+@pytest.fixture
+def applied_filter():
+    """Records the merged filter, which now lands on the snapshot rather than
+    on the walk call — the walk is deliberately kept filter-free and shared."""
+    seen: list[Any] = []
+    real = cached_walk.filter_snapshot
+
+    def spy(snapshot: Any, metadata_filter: Any) -> Any:
+        seen.append(metadata_filter)
+        return real(snapshot, metadata_filter)
+
+    with patch.object(cached_walk, "filter_snapshot", spy):
+        yield seen
 
 
 @pytest.fixture(autouse=True)
@@ -134,6 +159,7 @@ def test_metadata_filter_arg_uses_locked_field_description():
 def _make_dispatch_probe_tree():
     """A tree whose three views return distinguishable output."""
     tree = MagicMock()
+    tree.metadata_filter = None
     tree.resolve_visible_file_paths_via_folders_async = AsyncMock(
         return_value=FakeSnapshot(
             files=[
@@ -268,8 +294,17 @@ async def test_list_mode_with_min_score_errors():
 
 
 @pytest.mark.asyncio
-async def test_search_mode_with_folder_path_errors():
-    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
+async def test_search_mode_accepts_folder_path():
+    """folder_path scopes every mode now, not just list."""
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=[
+                (_make_content_info("c1"), PurePosixPath("Contracts/a.pdf")),
+                (_make_content_info("c2"), PurePosixPath("Other/a.pdf")),
+            ]
+        )
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="search",
             query="a.pdf",
@@ -278,23 +313,32 @@ async def test_search_mode_with_folder_path_errors():
         )
 
     assert isinstance(result, ToolResult)
-    assert result.is_error is True
+    assert result.is_error is not True
     text = result.content[0].text  # type: ignore[union-attr]
-    assert "folder_path" in text
-    assert "mode='list'" in text
-    mock_cls.assert_not_called()
+    assert "content_id=c1" in text
+    assert "content_id=c2" not in text
 
 
 @pytest.mark.asyncio
-async def test_tree_mode_with_folder_path_errors():
-    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
+async def test_tree_mode_accepts_folder_path():
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=[
+                (_make_content_info("c1"), PurePosixPath("Contracts/a.pdf")),
+                (_make_content_info("c2"), PurePosixPath("Other/b.pdf")),
+            ]
+        )
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="tree", folder_path="Contracts", config=ContentTreeToolConfig()
         )
 
     assert isinstance(result, ToolResult)
-    assert result.is_error is True
-    mock_cls.assert_not_called()
+    assert result.is_error is not True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "a.pdf" in text
+    assert "b.pdf" not in text
 
 
 @pytest.mark.asyncio
@@ -323,18 +367,18 @@ async def test_folder_path_prefix_filter_is_case_sensitive_exact_match():
 
 @pytest.mark.asyncio
 async def test_folder_path_filter_matches_display_path_with_brackets_stripped():
-    """Filters use display paths so ``SM/AlpenSys`` matches ``[SM]/AlpenSys``."""
-    sm_folder = "[" + "SM" + "]"
+    """Filters use display paths so ``ORG/Alpha`` matches ``[ORG]/Alpha``."""
+    bracketed_folder = "[ORG]"
     mock_tree = _make_mock_tree(
         snapshot=FakeSnapshot(
             files=[
                 (
                     _make_content_info("c1"),
-                    PurePosixPath(f"{sm_folder}/AlpenSys/a.pdf"),
+                    PurePosixPath(f"{bracketed_folder}/Alpha/a.pdf"),
                 ),
                 (
                     _make_content_info("c2"),
-                    PurePosixPath(f"{sm_folder}/Other/b.pdf"),
+                    PurePosixPath(f"{bracketed_folder}/Other/b.pdf"),
                 ),
                 (_make_content_info("c3"), PurePosixPath("Contracts/c.pdf")),
             ]
@@ -343,7 +387,7 @@ async def test_folder_path_filter_matches_display_path_with_brackets_stripped():
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="list",
-            folder_path="SM/AlpenSys",
+            folder_path="ORG/Alpha",
             config=ContentTreeToolConfig(),
         )
 
@@ -385,16 +429,16 @@ async def test_cache_reuses_same_content_tree_instance_for_same_identity():
 
 
 def test_cache_settings_default_and_env_override(monkeypatch):
-    assert get_settings().content_tree_cache_max_entries == 24
-    assert get_settings().content_tree_cache_ttl_seconds == 600
+    assert get_settings().tree_cache_max_entries == 24
+    assert get_settings().tree_cache_ttl_seconds == 600
 
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES", "999")
+    monkeypatch.setenv("KB_MCP_TREE_CACHE_MAX_ENTRIES", "999")
     get_settings.cache_clear()
-    assert get_settings().content_tree_cache_max_entries == 999
+    assert get_settings().tree_cache_max_entries == 999
 
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS", "60")
+    monkeypatch.setenv("KB_MCP_TREE_CACHE_TTL_SECONDS", "60")
     get_settings.cache_clear()
-    assert get_settings().content_tree_cache_ttl_seconds == 60
+    assert get_settings().tree_cache_ttl_seconds == 60
 
 
 def test_expire_idle_trees_is_noop_when_cache_uninitialized():
@@ -487,7 +531,7 @@ async def test_refresh_reuses_cached_instance_then_invalidates():
 
 
 @pytest.mark.asyncio
-async def test_default_metadata_filter_excludes_user_memory_folder():
+async def test_default_metadata_filter_excludes_user_memory_folder(applied_filter):
     """With no config override, the admin default filter (excluding the
     system-generated user-memory folder) is what reaches the service calls."""
     mock_tree = _make_mock_tree()
@@ -502,13 +546,14 @@ async def test_default_metadata_filter_excludes_user_memory_folder():
             config=ContentTreeToolConfig(),
         )
 
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == expected_filter
+    assert _walk_filter(mock_tree) == expected_filter
+    assert applied_filter[-1] is None
 
 
 @pytest.mark.asyncio
 async def test_admin_configured_metadata_filter_flows_through_to_service_calls(
     identity,
+    applied_filter,
 ):
     """Admins can override metadata_filter via ContentTreeToolConfig; the
     override (not the default) must reach the underlying ContentTree calls
@@ -520,24 +565,23 @@ async def test_admin_configured_metadata_filter_flows_through_to_service_calls(
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-tree")
         await content_tree(mode="tree", config=config)
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == custom_filter
+    assert _walk_filter(mock_tree) == custom_filter
 
     mock_tree = _make_mock_tree()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-list")
         await content_tree(mode="list", config=config)
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == custom_filter
+    assert _walk_filter(mock_tree) == custom_filter
 
     mock_tree = _make_mock_tree()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-search")
         await content_tree(mode="search", query="a.pdf", config=config)
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == custom_filter
+    assert _walk_filter(mock_tree) == custom_filter
+    # Must match the walk's filter exactly, or the fuzzy search resolves a
+    # second cache entry and silently pays for another whole walk.
     _, fuzzy_kwargs = mock_tree.search_visible_files_fuzzy_async.call_args
-    assert fuzzy_kwargs["metadata_filter"] == custom_filter
+    assert fuzzy_kwargs["metadata_filter"] == _walk_filter(mock_tree)
 
 
 _DEFAULT_CONTENT_TREE_FILTER = {
@@ -548,7 +592,7 @@ _DEFAULT_CONTENT_TREE_FILTER = {
 
 
 @pytest.mark.asyncio
-async def test_llm_metadata_filter_ands_default_admin_filter():
+async def test_llm_metadata_filter_ands_default_admin_filter(applied_filter):
     mock_tree = _make_mock_tree()
     expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
@@ -558,14 +602,12 @@ async def test_llm_metadata_filter_ands_default_admin_filter():
             config=ContentTreeToolConfig(),
         )
 
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == {
-        "and": [expected_llm, _DEFAULT_CONTENT_TREE_FILTER]
-    }
+    assert _walk_filter(mock_tree) == _DEFAULT_CONTENT_TREE_FILTER
+    assert applied_filter[-1] == expected_llm
 
 
 @pytest.mark.asyncio
-async def test_llm_metadata_filter_ands_admin_configured_filter():
+async def test_llm_metadata_filter_ands_admin_configured_filter(applied_filter):
     custom_filter = {"operator": "equals", "path": ["type"], "value": "pdf"}
     config = ContentTreeToolConfig(metadata_filter=custom_filter)
     expected_llm = parse_uniqueql(UNIQUEQL_EQUALS_PDF).to_dict()
@@ -577,8 +619,8 @@ async def test_llm_metadata_filter_ands_admin_configured_filter():
             config=config,
         )
 
-    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
-    assert kwargs["metadata_filter"] == {"and": [expected_llm, custom_filter]}
+    assert _walk_filter(mock_tree) == custom_filter
+    assert applied_filter[-1] == expected_llm
 
 
 @pytest.mark.asyncio
@@ -681,18 +723,16 @@ async def test_list_uses_frontend_deep_link_when_scope_known(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_list_strips_brackets_from_sm_folder_path():
-    """``[SM]/AlpenSys/Audit_Report_….pdf`` must emit a clean markdown link."""
+async def test_list_strips_brackets_from_bracketed_folder_path():
+    """``[ORG]/Alpha/Audit_Report_….pdf`` must emit a clean markdown link."""
     info = _make_content_info("cont_ioi3voailf7hr011zcp6b7eh")
-    sm_folder = "[" + "SM" + "]"
+    bracketed_folder = "[ORG]"
     mock_tree = _make_mock_tree(
         snapshot=FakeSnapshot(
             files=[
                 (
                     info,
-                    PurePosixPath(
-                        f"{sm_folder}/AlpenSys/Audit_Report_AlpenSys_FY2023.pdf"
-                    ),
+                    PurePosixPath(f"{bracketed_folder}/Alpha/Audit_Report_FY2023.pdf"),
                 )
             ]
         )
@@ -702,11 +742,11 @@ async def test_list_strips_brackets_from_sm_folder_path():
 
     text = result.content[0].text  # type: ignore[union-attr]
     assert text == (
-        "[SM/AlpenSys/Audit_Report_AlpenSys_FY2023.pdf]"
+        "[ORG/Alpha/Audit_Report_FY2023.pdf]"
         "(unique://content/cont_ioi3voailf7hr011zcp6b7eh) "
         "(content_id=cont_ioi3voailf7hr011zcp6b7eh)"
     )
-    assert "[" + "SM" + "]" not in text
+    assert "[ORG]" not in text
 
 
 @pytest.mark.asyncio
@@ -720,7 +760,7 @@ async def test_list_strips_no_folder_path_sentinel_keeps_unique_link():
                     info,
                     PurePosixPath(
                         "_no_folder_path/"
-                        "Chat_1780557337141_AlpenSys_Shareholder_Letter_H1_2024.pdf"
+                        "Chat_1234567890123_Shareholder_Letter_H1_2024.pdf"
                     ),
                 )
             ]
@@ -732,7 +772,7 @@ async def test_list_strips_no_folder_path_sentinel_keeps_unique_link():
     text = result.content[0].text  # type: ignore[union-attr]
     assert "_no_folder_path" not in text
     assert (
-        "[Chat_1780557337141_AlpenSys_Shareholder_Letter_H1_2024.pdf]"
+        "[Chat_1234567890123_Shareholder_Letter_H1_2024.pdf]"
         "(unique://content/chat_orphan) (content_id=chat_orphan)" in text
     )
 
@@ -785,22 +825,6 @@ async def test_list_orphan_with_scope_owner_keeps_deep_link(monkeypatch):
         "(https://example.unique.app/knowledge-upload/scope_leaf?file=c_scope)" in text
     )
     assert "(content_id=c_scope)" in text
-
-
-def test_clamped_timeout_uses_default_then_ceiling(monkeypatch):
-    get_settings.cache_clear()
-    settings = get_settings()
-    assert clamped_content_tree_timeout(None, settings) == 30.0
-    assert clamped_content_tree_timeout(12.0, settings) == 12.0
-    assert clamped_content_tree_timeout(300.0, settings) == 45.0
-    assert clamped_content_tree_timeout(-1.0, settings) == 0.0
-
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS", "20")
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS", "25")
-    get_settings.cache_clear()
-    settings = get_settings()
-    assert clamped_content_tree_timeout(None, settings) == 20.0
-    assert clamped_content_tree_timeout(40.0, settings) == 25.0
 
 
 @pytest.mark.asyncio
@@ -1094,3 +1118,232 @@ async def test_tree_folder_with_nothing_beneath_renders_without_id():
     text = result.content[0].text  # type: ignore[union-attr]
     assert "Empty" in text
     assert "Empty (folder_id" not in text
+
+
+@pytest.mark.asyncio
+async def test_resolvable_folder_path_roots_the_walk_instead_of_filtering():
+    """The whole point: scope the walk, do not walk everything and filter after."""
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=[(_make_content_info("c1"), PurePosixPath("a.pdf"))]
+        )
+    )
+    with (
+        patch(
+            "kb_mcp.tools.content_tree.tool.unique_sdk.Folder."
+            "resolve_scope_id_from_folder_path_async",
+            AsyncMock(return_value="scope_target"),
+        ),
+        patch(
+            "kb_mcp.tools.content_tree.tool.ScopedContentTree", return_value=mock_tree
+        ) as scoped_cls,
+        patch("kb_mcp.tools.content_tree.tool.ContentTree") as unscoped_cls,
+    ):
+        result = await content_tree(
+            mode="list", folder_path="Contracts/2024", config=ContentTreeToolConfig()
+        )
+
+    assert result.is_error is not True
+    scoped_cls.assert_called_once()
+    assert scoped_cls.call_args.kwargs["root_scope_ids"] == ("scope_target",)
+    unscoped_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_unreadable_scope_id_is_an_error_not_an_empty_folder():
+    with (
+        patch(
+            "kb_mcp.tools.content_tree.tool.unique_sdk.Folder.get_info_async",
+            AsyncMock(side_effect=ValueError("nope")),
+        ),
+        patch("kb_mcp.tools.content_tree.tool.ContentTree") as unscoped_cls,
+    ):
+        result = await content_tree(
+            mode="list", folder_path="scope_missing", config=ContentTreeToolConfig()
+        )
+
+    assert result.is_error is True
+    assert "scope_missing" in result.content[0].text  # type: ignore[union-attr]
+    unscoped_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_tree_mode_caps_files_and_says_it_truncated():
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=[
+                (_make_content_info(f"c{i}"), PurePosixPath(f"f{i}.pdf"))
+                for i in range(5)
+            ]
+        )
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree", limit=2, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "first 2 of 5" in text
+
+
+@pytest.mark.asyncio
+async def test_search_does_not_filter_files_it_then_discards(applied_filter):
+    """Search re-derives its hits from the fuzzy scorer and never reads the
+    snapshot's files, so filtering them is a full pass over the corpus."""
+    mock_tree = _make_mock_tree()
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        await content_tree(
+            mode="search",
+            query="a.pdf",
+            metadata_filter=UNIQUEQL_EQUALS_PDF,
+            config=ContentTreeToolConfig(),
+        )
+
+    assert applied_filter[-1] is None
+    _, fuzzy_kwargs = mock_tree.search_visible_files_fuzzy_async.call_args
+    assert fuzzy_kwargs["metadata_filter"] == _walk_filter(mock_tree)
+
+
+_PDF_ONLY_FILTER = {
+    "operator": "equals",
+    "path": ["mimeType"],
+    "value": "application/pdf",
+}
+
+
+def _real_content(content_id: str, key: str, mime_type: str) -> ContentInfo:
+    """A real ContentInfo — a MagicMock dumps to an empty record, which makes
+    every UniqueQL filter a silent no-op and the assertion meaningless."""
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    return ContentInfo(
+        id=content_id,
+        object="content",
+        key=key,
+        byteSize=1,
+        mimeType=mime_type,
+        ownerId="scope_a",
+        createdAt=now,
+        updatedAt=now,
+    )
+
+
+def _real_fuzzy_match(info: ContentInfo, score: float):
+    match = MagicMock()
+    match.path_segments = [info.key]
+    match.score = score
+    match.content_info = info
+    return match
+
+
+@pytest.mark.asyncio
+async def test_search_drops_fuzzy_hits_the_llm_filter_excludes():
+    """The fast path filters the scorer's hits, not the snapshot."""
+    pdf = _real_content("c_pdf", "report.pdf", "application/pdf")
+    txt = _real_content("c_txt", "report.txt", "text/plain")
+    mock_tree = _make_mock_tree()
+    mock_tree.search_visible_files_fuzzy_async = AsyncMock(
+        return_value=[_real_fuzzy_match(pdf, 0.9), _real_fuzzy_match(txt, 0.9)]
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="search",
+            query="report",
+            metadata_filter=_PDF_ONLY_FILTER,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "c_pdf" in text
+    assert "c_txt" not in text
+
+
+@pytest.mark.asyncio
+async def test_incomplete_search_still_applies_the_llm_filter():
+    """The fallback branch is the only one reading snapshot.files, and search
+    resolves that snapshot unfiltered — so it has to filter its own rows."""
+    pdf = _real_content("c_pdf", "report.pdf", "application/pdf")
+    txt = _real_content("c_txt", "report.txt", "text/plain")
+    snapshot = FakeSnapshot(
+        files=[(pdf, PurePosixPath("report.pdf")), (txt, PurePosixPath("report.txt"))],
+        complete=False,
+    )
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="search",
+            query="report",
+            metadata_filter=_PDF_ONLY_FILTER,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "c_pdf" in text
+    assert "c_txt" not in text
+
+
+@pytest.mark.asyncio
+async def test_tree_folders_only_never_reports_truncation():
+    """folders_only renders no files, so the cap cannot bite and claiming it did
+    would send the model chasing a limit that changes nothing."""
+    snapshot = FakeSnapshot(
+        files=[
+            (_make_content_info(f"f{i}"), PurePosixPath(f"Docs/f{i}.pdf"))
+            for i in range(5)
+        ],
+        folder_paths=[PurePosixPath("Docs")],
+    )
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree", folders_only=True, limit=2, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Showing the first" not in text
+
+
+def _bracketed_folder_snapshot() -> FakeSnapshot:
+    """A folder whose stored name carries brackets, e.g. ``[ORG]``."""
+    return FakeSnapshot(
+        files=[
+            (_make_content_info("c1"), PurePosixPath("[ORG]/Alpha/a.pdf")),
+            (_make_content_info("c2"), PurePosixPath("[ORG]/Beta/b.pdf")),
+            (_make_content_info("c3"), PurePosixPath("Gamma/c.pdf")),
+        ]
+    )
+
+
+@pytest.mark.asyncio
+async def test_search_scopes_to_a_bracket_stripped_folder_path():
+    """An [ORG] folder renders as ORG, so ORG/Alpha cannot resolve to a scope id
+    and search falls back to matching the prefix-filtered rows. It must still
+    scope, and must not reach outside the folder."""
+    mock_tree = _make_mock_tree(snapshot=_bracketed_folder_snapshot())
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="search",
+            query="a.pdf",
+            folder_path="ORG/Alpha",
+            config=ContentTreeToolConfig(),
+        )
+
+    assert result.is_error is not True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "content_id=c1" in text
+    assert "content_id=c2" not in text
+    assert "content_id=c3" not in text
+
+
+@pytest.mark.asyncio
+async def test_tree_scopes_to_a_bracket_stripped_folder_path():
+    mock_tree = _make_mock_tree(snapshot=_bracketed_folder_snapshot())
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree", folder_path="ORG/Alpha", config=ContentTreeToolConfig()
+        )
+
+    assert result.is_error is not True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "a.pdf" in text
+    assert "b.pdf" not in text
+    assert "c.pdf" not in text

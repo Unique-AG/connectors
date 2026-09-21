@@ -13,6 +13,12 @@ from backstop_mcp.features.party_resolver import PartyAmbiguousResponse
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
 
+_URL_DESCRIPTION = (
+    "Canonical CRM UI URL for this opportunity (no tab). Omitted when this deployment "
+    "has no UI origin. Echo it; never invent one. Call build_backstop_links for tabs "
+    "or a layout."
+)
+
 __all__ = [
     "BackfillOpportunityStageHistoryResponse",
     "CreateOpportunityResponse",
@@ -55,6 +61,7 @@ class CreatedOpportunityResponse(OmitNoneModel):
             "write landed as asked."
         ),
     )
+    url: str | None = Field(default=None, description=_URL_DESCRIPTION)
 
 
 class DeletedOpportunityResponse(OmitNoneModel):
@@ -99,6 +106,7 @@ class UpdatedOpportunityResponse(OmitNoneModel):
             "login that did not match a system user. Empty when the write landed as asked."
         ),
     )
+    url: str | None = Field(default=None, description=_URL_DESCRIPTION)
 
 
 class BackfillOpportunityStageHistoryResponse(OmitNoneModel):

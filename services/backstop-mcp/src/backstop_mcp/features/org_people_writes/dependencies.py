@@ -23,6 +23,10 @@ from backstop_mcp.features.org_people_writes.entity_relationship_types_service i
     EntityRelationshipTypesService,
 )
 from backstop_mcp.features.system_users import SystemUsersService, get_system_users_service
+from backstop_mcp.features.ui_links import (
+    BuildEntityLinkUtil,
+    get_build_entity_link_util_factory,
+)
 
 
 @lru_cache(maxsize=1)
@@ -36,16 +40,26 @@ def get_modify_contact_location_command_factory(
 def get_create_person_command_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     system_users_service: SystemUsersService = Depends(get_system_users_service),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> CreatePersonCommand:
-    return CreatePersonCommand(client=client, system_users_service=system_users_service)
+    return CreatePersonCommand(
+        client=client,
+        system_users_service=system_users_service,
+        build_entity_link_util=build_entity_link_util,
+    )
 
 
 @lru_cache(maxsize=1)
 def get_create_organization_command_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     system_users_service: SystemUsersService = Depends(get_system_users_service),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> CreateOrganizationCommand:
-    return CreateOrganizationCommand(client=client, system_users_service=system_users_service)
+    return CreateOrganizationCommand(
+        client=client,
+        system_users_service=system_users_service,
+        build_entity_link_util=build_entity_link_util,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -55,11 +69,13 @@ def get_update_person_command_factory(
     modify_contact_location_command: ModifyContactLocationCommand = Depends(
         get_modify_contact_location_command_factory
     ),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> UpdatePersonCommand:
     return UpdatePersonCommand(
         client=client,
         system_users_service=system_users_service,
         modify_contact_location_command=modify_contact_location_command,
+        build_entity_link_util=build_entity_link_util,
     )
 
 
@@ -70,11 +86,13 @@ def get_update_organization_command_factory(
     modify_contact_location_command: ModifyContactLocationCommand = Depends(
         get_modify_contact_location_command_factory
     ),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> UpdateOrganizationCommand:
     return UpdateOrganizationCommand(
         client=client,
         system_users_service=system_users_service,
         modify_contact_location_command=modify_contact_location_command,
+        build_entity_link_util=build_entity_link_util,
     )
 
 

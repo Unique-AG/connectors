@@ -88,6 +88,22 @@ class GraphUnavailable(GraphFailure):
     where retries spin forever."""
 
 
+class GraphResponseTooLarge(GraphFailure):
+    """Graph's answer was larger than the caller agreed to hold. `size` is `None` when the
+    refusal came from the `Content-Length` header and the body was never read."""
+
+    def __init__(self, *, size: int | None, limit: int, declared: int | None) -> None:
+        super().__init__(
+            f"Microsoft Graph answered with more than {limit} bytes",
+            status=None,
+            code=None,
+            request_id=None,
+        )
+        self.size: int | None = size
+        self.limit: int = limit
+        self.declared: int | None = declared
+
+
 class GraphPagingUnending(GraphFailure):
     """Graph does not end a collection: a run of empty pages, every one advertising more.
 
@@ -102,6 +118,7 @@ class GraphPagingUnending(GraphFailure):
 
 
 _STATUS: dict[type[GraphFailure], str] = {
+    GraphResponseTooLarge: "too_large",
     GraphThrottled: "throttled",
     GraphForbidden: "forbidden",
     GraphNotFound: "not_found",

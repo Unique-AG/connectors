@@ -21,6 +21,7 @@ from backstop_mcp.features.org_people_writes.create_organization_input import (
 )
 from backstop_mcp.features.org_people_writes.responses import CreatedOrganizationResponse
 from backstop_mcp.features.system_users import SystemUsersService
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -37,9 +38,11 @@ class CreateOrganizationCommand:
         *,
         client: BackstopClient,
         system_users_service: SystemUsersService,
+        build_entity_link_util: BuildEntityLinkUtil,
     ) -> None:
         self._client: BackstopClient = client
         self._system_users_service: SystemUsersService = system_users_service
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, organization: CreateOrganizationInput) -> CreatedOrganizationResponse:
         with _tracer.start_as_current_span("org_people_writes.command.create_organization"):
@@ -66,4 +69,7 @@ class CreateOrganizationCommand:
                 id=created_id,
                 resource_type=_RESOURCE_TYPE,
                 name=written.data.attributes.name,
+                url=self._build_entity_link_util.canonical_url(
+                    target=OrganizationLinkTarget(party_id=created_id)
+                ),
             )

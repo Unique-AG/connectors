@@ -20,11 +20,10 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 _DESCRIPTION = """\
-Return the signed-in user's profile: user_id, display_name, email, user_principal_name, job_title. \
-Call it before anything that depends on who "I", "me", or "my" is. Reuse the answer. It stays \
-stable for the whole session. Match sender and recipient addresses on `email`. \
-`user_principal_name` is a sign-in name on a possibly different domain, and it is correct only \
-when `email` is null.\
+Returns the signed-in user's own Microsoft 365 profile: id, display name, email, sign-in name, \
+and job title. This tool applies when a request depends on who "I", "me", or "my" refers to. \
+It describes only the caller. Resolve someone else's address with a directory or contacts \
+lookup instead.\
 """
 
 
@@ -36,27 +35,35 @@ class SignedInUser(BaseModel):
 
     user_id: str = Field(
         description=(
-            "The user's immutable Entra object id (Graph id). Compare only against another "
-            + "user_id."
+            "The user's immutable Entra object id (Graph `id`), stable even if the user's display "
+            + "name or email changes. Compare identity only against another `user_id`, never "
+            + "against an email address or name."
         )
     )
     display_name: str | None = Field(
-        description="The user's name as Microsoft 365 shows it. Null only on incomplete accounts."
+        description=(
+            "The user's display name as Microsoft 365 shows it. It is null only for an "
+            + "incomplete account."
+        )
     )
     email: str | None = Field(
         description=(
-            "The canonical primary SMTP address (Graph mail). Null for guest and unlicensed "
-            + "accounts. When null, use user_principal_name instead."
+            "The user's canonical primary SMTP address (Graph `mail`). The address is null for "
+            + "guest and unlicensed accounts. If it is null, use `user_principal_name` instead. "
+            + "Match sender and recipient addresses elsewhere against this field."
         )
     )
     user_principal_name: str | None = Field(
         description=(
-            "The sign-in name (Graph userPrincipalName). It usually looks like an email address, "
-            + "but it can be on a different domain. If email is null, use this field instead."
+            "The user's sign-in name (Graph `userPrincipalName`). It is null only if the account "
+            + "has no sign-in name. It can be on a different domain than `email`."
         )
     )
     job_title: str | None = Field(
-        description="The user's job title from the directory. Null if the directory has none."
+        description=(
+            "The user's job title from the directory. It is null if the directory has none on "
+            + "file."
+        )
     )
 
     @classmethod

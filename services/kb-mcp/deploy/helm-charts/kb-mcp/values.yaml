@@ -33,9 +33,9 @@ mcpConfig:
   # -- The search tool's own tuning knobs.
   search:
     scopeLookupConcurrency: 8
-  # -- The content_tree tool's own cache tuning. Only reachable while
-  # content_tree is enabled (see enabledTools above).
-  contentTree:
+  # -- Folder-walk cache and wait tuning, shared by content_tree and
+  # content_metadata.
+  folderWalk:
     cache:
       ttlSeconds: 600
       maxEntries: 24
@@ -80,7 +80,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/kb-mcp
-  tag: 0.1.4 # x-release-please-version
+  tag: 0.1.5 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:

@@ -20,6 +20,13 @@ class TaskRowResponse(OmitNoneModel):
     """One CRM task on the resolved party."""
 
     id: str = Field(description="Backstop id of this task. Echo it; never invent one.")
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this task. Omitted when this deployment has no UI "
+            "origin. Echo it; never invent one."
+        ),
+    )
     title: str | None = Field(default=None, description="Task title as Backstop publishes it.")
     status: str | None = Field(default=None, description="Backstop's status string, when present.")
     description: str | None = Field(default=None, description="Task body, when Backstop sends one.")
@@ -30,10 +37,13 @@ class TaskRowResponse(OmitNoneModel):
     is_open: bool = Field(description="False when completed, complete, done, closed, or dated so.")
 
     @classmethod
-    def from_resource(cls, resource: BackstopApiResource[TaskAttributes]) -> Self:
+    def from_resource(
+        cls, resource: BackstopApiResource[TaskAttributes], *, url: str | None
+    ) -> Self:
         attributes = resource.attributes
         return cls(
             id=resource.id,
+            url=url,
             title=attributes.title,
             status=attributes.status,
             description=attributes.description,

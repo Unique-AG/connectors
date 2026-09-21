@@ -332,6 +332,14 @@ class ActivityRecordResponse(OmitNoneModel):
             "for related fetches."
         ),
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this activity. Omitted when this deployment has no UI "
+            "origin, or when Backstop sent no `specificResource` for the row. Echo it; never "
+            "invent one."
+        ),
+    )
     occurred_at: date | None = Field(
         default=None,
         validation_alias=AliasChoices("occurred_at", "effective_date"),
@@ -391,6 +399,7 @@ class ActivityRecordResponse(OmitNoneModel):
         tags: tuple[ActivityTagChipResponse, ...],
         attendees: tuple[AttendeeResponse, ...],
         gist_max_chars: int,
+        url: str | None,
     ) -> Self:
         gist = extract_gist_from_html(attributes.description or "", max_chars=gist_max_chars)
         specific = attributes.specific_resource
@@ -398,6 +407,7 @@ class ActivityRecordResponse(OmitNoneModel):
             type=stream,
             activity_id=item_id,
             resource_id=None if specific is None else specific.resource_id,
+            url=url,
             occurred_at=attributes.effective_date,
             title=attributes.title,
             gist=gist.text,
@@ -634,6 +644,15 @@ class ActivityDetailResponse(OmitNoneModel):
             "search_activities publishes `attachments_count` only. Empty when there are none."
         ),
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this activity. Omitted when this deployment has no "
+            "UI origin, or when the activity kind has no CRM page. Echo it; never invent "
+            "one. Built from the `/entity-activity-details` id, not a history email "
+            "`activity_id`."
+        ),
+    )
 
     @classmethod
     def from_detail(
@@ -643,6 +662,7 @@ class ActivityDetailResponse(OmitNoneModel):
         detail: ActivityDetailDto,
         specifics: MeetingSpecificsDto | None,
         attendees: tuple[AttendeeDto, ...],
+        url: str | None,
     ) -> Self:
         """Convert the fetched parts to the tool's wire shape. Pure: no HTTP.
 
@@ -665,6 +685,7 @@ class ActivityDetailResponse(OmitNoneModel):
                 ActivityAttachmentResponse(id=item.id, name=item.name)
                 for item in detail.attachments
             ),
+            url=url,
         )
 
 
@@ -716,6 +737,15 @@ class SearchActivitiesRowResponse(OmitNoneModel):
             "`/entity-activity-details` uses. A get_activity_history `activity_id` "
             "(`meeting-or-calls_76537547`) also works. History email ids do not."
         )
+    )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this activity. Not in the default fieldset — select "
+            "`url` to get it, since one URL per row is dead weight on a wide sweep. Omitted "
+            "when this deployment has no UI origin, or when the row's `type` has no CRM page "
+            "(a bare `meeting_call` cannot choose meetings vs calls). Echo it; never invent one."
+        ),
     )
     type: str | None = Field(
         default=None,
@@ -811,7 +841,7 @@ class SearchActivitiesRowResponse(OmitNoneModel):
     )
 
     @classmethod
-    def from_dto(cls, row: EntityActivityDto, *, fields: frozenset[str]) -> Self:
+    def from_dto(cls, row: EntityActivityDto, *, fields: frozenset[str], url: str | None) -> Self:
         """Only the requested `fields`, plus `id` and `activity_id`.
 
         Both identifiers are the same value: `id` is what the search endpoint stores, and
@@ -823,7 +853,7 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         here only when selected, since flattening a note body is the expensive part of a row.
         """
         include = fields | {"id", "activity_id"}
-        overrides: dict[str, object] = {"activity_id": row.id}
+        overrides: dict[str, object] = {"activity_id": row.id, "url": url}
         if "short_description" in include:
             overrides["short_description"] = _plain_text(
                 row.short_description, max_chars=_SHORT_DESCRIPTION_MAX_CHARS
@@ -881,6 +911,7 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
         fields: frozenset[str],
         resolved: ResolvedPartyResponse | None,
         ceiling: int,
+        urls: Mapping[str, str | None],
         aggregates: tuple[AggregateBucketDto, ...] = (),
         description_row_capped: bool = False,
     ) -> Self:
@@ -898,7 +929,8 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
         rows = ()
         if mode == "rows":
             rows = tuple(
-                SearchActivitiesRowResponse.from_dto(row, fields=fields) for row in fetch.rows
+                SearchActivitiesRowResponse.from_dto(row, fields=fields, url=urls.get(row.id))
+                for row in fetch.rows
             )
         return cls(
             resolved=resolved,

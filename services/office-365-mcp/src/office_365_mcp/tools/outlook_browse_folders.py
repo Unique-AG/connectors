@@ -94,15 +94,12 @@ _FoldersQuery = MailFoldersRequestBuilder.MailFoldersRequestBuilderGetQueryParam
 _ChildFoldersQuery = ChildFoldersRequestBuilder.ChildFoldersRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Browse ONE level of the signed-in user's mail folders and get the handle for each. Omit \
-`parent` for the folders at the top of the mailbox. Pass a folder's `uri` back as `parent` to \
-descend into it. This is not the folder tree, and one call is not an inventory of the mailbox. \
-Microsoft returns only the immediate children of the folder asked about. So any folder whose \
-`child_folder_count` is above zero has folders below that this call did not return. Reaching \
-them means browsing that folder too. Each folder comes with the number of items it holds and \
-how many are unread, which is the cheap way to size a folder. Unless `include_hidden` is set, \
-this tool leaves out folders Outlook hides from the user. A hidden folder can still hold mail. \
-No message text comes back here. Use outlook_search_mail to find a message.\
+Lists the folders immediately under one level of the signed-in user's mail folder tree, with a \
+handle for each. This shows what folders exist and how large they are.
+
+Notes:
+- Returns one level only, never the tree: a folder whose `child_folder_count` is above zero has \
+folders below that this call did not return.
 """
 
 _NOT_A_FOLDER_HANDLE = (
@@ -117,46 +114,44 @@ class MailFolderSummary(BaseModel):
 
     uri: str = Field(
         description=(
-            "This folder's handle. Pass it back as `parent` to browse the level below it. Treat "
-            + "it as good for now, not as permanent: Microsoft's own pages disagree about whether "
-            + "a mail folder's id survives a copy or a move. If it stops resolving, browse the "
-            + "level above again and take the handle reported then — never repair or rebuild one."
+            "This folder's handle. Pass it back as `parent` to browse its children. Microsoft "
+            + "does not guarantee that it survives a copy or move. If it stops resolving, "
+            + "browse the level above again. Take the handle reported then, rather than "
+            + "repairing this one."
         )
     )
     display_name: str | None = Field(
         description=(
             "The folder's name as Outlook shows it, for example `Inbox`. Names are unique only "
-            + "among the folders sharing a parent, so two folders called `Archive` on different "
+            + "among folders sharing a parent, so two folders named `Archive` on different "
             + "branches are different folders. Null when Graph recorded none."
         )
     )
     total_items: int | None = Field(
         description=(
-            "How many items the folder holds, as Graph reports it on the folder itself. This is "
-            + "the cheap count, and the one Microsoft recommends over counting messages. "
-            + "Microsoft warns that counting messages directly can incur significant latency. It "
-            + "counts items of every type, so it is an upper bound on the messages in this folder "
-            + "and not a message count. Excludes the folders below."
+            "How many items of every kind this folder holds — an upper bound on its messages, "
+            + "not a count of them. Excludes the folders below. Null when Graph did not report "
+            + "it."
         )
     )
     unread_items: int | None = Field(
         description=(
-            "How many of `total_items` are unread, on the same terms. These are items of every "
-            + "type too, so this is an upper bound on unread messages, rather than a count of "
-            + "them."
+            "How many of `total_items` are unread, on the same terms: an upper bound, not an "
+            + "exact count. Null when Graph did not report it."
         )
     )
     child_folder_count: int | None = Field(
         description=(
-            "How many folders sit directly under this one. Above zero means this call did NOT "
-            + "return them. Pass this folder's `uri` back as `parent` to see them. Zero is the "
-            + "only value that means there is nothing below this folder."
+            "How many folders sit directly under this one. Null when Graph did not report it. "
+            + "Above zero means this call did not return them. Pass this folder's `uri` back as "
+            + "`parent` to see them. Zero is the only value that means there is nothing below."
         )
     )
     is_hidden: bool | None = Field(
         description=(
-            "True for a folder Outlook hides from the user, which can still hold mail. Only ever "
-            + "true when `include_hidden` was set, because Graph leaves such folders out otherwise."
+            "Whether Outlook hides this folder from the user. A hidden folder can still hold "
+            + "mail. Null when Graph did not report it. True only when the caller set "
+            + "`include_hidden`. Graph omits hidden folders otherwise."
         )
     )
 
@@ -178,19 +173,17 @@ class MailFolderLevel(BaseModel):
 
     folders: list[MailFolderSummary] = Field(
         description=(
-            "The folders immediately under the one asked about, in the order Graph returned "
-            + "them. This is one level, never the tree. A folder here with a "
-            + "`child_folder_count` above zero has folders of its own, not in this list. Empty "
-            + "means this folder has no children, or none that are visible. Unless asked for, "
-            + "this tool excludes hidden ones."
+            "The folders immediately under the folder the caller named, in the order Graph "
+            + "returned them — one level, never the tree. A folder here with "
+            + "`child_folder_count` above zero has more of its own, not in this list. Empty "
+            + "means this folder has no children, or none visible without `include_hidden`."
         )
     )
     capped: bool = Field(
         description=(
-            "True when `limit` stopped the listing while Graph still had more of THIS level to "
-            + "give. A higher `limit` can return more. False whenever the level ran out on its "
-            + "own, however few folders it held. It says nothing about the levels below, which "
-            + "this call never reaches. Read `child_folder_count` for those."
+            "True when `limit` stopped the listing while more of this level remained. Raise "
+            + "`limit` to see them. False means this level ran out on its own. This says "
+            + "nothing about the levels below. Read `child_folder_count` for those."
         )
     )
 
@@ -280,9 +273,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The folder whose children to list, as the `uri` of an earlier result: "
-                    + "outlook:///folders/{id}. Omit it for the folders at the top of the mailbox, "
-                    + "which is where a walk starts. A folder name is not a handle, and neither is "
-                    + "a well-known name such as `inbox`."
+                    + "outlook:///folders/{id}. Omit it for the folders at the top of the "
+                    + "mailbox. A folder name is not a handle, and neither is a well-known name "
+                    + "such as `inbox`."
                 ),
             ),
         ] = None,
@@ -290,10 +283,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool,
             Field(
                 description=(
-                    "Include folders Outlook hides from the user. Off by default, which is "
-                    + "Microsoft's own default. Turn it on when the goal is a full account of "
-                    + "the mailbox. Also turn it on when a message's folder matches nothing "
-                    + "listed. A hidden folder is invisible in Outlook, and still holds mail."
+                    "Includes folders Outlook hides from the user. This is off by default. Turn "
+                    + "it on for a full account of the mailbox. If a message's folder does not "
+                    + "appear in an unhidden listing, turn it on too. A hidden folder still "
+                    + "holds mail."
                 )
             ),
         ] = False,
@@ -303,9 +296,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_FOLDERS,
                 description=(
-                    f"How many folders to return from this one level, at most {MAX_FOLDERS}. "
-                    + "Paging happens inside the call and `capped` says whether this stopped it. "
-                    + "It bounds one level only. A higher value never reaches the folders below."
+                    f"How many folders to return from this level, at most {MAX_FOLDERS}. "
+                    + "`capped` says whether more remain. Bounds this level only — a higher "
+                    + "value never reaches the folders below."
                 ),
             ),
         ] = 50,

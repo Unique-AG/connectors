@@ -8,6 +8,16 @@ tool's output schema; include names live on the `include` parameter of `get_pers
 INSTRUCTIONS = """\
 Backstop CRM. People and organizations are the records; tools own different questions.
 
+Identity first. A name is not a handle. Every party-scoped tool takes either `search` (a \
+name or email, resolved server-side) or a trusted `party_id` **together with** that id's \
+`search_type` — two separate arguments, and `party_id` alone is rejected. Never invent an \
+id: only echo one a prior resolve returned (`id` / `search_type` / `name`). The four party \
+collections are organizations, people, contacts, and employees, and their ids are not \
+interchangeable — a contacts or employees id is not a people id. An ambiguous name comes \
+back as `candidates` to pick from, never a guess; `not_found` names the query actually \
+used. Account, product, opportunity, and activity ids are none of these and are not party \
+ids.
+
 Contact details (emails, locations, primary contact, the organization a person works at): \
 get_person / get_organization with `include`. `representative` is our internal account owner, \
 not a way to reach the investor. Contact Source is a standard vocabulary, not a custom \
@@ -69,6 +79,16 @@ what it sends. delete_person, delete_organization, delete_activity, and \
 delete_opportunity hard-delete one named record with a trusted id (no recycle \
 bin). Refuse bulk wipes, "all test records", and any search-then-delete sweep.
 
+Party and deal writes: create_person / create_organization / update_person / \
+update_organization for the record itself and its postal addresses; create_employment and \
+end_employment for who works where (no relationship-type id — the command resolves it, and \
+one call writes both directions). create_opportunity for a new deal; update_opportunity is \
+the only way to move a stage, one call per deal, and `stage` is a name from this instance's \
+vocabulary, not an id. Every create is non-idempotent — a repeated call makes a second \
+record. Custom-field values never go on these tools: use update_custom_field_values, \
+keyed by `definition_id` from list_custom_fields, so picklist and time-series rules are \
+enforced. A `201` is not success on a batch write — read `records[].status`.
+
 Firm-wide pipeline: look up a colleague's login with list_system_users, then \
 search_opportunities. filter[representative.name] takes that login, not a display name. \
 A disabled login returning empty is not "no coverage". One party's deals: \
@@ -84,7 +104,17 @@ recorded" — say you cannot answer rather than infer.
 Open follow-ups: get_tasks_for_party. Both entity filters are required; status is \
 client-side.
 
-Custom-field names and types: list_custom_fields. Read party values through \
-get_organization / get_person, product values through get_product, opportunity values \
-through get_opportunities / get_opportunities_by_ids, not through people-for-party.
+Custom-field names and types: list_custom_fields; list_custom_field_groups for the tab and \
+section layout those fields sit in. Read party values through get_organization / \
+get_person, product values through get_product, opportunity values through \
+get_opportunities / get_opportunities_by_ids, not through people-for-party.
+
+Saved Report Center reports: run_report, by exact name. There is no endpoint that lists \
+reports — ask the user for the name rather than guessing one. Its columns belong to that \
+saved report, so ask what a column means instead of inventing a schema; it returns one \
+page, continue with `next_offset`.
+
+CRM UI URLs: build_backstop_links turns an id you already resolved into labeled links, and \
+parse_backstop_link turns a pasted CRM URL back into a page, an id, and the tool to call \
+next. Never hand-write a Backstop URL or read an id out of one yourself.
 """
