@@ -43,6 +43,7 @@ from office_365_mcp.graph_client import (
     GraphForbidden,
     GraphNotFound,
     GraphPagingUnending,
+    GraphResponseTooLarge,
     GraphThrottled,
     GraphUnavailable,
     graph_client_for,
@@ -468,6 +469,7 @@ def _advice(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
 
 
 def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str | None) -> str:
+    """What a caller must do about `failure`, one branch per remedy rather than per status code."""
     if isinstance(failure, GraphThrottled):
         advice = failure.retry_after_seconds
         if advice is None:
@@ -519,6 +521,14 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
             "Microsoft 365 could not be reached or failed internally. Retry once; if it fails "
             + "again the same way, stop and report it — some Graph 500s are permanent for "
             + "particular content rather than transient."
+        )
+    if isinstance(failure, GraphResponseTooLarge):
+        return (
+            "Microsoft 365 answered, but the answer is larger than this connector can hold. "
+            + f"The limit is {failure.limit} bytes. Nothing about the request is wrong. The same "
+            + "request will give the same refusal, so do not retry it. Ask for less content. Use "
+            + "a narrower window, fewer items, or one item instead of a collection. You can also "
+            + "read the content with a tool that returns text."
         )
     if isinstance(failure, GraphPagingUnending):
         # No request failed, so `_diagnostics` has nothing to append and the page count, which is

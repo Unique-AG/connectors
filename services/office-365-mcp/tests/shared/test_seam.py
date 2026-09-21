@@ -30,6 +30,7 @@ from office_365_mcp.graph_client import (
     GraphForbidden,
     GraphNotFound,
     GraphPagingUnending,
+    GraphResponseTooLarge,
     GraphThrottled,
     GraphUnavailable,
 )
@@ -55,6 +56,20 @@ _UNCONSENTED = (
     + "'1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061'. Send an interactive authorization request for "
     + "this user and resource."
 )
+
+
+_FALLTHROUGH = "This is a bad request rather than an outage or a permission problem"
+
+_ONE_OF_EACH: Mapping[type[GraphFailure], GraphFailure] = {
+    GraphThrottled: GraphThrottled(
+        "held off", status=429, code=None, request_id=None, retry_after_seconds=2
+    ),
+    GraphForbidden: GraphForbidden("nope", status=403, code=None, request_id=None),
+    GraphNotFound: GraphNotFound("gone", status=404, code=None, request_id=None),
+    GraphUnavailable: GraphUnavailable("down", status=503, code=None, request_id=None),
+    GraphResponseTooLarge: GraphResponseTooLarge(size=None, limit=10, declared=11),
+    GraphPagingUnending: GraphPagingUnending("no end", empty_pages=11),
+}
 
 
 def _message(failure: GraphFailure) -> str:
@@ -228,6 +243,25 @@ class TestRetryAdvice:
 
         assert "Gone." not in str(raised.value)
         assert _PERMISSION in str(raised.value)
+
+
+class TestEveryFailureGetsItsOwnRemedy:
+    """The fallthrough says Graph rejected a bad request, which is false of a failure that is not
+    Graph's verdict, so every subclass needs a branch of its own."""
+
+    def test_no_subclass_falls_through_to_the_bad_request_sentence(self) -> None:
+        assert set(GraphFailure.__subclasses__()) == set(_ONE_OF_EACH), (
+            "a new GraphFailure needs a remedy in `_remedy` and a sample here"
+        )
+        for failure in _ONE_OF_EACH.values():
+            assert _FALLTHROUGH not in _message(failure), type(failure).__name__
+
+    def test_an_answer_too_large_to_hold_does_not_blame_the_request(self) -> None:
+        message = _message(_ONE_OF_EACH[GraphResponseTooLarge])
+
+        assert "larger than this connector can hold" in message
+        assert "The limit is 10 bytes" in message
+        assert "do not retry it" in message
 
 
 class TestDiagnostics:
