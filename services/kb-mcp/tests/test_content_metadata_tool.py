@@ -642,3 +642,29 @@ async def test_a_backend_outage_does_not_claim_the_id_is_wrong(readable_folders)
 
     assert result.is_error is True
     assert "temporarily unavailable" in result.content[0].text  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_forwards_the_clamped_timeout_and_configured_concurrency():
+    """The clamp lives on Settings now; this pins that the tool actually uses it."""
+    mock_tree = _make_mock_tree()
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        await content_metadata(timeout=300, config=ContentMetadataToolConfig())
+
+    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
+    assert kwargs["timeout"] == 45.0
+    assert kwargs["max_concurrent_directory_listings"] == 25
+
+
+@pytest.mark.asyncio
+async def test_timeout_defaults_to_the_configured_wait():
+    mock_tree = _make_mock_tree()
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        await content_metadata(config=ContentMetadataToolConfig())
+
+    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
+    assert kwargs["timeout"] == 30.0

@@ -1281,3 +1281,24 @@ async def test_incomplete_search_still_applies_the_llm_filter():
     text = result.content[0].text  # type: ignore[union-attr]
     assert "c_pdf" in text
     assert "c_txt" not in text
+
+
+@pytest.mark.asyncio
+async def test_tree_folders_only_never_reports_truncation():
+    """folders_only renders no files, so the cap cannot bite and claiming it did
+    would send the model chasing a limit that changes nothing."""
+    snapshot = FakeSnapshot(
+        files=[
+            (_make_content_info(f"f{i}"), PurePosixPath(f"Docs/f{i}.pdf"))
+            for i in range(5)
+        ],
+        folder_paths=[PurePosixPath("Docs")],
+    )
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree", folders_only=True, limit=2, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Showing the first" not in text
