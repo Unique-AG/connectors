@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from typing import cast
 
 import httpx
@@ -82,17 +82,21 @@ def content(graph: respx.MockRouter) -> respx.Route:
 
 
 async def _read(
-    client: GraphServiceClient, *, page: str = _PAGE, include_ids: bool = False
+    client: GraphServiceClient,
+    transport: httpx.AsyncClient,
+    *,
+    page: str = _PAGE,
+    include_ids: bool = False,
 ) -> reader.PageContent:
-    return await reader.onenote_read_page(client, page=page, include_ids=include_ids)
+    return await reader.onenote_read_page(client, transport, page=page, include_ids=include_ids)
 
 
 class TestWhatItAsks:
     @pytest.mark.usefixtures("content")
     async def test_it_selects_and_expands_the_fields_every_page_tool_agrees_on(
-        self, client: GraphServiceClient, page: respx.Route
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, page: respx.Route
     ) -> None:
-        _ = await _read(client)
+        _ = await _read(client, transport)
 
         params = page.calls.last.request.url.params
         assert params["$select"].split(",") == [
@@ -106,16 +110,20 @@ class TestWhatItAsks:
 
     @pytest.mark.usefixtures("page")
     async def test_the_content_request_carries_no_query_parameters_at_all(
-        self, client: GraphServiceClient, content: respx.Route
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, content: respx.Route
     ) -> None:
-        _ = await _read(client)
+        _ = await _read(client, transport)
 
         assert content.calls.last.request.url.params == httpx.QueryParams()
 
     async def test_both_requests_are_addressed_by_the_same_percent_encoded_id(
-        self, client: GraphServiceClient, page: respx.Route, content: respx.Route
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        page: respx.Route,
+        content: respx.Route,
     ) -> None:
-        _ = await _read(client)
+        _ = await _read(client, transport)
 
         assert page.call_count == 1
         assert content.call_count == 1
@@ -130,9 +138,13 @@ class TestWhatItAsks:
 
 class TestWhatItAnswers:
     async def test_the_page_summary_is_mapped_from_graph(
-        self, client: GraphServiceClient, page: respx.Route, content: respx.Route
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        page: respx.Route,
+        content: respx.Route,
     ) -> None:
-        answer = await _read(client)
+        answer = await _read(client, transport)
 
         summary = answer.page
         assert summary.uri == OnenotePageHandle(PAGE_ID).uri
@@ -145,15 +157,23 @@ class TestWhatItAnswers:
         assert (page.call_count, content.call_count) == (1, 1)
 
     async def test_the_html_comes_back_decoded_exactly_as_graph_sent_it(
-        self, client: GraphServiceClient, page: respx.Route, content: respx.Route
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        page: respx.Route,
+        content: respx.Route,
     ) -> None:
-        answer = await _read(client)
+        answer = await _read(client, transport)
 
         assert answer.html == _HTML.decode("utf-8")
         assert (page.call_count, content.call_count) == (1, 1)
 
     async def test_a_page_graph_named_no_parent_for_answers_null_handles(
-        self, client: GraphServiceClient, graph: respx.MockRouter, content: respx.Route
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        content: respx.Route,
     ) -> None:
         _ = graph.get(_PAGE_PATH).mock(
             return_value=httpx.Response(
@@ -162,7 +182,7 @@ class TestWhatItAnswers:
             )
         )
 
-        answer = await _read(client)
+        answer = await _read(client, transport)
 
         assert answer.page.section_uri is None
         assert answer.page.section_name is None
@@ -174,25 +194,33 @@ class TestWhatItAnswers:
 
 class TestTheSizeCap:
     async def test_content_exactly_at_the_cap_is_returned(
-        self, client: GraphServiceClient, page: respx.Route, graph: respx.MockRouter
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        page: respx.Route,
+        graph: respx.MockRouter,
     ) -> None:
         body = b"<html>" + b"a" * (reader.MAX_CONTENT_BYTES - len(b"<html></html>")) + b"</html>"
         assert len(body) == reader.MAX_CONTENT_BYTES
         _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=body))
 
-        answer = await _read(client)
+        answer = await _read(client, transport)
 
         assert answer.html == body.decode("utf-8")
         assert page.call_count == 1
 
     async def test_content_over_the_cap_is_refused_and_names_the_web_url(
-        self, client: GraphServiceClient, page: respx.Route, graph: respx.MockRouter
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        page: respx.Route,
+        graph: respx.MockRouter,
     ) -> None:
         body = b"x" * (reader.MAX_CONTENT_BYTES + 1)
         _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=body))
 
         with pytest.raises(ToolError) as refused:
-            _ = await _read(client)
+            _ = await _read(client, transport)
 
         refusal = str(refused.value)
         assert f"{len(body):,} bytes" in refusal
@@ -202,8 +230,54 @@ class TestTheSizeCap:
         assert "arrive in one message" in refusal
         assert page.call_count == 1
 
+    async def test_a_declared_length_over_the_cap_is_refused_before_a_second_request(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        page: respx.Route,
+        graph: respx.MockRouter,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Graph declares the length, so this is refused before a byte of it is read."""
+        monkeypatch.setattr(reader, "MAX_CONTENT_BYTES", 64)
+        body = b"x" * 100
+        route = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=body))
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _read(client, transport)
+
+        assert f"{len(body):,} bytes" in str(refused.value)
+        assert _WEB_URL in str(refused.value)
+        assert route.call_count == 1, "the declared length refused this before a retry"
+        assert page.call_count == 1
+
+    async def test_an_undeclared_length_over_the_cap_is_refused_on_the_bytes_counted(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        page: respx.Route,
+        graph: respx.MockRouter,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Chunked with no Content-Length, so the streamed-bytes guard fires instead."""
+        monkeypatch.setattr(reader, "MAX_CONTENT_BYTES", 64)
+
+        async def chunks() -> AsyncIterator[bytes]:
+            for _ in range(4):
+                yield b"x" * 40
+
+        graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=chunks()))
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _read(client, transport)
+
+        assert "content-length" not in str(refused.value).casefold(), "nothing was declared"
+        assert "160 bytes" in str(refused.value), "what it had counted when it stopped"
+        assert _WEB_URL in str(refused.value)
+        assert page.call_count == 1
+
     async def test_a_size_refusal_without_a_web_url_still_advises_something(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
         _ = graph.get(_PAGE_PATH).mock(
             return_value=httpx.Response(200, json=_page_payload(web_url=None))
@@ -212,7 +286,7 @@ class TestTheSizeCap:
         _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=body))
 
         with pytest.raises(ToolError, match="Microsoft gave no web address"):
-            _ = await _read(client)
+            _ = await _read(client, transport)
 
 
 class TestWhatItRefuses:
@@ -227,25 +301,29 @@ class TestWhatItRefuses:
         ],
     )
     async def test_a_value_that_is_not_a_page_handle_never_reaches_graph(
-        self, client: GraphServiceClient, graph: respx.MockRouter, value: str
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        value: str,
     ) -> None:
         with pytest.raises(ToolError, match="onenote_list_pages"):
-            _ = await _read(client, page=value)
+            _ = await _read(client, transport, page=value)
 
         assert graph.calls.call_count == 0
 
     async def test_the_refusal_names_the_page_handle_shape(
-        self, client: GraphServiceClient
+        self, client: GraphServiceClient, transport: httpx.AsyncClient
     ) -> None:
         with pytest.raises(ToolError, match=r"onenote:///pages/\{id\}") as refused:
-            _ = await _read(client, page=_SECTION)
+            _ = await _read(client, transport, page=_SECTION)
 
         assert "onenote:///sections/{id}" in str(refused.value)
 
 
 class TestGraphFailures:
     async def test_a_404_on_the_page_is_a_graph_not_found(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
         _ = graph.get(_PAGE_PATH).mock(
             return_value=httpx.Response(
@@ -254,10 +332,10 @@ class TestGraphFailures:
         )
 
         with pytest.raises(GraphNotFound):
-            _ = await _read(client)
+            _ = await _read(client, transport)
 
     async def test_a_403_on_the_page_is_a_graph_forbidden(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
         _ = graph.get(_PAGE_PATH).mock(
             return_value=httpx.Response(
@@ -266,11 +344,11 @@ class TestGraphFailures:
         )
 
         with pytest.raises(GraphForbidden):
-            _ = await _read(client)
+            _ = await _read(client, transport)
 
     @pytest.mark.usefixtures("page")
     async def test_a_404_on_the_content_is_a_graph_not_found(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
         _ = graph.get(_CONTENT_PATH).mock(
             return_value=httpx.Response(
@@ -279,26 +357,26 @@ class TestGraphFailures:
         )
 
         with pytest.raises(GraphNotFound):
-            _ = await _read(client)
+            _ = await _read(client, transport)
 
     @pytest.mark.usefixtures("page")
     async def test_no_content_at_all_is_refused_rather_than_answered_empty(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
         _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=b""))
 
         with pytest.raises(ToolError, match="sent no content"):
-            _ = await _read(client)
+            _ = await _read(client, transport)
 
     @pytest.mark.usefixtures("page")
     async def test_content_that_is_not_valid_utf8_is_refused_and_names_the_web_url(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
         not_utf8 = "<html>café</html>".encode("utf-16")
         _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=not_utf8))
 
         with pytest.raises(ToolError, match="cannot decode") as refused:
-            _ = await _read(client)
+            _ = await _read(client, transport)
 
         assert "not valid UTF-8" in str(refused.value)
         assert _WEB_URL in str(refused.value)
@@ -369,24 +447,24 @@ class TestHowItDeclaresItself:
 class TestIncludeIds:
     @pytest.mark.usefixtures("page")
     async def test_by_default_no_query_parameter_is_sent(
-        self, client: GraphServiceClient, content: respx.Route
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, content: respx.Route
     ) -> None:
-        _ = await _read(client)
+        _ = await _read(client, transport)
 
         assert content.calls.last.request.url.params == httpx.QueryParams()
 
     @pytest.mark.usefixtures("page")
     async def test_include_ids_true_sends_the_raw_query_parameter(
-        self, client: GraphServiceClient, content: respx.Route
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, content: respx.Route
     ) -> None:
-        _ = await _read(client, include_ids=True)
+        _ = await _read(client, transport, include_ids=True)
 
         assert content.calls.last.request.url.params["includeIDs"] == "true"
 
     @pytest.mark.usefixtures("content")
     async def test_include_ids_does_not_reach_the_page_metadata_call(
-        self, client: GraphServiceClient, page: respx.Route
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, page: respx.Route
     ) -> None:
-        _ = await _read(client, include_ids=True)
+        _ = await _read(client, transport, include_ids=True)
 
         assert "includeIDs" not in page.calls.last.request.url.params
