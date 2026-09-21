@@ -107,23 +107,17 @@ GRAPH_NOT_FOUND = (
 )
 
 _DESCRIPTION = """\
-Start copying an existing OneNote page into a different section. Pass the `page` handle from a \
-onenote_list_pages row or a onenote_create_page answer, and the `to_section` handle — a \
-section's `uri` from a onenote_list_notebooks or onenote_list_sections result — to name the \
-destination. This call does NOT copy the page itself: Microsoft Graph runs the copy on its own \
-side, and this tool's answer is the operation that tracks it, not the copied page. Pass the \
-answer's `uri` to onenote_get_operation, a few seconds apart, until `status` reads Completed — \
-its `result_uri` is then the new page's handle — or Failed, whose `error_code` and \
-`error_message` say why. This tool asks the person at the other end to confirm before starting \
-the copy when the destination section's notebook is shared with other people or belongs to \
-somebody else, or when Microsoft does not report who can see it, because the copy becomes \
-visible to them the moment it lands. A copy into the user's own unshared notebook starts \
-without a question. This call is NOT SAFE TO RETRY BLINDLY: if it times out, a copy may already \
-be running on Microsoft's side, and calling this tool again with the same arguments starts a \
-second, independent copy of the page. On a timeout, nothing came back to poll: list the \
-destination section's pages with onenote_list_pages and look for one with this page's title \
-before calling again. On the test tenant a copied page's title showed up at once, unlike a \
-freshly created page's, but judge by `created_at` and the count too before trying again.\
+Starts a copy of one page into another section. This call does not copy the page itself: \
+Microsoft runs the copy, and the answer is the operation that tracks it. Pass the answer's `uri` \
+to onenote_get_operation until `status` reads Completed or Failed.
+
+Notes:
+- This tool asks the user to agree before it writes into a notebook that is shared with other \
+people or belongs to somebody else. A copy into the user's own unshared notebook starts without a \
+question.
+- If a call times out, do not call this tool again first: a second call starts a second copy. \
+Before you call again, make sure that onenote_list_pages does not show the page in the \
+destination section.
 """
 
 
@@ -223,11 +217,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle of the page to copy, from a onenote_list_pages row or a "
-                    + "onenote_create_page answer: `uri`, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle, onenote:///sections/{id}, is not "
-                    + "a page handle. Never build one yourself: a page id alone, without this "
-                    + "connector's scheme around it, reaches nothing."
+                    "The page to copy: the `uri` of a onenote_list_pages row or a "
+                    + "onenote_create_page answer, copied word for word. The shape is "
+                    + "onenote:///pages/{id}. A section handle is not a page handle."
                 ),
             ),
         ],
@@ -236,10 +228,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle of the destination section, from the `uri` of a section in a "
-                    + "onenote_list_notebooks or onenote_list_sections result. The shape is "
-                    + "onenote:///sections/{id}. A page handle or a notebook handle is not a "
-                    + "section handle. Copy it word for word."
+                    "The destination section, from the `uri` of a section in a "
+                    + "onenote_list_notebooks or onenote_list_sections result, or a "
+                    + "onenote_create_section answer. The shape is onenote:///sections/{id}. A "
+                    + "page handle or a notebook handle is not a section handle. Copy it word "
+                    + "for word."
                 ),
             ),
         ],

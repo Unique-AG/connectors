@@ -44,24 +44,16 @@ GRAPH_NOT_FOUND = (
 )
 
 _DESCRIPTION = """\
-Poll the status of a copy this connector already started: onenote_copy_page, \
-onenote_copy_section or onenote_copy_notebook. Pass the `operation` handle from one of those \
-tools' answers, every time — keep polling with that same handle, because the `uri` this tool's \
-own answer carries can differ from it and is not the one to reuse for a later poll. `status` is \
-Microsoft's own word for where the copy stands: NotStarted, Running, Completed or Failed. \
-`percent_complete` is informational only and can already read high while `status` still reads \
-Running, so only `status` says a copy is actually done. Call this again a few seconds after the \
-last call rather than in a tight loop, and keep calling it until `status` reads Completed or \
-Failed — there is no push notification for a copy finishing. Once `status` reads Completed, \
-`result_uri` is the handle of whatever the copy produced, and `result_kind` says which of a \
-page, a section or a notebook it is: pass a page's `result_uri` to onenote_read_page, a \
-section's to onenote_list_pages, and a notebook's to onenote_list_sections. Once `status` reads \
-Failed, `error_code` and `error_message` carry what Microsoft said went wrong, and this tool \
-has nothing further to add: find out what happened by reading those two fields rather than \
-calling this tool again. A 404 from this call means Microsoft has no record of this operation: \
-the copy is over, one way or another, or the handle never named a real operation — not that \
-this call was wrong. Polling the same handle again will not change that answer: look for the \
-result with onenote_list_pages, onenote_list_sections or onenote_list_notebooks instead.\
+Polls a copy that onenote_copy_page, onenote_copy_section or onenote_copy_notebook started. Pass \
+the `operation` handle from the copy tool's answer every time. The `uri` in this tool's own \
+answer can differ and is not the one to reuse. `status` reads NotStarted, Running, Completed or \
+Failed. `percent_complete` is informational, and only `status` says that a copy is done.
+
+Notes:
+- Call again a few seconds apart until `status` reads Completed, which fills `result_uri`, or \
+Failed, which fills `error_code` and `error_message`.
+- A 404 means Microsoft has no record of this operation: the copy is over, or the handle never \
+named one. Look for the result with the list tools instead.
 """
 
 
@@ -94,11 +86,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle of the copy to poll, from the `uri` of a onenote_copy_page, "
-                    + "onenote_copy_section or onenote_copy_notebook answer, copied word for "
-                    + "word. The shape is onenote:///operations/{id}. Never build one yourself: "
-                    + "an operation id alone, without this connector's scheme around it, reaches "
-                    + "nothing."
+                    "The copy to poll: the `uri` of a onenote_copy_page, onenote_copy_section or "
+                    + "onenote_copy_notebook answer, copied word for word. The shape is "
+                    + "onenote:///operations/{id}. An operation id alone, with no connector scheme "
+                    + "around it, reaches nothing."
                 ),
             ),
         ],

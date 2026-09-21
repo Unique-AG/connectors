@@ -1142,11 +1142,13 @@ class TestHowItDeclaresItself:
     async def test_the_description_says_exactly_one_destination_and_not_safe_to_retry(
         self, transport: httpx.AsyncClient
     ) -> None:
+        """The retry warning now reads as STE guidance rather than "not safe to retry blindly",
+        but it still tells a caller not to call this tool again right after a timeout."""
         _parameters, tool = await _registered(transport)
 
         description = (tool.description or "").casefold()
         assert "exactly one" in description
-        assert "not safe to retry blindly" in description
+        assert "do not call this tool again first" in description
         assert "onenote_get_operation" in description
 
     async def test_the_to_notebook_description_names_onenote_create_notebook(

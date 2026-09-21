@@ -51,32 +51,18 @@ _UNNAMED_NOTEBOOK = "an unnamed notebook"
 _UNNAMED_SECTION_GROUP = "an unnamed section group"
 
 _DESCRIPTION = """\
-Create a brand-new, empty section group directly inside a notebook or another section group. \
-Pass a notebook's `uri` or a section group's `uri` in `parent`; the new section group is \
-created directly under whichever one you pass, never nested any deeper. A section group can \
-hold both sections and further section groups, at any depth: pass any section group's own \
-`uri` straight back as `parent` to nest another one under it. This is not a draft: there is no \
-review step, nobody approves it first, and the section group exists the moment this tool \
-returns. This connector sends no notification when it creates the section group, and Microsoft \
-Graph sends none for it either, but OneNote itself can show it to people who open the notebook. \
-This tool asks the person at the other end to confirm before creating the section group when \
-the notebook holding `parent` is shared with other people or belongs to somebody else, or when \
-Microsoft does not report who can see it, because the section group is visible to them the \
-moment it is written. A section group created inside the user's own unshared notebook is \
-created without a question. Section group names must be unique within the same parent, at most \
-50 characters, and cannot contain any of these characters: ? * / : < > | & # ' % ~. Microsoft \
-refuses a request that breaks either rule and creates nothing. If this call times out, do not \
-simply call it again: Microsoft may already have created the section group before the response \
-was lost, and calling again with the same `name` either creates a second section group with a \
-Microsoft-adjusted name or fails as a duplicate, depending on how Microsoft resolves the clash. \
-List the parent's contents with onenote_list_sections first and look for a section group \
-already named `name` before calling this again. Microsoft can refuse this write with a 403 that \
-looks exactly like a missing permission when `parent` names a section group — even one this \
-same account just created and can create sections in elsewhere — as observed on a test tenant; \
-if that happens, create directly under the notebook instead, or copy an existing section into \
-that group with onenote_copy_section, which Microsoft did accept. The answer's `uri` is this \
-new section group's handle: pass it to onenote_create_section to add a section to it, or to \
-onenote_list_sections to see what is directly under it.\
+Creates a new, empty section group directly under `parent`, a notebook or another section group. \
+There is no draft and no review step: the section group exists the moment this tool returns. \
+OneNote can show the change to everyone who opens the notebook.
+
+Notes:
+- This tool asks the user to agree before it writes into a notebook that is shared with other \
+people or belongs to somebody else. A section group in the user's own unshared notebook is \
+created without a question.
+- If a call times out, do not call this tool again first. Before you call again, make sure that \
+onenote_list_sections does not show a section group named `name`.
+- Microsoft can refuse a create under a section group with error 403. Then create under the \
+notebook, or copy a section into the group with onenote_copy_section.
 """
 
 _NOT_A_PARENT_HANDLE = (
@@ -105,19 +91,18 @@ class CreatedSectionGroup(BaseModel):
         description=(
             "This new section group's handle: onenote:///sectiongroups/{id}, with the id "
             + "percent-encoded. Pass it to onenote_create_section to add a section to it, or to "
-            + "onenote_list_sections to see what is directly under it. It can hold further "
-            + "section groups too: pass this same `uri` back as `parent` to nest one under it."
+            + "onenote_list_sections to see what is directly under it."
         )
     )
     name: str | None = Field(
         description=(
-            "The name Microsoft actually stored for this section group, read off its response "
-            + "rather than echoed from the `name` argument."
+            "What Microsoft stored, read from its response and not from the `name` argument."
         )
     )
     created_at: datetime | None = Field(
         description=(
-            "When Microsoft recorded creating this section group. Null when Graph reported none."
+            "When the section group was created, as Graph reported it. Null when Graph "
+            + "recorded none."
         )
     )
     parent_uri: str = Field(
@@ -242,14 +227,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Where the new section group is created, directly and one level only, as a "
-                    + "`uri`: onenote:///notebooks/{id} from an onenote_list_notebooks row, a "
-                    + "onenote_find_notebook_from_url answer, or a onenote_create_notebook "
-                    + "answer; or onenote:///sectiongroups/{id} from an onenote_list_sections "
-                    + "row, or this same tool's own answer, at any nesting depth. A section "
-                    + "group can refuse this write with a 403 that looks exactly like a missing "
-                    + "permission, as observed on a test tenant for a group created moments "
-                    + "earlier; create directly under the notebook instead if that happens."
+                    "Where the new section group is created, as a `uri`. A notebook's `uri` comes "
+                    + "from onenote_list_notebooks, onenote_find_notebook_from_url, or "
+                    + "onenote_create_notebook. A section group's `uri` comes from "
+                    + "onenote_list_sections or from this same tool's own answer. A section group "
+                    + "nests at any depth, so pass a group's own `uri` to nest a new section "
+                    + "group under it."
                 ),
             ),
         ],
@@ -259,11 +242,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_NAME_CHARACTERS,
                 description=(
-                    "The new section group's name, as the user wrote it, up to 50 characters. "
-                    + "It must be unique among the sections and section groups directly inside "
-                    + "`parent`, and cannot contain any of these characters: ? * / : < > | & # "
-                    + "' % ~. The answer's `name` is what Microsoft actually stored, so read "
-                    + "that back rather than assuming it equals this argument."
+                    "The new section group's name, as the user writes it. The name must be "
+                    + "unique among the sections and section groups directly inside the parent, "
+                    + "at most 50 characters long. It must not contain any of these characters: "
+                    + "? * / : < > | & # ' % ~. The answer's `name` is what Microsoft stored. "
+                    + "Read it from the answer, not from this argument."
                 ),
             ),
         ],

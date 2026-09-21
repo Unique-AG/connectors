@@ -1104,12 +1104,35 @@ class TestHowItDeclaresItself:
         assert annotations.destructive_hint is WRITE_DESTRUCTIVE["destructiveHint"]
         assert annotations.idempotent_hint is WRITE_DESTRUCTIVE["idempotentHint"]
 
-    async def test_the_description_carries_the_element_action_matrix(
+    async def test_the_description_names_the_sibling_and_the_recovery_tool(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
 
         description = (tool.description or "").casefold()
+        assert "onenote_rename_page" in description
+        assert "onenote_read_page" in description
+        assert "partly applied set" in description
+
+    async def test_the_description_says_when_it_asks_and_when_it_does_not(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = (tool.description or "").casefold()
+        assert "always asks the user to agree" in description
+        assert "shared with other people" in description
+        assert "belongs to somebody else" in description
+        assert "own unshared notebook" in description
+
+    def test_the_element_action_matrix_lives_on_target_and_action(self) -> None:
+        """House style moved the element-action matrix, once pinned whole in the tool
+        description, onto the `target` and `action` field descriptions of each `EditCommand`."""
+        target_described = EditCommand.model_fields["target"].description
+        action_described = EditCommand.model_fields["action"].description
+        assert target_described is not None
+        assert action_described is not None
+        described = (target_described + action_described).casefold()
         for word in (
             "body",
             "div",
@@ -1119,8 +1142,6 @@ class TestHowItDeclaresItself:
             "ul",
             "table",
             "title",
-            "onenote_rename_page",
-            "onenote_read_page",
             "include_ids",
             "tr",
             "td",
@@ -1128,9 +1149,8 @@ class TestHowItDeclaresItself:
             "head",
             "span",
             "style",
-            "not safe to retry blindly",
         ):
-            assert word in description, f"{word!r} is missing from the description"
+            assert word in described, f"{word!r} is missing from target and action"
 
     def test_not_found_advice_points_at_the_lister(self) -> None:
         assert "onenote_list_pages" in editor.GRAPH_NOT_FOUND

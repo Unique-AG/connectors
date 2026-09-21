@@ -1047,8 +1047,7 @@ class TestHowItDeclaresItself:
         assert "end" in description
         assert "cannot" in description
         assert "onenote_read_page" in description
-        assert "sends no notification" in description
-        assert "onenote itself can show" in description
+        assert "onenote can show the change to everyone who opens the notebook" in description
 
     async def test_the_description_says_when_it_asks_and_when_it_does_not(
         self, transport: httpx.AsyncClient

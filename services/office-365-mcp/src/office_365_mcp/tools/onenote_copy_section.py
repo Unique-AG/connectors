@@ -132,24 +132,17 @@ GRAPH_NOT_FOUND = (
 )
 
 _DESCRIPTION = """\
-Start copying an existing OneNote section into a different notebook or section group. Pass the \
-`section` handle from a onenote_list_sections or onenote_list_notebooks result, and exactly one \
-of `to_notebook` or `to_section_group` to name the destination — passing both, or passing \
-neither, is refused before anything reaches Microsoft. `new_name` renames the copy; omit it and \
-Microsoft names the copy the same as the section it copied. This call does NOT copy the section \
-itself: Microsoft Graph runs the copy on its own side, and this tool's answer is the operation \
-that tracks it, not the copied section. Pass the answer's `uri` to onenote_get_operation, a few \
-seconds apart, until `status` reads Completed — its `result_uri` is then the new section's \
-handle — or Failed, whose `error_code` and `error_message` say why. This tool asks the person \
-at the other end to confirm before starting the copy when the destination notebook is shared \
-with other people or belongs to somebody else, or when Microsoft does not report who can see \
-it, because the copy becomes visible to them the moment it lands. A copy into the user's own \
-unshared notebook starts without a question. This call is NOT SAFE TO RETRY BLINDLY: if it \
-times out, a copy may already be running on Microsoft's side, and calling this tool again with \
-the same arguments starts a second, independent copy of the section, with every one of its \
-pages copied twice. On a timeout, nothing came back to poll: list the destination's sections \
-with onenote_list_sections and look for one with this section's name (or `new_name`, if one \
-was given) before calling again — Microsoft's index can lag a copy just as it lags a create.\
+Starts a copy of one section into another notebook or section group. This call does not copy the \
+section itself: Microsoft runs the copy, and the answer is the operation that tracks it. Pass the \
+answer's `uri` to onenote_get_operation until `status` reads Completed or Failed.
+
+Notes:
+- Pass exactly one of `to_notebook` or `to_section_group`, never both.
+- This tool asks the user to agree before it writes into a notebook that is shared with other \
+people or belongs to somebody else. A copy into the user's own unshared notebook starts without a \
+question.
+- If a call times out, do not call this tool again first: a second call copies every page twice. \
+Before you call again, make sure that onenote_list_sections does not show the copy.
 """
 
 
@@ -317,9 +310,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle of the section to copy, from the `uri` of a section in a "
-                    + "onenote_list_notebooks or onenote_list_sections result. The shape is "
-                    + "onenote:///sections/{id}. Copy it word for word."
+                    "The section to copy: the `uri` of a section in a onenote_list_notebooks or "
+                    + "onenote_list_sections result, copied word for word. The shape is "
+                    + "onenote:///sections/{id}."
                 ),
             ),
         ],
@@ -330,9 +323,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The destination notebook, as the `uri` of a onenote_list_notebooks or "
-                    + "onenote_find_notebook_from_url result, or a onenote_create_notebook "
-                    + "answer: onenote:///notebooks/{id}. Give exactly one of `to_notebook` and "
-                    + "`to_section_group`; giving both, or neither, is refused."
+                    + "onenote_find_notebook_from_url result, or a onenote_create_notebook answer. "
+                    + "The shape is onenote:///notebooks/{id}."
                 ),
             ),
         ] = None,
@@ -342,11 +334,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The destination section group, as the `uri` of a section group in a "
-                    + "onenote_list_sections result, or a onenote_create_section_group answer: "
-                    + "onenote:///sectiongroups/{id}. Give exactly one of `to_notebook` and "
-                    + "`to_section_group`; giving both, or neither, is refused. On the test "
-                    + "tenant a copy into a section group succeeded even where listing or "
-                    + "writing directly into that same group was refused."
+                    + "onenote_list_sections result, or a onenote_create_section_group answer. The "
+                    + "shape is onenote:///sectiongroups/{id}."
                 ),
             ),
         ] = None,
@@ -356,11 +345,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_NEW_NAME_CHARACTERS,
                 description=(
-                    "A new name for the copy. Omit it to keep the section's own name. Section "
-                    + "names are unique within the same hierarchy level, take at most 50 "
-                    + "characters, and cannot contain any of these characters: "
-                    + "? * / : < > | & # ' % ~. Microsoft refuses a name that breaks either "
-                    + "rule, and this tool forwards that refusal."
+                    "A new name for the copy. Omit it to keep the section's own name. The name "
+                    + "must be unique among the sections and section groups directly inside the "
+                    + "parent, at most 50 characters long. It must not contain any of these "
+                    + "characters: ? * / : < > | & # ' % ~. Microsoft refuses a bad name and no "
+                    + "copy starts."
                 ),
             ),
         ] = None,

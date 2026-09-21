@@ -615,13 +615,16 @@ class TestHowItDeclaresItself:
         assert set(properties) == {"title", "body_html", "section", "section_name"}
         assert cast("list[str]", parameters["required"]) == ["title", "body_html"]
 
-    async def test_the_description_says_it_writes_now_and_cannot_attach(
+    async def test_the_description_says_it_writes_immediately_and_cannot_attach(
         self, transport: httpx.AsyncClient
     ) -> None:
+        """The immediate-write fact now uses the house canonical wording instead of
+        'right now'."""
         _parameters, tool = await _registered(transport)
 
         description = (tool.description or "").casefold()
-        assert "right now" in description
+        assert "no draft and no review step" in description
+        assert "exists the moment this tool returns" in description
         assert "no way to attach a file or an image" in description
         assert "onenote_append_to_page" in description
         assert "onenote_list_pages" in description
@@ -640,7 +643,20 @@ class TestHowItDeclaresItself:
 
         description = tool.description or ""
         assert "section_name" in description
-        assert "creating a new section there under that name" in description
+
+    async def test_the_section_name_description_covers_the_naming_rule(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        """The section-creation rule and the forbidden characters moved from the tool
+        description to the `section_name` field, so the house style keeps them at one
+        home only."""
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        section_name = cast("Mapping[str, object]", properties["section_name"])
+        description = cast("str", section_name["description"])
+        assert "Microsoft creates one" in description
+        assert "section_uri" in description
         assert "?" in description and "~" in description
 
     async def test_no_argument_offers_an_attachment(self, transport: httpx.AsyncClient) -> None:

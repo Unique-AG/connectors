@@ -77,28 +77,15 @@ _GroupSectionsQuery = _GroupSectionsBuilder.SectionsRequestBuilderGetQueryParame
 _GroupGroupsQuery = _GroupGroupsBuilder.SectionGroupsRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-List the sections and the section groups that sit directly inside one notebook or one section \
-group — one level at a time, never the whole notebook tree at once. Pass a notebook's `uri` in \
-`parent` to see what sits directly under that notebook, or a section group's `uri` to go one \
-level deeper into it. A notebook or a section group can hold both sections and section groups \
-side by side, so this always returns both lists together; an empty `section_groups` list means \
-this parent holds no section group, not that this call failed to look. To walk a notebook that \
-nests section groups several levels deep, call this again with each section group's own `uri` \
-from the previous answer, one level at a time. Each section's `uri` is a handle: pass it to \
-onenote_list_pages to see the pages inside that section, to onenote_create_page to write a new \
-page into it, or to onenote_copy_page as the `to_section` destination. Each section group's \
-`uri` is a handle too: pass it back to onenote_list_sections to see what sits directly under it, \
-or to onenote_create_section or onenote_create_section_group as the `parent` to add something \
-directly under it. `name_contains` keeps only the sections and the section groups whose NAME \
-holds this text, compared without regard to case; it is applied to both lists. Leave it out to \
-list everything directly under `parent` instead of searching for one. Microsoft's documented \
-default order for both lists is by name, ascending; this tool asks for no other order. Use \
-onenote_list_notebooks instead when what you need is every section of every notebook in one \
-call; use this tool to see section groups with their own handles, to filter by name, or to walk \
-one level at a time. On a test tenant, Microsoft refused to list anything under a section group \
-created moments earlier — every call, not just this one — with the same 403 this connector \
-answers when it lacks permission; if that happens here, list the notebook itself instead, or \
-onenote_copy_section into the group, which Microsoft did accept for that same group.\
+Lists the sections and the section groups directly under one notebook or one section group, one \
+level at a time. Both lists always come back. To walk deeper, call again with a section group's \
+`uri` as `parent`. onenote_list_notebooks is the sibling for every section of every notebook in \
+one call.
+
+Notes:
+- Both lists come in Microsoft's default order: ascending by name.
+- Microsoft can refuse to list under a section group with error 403. Then list the notebook \
+itself, or copy a section into the group with onenote_copy_section.
 """
 
 _NOT_A_PARENT_HANDLE = (
@@ -127,19 +114,17 @@ class SectionRow(BaseModel):
     uri: str = Field(
         description=(
             "This section's handle: onenote:///sections/{id}, with the id percent-encoded. Pass "
-            + "it to onenote_list_pages to see the pages inside it, to onenote_create_page to "
-            + "write a new page into it, or to onenote_copy_page as `to_section`. Never build "
-            + "one: a section id alone reaches nothing."
+            + "it to onenote_list_pages, onenote_create_page, or onenote_copy_page as "
+            + "`to_section`. Never build one. A section id alone reaches nothing."
         )
     )
     name: str | None = Field(
-        description="The section's display name. Null when Microsoft named none."
+        description="The section's display name. Null when Graph did not report one."
     )
     is_default: bool | None = Field(
         description=(
-            "True for the section onenote_create_page writes a page into when it is called with "
-            + "no section at all and this section's notebook is also the default one. Null when "
-            + "Microsoft did not say."
+            "True for the section onenote_create_page writes into, within the default "
+            + "notebook, when it gets no `section`. Null when Graph did not report it."
         )
     )
     web_url: str | None = Field(
@@ -159,13 +144,13 @@ class SectionGroupRow(BaseModel):
     uri: str = Field(
         description=(
             "This section group's handle: onenote:///sectiongroups/{id}, with the id "
-            + "percent-encoded. Pass it back to onenote_list_sections to see what sits directly "
-            + "under it, or to onenote_create_section or onenote_create_section_group as "
-            + "`parent`. Never build one: a section group id alone reaches nothing."
+            + "percent-encoded. Pass it to onenote_list_sections, onenote_create_section, or "
+            + "onenote_create_section_group as `parent`, or to onenote_copy_section as "
+            + "`to_section_group`. Never build one. A section group id alone reaches nothing."
         )
     )
     name: str | None = Field(
-        description="The section group's display name. Null when Microsoft named none."
+        description="The section group's display name. Null when Graph did not report one."
     )
     last_modified_at: datetime | None = Field(
         description=(
@@ -188,20 +173,18 @@ class Sections(BaseModel):
     )
     sections: list[SectionRow] = Field(
         description=(
-            "The sections that sit directly under `parent`, in whatever order Microsoft "
-            + "returned them, unless `capped` is true, in which case this list can be "
-            + "incomplete. A section Microsoft gave no id for is left out instead of being given "
-            + "a handle that would not resolve. An empty list means `parent` holds no section "
-            + "directly, though it may still hold section groups."
+            "The sections that sit directly under `parent`, in Microsoft's default order. "
+            + "`capped` true can leave this list incomplete. A section with no id from "
+            + "Microsoft is left out. An empty list means `parent` holds no section directly. "
+            + "It can still hold section groups."
         )
     )
     section_groups: list[SectionGroupRow] = Field(
         description=(
-            "The section groups that sit directly under `parent`, in whatever order Microsoft "
-            + "returned them, unless `capped` is true, in which case this list can be "
-            + "incomplete. A section group Microsoft gave no id for is left out instead of being "
-            + "given a handle that would not resolve. An empty list means `parent` holds no "
-            + "section group directly."
+            "The section groups that sit directly under `parent`, in Microsoft's default "
+            + "order. `capped` true can leave this list incomplete. A section group with no "
+            + "id from Microsoft is left out. An empty list means `parent` holds no section "
+            + "group directly."
         )
     )
     capped: bool = Field(
@@ -375,16 +358,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The notebook or section group to list directly under, as a `uri`: "
-                    + "onenote:///notebooks/{id} from an onenote_list_notebooks row, a "
-                    + "onenote_find_notebook_from_url answer, or a onenote_create_notebook "
-                    + "answer; or onenote:///sectiongroups/{id} from a prior "
-                    + "onenote_list_sections row, or a onenote_create_section_group answer. A "
-                    + "section handle, a page handle, a plain name and a web address are none of "
-                    + "them one of these. A section group can refuse to list its own contents "
-                    + "with a 403 that looks exactly like a missing permission, as observed on a "
-                    + "test tenant for a group created moments earlier; list the notebook itself "
-                    + "instead if that happens."
+                    "The notebook or section group to list directly under, as a `uri`. A "
+                    + "notebook's handle, onenote:///notebooks/{id}, comes from an "
+                    + "onenote_list_notebooks row, a onenote_find_notebook_from_url answer, or "
+                    + "a onenote_create_notebook answer. A section group's handle, "
+                    + "onenote:///sectiongroups/{id}, comes from a onenote_list_sections row, "
+                    + "or a onenote_create_section_group answer. A section handle, a page "
+                    + "handle, a plain name and a web address are not accepted here."
                 ),
             ),
         ],
@@ -394,9 +374,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=_MIN_NAME_FRAGMENT_CHARACTERS,
                 max_length=_MAX_NAME_FRAGMENT_CHARACTERS,
                 description=(
-                    "Keep only the sections and section groups whose NAME contains this text, "
-                    + "compared without regard to case. Applied to both lists. Omit it to list "
-                    + "everything directly under `parent` instead of searching for one."
+                    "Keep only the sections and section groups whose name contains this text, "
+                    + "compared without regard to case. Applies to both lists. Omit it to list "
+                    + "everything directly under `parent`."
                 ),
             ),
         ] = None,
@@ -408,9 +388,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "How many sections and how many section groups to return, at most "
                     + f"{MAX_SECTIONS} of each. Paging happens inside the call, so this is the "
-                    + "whole answer rather than a first page: raise it rather than calling again "
-                    + "with the same arguments. `capped` says whether this limit stopped either "
-                    + "listing early."
+                    + "whole answer, not a first page. Raise it. Do not call this tool "
+                    + "again with the same arguments. `capped` says whether this limit stopped "
+                    + "either listing early."
                 ),
             ),
         ] = 50,

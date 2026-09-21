@@ -66,29 +66,14 @@ _ORDER_BY_CLAUSES: Mapping[str, str] = {
 }
 
 _DESCRIPTION = """\
-Find pages across the signed-in user's OneNote notebooks, or inside one section. Omit `section` \
-to search every page of every notebook the user owns and every notebook shared with them. Pass a \
-section's `uri` from an onenote_list_notebooks result as `section` to search only that one \
-section's pages. `title_contains` keeps only the pages whose TITLE holds this text, compared \
-without regard to case. It matches the title alone. A page created or renamed recently can be \
-missed, because Microsoft's page index lags an edit and holds an empty title until it catches \
-up; on a test tenant, pages this connector created were still missed three days later, so \
-find such a page by `created_at` or its section instead. Microsoft Graph has no full-text \
-search over the words inside a OneNote page for a work or school account, so no value here \
-reaches what a page says, only what it is called. Leave `title_contains` out to list pages \
-instead of searching for one. `modified_after`/`modified_before` and \
-`created_after`/`created_before` bound when a page last changed or was created, and each of \
-those windows is covered whole at \
-both ends, so "the notes I touched in March" and "pages created since Monday" are each one \
-call; combine any of the four freely, they are joined together. Rows come back newest change \
-first by default; pass `order_by` to sort by last-modified time, created time, or title \
-instead, ascending or descending. `skip` moves past rows another call already returned, for \
-paging through a search larger than `limit`. `include_level_and_order` asks Microsoft to fill \
-each row's `level` and `order`, and only works together with `section`, because Microsoft \
-computes them only for one section's pages at a time. Each row carries a `uri`: pass it to \
-onenote_read_page to read that page. Each row also carries a `section_uri`: pass it back to \
-onenote_list_pages to see that page's siblings, or to onenote_create_page to add a page beside \
-it.\
+Finds pages across every notebook the signed-in user can reach, or inside one section. \
+`title_contains` matches the title only: Microsoft Graph has no full-text search over a page's \
+words for a work or school account. The page index can hold an empty title for days after a \
+create, so find a new page by `created_at` or by its section instead.
+
+Notes:
+- The four date windows are inclusive at both ends and combine with AND. The default order is \
+newest change first.
 """
 
 _NOT_A_SECTION_HANDLE = (
@@ -129,11 +114,9 @@ _CREATED_WINDOW_RUNS_BACKWARDS = (
 class PageList(BaseModel):
     pages: list[PageSummary] = Field(
         description=(
-            "The pages that matched, newest change first unless `order_by` asked for a "
-            + "different order. An empty list means nothing matched, or the section holds no "
-            + "pages at all. Microsoft sometimes returns a page with no id; this connector "
-            + "cannot address such a page again, so it leaves it out instead of giving a handle "
-            + "that fails."
+            "The pages that matched, in the order this call asked for. An empty list means "
+            + "nothing matched, or the section holds no pages at all. A page with no id from "
+            + "Microsoft is left out. It never gets a handle that fails."
         )
     )
     capped: bool = Field(
@@ -305,10 +288,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "Search only this section's pages, as the `uri` of a section in an "
-                    + "onenote_list_notebooks result: onenote:///sections/{id}. Omit it to "
-                    + "search across every notebook the user owns and every notebook shared "
-                    + "with them. A section's name, a notebook's name and a page handle are "
-                    + "none of them section handles."
+                    + "onenote_list_notebooks result: onenote:///sections/{id}. A section's "
+                    + "name, a notebook's name and a page handle are not section handles."
                 ),
             ),
         ] = None,
@@ -318,14 +299,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=_MIN_TITLE_FRAGMENT_CHARACTERS,
                 max_length=_MAX_TITLE_FRAGMENT_CHARACTERS,
                 description=(
-                    "Keep only the pages whose TITLE contains this text, compared without "
-                    + "regard to case. This matches the title alone, and a page created or "
-                    + "renamed recently can be missed, because Microsoft's page index lags an "
-                    + "edit and holds an empty title until it catches up, for days on a test "
-                    + "tenant. Microsoft Graph has no "
-                    + "full-text search over what a OneNote page says for a work or school "
-                    + "account, so no value here reaches the words inside a page, only its "
-                    + "title. Omit it to list pages instead of searching for one."
+                    "Keep only the pages whose title contains this text, compared without "
+                    + "regard to case. Omit it to list every page. Pass it to search for one "
+                    + "page instead."
                 ),
             ),
         ] = None,
@@ -333,11 +309,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             OrderBy | None,
             Field(
                 description=(
-                    "How to sort the pages that match, instead of Microsoft's own default of "
-                    + "newest change first. `last_modified_desc`/`last_modified_asc` sort by "
-                    + "when a page last changed; `created_desc`/`created_asc` sort by when it "
-                    + "was created; `title_asc`/`title_desc` sort by the page's own title. "
-                    + "Leave this out to keep Microsoft's own default order."
+                    "Sort the pages that match, instead of the default order. "
+                    + "`last_modified_desc`/`last_modified_asc` sorts by when a page last "
+                    + "changed. `created_desc`/`created_asc` sorts by when it was created. "
+                    + "`title_asc`/`title_desc` sorts by the page's own title. Omit it to keep "
+                    + "the default order."
                 ),
             ),
         ] = None,
@@ -345,11 +321,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | datetime | None,
             Field(
                 description=(
-                    "Keep only the pages last changed on or after this point, inclusive. Two "
-                    + "shapes: a date, `2026-03-04`, which opens at the first instant of that "
-                    + "whole UTC day; or a moment, `2026-03-04T09:00:00Z`, which opens at the "
-                    + "second it names. A moment with no zone is read as UTC. Pair it with "
-                    + "`modified_before` for a window that has already closed."
+                    "Keep only the pages last changed on or after this point, inclusive. A "
+                    + "date, `2026-03-04`, opens at the first instant of that whole UTC day. A "
+                    + "moment, `2026-03-04T09:00:00Z`, opens at the second it names, and a "
+                    + "moment with no zone is read as UTC. Pair it with `modified_before` to "
+                    + "close the window."
                 )
             ),
         ] = None,
@@ -358,10 +334,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Keep only the pages last changed on or before this point, inclusive, in "
-                    + "the same two shapes `modified_after` takes. A date closes at the END of "
-                    + "that UTC day, so the whole of it is inside the bound and the same date "
-                    + "in both bounds keeps that one day; a moment closes at the second it "
-                    + "names."
+                    + "the same two shapes as `modified_after`. A date closes at the end of "
+                    + "that UTC day, so the same date in both bounds keeps that one day. A "
+                    + "moment closes at the second it names."
                 )
             ),
         ] = None,
@@ -369,10 +344,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | datetime | None,
             Field(
                 description=(
-                    "Keep only the pages created on or after this point, inclusive, in the same "
-                    + "two shapes `modified_after` takes. This bounds when the page was first "
-                    + "written, not when it last changed. Pair it with `created_before` for a "
-                    + "window that has already closed."
+                    "Keep only the pages created on or after this point, inclusive, in the "
+                    + "same two shapes as `modified_after`. This bounds when the page was first "
+                    + "written, not when it last changed. Pair it with `created_before` to "
+                    + "close the window."
                 )
             ),
         ] = None,
@@ -381,7 +356,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Keep only the pages created on or before this point, inclusive, in the "
-                    + "same two shapes `modified_after` takes. A date closes at the END of that "
+                    + "same two shapes as `modified_after`. A date closes at the end of that "
                     + "UTC day, so the same date in both bounds keeps that one day."
                 )
             ),
@@ -392,9 +367,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=0,
                 description=(
                     "How many matching pages to skip before the first one this call returns. 0 "
-                    + "starts from the very first match. Raise this by the number of rows the "
-                    + "last call returned to move to the next page of the same search; a value "
-                    + "past the number of matches returns an empty list, not an error."
+                    + "starts from the first match. Raise this by the number of rows the last "
+                    + "call returned to reach the next page. A value past the number of "
+                    + "matches returns an empty list, not an error."
                 ),
             ),
         ] = 0,
@@ -402,11 +377,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool,
             Field(
                 description=(
-                    "Fill each row's `level` (how deeply it is indented under another page) and "
-                    + "`order` (its position within the section). Microsoft Graph computes "
-                    + "these only for one section's pages at a time, so this is refused unless "
-                    + "`section` is also given. Leave it false, the default, to leave `level` "
-                    + "and `order` null."
+                    "Fill each row's `level` (how deeply it is indented under another page) "
+                    + "and `order` (its position within the section). This works only "
+                    + "together with `section`, because Microsoft Graph computes them for one "
+                    + "section's pages at a time. Leave it false, the default, to leave "
+                    + "`level` and `order` null."
                 ),
             ),
         ] = False,
@@ -417,10 +392,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_PAGES,
                 description=(
                     f"How many pages to return, at most {MAX_PAGES}. Paging happens inside "
-                    + "the call, so this is the whole answer rather than a first page: raise "
-                    + "it rather than calling again with the same arguments. Rows come back "
-                    + "newest change first unless `order_by` says otherwise; `capped` says "
-                    + "whether this limit stopped the search early."
+                    + "the call, so this is the whole answer, not a first page. Raise it. Do "
+                    + "not call this tool again with the same arguments. `capped` says whether "
+                    + "this limit stopped the search early."
                 ),
             ),
         ] = 25,

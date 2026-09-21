@@ -33,17 +33,10 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 MAX_RECENT = 50
 
 _DESCRIPTION = """\
-List the notebooks Microsoft has recently seen the signed-in user open, newest access first \
-(confirmed on a test tenant). This reads a different signal than onenote_list_notebooks: it is \
-Microsoft's own memory of recent activity, not a full listing. Set `include_personal_notebooks` \
-to false to leave out the user's own notebooks and see only notebooks other people gave them \
-access to; on \
-a work tenant this can answer an empty list, because the user's own notebooks count as \
-"personal" even there. A row here carries NO handle at all, because Microsoft returns none in \
-this list — pass its `web_url` to onenote_find_notebook_from_url to get one before using \
-onenote_list_sections, onenote_create_section, onenote_create_section_group, \
-onenote_copy_section or onenote_copy_notebook. `source_service` names the backend store where \
-the notebook resides, not who owns it.\
+Lists the notebooks the signed-in user recently opened, as Microsoft recorded it, newest \
+access first. This is Microsoft's own memory of recent activity, not a full listing. \
+onenote_list_notebooks is the sibling for the full list. A row here carries no handle. Pass \
+its `web_url` to onenote_find_notebook_from_url to get one.\
 """
 
 
@@ -51,24 +44,18 @@ class RecentNotebook(BaseModel):
     name: str | None = Field(
         description=(
             "The notebook's display name, as Microsoft's recent-activity list holds it. Null "
-            + "when Microsoft named none."
+            + "when Graph did not report one."
         )
     )
     last_accessed_at: datetime | None = Field(
         description=(
-            "When the signed-in user last opened this notebook, as Microsoft reported it. Null "
-            + "when Microsoft recorded none. This tracks opening the notebook in a OneNote "
-            + "client, not reading or writing it through Graph: on a test tenant this value did "
-            + "not advance despite many Graph calls against the same notebook in the same "
-            + "session."
+            "When the signed-in user last opened this notebook, as Graph reported it. Null "
+            + "when Graph recorded none. This tracks when the user opens the notebook in a "
+            + "OneNote client. It can lag behind a read or a write made through Graph."
         )
     )
     web_url: str | None = Field(
-        description=(
-            "The address that opens this notebook in OneNote on the web. Pass it to "
-            + "onenote_find_notebook_from_url to get this notebook's handle: this row carries "
-            + "none of its own."
-        )
+        description="The address that opens this notebook in OneNote on the web."
     )
     client_url: str | None = Field(
         description=(
@@ -78,12 +65,10 @@ class RecentNotebook(BaseModel):
     )
     source_service: _SourceService | None = Field(
         description=(
-            "The backend store where this notebook resides, as Microsoft's own documentation "
-            + 'puts it: "OneDriveForBusiness" or "OneDrive". The underlying service also '
-            + 'carries "OnPremOneDriveForBusiness" and "Unknown", which Microsoft\'s reference '
-            + "does not explain further. On a test tenant this read OneDriveForBusiness for the "
-            + "user's own notebooks on a work account, so this does not say who owns the "
-            + "notebook. Informational only. Null when Microsoft did not say."
+            "The backend store that holds this notebook, not who owns it. Microsoft's own "
+            + 'documentation names "OneDriveForBusiness" and "OneDrive". The underlying '
+            + 'service can also report "OnPremOneDriveForBusiness" or "Unknown". Informational '
+            + "only. Null when Graph did not report it."
         )
     )
 
@@ -91,9 +76,8 @@ class RecentNotebook(BaseModel):
 class RecentNotebooks(BaseModel):
     notebooks: list[RecentNotebook] = Field(
         description=(
-            "The notebooks Microsoft has recently seen the signed-in user open, newest access "
-            + "first, unless `capped` is true, in which case a safety cap cut the list short. "
-            + "Empty when Microsoft has no recent-activity record for this user."
+            "The notebooks in this answer, newest access first. `capped` true can leave this "
+            + "list short. Empty when Microsoft has no recent-activity record for this user."
         )
     )
     capped: bool = Field(
@@ -153,9 +137,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Whether to include the notebooks the signed-in user owns. True, the "
                     + "default, includes both the user's own notebooks and the ones other "
-                    + "people gave them access to. Set it to false to see only the notebooks "
-                    + "shared with the user: on a work tenant this can answer an empty list, "
-                    + 'because the user\'s own notebooks count as "personal" even there.'
+                    + "people gave them access to. False leaves out the user's own notebooks. "
+                    + "On a work tenant the list can then be empty, because the user's own "
+                    + 'notebooks count as "personal" even there.'
                 ),
             ),
         ] = True,

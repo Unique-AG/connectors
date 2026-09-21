@@ -55,30 +55,18 @@ _UNNAMED_NOTEBOOK = "an unnamed notebook"
 _UNNAMED_SECTION_GROUP = "an unnamed section group"
 
 _DESCRIPTION = """\
-Create a brand-new, empty section directly inside a notebook or a section group. Pass a \
-notebook's `uri` or a section group's `uri` in `parent`; the new section is created directly \
-under whichever one you pass, never nested any deeper. This is not a draft: there is no review \
-step, nobody approves it first, and the section exists the moment this tool returns. This \
-connector sends no notification when it creates the section, and Microsoft Graph sends none for \
-it either, but OneNote itself can show the new section to people who open the notebook. This \
-tool asks the person at the other end to confirm before creating the section when the notebook \
-holding `parent` is shared with other people or belongs to somebody else, or when Microsoft \
-does not report who can see it, because the section is visible to them the moment it is \
-written. A section created inside the user's own unshared notebook is created without a \
-question. Section names must be unique within the same parent, at most 50 characters, and \
-cannot contain any of these characters: ? * / : < > | & # ' % ~. Microsoft refuses a request \
-that breaks either rule and creates nothing. If this call times out, do not simply call it \
-again: Microsoft may already have created the section before the response was lost, and calling \
-again with the same `name` either creates a second section with a Microsoft-adjusted name or \
-fails as a duplicate, depending on how Microsoft resolves the clash. List the parent's sections \
-with onenote_list_sections first and look for a section already named `name` before calling \
-this again. Microsoft can refuse this write with a 403 that looks exactly like a missing \
-permission when `parent` names a section group — even one this same account just created and \
-can create sections in elsewhere — as observed on a test tenant; if that happens, create the \
-section directly under the notebook instead, or copy an existing section into that group with \
-onenote_copy_section, which Microsoft did accept. The answer's `uri` is this new section's \
-handle: pass it to onenote_create_page to write the first page into it, or to onenote_list_pages \
-to confirm it holds none yet.\
+Creates a new, empty section directly under `parent`, a notebook or a section group. There is no \
+draft and no review step: the section exists the moment this tool returns. OneNote can show the \
+change to everyone who opens the notebook.
+
+Notes:
+- This tool asks the user to agree before it writes into a notebook that is shared with other \
+people or belongs to somebody else. A section in the user's own unshared notebook is created \
+without a question.
+- If a call times out, do not call this tool again first. Before you call again, make sure that \
+onenote_list_sections does not show a section named `name`.
+- Microsoft can refuse a create under a section group with error 403. Then create under the \
+notebook, or copy a section into the group with onenote_copy_section.
 """
 
 _NOT_A_PARENT_HANDLE = (
@@ -111,14 +99,13 @@ class CreatedSection(BaseModel):
     )
     name: str | None = Field(
         description=(
-            "The name Microsoft actually stored for this section, read off its response rather "
-            + "than echoed from the `name` argument."
+            "What Microsoft stored, read from its response and not from the `name` argument."
         )
     )
     is_default: bool | None = Field(
         description=(
             "True when this new section is also its notebook's default section. Null when "
-            + "Microsoft did not say."
+            + "Graph did not report it."
         )
     )
     web_url: str | None = Field(
@@ -133,7 +120,9 @@ class CreatedSection(BaseModel):
         )
     )
     created_at: datetime | None = Field(
-        description="When Microsoft recorded creating this section. Null when Graph reported none."
+        description=(
+            "When the section was created, as Graph reported it. Null when Graph recorded none."
+        )
     )
     parent_uri: str = Field(
         description="The `parent` handle this section was created directly under, spelled back."
@@ -246,14 +235,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Where the new section is created, directly and one level only, as a `uri`: "
-                    + "onenote:///notebooks/{id} from an onenote_list_notebooks row, a "
-                    + "onenote_find_notebook_from_url answer, or a onenote_create_notebook "
-                    + "answer; or onenote:///sectiongroups/{id} from an onenote_list_sections "
-                    + "row, or a onenote_create_section_group answer. A section group can refuse "
-                    + "this write with a 403 that looks exactly like a missing permission, as "
-                    + "observed on a test tenant for a group created moments earlier; create "
-                    + "directly under the notebook instead if that happens."
+                    "Where the new section is created, as a `uri`. A notebook's `uri` comes from "
+                    + "onenote_list_notebooks, onenote_find_notebook_from_url, or "
+                    + "onenote_create_notebook. A section group's `uri` comes from "
+                    + "onenote_list_sections or onenote_create_section_group. A section group "
+                    + "nests at any depth, so pass a group's own `uri` to nest a new section "
+                    + "under it."
                 ),
             ),
         ],
@@ -263,11 +250,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_NAME_CHARACTERS,
                 description=(
-                    "The new section's name, as the user wrote it, up to 50 characters. It must "
-                    + "be unique among the sections and section groups directly inside `parent`, "
-                    + "and cannot contain any of these characters: ? * / : < > | & # ' % ~. The "
-                    + "answer's `name` is what Microsoft actually stored, so read that back "
-                    + "rather than assuming it equals this argument."
+                    "The new section's name, as the user writes it. The name must be unique "
+                    + "among the sections and section groups directly inside the parent, at "
+                    + "most 50 characters long. It must not contain any of these characters: "
+                    + "? * / : < > | & # ' % ~. The answer's `name` is what Microsoft stored. "
+                    + "Read it from the answer, not from this argument."
                 ),
             ),
         ],

@@ -60,23 +60,14 @@ GRAPH_NOT_FOUND = (
 )
 
 _DESCRIPTION = """\
-Start copying an entire OneNote notebook — every section, section group and page in it — into \
-the signed-in user's own OneDrive. Pass the `notebook` handle from a onenote_list_notebooks or \
-onenote_find_notebook_from_url result. `new_name` renames the copy; omit it and Microsoft names \
-the copy the same as the notebook it copied. This call does NOT copy the notebook itself: \
-Microsoft Graph runs the copy on its own side, and this tool's answer is the operation that \
-tracks it, not the copied notebook. Pass the answer's `uri` to onenote_get_operation, a few \
-seconds apart, until `status` reads Completed — its `result_uri` is then the new notebook's \
-handle — or Failed, whose `error_code` and `error_message` say why. The copy always lands in \
-the user's own OneDrive, under their own account, so this tool asks nobody to confirm it: \
-nothing this call does can become visible to somebody else purely by running it, even when the \
-notebook being copied is one this user does not own or that others can see. This call is NOT \
-SAFE TO RETRY BLINDLY: if it times out, a copy may already be running on Microsoft's side, and \
-calling this tool again with the same arguments starts a second, independent copy of the whole \
-notebook, sections and pages included. On a timeout, nothing came back to poll: list the user's \
-notebooks with onenote_list_notebooks and look for one with this notebook's name (or \
-`new_name`, if one was given) before calling again — Microsoft's index can lag a copy just as \
-it lags a create.\
+Starts a copy of a whole notebook into the signed-in user's own OneDrive. This call does not copy \
+the notebook itself: Microsoft runs the copy, and the answer is the operation that tracks it. \
+Pass the answer's `uri` to onenote_get_operation until `status` reads Completed or Failed.
+
+Notes:
+- This tool asks nobody to agree, because the copy lands in the user's own OneDrive.
+- If a call times out, do not call this tool again first: a second call starts a second copy. \
+Before you call again, make sure that onenote_list_notebooks does not show the copy.
 """
 
 
@@ -126,9 +117,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle of the notebook to copy, from the `uri` of a "
-                    + "onenote_list_notebooks or onenote_find_notebook_from_url result. The "
-                    + "shape is onenote:///notebooks/{id}. Copy it word for word."
+                    "The notebook to copy: the `uri` of a onenote_list_notebooks or "
+                    + "onenote_find_notebook_from_url result, or a onenote_create_notebook answer, "
+                    + "copied word for word. The shape is onenote:///notebooks/{id}."
                 ),
             ),
         ],
@@ -138,11 +129,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_NEW_NAME_CHARACTERS,
                 description=(
-                    "A new name for the copy. Omit it to keep the notebook's own name. "
-                    + "Notebook names must be unique for this user, take at most 128 "
-                    + "characters, and cannot contain any of these characters: "
-                    + "? * / : < > | ' \". Microsoft refuses a name that breaks either rule, "
-                    + "and this tool forwards that refusal."
+                    "A new name for the copy. Omit it to keep the notebook's own name. The name "
+                    + "must be unique across the user's OneNote, at most 128 characters long, and "
+                    + "must not contain any of these characters: ? * / : < > | ' \". Microsoft "
+                    + "refuses a bad name and no copy starts."
                 ),
             ),
         ] = None,

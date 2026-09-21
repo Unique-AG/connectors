@@ -56,30 +56,16 @@ _UNTITLED_PAGE = "an untitled page"
 _UNNAMED_NOTEBOOK = "an unnamed notebook"
 
 _DESCRIPTION = """\
-Add HTML to the very END of an existing OneNote page's body. Pass the `page` handle from a \
-onenote_list_pages row or a onenote_create_page answer. This tool changes NOTHING that is \
-already on the page: it cannot insert content in the middle of the page, cannot edit a single \
-word that is already there, and cannot delete anything. It only ever adds new content after \
-everything else, the way writing at the bottom of a piece of paper does. This connector sends \
-no notification when it appends to the page, and Microsoft Graph sends none for it either, but \
-OneNote itself can show the change to people who open the notebook. This tool asks the person \
-at the other end to confirm before adding anything when the page's notebook is shared with \
-other people or belongs to somebody else, or when Microsoft does not report who can see it, \
-because the page is visible to them the moment it is written. A page \
-in the user's own unshared notebook is appended to without a question. `body_html` is HTML: \
-write `<p>`, `<br>`, `<ul>`/`<ol>`/`<li>` and `<table>`/`<tr>`/`<td>` for structure, and escape \
-`&`, `<` and `>` where they must read as themselves. Microsoft strips any `<script>` tag and \
-any CSS out of what you send, and removes an HTML form entirely, so neither one ever reaches \
-the page. There is no argument here that attaches a file or an image, and that absence is \
-deliberate: this connector has no content store, and offering one would let a model attach \
-whatever it chose. This call is NOT SAFE TO RETRY BLINDLY: if it times out, Microsoft may \
-already hold the append, and calling it again with the same `body_html` adds a second copy of \
-it to the page. On a timeout, read the page first with onenote_read_page and look for the \
-block you meant to add; call this tool again only when that block is not there. This tool \
-answers with the page as Microsoft's page index holds it right after the write. That index \
-lags an edit, by minutes or far longer, so `last_modified_at` and `title` in the answer can \
-still show the values from before this write while onenote_read_page already returns the \
-appended block.\
+Adds HTML to the end of one page. It changes nothing that is already there: it cannot insert in \
+the middle, edit a word, or delete. onenote_edit_page is the sibling for those changes. OneNote \
+can show the change to everyone who opens the notebook.
+
+Notes:
+- This tool asks the user to agree before it writes into a notebook that is shared with other \
+people or belongs to somebody else. A page in the user's own unshared notebook is appended to \
+without a question.
+- If a call times out, do not call this tool again first. Before you call again, make sure that \
+onenote_read_page does not already show the block.
 """
 
 _NOT_A_PAGE_HANDLE = (
@@ -194,11 +180,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle of the page to add to, from a onenote_list_pages row or a "
-                    + "onenote_create_page answer: `uri`, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle, onenote:///sections/{id}, is not "
-                    + "a page handle. Never build one yourself: a page id alone, without this "
-                    + "connector's scheme around it, reaches nothing."
+                    "The page to add to: the `uri` of a onenote_list_pages row or a "
+                    + "onenote_create_page answer, copied word for word. The shape is "
+                    + "onenote:///pages/{id}. A section handle is not a page handle."
                 ),
             ),
         ],
@@ -208,12 +192,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_BODY_CHARACTERS,
                 description=(
-                    "The HTML to add after everything already on the page. Write `<p>` and "
-                    + "`<br>` for structure, `<ul>`/`<ol>`/`<li>` for lists, and "
-                    + "`<table>`/`<tr>`/`<td>` for tables. Escape `&`, `<` and `>` where they "
-                    + "must read as themselves. Microsoft strips `<script>` tags and CSS out of "
-                    + "this before it reaches the page, and removes an HTML form entirely. There "
-                    + "is no way to attach a file or an image here; that absence is deliberate."
+                    "The HTML to add after everything already on the page. A newline is not a "
+                    + "line break. Write `<p>`, `<br>`, `<h1>` to `<h6>`, `<ul>`, `<ol>`, `<li>`, "
+                    + "`<table>`, `<b>` and `<i>` for structure. Microsoft removes JavaScript, "
+                    + "CSS and forms. Escape `&`, `<` and `>` where they must read as themselves. "
+                    + "No argument here attaches a file or an image."
                 ),
             ),
         ],

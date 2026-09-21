@@ -74,42 +74,14 @@ _MAX_NAME_FRAGMENT_CHARACTERS = 200
 _Role = Literal["Owner", "Contributor", "Reader"]
 
 _DESCRIPTION = """\
-List every OneNote notebook the signed-in user owns, plus every notebook someone else has \
-shared with them, and every section inside each one — unless `capped` is true, in which case a \
-safety cap cut one of those listings short and some notebooks or sections may be missing. This \
-is the starting point for reading or writing OneNote: every other onenote_* tool takes a \
-notebook's, a section group's, a section's or a page's handle. Notebook and section handles \
-come from here; onenote_list_sections mints section group handles, onenote_list_pages and \
-onenote_create_page mint page handles, and onenote_find_notebook_from_url and the three create \
-tools mint the handle of what they resolved or created. \
-`name_contains` keeps only the notebooks whose name holds this text, compared without regard to \
-case. `shared` keeps only notebooks that are (true) or are not (false) shared with anyone else. \
-`role` keeps only notebooks where the signed-in user holds exactly this access level: Owner, \
-Contributor or Reader. All three narrow which notebooks come back; a matched notebook still \
-carries every one of its own sections. Leave any of them out to list every notebook.
+Lists every notebook the signed-in user owns or that somebody else shares with them, with every \
+section of each. This is the starting point for OneNote: notebook and section handles come from \
+here. A section group appears only through a section's `group_uri`. onenote_list_sections lists \
+section groups as rows. This tool does not reach a notebook on a SharePoint site or in a \
+Microsoft 365 team.
 
-This covers only the notebooks reachable from the signed-in user's own OneNote: the user's own \
-notebooks and the ones shared with them. It does NOT cover a notebook that lives on a \
-SharePoint site or belongs to a Microsoft 365 team; no tool in this connector reaches those.
-
-Each section's `uri` is a handle: pass it to onenote_list_pages to see the pages inside that \
-section, or to onenote_create_page to write a new page into it. A section's `group_uri`, when \
-it is not null, is the handle of the section group that holds it directly: pass it to \
-onenote_list_sections to see what else sits in that group, to onenote_create_section or \
-onenote_create_section_group to add beside it, or to onenote_copy_section as `to_section_group`. \
-Each notebook's `uri` is a handle too: pass it to onenote_list_sections to see the section \
-groups directly inside it as rows of their own — this tool names a section group only through \
-each section's `group_uri`, never as a row by itself — or to walk one level of the notebook's \
-own contents at a time; to onenote_create_section or onenote_create_section_group to add \
-directly under it; to onenote_copy_section as `to_notebook`; or to onenote_copy_notebook to \
-copy the whole notebook. onenote_find_notebook_from_url mints this same kind of handle from a \
-web address.
-
-`is_default` on a notebook names the notebook onenote_create_page writes into when it is called \
-with no section at all; `is_default` on a section, inside that same notebook, names the section \
-that write lands in. A section's `group_path` says where the section sits inside its notebook \
-when one or more section groups sit between them: names joined outermost first. It is null for \
-a section that sits directly under its notebook.\
+Notes:
+- `capped` true means a safety cap cut the listing short.
 """
 
 
@@ -117,39 +89,33 @@ class NotebookSection(BaseModel):
     uri: str = Field(
         description=(
             "This section's handle: onenote:///sections/{id}, with the id percent-encoded. Pass "
-            + "it to onenote_list_pages to see the pages inside it, or to onenote_create_page to "
-            + "write a new page into it. Never build one: a section id alone reaches nothing."
+            + "it to onenote_list_pages, onenote_create_page, or onenote_copy_page as "
+            + "`to_section`. Never build one. A section id alone reaches nothing."
         )
     )
     group_uri: str | None = Field(
         description=(
             "The handle of the section group that holds this section directly: "
-            + "onenote:///sectiongroups/{id}. Pass it to onenote_list_sections to see what else "
-            + "sits in that group, to onenote_create_section or onenote_create_section_group to "
-            + "add beside this section, or to onenote_copy_section as `to_section_group`. Null "
-            + "when this section sits directly under its notebook, with no section group in "
-            + "between."
+            + "onenote:///sectiongroups/{id}. Pass it to onenote_list_sections, "
+            + "onenote_create_section, or onenote_create_section_group as `parent`, or to "
+            + "onenote_copy_section as `to_section_group`. Null when this section sits directly "
+            + "under its notebook."
         )
     )
     name: str | None = Field(
-        description="The section's display name. Null when Microsoft named none."
+        description="The section's display name. Null when Graph did not report one."
     )
     group_path: str | None = Field(
         description=(
-            "Where this section sits inside its notebook, when one or more section groups sit "
-            + 'between the notebook and the section: their names joined with " / ", outermost '
-            + 'first, for example "Projects / 2026". Null when the section sits directly under '
-            + "its notebook, with no section group in between. A section group Microsoft named "
-            + "nothing contributes an empty name to this path. This path can be cut short when "
-            + "the top-level `capped` is true, because a section group the walk never reached "
-            + "is left out of it."
+            "The names of the section groups above this section, outermost first, joined with "
+            + '" / ", for example "Projects / 2026". Null when the section sits directly under '
+            + "its notebook. `capped` true can leave this path incomplete."
         )
     )
     is_default: bool | None = Field(
         description=(
-            "True for the section onenote_create_page writes a page into when it is called with "
-            + "no section at all and this section's notebook is also the default one. Null when "
-            + "Microsoft did not say."
+            "True for the section onenote_create_page writes into, within the default "
+            + "notebook, when it gets no `section`. Null when Graph did not report it."
         )
     )
     web_url: str | None = Field(
@@ -169,33 +135,31 @@ class Notebook(BaseModel):
     uri: str = Field(
         description=(
             "This notebook's handle: onenote:///notebooks/{id}, with the id percent-encoded. "
-            + "Pass it to onenote_list_sections to see one level of this notebook's own "
-            + "contents, to onenote_create_section or onenote_create_section_group to add "
-            + "directly under it, to onenote_copy_section as `to_notebook`, or to "
-            + "onenote_copy_notebook to copy the whole notebook. Never build one: a notebook id "
-            + "alone reaches nothing."
+            + "Pass it to onenote_list_sections, onenote_create_section, "
+            + "onenote_create_section_group, or onenote_copy_section as `to_notebook`, or to "
+            + "onenote_copy_notebook. Never build one. A notebook id alone reaches nothing."
         )
     )
     name: str | None = Field(
-        description="The notebook's display name. Null when Microsoft named none."
+        description="The notebook's display name. Null when Graph did not report one."
     )
     is_default: bool | None = Field(
         description=(
-            "True for the signed-in user's default notebook: the one onenote_create_page writes "
-            + "into when it is called with no section at all. Null when Microsoft did not say."
+            "True for the notebook onenote_create_page writes into when it gets no `section`. "
+            + "Null when Graph did not report it."
         )
     )
     is_shared: bool | None = Field(
         description=(
             "True when this notebook is shared, so someone besides the owner can see it. Null "
-            + "when Microsoft did not say."
+            + "when Graph did not report it."
         )
     )
     user_role: str | None = Field(
         description=(
             "The signed-in user's own access to this notebook, exactly as Microsoft spells it: "
-            + '"Owner", "Contributor", "Reader", or "None" for no access. Null when Microsoft did '
-            + "not say."
+            + '"Owner", "Contributor", "Reader", or "None" for no access. Null when Graph did '
+            + "not report it."
         )
     )
     web_url: str | None = Field(
@@ -215,13 +179,10 @@ class Notebook(BaseModel):
     )
     sections: list[NotebookSection] = Field(
         description=(
-            "Every section inside this notebook, directly or nested inside a section group, in "
-            + "the order Microsoft returned them, unless the top-level `capped` is true, in "
-            + "which case a cut happened in one of the three listings behind this answer and "
-            + "this notebook's sections can be incomplete. A section Microsoft gave no id for, "
-            + "or whose parent notebook this connector could not match to a notebook in this "
-            + "same answer, is left out instead of being given a handle that would not resolve. "
-            + "An empty list means the notebook holds no section this connector could address."
+            "Every section inside this notebook, directly or in a section group, in the order "
+            + "Microsoft returned them. `capped` true can leave this list incomplete. A section "
+            + "with no id, or an unmatched parent notebook, is left out. Empty means the "
+            + "notebook holds no section this connector can address."
         )
     )
 
@@ -229,25 +190,19 @@ class Notebook(BaseModel):
 class Notebooks(BaseModel):
     notebooks: list[Notebook] = Field(
         description=(
-            "Every notebook this call found, unless `capped` is true, in which case a cut "
-            + "happened in one of the three listings behind this answer and this list can be "
-            + "missing some: the signed-in user's own, and the ones shared with them. Empty "
-            + "when the user has no OneNote notebooks. Microsoft sometimes returns a notebook "
-            + "with no id; this connector cannot address such a notebook again, so it leaves it "
-            + "out instead of giving a handle that fails."
+            "Every notebook this call found: the signed-in user's own, and the ones shared "
+            + "with them. `capped` true can leave this list incomplete. Empty when the user "
+            + "has no OneNote notebooks. A notebook with no id from Microsoft is left out. "
+            + "It never gets a handle that fails."
         )
     )
     capped: bool = Field(
         description=(
-            "True when a safety cap stopped one of the three listings behind this answer — "
-            + "notebooks, sections, or section groups — while Microsoft still had more of it to "
-            + "give, so some notebooks or sections may be missing above. When `name_contains`, "
-            + "`shared` or `role` narrowed which notebooks matched, this can also be true purely "
-            + "because of sections or section groups belonging to a notebook the filter "
-            + "excluded: the sections and section-group listings behind this answer are not "
-            + "narrowed by those same arguments. This is a safety cap, not a `limit` this tool "
-            + "exposes to raise. False means every listing behind this answer finished on its "
-            + "own."
+            "True when a safety cap stopped the notebook, section, or section-group listing "
+            + "behind this answer, not a `limit` this tool exposes to raise. `name_contains`, "
+            + "`shared`, and `role` narrow only the notebook listing, so an excluded "
+            + "notebook's own listing can still trigger this. False means every listing "
+            + "finished on its own."
         )
     )
 
@@ -422,7 +377,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 max_length=_MAX_NAME_FRAGMENT_CHARACTERS,
                 description=(
                     "Keep only the notebooks whose name contains this text, compared without "
-                    + "regard to case. Omit it to list every notebook regardless of name."
+                    + "regard to case. A matched notebook still carries every one of its "
+                    + "sections. Omit it to list every notebook."
                 ),
             ),
         ] = None,

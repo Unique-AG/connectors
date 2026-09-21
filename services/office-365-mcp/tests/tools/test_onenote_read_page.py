@@ -414,15 +414,19 @@ class TestHowItDeclaresItself:
     async def test_the_description_names_the_cap_and_the_append_tool(
         self, transport: httpx.AsyncClient
     ) -> None:
+        """onenote_list_pages and onenote_create_page moved to the page parameter's description."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         reader.register(mcp, transport)
         tool = await mcp.get_tool(reader.TOOL_NAME)
         assert tool is not None, "register left the tool off the server"
 
         described = tool.description or ""
+        properties = cast("Mapping[str, object]", tool.parameters["properties"])
+        page_property = cast("Mapping[str, object]", properties["page"])
+        page_described = cast("str", page_property["description"])
 
-        assert "onenote_list_pages" in described
-        assert "onenote_create_page" in described
+        assert "onenote_list_pages" in page_described
+        assert "onenote_create_page" in page_described
         assert "onenote_append_to_page" in described
         assert "1 MB" in described
         assert "opens only with this connector's own sign-in token" in described

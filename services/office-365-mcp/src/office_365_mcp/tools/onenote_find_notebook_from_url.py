@@ -36,20 +36,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 _DESCRIPTION = """\
-Resolve a OneNote web address into a notebook handle. Pass the exact `web_url` Microsoft gave \
-you — from an onenote_list_notebooks or onenote_list_recent_notebooks result, or from a \
-`web_url` this connector already read off a page, section or notebook — or an address a person \
-pasted from their browser or their OneNote client. Microsoft Graph accepts both a notebook's own \
-web address (`https://...`) and Microsoft's own `onenote:` client address, which is not one of \
-this connector's own onenote:/// handles, and it resolves a page's or a section's own address to \
-the notebook that holds it — confirmed on a test tenant across all of these address shapes — so \
-there is no need to trim the address down to the notebook first. This tool asks Microsoft \
-directly; it does not search or guess. The `uri` it returns is a notebook handle: pass it to \
-onenote_list_sections to see what the notebook holds, to onenote_create_section or \
-onenote_create_section_group to add to it, to onenote_copy_section as `to_notebook`, the \
-destination of a section copy, or to onenote_copy_notebook as `notebook`, the SOURCE that tool \
-copies into the user's own OneDrive. onenote_list_recent_notebooks returns no handle at all, \
-because Microsoft gives none there — call this tool with its `web_url` to get one.\
+Resolves a OneNote web address into a notebook handle. It asks Microsoft directly. It does not \
+search or guess. A page's or a section's address resolves to the notebook that holds it. \
+onenote_list_recent_notebooks rows carry no handle. Pass their `web_url` here to get one.\
 """
 
 _OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS = (
@@ -81,52 +70,50 @@ GRAPH_NOT_FOUND = (
 class FoundNotebook(BaseModel):
     uri: str = Field(
         description=(
-            "This notebook's handle: onenote:///notebooks/{id}, with the id percent-encoded. "
-            + "Pass it to onenote_list_sections, onenote_create_section or "
-            + "onenote_create_section_group to work inside this notebook, or to "
-            + "onenote_copy_section as `to_notebook`, the destination of a section copy, or to "
-            + "onenote_copy_notebook as `notebook`, the source it copies into the user's own "
-            + "OneDrive. Never build "
-            + "one: a notebook id alone reaches nothing."
+            "This notebook's handle: onenote:///notebooks/{id}, with the id percent-encoded. Pass "
+            + "it to onenote_list_sections, onenote_create_section or onenote_create_section_group "
+            + "to work inside the notebook. Pass it to onenote_copy_section as `to_notebook`, or "
+            + "to onenote_copy_notebook as `notebook`, the source it copies from. Never build one: "
+            + "a notebook id alone reaches nothing."
         )
     )
     name: str | None = Field(
         description=(
-            "The notebook's display name, as Microsoft stored it. Null when Microsoft named "
-            + "none."
+            "The notebook's display name, as Microsoft stored it. Null when Graph did not "
+            + "report one."
         )
     )
     is_default: bool | None = Field(
         description=(
             "True for the signed-in user's default notebook: the one onenote_create_page writes "
-            + "into when it is called with no section at all. Null when Microsoft did not say. "
-            + "On a test tenant this came back false for the tenant's actual default notebook: "
-            + "treat it as unreliable here, and use onenote_list_notebooks as the authority on "
-            + "which notebook is the default one."
+            + "into when no `section` is given. Null when Graph did not report it. This value can "
+            + "come back false for the user's actual default notebook. Use onenote_list_notebooks "
+            + "as the authority on which notebook is the default one."
         )
     )
     is_shared: bool | None = Field(
         description=(
             "True when this notebook is shared, so someone besides the owner can see it. Null "
-            + "when Microsoft did not say."
+            + "when Graph did not report it."
         )
     )
     user_role: str | None = Field(
         description=(
-            "The signed-in user's own access to this notebook, exactly as Microsoft spells it: "
-            + '"Owner", "Contributor", "Reader", or "None" for no access. Null when Microsoft '
-            + "did not say."
+            "The signed-in user's own access to this notebook, in Microsoft's own spelling: "
+            + "`Owner`, `Contributor`, `Reader`, or `None` for no access. Null when Graph did "
+            + "not report it."
         )
     )
     web_url: str | None = Field(
         description=(
-            "The address that opens this notebook in OneNote on the web, for a person to follow."
+            "The address that opens this notebook in OneNote on the web, for the person to follow. "
+            + "Null when Graph did not report one."
         )
     )
     client_url: str | None = Field(
         description=(
-            "The address that opens this notebook in the OneNote desktop app, if the person has "
-            + "it installed."
+            "If the person has the OneNote desktop app installed, this address opens the notebook "
+            + "there. Null when Graph did not report one."
         )
     )
     created_at: datetime | None = Field(
@@ -197,13 +184,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_WEB_URL_CHARACTERS,
                 description=(
-                    "A OneNote web address or Microsoft's own `onenote:` client address, "
-                    + "exactly as Microsoft gave it: the `web_url` of an onenote_list_notebooks "
-                    + "or onenote_list_recent_notebooks row, the `web_url` of a page or section "
-                    + "this connector already read, or an address a person pasted. A page's or "
-                    + "a section's own address resolves to the notebook that holds it. This is "
-                    + "not one of this connector's own onenote:/// handles: passing one is "
-                    + "refused."
+                    "A OneNote web address, or Microsoft's own `onenote:` client address, exactly "
+                    + "as Microsoft gave it. It can be the `web_url` of an onenote_list_notebooks "
+                    + "or onenote_list_recent_notebooks row, or the `web_url` of a page or a "
+                    + "section this connector already read. It can also be an address a person "
+                    + "pasted. This tool refuses one of its own onenote:/// handles."
                 ),
             ),
         ],

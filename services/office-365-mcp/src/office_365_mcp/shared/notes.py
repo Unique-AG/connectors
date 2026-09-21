@@ -86,17 +86,16 @@ def client_url_of(links: _Links | None) -> str | None:
 class PageSummary(BaseModel):
     uri: str = Field(
         description=(
-            "This page's handle: onenote:///pages/{id}, with the id percent-encoded. Pass it "
-            + "verbatim to onenote_read_page to read the page or to onenote_append_to_page to "
-            + "add to it. Never build one: a page id alone reaches nothing."
+            "This page's handle: onenote:///pages/{id}, with the id percent-encoded. Pass it word "
+            + "for word to onenote_read_page to read the page, or to onenote_append_to_page to add "
+            + "to it. Never build one: a page id alone reaches nothing."
         )
     )
     title: str | None = Field(
         description=(
-            "The page title as Microsoft's page index holds it. Null when the page has none. "
-            + "That index lags a create or an edit, and not by minutes only: on a test tenant, a "
-            + "page this connector created still came back with an empty title three days later, "
-            + "while its HTML, from onenote_read_page, carried the right one from the start."
+            "The page title as the page index holds it. Null when the page has none. The page "
+            + "index can lag a create or an edit by days, so a new or changed page can show no "
+            + "title here for days. onenote_read_page shows the true title from the start."
         )
     )
     created_at: datetime | None = Field(
@@ -107,9 +106,8 @@ class PageSummary(BaseModel):
     last_modified_at: datetime | None = Field(
         description=(
             "When the page last changed, as Graph reported it. Null when Graph recorded none. A "
-            + "listing of pages orders by this field, newest change first. Microsoft's page "
-            + "index lags an edit, so a page written moments ago can still show the earlier "
-            + "value here."
+            + "listing of pages orders by this field, newest change first. The page index can lag "
+            + "an edit, so a page written moments ago can still show the earlier value here."
         )
     )
     web_url: str | None = Field(
@@ -120,41 +118,40 @@ class PageSummary(BaseModel):
     )
     client_url: str | None = Field(
         description=(
-            "The address that opens this page in the OneNote desktop app, if the person has it "
-            + "installed."
+            "If the person has the OneNote desktop app installed, this address opens the page "
+            + "there."
         )
     )
     section_uri: str | None = Field(
         description=(
-            "The handle of the section holding this page: onenote:///sections/{id}. Pass it to "
-            + "onenote_list_pages to see this page's siblings, or to onenote_create_page to add "
-            + "a page beside it. Null when Graph named no parent section for this page."
+            "The handle of the section that holds this page: onenote:///sections/{id}. Pass it to "
+            + "onenote_list_pages to see this page's siblings, or to onenote_create_page to add a "
+            + "page beside it. Null when Graph named no parent section for this page."
         )
     )
     section_name: str | None = Field(
         description=(
-            "The display name of the section holding this page. Null when Graph gave no parent "
-            + "section."
+            "The display name of the section that holds this page. Null when Graph named no "
+            + "parent section."
         )
     )
     notebook_name: str | None = Field(
         description=(
-            "The display name of the notebook holding this page. Null when Graph gave no parent "
-            + "notebook."
+            "The display name of the notebook that holds this page. Null when Graph named no "
+            + "parent notebook."
         )
     )
     level: int | None = Field(
         description=(
-            "How deeply this page is indented under another page in its section: 0 for a "
-            + "top-level page, 1 for a page indented one level under it, and so on. Always null "
-            + "unless onenote_list_pages was asked for it with include_level_and_order=true."
+            "How deeply this page is indented under another page in its section. Level 0 is a "
+            + "top-level page, and each deeper level adds 1. This is null unless "
+            + "onenote_list_pages sets include_level_and_order=true."
         )
     )
     order: int | None = Field(
         description=(
-            "Where this page sits among the other pages of its section, in Microsoft's own "
-            + "ordering. Always null unless onenote_list_pages was asked for it with "
-            + "include_level_and_order=true."
+            "Where this page sits among the other pages of its section, in Microsoft's own order. "
+            + "This is null unless onenote_list_pages sets include_level_and_order=true."
         )
     )
 
@@ -451,33 +448,33 @@ class OperationSummary(BaseModel):
     uri: str = Field(
         description=(
             "This operation's handle: onenote:///operations/{id}, with the id percent-encoded. "
-            + "When it came from a copy tool's answer, pass it to onenote_get_operation to poll "
-            + "the copy, and keep using that same handle for every poll: the `uri` a poll itself "
-            + "answers with can differ from it, because Microsoft appends the caller's own id to "
-            + "the operation id it reports back, and that longer value is not the one to reuse. "
-            + "Never build one: an operation id alone reaches nothing."
+            + "Pass it to onenote_get_operation, and use that same handle for every poll. A later "
+            + "poll's own `uri` differs, because Microsoft appends the caller's id, and that value "
+            + "is not the one to reuse. Never build one: an operation id alone reaches nothing."
         )
     )
     status: OperationState | None = Field(
         description=(
             "Microsoft's own status word for this operation: NotStarted, Running, Completed or "
-            + "Failed. Null right after a copy is accepted, before Microsoft has reported any "
-            + "status; poll onenote_get_operation with `uri` to fill it in, and keep polling "
-            + "until it reads Completed or Failed."
+            + "Failed. Null right after Microsoft accepts a copy, before it reports any status. "
+            + "Poll onenote_get_operation with `uri` to fill it in. Poll again until it reads "
+            + "Completed or Failed."
         )
     )
     percent_complete: str | None = Field(
         description=(
-            "How far along Graph says the operation is, as the digits of a percentage. "
-            + "Microsoft reports this as text, not a number. Null while Graph has nothing to "
-            + "report."
+            "Graph's own estimate of how much of the operation is done, as the digits of a "
+            + "percentage. Microsoft reports this as text, not a number. Null while Graph has "
+            + "nothing to report."
         )
     )
     created_at: datetime | None = Field(
-        description="When the operation started, as Graph reported it. Null when Graph gave none."
+        description=(
+            "When the operation started, as Graph reported it. Null when Graph recorded " + "none."
+        )
     )
     last_action_at: datetime | None = Field(
-        description=("When Graph last acted on this operation. Null when Graph gave none.")
+        description=("When Graph last acted on this operation. Null when Graph recorded none.")
     )
     result_uri: str | None = Field(
         description=(

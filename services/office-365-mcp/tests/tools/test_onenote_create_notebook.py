@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 from typing import cast
 
 import httpx
@@ -236,21 +237,28 @@ class TestHowItDeclaresItself:
         assert "never asks" in description
         assert "unshared" in description
 
-    async def test_the_description_lists_the_forbidden_characters(
+    async def test_the_name_description_lists_the_forbidden_characters(
         self, transport: httpx.AsyncClient
     ) -> None:
-        _parameters, tool = await _registered(transport)
+        """The forbidden-character list moved from the tool description to the `name`
+        field, so the house style keeps that fact at one home only."""
+        parameters, _tool = await _registered(transport)
 
-        description = tool.description or ""
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        name = cast("Mapping[str, object]", properties["name"])
+        description = cast("str", name["description"])
         for character in "?*/:<>|'\"":
             assert character in description, f"{character!r} missing from the description"
 
-    async def test_the_description_states_the_duplicate_name_failure_as_observed_not_guessed(
+    async def test_the_description_states_the_duplicate_name_failure_as_a_fact(
         self, transport: httpx.AsyncClient
     ) -> None:
+        """The duplicate-name failure is stated as a documented fact, not pinned to a
+        test-tenant observation."""
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""
-        assert "confirmed on a test tenant" in description
+        assert "Microsoft refuses a duplicate name, and the same name fails again" in description
+        assert "confirmed on a test tenant" not in description
         assert "most often comes back as" not in description
         assert "bad request" not in description

@@ -78,47 +78,16 @@ _UNTITLED_PAGE = "an untitled page"
 _UNNAMED_NOTEBOOK = "an unnamed notebook"
 
 _DESCRIPTION = """\
-Change what is already on an existing OneNote page: add content next to something, or replace \
-an element outright. Pass the `page` handle from a onenote_list_pages row or a \
-onenote_create_page answer, and one to twenty `commands` to run against it in order. Each \
-command names a `target` (an element on the page: `body`, `title`, a `#data-id` written in the \
-page's own HTML, or a generated id from onenote_read_page with `include_ids=true` — a generated \
-id is passed bare with no `#` in front of it, while a `data-id` needs the `#` kept in front; \
-Microsoft keeps both forms side by side on the same element rather than discarding either) and \
-an `action`: `append` adds `content` as a new child of `target`, last by default or first when \
-`position` is `before`; `prepend` is a shortcut for append-before, always adding `content` as \
-the first child; `insert` adds `content` as a new sibling of `target`, after it by default or \
-before it when `position` is `before`; `replace` throws away everything `target` held and puts \
-`content` there instead. Microsoft's own schema lists a fifth action, `delete`, but its service \
-refused every `delete` command this connector sent it in testing, whichever id form targeted it, \
-so this tool does not offer `delete` at all — every command here takes `content`. `append` and \
-`insert` accept either a `#data-id` or a generated id for `target`; `replace` needs the \
-generated id for every target except `title` and an `img` or `object` inside a `div`, which \
-also accept a `#data-id`. `position` only changes anything for `insert` (before or after the \
-target) and for `append` on a list or the page body (first child or last child); everywhere \
-else it is ignored, and Microsoft's own default is `after`. Not every element accepts every \
-action: the page `body` (which is really its first div) takes `append` only; an absolutely \
-positioned `div` also takes `append` only, while a `div` nested inside another `div` takes \
-`replace`, `append` and `insert`; an `img` or an `object` inside a `div` takes `replace` and \
-`insert` but never `append`; an `ol` or a `ul` takes `replace`, `append` and `insert`; a `table` \
-takes `replace` and `insert` but never `append`; a `p`, an `li`, or a heading `h1` through `h6` \
-takes `replace` and `insert` but never `append`; the page `title` takes `replace` only — use \
-onenote_rename_page for that instead of spending a command here. Microsoft accepts no update at \
-all against an absolutely positioned `img` or `object`, a `tr`, a `td`, `meta`, `head`, `span`, \
-`a`, or a `style` tag: naming one of those as `target` is refused by Microsoft, not by this \
-tool. A `replace` command erases something that was on the page, so this tool ALWAYS asks the \
-person at the other end to confirm before running any command set that contains one, on top of \
-asking whenever the page's notebook is shared with other people, belongs to somebody else, or \
-Microsoft does not report who can see it. A command set with no `replace`, into the user's own \
-unshared notebook, runs without a question. This call is NOT SAFE TO RETRY BLINDLY: Microsoft \
-reports no per-command result, only one success or one failure for the whole request, and does \
-not document whether an earlier command in a refused set stays applied. Any failure of this \
-call, not only a timeout, can mean the set landed partly: read the page first with \
-onenote_read_page, compare it against what these commands were meant to do, and send again only \
-the commands that are genuinely still missing. This tool answers with the page as Microsoft's \
-page index holds it right after the write. That index lags an edit, by minutes or far longer, \
-so `last_modified_at` and `title` in the answer can still show the values from before this \
-write while onenote_read_page already returns the change.\
+Adds content next to an element on one page, or replaces an element. One to twenty `commands` run \
+in order. There is no `delete` action. onenote_rename_page is the sibling for the title. OneNote \
+can show the change to everyone who opens the notebook.
+
+Notes:
+- A `replace` erases content, so this tool always asks the user to agree for a set that contains \
+one. For other sets, it asks before it writes into a notebook that is shared with other people or \
+belongs to somebody else. A set in the user's own unshared notebook runs without a question.
+- Microsoft reports one result for the whole set. A failure can mean a partly applied set: read \
+the page with onenote_read_page and resend only the missing commands.
 """
 
 _NOT_A_PAGE_HANDLE = (
@@ -153,32 +122,33 @@ class EditCommand(BaseModel):
         min_length=1,
         max_length=MAX_TARGET_CHARACTERS,
         description=(
-            "The element to change: `body` (the page's first div), `title` (the page title — "
-            + "use onenote_rename_page instead of spending a command on it), a `#data-id` "
-            + "written in the page's own input HTML with the `#` kept in front of it, or a "
-            + "generated id from a onenote_read_page call made with `include_ids=true`, passed "
-            + "with no `#` in front. Microsoft keeps both forms side by side on the same "
-            + "element rather than discarding either. `append` and `insert` accept either "
-            + "form; `replace` needs the generated id for every target except `title` and an "
-            + "`img` or `object` inside a `div`, which also accept a `#data-id`."
+            "The element to change: `body` (the page's first div), `title`, a `#data-id` the "
+            + "author wrote with the `#` kept, or a generated id. Read the page with "
+            + "`include_ids=true` to get one, with no `#` in front. Microsoft keeps both forms "
+            + "on the element. `append` and `insert` accept either form. `replace` needs the "
+            + "generated id, except `title`, and an `img` or `object` inside a `div`, which "
+            + "also accept a `#data-id`. `body` and an absolutely positioned `div` accept only "
+            + "`append`."
         ),
     )
     action: _Action = Field(
         description=(
-            "What to do at `target`: `append` adds `content` as a new child of `target`, last "
-            + "by default or first when `position` is `before`; `prepend` is a shortcut for "
-            + "append-before; `insert` adds `content` as a new sibling of `target`; `replace` "
-            + "throws away what `target` held and puts `content` there instead. Not every "
-            + "element accepts every action — this tool's own description carries the full "
-            + "table."
+            "`append` adds `content` as the last child, or first when `position` is `before`. "
+            + "`prepend` is `append` as the first child. `insert` adds `content` as a sibling "
+            + "after `target`, or before it when `position` is `before`. `replace` erases what "
+            + "`target` held and puts `content` there. A nested `div`, `ol`, and `ul` accept "
+            + "`replace`, `append`, and `insert`. An `img` or `object` inside a `div`, a "
+            + "`table`, a `p`, an `li`, and `h1` to `h6` accept `replace` and `insert`. "
+            + "`title` accepts only `replace`. Microsoft refuses `tr`, `td`, `meta`, `head`, "
+            + "`span`, `a`, `style`, and an absolutely positioned `img` or `object`."
         ),
     )
     position: _Position | None = Field(
         default=None,
         description=(
-            "Where to put `content` relative to `target`: for `insert`, before or after the "
-            + "target; for `append` on a list or the page body, first child or last child. "
-            + "Microsoft's own default is `after`. Ignored by every other action."
+            "Where `content` goes next to `target`. For `insert`, before or after `target`. "
+            + "For `append` on a list or the page body, first child or last child. Microsoft's "
+            + "default is `after`. Every other action ignores it."
         ),
     )
     content: str = Field(
@@ -315,11 +285,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle of the page to change, from a onenote_list_pages row or a "
-                    + "onenote_create_page answer: `uri`, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle, onenote:///sections/{id}, is "
-                    + "not a page handle. Never build one yourself: a page id alone, without "
-                    + "this connector's scheme around it, reaches nothing."
+                    "The page to change: the `uri` of a onenote_list_pages row or a "
+                    + "onenote_create_page answer, copied word for word. The shape is "
+                    + "onenote:///pages/{id}. A section handle is not a page handle."
                 ),
             ),
         ],
@@ -329,13 +297,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_COMMANDS,
                 description=(
-                    "One to twenty changes to run against the page, in order. Each is applied "
-                    + "as its own Graph PATCH command inside the same request. Microsoft "
-                    + "reports no per-command result, only one success or one failure for the "
-                    + "whole set, and does not document whether an earlier command stays "
-                    + "applied after a later one is refused: treat any failure as a set that "
-                    + "may be partly applied, and see this tool's own description for how to "
-                    + "recover before sending a changed set again."
+                    "One to twenty changes to run against the page, in order. Each command "
+                    + "runs as its own `PATCH` command inside one request."
                 ),
             ),
         ],

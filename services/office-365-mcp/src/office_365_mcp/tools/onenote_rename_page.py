@@ -53,21 +53,15 @@ _UNTITLED_PAGE = "an untitled page"
 _UNNAMED_NOTEBOOK = "an unnamed notebook"
 
 _DESCRIPTION = """\
-Rename an existing OneNote page: change its title and nothing else on the page. Pass the `page` \
-handle from a onenote_list_pages row or a onenote_create_page answer, and the new `title`. This \
-tool changes nothing in the page body — for that, use onenote_edit_page instead. Renaming is \
-sent as a single Microsoft Graph request that replaces the page's title element, and putting \
-the same `title` again after a timeout does no harm: it sets the title to the same value rather \
-than piling up a second change, which is why this call keeps Microsoft's default retry instead \
-of refusing to be sent twice. This tool asks the person at the other end to confirm before \
-renaming when the page's notebook is shared with other people or belongs to somebody else, or \
-when Microsoft does not report who can see it, because the new title is visible to them the \
-moment it is written. A page in the user's own unshared notebook is renamed without a question. \
-This tool answers with the page as Microsoft's page index holds it right after the rename, and \
-with `previous_title`, the title the index held just before — which can already be stale or \
-empty, because that same index lags a create or an edit by minutes or far longer. A rename \
-itself does not share that lag: on a test tenant, the new `title` in the answer reflected the \
-rename right away, unlike a freshly created page's title.\
+Changes the title of one page and nothing else. onenote_edit_page is the sibling for the body. \
+OneNote can show the change to everyone who opens the notebook.
+
+Notes:
+- This tool asks the user to agree before it writes into a notebook that is shared with other \
+people or belongs to somebody else. A page in the user's own unshared notebook is renamed without \
+a question.
+- This call is safe to repeat after a timeout. The answer's `previous_title` comes from the page \
+index, which can lag, so it can be stale or empty.
 """
 
 _NOT_A_PAGE_HANDLE = (
@@ -101,19 +95,15 @@ _WRITTEN_BUT_UNREAD = (
 class RenamedPage(BaseModel):
     page: PageSummary = Field(
         description=(
-            "The page as Microsoft's page index holds it right after the rename. Its "
-            + "`last_modified_at` can still lag by minutes or far longer, the way any edit "
-            + "does, but on a test tenant this call's own `title` reflected the rename right "
-            + "away rather than lagging the same way."
+            "The page as the page index holds it right after the rename. Its "
+            + "`last_modified_at` can still show the earlier value, because the page index can "
+            + "lag an edit by minutes or by days."
         )
     )
     previous_title: str | None = Field(
         description=(
-            "The title Microsoft's page index held for this page just before the rename, read "
-            + "from a pre-read this call made before writing anything. This can already be "
-            + "stale, or empty, because that same index lags a create or an edit — on a test "
-            + "tenant a page this connector created still carried an empty title three days "
-            + "later. Null when Graph reported no title."
+            "The title the page index held for this page immediately before the rename, read "
+            + "before the write. Null when Graph did not report one."
         )
     )
 
@@ -200,11 +190,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle of the page to rename, from a onenote_list_pages row or a "
-                    + "onenote_create_page answer: `uri`, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle, onenote:///sections/{id}, is "
-                    + "not a page handle. Never build one yourself: a page id alone, without "
-                    + "this connector's scheme around it, reaches nothing."
+                    "The page to rename: the `uri` of a onenote_list_pages row or a "
+                    + "onenote_create_page answer, copied word for word. The shape is "
+                    + "onenote:///pages/{id}. A section handle is not a page handle."
                 ),
             ),
         ],
@@ -214,10 +202,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_TITLE_CHARACTERS,
                 description=(
-                    "The page's new title, as the user wrote it. This tool answers with what "
-                    + "Microsoft actually stored, read back off its response rather than echoed "
-                    + "from this argument, so read that back rather than assuming it equals "
-                    + "this value."
+                    "The page's new title, as the user writes it. The answer's `title` is what "
+                    + "Microsoft stored. Read it from the answer, not from this argument."
                 ),
             ),
         ],

@@ -333,11 +333,14 @@ class TestHowItDeclaresItself:
     async def test_the_description_says_no_confirmation_is_asked(
         self, transport: httpx.AsyncClient
     ) -> None:
+        """The pinned phrase "asks nobody to confirm it" became the STE "asks nobody to agree,"
+        and the retry warning now reads as guidance rather than "not safe to retry blindly," but
+        both keep their original guarantee."""
         _parameters, tool = await _registered(transport)
 
         description = (tool.description or "").casefold()
-        assert "asks nobody to confirm it" in description
-        assert "not safe to retry blindly" in description
+        assert "asks nobody to agree" in description
+        assert "do not call this tool again first" in description
         assert "onenote_get_operation" in description
 
     async def test_the_new_name_description_states_the_documented_naming_rule(

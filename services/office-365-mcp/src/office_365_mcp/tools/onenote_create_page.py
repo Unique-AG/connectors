@@ -91,46 +91,20 @@ _BOTH_SECTION_AND_SECTION_NAME = (
 )
 
 _DESCRIPTION = """\
-Write a brand-new page into the signed-in user's own OneNote, right now. This is not a draft: \
-there is no review step, nobody approves it first, and the page exists in the notebook the \
-moment this tool returns. This connector sends no notification when it creates the page, and \
-Microsoft Graph sends none for it either, but OneNote itself can show the new page to people \
-who open the notebook. This tool asks the person at the other end to confirm before writing \
-when the notebook is shared with other people or belongs to somebody else, or when Microsoft \
-does not report who can see it, because the page is visible to them the moment it is written. \
-A page in the user's own unshared notebook is written without a question. Pass a `section` \
-handle from onenote_list_notebooks to choose which section holds the new page; omit `section` \
-and Microsoft creates it in the default section of the default notebook instead. `section_name` \
-is the other way to pick a section: give it a name and Microsoft writes the page into the \
-section by that name inside the default notebook, creating a new section there under that name \
-first when none already matches — a typo in `section_name` makes a new, almost-empty section \
-rather than failing outright. When it does create that section, the answer's `section_uri` \
-comes back null: Microsoft's response names no parent section for it, so look the new \
-section up afterward with onenote_list_sections on the default notebook, matched by name. \
-`section_name` only ever reaches the default notebook, never any other one. Microsoft does not \
-document a naming rule for this parameter specifically, but the same rule a section's own name \
-follows most likely applies: at most 50 characters, and none of \
-`? * / : < > | & # ' % ~`. Pass at most one of `section` and \
-`section_name`; never both. `body_html` \
-is HTML, not \
-plain text: a newline in it is not a line break. Write `<p>` and `<br>` for structure, \
-`<h1>` through `<h6>` for headings, `<ul>`/`<ol>`/`<li>` for lists, `<table>` for a table, and \
-`<b>`/`<i>` for emphasis. Microsoft removes JavaScript, CSS and HTML forms from what is sent. \
-Escape `&`, `<` and `>` in `body_html` wherever they must read as themselves rather than as \
-markup. This tool places `title` in the page's own `<head><title>`, and `body_html` becomes the \
-page body exactly as sent. **There is no way to attach a file or an image here, and \
-that absence is deliberate.** This connector has no content store, and it fetches nothing a \
-model names: accepting a URL or a file id here would have this pod pull content from wherever \
-the model pointed it, into a page written under this user's name. To add more content to a page \
-that already exists — including one this call just created — use onenote_append_to_page \
-instead; it cannot attach a file either. If this call times out, do not simply call it again: \
-Microsoft may already have created the page before the response was lost, and calling again \
-writes a second, duplicate page. List the section's pages with onenote_list_pages first: a page \
-created moments ago is listed at once but can show an empty title for a long time (days on a \
-test tenant), so judge by `created_at` and the count rather than by title, and call this again \
-only once you have confirmed the page is not there. The answer's \
-`title` is what Microsoft actually stored, read back off its response rather than echoed from \
-the argument — read it to the user so they know what the page is really called.\
+Writes a new page into the signed-in user's OneNote. There is no draft and no review step: the \
+page exists the moment this tool returns. There is no way to attach a file or an image. \
+onenote_append_to_page adds to a page later. OneNote can show the change to everyone who opens \
+the notebook.
+
+Notes:
+- This tool asks the user to agree before it writes into a notebook that is shared with other \
+people or belongs to somebody else. A page in the user's own unshared notebook is written without \
+a question.
+- Pass at most one of `section` and `section_name`. Omit both, and the page lands in the default \
+section of the default notebook.
+- If a call times out, do not call this tool again first. Before you call again, make sure that \
+onenote_list_pages does not show the page. Judge by `created_at`: a new title can stay empty for \
+days.
 """
 
 
@@ -144,9 +118,8 @@ class CreatedPage(BaseModel):
     )
     title: str | None = Field(
         description=(
-            "The title Microsoft actually stored for this page, read off its response rather "
-            + "than echoed from the `title` argument. Read it back to the user: it is the "
-            + "record of what the page is really called."
+            "What Microsoft stored, read from its response and not from the `title` argument. "
+            + "Read it to the user."
         )
     )
     web_url: str | None = Field(
@@ -162,19 +135,16 @@ class CreatedPage(BaseModel):
         )
     )
     created_at: datetime | None = Field(
-        description="When Microsoft recorded creating this page. Null when Graph reported none."
+        description=(
+            "When the page was created, as Graph reported it. Null when Graph recorded none."
+        )
     )
     section_uri: str | None = Field(
         description=(
             "The handle of the section this page was written into: onenote:///sections/{id}. "
-            + "This is the `section` argument's own handle when one was given, unless "
-            + "Microsoft's response itself names a different parent section, which takes "
-            + "priority over the argument. Null when `section` was omitted and Microsoft's "
-            + "response named no parent section either — this is what happens when "
-            + "`section_name` just created a brand-new section, so look that section up "
-            + "afterward with onenote_list_sections on the default notebook, matched by name, "
-            + "or pass onenote_list_pages no `section` to find the page by looking through "
-            + "every notebook."
+            + "This is the `section` argument's own handle when one was given, though "
+            + "Microsoft's own response can name a different section instead. Null when "
+            + "`section` was omitted and `section_name` created a new section."
         )
     )
 
@@ -346,10 +316,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_TITLE_CHARACTERS,
                 description=(
-                    "The new page's title, as the user wrote it. This tool places it in the "
-                    + "page's own `<head><title>`; the answer's `title` is what Microsoft "
-                    + "actually stored, so read that back rather than assuming it equals this "
-                    + "argument."
+                    "The new page's title, as the user writes it. This tool places it in the "
+                    + "page's own `<head><title>`. The answer's `title` is what Microsoft "
+                    + "stored. Read it from the answer, not from this argument."
                 ),
             ),
         ],
@@ -360,13 +329,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 max_length=MAX_BODY_CHARACTERS,
                 description=(
                     f"The page content, as HTML, up to {MAX_BODY_CHARACTERS:,} characters "
-                    + "(Microsoft Graph refuses a request over 4 MB regardless). A newline is "
-                    + "not a line break: write `<p>` and `<br>` for structure, `<h1>` through "
-                    + "`<h6>` for headings, `<ul>`/`<ol>`/`<li>` for lists, `<table>` for a "
-                    + "table, and `<b>`/`<i>` for emphasis. Microsoft removes JavaScript, CSS "
-                    + "and HTML forms from what is sent. Escape `&`, `<` and `>` wherever they "
-                    + "must read as themselves rather than as markup. There is no way to include "
-                    + "an image or a file here."
+                    + "(Microsoft Graph refuses a request over 4 MB). A newline is not a line "
+                    + "break. Write `<p>`, `<br>`, `<h1>` to `<h6>`, `<ul>`, `<ol>`, `<li>`, "
+                    + "`<table>`, `<b>` and `<i>` for structure. Microsoft removes JavaScript, "
+                    + "CSS and forms. Escape `&`, `<` and `>` where they must read as "
+                    + "themselves."
                 ),
             ),
         ],
@@ -377,10 +344,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The section to create the page in, as the `uri` of a section from an "
-                    + "onenote_list_notebooks result: onenote:///sections/{id}. Omit it to "
-                    + "create the page in the default section of the default notebook instead. "
-                    + "A section name, a notebook name and a web address are none of them a "
-                    + "handle."
+                    + "onenote_list_notebooks result: onenote:///sections/{id}. A section name, "
+                    + "a notebook name and a web address are not handles."
                 ),
             ),
         ] = None,
@@ -390,16 +355,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_SECTION_NAME_CHARACTERS,
                 description=(
-                    "The other way to pick the section: a name, inside the signed-in user's "
-                    + "default notebook only. Microsoft creates a new section by this name "
-                    + "there when none already matches, so a typo makes a new, almost-empty "
-                    + "section rather than failing — the answer's `section_uri` then comes "
-                    + "back null, so look that new section up afterward with "
-                    + "onenote_list_sections. Not documented for this parameter specifically, "
-                    + "but the same rule a section's own name follows most likely applies: "
-                    + "at most 50 characters, and none of "
-                    + f"{_FORBIDDEN_SECTION_NAME_CHARACTERS}. Pass at most one of `section` and "
-                    + "`section_name`; giving both is refused."
+                    "A name for the section, in the signed-in user's default notebook only. If "
+                    + "no section matches, Microsoft creates one. A typo makes a new, almost "
+                    + "empty section, with `section_uri` null in the answer. Look it up with "
+                    + "onenote_list_sections, by name. Microsoft documents no naming rule, but a "
+                    + "section's own rule can apply: at most 50 characters, none of "
+                    + f"{_FORBIDDEN_SECTION_NAME_CHARACTERS}."
                 ),
             ),
         ] = None,

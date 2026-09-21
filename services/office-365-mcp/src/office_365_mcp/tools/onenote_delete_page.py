@@ -38,17 +38,13 @@ _UNNAMED_NOTEBOOK = "an unnamed notebook"
 _UNNAMED_SECTION = "an unnamed section"
 
 _DESCRIPTION = """\
-Delete an existing OneNote page outright. Pass the `page` handle from a onenote_list_pages row \
-or a onenote_create_page answer. This tool ALWAYS asks the person at the other end to confirm \
-before deleting, whatever notebook the page is in and whoever can see it, because a delete \
-cannot be undone: Microsoft Graph gives OneNote no recycle bin, no trash, and no way for this \
-connector to bring a deleted page back. A decline leaves the page exactly as it was. Once this \
-tool answers, the `page` handle it was given addresses nothing: Microsoft Graph answers 404 to \
-it from that moment on, and no other onenote_* tool — not onenote_read_page, not \
-onenote_edit_page, not onenote_rename_page, not this tool called again — can reach that page a \
-second time. This call is safe to retry after a timeout: if Microsoft already deleted the page \
-before the response was lost, the retry finds nothing there and reports that plainly rather \
-than deleting a second time, because there is nothing left to delete twice.\
+Deletes one page outright. This tool always asks the user to agree, because a delete cannot be \
+undone: Microsoft Graph keeps no recycle bin for a page.
+
+Notes:
+- After the delete, the page handle addresses nothing. onenote_read_page, onenote_edit_page and \
+onenote_rename_page answer 404 for it.
+- This call is safe to repeat after a timeout. A second delete finds nothing and reports that.
 """
 
 _NOT_A_PAGE_HANDLE = (
@@ -75,9 +71,9 @@ GRAPH_NOT_FOUND = (
 class DeletedPage(BaseModel):
     title: str | None = Field(
         description=(
-            "The title Microsoft's page index held for this page just before the delete. Can "
-            + "be stale or empty, because that index lags a create or an edit. Null when Graph "
-            + "reported none."
+            "The title the page index held for this page immediately before the delete. It "
+            + "can be stale or empty, because the page index can lag a create or an edit. "
+            + "Null when Graph did not report one."
         )
     )
     section_uri: str | None = Field(
@@ -99,12 +95,7 @@ class DeletedPage(BaseModel):
         )
     )
     deleted: Literal[True] = Field(
-        description=(
-            "Always true: this tool answers only once the delete has actually succeeded, never "
-            + "with a page that is still there. The `page` handle this call was given now "
-            + "addresses nothing — Microsoft Graph answers 404 to it from this point on, and no "
-            + "onenote_* tool can read, edit, rename or delete it again."
-        )
+        description=("Always true, because this tool answers only after a successful delete.")
     )
 
 
@@ -185,11 +176,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle of the page to delete, from a onenote_list_pages row or a "
-                    + "onenote_create_page answer: `uri`, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle, onenote:///sections/{id}, is "
-                    + "not a page handle. Never build one yourself: a page id alone, without "
-                    + "this connector's scheme around it, reaches nothing."
+                    "The page to delete: the `uri` of a onenote_list_pages row or a "
+                    + "onenote_create_page answer, copied word for word. The shape is "
+                    + "onenote:///pages/{id}. A section handle is not a page handle."
                 ),
             ),
         ],

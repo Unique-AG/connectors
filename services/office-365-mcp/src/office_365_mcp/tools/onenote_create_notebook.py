@@ -26,59 +26,47 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"name": "Synthetic notebook"}
 MAX_NAME_CHARACTERS = 128
 
 _DESCRIPTION = """\
-Create a brand-new, empty OneNote notebook of the signed-in user's own, right now. This is not \
-a draft: there is no review step, and the notebook exists the moment this tool returns. A new \
-notebook always belongs to the user alone and starts out unshared, so this tool never asks \
-anybody to confirm before creating one — unlike writing a page or a section into a notebook \
-that already exists, which can be shared with other people. Notebook names must be unique across \
-the user's whole OneNote, at most 128 characters, and cannot contain any of these characters: \
-? * / : < > | ' ". Microsoft refuses a duplicate name with a conflict — confirmed on a test \
-tenant, so the same name fails again — and refuses a name that breaks the length or character \
-rule too; either way nothing is created, and this tool raises Microsoft's own failure back \
-rather than guessing at a fix. If this call times out, the notebook may already have been \
-created before the response was lost: call \
-onenote_list_notebooks and look for a notebook already named `name` before calling this again, \
-because a second call with the same name most likely fails as a duplicate rather than creating \
-a second notebook — but do not rely on that instead of checking. The answer's `uri` is this new \
-notebook's handle: pass it to onenote_create_section to add a section to it, or to \
-onenote_create_section_group to add a section group. The answer's `name` is what Microsoft \
-actually stored, read back off its response rather than echoed from the `name` argument.\
+Creates a new, empty notebook for the signed-in user. There is no draft and no review step. A new \
+notebook belongs to the user alone and starts unshared, so this tool never asks anybody to agree.
+
+Notes:
+- Microsoft refuses a duplicate name, and the same name fails again.
+- If a call times out, do not call this tool again first. Before you call again, make sure that \
+onenote_list_notebooks does not show a notebook named `name`.
 """
 
 
 class CreatedNotebook(BaseModel):
     uri: str = Field(
         description=(
-            "This new notebook's handle: onenote:///notebooks/{id}, with the id "
-            + "percent-encoded. Pass it to onenote_create_section to add a section to this "
-            + "notebook, to onenote_create_section_group to add a section group, or to "
-            + "onenote_list_sections to see what is directly under it."
+            "This new notebook's handle: onenote:///notebooks/{id}, with the id percent-encoded. "
+            + "Pass it to onenote_create_section to add a section, or to "
+            + "onenote_create_section_group to add a section group."
         )
     )
     name: str | None = Field(
         description=(
-            "The name Microsoft actually stored for this notebook, read off its response rather "
-            + "than echoed from the `name` argument."
+            "What Microsoft stored, read from its response and not from the `name` argument."
         )
     )
     is_default: bool | None = Field(
         description=(
-            "True when this new notebook is also the signed-in user's default notebook — only "
-            + "possible when the user had no notebook at all before this call. Null when "
-            + "Microsoft did not say."
+            "True when this new notebook is also the signed-in user's default notebook. This is "
+            + "possible only when the user had no notebook before this call. Null when Graph did "
+            + "not report it."
         )
     )
     is_shared: bool | None = Field(
         description=(
             "Whether this notebook is shared with anybody besides the user. A brand-new "
-            + "notebook is always unshared, so this reads false unless Microsoft did not say."
+            + "notebook is always unshared, so this reads false unless Graph did not report it."
         )
     )
     user_role: str | None = Field(
         description=(
             "The signed-in user's own access to this notebook, exactly as Microsoft spells it: "
             + '"Owner", "Contributor", "Reader", or "None" for no access. A notebook this call '
-            + 'just created is always "Owner". Null when Microsoft did not say.'
+            + 'created is always "Owner". Null when Graph did not report it.'
         )
     )
     web_url: str | None = Field(
@@ -94,7 +82,7 @@ class CreatedNotebook(BaseModel):
     )
     created_at: datetime | None = Field(
         description=(
-            "When Microsoft recorded creating this notebook. Null when Graph reported none."
+            "When the notebook was created, as Graph reported it. Null when Graph recorded none."
         )
     )
 
@@ -146,11 +134,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_NAME_CHARACTERS,
                 description=(
-                    "The new notebook's name, as the user wrote it, up to 128 characters. It "
-                    + "must be unique across the user's whole OneNote, and cannot contain any of "
-                    + "these characters: ? * / : < > | ' \". The answer's `name` is what "
-                    + "Microsoft actually stored, so read that back rather than assuming it "
-                    + "equals this argument."
+                    "The new notebook's name, as the user writes it. The name must be unique "
+                    + "across the user's OneNote, at most 128 characters long, and must not "
+                    + "contain any of these characters: ? * / : < > | ' \". Microsoft refuses a "
+                    + "bad name and creates nothing. The answer's `name` is what Microsoft "
+                    + "stored. Read it from the answer, not from this argument."
                 ),
             ),
         ],
