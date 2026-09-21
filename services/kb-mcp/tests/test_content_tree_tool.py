@@ -1302,3 +1302,50 @@ async def test_tree_folders_only_never_reports_truncation():
 
     text = result.content[0].text  # type: ignore[union-attr]
     assert "Showing the first" not in text
+
+
+def _bracketed_folder_snapshot() -> FakeSnapshot:
+    """A folder whose stored name carries brackets, e.g. ``[ORG]``."""
+    return FakeSnapshot(
+        files=[
+            (_make_content_info("c1"), PurePosixPath("[ORG]/Alpha/a.pdf")),
+            (_make_content_info("c2"), PurePosixPath("[ORG]/Beta/b.pdf")),
+            (_make_content_info("c3"), PurePosixPath("Gamma/c.pdf")),
+        ]
+    )
+
+
+@pytest.mark.asyncio
+async def test_search_scopes_to_a_bracket_stripped_folder_path():
+    """An [ORG] folder renders as ORG, so ORG/Alpha cannot resolve to a scope id
+    and search falls back to matching the prefix-filtered rows. It must still
+    scope, and must not reach outside the folder."""
+    mock_tree = _make_mock_tree(snapshot=_bracketed_folder_snapshot())
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="search",
+            query="a.pdf",
+            folder_path="ORG/Alpha",
+            config=ContentTreeToolConfig(),
+        )
+
+    assert result.is_error is not True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "content_id=c1" in text
+    assert "content_id=c2" not in text
+    assert "content_id=c3" not in text
+
+
+@pytest.mark.asyncio
+async def test_tree_scopes_to_a_bracket_stripped_folder_path():
+    mock_tree = _make_mock_tree(snapshot=_bracketed_folder_snapshot())
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree", folder_path="ORG/Alpha", config=ContentTreeToolConfig()
+        )
+
+    assert result.is_error is not True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "a.pdf" in text
+    assert "b.pdf" not in text
+    assert "c.pdf" not in text
