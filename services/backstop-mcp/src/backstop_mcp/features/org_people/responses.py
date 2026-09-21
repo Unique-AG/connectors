@@ -215,6 +215,13 @@ class PersonAtOrganizationResponse(OmitNoneModel):
             "`id` — a contact or employee id is not a people id."
         )
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this person (no tab). Omitted when this deployment has "
+            "no UI origin. Echo it; never invent one. Call build_backstop_links for tabs."
+        ),
+    )
     name: str | None = Field(
         default=None,
         description="Display name as Backstop stores it, usually 'Last, First'.",
@@ -254,20 +261,28 @@ class PersonAtOrganizationResponse(OmitNoneModel):
     )
 
     @classmethod
-    def from_employment(cls, employment: EmploymentLinkResponse) -> Self:
+    def from_employment(cls, employment: EmploymentLinkResponse, *, url: str | None) -> Self:
         """A row with no `/employees` card — a former person, who is not on that walk."""
         return cls(
             id=employment.person_id,
             search_type=employment.person_type,
+            url=url,
             employment=employment,
         )
 
     @classmethod
-    def from_resource(cls, employment: EmploymentLinkResponse, resource: EmployeeResource) -> Self:
+    def from_resource(
+        cls,
+        employment: EmploymentLinkResponse,
+        resource: EmployeeResource,
+        *,
+        url: str | None,
+    ) -> Self:
         card = resource.attributes
         return cls(
             id=employment.person_id,
             search_type=employment.person_type,
+            url=url,
             name=card.name,
             job_title=card.job_title,
             email=card.email,
@@ -385,6 +400,14 @@ class PersonResolvedResponse(OmitNoneModel):
             "Slice with the custom_field_* filters rather than fetching again."
         ),
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this person (no tab). Omitted when this deployment "
+            "has no UI origin. Echo it; never invent one. Call build_backstop_links for "
+            "tabs or a layout."
+        ),
+    )
 
 
 class OrganizationResolvedResponse(OmitNoneModel):
@@ -430,6 +453,14 @@ class OrganizationResolvedResponse(OmitNoneModel):
             "layout, group, type, and value). Fields may belong to the organization or to the "
             "shared party catalog. Empty when the record has none or the catalog could not be "
             "loaded. Slice with the custom_field_* filters rather than fetching again."
+        ),
+    )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this organization (no tab). Omitted when this "
+            "deployment has no UI origin. Echo it; never invent one. Call "
+            "build_backstop_links for tabs or a layout."
         ),
     )
 

@@ -54,6 +54,8 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "end_employment",
         "search_activities",
         "search_opportunities",
+        "build_backstop_links",
+        "parse_backstop_link",
     }
 )
 _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
@@ -185,6 +187,13 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
     ),
     "search_activities": ("meeting_call", "party_id", "search_type"),
     "search_opportunities": ("representative", "get_opportunities"),
+    "build_backstop_links": (
+        '"kind"',
+        '"party_id"',
+        "entity_activity_details_id",
+        "get_activity_history",
+    ),
+    "parse_backstop_link": ('"url"', "suggested_tool", "entity_id"),
 }
 
 

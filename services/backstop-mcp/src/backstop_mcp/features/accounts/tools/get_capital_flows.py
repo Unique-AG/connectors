@@ -87,6 +87,9 @@ async def get_capital_flows(
     `account_ids` **before** `max_rows` cuts the list. Share class lives on the original
     subscription, so the window must include that subscription's `transaction_date`, not only
     the period you are asking about.
+
+    Call like: {"start_date": "2020-01-01", "end_date": "2026-09-17",
+    "account_ids": ["<id from get_accounts_for_party>"]}
     """
     if start_date > end_date:
         raise ValueError("start_date must not be after end_date")

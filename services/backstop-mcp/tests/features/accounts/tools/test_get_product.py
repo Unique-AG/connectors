@@ -7,6 +7,7 @@ import respx
 from backstop_mcp.features.accounts import ProductResolvedResponse
 from backstop_mcp.features.accounts.tools.get_product import get_product
 from backstop_mcp.features.resolution import NotFoundResponse
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.features.accounts.conftest import make_get_product_query
 from tests.features.party_resolver.helpers import ctx_never_elicit
@@ -20,6 +21,7 @@ from tests.helpers import (
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
 _PRODUCT_ID = "1653647"
+_NO_UI_LINKS = BuildEntityLinkUtil(ui_base_url=None)
 
 
 def tenant(name: str) -> str:
@@ -104,6 +106,7 @@ class TestGetProduct:
                     client=client,
                     custom_fields=custom_fields_service(client),
                     get_product_query=make_get_product_query(client),
+                    build_entity_link_util=_NO_UI_LINKS,
                 ),
                 ProductResolvedResponse,
             )
@@ -164,6 +167,7 @@ class TestGetProduct:
                     client=client,
                     custom_fields=custom_fields_service(client),
                     get_product_query=make_get_product_query(client),
+                    build_entity_link_util=_NO_UI_LINKS,
                     **kwargs,
                 ),
                 ProductResolvedResponse,
@@ -209,6 +213,7 @@ class TestGetProduct:
                     client=client,
                     custom_fields=custom_fields_service(client),
                     get_product_query=make_get_product_query(client),
+                    build_entity_link_util=_NO_UI_LINKS,
                 ),
                 ProductResolvedResponse,
             )
@@ -234,6 +239,7 @@ class TestGetProduct:
                     client=client,
                     custom_fields=custom_fields_service(client),
                     get_product_query=make_get_product_query(client),
+                    build_entity_link_util=_NO_UI_LINKS,
                 ),
                 NotFoundResponse,
             )
@@ -255,5 +261,6 @@ class TestGetProduct:
                     client=client,
                     custom_fields=custom_fields_service(client),
                     get_product_query=make_get_product_query(client),
+                    build_entity_link_util=_NO_UI_LINKS,
                 )
         assert products.call_count == 0

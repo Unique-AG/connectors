@@ -68,6 +68,8 @@ async def list_system_users(
     whether a colleague is `disabled`. These are our staff, not investors. Pass `search` to
     keep colleagues whose name or login contains that substring. Pass refresh=true only when
     the user reports a missing colleague.
+
+    Call like: {"search": "lazarus"}
     """
     catalog, cache = await system_users.get(refresh=refresh)
     selected = tuple(catalog.values())

@@ -20,6 +20,7 @@ from backstop_mcp.features.org_people.responses import (
     PartyOrgPeopleResponse,
     PersonAtOrganizationResponse,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +44,11 @@ class GetPeopleForOrganizationQuery:
         *,
         client: BackstopClient,
         employment_index_factory: EmploymentIndexFactory,
+        build_entity_link_util: BuildEntityLinkUtil,
     ) -> None:
         self._client: BackstopClient = client
         self._employment_index_factory: EmploymentIndexFactory = employment_index_factory
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, organization_id: str, include_former: bool) -> PartyOrgPeopleResponse:
         quoted_organization_id = quote(organization_id, safe="")
@@ -138,9 +141,12 @@ class GetPeopleForOrganizationQuery:
     def _person_at_organization(
         self, employment: EmploymentLinkResponse, employee: EmployeeResource | None
     ) -> PersonAtOrganizationResponse:
+        url = self._build_entity_link_util.canonical_url(
+            target=PersonLinkTarget(party_id=employment.person_id),
+        )
         if employee is None:
-            return PersonAtOrganizationResponse.from_employment(employment)
-        return PersonAtOrganizationResponse.from_resource(employment, employee)
+            return PersonAtOrganizationResponse.from_employment(employment, url=url)
+        return PersonAtOrganizationResponse.from_resource(employment, employee, url=url)
 
     def _get_included_resources_of_type[ResourceT: BaseModel](
         self,

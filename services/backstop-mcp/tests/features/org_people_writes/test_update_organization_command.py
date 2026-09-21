@@ -15,6 +15,7 @@ from backstop_mcp.features.org_people_writes import (
     get_modify_contact_location_command_factory,
     get_update_organization_command_factory,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import (
     BASE_URL,
     client_factory,
@@ -39,11 +40,16 @@ def _update(**payload: object) -> UpdateOrganizationInput:
     return _ORG.validate_python({"party_id": _ID, **payload})
 
 
-def make_command(client: BackstopClient) -> UpdateOrganizationCommand:
+def make_command(
+    client: BackstopClient,
+    *,
+    build_entity_link_util: BuildEntityLinkUtil | None = None,
+) -> UpdateOrganizationCommand:
     return get_update_organization_command_factory(
         client,
         system_users_service=system_users_service(client),
         modify_contact_location_command=get_modify_contact_location_command_factory(client),
+        build_entity_link_util=build_entity_link_util or BuildEntityLinkUtil(ui_base_url=None),
     )
 
 
@@ -134,6 +140,7 @@ class TestUpdateOrganizationCommand:
         )
 
         assert isinstance(result, UpdatedOrganizationResponse)
+        assert result.url is None
         assert result.organization.name == "Northwind"
         assert result.organization.legal_name == "Northwind Ltd"
         assert result.organization.website == "https://northwind.example"
@@ -146,3 +153,18 @@ class TestUpdateOrganizationCommand:
         assert "email" not in dumped
         assert "legalName" not in dumped
         assert "numberOfEmployees" not in dumped
+
+    @respx.mock
+    async def test_confirmation_carries_canonical_url(self, client: BackstopClient) -> None:
+        respx.patch(f"{BASE_URL}/organizations/{_ID}").mock(return_value=_org_document())
+        respx.get(f"{BASE_URL}/organizations/{_ID}").mock(return_value=_org_document())
+
+        result = await make_command(
+            client,
+            build_entity_link_util=BuildEntityLinkUtil(ui_base_url="https://tenant.example.test"),
+        ).run(new_organization_fields=_update(website="https://example.com"), party_id=_ID)
+
+        assert result.url == (
+            "https://tenant.example.test/backstop/crm/ManageOrganization.action"
+            f"?display=&party_id={_ID}"
+        )

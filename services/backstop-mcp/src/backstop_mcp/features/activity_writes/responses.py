@@ -33,6 +33,11 @@ _ID_DESCRIPTION = "Backstop id of the activity. Echo it; never invent one."
 _TITLE_DESCRIPTION = "Title (or task name) as written. Omitted when the create did not send one."
 _COLLECTION_DESCRIPTION = "Backstop collection this record lives in."
 _RESOURCE_TYPE = Literal["notes", "meeting-or-calls", "tasks", "emails", "documents"]
+_URL_DESCRIPTION = (
+    "Canonical CRM UI URL for this record (no tab). Omitted when this deployment has "
+    "no UI origin, and for emails — the `/emails` id is not a CRM summaryId. Echo it; "
+    "never invent one."
+)
 
 
 class ActivityBaseResponse(OmitNoneModel):
@@ -43,6 +48,7 @@ class ActivityBaseResponse(OmitNoneModel):
 
 class _LoggedActivityResponse(ActivityBaseResponse):
     title: str | None = Field(default=None, description=_TITLE_DESCRIPTION)
+    url: str | None = Field(default=None, description=_URL_DESCRIPTION)
 
 
 class _LoggedMeetingOrCallResponse(_LoggedActivityResponse):
@@ -109,12 +115,14 @@ class AttachedFileResponse(ActivityBaseResponse):
     kind: Literal["document", "email"] = Field(
         description="Which collection the file was created in: document or email."
     )
+    url: str | None = Field(default=None, description=_URL_DESCRIPTION)
 
 
 class UpdatedActivityResponse(ActivityBaseResponse):
     """An activity after a successful PATCH."""
 
     resource_type: _RESOURCE_TYPE = Field(description=_COLLECTION_DESCRIPTION)
+    url: str | None = Field(default=None, description=_URL_DESCRIPTION)
 
 
 class DeletedActivityResponse(ActivityBaseResponse):

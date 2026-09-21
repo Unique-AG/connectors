@@ -31,6 +31,7 @@ from backstop_mcp.features.opportunity_writes.commands._opportunity_attributes i
 from backstop_mcp.features.opportunity_writes.responses import UpdatedOpportunityResponse
 from backstop_mcp.features.opportunity_writes.update_opportunity_input import UpdateOpportunityInput
 from backstop_mcp.features.system_users import SystemUsersService
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
 from backstop_mcp.utils import first_item, identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -49,10 +50,12 @@ class UpdateOpportunityCommand:
         client: BackstopClient,
         opportunity_stages_service: OpportunityStagesService,
         system_users_service: SystemUsersService,
+        build_entity_link_util: BuildEntityLinkUtil,
     ) -> None:
         self._client: BackstopClient = client
         self._opportunity_stages_service: OpportunityStagesService = opportunity_stages_service
         self._system_users_service: SystemUsersService = system_users_service
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, new_opportunity: UpdateOpportunityInput) -> UpdatedOpportunityResponse:
         with _tracer.start_as_current_span("opportunity_writes.command.update") as span:
@@ -106,6 +109,9 @@ class UpdateOpportunityCommand:
                 stage=stage_name,
                 stage_id=stage_id,
                 warnings=warnings,
+                url=self._build_entity_link_util.canonical_url(
+                    target=OpportunityLinkTarget(entity_id=new_opportunity.opportunity_id),
+                ),
             )
 
     async def _read(self, opportunity_id: str) -> _Document:

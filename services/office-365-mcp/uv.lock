@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.14"
 
 [manifest]
-overrides = [{ name = "fastmcp", extras = ["azure"], specifier = "==4.0.2" }]
+overrides = [{ name = "fastmcp", extras = ["azure"], specifier = "==4.0.3" }]
 
 [[package]]
 name = "aiofile"
@@ -523,14 +523,14 @@ wheels = [
 
 [[package]]
 name = "fastmcp"
-version = "4.0.2"
+version = "4.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastmcp-slim", extra = ["client", "server"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/37/1c/981a1854f91a08872f4b8b9a627d5d751cafc1340d29b21b747f0b520b0a/fastmcp-4.0.2.tar.gz", hash = "sha256:60d5c5ead3b6a117bfada5c0f95fe5c1aba53d1577079ecbdf42eeff0cd9b931", size = 42306015, upload-time = "2026-09-02T23:28:08.386Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5d/1a/bee10aff530338f3b8982a3dd1c377c3ba5d0bc724615bf358422c4e9ecf/fastmcp-4.0.3.tar.gz", hash = "sha256:0dd50baf070105ee4436c245f087ac3c047e655c32d9e783de16d0bf15783a98", size = 42311418, upload-time = "2026-09-05T00:31:36.932Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/3f/b97cfb92e0d6db8232c67c258117cd0dd9def86c8b472270bd7196d5cd9d/fastmcp-4.0.2-py3-none-any.whl", hash = "sha256:9075e64a94634ad660971ed14374c87be06f2a16a921028ca87987e6aa2f3bfa", size = 8078, upload-time = "2026-09-02T23:28:03.777Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/cb/66600db497b3be21cf141f01296308169859d48ed9b1bc8ba7c9d83279b7/fastmcp-4.0.3-py3-none-any.whl", hash = "sha256:f743f43193e1daf606e6497a9dddba5bbaad7df7957a98fd093716ecf4458b99", size = 8076, upload-time = "2026-09-05T00:31:33.957Z" },
 ]
 
 [package.optional-dependencies]
@@ -540,7 +540,7 @@ azure = [
 
 [[package]]
 name = "fastmcp-slim"
-version = "4.0.2"
+version = "4.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mcp-types" },
@@ -551,9 +551,9 @@ dependencies = [
     { name = "rich" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9c/7d/c2597734e3a0859d62c9d8f6f35067d1e296537512e280db3af19204be64/fastmcp_slim-4.0.2.tar.gz", hash = "sha256:86b99bdcb872b52d964c79bc6d43ce79f40ed5538b589d102792b4a7cf3947f4", size = 684052, upload-time = "2026-09-02T23:27:39.868Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b0/a9/b7b796b0d4a5e095dadef233833c82ac1136f5c110dd9947b2e9a4988518/fastmcp_slim-4.0.3.tar.gz", hash = "sha256:3ce04a82b82cc41ccb12bb3bb366cfd65b52bc797b8fee332a75da9d480f9b74", size = 685704, upload-time = "2026-09-05T00:31:12.346Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fa/c0/c022eba3a25ebb56111de1b5f76fbfca81925def58880464263582acfcd8/fastmcp_slim-4.0.2-py3-none-any.whl", hash = "sha256:6bd5b5885628f73263fa2247ea1d26e4a514499a6e079ee3e340cd03a7fe5ed8", size = 858100, upload-time = "2026-09-02T23:27:38.459Z" },
+    { url = "https://files.pythonhosted.org/packages/43/4b/6b31820d87f56d5773538860878c8634b618cd1e9044b3bfbd8a78380a0f/fastmcp_slim-4.0.3-py3-none-any.whl", hash = "sha256:3756ed4bd9f82f40adaf51974b7cdd1463ab6b9f479cf69b69b2692969312b87", size = 859717, upload-time = "2026-09-05T00:31:10.93Z" },
 ]
 
 [package.optional-dependencies]
@@ -1521,7 +1521,7 @@ dev = [
 requires-dist = [
     { name = "asyncpg", specifier = "==0.31.0" },
     { name = "cryptography", specifier = "==50.0.1" },
-    { name = "fastmcp", extras = ["azure"], specifier = "==4.0.2" },
+    { name = "fastmcp", extras = ["azure"], specifier = "==4.0.3" },
     { name = "httpx", extras = ["http2"], specifier = "==0.28.1" },
     { name = "mcp", specifier = "==2.2.0" },
     { name = "msgraph-sdk", specifier = "==1.62.0" },
@@ -1536,8 +1536,8 @@ requires-dist = [
     { name = "starlette", specifier = "==1.6.0" },
     { name = "tzdata", specifier = "==2026.3" },
     { name = "unique-mcp", specifier = "==2026.36.1" },
-    { name = "unique-toolkit", extras = ["monitoring", "otel"], specifier = "==2026.36.1" },
-    { name = "uvicorn", extras = ["standard"], specifier = "==0.52.4" },
+    { name = "unique-toolkit", extras = ["monitoring", "otel"], specifier = "==2026.38.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = "==0.53.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -2717,7 +2717,7 @@ wheels = [
 
 [[package]]
 name = "unique-sdk"
-version = "2026.36.1"
+version = "2026.38.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2729,14 +2729,14 @@ dependencies = [
     { name = "tiktoken" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1d/f0/997aa0cc7654cc9e0f4aaaf569840f65a9d875998d378c587dce14d1b195/unique_sdk-2026.36.1.tar.gz", hash = "sha256:396507e93502fc2bcb800ccbfb03516a9c4db13a3d63e551747a1fda3018fa31", size = 203974, upload-time = "2026-09-01T05:45:28.589Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/49/3c4fd2010cb1428f478fd16bf6c4963188eade4a0ef1226d77b0934961a4/unique_sdk-2026.38.0.tar.gz", hash = "sha256:5bab19ef1a2c974cdb10b681ec4499feb09de683a5512d8bace5e547d425aafd", size = 204452, upload-time = "2026-09-10T14:11:24.148Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d7/e5/348dad8e537ceeaf90824e55b6d2c8a4fafb4276a97f5d90fdeef18002c7/unique_sdk-2026.36.1-py3-none-any.whl", hash = "sha256:4c3dfc1de8980794449f7e60334448515ffa933c28a3bd780f2bcd3068bbbbf8", size = 251815, upload-time = "2026-09-01T05:45:26.887Z" },
+    { url = "https://files.pythonhosted.org/packages/84/80/a25d9194fb3506063614a17ee2c82a6e05ffc6ced6b28f1298ddc5307a5b/unique_sdk-2026.38.0-py3-none-any.whl", hash = "sha256:fb987d6daebdc4895e8bf147525c90fd8766a2d02823cf71f5c5d45503184f70", size = 252362, upload-time = "2026-09-10T14:11:22.954Z" },
 ]
 
 [[package]]
 name = "unique-toolkit"
-version = "2026.36.1"
+version = "2026.38.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2769,9 +2769,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "unique-sdk" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5f/b0/f8c46fd07b8f7403c469ce9c627292905231fa420ba48aad89b70b3c4672/unique_toolkit-2026.36.1.tar.gz", hash = "sha256:c924a6dcabb821a053790caa888c5f4a54d4c3d84c9f2fb5248c030ac318aea5", size = 4554340, upload-time = "2026-09-01T05:45:38.05Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cf/a0/562bf6dc4f8f45307c5f62e50700d97920870d17ef9f7839d8622af41673/unique_toolkit-2026.38.0.tar.gz", hash = "sha256:02d586ec4aee3a8d62c9247eec457860c7760446524feae5229e14d3d0fd08d0", size = 4561238, upload-time = "2026-09-10T14:11:26.946Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/c8/835bb989b7f03f3479b0cafe1d5014203e1d2d0c42e42056a6ef80deb828/unique_toolkit-2026.36.1-py3-none-any.whl", hash = "sha256:4804cca448213ba963e9cd9b7294ffb262bd01b4292d747bb7e4a6453f1c5b84", size = 4756892, upload-time = "2026-09-01T05:45:34.962Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/ec/9ce085c501214fd187269ef1c85df3f034a047225dbc068c617305bc1187/unique_toolkit-2026.38.0-py3-none-any.whl", hash = "sha256:c18e6008612c97feacb5a51d1872a78bb945b2fb7df96167dd35e2bc40f284af", size = 4764011, upload-time = "2026-09-10T14:11:25.045Z" },
 ]
 
 [package.optional-dependencies]
@@ -2796,15 +2796,15 @@ wheels = [
 
 [[package]]
 name = "uvicorn"
-version = "0.52.4"
+version = "0.53.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "h11" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f2/0f/3f86e61397dd33bf2ccf28188c40db6a740658aeebbbf6e7dbc101a1f487/uvicorn-0.52.4.tar.gz", hash = "sha256:73acfee47a0b133c5de13d219492d62d8a31e935f4fe6e41a232451a15379f86", size = 100627, upload-time = "2026-08-19T06:27:41.821Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5d/ad/04bbb797c84fc1f26cb171f7394716f4865ffb8d8c5e1eef42565c2dfa6b/uvicorn-0.53.0.tar.gz", hash = "sha256:a9356f0cb89b3b8621529c5d5eebd69bfe154f4c3f68b4cf2de47e45fa855c2e", size = 110881, upload-time = "2026-09-14T07:44:23.815Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f1/79/4a20b54ab0491485ccd8c077db2d39187c7f12b3e15485d38a7be37c81b4/uvicorn-0.52.4-py3-none-any.whl", hash = "sha256:f86e41a149d7d05a9969337e3946a9c171c06a5d42680896daaba624aeac8da1", size = 79871, upload-time = "2026-08-19T06:27:40.36Z" },
+    { url = "https://files.pythonhosted.org/packages/76/18/0eea75741ee812e9f598b687619ce2454f6c3a1c5cd21ea990ec6bd26f45/uvicorn-0.53.0-py3-none-any.whl", hash = "sha256:e8dca71ec86dce5f04e333f0d56cdedf942446e6643b9cea1af0d6d3a02cb03e", size = 87081, upload-time = "2026-09-14T07:44:22.179Z" },
 ]
 
 [package.optional-dependencies]

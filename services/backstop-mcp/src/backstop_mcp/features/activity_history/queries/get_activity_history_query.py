@@ -59,6 +59,7 @@ from backstop_mcp.features.includes import (
     ActivityTagChipResponse as ActivityTagInclude,
 )
 from backstop_mcp.features.party_resolver import ResolvedPartyDto
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, activity_link_target
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +79,11 @@ _FetchedPage = tuple[tuple[TimelineRecord, ...], bool]
 class GetActivityHistoryQuery:
     """Party record plus one page per requested stream, grouped for the published payload."""
 
-    def __init__(self, *, client: BackstopClient) -> None:
+    def __init__(
+        self, *, client: BackstopClient, build_entity_link_util: BuildEntityLinkUtil
+    ) -> None:
         self._client: BackstopClient = client
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(
         self,
@@ -387,7 +391,27 @@ class GetActivityHistoryQuery:
             tags=self._tag_chips(projected.activity_tags),
             attendees=self._attendee_chips(projected.attendees),
             gist_max_chars=gist_max_chars,
+            url=self._record_url(stream, resource.attributes),
         )
+
+    def _record_url(
+        self, stream: BackstopActivityType, attributes: ActivityAttributes
+    ) -> str | None:
+        """CRM URL from the row's `specificResource` id — the `/entity-activity-details` id.
+
+        The row's own `id` is a per-stream activities id, not that one, so a row Backstop
+        sent without `specificResource` gets no link rather than a wrong one.
+        """
+        specific = attributes.specific_resource
+        if specific is None or specific.resource_id is None:
+            return None
+        target = activity_link_target(
+            activity_type=stream,
+            entity_activity_details_id=specific.resource_id,
+        )
+        if target is None:
+            return None
+        return self._build_entity_link_util.canonical_url(target=target)
 
     def _tag_chips(
         self, tags: list[ActivityTagInclude] | None

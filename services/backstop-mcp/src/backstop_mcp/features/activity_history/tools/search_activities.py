@@ -21,6 +21,7 @@ from backstop_mcp.features.activity_history import (
     ENTITY_ACTIVITY_TYPES,
     MAX_RETRIEVABLE,
     ActivityAggregateBy,
+    EntityActivityDto,
     EntityActivityType,
     GetSearchActivitiesResponse,
     SearchActivitiesQuery,
@@ -37,6 +38,11 @@ from backstop_mcp.features.party_resolver import (
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
+from backstop_mcp.features.ui_links import (
+    BuildEntityLinkUtil,
+    activity_link_target,
+    get_build_entity_link_util_factory,
+)
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -71,6 +77,7 @@ SearchMode = Literal["rows", "aggregate"]
 SearchRowField = Literal[
     "id",
     "activity_id",
+    "url",
     "type",
     "activity_type",
     "title",
@@ -105,6 +112,22 @@ def _add_years(day: date, years: int) -> date:
         return day.replace(year=day.year + years)
     except ValueError:
         return day.replace(year=day.year + years, day=28)
+
+
+def _row_urls(
+    rows: Sequence[EntityActivityDto], build_entity_link_util: BuildEntityLinkUtil
+) -> dict[str, str | None]:
+    """Row id → CRM URL. A row whose `type` has no CRM page is absent, which reads as None."""
+    urls: dict[str, str | None] = {}
+    for row in rows:
+        target = activity_link_target(
+            activity_type=row.type,
+            entity_activity_details_id=row.id,
+        )
+        if target is None:
+            continue
+        urls[row.id] = build_entity_link_util.canonical_url(target=target)
+    return urls
 
 
 def _date_window(
@@ -268,12 +291,15 @@ async def search_activities(
                 "Sparse row fields. Default is id, activity_id, type, title, effective_date, "
                 "short_description, associated_with, tags, attendees, author, meeting_type, "
                 "attachments_count. `description` is only filled when include_description "
-                "is true. Pass `activity_id` to get_activity_detail."
+                "is true. Select `url` when the answer will link to the activities — it is "
+                "off by default so a wide sweep stays cheap. Pass `activity_id` to "
+                "get_activity_detail."
             ),
         ),
     ] = None,
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     search_activities_query: SearchActivitiesQuery = Depends(get_search_activities_query_factory),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> GetSearchActivitiesResponse | InputRequiredResult:
     """Search activities firm-wide or for one party: meetings, calls, notes, emails, documents.
 
@@ -408,6 +434,9 @@ async def search_activities(
         mode=mode,
         fields=selected_fields,
         resolved=resolved_party,
+        urls=_row_urls(fetch.rows, build_entity_link_util)
+        if mode == "rows" and "url" in selected_fields
+        else {},
         aggregates=aggregates,
         description_row_capped=include_description and max_rows > _DESCRIPTION_MAX_ROWS,
         ceiling=MAX_RETRIEVABLE,

@@ -15,6 +15,7 @@ from backstop_mcp.features.org_people_writes import (
     get_modify_contact_location_command_factory,
     get_update_person_command_factory,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import (
     BASE_URL,
     client_factory,
@@ -40,11 +41,16 @@ def _update(**payload: object) -> UpdatePersonInput:
     return _PERSON.validate_python({"party_id": _ID, **payload})
 
 
-def make_command(client: BackstopClient) -> UpdatePersonCommand:
+def make_command(
+    client: BackstopClient,
+    *,
+    build_entity_link_util: BuildEntityLinkUtil | None = None,
+) -> UpdatePersonCommand:
     return get_update_person_command_factory(
         client,
         system_users_service=system_users_service(client),
         modify_contact_location_command=get_modify_contact_location_command_factory(client),
+        build_entity_link_util=build_entity_link_util or BuildEntityLinkUtil(ui_base_url=None),
     )
 
 
@@ -122,6 +128,21 @@ class TestUpdatePersonCommand:
         assert isinstance(result, UpdatedPersonResponse)
         assert result.mobile_phone == "555-0100"
         assert result.person.mobile_phone == "555-0100"
+        assert result.url is None
+
+    @respx.mock
+    async def test_confirmation_carries_canonical_url(self, client: BackstopClient) -> None:
+        respx.patch(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
+        respx.get(f"{BASE_URL}/people/{_ID}").mock(return_value=_person_document())
+
+        result = await make_command(
+            client,
+            build_entity_link_util=BuildEntityLinkUtil(ui_base_url="https://tenant.example.test"),
+        ).run(person=_update(job_title="Managing Director"), party_id=_ID, search_type="people")
+
+        assert result.url == (
+            f"https://tenant.example.test/backstop/crm/ManagePerson.action?display=&party_id={_ID}"
+        )
 
     @respx.mock
     async def test_reread_publishes_top_level_fields_as_snake_case(

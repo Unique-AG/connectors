@@ -26,6 +26,7 @@ from backstop_mcp.features.activity_writes.internal_dto import AuthorDto
 from backstop_mcp.features.activity_writes.log_activity_input import NoteActivityInput
 from backstop_mcp.features.activity_writes.responses import LoggedNoteResponse
 from backstop_mcp.features.system_users import system_user_relationship
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, NoteLinkTarget
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,14 @@ _NoteDocument = BackstopApiSingleResourceDocument[NoteAttributes]
 class LogNoteCommand:
     """Create a note via top-level `POST /notes`."""
 
-    def __init__(self, *, client: BackstopClient) -> None:
+    def __init__(
+        self,
+        *,
+        client: BackstopClient,
+        build_entity_link_util: BuildEntityLinkUtil,
+    ) -> None:
         self._client: BackstopClient = client
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(
         self,
@@ -74,4 +81,10 @@ class LogNoteCommand:
             "activity_writes.note.created",
             extra={"id": document.data.id, "party_id": party_id},
         )
-        return LoggedNoteResponse(id=document.data.id, title=activity.title)
+        return LoggedNoteResponse(
+            id=document.data.id,
+            title=activity.title,
+            url=self._build_entity_link_util.canonical_url(
+                target=NoteLinkTarget(entity_activity_details_id=document.data.id),
+            ),
+        )

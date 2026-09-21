@@ -17,6 +17,7 @@ from backstop_mcp.features.activity_history.tools.search_activities import (
     _date_window,  # pyright: ignore[reportPrivateUsage]
     search_activities,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.features.activity_history.conftest import make_search_activities_query
 from tests.features.party_resolver.helpers import ctx_never_elicit, make_resolve_party_query
@@ -115,6 +116,45 @@ class TestSearchActivities:
         assert "description" not in row
         assert result.coverage.visible_count == 1
         assert result.coverage.ceiling_hit is False
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_url_is_off_by_default_and_arrives_when_selected(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(
+            return_value=_page(_row(), _row(2, type="Email Blast"), _row(3, type="Note"), total=3)
+        )
+
+        async def run(fields: list[str] | None) -> SearchActivitiesResolvedResponse:
+            return tool_model(
+                await search_activities(
+                    ctx_never_elicit(),
+                    start_date=date(2024, 1, 1),
+                    end_date=date(2026, 8, 20),
+                    fields=fields,  # pyright: ignore[reportArgumentType]
+                    resolve_party_query=make_resolve_party_query(client),
+                    search_activities_query=make_search_activities_query(client),
+                    build_entity_link_util=BuildEntityLinkUtil(
+                        ui_base_url="https://tenant.example.test"
+                    ),
+                ),
+                SearchActivitiesResolvedResponse,
+            )
+
+        default_rows = object_list(tool_payload(await run(None))["rows"])
+        assert "url" not in object_dict(default_rows[0])
+
+        email_url = (
+            "https://tenant.example.test/backstop/crm/collaboration/"
+            + "DisplayEmailMessage.action?summaryId=2&showControls=true"
+        )
+        selected = object_list(tool_payload(await run(["type", "url"]))["rows"])
+        assert [object_dict(row).get("url") for row in selected] == [
+            "https://tenant.example.test/backstop/activities.jsp/meetings/1",
+            email_url,
+            "https://tenant.example.test/backstop/activities.jsp/notes/3",
+        ]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -446,6 +486,7 @@ class TestSearchActivities:
             mode="aggregate",
             fields=frozenset(),
             resolved=None,
+            urls={},
             ceiling=10_000,
         )
 

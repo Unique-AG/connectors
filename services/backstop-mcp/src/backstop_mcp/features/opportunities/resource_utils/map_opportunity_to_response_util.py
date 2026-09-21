@@ -36,6 +36,7 @@ class MapOpportunityToResponseUtil:
         api_include_resources: Sequence[dict[str, object]],
         custom_fields_filters: CustomFieldFilters,
         include_stage_history: bool = True,
+        url: str | None,
     ) -> OpportunityResponse:
         stage_id = first_item(row.related_ids("stage"))
 
@@ -63,4 +64,5 @@ class MapOpportunityToResponseUtil:
             stage_id=stage_id,
             stage_history=stage_history,
             custom_field_values=tuple(custom_field_values),
+            url=url,
         )

@@ -20,6 +20,7 @@ from backstop_mcp.features.activity_writes import (
 from backstop_mcp.features.activity_writes.tools.attach_file import attach_file
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.features.system_users import SystemUserDto
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import ctx_never_elicit, make_resolve_party_query
 from tests.helpers import BASE_URL, client_factory, collection, credential
@@ -41,7 +42,9 @@ async def client() -> AsyncGenerator[BackstopClient]:
 
 def make_command(client: BackstopClient) -> AttachFileCommand:
     return get_attach_file_command_factory(
-        attach_document_command=get_attach_document_command_factory(client),
+        attach_document_command=get_attach_document_command_factory(
+            client, build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None)
+        ),
         attach_email_command=get_attach_email_command_factory(client),
     )
 
