@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.7](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.6...backstop-mcp@0.0.7) (2026-09-21)
+
+
+### Dependencies
+
+* bump uvicorn[standard] in /services/* ([#1067](https://github.com/Unique-AG/connectors/issues/1067)) ([3b93279](https://github.com/Unique-AG/connectors/commit/3b93279c15e729feb9c62ce807134fd762f86432))
+
 ## [0.0.6](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.5...backstop-mcp@0.0.6) (2026-09-21)
 
 
