@@ -85,7 +85,7 @@ one call.
 Notes:
 - Both lists come in Microsoft's default order: ascending by name.
 - Microsoft can refuse to list under a section group with error 403. Then list the notebook \
-itself, or copy a section into the group with onenote_copy_section.
+itself.
 """
 
 _NOT_A_PARENT_HANDLE = (
@@ -190,8 +190,9 @@ class Sections(BaseModel):
     capped: bool = Field(
         description=(
             "True when `limit` stopped either the section listing or the section group listing "
-            + "while Microsoft still had more to give. Ask again with a higher `limit` to see "
-            + "more. False when both listings ended on their own, however few rows came back."
+            + f"while more rows remained. Raise `limit` while it is below {MAX_SECTIONS}, or "
+            + "narrow the listing with `name_contains`. False when both listings ended on their "
+            + "own."
         )
     )
 

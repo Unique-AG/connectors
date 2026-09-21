@@ -414,7 +414,6 @@ class TestHowItDeclaresItself:
     async def test_the_description_names_the_cap_and_the_append_tool(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """onenote_list_pages and onenote_create_page moved to the page parameter's description."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         reader.register(mcp, transport)
         tool = await mcp.get_tool(reader.TOOL_NAME)

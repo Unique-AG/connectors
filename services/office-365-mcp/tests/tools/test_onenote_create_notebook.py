@@ -240,8 +240,6 @@ class TestHowItDeclaresItself:
     async def test_the_name_description_lists_the_forbidden_characters(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The forbidden-character list moved from the tool description to the `name`
-        field, so the house style keeps that fact at one home only."""
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
@@ -253,8 +251,6 @@ class TestHowItDeclaresItself:
     async def test_the_description_states_the_duplicate_name_failure_as_a_fact(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The duplicate-name failure is stated as a documented fact, not pinned to a
-        test-tenant observation."""
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""

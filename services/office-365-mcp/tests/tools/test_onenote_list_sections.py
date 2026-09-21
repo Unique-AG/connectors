@@ -400,6 +400,8 @@ class TestHowItDescribesItself:
         assert "ascending" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
         assert "whatever order" not in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
 
-    def test_the_description_and_the_parent_field_warn_about_the_section_group_403(self) -> None:
+    def test_the_description_warns_about_the_section_group_403_without_naming_a_write_tool(
+        self,
+    ) -> None:
         assert "403" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
-        assert "onenote_copy_section" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
+        assert "onenote_copy_section" not in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]

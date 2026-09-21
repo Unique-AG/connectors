@@ -998,8 +998,6 @@ class TestHowItDeclaresItself:
     async def test_the_description_says_it_is_not_the_copy_itself(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The retry warning now reads as STE guidance rather than "not safe to retry blindly",
-        but it still tells a caller not to call this tool again right after a timeout."""
         _parameters, tool = await _registered(transport)
 
         description = (tool.description or "").casefold()

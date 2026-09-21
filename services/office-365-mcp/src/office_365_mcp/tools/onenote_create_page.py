@@ -91,10 +91,9 @@ _BOTH_SECTION_AND_SECTION_NAME = (
 )
 
 _DESCRIPTION = """\
-Writes a new page into the signed-in user's OneNote. There is no draft and no review step: the \
-page exists the moment this tool returns. There is no way to attach a file or an image. \
-onenote_append_to_page adds to a page later. OneNote can show the change to everyone who opens \
-the notebook.
+Writes a new page into the signed-in user's OneNote. There is no way to attach a file or an \
+image. onenote_append_to_page adds to a page later. OneNote can show the change to everyone who \
+opens the notebook.
 
 Notes:
 - This tool asks the user to agree before it writes into a notebook that is shared with other \

@@ -1126,8 +1126,6 @@ class TestHowItDeclaresItself:
         assert "own unshared notebook" in description
 
     def test_the_element_action_matrix_lives_on_target_and_action(self) -> None:
-        """House style moved the element-action matrix, once pinned whole in the tool
-        description, onto the `target` and `action` field descriptions of each `EditCommand`."""
         target_described = EditCommand.model_fields["target"].description
         action_described = EditCommand.model_fields["action"].description
         assert target_described is not None

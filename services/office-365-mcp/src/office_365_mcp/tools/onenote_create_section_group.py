@@ -52,7 +52,6 @@ _UNNAMED_SECTION_GROUP = "an unnamed section group"
 
 _DESCRIPTION = """\
 Creates a new, empty section group directly under `parent`, a notebook or another section group. \
-There is no draft and no review step: the section group exists the moment this tool returns. \
 OneNote can show the change to everyone who opens the notebook.
 
 Notes:

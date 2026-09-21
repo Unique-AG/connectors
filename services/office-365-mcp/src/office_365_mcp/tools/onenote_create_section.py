@@ -55,9 +55,8 @@ _UNNAMED_NOTEBOOK = "an unnamed notebook"
 _UNNAMED_SECTION_GROUP = "an unnamed section group"
 
 _DESCRIPTION = """\
-Creates a new, empty section directly under `parent`, a notebook or a section group. There is no \
-draft and no review step: the section exists the moment this tool returns. OneNote can show the \
-change to everyone who opens the notebook.
+Creates a new, empty section directly under `parent`, a notebook or a section group. OneNote can \
+show the change to everyone who opens the notebook.
 
 Notes:
 - This tool asks the user to agree before it writes into a notebook that is shared with other \

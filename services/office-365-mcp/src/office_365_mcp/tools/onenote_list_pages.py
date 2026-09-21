@@ -121,9 +121,9 @@ class PageList(BaseModel):
     )
     capped: bool = Field(
         description=(
-            "True when `limit` stopped this search while Microsoft still had more matching "
-            + "pages to give. Ask again with a higher `limit` to see more of them. False when "
-            + "the search ended on its own, however few pages came back."
+            "True when `limit` stopped this search while more pages matched. Raise `limit` "
+            + f"while it is below {MAX_PAGES}. At {MAX_PAGES}, call again with `skip` set to the "
+            + "number of rows already returned. False when the search ended on its own."
         )
     )
 
