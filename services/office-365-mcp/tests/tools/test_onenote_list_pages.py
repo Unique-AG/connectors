@@ -1,3 +1,5 @@
+from datetime import UTC, date, datetime
+
 import httpx
 import pytest
 import respx
@@ -372,3 +374,258 @@ class TestGraphFailures:
     def test_a_stale_section_handle_is_answered_with_the_recovery_that_works(self) -> None:
         assert "onenote_list_notebooks" in lister.GRAPH_NOT_FOUND
         assert "fails again" in lister.GRAPH_NOT_FOUND
+
+
+async def _ordered(client: GraphServiceClient, order_by: lister.OrderBy) -> None:
+    _ = await lister.list_pages(client, order_by=order_by, limit=25)
+
+
+class TestOrderBy:
+    @pytest.mark.usefixtures("section_pages")
+    async def test_last_modified_desc_becomes_the_matching_orderby_clause(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        await _ordered(client, "last_modified_desc")
+
+        assert pages.calls.last.request.url.params["$orderby"] == "lastModifiedDateTime desc"
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_last_modified_asc_becomes_the_matching_orderby_clause(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        await _ordered(client, "last_modified_asc")
+
+        assert pages.calls.last.request.url.params["$orderby"] == "lastModifiedDateTime asc"
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_created_desc_becomes_the_matching_orderby_clause(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        await _ordered(client, "created_desc")
+
+        assert pages.calls.last.request.url.params["$orderby"] == "createdDateTime desc"
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_created_asc_becomes_the_matching_orderby_clause(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        await _ordered(client, "created_asc")
+
+        assert pages.calls.last.request.url.params["$orderby"] == "createdDateTime asc"
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_title_asc_becomes_the_matching_orderby_clause(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        await _ordered(client, "title_asc")
+
+        assert pages.calls.last.request.url.params["$orderby"] == "title asc"
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_title_desc_becomes_the_matching_orderby_clause(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        await _ordered(client, "title_desc")
+
+        assert pages.calls.last.request.url.params["$orderby"] == "title desc"
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_order_by_reaches_the_section_route_too(
+        self, client: GraphServiceClient, section_pages: respx.Route
+    ) -> None:
+        section_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, section=_SECTION, order_by="title_asc", limit=25)
+
+        assert section_pages.calls.last.request.url.params["$orderby"] == "title asc"
+
+
+class TestTheTimeWindows:
+    @pytest.mark.usefixtures("section_pages")
+    async def test_modified_after_a_date_is_a_ge_clause_at_the_start_of_the_day(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, modified_after=date(2026, 3, 4), limit=25)
+
+        assert pages.calls.last.request.url.params["$filter"] == (
+            "lastModifiedDateTime ge 2026-03-04T00:00:00Z"
+        )
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_modified_before_a_date_is_a_lt_clause_at_the_start_of_the_next_day(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, modified_before=date(2026, 3, 4), limit=25)
+
+        assert pages.calls.last.request.url.params["$filter"] == (
+            "lastModifiedDateTime lt 2026-03-05T00:00:00Z"
+        )
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_modified_before_a_moment_is_a_le_clause_at_that_second(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(
+            client, modified_before=datetime(2026, 3, 4, 9, 0, 0, tzinfo=UTC), limit=25
+        )
+
+        assert pages.calls.last.request.url.params["$filter"] == (
+            "lastModifiedDateTime le 2026-03-04T09:00:00Z"
+        )
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_created_after_and_before_use_createddatetime(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(
+            client,
+            created_after=date(2026, 1, 1),
+            created_before=date(2026, 1, 31),
+            limit=25,
+        )
+
+        assert pages.calls.last.request.url.params["$filter"] == (
+            "createdDateTime ge 2026-01-01T00:00:00Z and createdDateTime lt 2026-02-01T00:00:00Z"
+        )
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_a_window_and_title_contains_are_joined_with_and(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(
+            client, modified_after=date(2026, 3, 4), title_contains="Roadmap", limit=25
+        )
+
+        assert pages.calls.last.request.url.params["$filter"] == (
+            "lastModifiedDateTime ge 2026-03-04T00:00:00Z and contains(tolower(title),'roadmap')"
+        )
+
+    async def test_a_backwards_modified_window_never_reaches_graph(
+        self, client: GraphServiceClient, pages: respx.Route, section_pages: respx.Route
+    ) -> None:
+        with pytest.raises(ToolError, match="modified_after"):
+            _ = await lister.list_pages(
+                client,
+                modified_after=date(2026, 3, 5),
+                modified_before=date(2026, 3, 1),
+                limit=25,
+            )
+
+        assert pages.call_count == 0
+        assert section_pages.call_count == 0
+
+    async def test_a_backwards_created_window_never_reaches_graph(
+        self, client: GraphServiceClient, pages: respx.Route, section_pages: respx.Route
+    ) -> None:
+        with pytest.raises(ToolError, match="created_after"):
+            _ = await lister.list_pages(
+                client,
+                created_after=date(2026, 3, 5),
+                created_before=date(2026, 3, 1),
+                limit=25,
+            )
+
+        assert pages.call_count == 0
+        assert section_pages.call_count == 0
+
+
+class TestSkip:
+    @pytest.mark.usefixtures("section_pages")
+    async def test_skip_zero_sends_no_skip(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, skip=0, limit=25)
+
+        assert "$skip" not in pages.calls.last.request.url.params
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_a_positive_skip_is_sent(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, skip=10, limit=25)
+
+        assert pages.calls.last.request.url.params["$skip"] == "10"
+
+
+class TestIncludeLevelAndOrder:
+    async def test_pagelevel_is_sent_raw_on_the_section_route(
+        self, client: GraphServiceClient, section_pages: respx.Route
+    ) -> None:
+        section_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(
+            client, section=_SECTION, include_level_and_order=True, limit=25
+        )
+
+        assert section_pages.calls.last.request.url.params["pagelevel"] == "true"
+
+    async def test_the_typed_parameters_still_reach_the_wire_alongside_pagelevel(
+        self, client: GraphServiceClient, section_pages: respx.Route
+    ) -> None:
+        section_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, section=_SECTION, include_level_and_order=True, limit=7)
+
+        params = section_pages.calls.last.request.url.params
+        assert params["$select"].split(",") == list(PAGE_FIELDS)
+        assert params["$top"] == "7"
+
+    async def test_without_a_section_it_is_refused_before_reaching_graph(
+        self, client: GraphServiceClient, pages: respx.Route, section_pages: respx.Route
+    ) -> None:
+        with pytest.raises(ToolError, match="section"):
+            _ = await lister.list_pages(client, include_level_and_order=True, limit=25)
+
+        assert pages.call_count == 0
+        assert section_pages.call_count == 0
+
+    async def test_level_and_order_flow_into_the_page_summary(
+        self, client: GraphServiceClient, section_pages: respx.Route
+    ) -> None:
+        payload = _page_payload(_PAGE_ID)
+        payload["level"] = 1
+        payload["order"] = 3
+        section_pages.mock(return_value=_page(payload))
+
+        answer = await lister.list_pages(
+            client, section=_SECTION, include_level_and_order=True, limit=25
+        )
+
+        assert answer.pages[0].level == 1
+        assert answer.pages[0].order == 3
+
+    async def test_level_and_order_are_null_when_not_asked_for(
+        self, client: GraphServiceClient, section_pages: respx.Route
+    ) -> None:
+        section_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        answer = await lister.list_pages(client, section=_SECTION, limit=25)
+
+        assert answer.pages[0].level is None
+        assert answer.pages[0].order is None

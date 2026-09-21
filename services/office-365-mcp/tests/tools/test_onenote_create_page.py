@@ -156,6 +156,7 @@ async def _create(client: GraphServiceClient, **overrides: object) -> CreatedPag
         title=cast("str", arguments["title"]),
         body_html=cast("str", arguments["body_html"]),
         section=cast("str | None", arguments.get("section")),
+        section_name=cast("str | None", arguments.get("section_name")),
         now=now,
         confirm=confirm,
     )
@@ -299,6 +300,66 @@ class TestTheSectionItRefuses:
     ) -> None:
         with pytest.raises(ToolError, match="onenote_list_notebooks"):
             _ = await _create(client, section="General")
+
+
+class TestSectionName:
+    async def test_section_name_is_sent_as_a_raw_query_parameter(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _no_default_notebook(graph)
+        route = _creates(graph, _DEFAULT_ROUTE, _page_payload())
+
+        _ = await _create(client, section_name="Planning")
+
+        assert route.calls.last.request.url.params["sectionName"] == "Planning"
+
+    async def test_no_section_name_sends_no_query_parameter_at_all(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _no_default_notebook(graph)
+        route = _creates(graph, _DEFAULT_ROUTE, _page_payload())
+
+        _ = await _create(client)
+
+        assert route.calls.last.request.url.params == httpx.QueryParams()
+
+    async def test_both_section_and_section_name_are_refused_before_reaching_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        default_route = graph.post(_DEFAULT_ROUTE).mock(return_value=httpx.Response(201))
+        section_route = graph.post(_SECTION_ROUTE).mock(return_value=httpx.Response(201))
+
+        with pytest.raises(ToolError, match="section_name"):
+            _ = await _create(client, section=_SECTION_URI, section_name="Planning")
+
+        assert default_route.call_count == 0
+        assert section_route.call_count == 0
+
+    async def test_the_refusal_names_both_arguments_as_alternatives(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError, match="never both") as refused:
+            _ = await _create(client, section=_SECTION_URI, section_name="Planning")
+
+        assert "`section`" in str(refused.value)
+        assert "`section_name`" in str(refused.value)
+
+    async def test_the_about_digest_uses_section_name_instead_of_default(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads_default_notebooks(graph, _notebook_payload(is_shared=True, user_role="Owner"))
+        _ = _creates(graph, _DEFAULT_ROUTE, _page_payload())
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _create(client, section_name="Planning", confirm=capturing)
+
+        assert bound[0] == write_state_for("create", "Planning", _TITLE, _BODY_HTML)
+        assert bound[0] != write_state_for("create", "default", _TITLE, _BODY_HTML)
 
 
 class TestWhatItAnswers:
@@ -508,13 +569,13 @@ class TestHowItDeclaresItself:
         assert annotations.destructive_hint is WRITE_ADDITIVE["destructiveHint"]
         assert annotations.idempotent_hint is WRITE_ADDITIVE["idempotentHint"]
 
-    async def test_it_takes_three_arguments_and_no_others(
+    async def test_it_takes_four_arguments_and_no_others(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"title", "body_html", "section"}
+        assert set(properties) == {"title", "body_html", "section", "section_name"}
         assert cast("list[str]", parameters["required"]) == ["title", "body_html"]
 
     async def test_the_description_says_it_writes_now_and_cannot_attach(
@@ -536,6 +597,14 @@ class TestHowItDeclaresItself:
         description = tool.description or ""
         assert "shared with other people or belongs to somebody else" in description
         assert "written without a question" in description
+
+    async def test_the_description_covers_section_name(self, transport: httpx.AsyncClient) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "section_name" in description
+        assert "creating a new section there under that name" in description
+        assert "?" in description and "~" in description
 
     async def test_no_argument_offers_an_attachment(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)

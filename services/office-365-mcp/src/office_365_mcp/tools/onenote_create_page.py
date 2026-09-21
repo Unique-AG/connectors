@@ -7,14 +7,19 @@ import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.method import Method
-from kiota_abstractions.request_information import RequestInformation
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import (
+    graph_errors,
+    graph_step,
+    no_retry,
+    not_graph,
+    request_with_query,
+)
 from office_365_mcp.shared.handles import (
     OnenotePageHandle,
     OnenoteSectionHandle,
@@ -53,6 +58,10 @@ MAX_TITLE_CHARACTERS = 255
 
 MAX_BODY_CHARACTERS = 500_000
 
+MAX_SECTION_NAME_CHARACTERS = 50
+
+_FORBIDDEN_SECTION_NAME_CHARACTERS = "? * / : < > | & # ' % ~"
+
 GRAPH_NOT_FOUND = (
     "Microsoft 365 will not create this page. If this call named a `section`, the handle is well "
     + "formed, so the section was most likely deleted, moved into a different notebook, which "
@@ -72,6 +81,15 @@ _NOT_A_SECTION_HANDLE = (
     + "to create the page in the default section of the default notebook instead."
 )
 
+_BOTH_SECTION_AND_SECTION_NAME = (
+    "onenote_create_page takes at most one of `section` and `section_name`: they are two "
+    + "different ways to pick the section this page is written into. `section` addresses any "
+    + "section in any notebook by its handle; `section_name` picks a section by name, only ever "
+    + "inside the signed-in user's default notebook, and Microsoft creates a section by that "
+    + "name there when none already matches. Pass one or the other, never both, or omit both to "
+    + "write into the default section of the default notebook."
+)
+
 _DESCRIPTION = """\
 Write a brand-new page into the signed-in user's own OneNote, right now. This is not a draft: \
 there is no review step, nobody approves it first, and the page exists in the notebook the \
@@ -82,7 +100,13 @@ when the notebook is shared with other people or belongs to somebody else, or wh
 does not report who can see it, because the page is visible to them the moment it is written. \
 A page in the user's own unshared notebook is written without a question. Pass a `section` \
 handle from onenote_list_notebooks to choose which section holds the new page; omit `section` \
-and Microsoft creates it in the default section of the default notebook instead. `body_html` \
+and Microsoft creates it in the default section of the default notebook instead. `section_name` \
+is the other way to pick a section: give it a name and Microsoft writes the page into the \
+section by that name inside the default notebook, creating a new section there under that name \
+first when none already matches — a typo in `section_name` makes a new, almost-empty section \
+rather than failing outright. `section_name` only ever reaches the default notebook, never any \
+other one, and forbidden in it are `? * / : < > | & # ' % ~`. Pass at most one of `section` and \
+`section_name`; never both. `body_html` \
 is HTML, not \
 plain text: a newline in it is not a line break. Write `<p>` and `<br>` for structure, \
 `<h1>` through `<h6>` for headings, `<ul>`/`<ol>`/`<li>` for lists, `<table>` for a table, and \
@@ -184,6 +208,7 @@ async def create_page(
     title: str,
     body_html: str,
     section: str | None = None,
+    section_name: str | None = None,
     now: Callable[[], datetime] = _now,
     confirm: Confirm,
     answer_pending: bool = False,
@@ -194,6 +219,11 @@ async def create_page(
     assert 1 <= len(body_html) <= MAX_BODY_CHARACTERS, (
         f"body_html is bounded by the schema, got {len(body_html)}"
     )
+    assert section_name is None or 1 <= len(section_name) <= MAX_SECTION_NAME_CHARACTERS, (
+        f"section_name is bounded by the schema, got {len(section_name or '')}"
+    )
+    if section is not None and section_name is not None:
+        raise ToolError(_BOTH_SECTION_AND_SECTION_NAME)
     handle = _section_to_write_to(section)
     html_bytes = _envelope(title, body_html, now()).encode("utf-8")
 
@@ -202,12 +232,17 @@ async def create_page(
         if handle is None
         else client.me.onenote.sections.by_onenote_section_id(handle.section_id).pages
     )
-    request = RequestInformation(Method.POST, pages.url_template, pages.path_parameters)
+    raw_query: dict[str, str] = {"sectionName": section_name} if section_name is not None else {}
+    request = request_with_query(
+        Method.POST, pages.url_template, pages.path_parameters, query=raw_query
+    )
     request.headers.try_add("Accept", "application/json")
     request.set_stream_content(html_bytes, "text/html")
     request.add_request_options(no_retry())
 
-    about = write_state_for("create", handle.section_id if handle else "default", title, body_html)
+    about = write_state_for(
+        "create", handle.section_id if handle else (section_name or "default"), title, body_html
+    )
     created: OnenotePage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
@@ -328,6 +363,21 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
+        section_name: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                max_length=MAX_SECTION_NAME_CHARACTERS,
+                description=(
+                    "The other way to pick the section: a name, inside the signed-in user's "
+                    + "default notebook only. Microsoft creates a new section by this name "
+                    + "there when none already matches, so a typo makes a new, almost-empty "
+                    + "section rather than failing. Forbidden: "
+                    + f"{_FORBIDDEN_SECTION_NAME_CHARACTERS}. Pass at most one of `section` and "
+                    + "`section_name`; giving both is refused."
+                ),
+            ),
+        ] = None,
         client: GraphServiceClient = graph,
     ) -> CreatedPage | InputRequiredResult:
         return await create_page(
@@ -335,6 +385,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             title=title,
             body_html=body_html,
             section=section,
+            section_name=section_name,
             confirm=a_person_agrees(ctx),
             answer_pending=answer_pending(ctx),
         )

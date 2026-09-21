@@ -81,8 +81,10 @@ def content(graph: respx.MockRouter) -> respx.Route:
     )
 
 
-async def _read(client: GraphServiceClient, *, page: str = _PAGE) -> reader.PageContent:
-    return await reader.onenote_read_page(client, page=page)
+async def _read(
+    client: GraphServiceClient, *, page: str = _PAGE, include_ids: bool = False
+) -> reader.PageContent:
+    return await reader.onenote_read_page(client, page=page, include_ids=include_ids)
 
 
 class TestWhatItAsks:
@@ -347,8 +349,10 @@ class TestHowItDeclaresItself:
         assert "1 MB" in described
         assert "opens only with this connector's own sign-in token" in described
         assert "This tool converts nothing" in described
+        assert "onenote_edit_page" in described
+        assert "include_ids" in described
 
-    async def test_it_takes_one_argument_and_it_is_the_page_handle(
+    async def test_it_takes_the_page_handle_and_include_ids(
         self, transport: httpx.AsyncClient
     ) -> None:
         mcp: FastMCP = FastMCP(name="schema-under-test")
@@ -358,5 +362,31 @@ class TestHowItDeclaresItself:
 
         parameters = tool.parameters
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"page"}
+        assert set(properties) == {"page", "include_ids"}
         assert parameters["required"] == ["page"]
+
+
+class TestIncludeIds:
+    @pytest.mark.usefixtures("page")
+    async def test_by_default_no_query_parameter_is_sent(
+        self, client: GraphServiceClient, content: respx.Route
+    ) -> None:
+        _ = await _read(client)
+
+        assert content.calls.last.request.url.params == httpx.QueryParams()
+
+    @pytest.mark.usefixtures("page")
+    async def test_include_ids_true_sends_the_raw_query_parameter(
+        self, client: GraphServiceClient, content: respx.Route
+    ) -> None:
+        _ = await _read(client, include_ids=True)
+
+        assert content.calls.last.request.url.params["includeIDs"] == "true"
+
+    @pytest.mark.usefixtures("content")
+    async def test_include_ids_does_not_reach_the_page_metadata_call(
+        self, client: GraphServiceClient, page: respx.Route
+    ) -> None:
+        _ = await _read(client, include_ids=True)
+
+        assert "includeIDs" not in page.calls.last.request.url.params

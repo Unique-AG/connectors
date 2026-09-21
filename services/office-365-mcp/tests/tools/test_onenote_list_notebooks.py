@@ -4,7 +4,11 @@ import respx
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
-from office_365_mcp.shared.handles import OnenoteSectionHandle
+from office_365_mcp.shared.handles import (
+    OnenoteNotebookHandle,
+    OnenoteSectionGroupHandle,
+    OnenoteSectionHandle,
+)
 from office_365_mcp.tools import onenote_list_notebooks as lister
 
 from .conftest import GRAPH_V1
@@ -40,7 +44,7 @@ _SECTION_FOUR = "1-SYNTHETICSECTIONFOUR00000000000000000!304"
 
 
 def _notebook_payload(
-    notebook_id: str,
+    notebook_id: str | None,
     *,
     display_name: str | None = "Engineering",
     is_default: bool | None = True,
@@ -469,3 +473,125 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await lister.list_notebooks(client)
+
+
+class TestTheNotebookFilter:
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_name_contains_becomes_a_lowercase_contains_filter(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        _ = await lister.list_notebooks(client, name_contains="Eng")
+
+        params = notebooks_route.calls.last.request.url.params
+        assert params["$filter"] == "contains(tolower(displayName),'eng')"
+
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_shared_true_becomes_an_is_shared_filter(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        _ = await lister.list_notebooks(client, shared=True)
+
+        assert notebooks_route.calls.last.request.url.params["$filter"] == "isShared eq true"
+
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_shared_false_becomes_an_is_shared_filter(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        _ = await lister.list_notebooks(client, shared=False)
+
+        assert notebooks_route.calls.last.request.url.params["$filter"] == "isShared eq false"
+
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_role_becomes_a_userrole_filter(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        _ = await lister.list_notebooks(client, role="Owner")
+
+        assert notebooks_route.calls.last.request.url.params["$filter"] == "userRole eq 'Owner'"
+
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_all_three_clauses_are_joined_with_and(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        _ = await lister.list_notebooks(
+            client, name_contains="Eng", shared=True, role="Contributor"
+        )
+
+        assert notebooks_route.calls.last.request.url.params["$filter"] == (
+            "contains(tolower(displayName),'eng') and isShared eq true and "
+            + "userRole eq 'Contributor'"
+        )
+
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    @pytest.mark.usefixtures("notebooks_route")
+    async def test_the_filter_never_reaches_the_sections_or_groups_calls(
+        self,
+        client: GraphServiceClient,
+        sections_route: respx.Route,
+        groups_route: respx.Route,
+    ) -> None:
+        _ = await lister.list_notebooks(client, name_contains="Eng", shared=True, role="Owner")
+
+        assert "$filter" not in sections_route.calls.last.request.url.params
+        assert "$filter" not in groups_route.calls.last.request.url.params
+
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_no_arguments_send_no_filter(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        _ = await lister.list_notebooks(client)
+
+        assert "$filter" not in notebooks_route.calls.last.request.url.params
+
+
+class TestNotebookAndSectionGroupHandles:
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_a_notebook_carries_its_own_handle(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        notebooks_route.mock(return_value=_page(_notebook_payload(_ENGINEERING)))
+
+        result = await lister.list_notebooks(client)
+
+        assert result.notebooks[0].uri == OnenoteNotebookHandle(_ENGINEERING).uri
+
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_a_notebook_with_no_id_is_dropped(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        notebooks_route.mock(
+            return_value=_page(
+                _notebook_payload(None, display_name="No id"),
+                _notebook_payload(_ENGINEERING, display_name="Has id"),
+            )
+        )
+
+        result = await lister.list_notebooks(client)
+
+        assert [notebook.name for notebook in result.notebooks] == ["Has id"]
+
+    @pytest.mark.usefixtures("groups_route", "notebooks_route")
+    async def test_a_section_directly_under_its_notebook_has_no_group_uri(
+        self, client: GraphServiceClient, sections_route: respx.Route
+    ) -> None:
+        sections_route.mock(return_value=_page(_section_payload(_STANDUPS, group_id=None)))
+
+        result = await lister.list_notebooks(client)
+
+        assert result.notebooks[0].sections[0].group_uri is None
+
+    @pytest.mark.usefixtures("notebooks_route")
+    async def test_a_section_inside_a_group_carries_that_groups_handle(
+        self,
+        client: GraphServiceClient,
+        sections_route: respx.Route,
+        groups_route: respx.Route,
+    ) -> None:
+        sections_route.mock(return_value=_page(_section_payload(_STANDUPS, group_id=_OUTER_GROUP)))
+        groups_route.mock(return_value=_page(_group_payload(_OUTER_GROUP)))
+
+        result = await lister.list_notebooks(client)
+
+        assert result.notebooks[0].sections[0].group_uri == (
+            OnenoteSectionGroupHandle(_OUTER_GROUP).uri
+        )
