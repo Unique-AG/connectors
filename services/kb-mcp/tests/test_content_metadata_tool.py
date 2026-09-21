@@ -9,12 +9,13 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import unique_sdk
 from fastmcp.tools import ToolResult
 from pydantic import SecretStr
 
 from kb_mcp import cached_walk
 from kb_mcp.tools.content_metadata import ContentMetadataToolConfig, content_metadata
-from kb_mcp.tools.content_metadata.tool import _clamped_timeout, _flatten_metadata_value
+from kb_mcp.tools.content_metadata.tool import _flatten_metadata_value
 from kb_mcp.tools.content_tree import cache as ct_cache
 
 pytestmark = pytest.mark.ai
@@ -42,6 +43,16 @@ def identity(monkeypatch):
     mock = AsyncMock(return_value=_make_settings())
     monkeypatch.setattr(
         "kb_mcp.tools.content_metadata.tool.get_unique_settings_async", mock
+    )
+    return mock
+
+
+@pytest.fixture(autouse=True)
+def readable_folders(monkeypatch):
+    """folder_ids are probed before the walk; default every id to readable."""
+    mock = AsyncMock(return_value={"id": "scope_a"})
+    monkeypatch.setattr(
+        "kb_mcp.tools.content_metadata.tool.unique_sdk.Folder.get_info_async", mock
     )
     return mock
 
@@ -119,13 +130,6 @@ def test_flatten_metadata_value_list_expands_each_element():
 def test_flatten_metadata_value_drops_nested_objects():
     assert _flatten_metadata_value(["a", {"nested": True}, ["b"]]) == ["a"]
     assert _flatten_metadata_value({"nested": True}) == []
-
-
-def test_clamped_timeout_uses_default_then_ceiling():
-    assert _clamped_timeout(None) == 30.0
-    assert _clamped_timeout(12.0) == 12.0
-    assert _clamped_timeout(300.0) == 45.0
-    assert _clamped_timeout(-1.0) == 0.0
 
 
 @pytest.mark.asyncio
@@ -610,3 +614,31 @@ async def test_logs_never_contain_raw_user_or_company_id(caplog):
     for record in caplog.records:
         assert "user-1" not in record.getMessage()
         assert "company-1" not in record.getMessage()
+
+
+@pytest.mark.asyncio
+async def test_unreadable_folder_id_surfaces_as_tool_error(readable_folders):
+    """The walk cannot report this: unique_toolkit turns a failed listing into
+    no children, so without the probe it renders as an empty catalog."""
+    readable_folders.side_effect = unique_sdk.APIError("no folder with that scope id")
+
+    with patch("kb_mcp.tools.content_metadata.tool.ScopedContentTree") as mock_cls:
+        result = await content_metadata(
+            folder_ids=["scope_denied"], config=ContentMetadataToolConfig()
+        )
+
+    assert result.is_error is True
+    assert "scope_denied" in result.content[0].text  # type: ignore[union-attr]
+    mock_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_backend_outage_does_not_claim_the_id_is_wrong(readable_folders):
+    readable_folders.side_effect = unique_sdk.APIConnectionError("kb unreachable")
+
+    result = await content_metadata(
+        folder_ids=["scope_a"], config=ContentMetadataToolConfig()
+    )
+
+    assert result.is_error is True
+    assert "temporarily unavailable" in result.content[0].text  # type: ignore[union-attr]

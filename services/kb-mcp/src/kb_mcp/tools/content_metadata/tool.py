@@ -20,6 +20,7 @@ import asyncio
 import json
 import logging
 from collections import Counter, defaultdict
+from collections.abc import Sequence
 from typing import Annotated, Any
 
 import unique_sdk
@@ -42,16 +43,11 @@ from kb_mcp.correlation import correlation_id
 from kb_mcp.scoped_walk import ScopedContentTree
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_metadata.config import ContentMetadataToolConfig
-from kb_mcp.tools.content_metadata.metadata_filter import (
-    build_folder_scoped_metadata_filter,
-)
 from kb_mcp.tools.content_tree.cache import get_tree_cache
 from kb_mcp.tools.content_tree.config import DEFAULT_METADATA_FILTER_STATEMENT
+from kb_mcp.tools.search.metadata_filter import merge_request_metadata_filter
 
 _LOGGER = logging.getLogger(__name__)
-
-_DEFAULT_TIMEOUT_SECONDS = 30.0
-_MAX_TIMEOUT_SECONDS = 45.0
 
 _INCOMPLETE_NOTICE = (
     "This scan is incomplete. The catalog is still being built in the "
@@ -60,9 +56,32 @@ _INCOMPLETE_NOTICE = (
 )
 
 
-def _clamped_timeout(requested: float | None) -> float:
-    raw = _DEFAULT_TIMEOUT_SECONDS if requested is None else requested
-    return min(max(0.0, raw), _MAX_TIMEOUT_SECONDS)
+async def _unreadable_folder_ids(
+    folder_ids: Sequence[str],
+    *,
+    user_id: str,
+    company_id: str,
+    concurrency: int,
+) -> list[str]:
+    """Folder ids whose listing the caller cannot read. Probed up front because
+    unique_toolkit swallows a failed listing, which would render as an empty
+    catalog rather than an error."""
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def _readable(scope_id: str) -> bool:
+        async with semaphore:
+            try:
+                await unique_sdk.Folder.get_info_async(
+                    user_id=user_id, company_id=company_id, scopeId=scope_id
+                )
+            except unique_sdk.UniqueError as exc:
+                # Only the exception separates a bad id from a backend outage.
+                _LOGGER.info("folder_id %s not readable", scope_id, exc_info=exc)
+                return False
+            return True
+
+    readable = await asyncio.gather(*(_readable(f) for f in folder_ids))
+    return [fid for fid, ok in zip(folder_ids, readable, strict=True) if not ok]
 
 
 def _flatten_metadata_value(value: Any) -> list[Any]:
@@ -209,6 +228,28 @@ async def content_metadata(
         # ids. The backend's lookup needs an absolute path, so bare ones are
         # normalized rather than making the caller know that.
         effective_folder_ids = folder_ids
+        if folder_ids:
+            unreadable = await _unreadable_folder_ids(
+                folder_ids,
+                user_id=user_id,
+                company_id=company_id,
+                concurrency=config.max_concurrent_scope_lookups,
+            )
+            if unreadable:
+                return ToolResult(
+                    is_error=True,
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=(
+                                f"No folder readable at folder_ids: {unreadable}. "
+                                "Pass scope_xxx ids from content_tree(mode='tree') "
+                                "output, or retry if the knowledge base is "
+                                "temporarily unavailable."
+                            ),
+                        )
+                    ],
+                )
         if folder_paths:
             resolved_ids = await asyncio.gather(
                 *(
@@ -250,13 +291,11 @@ async def content_metadata(
         if refresh:
             tree_svc.invalidate_cache()
 
-        metadata_filter = build_folder_scoped_metadata_filter(
-            None if use_scoped_walk else effective_folder_ids,
-            include_subfolders=include_subfolders,
+        metadata_filter = merge_request_metadata_filter(
             admin_metadata_filter=config.metadata_filter
             or DEFAULT_METADATA_FILTER_STATEMENT,
         )
-        wait = _clamped_timeout(timeout)
+        wait = kb_settings.clamped_walk_timeout(timeout)
         # All admin here — no LLM filter reaches this tool — so the whole thing
         # rides in the walk and nothing is filtered in memory.
         snapshot = await resolve_filtered_snapshot(

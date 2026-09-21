@@ -45,7 +45,6 @@ from kb_mcp.tools.content_tree import (
 from kb_mcp.tools.content_tree import cache as ct_cache
 from kb_mcp.tools.content_tree import tool as ct_module
 from kb_mcp.tools.content_tree.cache import expire_idle_trees
-from kb_mcp.tools.content_tree.tool import clamped_content_tree_timeout
 
 pytestmark = pytest.mark.ai
 
@@ -828,22 +827,6 @@ async def test_list_orphan_with_scope_owner_keeps_deep_link(monkeypatch):
         "(https://example.unique.app/knowledge-upload/scope_leaf?file=c_scope)" in text
     )
     assert "(content_id=c_scope)" in text
-
-
-def test_clamped_timeout_uses_default_then_ceiling(monkeypatch):
-    get_settings.cache_clear()
-    settings = get_settings()
-    assert clamped_content_tree_timeout(None, settings) == 30.0
-    assert clamped_content_tree_timeout(12.0, settings) == 12.0
-    assert clamped_content_tree_timeout(300.0, settings) == 45.0
-    assert clamped_content_tree_timeout(-1.0, settings) == 0.0
-
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS", "20")
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS", "25")
-    get_settings.cache_clear()
-    settings = get_settings()
-    assert clamped_content_tree_timeout(None, settings) == 20.0
-    assert clamped_content_tree_timeout(40.0, settings) == 25.0
 
 
 @pytest.mark.asyncio

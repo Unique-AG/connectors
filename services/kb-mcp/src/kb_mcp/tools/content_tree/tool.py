@@ -40,7 +40,7 @@ from kb_mcp.references import (
     markdown_citation_link,
 )
 from kb_mcp.scoped_walk import ScopedContentTree
-from kb_mcp.settings import Settings, get_settings
+from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_tree.cache import get_tree_cache
 from kb_mcp.tools.content_tree.config import (
     DEFAULT_METADATA_FILTER_STATEMENT,
@@ -94,11 +94,6 @@ def _with_empty_metadata_filter_hint(
     if empty and complete and llm_filter is not None:
         return f"{body}\n{METADATA_FILTER_EMPTY_RETRY_HINT}"
     return body
-
-
-def clamped_content_tree_timeout(requested: float | None, settings: Settings) -> float:
-    raw = settings.content_tree_timeout_seconds if requested is None else requested
-    return min(max(0.0, raw), settings.content_tree_max_timeout_seconds)
 
 
 def _mode_misuse_error(
@@ -503,7 +498,7 @@ async def content_tree(
             admin_metadata_filter=None, llm_metadata_filter=parsed_llm_filter
         )
         assert admin_metadata_filter is not None
-        wait = clamped_content_tree_timeout(timeout, kb_settings)
+        wait = kb_settings.clamped_walk_timeout(timeout)
         # Walk one level past max_depth — otherwise a folder exactly at the
         # cutoff never gets its own contents visited and stays id-less.
         walk_depth = None

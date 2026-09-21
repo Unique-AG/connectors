@@ -145,3 +145,19 @@ def test_scope_lookup_concurrency_env_override(monkeypatch):
     monkeypatch.setenv("KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY", "3")
     get_settings.cache_clear()
     assert get_settings().scope_lookup_concurrency == 3
+
+
+def test_clamped_walk_timeout_uses_default_then_ceiling():
+    settings = Settings()
+    assert settings.clamped_walk_timeout(None) == 30.0
+    assert settings.clamped_walk_timeout(12.0) == 12.0
+    assert settings.clamped_walk_timeout(300.0) == 45.0
+    assert settings.clamped_walk_timeout(-1.0) == 0.0
+
+
+def test_clamped_walk_timeout_follows_configured_values(monkeypatch):
+    monkeypatch.setenv("KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS", "20")
+    monkeypatch.setenv("KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS", "25")
+    settings = Settings()
+    assert settings.clamped_walk_timeout(None) == 20.0
+    assert settings.clamped_walk_timeout(40.0) == 25.0

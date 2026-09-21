@@ -95,8 +95,9 @@ class Settings(BaseSettings):
         default=30.0,
         ge=0,
         description=(
-            "Default seconds content_tree waits before returning a partial "
-            "tree. The walk keeps running; a follow-up call is usually instant."
+            "Default seconds content_tree and content_metadata wait before "
+            "returning a partial result. The walk keeps running; a follow-up "
+            "call is usually instant."
         ),
         validation_alias="KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS",
     )
@@ -104,9 +105,9 @@ class Settings(BaseSettings):
         default=45.0,
         ge=0,
         description=(
-            "Ceiling on content_tree timeout. Must stay below the MCP client's "
-            "own budget (~60s) or an LLM-supplied value silently disables the "
-            "partial-tree guarantee."
+            "Ceiling on the content_tree and content_metadata timeout. Must "
+            "stay below the MCP client's own budget (~60s) or an LLM-supplied "
+            "value silently disables the partial-result guarantee."
         ),
         validation_alias="KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS",
     )
@@ -203,6 +204,11 @@ class Settings(BaseSettings):
         if self.frontend_base_url is None:
             return None
         return str(self.frontend_base_url).rstrip("/")
+
+    def clamped_walk_timeout(self, requested: float | None) -> float:
+        """Seconds a folder-walk tool waits, bounded by the configured ceiling."""
+        raw = self.content_tree_timeout_seconds if requested is None else requested
+        return min(max(0.0, raw), self.content_tree_max_timeout_seconds)
 
     @model_validator(mode="after")
     def _content_tree_timeout_is_within_max(self) -> Settings:
