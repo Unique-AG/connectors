@@ -82,6 +82,12 @@ WRITE_DESTRUCTIVE: dict[str, bool] = {
     "idempotentHint": False,
     "openWorldHint": True,
 }
+WRITE_DESTRUCTIVE_IDEMPOTENT: dict[str, bool] = {
+    "readOnlyHint": False,
+    "destructiveHint": True,
+    "idempotentHint": True,
+    "openWorldHint": True,
+}
 
 # This is what a tool file's own permissions are checked against. Without it, a misspelling like
 # `Chat.Raed` is only ever compared with itself: Entra rejects an unknown scope at the authorize
@@ -456,6 +462,7 @@ def _token_advice(failure: BaseException, permissions: tuple[str, ...]) -> str:
 
 
 _TOO_MANY_REQUESTS = 429
+_CONFLICT = 409
 
 # Graph's inner error code for the tenant switch, branched on rather than the message text, as
 # Microsoft's transcript reference instructs twice. `services/teams-mcp` met this switch first
@@ -544,6 +551,13 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
             + "Nothing was wrong with the request and no other arguments will avoid it. Retry once "
             + "if the list matters; if it happens again, stop and report it, because the list "
             + "cannot be read while Microsoft answers this way."
+        )
+    if failure.status == _CONFLICT:
+        return (
+            "Microsoft 365 refused this request because it conflicts with something that already "
+            + "exists there, most often a name already taken at that level. The same arguments "
+            + "fail the same way: change the name, or find the existing item with a listing tool "
+            + "first."
         )
     return (
         "Microsoft 365 rejected this request. This is a bad request rather than an outage or a "

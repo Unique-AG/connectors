@@ -1,20 +1,26 @@
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
 from typing import Literal, Protocol, Self, cast
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
+from kiota_serialization_json.json_parse_node_factory import JsonParseNodeFactory
 from msgraph.generated.models.external_link import ExternalLink
 from msgraph.generated.models.notebook import Notebook
 from msgraph.generated.models.onenote_operation import OnenoteOperation
 from msgraph.generated.models.onenote_page import OnenotePage
+from msgraph.generated.models.operation_status import OperationStatus
 from msgraph.generated.users.item.onenote.notebooks.item.notebook_item_request_builder import (
     NotebookItemRequestBuilder,
 )
 from msgraph.generated.users.item.onenote.notebooks.notebooks_request_builder import (
     NotebooksRequestBuilder,
+)
+from msgraph.generated.users.item.onenote.pages.item.onenote_page_item_request_builder import (
+    OnenotePageItemRequestBuilder,
 )
 from msgraph.generated.users.item.onenote.section_groups.item import (
     section_group_item_request_builder,
@@ -25,11 +31,12 @@ from msgraph.generated.users.item.onenote.sections.item import (
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_step
+from office_365_mcp.graph_client import FetchedResponse, collect_pages, graph_step
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOperationHandle,
     OnenotePageHandle,
+    OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
 )
 
@@ -43,6 +50,7 @@ STEP_NOTEBOOK = "notebook"
 STEP_SECTION = "section"
 STEP_SECTION_GROUP = "section_group"
 STEP_NOTEBOOKS = "notebooks"
+STEP_PAGE = "page"
 
 _MAX_NOTEBOOKS = 200
 
@@ -52,6 +60,7 @@ _SectionItemBuilder = onenote_section_item_request_builder.OnenoteSectionItemReq
 _SectionQuery = _SectionItemBuilder.OnenoteSectionItemRequestBuilderGetQueryParameters
 _SectionGroupItemBuilder = section_group_item_request_builder.SectionGroupItemRequestBuilder
 _SectionGroupQuery = _SectionGroupItemBuilder.SectionGroupItemRequestBuilderGetQueryParameters
+_PageQuery = OnenotePageItemRequestBuilder.OnenotePageItemRequestBuilderGetQueryParameters
 
 
 class _Links(Protocol):
@@ -171,6 +180,19 @@ class PageSummary(BaseModel):
         )
 
 
+async def page_summary(client: GraphServiceClient, page_id: str) -> PageSummary:
+    with graph_step(STEP_PAGE):
+        found = await client.me.onenote.pages.by_onenote_page_id(page_id).get(
+            request_configuration=RequestConfiguration[_PageQuery](
+                query_parameters=_PageQuery(select=list(PAGE_FIELDS), expand=list(PAGE_EXPANSIONS))
+            )
+        )
+    assert found is not None, "Graph answered a page re-read with no page"
+    summary = PageSummary.from_page(found)
+    assert summary is not None, "Graph re-read a page it gave no id, which cannot be addressed"
+    return summary
+
+
 OWNER_ROLE = "Owner"
 
 
@@ -270,25 +292,109 @@ async def section_group_notebook_id(
     return parent.id if parent is not None else None
 
 
-async def section_audience(client: GraphServiceClient, section_id: str) -> NotebookAudience:
-    notebook_id = await section_notebook_id(client, section_id)
+_CONTAINER_FIELDS: tuple[str, ...] = ("id", "displayName")
+
+
+@dataclass(frozen=True, slots=True)
+class ContainerAudience:
+    name: str | None
+    notebook: NotebookAudience
+
+
+async def _audience_of_notebook_id(
+    client: GraphServiceClient, notebook_id: str | None
+) -> NotebookAudience:
     if notebook_id is None:
         return UNKNOWN_AUDIENCE
     return await notebook_audience(client, notebook_id)
+
+
+async def section_container(client: GraphServiceClient, section_id: str) -> ContainerAudience:
+    with graph_step(STEP_SECTION):
+        found = await client.me.onenote.sections.by_onenote_section_id(section_id).get(
+            request_configuration=RequestConfiguration[_SectionQuery](
+                query_parameters=_SectionQuery(
+                    select=list(_CONTAINER_FIELDS), expand=["parentNotebook"]
+                )
+            )
+        )
+    assert found is not None, "Graph answered a section read with no section"
+    parent = found.parent_notebook
+    notebook_id = parent.id if parent is not None else None
+    return ContainerAudience(
+        name=found.display_name, notebook=await _audience_of_notebook_id(client, notebook_id)
+    )
+
+
+async def section_group_container(
+    client: GraphServiceClient, section_group_id: str
+) -> ContainerAudience:
+    with graph_step(STEP_SECTION_GROUP):
+        found = await client.me.onenote.section_groups.by_section_group_id(section_group_id).get(
+            request_configuration=RequestConfiguration[_SectionGroupQuery](
+                query_parameters=_SectionGroupQuery(
+                    select=list(_CONTAINER_FIELDS), expand=["parentNotebook"]
+                )
+            )
+        )
+    assert found is not None, "Graph answered a section group read with no section group"
+    parent = found.parent_notebook
+    notebook_id = parent.id if parent is not None else None
+    return ContainerAudience(
+        name=found.display_name, notebook=await _audience_of_notebook_id(client, notebook_id)
+    )
+
+
+async def section_audience(client: GraphServiceClient, section_id: str) -> NotebookAudience:
+    return (await section_container(client, section_id)).notebook
 
 
 async def section_group_audience(
     client: GraphServiceClient, section_group_id: str
 ) -> NotebookAudience:
-    notebook_id = await section_group_notebook_id(client, section_group_id)
-    if notebook_id is None:
-        return UNKNOWN_AUDIENCE
-    return await notebook_audience(client, notebook_id)
+    return (await section_group_container(client, section_group_id)).notebook
 
 
-_RESOURCE_LOCATION = re.compile(r"/onenote/(pages|sections|notebooks)/([^/?#]+)/?\Z")
+async def container_audience(
+    client: GraphServiceClient, handle: OnenoteNotebookHandle | OnenoteSectionGroupHandle
+) -> ContainerAudience:
+    if isinstance(handle, OnenoteNotebookHandle):
+        notebook = await notebook_audience(client, handle.notebook_id)
+        return ContainerAudience(name=notebook.name, notebook=notebook)
+    return await section_group_container(client, handle.section_group_id)
 
-_RESOURCE_KIND_OF: dict[str, Literal["page", "section", "notebook"]] = {
+
+_PAGE_FOR_A_QUESTION_FIELDS: tuple[str, ...] = ("id", "title")
+_PAGE_FOR_A_QUESTION_EXPANSIONS: tuple[str, ...] = ("parentNotebook", "parentSection")
+
+
+@dataclass(frozen=True, slots=True)
+class PageForAQuestion:
+    page: OnenotePage
+    audience: NotebookAudience
+
+
+async def page_for_a_question(client: GraphServiceClient, page_id: str) -> PageForAQuestion:
+    with graph_step(STEP_PAGE):
+        found = await client.me.onenote.pages.by_onenote_page_id(page_id).get(
+            request_configuration=RequestConfiguration[_PageQuery](
+                query_parameters=_PageQuery(
+                    select=list(_PAGE_FOR_A_QUESTION_FIELDS),
+                    expand=list(_PAGE_FOR_A_QUESTION_EXPANSIONS),
+                )
+            )
+        )
+    assert found is not None, "Graph answered a page read with no page"
+    parent = found.parent_notebook
+    notebook_id = parent.id if parent is not None else None
+    return PageForAQuestion(
+        page=found, audience=await _audience_of_notebook_id(client, notebook_id)
+    )
+
+
+_RESOURCE_LOCATION = re.compile(r"/onenote/(pages|sections|notebooks)/([^/]+)/?\Z")
+
+_RESOURCE_KIND_OF: Mapping[str, Literal["page", "section", "notebook"]] = {
     "pages": "page",
     "sections": "section",
     "notebooks": "notebook",
@@ -300,7 +406,7 @@ def resource_handle_of(
 ) -> tuple[str, Literal["page", "section", "notebook"]] | None:
     if location is None:
         return None
-    match = _RESOURCE_LOCATION.search(location)
+    match = _RESOURCE_LOCATION.search(urlsplit(location).path)
     if match is None:
         return None
     family, encoded_id = match.groups()
@@ -313,12 +419,32 @@ def resource_handle_of(
     return OnenoteNotebookHandle(resolved_id).uri, kind
 
 
-_RESOURCE_ID_IN_URL = re.compile(r"/onenote/resources/([^/?#]+)(?:/\$value|/content)?\Z")
+_RESOURCE_ID_IN_URL = re.compile(r"/onenote/resources/([^/?#]+)(?:/\$value|/content)?/?(?:[?#]|\Z)")
 
 
 def resource_id_in(url: str) -> str | None:
     match = _RESOURCE_ID_IN_URL.search(url)
     return None if match is None else unquote(match.group(1))
+
+
+_OPERATION_ID_IN_URL = re.compile(r"/onenote/operations/([^/?#]+)/?(?:[?#]|\Z)")
+
+
+def operation_id_in(location: str | None) -> str | None:
+    if location is None:
+        return None
+    match = _OPERATION_ID_IN_URL.search(location)
+    return None if match is None else unquote(match.group(1))
+
+
+OperationState = Literal["NotStarted", "Running", "Completed", "Failed"]
+
+_STATUS_TEXT: Mapping[OperationStatus, OperationState] = {
+    OperationStatus.NotStarted: "NotStarted",
+    OperationStatus.Running: "Running",
+    OperationStatus.Completed: "Completed",
+    OperationStatus.Failed: "Failed",
+}
 
 
 class OperationSummary(BaseModel):
@@ -329,11 +455,12 @@ class OperationSummary(BaseModel):
             + "alone reaches nothing."
         )
     )
-    status: str | None = Field(
+    status: OperationState | None = Field(
         description=(
             "Microsoft's own status word for this operation: NotStarted, Running, Completed or "
-            + "Failed. Poll onenote_get_operation with `uri` until this reads Completed or "
-            + "Failed; null when Graph reported none."
+            + "Failed. Null right after a copy is accepted, before Microsoft has reported any "
+            + "status; poll onenote_get_operation with `uri` to fill it in, and keep polling "
+            + "until it reads Completed or Failed."
         )
     )
     percent_complete: str | None = Field(
@@ -375,15 +502,14 @@ class OperationSummary(BaseModel):
     )
 
     @classmethod
-    def from_operation(cls, op: OnenoteOperation) -> Self | None:
-        if op.id is None:
-            return None
+    def from_operation(cls, op: OnenoteOperation) -> Self:
+        assert op.id is not None, "Graph answered with an operation that has no id"
         result = resource_handle_of(op.resource_location, op.resource_id)
         result_uri, result_kind = result if result is not None else (None, None)
         error = op.error
         return cls(
             uri=OnenoteOperationHandle(op.id).uri,
-            status=(None if op.status is None else cast("str", cast("object", op.status.value))),
+            status=(None if op.status is None else _STATUS_TEXT[op.status]),
             percent_complete=op.percent_complete,
             created_at=op.created_date_time,
             last_action_at=op.last_action_date_time,
@@ -392,6 +518,30 @@ class OperationSummary(BaseModel):
             error_code=error.code if error is not None else None,
             error_message=error.message if error is not None else None,
         )
+
+    @classmethod
+    def accepted(cls, operation_id: str) -> Self:
+        return cls(
+            uri=OnenoteOperationHandle(operation_id).uri,
+            status=None,
+            percent_complete=None,
+            created_at=None,
+            last_action_at=None,
+            result_uri=None,
+            result_kind=None,
+            error_code=None,
+            error_message=None,
+        )
+
+
+def accepted_operation(fetched: FetchedResponse) -> OperationSummary | None:
+    if fetched.content:
+        node = JsonParseNodeFactory().get_root_parse_node("application/json", fetched.content)
+        operation = node.get_object_value(OnenoteOperation)
+        if operation.id is not None:
+            return OperationSummary.from_operation(operation)
+    operation_id = operation_id_in(fetched.headers.get("operation-location"))
+    return None if operation_id is None else OperationSummary.accepted(operation_id)
 
 
 def write_state_for(*parts: str) -> str:

@@ -6,7 +6,7 @@ proxy and the On-Behalf-Of exchange, and this module only sends the result as a 
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import cast, override
+from typing import Protocol, cast, override
 from urllib.parse import urlparse
 
 import httpx
@@ -232,22 +232,36 @@ def no_retry() -> list[RequestOption]:
     return [RetryHandlerOption(max_retries=0, should_retry=False)]
 
 
+def native_response() -> list[RequestOption]:
+    return [ResponseHandlerOption(NativeResponseHandler())]
+
+
+class TypedQueryParameters(Protocol):
+    def get_query_parameter(self, original_name: str) -> str: ...
+
+
 def request_with_query(
     method: Method,
     url_template: str,
     path_parameters: Mapping[str, object],
     *,
     query: Mapping[str, str],
+    typed: TypedQueryParameters | None = None,
 ) -> RequestInformation:
     request = RequestInformation(
         method, _template_naming(url_template, query), dict(path_parameters)
     )
     for name, value in query.items():
         request.query_parameters[name] = value
+    if typed is not None:
+        request.set_query_string_parameters_from_raw_object(typed)
     return request
 
 
 def _template_naming(url_template: str, query: Mapping[str, str]) -> str:
+    assert all(not name.startswith(("$", "%24")) for name in query), (
+        f"a raw query name must not spell a typed OData parameter: {sorted(query)}"
+    )
     head, marker, tail = url_template.rpartition("{?")
     if marker:
         assert tail.endswith("}"), f"a template opened with {{? must close with }}: {url_template}"
@@ -263,18 +277,32 @@ def _template_naming(url_template: str, query: Mapping[str, str]) -> str:
 
 
 @dataclass(frozen=True, slots=True)
-class FetchedContent:
+class FetchedResponse:
+    status_code: int
+    headers: Mapping[str, str]
     content: bytes
-    media_type: str | None
+
+    @property
+    def media_type(self) -> str | None:
+        content_type = self.headers.get("content-type")
+        return None if content_type is None else content_type.split(";", 1)[0].strip().lower()
 
 
-async def fetch_content(client: GraphServiceClient, request: RequestInformation) -> FetchedContent:
+async def fetch_response(
+    client: GraphServiceClient, request: RequestInformation
+) -> FetchedResponse:
     adapter = cast("HttpxRequestAdapter", client.request_adapter)
     assert isinstance(adapter, HttpxRequestAdapter), (
-        "fetch_content needs the concrete HttpxRequestAdapter for its response-handler and "
+        "fetch_response needs the concrete HttpxRequestAdapter for its response-handler and "
         + "tracing hooks, which the abstract RequestAdapter does not carry"
     )
-    request.add_request_options([ResponseHandlerOption(NativeResponseHandler())])
+    option = request.request_options.get(ResponseHandlerOption.get_key())
+    assert isinstance(option, ResponseHandlerOption) and isinstance(
+        option.response_handler, NativeResponseHandler
+    ), (
+        "fetch_response reads status, headers and bytes off the raw response, so the caller "
+        + "must add native_response() to its own request before calling this"
+    )
     response = cast(
         "object",
         await adapter.send_primitive_async(  # pyright: ignore[reportUnknownMemberType]
@@ -284,19 +312,18 @@ async def fetch_content(client: GraphServiceClient, request: RequestInformation)
     assert isinstance(response, httpx.Response), (
         "the native response handler must hand back the raw httpx.Response, not a decoded body"
     )
-    span = adapter.start_tracing_span(request, "fetch_content")
+    span = adapter.start_tracing_span(request, "fetch_response")
     try:
         await adapter.throw_failed_responses(  # pyright: ignore[reportUnknownMemberType]
             response, {"XXX": ODataError}, span, span
         )
     finally:
         span.end()
-    return FetchedContent(response.content, _media_type(response))
-
-
-def _media_type(response: httpx.Response) -> str | None:
-    content_type = cast("str | None", response.headers.get("content-type"))
-    return None if content_type is None else content_type.split(";", 1)[0].strip().lower()
+    return FetchedResponse(
+        status_code=response.status_code,
+        headers=dict(response.headers.items()),
+        content=response.content,
+    )
 
 
 def create_graph_transport(settings: GraphSettings) -> httpx.AsyncClient:

@@ -208,6 +208,15 @@ class TestRetryAdvice:
 
         assert "retrying it unchanged will fail identically" in message
 
+    def test_a_conflict_names_the_collision_rather_than_a_bad_request(self) -> None:
+        """A duplicate notebook or section name comes back as 409; calling that a bad request
+        sends the model to fix a request that was well formed."""
+        message = _message(GraphFailure("taken", status=409, code="20117", request_id=None))
+
+        assert "already exists" in message
+        assert "change the name" in message
+        assert "bad request" not in message
+
     def test_a_missing_item_does_not_claim_the_item_does_not_exist(self) -> None:
         """Graph returns 404 both for "no such thing" and for "none of your business"."""
         message = _message(GraphNotFound("gone", status=404, code=None, request_id=None))

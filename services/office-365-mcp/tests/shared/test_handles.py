@@ -560,3 +560,28 @@ class TestTheOnenoteNotebookSectionGroupAndOperationHandleGrammar:
     )
     def test_it_refuses_everything_that_is_not_an_operation_handle(self, uri: str) -> None:
         assert handles.onenote_operation_handle(uri) is None
+
+
+class TestOnenoteContainerHandle:
+    def test_a_notebook_uri_parses_as_a_notebook_handle(self) -> None:
+        notebook = handles.OnenoteNotebookHandle(_ONENOTE_NOTEBOOK_ID)
+
+        assert handles.onenote_container_handle(notebook.uri) == notebook
+
+    def test_a_section_group_uri_parses_as_a_section_group_handle(self) -> None:
+        section_group = handles.OnenoteSectionGroupHandle(_ONENOTE_SECTION_GROUP_ID)
+
+        assert handles.onenote_container_handle(section_group.uri) == section_group
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            handles.OnenoteSectionHandle(_ONENOTE_SECTION_ID).uri,
+            handles.OnenotePageHandle(_ONENOTE_PAGE_ID).uri,
+            handles.OnenoteOperationHandle(_ONENOTE_OPERATION_ID).uri,
+            "Work Notebook",
+            "",
+        ],
+    )
+    def test_it_refuses_everything_that_is_neither(self, uri: str) -> None:
+        assert handles.onenote_container_handle(uri) is None

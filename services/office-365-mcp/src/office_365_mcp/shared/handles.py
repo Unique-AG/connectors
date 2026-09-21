@@ -386,6 +386,13 @@ def onenote_operation_handle(uri: str) -> OnenoteOperationHandle | None:
     return None if operation_id is None else OnenoteOperationHandle(operation_id)
 
 
+def onenote_container_handle(uri: str) -> OnenoteNotebookHandle | OnenoteSectionGroupHandle | None:
+    notebook = onenote_notebook_handle(uri)
+    if notebook is not None:
+        return notebook
+    return onenote_section_group_handle(uri)
+
+
 def meeting_uri_for(join_web_url: str | None) -> str | None:
     """Meeting handle for `join_web_url`, or None when Graph gave none."""
     if join_web_url is None or not join_web_url.strip():
