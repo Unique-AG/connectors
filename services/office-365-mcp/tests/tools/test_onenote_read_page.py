@@ -199,7 +199,7 @@ class TestTheSizeCap:
         assert "1,048,577 bytes" in refusal
         assert "1,048,576 bytes" in refusal
         assert _WEB_URL in refusal
-        assert "held in memory" in refusal
+        assert "arrive in one message" in refusal
         assert page.call_count == 1
 
     async def test_a_size_refusal_without_a_web_url_still_advises_something(

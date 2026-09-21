@@ -30,7 +30,7 @@ from office_365_mcp.shared.handles import (
     onenote_page_handle,
 )
 from office_365_mcp.shared.notes import write_state_for
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Confirm
+from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
 from office_365_mcp.tools import onenote_delete_page as deleter
 from office_365_mcp.tools.onenote_delete_page import DeletedPage, a_person_agrees, delete_page
 
@@ -669,9 +669,9 @@ class TestHowItDeclaresItself:
         assert annotations is not None, (
             "a tool with no annotations joins the write surface by omission"
         )
-        assert annotations.read_only_hint is WRITE_DESTRUCTIVE["readOnlyHint"]
-        assert annotations.destructive_hint is WRITE_DESTRUCTIVE["destructiveHint"]
-        assert annotations.idempotent_hint is WRITE_DESTRUCTIVE["idempotentHint"]
+        assert annotations.read_only_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["readOnlyHint"]
+        assert annotations.destructive_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["destructiveHint"]
+        assert annotations.idempotent_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["idempotentHint"]
 
     async def test_the_description_says_it_always_asks_and_cannot_be_undone(
         self, transport: httpx.AsyncClient

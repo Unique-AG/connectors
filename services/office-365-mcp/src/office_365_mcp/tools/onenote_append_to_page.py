@@ -11,23 +11,19 @@ from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_patch_action_type import OnenotePatchActionType
 from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
 from msgraph.generated.models.onenote_patch_insert_position import OnenotePatchInsertPosition
-from msgraph.generated.users.item.onenote.pages.item.onenote_page_item_request_builder import (
-    OnenotePageItemRequestBuilder,
-)
 from msgraph.generated.users.item.onenote.pages.item.onenote_patch_content import (
     onenote_patch_content_post_request_body as _post_request_body,
 )
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
-    PAGE_EXPANSIONS,
-    PAGE_FIELDS,
     NotebookAudience,
     PageSummary,
-    notebook_audience,
+    page_for_a_question,
+    page_summary,
     write_state_for,
 )
 from office_365_mcp.shared.prose import body_opening
@@ -42,7 +38,6 @@ from office_365_mcp.shared.seam import (
 TOOL_NAME = "onenote_append_to_page"
 
 STEP_APPEND_CONTENT = "append_content"
-STEP_PAGE = "page"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.ReadWrite",)
 
@@ -52,11 +47,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 MAX_BODY_CHARACTERS = 500_000
-
-_PageQuery = OnenotePageItemRequestBuilder.OnenotePageItemRequestBuilderGetQueryParameters
-
-_AUDIENCE_PAGE_FIELDS: tuple[str, ...] = ("id", "title")
-_AUDIENCE_PAGE_EXPANSIONS: tuple[str, ...] = ("parentNotebook",)
 
 _APPEND = "append"
 _DO_NOT_APPEND = "do not append"
@@ -111,6 +101,13 @@ GRAPH_NOT_FOUND = (
     + "handle fails the same way every time, so do not retry it."
 )
 
+_WRITTEN_BUT_UNREAD = (
+    "The append reached Microsoft 365 and was applied to the page: only the read back that "
+    + "confirms it failed afterward. Read the page with onenote_read_page to see the new "
+    + "content. Calling onenote_append_to_page again for this same reason adds the same text a "
+    + "second time, so do not retry it — retry only if the append itself times out."
+)
+
 
 async def append_to_page(
     client: GraphServiceClient,
@@ -125,40 +122,32 @@ async def append_to_page(
         raise ToolError(_NOT_A_PAGE_HANDLE)
 
     about = write_state_for(_APPEND, handle.page_id, body_html)
-    refreshed: OnenotePage | None = None
+    summary: PageSummary | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        with graph_step(STEP_PAGE):
-            for_audience = await _page_for_audience(client, handle)
-        audience = await _audience_of(client, for_audience)
-        if answer_pending or audience.reaches_others:
+        pre_read = await page_for_a_question(client, handle.page_id)
+        if answer_pending or pre_read.audience.reaches_others:
             with not_graph():
-                answer = await confirm(_question(for_audience, audience, body_html), about)
+                answer = await confirm(
+                    _question(pre_read.page, pre_read.audience, body_html), about
+                )
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with graph_step(STEP_APPEND_CONTENT):
                 await _append(client, handle, body_html=body_html)
-            with graph_step(STEP_PAGE):
-                refreshed = await _page(client, handle)
+            try:
+                summary = await page_summary(client, handle.page_id)
+            except GraphFailure as failure:
+                raise ToolError(_WRITTEN_BUT_UNREAD) from failure
 
     if asked is not None:
         return asked
     if refused is not None:
         raise ToolError(refused)
-    assert refreshed is not None, "a write neither asked about nor refused wrote nothing"
-    summary = PageSummary.from_page(refreshed)
-    assert summary is not None, "Graph re-read a page it gave no id, which cannot be addressed"
+    assert summary is not None, "a write neither asked about nor refused wrote nothing"
     return summary
-
-
-async def _audience_of(client: GraphServiceClient, page: OnenotePage) -> NotebookAudience:
-    parent = page.parent_notebook
-    notebook_id = parent.id if parent is not None else None
-    if notebook_id is None:
-        return NotebookAudience(notebook_id=None, name=None, is_shared=None, user_role=None)
-    return await notebook_audience(client, notebook_id)
 
 
 def _question(page: OnenotePage, audience: NotebookAudience, body_html: str) -> str:
@@ -177,18 +166,6 @@ def a_person_agrees(ctx: Context) -> Confirm:
     )
 
 
-async def _page_for_audience(client: GraphServiceClient, handle: OnenotePageHandle) -> OnenotePage:
-    page = await client.me.onenote.pages.by_onenote_page_id(handle.page_id).get(
-        request_configuration=RequestConfiguration[_PageQuery](
-            query_parameters=_PageQuery(
-                select=list(_AUDIENCE_PAGE_FIELDS), expand=list(_AUDIENCE_PAGE_EXPANSIONS)
-            )
-        )
-    )
-    assert page is not None, "Graph answered a page read with no page"
-    return page
-
-
 async def _append(client: GraphServiceClient, handle: OnenotePageHandle, *, body_html: str) -> None:
     command = OnenotePatchContentCommand(
         target="body",
@@ -200,16 +177,6 @@ async def _append(client: GraphServiceClient, handle: OnenotePageHandle, *, body
         _post_request_body.OnenotePatchContentPostRequestBody(commands=[command]),
         request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
     )
-
-
-async def _page(client: GraphServiceClient, handle: OnenotePageHandle) -> OnenotePage:
-    page = await client.me.onenote.pages.by_onenote_page_id(handle.page_id).get(
-        request_configuration=RequestConfiguration[_PageQuery](
-            query_parameters=_PageQuery(select=list(PAGE_FIELDS), expand=list(PAGE_EXPANSIONS))
-        )
-    )
-    assert page is not None, "Graph answered a page re-read with no page"
-    return page
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

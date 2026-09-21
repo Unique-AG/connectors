@@ -435,7 +435,7 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "onenote_create_notebook": frozenset({"name"}),
     "onenote_create_section": frozenset({"name"}),
     "onenote_create_section_group": frozenset({"name"}),
-    "onenote_edit_page": frozenset({"commands", "target", "action"}),
+    "onenote_edit_page": frozenset({"commands", "target", "action", "content"}),
     "onenote_rename_page": frozenset({"title"}),
 }
 

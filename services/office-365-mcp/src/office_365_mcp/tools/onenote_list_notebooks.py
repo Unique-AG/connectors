@@ -94,10 +94,13 @@ section, or to onenote_create_page to write a new page into it. A section's `gro
 it is not null, is the handle of the section group that holds it directly: pass it to \
 onenote_list_sections to see what else sits in that group, to onenote_create_section or \
 onenote_create_section_group to add beside it, or to onenote_copy_section as `to_section_group`. \
-Each notebook's `uri` is a handle too: pass it to onenote_list_sections to see one level of its \
-own contents, to onenote_create_section or onenote_create_section_group to add directly under \
-it, to onenote_copy_section as `to_notebook`, or to onenote_copy_notebook to copy the whole \
-notebook. onenote_find_notebook_from_url mints this same kind of handle from a web address.
+Each notebook's `uri` is a handle too: pass it to onenote_list_sections to see the section \
+groups directly inside it as rows of their own — this tool names a section group only through \
+each section's `group_uri`, never as a row by itself — or to walk one level of the notebook's \
+own contents at a time; to onenote_create_section or onenote_create_section_group to add \
+directly under it; to onenote_copy_section as `to_notebook`; or to onenote_copy_notebook to \
+copy the whole notebook. onenote_find_notebook_from_url mints this same kind of handle from a \
+web address.
 
 `is_default` on a notebook names the notebook onenote_create_page writes into when it is called \
 with no section at all; `is_default` on a section, inside that same notebook, names the section \
@@ -235,9 +238,13 @@ class Notebooks(BaseModel):
         description=(
             "True when a safety cap stopped one of the three listings behind this answer — "
             + "notebooks, sections, or section groups — while Microsoft still had more of it to "
-            + "give, so some notebooks or sections may be missing above. This is a safety cap, "
-            + "not a `limit` the caller can raise: onenote_list_notebooks takes no arguments. "
-            + "False means the listing is complete."
+            + "give, so some notebooks or sections may be missing above. When `name_contains`, "
+            + "`shared` or `role` narrowed which notebooks matched, this can also be true purely "
+            + "because of sections or section groups belonging to a notebook the filter "
+            + "excluded: the sections and section-group listings behind this answer are not "
+            + "narrowed by those same arguments. This is a safety cap, not a `limit` this tool "
+            + "exposes to raise. False means every listing behind this answer finished on its "
+            + "own."
         )
     )
 

@@ -10,6 +10,7 @@ from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_page_collection_response import (
     OnenotePageCollectionResponse,
 )
+from msgraph.generated.users.item.onenote.pages.pages_request_builder import PagesRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -42,12 +43,9 @@ MAX_PAGES = 100
 _MIN_TITLE_FRAGMENT_CHARACTERS = 1
 _MAX_TITLE_FRAGMENT_CHARACTERS = 200
 
-_SELECT = "%24select"
-_EXPAND = "%24expand"
-_TOP = "%24top"
-_FILTER = "%24filter"
-_ORDERBY = "%24orderby"
-_SKIP = "%24skip"
+_PagesQuery = PagesRequestBuilder.PagesRequestBuilderGetQueryParameters
+
+_LEVEL_AND_ORDER_FIELDS: tuple[str, ...] = ("level", "order")
 
 OrderBy = Literal[
     "last_modified_desc",
@@ -273,18 +271,18 @@ async def _first_page(
         if section is None
         else client.me.onenote.sections.by_onenote_section_id(section.section_id).pages
     )
-    request = request_with_query(
-        Method.GET, pages.url_template, pages.path_parameters, query=raw_query
+    fields = (*PAGE_FIELDS, *_LEVEL_AND_ORDER_FIELDS) if include_level_and_order else PAGE_FIELDS
+    typed = _PagesQuery(
+        select=list(fields),
+        expand=list(PAGE_EXPANSIONS),
+        top=limit,
+        filter=query_filter,
+        orderby=[order_by] if order_by is not None else None,
+        skip=skip if skip > 0 else None,
     )
-    request.query_parameters[_SELECT] = list(PAGE_FIELDS)
-    request.query_parameters[_EXPAND] = list(PAGE_EXPANSIONS)
-    request.query_parameters[_TOP] = limit
-    if query_filter is not None:
-        request.query_parameters[_FILTER] = query_filter
-    if order_by is not None:
-        request.query_parameters[_ORDERBY] = [order_by]
-    if skip > 0:
-        request.query_parameters[_SKIP] = skip
+    request = request_with_query(
+        Method.GET, pages.url_template, pages.path_parameters, query=raw_query, typed=typed
+    )
     request.headers.try_add("Accept", "application/json")
     return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
         request, OnenotePageCollectionResponse, {"XXX": ODataError}

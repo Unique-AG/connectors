@@ -104,8 +104,13 @@ and Microsoft creates it in the default section of the default notebook instead.
 is the other way to pick a section: give it a name and Microsoft writes the page into the \
 section by that name inside the default notebook, creating a new section there under that name \
 first when none already matches — a typo in `section_name` makes a new, almost-empty section \
-rather than failing outright. `section_name` only ever reaches the default notebook, never any \
-other one, and forbidden in it are `? * / : < > | & # ' % ~`. Pass at most one of `section` and \
+rather than failing outright. When it does create that section, the answer's `section_uri` \
+comes back null: Microsoft's response names no parent section for it, so look the new \
+section up afterward with onenote_list_sections on the default notebook, matched by name. \
+`section_name` only ever reaches the default notebook, never any other one. Microsoft does not \
+document a naming rule for this parameter specifically, but the same rule a section's own name \
+follows most likely applies: at most 50 characters, and none of \
+`? * / : < > | & # ' % ~`. Pass at most one of `section` and \
 `section_name`; never both. `body_html` \
 is HTML, not \
 plain text: a newline in it is not a line break. Write `<p>` and `<br>` for structure, \
@@ -165,8 +170,11 @@ class CreatedPage(BaseModel):
             + "This is the `section` argument's own handle when one was given, unless "
             + "Microsoft's response itself names a different parent section, which takes "
             + "priority over the argument. Null when `section` was omitted and Microsoft's "
-            + "response named no parent section either — pass onenote_list_pages no `section` "
-            + "to find the page by looking through every notebook."
+            + "response named no parent section either — this is what happens when "
+            + "`section_name` just created a brand-new section, so look that section up "
+            + "afterward with onenote_list_sections on the default notebook, matched by name, "
+            + "or pass onenote_list_pages no `section` to find the page by looking through "
+            + "every notebook."
         )
     )
 
@@ -188,10 +196,18 @@ async def _notebook_audience_for(
     return await section_audience(client, handle.section_id)
 
 
-def _question(title: str, body_html: str, audience: NotebookAudience) -> str:
+def _question(
+    title: str, body_html: str, audience: NotebookAudience, section_name: str | None
+) -> str:
     name = audience.name or "an unnamed notebook"
+    into_section = (
+        f" into the section {section_name!r}, which Microsoft creates in that notebook when "
+        + "no section has that name yet"
+        if section_name is not None
+        else ""
+    )
     return (
-        f"Create the page {title!r} in the notebook {name!r}, {audience.reason}? "
+        f"Create the page {title!r} in the notebook {name!r}, {audience.reason}{into_section}? "
         + f"It opens {body_opening(body_html)!r}."
     )
 
@@ -251,7 +267,7 @@ async def create_page(
         if answer_pending or (audience is not None and audience.reaches_others):
             heard_by = audience if audience is not None else UNKNOWN_AUDIENCE
             with not_graph():
-                answer = await confirm(_question(title, body_html, heard_by), about)
+                answer = await confirm(_question(title, body_html, heard_by, section_name), about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
@@ -372,7 +388,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "The other way to pick the section: a name, inside the signed-in user's "
                     + "default notebook only. Microsoft creates a new section by this name "
                     + "there when none already matches, so a typo makes a new, almost-empty "
-                    + "section rather than failing. Forbidden: "
+                    + "section rather than failing — the answer's `section_uri` then comes "
+                    + "back null, so look that new section up afterward with "
+                    + "onenote_list_sections. Not documented for this parameter specifically, "
+                    + "but the same rule a section's own name follows most likely applies: "
+                    + "at most 50 characters, and none of "
                     + f"{_FORBIDDEN_SECTION_NAME_CHARACTERS}. Pass at most one of `section` and "
                     + "`section_name`; giving both is refused."
                 ),

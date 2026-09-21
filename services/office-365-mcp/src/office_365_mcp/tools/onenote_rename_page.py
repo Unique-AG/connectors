@@ -1,36 +1,31 @@
 from collections.abc import Mapping
+from html import escape
 from typing import Annotated
 
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_patch_action_type import OnenotePatchActionType
 from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
-from msgraph.generated.users.item.onenote.pages.item.onenote_page_item_request_builder import (
-    OnenotePageItemRequestBuilder,
-)
 from msgraph.generated.users.item.onenote.pages.item.onenote_patch_content import (
     onenote_patch_content_post_request_body as _post_request_body,
 )
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, not_graph
+from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, not_graph
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
-    PAGE_EXPANSIONS,
-    PAGE_FIELDS,
-    UNKNOWN_AUDIENCE,
     NotebookAudience,
     PageSummary,
-    notebook_audience,
+    page_for_a_question,
+    page_summary,
     write_state_for,
 )
 from office_365_mcp.shared.seam import (
-    WRITE_DESTRUCTIVE,
+    WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
     answer_pending,
     graph_client_for_caller,
@@ -39,7 +34,6 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "onenote_rename_page"
 
-STEP_PAGE = "page"
 STEP_RENAME_PAGE = "rename_page"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.ReadWrite",)
@@ -50,11 +44,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 MAX_TITLE_CHARACTERS = 255
-
-_PageQuery = OnenotePageItemRequestBuilder.OnenotePageItemRequestBuilderGetQueryParameters
-
-_AUDIENCE_PAGE_FIELDS: tuple[str, ...] = ("id", "title")
-_AUDIENCE_PAGE_EXPANSIONS: tuple[str, ...] = ("parentNotebook",)
 
 _RENAME = "rename"
 _DO_NOT_RENAME = "do not rename"
@@ -76,9 +65,9 @@ when Microsoft does not report who can see it, because the new title is visible 
 moment it is written. A page in the user's own unshared notebook is renamed without a question. \
 This tool answers with the page as Microsoft's page index holds it right after the rename, and \
 with `previous_title`, the title the index held just before — which can already be stale or \
-empty, because that same index lags a create or an edit by minutes or far longer. The new \
-`title` in the answer can likewise still show the old value for a while even though the rename \
-itself has already taken effect.\
+empty, because that same index lags a create or an edit by minutes or far longer. A rename \
+itself does not share that lag: on a test tenant, the new `title` in the answer reflected the \
+rename right away, unlike a freshly created page's title.\
 """
 
 _NOT_A_PAGE_HANDLE = (
@@ -100,13 +89,22 @@ GRAPH_NOT_FOUND = (
     + "same way every time, so do not retry it."
 )
 
+_WRITTEN_BUT_UNREAD = (
+    "The rename reached Microsoft 365 and was applied: only the read back that confirms it "
+    + "failed afterward. Read the page with onenote_read_page to see the new title. Calling "
+    + "onenote_rename_page again with the same title is harmless — it sets the title to the "
+    + "same value rather than piling up a second change — so retry it once if you need the "
+    + "answer this call could not give you."
+)
+
 
 class RenamedPage(BaseModel):
     page: PageSummary = Field(
         description=(
-            "The page as Microsoft's page index holds it right after the rename. That index "
-            + "lags an edit, by minutes or far longer, so its own `title` and "
-            + "`last_modified_at` can still show the values from before this rename."
+            "The page as Microsoft's page index holds it right after the rename. Its "
+            + "`last_modified_at` can still lag by minutes or far longer, the way any edit "
+            + "does, but on a test tenant this call's own `title` reflected the rename right "
+            + "away rather than lagging the same way."
         )
     )
     previous_title: str | None = Field(
@@ -136,42 +134,32 @@ async def rename_page(
         raise ToolError(_NOT_A_PAGE_HANDLE)
 
     about = write_state_for(_RENAME, handle.page_id, title)
-    refreshed: OnenotePage | None = None
+    summary: PageSummary | None = None
     previous_title: str | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        with graph_step(STEP_PAGE):
-            for_audience = await _page_for_audience(client, handle)
-        previous_title = for_audience.title
-        audience = await _audience_of(client, for_audience)
-        if answer_pending or audience.reaches_others:
+        pre_read = await page_for_a_question(client, handle.page_id)
+        previous_title = pre_read.page.title
+        if answer_pending or pre_read.audience.reaches_others:
             with not_graph():
-                answer = await confirm(_question(for_audience, title, audience), about)
+                answer = await confirm(_question(pre_read.page, title, pre_read.audience), about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with graph_step(STEP_RENAME_PAGE):
                 await _rename(client, handle, title)
-            with graph_step(STEP_PAGE):
-                refreshed = await _page(client, handle)
+            try:
+                summary = await page_summary(client, handle.page_id)
+            except GraphFailure as failure:
+                raise ToolError(_WRITTEN_BUT_UNREAD) from failure
 
     if asked is not None:
         return asked
     if refused is not None:
         raise ToolError(refused)
-    assert refreshed is not None, "a write neither asked about nor refused wrote nothing"
-    summary = PageSummary.from_page(refreshed)
-    assert summary is not None, "Graph re-read a page it gave no id, which cannot be addressed"
+    assert summary is not None, "a write neither asked about nor refused wrote nothing"
     return RenamedPage(page=summary, previous_title=previous_title)
-
-
-async def _audience_of(client: GraphServiceClient, page: OnenotePage) -> NotebookAudience:
-    parent = page.parent_notebook
-    notebook_id = parent.id if parent is not None else None
-    if notebook_id is None:
-        return UNKNOWN_AUDIENCE
-    return await notebook_audience(client, notebook_id)
 
 
 def _question(page: OnenotePage, title: str, audience: NotebookAudience) -> str:
@@ -187,36 +175,14 @@ def a_person_agrees(ctx: Context) -> Confirm:
     )
 
 
-async def _page_for_audience(client: GraphServiceClient, handle: OnenotePageHandle) -> OnenotePage:
-    page = await client.me.onenote.pages.by_onenote_page_id(handle.page_id).get(
-        request_configuration=RequestConfiguration[_PageQuery](
-            query_parameters=_PageQuery(
-                select=list(_AUDIENCE_PAGE_FIELDS), expand=list(_AUDIENCE_PAGE_EXPANSIONS)
-            )
-        )
-    )
-    assert page is not None, "Graph answered a page read with no page"
-    return page
-
-
 async def _rename(client: GraphServiceClient, handle: OnenotePageHandle, title: str) -> None:
     command = OnenotePatchContentCommand(
-        target="title", action=OnenotePatchActionType.Replace, content=title
+        target="title", action=OnenotePatchActionType.Replace, content=escape(title)
     )
     body = _post_request_body.OnenotePatchContentPostRequestBody(commands=[command])
     await client.me.onenote.pages.by_onenote_page_id(handle.page_id).onenote_patch_content.post(
         body
     )
-
-
-async def _page(client: GraphServiceClient, handle: OnenotePageHandle) -> OnenotePage:
-    page = await client.me.onenote.pages.by_onenote_page_id(handle.page_id).get(
-        request_configuration=RequestConfiguration[_PageQuery](
-            query_parameters=_PageQuery(select=list(PAGE_FIELDS), expand=list(PAGE_EXPANSIONS))
-        )
-    )
-    assert page is not None, "Graph answered a page re-read with no page"
-    return page
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -226,7 +192,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         name=TOOL_NAME,
         title="Rename a Page",
         description=_DESCRIPTION,
-        annotations=WRITE_DESTRUCTIVE,
+        annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )
     async def onenote_rename_page(
         page: Annotated[

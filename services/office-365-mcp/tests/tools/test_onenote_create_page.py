@@ -361,6 +361,43 @@ class TestSectionName:
         assert bound[0] == write_state_for("create", "Planning", _TITLE, _BODY_HTML)
         assert bound[0] != write_state_for("create", "default", _TITLE, _BODY_HTML)
 
+    async def test_the_question_names_the_section_name_when_one_is_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads_default_notebooks(graph, _notebook_payload(is_shared=True, user_role="Owner"))
+        _ = _creates(graph, _DEFAULT_ROUTE, _page_payload())
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, section_name="Q3 planning", confirm=counting)
+
+        assert len(asked) == 1
+        assert (
+            "into the section 'Q3 planning', which Microsoft creates in that notebook when no "
+            + "section has that name yet"
+        ) in asked[0]
+
+    async def test_the_question_says_nothing_about_a_section_when_none_is_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads_default_notebooks(graph, _notebook_payload(is_shared=True, user_role="Owner"))
+        _ = _creates(graph, _DEFAULT_ROUTE, _page_payload())
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, confirm=counting)
+
+        assert len(asked) == 1
+        assert "into the section" not in asked[0]
+
 
 class TestWhatItAnswers:
     async def test_the_handle_is_minted_from_the_id_graph_returned(

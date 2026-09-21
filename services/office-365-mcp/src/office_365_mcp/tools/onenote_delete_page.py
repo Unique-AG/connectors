@@ -4,29 +4,16 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.onenote_page import OnenotePage
-from msgraph.generated.users.item.onenote.pages.item.onenote_page_item_request_builder import (
-    OnenotePageItemRequestBuilder,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, not_graph
-from office_365_mcp.shared.handles import (
-    OnenotePageHandle,
-    OnenoteSectionHandle,
-    onenote_page_handle,
-)
-from office_365_mcp.shared.notes import (
-    UNKNOWN_AUDIENCE,
-    NotebookAudience,
-    notebook_audience,
-    write_state_for,
-)
+from office_365_mcp.shared.handles import OnenoteSectionHandle, onenote_page_handle
+from office_365_mcp.shared.notes import NotebookAudience, page_for_a_question, write_state_for
 from office_365_mcp.shared.seam import (
-    WRITE_DESTRUCTIVE,
+    WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
     graph_client_for_caller,
     person_confirms,
@@ -34,7 +21,6 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "onenote_delete_page"
 
-STEP_PAGE = "page"
 STEP_DELETE_PAGE = "delete_page"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.ReadWrite",)
@@ -42,11 +28,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.ReadWrite",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "page": "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF",
 }
-
-_PageQuery = OnenotePageItemRequestBuilder.OnenotePageItemRequestBuilderGetQueryParameters
-
-_PAGE_FIELDS: tuple[str, ...] = ("id", "title")
-_PAGE_EXPANSIONS: tuple[str, ...] = ("parentNotebook", "parentSection")
 
 _DELETE = "delete"
 _KEEP_THE_PAGE = "keep the page"
@@ -136,36 +117,25 @@ async def delete_page(
 
     about = write_state_for(_DELETE, handle.page_id)
     found: OnenotePage | None = None
-    deleted = False
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        with graph_step(STEP_PAGE):
-            found = await _page_for_delete(client, handle)
-        audience = await _audience_of(client, found)
+        pre_read = await page_for_a_question(client, handle.page_id)
+        found = pre_read.page
         with not_graph():
-            answer = await confirm(_question(found, audience), about)
+            answer = await confirm(_question(found, pre_read.audience), about)
         asked = answer if isinstance(answer, InputRequiredResult) else None
         refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with graph_step(STEP_DELETE_PAGE):
                 await client.me.onenote.pages.by_onenote_page_id(handle.page_id).delete()
-            deleted = True
 
     if asked is not None:
         return asked
     if refused is not None:
         raise ToolError(refused)
-    assert found is not None and deleted, "a delete neither asked about nor refused deleted nothing"
+    assert found is not None, "a delete neither asked about nor refused deleted nothing"
     return _answer(found)
-
-
-async def _audience_of(client: GraphServiceClient, page: OnenotePage) -> NotebookAudience:
-    parent = page.parent_notebook
-    notebook_id = parent.id if parent is not None else None
-    if notebook_id is None:
-        return UNKNOWN_AUDIENCE
-    return await notebook_audience(client, notebook_id)
 
 
 def _question(page: OnenotePage, audience: NotebookAudience) -> str:
@@ -185,16 +155,6 @@ def a_person_agrees(ctx: Context) -> Confirm:
     return person_confirms(
         ctx, agree=_DELETE, decline=_KEEP_THE_PAGE, nothing_happened=_NOTHING_DELETED
     )
-
-
-async def _page_for_delete(client: GraphServiceClient, handle: OnenotePageHandle) -> OnenotePage:
-    page = await client.me.onenote.pages.by_onenote_page_id(handle.page_id).get(
-        request_configuration=RequestConfiguration[_PageQuery](
-            query_parameters=_PageQuery(select=list(_PAGE_FIELDS), expand=list(_PAGE_EXPANSIONS))
-        )
-    )
-    assert page is not None, "Graph answered a page read with no page"
-    return page
 
 
 def _answer(page: OnenotePage) -> DeletedPage:
@@ -217,7 +177,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         name=TOOL_NAME,
         title="Delete a Page",
         description=_DESCRIPTION,
-        annotations=WRITE_DESTRUCTIVE,
+        annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )
     async def onenote_delete_page(
         page: Annotated[

@@ -31,7 +31,7 @@ from office_365_mcp.shared.handles import (
     onenote_page_handle,
 )
 from office_365_mcp.shared.notes import write_state_for
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Confirm
+from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
 from office_365_mcp.tools import onenote_rename_page as renamer
 from office_365_mcp.tools.onenote_rename_page import RenamedPage, a_person_agrees, rename_page
 
@@ -192,6 +192,17 @@ class TestWhatItSendsToGraph:
             "commands": [{"action": "Replace", "content": "A whole new title", "target": "title"}]
         }
 
+    async def test_a_title_with_html_metacharacters_is_escaped_before_it_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _patches(graph)
+        _ = _rereads(graph, _page_payload())
+
+        _ = await _rename(client, title="Q&A <2026>")
+
+        commands = cast("list[dict[str, object]]", _sent(patch)["commands"])
+        assert commands[0]["content"] == "Q&amp;A &lt;2026&gt;"
+
     async def test_the_patch_content_type_is_json(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -214,7 +225,7 @@ class TestWhatItSendsToGraph:
         assert query["$select"] == "id,title,createdDateTime,lastModifiedDateTime,links"
         assert query["$expand"] == "parentSection,parentNotebook"
 
-    async def test_the_pre_read_asks_only_for_id_title_and_the_parent_notebook(
+    async def test_the_pre_read_asks_for_id_title_the_parent_notebook_and_section(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         page_route = _rereads(graph, _page_payload())
@@ -224,7 +235,7 @@ class TestWhatItSendsToGraph:
 
         query = _made(page_route)[0].request.url.params
         assert query["$select"] == "id,title"
-        assert query["$expand"] == "parentNotebook"
+        assert query["$expand"] == "parentNotebook,parentSection"
 
     @pytest.mark.usefixtures("retry_sleeps")
     async def test_a_rename_is_idempotent_so_the_default_retry_runs(
@@ -401,7 +412,7 @@ class TestGraphFailures:
         with pytest.raises(GraphForbidden):
             _ = await _rename(client)
 
-    async def test_a_404_on_the_reread_is_a_not_found_and_the_patch_was_sent_once(
+    async def test_a_404_on_the_reread_is_reported_as_a_successful_rename(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         patch = _patches(graph, status=204)
@@ -414,11 +425,29 @@ class TestGraphFailures:
             ]
         )
 
-        with pytest.raises(GraphNotFound):
+        with pytest.raises(ToolError, match="reached Microsoft 365 and was applied"):
             _ = await _rename(client)
 
         assert patch.call_count == 1
         assert reread.call_count == 2, "the pre-read succeeded; the post-write reread failed"
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_503_on_the_reread_is_also_reported_as_a_successful_rename(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _patches(graph, status=204)
+        reread = graph.get(_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_page_payload()),
+                *([httpx.Response(503)] * 4),
+            ]
+        )
+
+        with pytest.raises(ToolError, match="reached Microsoft 365 and was applied"):
+            _ = await _rename(client)
+
+        assert patch.call_count == 1
+        assert reread.call_count > 1, "the pre-read succeeded; the post-write reread failed"
 
     async def test_the_call_example_reaches_graph_and_the_pre_read_is_what_a_403_refuses(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1005,9 +1034,9 @@ class TestHowItDeclaresItself:
         assert annotations is not None, (
             "a tool with no annotations joins the write surface by omission"
         )
-        assert annotations.read_only_hint is WRITE_DESTRUCTIVE["readOnlyHint"]
-        assert annotations.destructive_hint is WRITE_DESTRUCTIVE["destructiveHint"]
-        assert annotations.idempotent_hint is WRITE_DESTRUCTIVE["idempotentHint"]
+        assert annotations.read_only_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["readOnlyHint"]
+        assert annotations.destructive_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["destructiveHint"]
+        assert annotations.idempotent_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["idempotentHint"]
 
     async def test_the_description_says_what_it_does_and_does_not_change(
         self, transport: httpx.AsyncClient

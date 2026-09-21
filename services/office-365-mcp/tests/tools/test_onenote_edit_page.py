@@ -52,7 +52,6 @@ _APPEND_COMMAND = EditCommand(target="body", action="append", content="<p>Append
 _REPLACE_COMMAND = EditCommand(
     target="div:{33f8a2}{1}", action="replace", content="<p>Replaced.</p>"
 )
-_DELETE_COMMAND = EditCommand(target="#intro", action="delete")
 
 
 def _page_payload(
@@ -161,23 +160,19 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
 
 
 class TestTheCommandValidator:
-    def test_delete_with_content_is_refused(self) -> None:
-        with pytest.raises(ValidationError, match="delete command takes no content"):
-            _ = EditCommand(target="#p1", action="delete", content="<p>x</p>")
-
-    def test_delete_without_content_is_accepted(self) -> None:
-        command = EditCommand(target="#p1", action="delete")
-        assert command.content is None
+    def test_delete_is_refused_by_the_schema(self) -> None:
+        with pytest.raises(ValidationError):
+            _ = EditCommand.model_validate({"target": "#p1", "action": "delete"})
 
     @pytest.mark.parametrize("action", ["append", "insert", "prepend", "replace"])
-    def test_every_other_action_without_content_is_refused(
+    def test_every_action_without_content_is_refused(
         self, action: Literal["append", "insert", "prepend", "replace"]
     ) -> None:
-        with pytest.raises(ValidationError, match="needs content"):
-            _ = EditCommand(target="#p1", action=action)
+        with pytest.raises(ValidationError, match="Field required"):
+            _ = EditCommand.model_validate({"target": "#p1", "action": action})
 
     @pytest.mark.parametrize("action", ["append", "insert", "prepend", "replace"])
-    def test_every_other_action_with_content_is_accepted(
+    def test_every_action_with_content_is_accepted(
         self, action: Literal["append", "insert", "prepend", "replace"]
     ) -> None:
         command = EditCommand(target="#p1", action=action, content="<p>x</p>")
@@ -218,7 +213,7 @@ class TestWhatItSendsToGraph:
         _ = _rereads(graph, _page_payload())
         commands = [
             EditCommand(target="#p1", action="insert", position="before", content="<p>x</p>"),
-            EditCommand(target="#p2", action="delete"),
+            EditCommand(target="#p2", action="replace", content="<p>y</p>"),
         ]
 
         _ = await _edit(client, commands=commands)
@@ -226,21 +221,9 @@ class TestWhatItSendsToGraph:
         assert _sent(patch) == {
             "commands": [
                 {"action": "Insert", "content": "<p>x</p>", "position": "Before", "target": "#p1"},
-                {"action": "Delete", "target": "#p2"},
+                {"action": "Replace", "content": "<p>y</p>", "target": "#p2"},
             ]
         }
-
-    async def test_a_command_with_no_position_carries_no_position_key_on_the_wire(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        patch = _patches(graph)
-        _ = _rereads(graph, _page_payload())
-
-        _ = await _edit(client, commands=[_APPEND_COMMAND])
-
-        sent = _sent(patch)
-        commands = cast("list[dict[str, object]]", sent["commands"])
-        assert set(commands[0]) == {"action", "content", "target"}
 
     async def test_every_action_spelling_reaches_graph_capitalized(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -252,7 +235,6 @@ class TestWhatItSendsToGraph:
             EditCommand(target="#p1", action="insert", content="<p>b</p>"),
             EditCommand(target="ol:{1}", action="prepend", content="<li>c</li>"),
             EditCommand(target="div:{2}", action="replace", content="<p>d</p>"),
-            EditCommand(target="#p3", action="delete"),
         ]
 
         _ = await _edit(client, commands=commands)
@@ -263,7 +245,6 @@ class TestWhatItSendsToGraph:
             "Insert",
             "Prepend",
             "Replace",
-            "Delete",
         ]
 
     async def test_the_patch_content_type_is_json(
@@ -288,7 +269,7 @@ class TestWhatItSendsToGraph:
         assert query["$select"] == "id,title,createdDateTime,lastModifiedDateTime,links"
         assert query["$expand"] == "parentSection,parentNotebook"
 
-    async def test_the_pre_read_asks_only_for_id_title_and_the_parent_notebook(
+    async def test_the_pre_read_asks_for_id_title_the_parent_notebook_and_section(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         page_route = _rereads(graph, _page_payload())
@@ -298,7 +279,7 @@ class TestWhatItSendsToGraph:
 
         query = _made(page_route)[0].request.url.params
         assert query["$select"] == "id,title"
-        assert query["$expand"] == "parentNotebook"
+        assert query["$expand"] == "parentNotebook,parentSection"
 
     @pytest.mark.usefixtures("retry_sleeps")
     async def test_a_patch_graph_declines_is_never_sent_a_second_time(
@@ -459,7 +440,7 @@ class TestGraphFailures:
         with pytest.raises(GraphForbidden):
             _ = await _edit(client)
 
-    async def test_a_404_on_the_reread_is_a_not_found_and_the_patch_was_sent_once(
+    async def test_a_404_on_the_reread_is_reported_as_a_successful_edit(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         patch = _patches(graph, status=204)
@@ -472,11 +453,29 @@ class TestGraphFailures:
             ]
         )
 
-        with pytest.raises(GraphNotFound):
+        with pytest.raises(ToolError, match="reached Microsoft 365 and was applied"):
             _ = await _edit(client)
 
         assert patch.call_count == 1
         assert reread.call_count == 2, "the pre-read succeeded; the post-write reread failed"
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_503_on_the_reread_is_also_reported_as_a_successful_edit(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _patches(graph, status=204)
+        reread = graph.get(_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_page_payload()),
+                *([httpx.Response(503)] * 4),
+            ]
+        )
+
+        with pytest.raises(ToolError, match="reached Microsoft 365 and was applied"):
+            _ = await _edit(client)
+
+        assert patch.call_count == 1
+        assert reread.call_count > 1, "the pre-read succeeded; the post-write reread failed"
 
     async def test_the_call_example_reaches_graph_and_the_pre_read_is_what_a_403_refuses(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -537,23 +536,35 @@ class TestThePersonBetweenTheEditAndTheOthersInTheNotebook:
         assert "cannot be undone" in asked[0]
         assert patch.call_count == 1
 
-    async def test_a_delete_command_is_asked_about_even_in_a_private_notebook(
+    async def test_the_question_names_every_destructive_target_up_to_two_then_counts_the_rest(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
         _ = _notebook_route(graph, is_shared=False, user_role="Owner")
         patch = _patches(graph)
         asked: list[str] = []
+        commands = [
+            EditCommand(target="body", action="append", content="<p>a</p>"),
+            EditCommand(target="#p1", action="replace", content="<p>b</p>"),
+            EditCommand(target="#p2", action="replace", content="<p>c</p>"),
+            EditCommand(target="#p3", action="replace", content="<p>d</p>"),
+        ]
 
         async def counting(question: str, about: str) -> str | None:
             assert about
             asked.append(question)
             return None
 
-        _ = await _edit(client, commands=[_DELETE_COMMAND], confirm=counting)
+        _ = await _edit(client, commands=commands, confirm=counting)
 
         assert len(asked) == 1
-        assert "cannot be undone" in asked[0]
+        question = asked[0]
+        assert "3 of them replace" in question
+        assert "'#p1'" in question
+        assert "'#p2'" in question
+        assert "'#p3'" not in question
+        assert "and 1 more" in question
+        assert "cannot be undone" in question
         assert patch.call_count == 1
 
     async def test_the_warning_is_absent_when_every_command_is_non_destructive(
@@ -631,7 +642,7 @@ class TestThePersonBetweenTheEditAndTheOthersInTheNotebook:
         bound: list[str] = []
         commands = [
             EditCommand(target="body", action="append", content="<p>Agenda: pricing</p>"),
-            EditCommand(target="#p2", action="delete"),
+            EditCommand(target="#p2", action="insert", content="<p>more</p>"),
         ]
 
         async def capturing(question: str, about: str) -> str | None:

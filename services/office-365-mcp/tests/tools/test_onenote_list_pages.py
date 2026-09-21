@@ -593,8 +593,18 @@ class TestIncludeLevelAndOrder:
         _ = await lister.list_pages(client, section=_SECTION, include_level_and_order=True, limit=7)
 
         params = section_pages.calls.last.request.url.params
-        assert params["$select"].split(",") == list(PAGE_FIELDS)
+        assert params["$select"].split(",") == [*PAGE_FIELDS, "level", "order"]
         assert params["$top"] == "7"
+
+    async def test_the_select_stays_narrow_when_level_and_order_are_not_asked_for(
+        self, client: GraphServiceClient, section_pages: respx.Route
+    ) -> None:
+        section_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, section=_SECTION, limit=7)
+
+        params = section_pages.calls.last.request.url.params
+        assert params["$select"].split(",") == list(PAGE_FIELDS)
 
     async def test_without_a_section_it_is_refused_before_reaching_graph(
         self, client: GraphServiceClient, pages: respx.Route, section_pages: respx.Route

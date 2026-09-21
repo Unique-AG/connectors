@@ -221,7 +221,7 @@ class TestWhatItSendsToGraph:
         assert query["$select"] == "id,title,createdDateTime,lastModifiedDateTime,links"
         assert query["$expand"] == "parentSection,parentNotebook"
 
-    async def test_the_pre_read_asks_only_for_id_title_and_the_parent_notebook(
+    async def test_the_pre_read_asks_for_id_title_the_parent_notebook_and_section(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         page_route = _rereads(graph, _page_payload())
@@ -231,7 +231,7 @@ class TestWhatItSendsToGraph:
 
         query = _made(page_route)[0].request.url.params
         assert query["$select"] == "id,title"
-        assert query["$expand"] == "parentNotebook"
+        assert query["$expand"] == "parentNotebook,parentSection"
 
     async def test_the_body_html_reaches_graph_byte_for_byte(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -414,7 +414,25 @@ class TestGraphFailures:
         with pytest.raises(GraphForbidden):
             _ = await _append(client)
 
-    async def test_a_404_on_the_reread_is_a_not_found_and_the_patch_was_sent_once(
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_failed_reread_is_reported_as_a_successful_write_not_a_failure(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _patches(graph, status=204)
+        reread = graph.get(_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_page_payload()),
+                *([httpx.Response(503)] * 4),
+            ]
+        )
+
+        with pytest.raises(ToolError, match="reached Microsoft 365 and was applied"):
+            _ = await _append(client)
+
+        assert patch.call_count == 1
+        assert reread.call_count > 1, "the pre-read succeeded; the post-write reread failed"
+
+    async def test_a_404_on_the_reread_is_also_reported_as_a_successful_write(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         patch = _patches(graph, status=204)
@@ -427,7 +445,7 @@ class TestGraphFailures:
             ]
         )
 
-        with pytest.raises(GraphNotFound):
+        with pytest.raises(ToolError, match="reached Microsoft 365 and was applied"):
             _ = await _append(client)
 
         assert patch.call_count == 1
