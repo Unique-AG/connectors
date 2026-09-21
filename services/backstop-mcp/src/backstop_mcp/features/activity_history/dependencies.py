@@ -39,8 +39,9 @@ def get_activity_detail_query_factory(
 @lru_cache(maxsize=1)
 def get_activity_history_query_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> GetActivityHistoryQuery:
-    return GetActivityHistoryQuery(client=client)
+    return GetActivityHistoryQuery(client=client, build_entity_link_util=build_entity_link_util)
 
 
 @lru_cache(maxsize=1)

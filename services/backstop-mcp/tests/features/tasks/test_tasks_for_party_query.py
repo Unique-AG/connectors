@@ -58,3 +58,22 @@ class TestGetTasksForPartyQuery:
         assert fetched.open_count == 1
         assert fetched.completed_count == 1
         assert fetched.scan_truncated is False
+        assert fetched.tasks[0].url is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_configured_ui_origin_puts_a_task_url_on_every_row(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/tasks").mock(
+            return_value=_page(_task("t1", title="Call back", status="Open"))
+        )
+
+        fetched = await make_get_tasks_for_party_query(
+            client, ui_base_url="https://tenant.example.test"
+        ).run(search_type="organizations", entity_id=_ORG_ID, status="all")
+
+        assert fetched.tasks[0].url == (
+            "https://tenant.example.test/backstop/crm/Task.action"
+            "?popupAddEditTask=&taskId=t1&workflowTaskId=&viewOnly=true"
+        )

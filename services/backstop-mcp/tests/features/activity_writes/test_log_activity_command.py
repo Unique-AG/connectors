@@ -444,7 +444,9 @@ class TestLogActivityCommandDispatch:
         created = await make_command(client).run(
             activity=_meeting(), party_id=_ORG_ID, author=_AUTHOR
         )
-        history = await GetActivityHistoryQuery(client=client).run(
+        history = await GetActivityHistoryQuery(
+            client=client, build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None)
+        ).run(
             segment="organizations",
             entity_id=_ORG_ID,
             party=ResolvedPartyDto(id=_ORG_ID, search_type="organizations", name="Northwind"),

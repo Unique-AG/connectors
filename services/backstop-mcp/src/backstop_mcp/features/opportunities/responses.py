@@ -477,6 +477,14 @@ class SearchOpportunityRowResponse(OmitNoneModel):
             "Backstop id of the opportunity. Always populated, even when omitted from `fields`."
         ),
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this deal (no tab). Not in the default fieldset — "
+            "select `url` to get it, since one URL per row is dead weight on a wide walk. "
+            "Omitted when this deployment has no UI origin. Echo it; never invent one."
+        ),
+    )
     name: str | None = Field(default=None, description="Deal name, usually 'investor - fund'.")
     stage: str | None = Field(default=None, description="The stage the deal is in now.")
     stage_id: str | None = Field(default=None, description="Backstop id of the current stage.")
@@ -527,6 +535,7 @@ class SearchOpportunityRowResponse(OmitNoneModel):
     ) -> Self:
         return cls(
             id=deal.id,
+            url=deal.url,
             name=deal.name,
             stage=deal.stage,
             stage_id=deal.stage_id,

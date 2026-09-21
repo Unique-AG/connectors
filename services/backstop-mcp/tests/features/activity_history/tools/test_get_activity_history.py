@@ -174,6 +174,64 @@ class TestFirstCallByTrustedPartyId:
         assert meeting.occurred_at == date(2026, 1, 5)
         assert result.groups["email"].next is not None
         assert result.groups["meeting"].next is None
+        assert meeting.url is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_specific_resource_becomes_the_crm_url_and_emails_stay_url_less(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/organizations/o42").mock(
+            return_value=httpx.Response(200, json=_org_document())
+        )
+        _activities_route("organizations", "o42", "meetings").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource(
+                        "m1",
+                        "activities",
+                        title="Item m1",
+                        effectiveDate="2026-01-05",
+                        specificResource={
+                            "resourceId": "76280387",
+                            "resourceType": "meeting-or-calls",
+                        },
+                    )
+                ),
+            )
+        )
+        for activity_type in ("calls", "notes", "documents"):
+            _activities_route("organizations", "o42", activity_type).mock(
+                return_value=httpx.Response(200, json=collection())
+            )
+        _emails_route("organizations", "o42").mock(
+            return_value=httpx.Response(
+                200, json=collection(_email("e1", "2026-02-09T00:00:00.000-0500"))
+            )
+        )
+
+        result = tool_model(
+            await get_activity_history(
+                ctx_never_elicit(),
+                _first(search_type="organizations", party_id="o42"),
+                resolve_party_query=make_resolve_party_query(client),
+                activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(
+                    client, ui_base_url="https://tenant.example.test"
+                ),
+            ),
+            ActivityHistoryResolvedResponse,
+        )
+
+        meeting = result.groups["meeting"].items[0]
+        assert isinstance(meeting, ActivityRecordResponse)
+        assert meeting.url == (
+            "https://tenant.example.test/backstop/activities.jsp/meetings/76280387"
+        )
+        email = result.groups["email"].items[0]
+        assert isinstance(email, EmailRecordResponse)
+        assert not hasattr(email, "url")
 
 
 class TestFirstCallBySearch:

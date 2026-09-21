@@ -57,6 +57,7 @@ def _activity_record(
         tags=(),
         attendees=(),
         gist_max_chars=gist_max_chars,
+        url=None,
     )
 
 

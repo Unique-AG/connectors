@@ -97,9 +97,11 @@ def get_search_opportunities_query_factory(
         get_map_opportunity_to_response_util_factory
     ),
     custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> SearchOpportunitiesQuery:
     return SearchOpportunitiesQuery(
         client=client,
         map_opportunity_to_response_util=map_opportunity_to_response_util,
         custom_fields_service=custom_fields_service,
+        build_entity_link_util=build_entity_link_util,
     )

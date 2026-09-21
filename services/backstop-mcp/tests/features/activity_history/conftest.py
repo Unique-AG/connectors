@@ -25,8 +25,12 @@ def make_get_activity_detail_query(client: BackstopClient) -> GetActivityDetailQ
     )
 
 
-def make_get_activity_history_query(client: BackstopClient) -> GetActivityHistoryQuery:
-    return GetActivityHistoryQuery(client=client)
+def make_get_activity_history_query(
+    client: BackstopClient, *, ui_base_url: str | None = None
+) -> GetActivityHistoryQuery:
+    return GetActivityHistoryQuery(
+        client=client, build_entity_link_util=BuildEntityLinkUtil(ui_base_url=ui_base_url)
+    )
 
 
 def make_search_activities_query(client: BackstopClient) -> SearchActivitiesQuery:

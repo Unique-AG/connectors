@@ -31,6 +31,7 @@ _MAX_ROWS = 1_000
 
 SearchRowField = Literal[
     "id",
+    "url",
     "name",
     "stage",
     "stage_id",
@@ -123,7 +124,8 @@ async def search_opportunities(
         Field(
             description=(
                 "Sparse row fields. Defaults to id, name, stage, is_open, dates, chips. "
-                "`id` is always included."
+                "`id` is always included. Select `url` when the answer will link to the "
+                "deals — it is off by default so a wide walk stays cheap."
             ),
         ),
     ] = None,

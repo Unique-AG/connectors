@@ -384,12 +384,21 @@ only when the set is no longer small.
 `canonical_url` do not take an origin. Commands and queries that publish a record `url`
 take `BuildEntityLinkUtil` as a constructor argument. Their factories inject it with
 `Depends(get_build_entity_link_util_factory)`. Tools that have no query/command
-(`get_person`, `get_product`, `get_accounts_for_party`) Depends the util the same way.
+(`get_person`, `get_product`, `get_accounts_for_party`), or that assemble the rows
+themselves (`search_activities`), Depends the util the same way.
 
 DTOs, attributes, and responses never build URLs. They take `url` as a constructor
-argument. Holdings rows are the list-row exception: `from_holdings` takes
-`urls: Mapping[str, str | None]` keyed by account id. Search rows pass `url=None`
-explicitly when the published model has the field.
+argument. List rows whose response is assembled in one classmethod take
+`urls: Mapping[str, str | None]` keyed by row id instead — `from_holdings` (account id)
+and `SearchActivitiesResolvedResponse.from_fetch` (activity row id).
+
+**A wide walk makes `url` opt-in.** Every read publishes a `url`, but on the two sparse
+searches (`search_opportunities`, `search_activities`) it is a selectable `fields` member
+outside the default set: one URL per row is ~100 bytes times up to 20,000 rows for a link
+the caller usually does not want. Bounded per-party lists (`get_tasks_for_party`,
+`get_people_for_party`, `get_activity_history`) publish it unconditionally. An activity
+row whose type has no CRM page — a bare `meeting_call`, or a history row Backstop sent
+without `specificResource` — gets no `url` rather than a guessed one.
 
 `canonical_url` is the no-tab open link. Tabs and layouts are a `build_backstop_links`
 call. When the origin is unset, `url` is `None` — never invent a host from the API

@@ -12,6 +12,7 @@ from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.entity_types import SearchType, map_search_type_to_resource_type_bean
 from backstop_mcp.features.tasks.api_responses import TaskAttributes
 from backstop_mcp.features.tasks.responses import PartyTasksResponse, TaskRowResponse
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, TaskLinkTarget
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +27,11 @@ MAX_TASK_SCAN_RECORDS = 5_000
 class GetTasksForPartyQuery:
     """Walk `/tasks` for one party. Both entity filters are always sent."""
 
-    def __init__(self, *, client: BackstopClient) -> None:
+    def __init__(
+        self, *, client: BackstopClient, build_entity_link_util: BuildEntityLinkUtil
+    ) -> None:
         self._client: BackstopClient = client
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(
         self,
@@ -55,7 +59,15 @@ class GetTasksForPartyQuery:
                     "total_count": page.total_count,
                 },
             )
-        rows = tuple(TaskRowResponse.from_resource(resource) for resource in page.items)
+        rows = tuple(
+            TaskRowResponse.from_resource(
+                resource,
+                url=self._build_entity_link_util.canonical_url(
+                    target=TaskLinkTarget(task_id=resource.id),
+                ),
+            )
+            for resource in page.items
+        )
         selected = tuple(
             row for row in rows if status == "all" or (row.is_open is (status == "open"))
         )

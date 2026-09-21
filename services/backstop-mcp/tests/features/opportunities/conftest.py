@@ -72,7 +72,9 @@ def make_get_opportunities_by_ids_query(client: BackstopClient) -> GetOpportunit
     )
 
 
-def make_search_opportunities_query(client: BackstopClient) -> SearchOpportunitiesQuery:
+def make_search_opportunities_query(
+    client: BackstopClient, *, ui_base_url: str | None = None
+) -> SearchOpportunitiesQuery:
     custom_fields = custom_fields_service(client)
     return SearchOpportunitiesQuery(
         client=client,
@@ -80,4 +82,5 @@ def make_search_opportunities_query(client: BackstopClient) -> SearchOpportuniti
             client, custom_fields=custom_fields
         ),
         custom_fields_service=custom_fields,
+        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=ui_base_url),
     )
