@@ -34,7 +34,8 @@ returns is its own, signed with `ZITADEL_JWT_SIGNING_KEY`. Zitadel never sees th
 ## Tool Call
 
 Every tool call resolves identity from the OIDC session, then queries the Unique API live. `search`
-shows the full shape; `content_tree` and `read_file` follow the same first two steps.
+shows the full shape; `content_tree`, `content_metadata`, and `read_file` follow the same first two
+steps.
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -59,14 +60,19 @@ sequenceDiagram
 Scope resolution only builds clickable citation links. If it fails, results still return, with
 `unique://content/{id}` references instead.
 
-## Content Tree
+## Content Tree & Content Metadata
 
-`content_tree` walks the folder hierarchy, which can outlast a single call. Rather than block, it
-returns whatever it has when `KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS` (default 30) elapses, and the
-walk continues in the background, so a follow-up call is usually instant.
+`content_tree` and `content_metadata` share one walk of the folder hierarchy, which can outlast a
+single call. Rather than block, it returns whatever it has when `KB_MCP_WALK_TIMEOUT_SECONDS`
+(default 30) elapses, and the walk continues in the background, so a follow-up call is usually
+instant. Passing `folder_path` (`content_tree`) or `folder_ids`/`folder_paths` (`content_metadata`)
+roots the walk at that folder instead of walking everything and filtering afterward, which is what
+makes a folder-scoped call fast.
 
-Responses are cached in memory per pod, keyed on `(company_id, user_id)`. With multiple replicas a
-change can therefore take up to the cache TTL (default 600s) to appear.
+Responses are cached in memory per pod, keyed on `(company_id, user_id, folder_scope)`. With
+multiple replicas a change can therefore take up to the cache TTL (default 600s) to appear. A
+caller's own `metadata_filter` no longer forces a second walk: only the admin filter is baked into
+the cached walk.
 
 ## Read File
 

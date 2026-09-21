@@ -13,7 +13,7 @@ registrations, tokens, and JTI replay-protection mappings.
 flowchart LR
     Client["MCP Client"] -->|"HTTP MCP + OAuth"| KbMcp["kb-mcp"]
     KbMcp -->|"OIDC / PKCE"| Zitadel["Zitadel"]
-    KbMcp -->|"search / content_tree / read_file"| NodeChat["Unique API (node-chat)"]
+    KbMcp -->|"search / content_tree / content_metadata / read_file"| NodeChat["Unique API (node-chat)"]
     KbMcp -->|"OAuth-proxy state"| Postgres[("Postgres")]
 ```
 
@@ -43,8 +43,9 @@ The MCP client authenticates to kb-mcp via Zitadel; kb-mcp then calls the Unique
 identity established through that session, not a service-wide credential. Every outbound call
 carries that identity as two headers, `x-user-id` and `x-company-id`, set by `unique-toolkit` from
 the resolved settings. The Unique API enforces that identity on every call, so a `search`,
-`content_tree`, or `read_file` result is always scoped to what the calling user can already see in
-the knowledge base. kb-mcp has no broader access of its own to leak. Upstream Unique API
+`content_tree`, `content_metadata`, or `read_file` result is always scoped to what the calling user
+can already see in the knowledge base. kb-mcp has no broader access of its own to leak. Upstream
+Unique API
 credentials (`UNIQUE_APP_ID`/`UNIQUE_APP_KEY`, sent as `Authorization`/`x-app-id`) are only needed
 when the call has to cross the Kong gateway: local development, or a deployment that routes through
 Kong rather than calling `node-chat` directly in-cluster. Direct in-cluster calls carry only the two
