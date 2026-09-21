@@ -47,12 +47,9 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.metrics import configure_metrics
 from office_365_mcp.shared.handles import TranscriptHandle
+from office_365_mcp.tools import teams_read_transcript as transcript_reader
 from office_365_mcp.tools.outlook_send_draft import a_person_agrees, send_draft
-from office_365_mcp.tools.teams_read_transcript import (
-    MAX_TRANSCRIPT_BYTES,
-    STEP_ATTRIBUTED,
-    teams_read_transcript,
-)
+from office_365_mcp.tools.teams_read_transcript import STEP_ATTRIBUTED, teams_read_transcript
 from office_365_mcp.tools.teams_read_transcript import TOOL_NAME as TRANSCRIPT_TOOL
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
@@ -219,14 +216,17 @@ class TestAGraphCallIsCountedAndTimed:
         assert _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="forbidden") == before + 1
 
     async def test_a_transcript_over_the_ceiling_is_counted_under_its_own_status(
-        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Two dashboard queries exclude `too_large`, and nothing else pins that status."""
+        monkeypatch.setattr(transcript_reader, "MAX_TRANSCRIPT_BYTES", 64)
         _ = graph.get(_TRANSCRIPT_PATH).mock(
             return_value=httpx.Response(
-                200,
-                content=b"x" * (MAX_TRANSCRIPT_BYTES + 1),
-                headers={"Content-Type": "text/vtt"},
+                200, content=b"x" * 65, headers={"Content-Type": "text/vtt"}
             )
         )
         before = _value(GRAPH_OPERATIONS_TOTAL, operation=TRANSCRIPT_TOOL, status="too_large")

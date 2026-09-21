@@ -43,7 +43,7 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 MAX_TURNS = 500
 
-MAX_TRANSCRIPT_BYTES = 10 * 1024 * 1024
+MAX_TRANSCRIPT_BYTES = 100 * 1024 * 1024
 
 _DESCRIPTION = f"""\
 Returns the spoken turns of one Teams meeting transcript. Use this tool to read what a \

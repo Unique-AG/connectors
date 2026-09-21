@@ -100,7 +100,7 @@ serviceAccount:
 volumes:
   - name: tmp
     emptyDir:
-      sizeLimit: 256Mi # 10 MiB per in-flight transcript read
+      sizeLimit: 1Gi # 100 MiB per in-flight transcript read, so ten at once
 
 volumeMounts:
   - name: tmp
