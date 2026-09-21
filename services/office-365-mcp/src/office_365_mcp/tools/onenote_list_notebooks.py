@@ -89,8 +89,8 @@ class NotebookSection(BaseModel):
     uri: str = Field(
         description=(
             "This section's handle: onenote:///sections/{id}, with the id percent-encoded. Pass "
-            + "it to onenote_list_pages, onenote_create_page, or onenote_copy_page as "
-            + "`to_section`. Never build one. A section id alone reaches nothing."
+            + "it as `section` to onenote_list_pages or onenote_create_page, or as `to_section` "
+            + "to onenote_copy_page. Never build one. A section id alone reaches nothing."
         )
     )
     group_uri: str | None = Field(
@@ -135,9 +135,10 @@ class Notebook(BaseModel):
     uri: str = Field(
         description=(
             "This notebook's handle: onenote:///notebooks/{id}, with the id percent-encoded. "
-            + "Pass it to onenote_list_sections, onenote_create_section, "
-            + "onenote_create_section_group, or onenote_copy_section as `to_notebook`, or to "
-            + "onenote_copy_notebook. Never build one. A notebook id alone reaches nothing."
+            + "Pass it as `parent` to onenote_list_sections, onenote_create_section or "
+            + "onenote_create_section_group, as `to_notebook` to onenote_copy_section, or as "
+            + "`notebook` to onenote_copy_notebook. Never build one. A notebook id alone reaches "
+            + "nothing."
         )
     )
     name: str | None = Field(

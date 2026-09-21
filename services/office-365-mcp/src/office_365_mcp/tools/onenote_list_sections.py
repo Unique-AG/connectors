@@ -114,8 +114,8 @@ class SectionRow(BaseModel):
     uri: str = Field(
         description=(
             "This section's handle: onenote:///sections/{id}, with the id percent-encoded. Pass "
-            + "it to onenote_list_pages, onenote_create_page, or onenote_copy_page as "
-            + "`to_section`. Never build one. A section id alone reaches nothing."
+            + "it as `section` to onenote_list_pages or onenote_create_page, or as `to_section` "
+            + "to onenote_copy_page. Never build one. A section id alone reaches nothing."
         )
     )
     name: str | None = Field(
@@ -388,10 +388,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_SECTIONS,
                 description=(
                     "How many sections and how many section groups to return, at most "
-                    + f"{MAX_SECTIONS} of each. Paging happens inside the call, so this is the "
-                    + "whole answer, not a first page. Raise it. Do not call this tool "
-                    + "again with the same arguments. `capped` says whether this limit stopped "
-                    + "either listing early."
+                    + f"{MAX_SECTIONS} of each. `capped` says whether this limit stopped either "
+                    + f"listing early. Raise it while it is below {MAX_SECTIONS}, or narrow the "
+                    + "listing with `name_contains`."
                 ),
             ),
         ] = 50,

@@ -391,10 +391,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_PAGES,
                 description=(
-                    f"How many pages to return, at most {MAX_PAGES}. Paging happens inside "
-                    + "the call, so this is the whole answer, not a first page. Raise it. Do "
-                    + "not call this tool again with the same arguments. `capped` says whether "
-                    + "this limit stopped the search early."
+                    f"How many pages to return, at most {MAX_PAGES}. `capped` says whether this "
+                    + f"limit stopped the search early. Raise it while it is below {MAX_PAGES}. "
+                    + f"At {MAX_PAGES}, call again with `skip` set to the rows already returned."
                 ),
             ),
         ] = 25,
