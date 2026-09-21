@@ -3,7 +3,7 @@
 
 ## Configuration
 
-kb-mcp reads its deployment configuration from environment variables. In Helm deployments most map
+`kb-mcp` reads its deployment configuration from environment variables. In Helm deployments most map
 onto typed values under `mcpConfig`. See `values.schema.json` for field-level descriptions and
 [Minimal Values](./deployment.md#Minimal-Values).
 
@@ -19,7 +19,7 @@ admin UI.
 | `UNIQUE_API_BASE_URL` | Base URL of the Unique API (`node-chat`) this instance calls |
 | `ZITADEL_BASE_URL` | Zitadel instance base URL |
 | `ZITADEL_CLIENT_ID` | Public PKCE client id, not a secret |
-| `ZITADEL_JWT_SIGNING_KEY` | Signs kb-mcp's own downstream OAuth-proxy JWTs; never sent to Zitadel |
+| `ZITADEL_JWT_SIGNING_KEY` | Signs `kb-mcp`'s own downstream OAuth-proxy JWTs; never sent to Zitadel |
 | `DATABASE_URL` | Postgres connection string for OAuth-proxy state |
 | `ENCRYPTION_KEY` | Encrypts that state at rest |
 
@@ -36,7 +36,7 @@ secret for an in-cluster database, or your own secret for an external one. See
 
 !!! warning "Rotating a secret logs everyone out"
     Changing `ENCRYPTION_KEY` makes every token already stored in Postgres undecryptable.
-    Changing `ZITADEL_JWT_SIGNING_KEY` invalidates every downstream JWT kb-mcp has already issued.
+    Changing `ZITADEL_JWT_SIGNING_KEY` invalidates every downstream JWT `kb-mcp` has already issued.
     Either one forces every connected client to reconnect and sign in again; neither has a
     migration path.
 
