@@ -38,6 +38,7 @@ from office_365_mcp.tools.onenote_copy_section import a_person_agrees, copy_sect
 _SECTION_ID = "1-SYNTHETICSECTION0000!0-ABCDEF"
 _NOTEBOOK_ID = "1-SYNTHETICNOTEBOOK0000!0-ABCDEF"
 _GROUP_ID = "1-SYNTHETICGROUP0000!0-ABCDEF"
+_OPERATION_ID = "1-SYNTHETICOPERATION0000!0-ABCDEF"
 
 _SECTION_URI = OnenoteSectionHandle(_SECTION_ID).uri
 _NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID).uri
@@ -61,14 +62,27 @@ def _notebook_payload(
 
 
 def _group_payload(
-    *, group_id: str = _GROUP_ID, notebook: Mapping[str, object] | None = None
+    *,
+    group_id: str = _GROUP_ID,
+    display_name: str | None = "Archive",
+    notebook: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    return {"id": group_id, "parentNotebook": dict(notebook) if notebook is not None else None}
+    return {
+        "id": group_id,
+        "displayName": display_name,
+        "parentNotebook": dict(notebook) if notebook is not None else None,
+    }
+
+
+def _section_name_payload(
+    *, section_id: str = _SECTION_ID, display_name: str | None = "Notes"
+) -> dict[str, object]:
+    return {"id": section_id, "displayName": display_name}
 
 
 def _operation_payload(
     *,
-    operation_id: str | None = "1-SYNTHETICOPERATION0000!0-ABCDEF",
+    operation_id: str | None = _OPERATION_ID,
     status: str | None = "Running",
 ) -> dict[str, object]:
     return {
@@ -106,25 +120,61 @@ def _group_route(
     graph: respx.MockRouter,
     *,
     group_id: str = _GROUP_ID,
+    display_name: str | None = "Archive",
     notebook: Mapping[str, object] | None = _GROUP_UNDER_NOTEBOOK,
 ) -> respx.Route:
     return graph.get(f"/me/onenote/sectionGroups/{group_id}").mock(
-        return_value=httpx.Response(200, json=_group_payload(group_id=group_id, notebook=notebook))
+        return_value=httpx.Response(
+            200,
+            json=_group_payload(group_id=group_id, display_name=display_name, notebook=notebook),
+        )
     )
 
 
-def _copies_to_notebook(
+def _section_name_route(
+    graph: respx.MockRouter, *, display_name: str | None = "Notes"
+) -> respx.Route:
+    return graph.get(_SECTION_GET_PATH).mock(
+        return_value=httpx.Response(200, json=_section_name_payload(display_name=display_name))
+    )
+
+
+def _operation_location(operation_id: str = _OPERATION_ID) -> str:
+    return f"https://graph.microsoft.com/v1.0/me/onenote/operations/{operation_id}"
+
+
+def _copies_to_notebook_with_body(
     graph: respx.MockRouter, *, status: int = 202, payload: Mapping[str, object] | None = None
 ) -> respx.Route:
     body = dict(payload) if payload is not None else _operation_payload()
     return graph.post(_COPY_TO_NOTEBOOK_PATH).mock(return_value=httpx.Response(status, json=body))
 
 
-def _copies_to_group(
+def _copies_to_notebook_with_header_only(
+    graph: respx.MockRouter, *, status: int = 202, operation_id: str = _OPERATION_ID
+) -> respx.Route:
+    return graph.post(_COPY_TO_NOTEBOOK_PATH).mock(
+        return_value=httpx.Response(
+            status, content=b"", headers={"Operation-Location": _operation_location(operation_id)}
+        )
+    )
+
+
+def _copies_to_group_with_body(
     graph: respx.MockRouter, *, status: int = 202, payload: Mapping[str, object] | None = None
 ) -> respx.Route:
     body = dict(payload) if payload is not None else _operation_payload()
     return graph.post(_COPY_TO_GROUP_PATH).mock(return_value=httpx.Response(status, json=body))
+
+
+def _copies_to_group_with_header_only(
+    graph: respx.MockRouter, *, status: int = 202, operation_id: str = _OPERATION_ID
+) -> respx.Route:
+    return graph.post(_COPY_TO_GROUP_PATH).mock(
+        return_value=httpx.Response(
+            status, content=b"", headers={"Operation-Location": _operation_location(operation_id)}
+        )
+    )
 
 
 def _private_notebook(graph: respx.MockRouter) -> None:
@@ -179,22 +229,34 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
 
 
 class TestWhatItSendsToGraphForANotebookDestination:
-    async def test_it_reads_the_notebook_then_copies_and_nothing_else(
+    async def test_a_private_notebook_reads_the_notebook_then_copies_and_nothing_else(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _private_notebook(graph)
-        copy = _copies_to_notebook(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
 
         _ = await _copy(client)
 
         assert copy.call_count == 1
         assert len(graph.calls) == 2, "the notebook read and the copy"
 
+    async def test_a_shared_notebook_also_reads_the_source_section_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
+
+        _ = await _copy(client)
+
+        assert copy.call_count == 1
+        assert len(graph.calls) == 3, "the notebook read, the source section read, the copy"
+
     async def test_the_copy_is_sent_with_only_the_destination_id_when_no_rename_is_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _private_notebook(graph)
-        copy = _copies_to_notebook(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
 
         _ = await _copy(client)
 
@@ -204,7 +266,7 @@ class TestWhatItSendsToGraphForANotebookDestination:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _private_notebook(graph)
-        copy = _copies_to_notebook(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
 
         _ = await _copy(client, new_name="Renamed section")
 
@@ -214,7 +276,7 @@ class TestWhatItSendsToGraphForANotebookDestination:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _private_notebook(graph)
-        copy = _copies_to_notebook(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
 
         _ = await _copy(client, new_name="Renamed section")
 
@@ -222,6 +284,17 @@ class TestWhatItSendsToGraphForANotebookDestination:
         assert "groupId" not in sent
         assert "siteId" not in sent
         assert "siteCollectionId" not in sent
+
+    async def test_the_section_name_get_is_not_issued_when_the_notebook_is_private(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        section_route = _section_name_route(graph)
+        _private_notebook(graph)
+        _ = _copies_to_notebook_with_header_only(graph)
+
+        _ = await _copy(client)
+
+        assert section_route.call_count == 0, "nobody was asked, so the name was never needed"
 
     @pytest.mark.usefixtures("retry_sleeps")
     async def test_a_copy_graph_declines_is_never_sent_a_second_time(
@@ -242,7 +315,7 @@ class TestWhatItSendsToGraphForASectionGroupDestination:
     ) -> None:
         _ = _group_route(graph, notebook={"id": _NOTEBOOK_ID})
         _ = _notebook_route(graph, is_shared=False, user_role="Owner")
-        copy = _copies_to_group(graph)
+        copy = _copies_to_group_with_header_only(graph)
 
         _ = await _copy(client, to_notebook=None, to_section_group=_GROUP_URI)
 
@@ -254,11 +327,24 @@ class TestWhatItSendsToGraphForASectionGroupDestination:
     ) -> None:
         _ = _group_route(graph, notebook={"id": _NOTEBOOK_ID})
         _ = _notebook_route(graph, is_shared=False, user_role="Owner")
-        copy = _copies_to_group(graph)
+        copy = _copies_to_group_with_header_only(graph)
 
         _ = await _copy(client, to_notebook=None, to_section_group=_GROUP_URI)
 
         assert _sent(copy) == {"id": _GROUP_ID}
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_copy_graph_declines_is_never_sent_a_second_time(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _group_route(graph, notebook={"id": _NOTEBOOK_ID})
+        _ = _notebook_route(graph, is_shared=False, user_role="Owner")
+        copy = graph.post(_COPY_TO_GROUP_PATH).mock(return_value=httpx.Response(503))
+
+        with pytest.raises(GraphUnavailable):
+            _ = await _copy(client, to_notebook=None, to_section_group=_GROUP_URI)
+
+        assert copy.call_count == 1, "no_retry means one attempt, however Graph answers"
 
 
 class TestWhatItRefuses:
@@ -315,6 +401,12 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
+    async def test_the_notebook_refusal_names_onenote_create_notebook(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError, match="onenote_create_notebook"):
+            _ = await _copy(client, to_notebook="not a handle", to_section_group=None)
+
     @pytest.mark.parametrize(
         "value",
         [OnenoteSectionHandle(_SECTION_ID).uri, _GROUP_ID, "", "   "],
@@ -327,6 +419,12 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
+    async def test_the_section_group_refusal_names_onenote_create_section_group(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError, match="onenote_create_section_group"):
+            _ = await _copy(client, to_notebook=None, to_section_group="not a handle")
+
     async def test_the_section_handle_is_checked_before_the_destination(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -335,13 +433,31 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
+    async def test_the_no_destination_refusal_says_a_correction_would_succeed(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError, match="corrected call succeeds"):
+            _ = await _copy(client, to_notebook=None, to_section_group=None)
+
+    async def test_the_notebook_refusal_says_a_correction_would_succeed(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError, match="corrected call succeeds"):
+            _ = await _copy(client, to_notebook="not a handle", to_section_group=None)
+
+    async def test_the_section_group_refusal_says_a_correction_would_succeed(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError, match="corrected call succeeds"):
+            _ = await _copy(client, to_notebook=None, to_section_group="not a handle")
+
 
 class TestWhatItAnswers:
-    async def test_the_answer_is_the_operation_graph_started(
+    async def test_the_answer_is_the_operation_graph_started_from_the_body(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _private_notebook(graph)
-        _ = _copies_to_notebook(
+        _ = _copies_to_notebook_with_body(
             graph,
             payload=_operation_payload(operation_id="1-OPERATION0000!0-ABCDEF", status="Running"),
         )
@@ -351,13 +467,56 @@ class TestWhatItAnswers:
         assert answer.status == "Running"
         assert "1-OPERATION0000" in answer.uri
 
-    async def test_an_operation_with_no_id_is_a_programming_error(
+    async def test_an_empty_202_with_only_the_operation_location_header_mints_the_handle(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _private_notebook(graph)
-        _ = _copies_to_notebook(graph, payload=_operation_payload(operation_id=None))
+        copy = _copies_to_notebook_with_header_only(graph, operation_id="1-HEADERONLY0000!0-ABCDEF")
 
-        with pytest.raises(AssertionError):
+        answer = await _copy(client)
+
+        assert copy.call_count == 1
+        assert "1-HEADERONLY0000" in answer.uri
+        assert answer.status is None
+
+    async def test_a_body_and_a_header_together_are_answered_from_the_body(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _private_notebook(graph)
+        body = _operation_payload(operation_id="1-FROMBODY0000!0-ABCDEF", status="Running")
+        _ = graph.post(_COPY_TO_NOTEBOOK_PATH).mock(
+            return_value=httpx.Response(
+                202,
+                json=body,
+                headers={"Operation-Location": _operation_location("1-FROMHEADER0000!0-ABCDEF")},
+            )
+        )
+
+        answer = await _copy(client)
+
+        assert "1-FROMBODY0000" in answer.uri
+        assert "1-FROMHEADER0000" not in answer.uri
+
+    async def test_an_empty_202_with_neither_a_body_nor_a_header_is_refused(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _private_notebook(graph)
+        copy = graph.post(_COPY_TO_NOTEBOOK_PATH).mock(
+            return_value=httpx.Response(202, content=b"")
+        )
+
+        with pytest.raises(ToolError, match="named no operation"):
+            _ = await _copy(client)
+
+        assert copy.call_count == 1, "the copy was still sent before this tool gave up on it"
+
+    async def test_a_body_with_no_id_and_no_header_is_the_same_refusal_as_an_empty_202(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _private_notebook(graph)
+        _ = _copies_to_notebook_with_body(graph, payload=_operation_payload(operation_id=None))
+
+        with pytest.raises(ToolError, match="named no operation"):
             _ = await _copy(client)
 
 
@@ -383,7 +542,7 @@ class TestGraphFailures:
                 404, json={"error": {"code": "itemNotFound", "message": "not found"}}
             )
         )
-        copy = _copies_to_notebook(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
 
         with pytest.raises(GraphNotFound):
             _ = await _copy(client)
@@ -413,7 +572,7 @@ class TestThePersonBetweenTheCopyAndTheOthersInTheNotebook:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _private_notebook(graph)
-        copy = _copies_to_notebook(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
         asked: list[str] = []
 
         async def counting(question: str, about: str) -> str | None:
@@ -430,7 +589,8 @@ class TestThePersonBetweenTheCopyAndTheOthersInTheNotebook:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, is_shared=True, user_role="Owner")
-        copy = _copies_to_notebook(graph)
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
 
         with pytest.raises(ToolError, match="Nothing was copied"):
             _ = await _copy(client, confirm=_refuses)
@@ -441,7 +601,8 @@ class TestThePersonBetweenTheCopyAndTheOthersInTheNotebook:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, is_shared=False, user_role="Contributor")
-        copy = _copies_to_notebook(graph)
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
         asked: list[str] = []
 
         async def counting(question: str, about: str) -> str | None:
@@ -459,7 +620,7 @@ class TestThePersonBetweenTheCopyAndTheOthersInTheNotebook:
     ) -> None:
         _ = _group_route(graph, notebook={"id": _NOTEBOOK_ID})
         _ = _notebook_route(graph, is_shared=False, user_role="Owner")
-        copy = _copies_to_group(graph)
+        copy = _copies_to_group_with_header_only(graph)
         asked: list[str] = []
 
         async def counting(question: str, about: str) -> str | None:
@@ -475,9 +636,10 @@ class TestThePersonBetweenTheCopyAndTheOthersInTheNotebook:
     async def test_a_shared_section_group_destination_is_asked_about(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _group_route(graph, notebook={"id": _NOTEBOOK_ID})
-        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
-        copy = _copies_to_group(graph)
+        _ = _group_route(graph, display_name="Archive", notebook={"id": _NOTEBOOK_ID})
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner", name="Work")
+        _ = _section_name_route(graph)
+        copy = _copies_to_group_with_header_only(graph)
         asked: list[str] = []
 
         async def counting(question: str, about: str) -> str | None:
@@ -488,14 +650,15 @@ class TestThePersonBetweenTheCopyAndTheOthersInTheNotebook:
         _ = await _copy(client, to_notebook=None, to_section_group=_GROUP_URI, confirm=counting)
 
         assert len(asked) == 1
-        assert "a section group in the notebook" in asked[0]
+        assert "the section group 'Archive' of the notebook 'Work'" in asked[0]
         assert copy.call_count == 1
 
-    async def test_the_question_names_the_notebook_and_the_reason(
+    async def test_the_question_names_the_section_the_notebook_and_the_reason(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, is_shared=True, user_role="Owner", name="Work")
-        _ = _copies_to_notebook(graph)
+        _ = _section_name_route(graph, display_name="Notes")
+        _ = _copies_to_notebook_with_header_only(graph)
         asked: list[str] = []
         bound: list[str] = []
 
@@ -508,15 +671,17 @@ class TestThePersonBetweenTheCopyAndTheOthersInTheNotebook:
 
         assert len(asked) == 1
         question = asked[0]
+        assert "Notes" in question
         assert "Work" in question
         assert "shared with other people" in question
-        assert bound == [write_state_for("copy_section", _SECTION_ID, _NOTEBOOK_ID, "")]
+        assert bound == [write_state_for("copy_section", _SECTION_ID, _NOTEBOOK_URI, "")]
 
     async def test_the_question_mentions_the_new_name_when_one_is_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, is_shared=True, user_role="Owner")
-        _ = _copies_to_notebook(graph)
+        _ = _section_name_route(graph)
+        _ = _copies_to_notebook_with_header_only(graph)
         asked: list[str] = []
 
         async def capturing(question: str, about: str) -> str | None:
@@ -528,11 +693,12 @@ class TestThePersonBetweenTheCopyAndTheOthersInTheNotebook:
 
         assert "Renamed section" in asked[0]
 
-    async def test_the_question_names_no_notebook_graph_left_unnamed(
+    async def test_the_question_names_nothing_none_of_it_has(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, is_shared=True, user_role="Owner", name=None)
-        _ = _copies_to_notebook(graph)
+        _ = _section_name_route(graph, display_name=None)
+        _ = _copies_to_notebook_with_header_only(graph)
         asked: list[str] = []
 
         async def capturing(question: str, about: str) -> str | None:
@@ -542,13 +708,15 @@ class TestThePersonBetweenTheCopyAndTheOthersInTheNotebook:
 
         _ = await _copy(client, confirm=capturing)
 
+        assert "an unnamed section" in asked[0]
         assert "an unnamed notebook" in asked[0]
 
     async def test_about_changes_with_the_destination_and_the_new_name(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, is_shared=True, user_role="Owner")
-        _ = _copies_to_notebook(graph)
+        _ = _section_name_route(graph)
+        _ = _copies_to_notebook_with_header_only(graph)
         bound: list[str] = []
 
         async def capturing(question: str, about: str) -> str | None:
@@ -562,6 +730,35 @@ class TestThePersonBetweenTheCopyAndTheOthersInTheNotebook:
 
         assert bound[0] == bound[1]
         assert bound[2] != bound[0]
+
+    async def test_about_differs_between_a_notebook_and_a_section_group_of_the_same_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph, notebook_id=_GROUP_ID, is_shared=True, user_role="Owner")
+        _ = _group_route(graph, group_id=_GROUP_ID, notebook={"id": _NOTEBOOK_ID})
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        _ = _section_name_route(graph)
+        _ = graph.post(_COPY_TO_NOTEBOOK_PATH).mock(
+            return_value=httpx.Response(
+                202, content=b"", headers={"Operation-Location": _operation_location()}
+            )
+        )
+        _ = graph.post(_COPY_TO_GROUP_PATH).mock(
+            return_value=httpx.Response(
+                202, content=b"", headers={"Operation-Location": _operation_location()}
+            )
+        )
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _copy(client, to_notebook=OnenoteNotebookHandle(_GROUP_ID).uri, confirm=capturing)
+        _ = await _copy(client, to_notebook=None, to_section_group=_GROUP_URI, confirm=capturing)
+
+        assert bound[0] != bound[1]
 
     @pytest.mark.parametrize(
         "answer",
@@ -636,7 +833,8 @@ class TestTheEraWithNoBackChannel:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, is_shared=True, user_role="Owner")
-        copy = _copies_to_notebook(graph)
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
 
         answer = await copy_section(
             client,
@@ -647,7 +845,7 @@ class TestTheEraWithNoBackChannel:
 
         assert isinstance(answer, InputRequiredResult)
         assert answer.request_state == write_state_for(
-            "copy_section", _SECTION_ID, _NOTEBOOK_ID, ""
+            "copy_section", _SECTION_ID, _NOTEBOOK_URI, ""
         )
         assert copy.call_count == 0
 
@@ -655,7 +853,8 @@ class TestTheEraWithNoBackChannel:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, is_shared=True, user_role="Owner", name="Work")
-        _ = _copies_to_notebook(graph)
+        _ = _section_name_route(graph)
+        _ = _copies_to_notebook_with_header_only(graph)
 
         answer = await copy_section(
             client,
@@ -676,8 +875,9 @@ class TestTheEraWithNoBackChannel:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, is_shared=True, user_role="Owner")
-        copy = _copies_to_notebook(graph)
-        state = write_state_for("copy_section", _SECTION_ID, _NOTEBOOK_ID, "")
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
+        state = write_state_for("copy_section", _SECTION_ID, _NOTEBOOK_URI, "")
 
         first = await copy_section(
             client,
@@ -708,7 +908,8 @@ class TestTheEraWithNoBackChannel:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, is_shared=True, user_role="Owner")
-        copy = _copies_to_notebook(graph)
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
 
         first = await copy_section(
             client,
@@ -744,7 +945,8 @@ class TestTheEraWithNoBackChannel:
                 httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
             ]
         )
-        copy = _copies_to_notebook(graph)
+        section_route = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
 
         first = await copy_section(
             client,
@@ -771,6 +973,51 @@ class TestTheEraWithNoBackChannel:
 
         assert copy.call_count == 0
         assert notebook_route.call_count == 2
+        assert section_route.call_count == 2, (
+            "the source name is read again each round the question is asked in"
+        )
+
+    async def test_a_pending_accept_still_copies_when_the_fresh_read_says_private(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        notebook_route = graph.get(_NOTEBOOK_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+        section_route = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
+
+        first = await copy_section(
+            client,
+            section=_SECTION_URI,
+            to_notebook=_NOTEBOOK_URI,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        state = first.request_state
+        assert state is not None
+
+        answer = await copy_section(
+            client,
+            section=_SECTION_URI,
+            to_notebook=_NOTEBOOK_URI,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": "copy"})},
+                    state=state,
+                )
+            ),
+            answer_pending=True,
+        )
+
+        assert isinstance(answer, OperationSummary)
+        assert copy.call_count == 1
+        assert notebook_route.call_count == 2
+        assert section_route.call_count == 2
 
 
 class TestTheClientThatCannotAsk:
@@ -778,7 +1025,8 @@ class TestTheClientThatCannotAsk:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, is_shared=True, user_role="Owner")
-        copy = _copies_to_notebook(graph)
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
 
         class _CannotAsk:
             request_context: object = None
@@ -807,7 +1055,8 @@ class TestHowRegisterWiresThePendingAnswer:
                 httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
             ]
         )
-        copy = _copies_to_notebook(graph)
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
         mcp: FastMCP = FastMCP(name="wiring-under-test")
         copier.register(mcp, transport)
         tool = await mcp.get_tool(copier.TOOL_NAME)
@@ -899,3 +1148,19 @@ class TestHowItDeclaresItself:
         assert "exactly one" in description
         assert "not safe to retry blindly" in description
         assert "onenote_get_operation" in description
+
+    async def test_the_to_notebook_description_names_onenote_create_notebook(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", tool.parameters["properties"])
+        to_notebook = cast("Mapping[str, object]", properties["to_notebook"])
+        assert "onenote_create_notebook" in cast("str", to_notebook["description"])
+
+    async def test_the_to_section_group_description_names_onenote_create_section_group(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", tool.parameters["properties"])
+        to_section_group = cast("Mapping[str, object]", properties["to_section_group"])
+        assert "onenote_create_section_group" in cast("str", to_section_group["description"])

@@ -5,7 +5,8 @@ import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.default_query_parameters import QueryParameters
+from kiota_abstractions.method import Method
+from kiota_abstractions.request_information import RequestInformation
 from mcp.types import InputRequiredResult
 from msgraph.generated.users.item.onenote.pages.item.copy_to_section import (
     copy_to_section_post_request_body as _copy_to_section_body,
@@ -16,7 +17,15 @@ from msgraph.generated.users.item.onenote.pages.item.onenote_page_item_request_b
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import (
+    FetchedResponse,
+    fetch_response,
+    graph_errors,
+    graph_step,
+    native_response,
+    no_retry,
+    not_graph,
+)
 from office_365_mcp.shared.handles import (
     OnenotePageHandle,
     onenote_page_handle,
@@ -25,7 +34,8 @@ from office_365_mcp.shared.handles import (
 from office_365_mcp.shared.notes import (
     NotebookAudience,
     OperationSummary,
-    section_audience,
+    accepted_operation,
+    section_container,
     write_state_for,
 )
 from office_365_mcp.shared.seam import (
@@ -57,6 +67,7 @@ _DO_NOT_COPY = "do not copy"
 _NOTHING_COPIED = "Nothing was copied."
 
 _UNTITLED_PAGE = "an untitled page"
+_UNNAMED_SECTION = "an unnamed section"
 _UNNAMED_NOTEBOOK = "an unnamed notebook"
 
 _NOT_A_PAGE_HANDLE = (
@@ -74,6 +85,14 @@ _NOT_A_SECTION_HANDLE = (
     + "onenote_list_notebooks or onenote_list_sections result. A page handle "
     + "(onenote:///pages/{id}) and a notebook handle (onenote:///notebooks/{id}) are neither one "
     + "a section handle. Copy it word for word. This same value fails again, so do not retry it."
+)
+
+_NO_OPERATION_NAMED = (
+    "Microsoft accepted this copy but named no operation to follow: the response carried "
+    + "neither an operation in its body nor an Operation-Location header. The copy may still be "
+    + "running with nothing here able to track it. Poll nothing; instead look for the result "
+    + "with onenote_list_pages after a while, and do not call this tool again for the same copy "
+    + "— that starts a second, independent one."
 )
 
 GRAPH_NOT_FOUND = (
@@ -99,20 +118,23 @@ its `result_uri` is then the new page's handle — or Failed, whose `error_code`
 the copy when the destination section's notebook is shared with other people or belongs to \
 somebody else, or when Microsoft does not report who can see it, because the copy becomes \
 visible to them the moment it lands. A copy into the user's own unshared notebook starts \
-without a question. This call is NOT SAFE TO RETRY BLINDLY: if it times out, Microsoft may \
-already be running the copy, and calling this tool again with the same arguments starts a \
-second, independent copy of the page. On a timeout, poll onenote_get_operation first if an \
-operation handle came back already; otherwise list the destination section's pages with \
-onenote_list_pages and look for one with this page's title before trying again — remember that \
-Microsoft's page index lags a copy the same way it lags a create, so a fresh copy can still be \
-missing from that listing, or show an empty title, for a while after it lands.\
+without a question. This call is NOT SAFE TO RETRY BLINDLY: if it times out, a copy may already \
+be running on Microsoft's side, and calling this tool again with the same arguments starts a \
+second, independent copy of the page. On a timeout, nothing came back to poll: list the \
+destination section's pages with onenote_list_pages and look for one with this page's title \
+before calling again. On the test tenant a copied page's title showed up at once, unlike a \
+freshly created page's, but judge by `created_at` and the count too before trying again.\
 """
 
 
-def _question(title: str | None, audience: NotebookAudience) -> str:
+def _question(title: str | None, section_name: str | None, audience: NotebookAudience) -> str:
     named = title or _UNTITLED_PAGE
+    section = section_name or _UNNAMED_SECTION
     name = audience.name or _UNNAMED_NOTEBOOK
-    return f"Copy the page {named!r} into the section of the notebook {name!r}, {audience.reason}?"
+    return (
+        f"Copy the page {named!r} into the section {section!r} of the notebook {name!r}, "
+        + f"{audience.reason}?"
+    )
 
 
 def a_person_agrees(ctx: Context) -> Confirm:
@@ -135,36 +157,31 @@ async def copy_page(
         raise ToolError(_NOT_A_SECTION_HANDLE)
 
     about = write_state_for("copy_page", handle.page_id, section_handle.section_id)
-    operation = None
+    fetched: FetchedResponse | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        with graph_step(STEP_PAGE):
-            title = await _page_title(client, handle)
-        audience = await section_audience(client, section_handle.section_id)
+        container = await section_container(client, section_handle.section_id)
+        audience = container.notebook
         if answer_pending or audience.reaches_others:
+            with graph_step(STEP_PAGE):
+                title = await _page_title(client, handle)
             with not_graph():
-                answer = await confirm(_question(title, audience), about)
+                answer = await confirm(_question(title, container.name, audience), about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with graph_step(STEP_COPY_PAGE):
-                operation = await client.me.onenote.pages.by_onenote_page_id(
-                    handle.page_id
-                ).copy_to_section.post(
-                    _copy_to_section_body.CopyToSectionPostRequestBody(
-                        id=section_handle.section_id
-                    ),
-                    request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
-                )
+                fetched = await _copy(client, handle.page_id, section_handle.section_id)
 
     if asked is not None:
         return asked
     if refused is not None:
         raise ToolError(refused)
-    assert operation is not None, "Graph answered a page copy with no operation"
-    summary = OperationSummary.from_operation(operation)
-    assert summary is not None, "Graph answered a page copy with an operation that has no id"
+    assert fetched is not None, "a copy neither asked about nor refused sent nothing"
+    summary = accepted_operation(fetched)
+    if summary is None:
+        raise ToolError(_NO_OPERATION_NAMED)
     return summary
 
 
@@ -176,6 +193,19 @@ async def _page_title(client: GraphServiceClient, handle: OnenotePageHandle) -> 
     )
     assert page is not None, "Graph answered a page read with no page"
     return page.title
+
+
+async def _copy(client: GraphServiceClient, page_id: str, section_id: str) -> FetchedResponse:
+    builder = client.me.onenote.pages.by_onenote_page_id(page_id).copy_to_section
+    request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
+    request.headers.try_add("Accept", "application/json")
+    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
+        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+        "application/json",
+        _copy_to_section_body.CopyToSectionPostRequestBody(id=section_id),
+    )
+    request.add_request_options([*no_retry(), *native_response()])
+    return await fetch_response(client, request)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

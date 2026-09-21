@@ -34,32 +34,34 @@ _NOT_AN_OPERATION_HANDLE = (
 )
 
 GRAPH_NOT_FOUND = (
-    "Microsoft 365 has no record of this operation. An operation id is not permanent: Microsoft "
-    + "expires it once the copy it tracked has been done, or gone, for a while, and answers a "
-    + "plain 404 rather than a Failed status from then on. So this almost always means the copy "
-    + "finished long ago, or never started — not that this call did anything wrong, and not that "
-    + "the handle is malformed. Look for what the copy produced with onenote_list_pages, "
-    + "onenote_list_sections or onenote_list_notebooks instead. This same handle fails the same "
-    + "way every time, so do not call this tool again for it."
+    "Microsoft 365 has no record of this operation. That can mean the copy finished long ago "
+    + "and Microsoft has since dropped it, or that this handle never named a real operation to "
+    + "begin with — either way, this call did nothing wrong, and the handle is not malformed. "
+    + "Polling the same handle again will not change this answer. Look for what the copy "
+    + "produced with onenote_list_pages, onenote_list_sections or onenote_list_notebooks "
+    + "instead. This same handle fails the same way every time, so do not call this tool again "
+    + "for it."
 )
 
 _DESCRIPTION = """\
 Poll the status of a copy this connector already started: onenote_copy_page, \
 onenote_copy_section or onenote_copy_notebook. Pass the `operation` handle from one of those \
-tools' answers. `status` is Microsoft's own word for where the copy stands: NotStarted, \
-Running, Completed or Failed. Call this again a few seconds after the last call rather than in \
-a tight loop, and keep calling it until `status` reads Completed or Failed — there is no push \
-notification for a copy finishing. Once `status` reads Completed, `result_uri` is the handle of \
-whatever the copy produced, and `result_kind` says which of a page, a section or a notebook it \
-is: pass a page's `result_uri` to onenote_read_page, a section's to onenote_list_pages, and a \
-notebook's to onenote_list_sections. Once `status` reads Failed, `error_code` and \
-`error_message` carry what Microsoft said went wrong, and this tool has nothing further to add: \
-find out what happened by reading those two fields rather than calling this tool again. An \
-operation id expires once its copy has been done, or gone, for a while — Microsoft Graph then \
-answers this call with a plain 404 instead of a Failed status. That 404 means the copy is over, \
-one way or another, not that this call was wrong: look for the result with onenote_list_pages, \
-onenote_list_sections or onenote_list_notebooks instead of retrying this tool for the same \
-handle.\
+tools' answers, every time — keep polling with that same handle, because the `uri` this tool's \
+own answer carries can differ from it and is not the one to reuse for a later poll. `status` is \
+Microsoft's own word for where the copy stands: NotStarted, Running, Completed or Failed. \
+`percent_complete` is informational only and can already read high while `status` still reads \
+Running, so only `status` says a copy is actually done. Call this again a few seconds after the \
+last call rather than in a tight loop, and keep calling it until `status` reads Completed or \
+Failed — there is no push notification for a copy finishing. Once `status` reads Completed, \
+`result_uri` is the handle of whatever the copy produced, and `result_kind` says which of a \
+page, a section or a notebook it is: pass a page's `result_uri` to onenote_read_page, a \
+section's to onenote_list_pages, and a notebook's to onenote_list_sections. Once `status` reads \
+Failed, `error_code` and `error_message` carry what Microsoft said went wrong, and this tool \
+has nothing further to add: find out what happened by reading those two fields rather than \
+calling this tool again. A 404 from this call means Microsoft has no record of this operation: \
+the copy is over, one way or another, or the handle never named a real operation — not that \
+this call was wrong. Polling the same handle again will not change that answer: look for the \
+result with onenote_list_pages, onenote_list_sections or onenote_list_notebooks instead.\
 """
 
 
@@ -74,9 +76,7 @@ async def get_operation(client: GraphServiceClient, *, operation: str) -> Operat
         ).get()
 
     assert found is not None, "Graph answered an operation read with no operation"
-    summary = OperationSummary.from_operation(found)
-    assert summary is not None, "Graph answered an operation read with an operation that has no id"
-    return summary
+    return OperationSummary.from_operation(found)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

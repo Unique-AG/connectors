@@ -4,17 +4,23 @@ from typing import Annotated
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.default_query_parameters import QueryParameters
+from kiota_abstractions.method import Method
+from kiota_abstractions.request_information import RequestInformation
 from msgraph.generated.users.item.onenote.notebooks.item.copy_notebook import (
     copy_notebook_post_request_body as _copy_notebook_body,
 )
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry
+from office_365_mcp.graph_client import (
+    FetchedResponse,
+    fetch_response,
+    graph_errors,
+    native_response,
+    no_retry,
+)
 from office_365_mcp.shared.handles import onenote_notebook_handle
-from office_365_mcp.shared.notes import OperationSummary
+from office_365_mcp.shared.notes import OperationSummary, accepted_operation
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
 
 TOOL_NAME = "onenote_copy_notebook"
@@ -37,6 +43,14 @@ _NOT_A_NOTEBOOK_HANDLE = (
     + "Copy it word for word. This same value fails again, so do not retry it."
 )
 
+_NO_OPERATION_NAMED = (
+    "Microsoft accepted this copy but named no operation to follow: the response carried "
+    + "neither an operation in its body nor an Operation-Location header. The copy may still be "
+    + "running with nothing here able to track it. Poll nothing; instead look for the result "
+    + "with onenote_list_notebooks after a while, and do not call this tool again for the same "
+    + "copy — that starts a second, independent one."
+)
+
 GRAPH_NOT_FOUND = (
     "Microsoft 365 could not start this copy. The handle is well formed, so the argument is not "
     + "the problem: the notebook was most likely deleted, or the signed-in user's access to it "
@@ -57,12 +71,12 @@ handle — or Failed, whose `error_code` and `error_message` say why. The copy a
 the user's own OneDrive, under their own account, so this tool asks nobody to confirm it: \
 nothing this call does can become visible to somebody else purely by running it, even when the \
 notebook being copied is one this user does not own or that others can see. This call is NOT \
-SAFE TO RETRY BLINDLY: if it times out, Microsoft may already be running the copy, and calling \
-this tool again with the same arguments starts a second, independent copy of the whole \
-notebook, sections and pages included. On a timeout, poll onenote_get_operation first if an \
-operation handle came back already; otherwise list the user's notebooks with \
-onenote_list_notebooks and look for one with this notebook's name (or `new_name`, if one was \
-given) before trying again — Microsoft's index can lag a copy just as it lags a create.\
+SAFE TO RETRY BLINDLY: if it times out, a copy may already be running on Microsoft's side, and \
+calling this tool again with the same arguments starts a second, independent copy of the whole \
+notebook, sections and pages included. On a timeout, nothing came back to poll: list the user's \
+notebooks with onenote_list_notebooks and look for one with this notebook's name (or \
+`new_name`, if one was given) before calling again — Microsoft's index can lag a copy just as \
+it lags a create.\
 """
 
 
@@ -74,17 +88,27 @@ async def copy_notebook(
         raise ToolError(_NOT_A_NOTEBOOK_HANDLE)
 
     with graph_errors(TOOL_NAME, step=STEP_COPY_NOTEBOOK):
-        operation = await client.me.onenote.notebooks.by_notebook_id(
-            handle.notebook_id
-        ).copy_notebook.post(
-            _copy_notebook_body.CopyNotebookPostRequestBody(rename_as=new_name),
-            request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
-        )
+        fetched = await _copy(client, handle.notebook_id, new_name)
 
-    assert operation is not None, "Graph answered a notebook copy with no operation"
-    summary = OperationSummary.from_operation(operation)
-    assert summary is not None, "Graph answered a notebook copy with an operation that has no id"
+    summary = accepted_operation(fetched)
+    if summary is None:
+        raise ToolError(_NO_OPERATION_NAMED)
     return summary
+
+
+async def _copy(
+    client: GraphServiceClient, notebook_id: str, new_name: str | None
+) -> FetchedResponse:
+    builder = client.me.onenote.notebooks.by_notebook_id(notebook_id).copy_notebook
+    request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
+    request.headers.try_add("Accept", "application/json")
+    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
+        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+        "application/json",
+        _copy_notebook_body.CopyNotebookPostRequestBody(rename_as=new_name),
+    )
+    request.add_request_options([*no_retry(), *native_response()])
+    return await fetch_response(client, request)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -115,8 +139,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 max_length=MAX_NEW_NAME_CHARACTERS,
                 description=(
                     "A new name for the copy. Omit it to keep the notebook's own name. "
-                    + "Microsoft answers a name collision in the destination OneDrive with a "
-                    + "400 or a 409, which this argument does not prevent."
+                    + "Notebook names must be unique for this user, take at most 128 "
+                    + "characters, and cannot contain any of these characters: "
+                    + "? * / : < > | ' \". Microsoft refuses a name that breaks either rule, "
+                    + "and this tool forwards that refusal."
                 ),
             ),
         ] = None,

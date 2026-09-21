@@ -23,6 +23,7 @@ from office_365_mcp.tools import onenote_copy_notebook as copier
 from office_365_mcp.tools.onenote_copy_notebook import copy_notebook
 
 _NOTEBOOK_ID = "1-SYNTHETICNOTEBOOK0000!0-ABCDEF"
+_OPERATION_ID = "1-SYNTHETICOPERATION0000!0-ABCDEF"
 
 _NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID).uri
 
@@ -31,7 +32,7 @@ _COPY_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}/copyNotebook"
 
 def _operation_payload(
     *,
-    operation_id: str | None = "1-SYNTHETICOPERATION0000!0-ABCDEF",
+    operation_id: str | None = _OPERATION_ID,
     status: str | None = "Running",
 ) -> dict[str, object]:
     return {
@@ -46,11 +47,25 @@ def _operation_payload(
     }
 
 
-def _copies(
+def _operation_location(operation_id: str = _OPERATION_ID) -> str:
+    return f"https://graph.microsoft.com/v1.0/me/onenote/operations/{operation_id}"
+
+
+def _copies_with_body(
     graph: respx.MockRouter, *, status: int = 202, payload: Mapping[str, object] | None = None
 ) -> respx.Route:
     body = dict(payload) if payload is not None else _operation_payload()
     return graph.post(_COPY_PATH).mock(return_value=httpx.Response(status, json=body))
+
+
+def _copies_with_header_only(
+    graph: respx.MockRouter, *, status: int = 202, operation_id: str = _OPERATION_ID
+) -> respx.Route:
+    return graph.post(_COPY_PATH).mock(
+        return_value=httpx.Response(
+            status, content=b"", headers={"Operation-Location": _operation_location(operation_id)}
+        )
+    )
 
 
 async def _copy(
@@ -75,7 +90,7 @@ class TestWhatItSendsToGraph:
     async def test_it_copies_the_notebook_and_nothing_else(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        copy = _copies(graph)
+        copy = _copies_with_header_only(graph)
 
         _ = await _copy(client)
 
@@ -85,7 +100,7 @@ class TestWhatItSendsToGraph:
     async def test_an_empty_body_is_sent_when_no_name_is_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        copy = _copies(graph)
+        copy = _copies_with_header_only(graph)
 
         _ = await _copy(client)
 
@@ -94,7 +109,7 @@ class TestWhatItSendsToGraph:
     async def test_a_new_name_is_sent_as_rename_as(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        copy = _copies(graph)
+        copy = _copies_with_header_only(graph)
 
         _ = await _copy(client, new_name="Renamed notebook")
 
@@ -103,7 +118,7 @@ class TestWhatItSendsToGraph:
     async def test_no_group_site_or_folder_keys_are_ever_sent(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        copy = _copies(graph)
+        copy = _copies_with_header_only(graph)
 
         _ = await _copy(client, new_name="Renamed notebook")
 
@@ -116,7 +131,7 @@ class TestWhatItSendsToGraph:
     async def test_the_copy_content_type_is_json(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        copy = _copies(graph)
+        copy = _copies_with_header_only(graph)
 
         _ = await _copy(client)
 
@@ -167,10 +182,10 @@ class TestWhatItRefuses:
 
 
 class TestWhatItAnswers:
-    async def test_the_answer_is_the_operation_graph_started(
+    async def test_the_answer_is_the_operation_graph_started_from_the_body(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _copies(
+        _ = _copies_with_body(
             graph,
             payload=_operation_payload(operation_id="1-OPERATION0000!0-ABCDEF", status="Running"),
         )
@@ -180,12 +195,50 @@ class TestWhatItAnswers:
         assert answer.status == "Running"
         assert "1-OPERATION0000" in answer.uri
 
-    async def test_an_operation_with_no_id_is_a_programming_error(
+    async def test_an_empty_202_with_only_the_operation_location_header_mints_the_handle(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _copies(graph, payload=_operation_payload(operation_id=None))
+        copy = _copies_with_header_only(graph, operation_id="1-HEADERONLY0000!0-ABCDEF")
 
-        with pytest.raises(AssertionError):
+        answer = await _copy(client)
+
+        assert copy.call_count == 1
+        assert "1-HEADERONLY0000" in answer.uri
+        assert answer.status is None
+
+    async def test_a_body_and_a_header_together_are_answered_from_the_body(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        body = _operation_payload(operation_id="1-FROMBODY0000!0-ABCDEF", status="Running")
+        _ = graph.post(_COPY_PATH).mock(
+            return_value=httpx.Response(
+                202,
+                json=body,
+                headers={"Operation-Location": _operation_location("1-FROMHEADER0000!0-ABCDEF")},
+            )
+        )
+
+        answer = await _copy(client)
+
+        assert "1-FROMBODY0000" in answer.uri
+        assert "1-FROMHEADER0000" not in answer.uri
+
+    async def test_an_empty_202_with_neither_a_body_nor_a_header_is_refused(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        copy = graph.post(_COPY_PATH).mock(return_value=httpx.Response(202, content=b""))
+
+        with pytest.raises(ToolError, match="named no operation"):
+            _ = await _copy(client)
+
+        assert copy.call_count == 1, "the copy was still sent before this tool gave up on it"
+
+    async def test_a_body_with_no_id_and_no_header_is_the_same_refusal_as_an_empty_202(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _copies_with_body(graph, payload=_operation_payload(operation_id=None))
+
+        with pytest.raises(ToolError, match="named no operation"):
             _ = await _copy(client)
 
 
@@ -222,7 +275,9 @@ class TestGraphFailures:
         assert handle is not None, "GRAPH_CALL_EXAMPLE's own notebook value is not a handle"
         route = graph.post(f"/me/onenote/notebooks/{handle.notebook_id}/copyNotebook").mock(
             return_value=httpx.Response(
-                202, json=_operation_payload(operation_id=handle.notebook_id)
+                202,
+                content=b"",
+                headers={"Operation-Location": _operation_location(handle.notebook_id)},
             )
         )
 
@@ -284,3 +339,14 @@ class TestHowItDeclaresItself:
         assert "asks nobody to confirm it" in description
         assert "not safe to retry blindly" in description
         assert "onenote_get_operation" in description
+
+    async def test_the_new_name_description_states_the_documented_naming_rule(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", tool.parameters["properties"])
+        new_name = cast("Mapping[str, object]", properties["new_name"])
+        description = cast("str", new_name["description"])
+        assert "128" in description
+        assert "400" not in description
+        assert "409" not in description

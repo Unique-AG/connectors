@@ -185,6 +185,16 @@ class TestWhatItAnswers:
         assert answer.result_uri is None
         assert answer.result_kind is None
 
+    async def test_a_running_operation_can_already_show_a_high_percent_complete(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _gets(graph, _operation_payload(status="Running", percent_complete="100"))
+
+        answer = await _get(client)
+
+        assert answer.status == "Running"
+        assert answer.percent_complete == "100"
+
     async def test_a_failed_operation_carries_the_error(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -356,15 +366,39 @@ class TestHowItDeclaresItself:
         for tool_name in ("onenote_copy_page", "onenote_copy_section", "onenote_copy_notebook"):
             assert tool_name in description
 
-    async def test_the_description_says_a_404_means_the_copy_is_over(
+    async def test_the_description_says_a_404_means_no_record_rather_than_an_expiry(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
 
         description = (tool.description or "").casefold()
-        assert "expires" in description
+        assert "no record of this operation" in description
+        assert "expire" not in description
+        assert "almost always" not in description
+
+    async def test_the_description_says_percent_complete_is_not_the_completion_signal(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "percent_complete" in description
+        assert "only `status` says" in description
+
+    async def test_the_description_warns_the_returned_uri_can_differ_from_the_polled_handle(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = (tool.description or "").casefold()
+        assert "not the one to reuse" in description
 
     def test_not_found_advice_points_at_the_listers(self) -> None:
         assert "onenote_list_pages" in getter.GRAPH_NOT_FOUND
         assert "onenote_list_sections" in getter.GRAPH_NOT_FOUND
         assert "onenote_list_notebooks" in getter.GRAPH_NOT_FOUND
+
+    def test_not_found_advice_does_not_invent_an_expiry_or_a_base_rate(self) -> None:
+        advice = getter.GRAPH_NOT_FOUND.casefold()
+        assert "expire" not in advice
+        assert "almost always" not in advice
