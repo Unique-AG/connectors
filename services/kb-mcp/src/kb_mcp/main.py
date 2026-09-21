@@ -15,11 +15,11 @@ from unique_toolkit.monitoring import configure_tracing
 from unique_toolkit.monitoring.memory import start_memory_trimmer
 
 from kb_mcp.auth import build_auth
+from kb_mcp.common.references import SERVER_INSTRUCTIONS_CITATION_GUIDANCE
+from kb_mcp.common.tree_cache import expire_idle_trees_loop
 from kb_mcp.health import PoolHealthMiddleware
 from kb_mcp.http_client import install_pooled_http_client
-from kb_mcp.references import SERVER_INSTRUCTIONS_CITATION_GUIDANCE
 from kb_mcp.settings import ENV_FILE, Settings, get_settings
-from kb_mcp.tools.content_tree.cache import expire_idle_trees_loop
 
 _LOGGER = logging.getLogger(__name__)
 

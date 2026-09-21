@@ -7,7 +7,7 @@ import httpx
 import pytest
 from unique_toolkit.content.schemas import Content, ContentChunk
 
-from kb_mcp.references import MIME_TYPE_JSON, MIME_TYPE_PDF, MIME_TYPE_TEXT_PLAIN
+from kb_mcp.common.references import MIME_TYPE_JSON, MIME_TYPE_PDF, MIME_TYPE_TEXT_PLAIN
 from kb_mcp.tools.read_file import ReadFileToolConfig, read_file
 from kb_mcp.tools.read_file.tool import _download_with_retry
 

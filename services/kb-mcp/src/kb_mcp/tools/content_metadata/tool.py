@@ -1,0 +1,421 @@
+"""Knowledge Base content-metadata tool — discover metadata fields/values
+that exist on visible content, so a caller can build a metadata filter.
+
+- CONFIG (admin, per company): ContentMetadataToolConfig
+- ENV (process-wide): KB_MCP_TREE_CACHE_TTL_SECONDS / _MAX_ENTRIES and
+  KB_MCP_WALK_TIMEOUT_SECONDS / KB_MCP_WALK_MAX_TIMEOUT_SECONDS
+- STATE (LLM, per call): folder_ids/folder_paths/include_subfolders scope
+  which content counts; the tool always returns the full field/value catalog
+  for that scope
+
+Mirrors content_tree's structure and shares its ContentTree cache, keyed by
+company+user+folder scope, since both tools are just different views over the
+same visible-file snapshot. Scoping roots the walk at the requested folders
+rather than filtering afterwards; the admin filter is never bypassed.
+
+Exhaustive for now: every known field and every distinct value it has, with
+no caps — pagination will be added once scale requires it.
+"""
+
+import asyncio
+import json
+import logging
+from collections import Counter, defaultdict
+from collections.abc import Sequence
+from typing import Annotated, Any
+
+import unique_sdk
+from fastmcp.dependencies import Depends
+from fastmcp.tools import ToolResult, tool
+from mcp.types import TextContent, ToolAnnotations
+from pydantic import Field
+from unique_mcp import (
+    ConfigSchemaMeta,
+    ContextRequirements,
+    MetaKeys,
+    get_tool_config,
+    get_unique_settings_async,
+    merge_tool_meta,
+)
+from unique_toolkit.experimental.components.content_tree import ContentTree
+
+from kb_mcp.common.cached_walk import resolve_filtered_snapshot
+from kb_mcp.common.correlation import correlation_id
+from kb_mcp.common.metadata_filter import (
+    DEFAULT_METADATA_FILTER_STATEMENT,
+    merge_request_metadata_filter,
+)
+from kb_mcp.common.scoped_walk import ScopedContentTree
+from kb_mcp.common.tree_cache import get_tree_cache
+from kb_mcp.settings import get_settings
+from kb_mcp.tools.content_metadata.config import ContentMetadataToolConfig
+
+_LOGGER = logging.getLogger(__name__)
+
+_INCOMPLETE_NOTICE = (
+    "This scan is incomplete. The catalog is still being built in the "
+    "background; call content_metadata again (same arguments) to get the "
+    "complete picture — that follow-up is usually instant from cache."
+)
+
+
+async def _unreadable_folder_ids(
+    folder_ids: Sequence[str],
+    *,
+    user_id: str,
+    company_id: str,
+    concurrency: int,
+) -> list[str]:
+    """Folder ids whose listing the caller cannot read. Probed up front because
+    unique_toolkit swallows a failed listing, which would render as an empty
+    catalog rather than an error."""
+    semaphore = asyncio.Semaphore(concurrency)
+    unreadable: list[str] = []
+
+    async def _probe(scope_id: str) -> None:
+        async with semaphore:
+            try:
+                await unique_sdk.Folder.get_info_async(
+                    user_id=user_id, company_id=company_id, scopeId=scope_id
+                )
+            except asyncio.CancelledError, TimeoutError:
+                raise
+            except Exception as exc:  # noqa: BLE001 — nothing may reach the TaskGroup
+                # Escaping here would cancel the siblings and collapse the error
+                # into an ExceptionGroup. The class separates a bad id from an
+                # outage; the message is dropped because it can carry a folder name.
+                _LOGGER.info(
+                    "folder_id %s not readable (%s)", scope_id, type(exc).__name__
+                )
+                unreadable.append(scope_id)
+
+    async with asyncio.TaskGroup() as tg:
+        for scope_id in folder_ids:
+            _ = tg.create_task(_probe(scope_id))
+    return [fid for fid in folder_ids if fid in set(unreadable)]
+
+
+async def _resolve_folder_paths(
+    folder_paths: Sequence[str],
+    *,
+    user_id: str,
+    company_id: str,
+    concurrency: int,
+) -> tuple[list[str], list[str]]:
+    """Scope ids for these paths, and the paths that resolved to nothing.
+
+    An unresolved path is returned rather than dropped: dropping it would leave
+    the walk unscoped, so asking about one folder would answer for the whole
+    knowledge base.
+    """
+    semaphore = asyncio.Semaphore(concurrency)
+    resolved: dict[str, str] = {}
+    unresolved: list[str] = []
+
+    async def _resolve(folder_path: str) -> None:
+        async with semaphore:
+            try:
+                scope_id = (
+                    await unique_sdk.Folder.resolve_scope_id_from_folder_path_async(
+                        user_id=user_id,
+                        company_id=company_id,
+                        folder_path="/" + folder_path.strip("/"),
+                    )
+                )
+            except asyncio.CancelledError, TimeoutError:
+                raise
+            except Exception as exc:  # noqa: BLE001 — nothing may reach the TaskGroup
+                _LOGGER.info("folder_path did not resolve (%s)", type(exc).__name__)
+                unresolved.append(folder_path)
+                return
+            if scope_id:
+                resolved[folder_path] = scope_id
+            else:
+                unresolved.append(folder_path)
+
+    async with asyncio.TaskGroup() as tg:
+        for folder_path in folder_paths:
+            _ = tg.create_task(_resolve(folder_path))
+    return [resolved[p] for p in folder_paths if p in resolved], unresolved
+
+
+def _flatten_metadata_value(value: Any) -> list[Any]:
+    """List-valued metadata (tags) count each element as its own value;
+    scalars count as themselves. Nested objects aren't simply filterable
+    (no plain equals/contains against a dict), so they're skipped rather
+    than catalogued."""
+    if isinstance(value, list):
+        return [v for v in value if not isinstance(v, (list, dict))]
+    if isinstance(value, dict):
+        return []
+    return [value]
+
+
+_META = merge_tool_meta(
+    {
+        "unique.app/icon": "tags",
+        "unique.app/system-prompt": (
+            "Discover what metadata fields and values exist on the "
+            "knowledge base's visible content, so a caller can build a "
+            "metadata filter for search — not for searching content "
+            "itself. Returns JSON: a list of single-key objects, e.g. "
+            '[{"department": ["Legal", "Finance"]}], one per known field, '
+            "listing every distinct value found. Optionally scope it to "
+            "one or more folders with folder_ids (same as search's), or to "
+            "one or more folders by exact path with folder_paths if you "
+            "don't have scope_xxx ids in hand. If the result says the scan "
+            "is incomplete, call this tool again; do not tell the user "
+            "missing fields/values do not exist."
+        ),
+    },
+    ContextRequirements(
+        required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID],
+    ),
+    ConfigSchemaMeta(ContentMetadataToolConfig),
+)
+
+
+@tool(
+    name="content_metadata",
+    meta=_META,
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+)
+async def content_metadata(
+    folder_ids: Annotated[
+        list[str] | None,
+        Field(
+            description=(
+                "Restrict the catalog to these folders. A value is only "
+                "ever a `scope_xxx` id copied verbatim from a `folder_id=` "
+                "annotation in content_tree(mode='tree') output — never a "
+                "folder name, a path, or an id you assembled yourself. No "
+                "id in hand means omit this parameter — the full knowledge "
+                "base is the default and correct for most requests."
+            )
+        ),
+    ] = None,
+    folder_paths: Annotated[
+        list[str] | None,
+        Field(
+            description=(
+                "Restrict the catalog to these folders, each given as its "
+                "exact path from the knowledge base root (e.g. "
+                "'Contracts/2024') — resolved to `scope_xxx` ids "
+                "internally, so you don't need one in hand first. Mutually "
+                "exclusive with folder_ids; pass whichever you already have."
+            )
+        ),
+    ] = None,
+    include_subfolders: Annotated[
+        bool,
+        Field(
+            description=(
+                "Ignored unless folder_ids or folder_paths is set. Leave it "
+                "true — a folder's own metadata is often carried by files "
+                "in its subfolders, not directly inside it."
+            )
+        ),
+    ] = True,
+    refresh: Annotated[
+        bool,
+        Field(
+            description=(
+                "If true, drop this caller's cached content snapshot and "
+                "rescan the backend (~20s). Use when the user reports "
+                "added/changed files and needs fresh values."
+            )
+        ),
+    ] = False,
+    timeout: Annotated[
+        float | None,
+        Field(
+            ge=0,
+            description=(
+                "Seconds to wait before returning a partial catalog; the "
+                "scan continues, so a follow-up call usually returns the "
+                "complete result."
+            ),
+        ),
+    ] = None,
+    config: ContentMetadataToolConfig = Depends(
+        get_tool_config(ContentMetadataToolConfig)
+    ),
+) -> ToolResult:
+    """Discover metadata fields and values on the knowledge base's visible
+    content (optionally scoped to folder_ids), so a caller can build a
+    metadata filter for search. Returns JSON: a list of single-key objects
+    mapping a field name to every distinct value found, e.g.
+    [{"department": ["Legal", "Finance"]}] — one entry per known field.
+    Exhaustive: every field and value the scope has, not a sample. Values
+    here describe what filtering is *possible*, not a guarantee today's
+    search tool accepts an arbitrary metadata filter — check with the
+    user's actual search tool before promising a filter will work.
+    """
+    kb_settings = get_settings()
+    cid: str | None = None
+    try:
+        if folder_ids and folder_paths:
+            return ToolResult(
+                is_error=True,
+                content=[
+                    TextContent(
+                        type="text",
+                        text="Pass either folder_ids or folder_paths, not both.",
+                    )
+                ],
+            )
+
+        # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.
+        settings = await get_unique_settings_async()
+        company_id = settings.authcontext.get_confidential_company_id()
+        user_id = settings.authcontext.get_confidential_user_id()
+        cid = correlation_id(user_id, company_id)
+        _LOGGER.info("content_metadata start correlation_id=%s", cid)
+
+        cache = get_tree_cache(kb_settings)
+
+        # Resolved up front so the rest of the function treats them as folder
+        # ids. The backend's lookup needs an absolute path, so bare ones are
+        # normalized rather than making the caller know that.
+        effective_folder_ids = folder_ids
+        if folder_ids:
+            unreadable = await _unreadable_folder_ids(
+                folder_ids,
+                user_id=user_id,
+                company_id=company_id,
+                concurrency=config.max_concurrent_scope_lookups,
+            )
+            if unreadable:
+                return ToolResult(
+                    is_error=True,
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=(
+                                f"No folder readable at folder_ids: {unreadable}. "
+                                "Pass scope_xxx ids from content_tree(mode='tree') "
+                                "output, or retry if the knowledge base is "
+                                "temporarily unavailable."
+                            ),
+                        )
+                    ],
+                )
+        if folder_paths:
+            resolved, unresolved = await _resolve_folder_paths(
+                folder_paths,
+                user_id=user_id,
+                company_id=company_id,
+                concurrency=config.max_concurrent_scope_lookups,
+            )
+            if unresolved:
+                return ToolResult(
+                    is_error=True,
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=(
+                                f"No folder found at folder_paths: {unresolved}. "
+                                "Give each path from the knowledge-base root, e.g. "
+                                "'Contracts/2024', or pass folder_ids instead."
+                            ),
+                        )
+                    ],
+                )
+            effective_folder_ids = resolved
+
+        # include_subfolders=False is max_depth=1 on the same rooted walk:
+        # roots enter at depth 0, so nothing below them is visited.
+        scoped_root_ids: tuple[str, ...] | None = None
+        if effective_folder_ids:
+            scoped_root_ids = tuple(sorted(set(effective_folder_ids)))
+        use_scoped_walk = scoped_root_ids is not None
+        walk_depth = None if include_subfolders else 1
+
+        async def _construct() -> ContentTree:
+            if scoped_root_ids:
+                return ScopedContentTree(
+                    company_id=company_id,
+                    user_id=user_id,
+                    root_scope_ids=scoped_root_ids,
+                )
+            return ContentTree(company_id=company_id, user_id=user_id)
+
+        # SecretStr fields so cache/exception reprs stay masked.
+        cache_key = (
+            settings.authcontext.company_id,
+            settings.authcontext.user_id,
+            scoped_root_ids,
+        )
+        tree_svc, _ = await cache.get_or_fetch(cache_key, _construct)
+
+        if refresh:
+            tree_svc.invalidate_cache()
+
+        metadata_filter = merge_request_metadata_filter(
+            admin_metadata_filter=config.metadata_filter
+            or DEFAULT_METADATA_FILTER_STATEMENT,
+        )
+        wait = kb_settings.clamped_walk_timeout(timeout)
+        # All admin here — no LLM filter reaches this tool — so the whole thing
+        # rides in the walk and nothing is filtered in memory.
+        snapshot = await resolve_filtered_snapshot(
+            tree_svc,
+            walk_filter=metadata_filter,
+            post_filter=None,
+            max_depth=walk_depth if use_scoped_walk else None,
+            timeout=wait,
+            max_concurrent_directory_listings=config.max_concurrent_scope_lookups,
+        )
+
+        excluded = set(config.excluded_fields)
+        field_file_counts: Counter[str] = Counter()
+        field_value_counts: defaultdict[str, Counter[Any]] = defaultdict(Counter)
+
+        for content_info, _path in snapshot.files:
+            item_metadata = content_info.metadata or {}
+            for meta_field, raw_value in item_metadata.items():
+                if meta_field in excluded:
+                    continue
+                values = _flatten_metadata_value(raw_value)
+                if not values:
+                    continue
+                field_file_counts[meta_field] += 1
+                for value in values:
+                    field_value_counts[meta_field][value] += 1
+
+        payload = [
+            {
+                meta_field: [
+                    value
+                    for value, _count in field_value_counts[meta_field].most_common()
+                ]
+            }
+            for meta_field, _file_count in field_file_counts.most_common()
+        ]
+
+        content: list[TextContent] = [
+            TextContent(type="text", text=json.dumps(payload))
+        ]
+        if not snapshot.complete:
+            content.append(TextContent(type="text", text=_INCOMPLETE_NOTICE))
+
+        _LOGGER.info(
+            "content_metadata complete correlation_id=%s field_count=%d",
+            cid,
+            len(payload),
+        )
+        return ToolResult(content=content)
+    except Exception as exc:
+        _LOGGER.exception(
+            "content_metadata error correlation_id=%s error_type=%s",
+            cid,
+            type(exc).__name__,
+        )
+        return ToolResult(
+            is_error=True, content=[TextContent(type="text", text=str(exc))]
+        )

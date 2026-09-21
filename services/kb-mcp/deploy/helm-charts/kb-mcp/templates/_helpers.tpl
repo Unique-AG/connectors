@@ -28,22 +28,24 @@ Zitadel) stay in envVars/secret refs.
 - name: KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY
   value: {{ .Values.mcpConfig.search.scopeLookupConcurrency | quote }}
 {{- end }}
-{{- if .Values.mcpConfig.contentTree.cache.ttlSeconds }}
-- name: KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS
-  value: {{ .Values.mcpConfig.contentTree.cache.ttlSeconds | quote }}
+{{- $walk := .Values.mcpConfig.folderWalk | default dict }}
+{{- $cache := $walk.cache | default dict }}
+{{- if $cache.ttlSeconds }}
+- name: KB_MCP_TREE_CACHE_TTL_SECONDS
+  value: {{ $cache.ttlSeconds | quote }}
 {{- end }}
-{{- if .Values.mcpConfig.contentTree.cache.maxEntries }}
-- name: KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES
-  value: {{ .Values.mcpConfig.contentTree.cache.maxEntries | quote }}
+{{- if $cache.maxEntries }}
+- name: KB_MCP_TREE_CACHE_MAX_ENTRIES
+  value: {{ $cache.maxEntries | quote }}
 {{- end }}
 {{/* hasKey preserves explicit zero values, which Helm treats as false. */}}
-{{- if hasKey .Values.mcpConfig.contentTree "timeoutSeconds" }}
-- name: KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS
-  value: {{ .Values.mcpConfig.contentTree.timeoutSeconds | quote }}
+{{- if hasKey $walk "timeoutSeconds" }}
+- name: KB_MCP_WALK_TIMEOUT_SECONDS
+  value: {{ $walk.timeoutSeconds | quote }}
 {{- end }}
-{{- if hasKey .Values.mcpConfig.contentTree "maxTimeoutSeconds" }}
-- name: KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS
-  value: {{ .Values.mcpConfig.contentTree.maxTimeoutSeconds | quote }}
+{{- if hasKey $walk "maxTimeoutSeconds" }}
+- name: KB_MCP_WALK_MAX_TIMEOUT_SECONDS
+  value: {{ $walk.maxTimeoutSeconds | quote }}
 {{- end }}
 {{- if .Values.mcpConfig.http.maxConnections }}
 - name: KB_MCP_HTTP_MAX_CONNECTIONS

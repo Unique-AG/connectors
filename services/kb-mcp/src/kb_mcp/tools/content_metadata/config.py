@@ -1,15 +1,27 @@
-"""Admin-set RJSF config for the content_tree tool."""
+"""Admin-set RJSF config for the content_metadata tool."""
 
-from typing import Annotated, Literal
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 from unique_toolkit._common.pydantic.rjsf_tags import RJSFMetaTag
 from unique_toolkit.content.smart_rules import UniqueQLField
 
-MatchTarget = Literal["key", "path", "both"]
+# System-assigned per-file identifiers, not business/domain metadata a
+# caller would ever build a search filter on — excluded from the catalog by
+# default so they don't drown out fields actually worth filtering on.
+_DEFAULT_EXCLUDED_FIELDS = [
+    "folderIdPath",
+    "key",
+    "title",
+    "folderId",
+    "mimeType",
+    "companyId",
+    "contentId",
+    "validAsOf",
+]
 
 
-class ContentTreeToolConfig(BaseModel):
+class ContentMetadataToolConfig(BaseModel):
     # dict[str, Any] breaks the admin schema generator (RJSF can't infer
     # `items` for a nested array under Any); UniqueQLField avoids this.
     metadata_filter: Annotated[
@@ -30,11 +42,7 @@ class ContentTreeToolConfig(BaseModel):
             }
         ),
     ] = Field(default=None)
-    default_limit: int = 50
-    # Its own default: 50 is a sensible page of search hits but would gut a
-    # tree, which today renders uncapped.
-    default_tree_limit: int = 1000
-    default_min_score: float = 0.6
-    default_match_on: MatchTarget = "both"
-    default_case_sensitive: bool = False
+    excluded_fields: list[str] = Field(
+        default_factory=lambda: list(_DEFAULT_EXCLUDED_FIELDS)
+    )
     max_concurrent_scope_lookups: int = 25

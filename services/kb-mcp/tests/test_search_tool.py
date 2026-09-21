@@ -15,7 +15,7 @@ from unique_toolkit.experimental.components.internal_search import (
     KnowledgeBaseInternalSearchConfig,
 )
 
-from kb_mcp.references import (
+from kb_mcp.common.references import (
     GENERIC_RESULT_CITATION_INSTRUCTION,
     INVALID_METADATA_FILTER_MESSAGE,
     METADATA_FILTER_ARG_DESCRIPTION,
@@ -645,26 +645,26 @@ async def test_search_returns_error_when_identity_unresolvable():
 def test_is_unique_ai_client_true_for_node_chats_own_client_name():
     ctx = MagicMock()
     ctx.session.client_params.client_info.name = "unique-ai-mcp-client-module-kb-mcp"
-    with patch("kb_mcp.references.get_context", return_value=ctx):
+    with patch("kb_mcp.common.references.get_context", return_value=ctx):
         assert is_unique_ai_client() is True
 
 
 def test_is_unique_ai_client_false_for_generic_client_name():
     ctx = MagicMock()
     ctx.session.client_params.client_info.name = "claude-code"
-    with patch("kb_mcp.references.get_context", return_value=ctx):
+    with patch("kb_mcp.common.references.get_context", return_value=ctx):
         assert is_unique_ai_client() is False
 
 
 def test_is_unique_ai_client_false_when_no_context():
-    with patch("kb_mcp.references.get_context", side_effect=RuntimeError):
+    with patch("kb_mcp.common.references.get_context", side_effect=RuntimeError):
         assert is_unique_ai_client() is False
 
 
 def test_is_unique_ai_client_false_when_client_params_missing():
     ctx = MagicMock()
     ctx.session.client_params = None
-    with patch("kb_mcp.references.get_context", return_value=ctx):
+    with patch("kb_mcp.common.references.get_context", return_value=ctx):
         assert is_unique_ai_client() is False
 
 
@@ -718,21 +718,21 @@ def test_reference_url_external_chunk_keeps_original_url():
     assert reference_url(chunk) == "https://example.com/doc"
 
 
-def test_markdown_citation_link_escapes_sm_folder_path():
+def test_markdown_citation_link_escapes_bracketed_folder_path():
     """Primary Fix 3 fixture matching the Unique AI stringified paste."""
-    path = "[" + "SM" + "]/AlpenSys/Audit_Report_AlpenSys_FY2023.pdf"
+    path = "[ORG]/Alpha/Audit_Report_FY2023.pdf"
     link = markdown_citation_link(
         path, "unique://content/cont_ioi3voailf7hr011zcp6b7eh"
     )
     assert link == (
-        "[\\[SM\\]/AlpenSys/Audit_Report_AlpenSys_FY2023.pdf]"
+        "[\\[ORG\\]/Alpha/Audit_Report_FY2023.pdf]"
         "(unique://content/cont_ioi3voailf7hr011zcp6b7eh)"
     )
     assert not link.startswith("[[")
 
 
 def test_chunk_to_text_content_escapes_brackets_in_title():
-    title = "[" + "SM" + "]/AlpenSys/notes.txt"
+    title = "[ORG]/Alpha/notes.txt"
     chunk = _make_chunk(
         "body",
         title=title,
@@ -740,8 +740,7 @@ def test_chunk_to_text_content_escapes_brackets_in_title():
     )
     content = chunk_to_text_content(chunk, sequence_number=1)
     assert content.text.startswith(
-        "[\\[SM\\]/AlpenSys/notes.txt]"
-        "(unique://content/cont_abcdefgehijklmnopqrstuvwx)\n"
+        "[\\[ORG\\]/Alpha/notes.txt](unique://content/cont_abcdefgehijklmnopqrstuvwx)\n"
     )
 
 

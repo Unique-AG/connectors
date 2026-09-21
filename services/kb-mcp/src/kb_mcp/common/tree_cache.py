@@ -18,8 +18,8 @@ def get_tree_cache(settings: Settings) -> AsyncTTLCache:
     global _tree_cache
     if _tree_cache is None:
         _tree_cache = AsyncTTLCache(
-            maxsize=settings.content_tree_cache_max_entries,
-            ttl_ms=settings.content_tree_cache_ttl_seconds * 1000,
+            maxsize=settings.tree_cache_max_entries,
+            ttl_ms=settings.tree_cache_ttl_seconds * 1000,
             keep_stale=False,
         )
     return _tree_cache

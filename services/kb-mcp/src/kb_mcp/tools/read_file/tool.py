@@ -32,8 +32,8 @@ from unique_toolkit.content.functions import (
 from unique_toolkit.content.schemas import Content, ContentChunk
 from unique_toolkit.content.utils import sort_content_chunks
 
-from kb_mcp.correlation import correlation_id
-from kb_mcp.references import (
+from kb_mcp.common.correlation import correlation_id
+from kb_mcp.common.references import (
     MIME_TYPE_JSON,
     MIME_TYPE_PDF,
     file_reference_url,

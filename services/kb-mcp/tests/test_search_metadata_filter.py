@@ -4,13 +4,13 @@ import pytest
 from pydantic import ValidationError
 from unique_toolkit.content.smart_rules import Statement, parse_uniqueql
 
-from kb_mcp.references import (
+from kb_mcp.common.metadata_filter import merge_request_metadata_filter
+from kb_mcp.common.references import (
     UNIQUEQL_EQUALS_PDF,
     UNIQUEQL_EQUALS_PDF_PATH_AS_STRING,
     UNIQUEQL_EQUALS_PDF_WRAPPED,
     UNIQUEQL_IN_PDF,
 )
-from kb_mcp.tools.search.metadata_filter import merge_request_metadata_filter
 
 ADMIN_FILTER = Statement.model_validate(
     {"operator": "isNotNull", "path": ["folderId"], "value": ""}

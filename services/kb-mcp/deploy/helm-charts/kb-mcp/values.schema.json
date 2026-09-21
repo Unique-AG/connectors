@@ -2070,13 +2070,13 @@
           },
           "additionalProperties": false
         },
-        "contentTree": {
+        "folderWalk": {
           "type": "object",
-          "description": "The content_tree tool's own cache tuning. Only reachable while content_tree is enabled (see enabledTools).",
+          "description": "Folder-walk cache and wait tuning, shared by content_tree and content_metadata. Only reachable while one of those tools is enabled (see enabledTools).",
           "properties": {
             "cache": {
               "type": "object",
-              "description": "Mirrors the app's own defaults (kb_mcp.settings.Settings.content_tree_cache_*) so they stay visible here and stable across app releases.",
+              "description": "Mirrors the app's own defaults (kb_mcp.settings.Settings.tree_cache_*) so they stay visible here and stable across app releases.",
               "properties": {
                 "ttlSeconds": {
                   "type": "integer",
