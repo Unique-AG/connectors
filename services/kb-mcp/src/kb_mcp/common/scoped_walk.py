@@ -22,6 +22,7 @@ from unique_toolkit.experimental.components.content_tree import ContentTree
 # that renames/removes it needs a look.
 from unique_toolkit.experimental.components.content_tree.functions import (
     _list_direct_children_async,  # pyright: ignore[reportPrivateUsage]
+    _task_group_results,  # pyright: ignore[reportPrivateUsage]
 )
 from unique_toolkit.experimental.components.content_tree.schemas import (
     FolderWalkSnapshot,
@@ -95,21 +96,16 @@ def create_scoped_walk(
             )
         recurse = max_depth is None or depth + 1 < max_depth
         if recurse and folders:
-            results = await asyncio.gather(
-                *(
-                    _visit(folder.id, path / folder.name, depth + 1)
-                    for folder in folders
-                ),
-                return_exceptions=True,
+            results = await _task_group_results(
+                [_visit(folder.id, path / folder.name, depth + 1) for folder in folders]
             )
             for folder, result in zip(folders, results, strict=True):
                 if isinstance(result, BaseException):
                     _LOGGER.debug("Skipping subtree %s", folder.id, exc_info=result)
 
     async def _visit_roots() -> None:
-        results = await asyncio.gather(
-            *(_visit(root_id, PurePosixPath(), 0) for root_id in root_scope_ids),
-            return_exceptions=True,
+        results = await _task_group_results(
+            [_visit(root_id, PurePosixPath(), 0) for root_id in root_scope_ids]
         )
         for root_id, result in zip(root_scope_ids, results, strict=True):
             if isinstance(result, BaseException):

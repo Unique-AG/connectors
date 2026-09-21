@@ -156,10 +156,12 @@ async def _resolve_scope_id(
             user_id=user_id, company_id=company_id, folder_path=absolute
         )
     except (UniqueError, ValueError) as exc:
-        # Name omitted: folder names can identify a customer. The exception is
-        # kept, since "did not resolve" alone cannot tell a typo from an outage.
+        # Class only, no exc_info: the SDK puts the folder path in the message,
+        # and folder names can identify a customer. The class still separates a
+        # typo (InvalidRequestError) from an outage (APIConnectionError).
         _LOGGER.info(
-            "folder_path did not resolve; filtering the unscoped walk", exc_info=exc
+            "folder_path did not resolve (%s); filtering the unscoped walk",
+            type(exc).__name__,
         )
         return None
 

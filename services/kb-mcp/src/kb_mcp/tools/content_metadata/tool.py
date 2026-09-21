@@ -71,21 +71,73 @@ async def _unreadable_folder_ids(
     unique_toolkit swallows a failed listing, which would render as an empty
     catalog rather than an error."""
     semaphore = asyncio.Semaphore(concurrency)
+    unreadable: list[str] = []
 
-    async def _readable(scope_id: str) -> bool:
+    async def _probe(scope_id: str) -> None:
         async with semaphore:
             try:
                 await unique_sdk.Folder.get_info_async(
                     user_id=user_id, company_id=company_id, scopeId=scope_id
                 )
-            except unique_sdk.UniqueError as exc:
-                # Only the exception separates a bad id from a backend outage.
-                _LOGGER.info("folder_id %s not readable", scope_id, exc_info=exc)
-                return False
-            return True
+            except asyncio.CancelledError, TimeoutError:
+                raise
+            except Exception as exc:  # noqa: BLE001 — nothing may reach the TaskGroup
+                # Escaping here would cancel the siblings and collapse the error
+                # into an ExceptionGroup. The class separates a bad id from an
+                # outage; the message is dropped because it can carry a folder name.
+                _LOGGER.info(
+                    "folder_id %s not readable (%s)", scope_id, type(exc).__name__
+                )
+                unreadable.append(scope_id)
 
-    readable = await asyncio.gather(*(_readable(f) for f in folder_ids))
-    return [fid for fid, ok in zip(folder_ids, readable, strict=True) if not ok]
+    async with asyncio.TaskGroup() as tg:
+        for scope_id in folder_ids:
+            _ = tg.create_task(_probe(scope_id))
+    return [fid for fid in folder_ids if fid in set(unreadable)]
+
+
+async def _resolve_folder_paths(
+    folder_paths: Sequence[str],
+    *,
+    user_id: str,
+    company_id: str,
+    concurrency: int,
+) -> tuple[list[str], list[str]]:
+    """Scope ids for these paths, and the paths that resolved to nothing.
+
+    An unresolved path is returned rather than dropped: dropping it would leave
+    the walk unscoped, so asking about one folder would answer for the whole
+    knowledge base.
+    """
+    semaphore = asyncio.Semaphore(concurrency)
+    resolved: dict[str, str] = {}
+    unresolved: list[str] = []
+
+    async def _resolve(folder_path: str) -> None:
+        async with semaphore:
+            try:
+                scope_id = (
+                    await unique_sdk.Folder.resolve_scope_id_from_folder_path_async(
+                        user_id=user_id,
+                        company_id=company_id,
+                        folder_path="/" + folder_path.strip("/"),
+                    )
+                )
+            except asyncio.CancelledError, TimeoutError:
+                raise
+            except Exception as exc:  # noqa: BLE001 — nothing may reach the TaskGroup
+                _LOGGER.info("folder_path did not resolve (%s)", type(exc).__name__)
+                unresolved.append(folder_path)
+                return
+            if scope_id:
+                resolved[folder_path] = scope_id
+            else:
+                unresolved.append(folder_path)
+
+    async with asyncio.TaskGroup() as tg:
+        for folder_path in folder_paths:
+            _ = tg.create_task(_resolve(folder_path))
+    return [resolved[p] for p in folder_paths if p in resolved], unresolved
 
 
 def _flatten_metadata_value(value: Any) -> list[Any]:
@@ -255,17 +307,27 @@ async def content_metadata(
                     ],
                 )
         if folder_paths:
-            resolved_ids = await asyncio.gather(
-                *(
-                    unique_sdk.Folder.resolve_scope_id_from_folder_path_async(
-                        user_id=user_id,
-                        company_id=company_id,
-                        folder_path="/" + folder_path.strip("/"),
-                    )
-                    for folder_path in folder_paths
-                )
+            resolved, unresolved = await _resolve_folder_paths(
+                folder_paths,
+                user_id=user_id,
+                company_id=company_id,
+                concurrency=config.max_concurrent_scope_lookups,
             )
-            effective_folder_ids = [rid for rid in resolved_ids if rid] or None
+            if unresolved:
+                return ToolResult(
+                    is_error=True,
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=(
+                                f"No folder found at folder_paths: {unresolved}. "
+                                "Give each path from the knowledge-base root, e.g. "
+                                "'Contracts/2024', or pass folder_ids instead."
+                            ),
+                        )
+                    ],
+                )
+            effective_folder_ids = resolved
 
         # include_subfolders=False is max_depth=1 on the same rooted walk:
         # roots enter at depth 0, so nothing below them is visited.

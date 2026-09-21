@@ -668,3 +668,49 @@ async def test_timeout_defaults_to_the_configured_wait():
 
     _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
     assert kwargs["timeout"] == 30.0
+
+
+@pytest.mark.asyncio
+async def test_folder_path_resolving_to_nothing_errors_instead_of_widening():
+    """A falsy resolve must not drop the restriction: scoping to one folder and
+    silently getting the whole knowledge base's catalog is the worse answer."""
+    resolve = AsyncMock(return_value=None)
+    with (
+        patch(
+            "kb_mcp.tools.content_metadata.tool.unique_sdk.Folder"
+            ".resolve_scope_id_from_folder_path_async",
+            resolve,
+        ),
+        patch("kb_mcp.tools.content_metadata.tool.ContentTree") as unscoped,
+    ):
+        result = await content_metadata(
+            folder_paths=["Contracts/2024"], config=ContentMetadataToolConfig()
+        )
+
+    assert result.is_error is True
+    assert "Contracts/2024" in result.content[0].text  # type: ignore[union-attr]
+    unscoped.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_one_unresolvable_path_fails_the_call_rather_than_narrowing_it():
+    """Two paths in, one resolvable: scoping to just the resolvable one would
+    answer a question the caller did not ask."""
+    resolve = AsyncMock(
+        side_effect=lambda **kw: "scope_a" if "Good" in kw["folder_path"] else None
+    )
+    with (
+        patch(
+            "kb_mcp.tools.content_metadata.tool.unique_sdk.Folder"
+            ".resolve_scope_id_from_folder_path_async",
+            resolve,
+        ),
+        patch("kb_mcp.tools.content_metadata.tool.ScopedContentTree") as scoped,
+    ):
+        result = await content_metadata(
+            folder_paths=["Good", "Bad"], config=ContentMetadataToolConfig()
+        )
+
+    assert result.is_error is True
+    assert "Bad" in result.content[0].text  # type: ignore[union-attr]
+    scoped.assert_not_called()
