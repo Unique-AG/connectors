@@ -1,3 +1,4 @@
+<!-- confluence-page-id: 2744614980 -->
 <!-- confluence-space-key: PUBDOC -->
 
 kb-mcp has no access of its own. It authenticates the caller against Zitadel, then passes that

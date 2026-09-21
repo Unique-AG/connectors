@@ -1,3 +1,4 @@
+<!-- confluence-page-id: 2744352807 -->
 <!-- confluence-space-key: PUBDOC -->
 
 kb-mcp is a stateless proxy in front of a tenant's Unique knowledge base: every MCP tool call
