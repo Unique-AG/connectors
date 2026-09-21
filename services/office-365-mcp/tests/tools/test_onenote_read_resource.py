@@ -1,12 +1,19 @@
+from collections.abc import Mapping
+from typing import cast
+
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.tools import Tool
 from fastmcp.utilities.types import File
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphNotFound
 from office_365_mcp.shared.handles import OnenotePageHandle, OnenoteSectionHandle
+from office_365_mcp.shared.notes import resource_id_in
+from office_365_mcp.shared.seam import READ_ONLY
 from office_365_mcp.tools import onenote_read_resource as reader
 
 RESOURCE_ID = "1-SYNTHETICRESOURCE0000"
@@ -117,7 +124,7 @@ class TestTheSizeCap:
         refusal = str(refused.value)
         assert f"{len(body):,} bytes" in refusal
         assert f"{reader.MAX_BYTES:,} bytes" in refusal
-        assert "held in memory" in refusal
+        assert "arrive in one message" in refusal
 
     async def test_empty_content_is_refused_rather_than_returned_as_an_empty_file(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -160,3 +167,54 @@ class TestGraphFailures:
 
         with pytest.raises(GraphNotFound):
             _ = await _read(client)
+
+    def test_the_not_found_advice_names_onenote_read_page_and_a_fresh_address(self) -> None:
+        assert "onenote_read_page" in reader.GRAPH_NOT_FOUND
+        assert "fails again" in reader.GRAPH_NOT_FOUND
+
+
+async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
+    mcp: FastMCP = FastMCP(name="schema-under-test")
+    reader.register(mcp, transport)
+    tool = await mcp.get_tool(reader.TOOL_NAME)
+    assert tool is not None, "register left the tool off the server"
+    return cast("Mapping[str, object]", tool.parameters), tool
+
+
+class TestHowItDeclaresItself:
+    def test_the_permission_is_notes_read(self) -> None:
+        assert reader.GRAPH_PERMISSIONS == ("Notes.Read",)
+
+    def test_the_call_example_is_a_resource_address(self) -> None:
+        assert set(reader.GRAPH_CALL_EXAMPLE) == {"resource"}
+
+    def test_the_call_example_parses_as_a_resource_id(self) -> None:
+        example = cast("Mapping[str, str]", reader.GRAPH_CALL_EXAMPLE)
+        assert resource_id_in(example["resource"]) is not None
+
+    async def test_the_call_example_is_accepted_by_the_schema(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert set(reader.GRAPH_CALL_EXAMPLE) <= set(properties)
+
+    async def test_it_takes_one_argument_and_no_others(self, transport: httpx.AsyncClient) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert set(properties) == {"resource"}
+
+    @pytest.mark.parametrize("word", ["client", "ctx", "context", "token", "graph"])
+    async def test_no_wiring_of_this_server_is_published_as_an_argument(
+        self, transport: httpx.AsyncClient, word: str
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert not [name for name in properties if word in name.casefold()]
+
+    async def test_it_announces_itself_as_read_only(self, transport: httpx.AsyncClient) -> None:
+        _parameters, tool = await _registered(transport)
+
+        annotations = tool.annotations
+        assert annotations is not None, "a tool with no annotations joins the write surface"
+        assert annotations.read_only_hint is READ_ONLY["readOnlyHint"]

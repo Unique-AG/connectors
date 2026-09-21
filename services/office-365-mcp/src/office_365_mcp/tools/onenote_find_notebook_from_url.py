@@ -4,6 +4,7 @@ from typing import Annotated, cast
 
 import httpx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from msgraph.generated.models.copy_notebook_model import CopyNotebookModel
 from msgraph.generated.users.item.onenote.notebooks.get_notebook_from_web_url import (
     get_notebook_from_web_url_post_request_body as _post_body,
@@ -11,8 +12,14 @@ from msgraph.generated.users.item.onenote.notebooks.get_notebook_from_web_url im
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step
-from office_365_mcp.shared.handles import OnenoteNotebookHandle
+from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.shared.handles import (
+    OnenoteNotebookHandle,
+    onenote_notebook_handle,
+    onenote_page_handle,
+    onenote_section_group_handle,
+    onenote_section_handle,
+)
 from office_365_mcp.shared.notes import client_url_of, web_url_of
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -33,15 +40,32 @@ Resolve a OneNote web address into a notebook handle. Pass the exact `web_url` M
 you — from an onenote_list_notebooks or onenote_list_recent_notebooks result, or from a \
 `web_url` this connector already read off a page, section or notebook — or an address a person \
 pasted from their browser or their OneNote client. Microsoft Graph accepts both a notebook's own \
-web address (`https://...`) and its `onenote:` client address, and it resolves a page's or a \
-section's own address to the notebook that holds it, so there is no need to trim the address \
-down to the notebook first. This tool asks Microsoft directly; it does not search or guess. The \
-`uri` it returns is a notebook handle: pass it to onenote_list_sections to see what the notebook \
-holds, to onenote_create_section or onenote_create_section_group to add to it, or to \
-onenote_copy_section or onenote_copy_notebook as a copy destination. onenote_list_recent_notebooks \
-returns no handle at all, because Microsoft gives none there — call this tool with its `web_url` \
-to get one.\
+web address (`https://...`) and Microsoft's own `onenote:` client address, which is not one of \
+this connector's own onenote:/// handles, and it resolves a page's or a section's own address to \
+the notebook that holds it — confirmed on a test tenant across all of these address shapes — so \
+there is no need to trim the address down to the notebook first. This tool asks Microsoft \
+directly; it does not search or guess. The `uri` it returns is a notebook handle: pass it to \
+onenote_list_sections to see what the notebook holds, to onenote_create_section or \
+onenote_create_section_group to add to it, or to onenote_copy_section or onenote_copy_notebook \
+as a copy destination. onenote_list_recent_notebooks returns no handle at all, because Microsoft \
+gives none there — call this tool with its `web_url` to get one.\
 """
+
+_OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS = (
+    "onenote_find_notebook_from_url takes a web address or Microsoft's own `onenote:` client "
+    + "address, not one of this connector's own onenote:/// handles. This value is already a "
+    + "notebook handle: it needs no resolving at all, pass it straight to onenote_list_sections. "
+    + "This same value fails again, so do not retry it."
+)
+
+_OWN_OTHER_HANDLE_NOT_A_WEB_ADDRESS = (
+    "onenote_find_notebook_from_url takes a web address or Microsoft's own `onenote:` client "
+    + "address, not one of this connector's own onenote:/// handles. This value is a page, "
+    + "section or section group handle, not a notebook one, and this tool does not resolve it: "
+    + "use onenote_list_pages to work with a page handle, or onenote_list_notebooks to find the "
+    + "notebook a section or section group belongs to. This same value fails again, so do not "
+    + "retry it."
+)
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 found no notebook at this address: the address names no notebook this user "
@@ -72,7 +96,10 @@ class FoundNotebook(BaseModel):
     is_default: bool | None = Field(
         description=(
             "True for the signed-in user's default notebook: the one onenote_create_page writes "
-            + "into when it is called with no section at all. Null when Microsoft did not say."
+            + "into when it is called with no section at all. Null when Microsoft did not say. "
+            + "On a test tenant this came back false for the tenant's actual default notebook: "
+            + "treat it as unreliable here, and use onenote_list_notebooks as the authority on "
+            + "which notebook is the default one."
         )
     )
     is_shared: bool | None = Field(
@@ -115,7 +142,16 @@ async def find_notebook_from_url(client: GraphServiceClient, *, web_url: str) ->
     assert 1 <= len(web_url) <= MAX_WEB_URL_CHARACTERS, (
         f"web_url is bounded by the schema, got {len(web_url)}"
     )
-    with graph_errors(TOOL_NAME), graph_step(STEP_NOTEBOOK_FROM_URL):
+    if onenote_notebook_handle(web_url) is not None:
+        raise ToolError(_OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS)
+    if (
+        onenote_section_group_handle(web_url) is not None
+        or onenote_section_handle(web_url) is not None
+        or onenote_page_handle(web_url) is not None
+    ):
+        raise ToolError(_OWN_OTHER_HANDLE_NOT_A_WEB_ADDRESS)
+
+    with graph_errors(TOOL_NAME, step=STEP_NOTEBOOK_FROM_URL):
         found = await client.me.onenote.notebooks.get_notebook_from_web_url.post(
             _post_body.GetNotebookFromWebUrlPostRequestBody(web_url=web_url)
         )
@@ -158,11 +194,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_WEB_URL_CHARACTERS,
                 description=(
-                    "A OneNote web address or `onenote:` client address, exactly as Microsoft "
-                    + "gave it: the `web_url` of an onenote_list_notebooks or "
-                    + "onenote_list_recent_notebooks row, the `web_url` of a page or section "
+                    "A OneNote web address or Microsoft's own `onenote:` client address, "
+                    + "exactly as Microsoft gave it: the `web_url` of an onenote_list_notebooks "
+                    + "or onenote_list_recent_notebooks row, the `web_url` of a page or section "
                     + "this connector already read, or an address a person pasted. A page's or "
-                    + "a section's own address resolves to the notebook that holds it."
+                    + "a section's own address resolves to the notebook that holds it. This is "
+                    + "not one of this connector's own onenote:/// handles: passing one is "
+                    + "refused."
                 ),
             ),
         ],

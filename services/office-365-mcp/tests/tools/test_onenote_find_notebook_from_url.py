@@ -1,13 +1,23 @@
 import json
+from collections.abc import Mapping
 from typing import cast
 
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
+from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared.handles import OnenoteNotebookHandle
+from office_365_mcp.shared.handles import (
+    OnenoteNotebookHandle,
+    OnenotePageHandle,
+    OnenoteSectionGroupHandle,
+    OnenoteSectionHandle,
+)
+from office_365_mcp.shared.seam import READ_ONLY
 from office_365_mcp.tools import onenote_find_notebook_from_url as finder
 
 NOTEBOOK_ID = "1-SYNTHETICNOTEBOOK0000!0001"
@@ -75,6 +85,20 @@ class TestWhatItAsks:
 
         assert found.calls.last.request.url.params == httpx.QueryParams()
 
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_declined_call_is_retried_by_default(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post(_PATH).mock(
+            side_effect=[httpx.Response(503), httpx.Response(200, json=_notebook_payload())]
+        )
+
+        _ = await _find(client)
+
+        assert route.call_count == 2, (
+            "getNotebookFromWebUrl is a read spelled as a POST, so the SDK's default retry runs"
+        )
+
 
 class TestWhatItAnswers:
     async def test_the_notebook_is_mapped_from_graph(
@@ -141,3 +165,72 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await _find(client)
+
+
+class TestWhatItRefuses:
+    async def test_a_notebook_handle_is_refused_before_any_graph_call(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="needs no resolving"):
+            _ = await _find(client, web_url=OnenoteNotebookHandle("1-ABC").uri)
+
+        assert len(graph.calls) == 0
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            OnenoteSectionGroupHandle("1-ABC").uri,
+            OnenoteSectionHandle("1-ABC").uri,
+            OnenotePageHandle("1-ABC!0").uri,
+        ],
+    )
+    async def test_a_page_section_or_group_handle_is_refused_before_any_graph_call(
+        self, client: GraphServiceClient, graph: respx.MockRouter, value: str
+    ) -> None:
+        with pytest.raises(ToolError, match="does not resolve it"):
+            _ = await _find(client, web_url=value)
+
+        assert len(graph.calls) == 0
+
+
+async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
+    mcp: FastMCP = FastMCP(name="schema-under-test")
+    finder.register(mcp, transport)
+    tool = await mcp.get_tool(finder.TOOL_NAME)
+    assert tool is not None, "register left the tool off the server"
+    return cast("Mapping[str, object]", tool.parameters), tool
+
+
+class TestHowItDeclaresItself:
+    def test_the_permission_is_notes_read(self) -> None:
+        assert finder.GRAPH_PERMISSIONS == ("Notes.Read",)
+
+    def test_the_call_example_is_a_web_url(self) -> None:
+        assert set(finder.GRAPH_CALL_EXAMPLE) == {"web_url"}
+
+    async def test_the_call_example_is_accepted_by_the_schema(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert set(finder.GRAPH_CALL_EXAMPLE) <= set(properties)
+
+    async def test_it_takes_one_argument_and_no_others(self, transport: httpx.AsyncClient) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert set(properties) == {"web_url"}
+
+    @pytest.mark.parametrize("word", ["client", "ctx", "context", "token", "graph"])
+    async def test_no_wiring_of_this_server_is_published_as_an_argument(
+        self, transport: httpx.AsyncClient, word: str
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert not [name for name in properties if word in name.casefold()]
+
+    async def test_it_announces_itself_as_read_only(self, transport: httpx.AsyncClient) -> None:
+        _parameters, tool = await _registered(transport)
+
+        annotations = tool.annotations
+        assert annotations is not None, "a tool with no annotations joins the write surface"
+        assert annotations.read_only_hint is READ_ONLY["readOnlyHint"]

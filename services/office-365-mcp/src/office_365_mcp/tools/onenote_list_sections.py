@@ -34,8 +34,7 @@ from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
-    onenote_notebook_handle,
-    onenote_section_group_handle,
+    onenote_container_handle,
 )
 from office_365_mcp.shared.notes import web_url_of
 from office_365_mcp.shared.odata import odata_literal
@@ -65,6 +64,7 @@ _SECTION_FIELDS: tuple[str, ...] = (
     "links",
 )
 _SECTION_GROUP_FIELDS: tuple[str, ...] = ("id", "displayName", "lastModifiedDateTime")
+_SECTION_EXPANSIONS: tuple[str, ...] = ("parentNotebook($select=id,displayName)",)
 
 _NotebookSectionsBuilder = _notebook_sections_module.SectionsRequestBuilder
 _NotebookGroupsBuilder = _notebook_section_groups_module.SectionGroupsRequestBuilder
@@ -91,8 +91,14 @@ page into it, or to onenote_copy_page as the `to_section` destination. Each sect
 or to onenote_create_section or onenote_create_section_group as the `parent` to add something \
 directly under it. `name_contains` keeps only the sections and the section groups whose NAME \
 holds this text, compared without regard to case; it is applied to both lists. Leave it out to \
-list everything directly under `parent` instead of searching for one. Rows come back in \
-whatever order Microsoft returns them.\
+list everything directly under `parent` instead of searching for one. Microsoft's documented \
+default order for both lists is by name, ascending; this tool asks for no other order. Use \
+onenote_list_notebooks instead when what you need is every section of every notebook in one \
+call; use this tool to see section groups with their own handles, to filter by name, or to walk \
+one level at a time. On a test tenant, Microsoft refused to list anything under a section group \
+created moments earlier — every call, not just this one — with the same 403 this connector \
+answers when it lacks permission; if that happens here, list the notebook itself instead, or \
+onenote_copy_section into the group, which Microsoft did accept for that same group.\
 """
 
 _NOT_A_PARENT_HANDLE = (
@@ -173,6 +179,13 @@ class Sections(BaseModel):
     parent_uri: str = Field(
         description="The `parent` handle this call was given, spelled back exactly as passed in."
     )
+    notebook_name: str | None = Field(
+        description=(
+            "The display name of the notebook that holds `parent`, read off the sections "
+            + "already fetched for this call at no extra Graph cost. Null when `parent` holds "
+            + "no section to read it from, or when Microsoft named no parent notebook."
+        )
+    )
     sections: list[SectionRow] = Field(
         description=(
             "The sections that sit directly under `parent`, in whatever order Microsoft "
@@ -208,7 +221,9 @@ async def list_sections(
     limit: int,
 ) -> Sections:
     assert 1 <= limit <= MAX_SECTIONS, f"limit must be within 1..{MAX_SECTIONS}, got {limit}"
-    handle = _parent_handle(parent)
+    handle = onenote_container_handle(parent)
+    if handle is None:
+        raise ToolError(_NOT_A_PARENT_HANDLE)
     query_filter = _name_filter(name_contains)
 
     with graph_errors(TOOL_NAME):
@@ -233,6 +248,7 @@ async def list_sections(
 
     return Sections(
         parent_uri=handle.uri,
+        notebook_name=_notebook_name(sections_collected.items),
         sections=[
             row
             for section in sections_collected.items
@@ -247,14 +263,12 @@ async def list_sections(
     )
 
 
-def _parent_handle(parent: str) -> OnenoteNotebookHandle | OnenoteSectionGroupHandle:
-    notebook = onenote_notebook_handle(parent)
-    if notebook is not None:
-        return notebook
-    group = onenote_section_group_handle(parent)
-    if group is not None:
-        return group
-    raise ToolError(_NOT_A_PARENT_HANDLE)
+def _notebook_name(sections: list[OnenoteSection]) -> str | None:
+    for section in sections:
+        parent_notebook = section.parent_notebook
+        if parent_notebook is not None and parent_notebook.display_name is not None:
+            return parent_notebook.display_name
+    return None
 
 
 def _name_filter(name_contains: str | None) -> str | None:
@@ -275,7 +289,10 @@ async def _first_sections(
         return await client.me.onenote.notebooks.by_notebook_id(handle.notebook_id).sections.get(
             request_configuration=RequestConfiguration[_NotebookSectionsQuery](
                 query_parameters=_NotebookSectionsQuery(
-                    select=list(_SECTION_FIELDS), top=limit, filter=query_filter
+                    select=list(_SECTION_FIELDS),
+                    expand=list(_SECTION_EXPANSIONS),
+                    top=limit,
+                    filter=query_filter,
                 )
             )
         )
@@ -284,7 +301,10 @@ async def _first_sections(
     ).sections.get(
         request_configuration=RequestConfiguration[_GroupSectionsQuery](
             query_parameters=_GroupSectionsQuery(
-                select=list(_SECTION_FIELDS), top=limit, filter=query_filter
+                select=list(_SECTION_FIELDS),
+                expand=list(_SECTION_EXPANSIONS),
+                top=limit,
+                filter=query_filter,
             )
         )
     )
@@ -361,7 +381,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "answer; or onenote:///sectiongroups/{id} from a prior "
                     + "onenote_list_sections row, or a onenote_create_section_group answer. A "
                     + "section handle, a page handle, a plain name and a web address are none of "
-                    + "them one of these."
+                    + "them one of these. A section group can refuse to list its own contents "
+                    + "with a 403 that looks exactly like a missing permission, as observed on a "
+                    + "test tenant for a group created moments earlier; list the notebook itself "
+                    + "instead if that happens."
                 ),
             ),
         ],

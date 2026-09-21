@@ -244,3 +244,13 @@ class TestHowItDeclaresItself:
         description = tool.description or ""
         for character in "?*/:<>|'\"":
             assert character in description, f"{character!r} missing from the description"
+
+    async def test_the_description_states_the_duplicate_name_failure_as_observed_not_guessed(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "confirmed on a test tenant" in description
+        assert "most often comes back as" not in description
+        assert "bad request" not in description

@@ -5,9 +5,10 @@ from typing import cast
 import httpx
 import pytest
 import respx
-from fastmcp import Context
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.elicitation import AcceptedElicitation, DeclinedElicitation
+from fastmcp.tools import FunctionTool
 from mcp.types import ElicitResult, InputRequiredResult, InputResponse
 from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
@@ -401,6 +402,40 @@ class TestThePersonBetweenTheCreateAndTheOthersInTheNotebook:
         assert "Work" in asked[0]
         assert "shared with other people" in asked[0]
 
+    @pytest.mark.usefixtures("group_groups")
+    async def test_the_question_names_the_parent_section_group_when_nesting(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_AUDIENCE_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": _GROUP_ID,
+                    "displayName": "Projects",
+                    "parentNotebook": {"id": _NOTEBOOK_ID},
+                },
+            )
+        )
+        _ = graph.get(_NOTEBOOK_AUDIENCE_PATH).mock(
+            return_value=httpx.Response(
+                200, json=_notebook_payload(name="Work", is_shared=True, user_role="Owner")
+            )
+        )
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, parent=_GROUP, name="Nested group", confirm=capturing)
+
+        assert len(asked) == 1
+        assert "Nested group" in asked[0]
+        assert "section group" in asked[0]
+        assert "Projects" in asked[0]
+        assert "Work" in asked[0]
+
     @pytest.mark.usefixtures("notebook_groups")
     async def test_the_question_names_the_section_group_and_the_notebook(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -447,7 +482,7 @@ class TestThePersonBetweenTheCreateAndTheOthersInTheNotebook:
 
         assert bound[0] == bound[1]
         assert bound[2] != bound[0]
-        assert bound[0] == write_state_for("create_section_group", _NOTEBOOK_ID, "Same")
+        assert bound[0] == write_state_for("create_section_group", _NOTEBOOK, "Same")
 
 
 def _context(answer: object) -> Context:
@@ -503,7 +538,7 @@ class TestTheEraWithNoBackChannel:
         )
 
         assert isinstance(answer, InputRequiredResult)
-        assert answer.request_state == write_state_for("create_section_group", _NOTEBOOK_ID, _NAME)
+        assert answer.request_state == write_state_for("create_section_group", _NOTEBOOK, _NAME)
         assert notebook_groups.call_count == 0
 
     async def test_the_second_round_creates_under_the_id_it_was_agreed_to_by(
@@ -514,7 +549,7 @@ class TestTheEraWithNoBackChannel:
                 200, json=_notebook_payload(is_shared=True, user_role="Owner")
             )
         )
-        state = write_state_for("create_section_group", _NOTEBOOK_ID, _NAME)
+        state = write_state_for("create_section_group", _NOTEBOOK, _NAME)
 
         first = await create_section_group(
             client,
@@ -540,6 +575,125 @@ class TestTheEraWithNoBackChannel:
 
         assert isinstance(answer, creator.CreatedSectionGroup)
         assert notebook_groups.call_count == 1
+
+    async def test_a_pending_decline_is_honored_even_when_the_fresh_read_says_private(
+        self, client: GraphServiceClient, graph: respx.MockRouter, notebook_groups: respx.Route
+    ) -> None:
+        notebook_route = graph.get(_NOTEBOOK_AUDIENCE_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+
+        first = await create_section_group(
+            client,
+            parent=_NOTEBOOK,
+            name=_NAME,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        state = first.request_state
+        assert state is not None
+
+        with pytest.raises(ToolError, match="No section group was created"):
+            _ = await create_section_group(
+                client,
+                parent=_NOTEBOOK,
+                name=_NAME,
+                confirm=a_person_agrees(
+                    _modern_context(answers={key: ElicitResult(action="decline")}, state=state)
+                ),
+                answer_pending=True,
+            )
+
+        assert notebook_groups.call_count == 0
+        assert notebook_route.call_count == 2
+
+    async def test_a_pending_accept_still_creates_when_the_fresh_read_says_private(
+        self, client: GraphServiceClient, graph: respx.MockRouter, notebook_groups: respx.Route
+    ) -> None:
+        notebook_route = graph.get(_NOTEBOOK_AUDIENCE_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+
+        first = await create_section_group(
+            client,
+            parent=_NOTEBOOK,
+            name=_NAME,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        state = first.request_state
+        assert state is not None
+
+        answer = await create_section_group(
+            client,
+            parent=_NOTEBOOK,
+            name=_NAME,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": "create"})},
+                    state=state,
+                )
+            ),
+            answer_pending=True,
+        )
+
+        assert isinstance(answer, creator.CreatedSectionGroup)
+        assert notebook_groups.call_count == 1
+        assert notebook_route.call_count == 2
+
+
+class TestHowRegisterWiresThePendingAnswer:
+    async def test_register_consults_a_pending_answer_the_fresh_read_alone_would_skip(
+        self, transport: httpx.AsyncClient, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        notebook_route = graph.get(_NOTEBOOK_AUDIENCE_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+        post = graph.post(_NOTEBOOK_GROUPS_PATH).mock(
+            return_value=httpx.Response(201, json=_group_payload())
+        )
+        mcp: FastMCP = FastMCP(name="wiring-under-test")
+        creator.register(mcp, transport)
+        tool = await mcp.get_tool(creator.TOOL_NAME)
+        assert tool is not None, "register left the tool off the server"
+        assert isinstance(tool, FunctionTool)
+
+        first = cast(
+            "creator.CreatedSectionGroup | InputRequiredResult",
+            await tool.fn(parent=_NOTEBOOK, name=_NAME, ctx=_modern_context(), client=client),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        state = first.request_state
+        assert state is not None
+
+        with pytest.raises(ToolError, match="No section group was created"):
+            _ = cast(
+                "creator.CreatedSectionGroup | InputRequiredResult",
+                await tool.fn(
+                    parent=_NOTEBOOK,
+                    name=_NAME,
+                    ctx=_modern_context(answers={key: ElicitResult(action="decline")}, state=state),
+                    client=client,
+                ),
+            )
+
+        assert post.call_count == 0
+        assert notebook_route.call_count == 2
 
 
 class TestNoRefusalIsEverRaisedByThePrompt:

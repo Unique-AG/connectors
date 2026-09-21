@@ -10,7 +10,7 @@ from msgraph.generated.models.notebook import Notebook
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
+from office_365_mcp.graph_client import graph_errors, no_retry
 from office_365_mcp.shared.handles import OnenoteNotebookHandle
 from office_365_mcp.shared.notes import client_url_of, web_url_of
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
@@ -32,11 +32,11 @@ notebook always belongs to the user alone and starts out unshared, so this tool 
 anybody to confirm before creating one — unlike writing a page or a section into a notebook \
 that already exists, which can be shared with other people. Notebook names must be unique across \
 the user's whole OneNote, at most 128 characters, and cannot contain any of these characters: \
-? * / : < > | ' ". Microsoft answers a request that breaks either rule by refusing to create \
-anything: a name already in use most often comes back as a conflict, and a name that is too \
-long or carries a forbidden character comes back as a bad request; either way nothing is \
-created, and this tool raises the failure back rather than guessing at a fix. If this call \
-times out, the notebook may already have been created before the response was lost: call \
+? * / : < > | ' ". Microsoft refuses a duplicate name with a conflict — confirmed on a test \
+tenant, so the same name fails again — and refuses a name that breaks the length or character \
+rule too; either way nothing is created, and this tool raises Microsoft's own failure back \
+rather than guessing at a fix. If this call times out, the notebook may already have been \
+created before the response was lost: call \
 onenote_list_notebooks and look for a notebook already named `name` before calling this again, \
 because a second call with the same name most likely fails as a duplicate rather than creating \
 a second notebook — but do not rely on that instead of checking. The answer's `uri` is this new \
@@ -101,7 +101,7 @@ class CreatedNotebook(BaseModel):
 
 async def create_notebook(client: GraphServiceClient, *, name: str) -> CreatedNotebook:
     assert 1 <= len(name) <= MAX_NAME_CHARACTERS, f"name is bounded by the schema, got {len(name)}"
-    with graph_errors(TOOL_NAME), graph_step(STEP_CREATE_NOTEBOOK):
+    with graph_errors(TOOL_NAME, step=STEP_CREATE_NOTEBOOK):
         created = await client.me.onenote.notebooks.post(
             Notebook(display_name=name),
             request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),

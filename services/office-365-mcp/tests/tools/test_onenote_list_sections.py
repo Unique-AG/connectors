@@ -36,6 +36,7 @@ def _section_payload(
     is_default: bool | None = True,
     last_modified: str | None = "2026-02-10T14:00:00Z",
     web_url: str | None = "https://onenote.example.invalid/sections/planning",
+    notebook_name: str | None = None,
 ) -> dict[str, object]:
     return {
         "id": section_id,
@@ -43,6 +44,11 @@ def _section_payload(
         "isDefault": is_default,
         "lastModifiedDateTime": last_modified,
         "links": {"oneNoteWebUrl": {"href": web_url} if web_url is not None else None},
+        "parentNotebook": (
+            {"id": _NOTEBOOK_ID, "displayName": notebook_name}
+            if notebook_name is not None
+            else None
+        ),
     }
 
 
@@ -131,6 +137,24 @@ class TestWhatItAsks:
         ]
         assert params["$top"] == "7"
         assert "$filter" not in params
+
+    @pytest.mark.usefixtures("notebook_groups", "group_sections", "group_groups")
+    async def test_the_notebook_sections_route_expands_the_parent_notebook(
+        self, client: GraphServiceClient, notebook_sections: respx.Route
+    ) -> None:
+        _ = await lister.list_sections(client, parent=_NOTEBOOK, limit=7)
+
+        params = notebook_sections.calls.last.request.url.params
+        assert params["$expand"] == "parentNotebook($select=id,displayName)"
+
+    @pytest.mark.usefixtures("notebook_sections", "notebook_groups", "group_groups")
+    async def test_the_group_sections_route_expands_the_parent_notebook(
+        self, client: GraphServiceClient, group_sections: respx.Route
+    ) -> None:
+        _ = await lister.list_sections(client, parent=_GROUP, limit=7)
+
+        params = group_sections.calls.last.request.url.params
+        assert params["$expand"] == "parentNotebook($select=id,displayName)"
 
     @pytest.mark.usefixtures("notebook_sections", "group_sections", "group_groups")
     async def test_the_notebook_groups_route_asks_select_and_top(
@@ -254,6 +278,37 @@ class TestWhatItAnswers:
         assert answer.section_groups == []
         assert answer.capped is False
 
+    @pytest.mark.usefixtures("notebook_groups")
+    async def test_the_notebook_name_is_read_off_a_sections_expansion_at_no_extra_cost(
+        self, client: GraphServiceClient, notebook_sections: respx.Route, graph: respx.MockRouter
+    ) -> None:
+        notebook_sections.mock(
+            return_value=_page(_section_payload(_SECTION_ID, notebook_name="Engineering"))
+        )
+
+        answer = await lister.list_sections(client, parent=_NOTEBOOK, limit=50)
+
+        assert answer.notebook_name == "Engineering"
+        assert len(graph.calls) == 2
+
+    @pytest.mark.usefixtures("notebook_groups")
+    async def test_the_notebook_name_is_null_when_no_section_carries_a_parent_notebook(
+        self, client: GraphServiceClient, notebook_sections: respx.Route
+    ) -> None:
+        notebook_sections.mock(return_value=_page(_section_payload(_SECTION_ID)))
+
+        answer = await lister.list_sections(client, parent=_NOTEBOOK, limit=50)
+
+        assert answer.notebook_name is None
+
+    @pytest.mark.usefixtures("notebook_sections", "notebook_groups")
+    async def test_the_notebook_name_is_null_when_the_section_listing_is_empty(
+        self, client: GraphServiceClient
+    ) -> None:
+        answer = await lister.list_sections(client, parent=_NOTEBOOK, limit=50)
+
+        assert answer.notebook_name is None
+
 
 class TestWhatItRefuses:
     @pytest.mark.parametrize(
@@ -335,3 +390,16 @@ class TestGraphFailures:
         assert "onenote_list_notebooks" in lister.GRAPH_NOT_FOUND
         assert "onenote_list_sections" in lister.GRAPH_NOT_FOUND
         assert "fails" in lister.GRAPH_NOT_FOUND
+
+
+class TestHowItDescribesItself:
+    def test_it_names_onenote_list_notebooks_as_the_whole_tree_alternative(self) -> None:
+        assert "onenote_list_notebooks" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
+
+    def test_it_states_the_documented_default_order_instead_of_an_unspecified_one(self) -> None:
+        assert "ascending" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
+        assert "whatever order" not in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
+
+    def test_the_description_and_the_parent_field_warn_about_the_section_group_403(self) -> None:
+        assert "403" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
+        assert "onenote_copy_section" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]

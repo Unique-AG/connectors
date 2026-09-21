@@ -17,14 +17,12 @@ from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
-    onenote_notebook_handle,
-    onenote_section_group_handle,
+    onenote_container_handle,
 )
 from office_365_mcp.shared.notes import (
-    NotebookAudience,
+    ContainerAudience,
     client_url_of,
-    notebook_audience,
-    section_group_audience,
+    container_audience,
     web_url_of,
     write_state_for,
 )
@@ -54,6 +52,7 @@ _DO_NOT_CREATE = "do not create"
 _NOTHING_CREATED = "No section was created."
 
 _UNNAMED_NOTEBOOK = "an unnamed notebook"
+_UNNAMED_SECTION_GROUP = "an unnamed section group"
 
 _DESCRIPTION = """\
 Create a brand-new, empty section directly inside a notebook or a section group. Pass a \
@@ -73,8 +72,13 @@ again: Microsoft may already have created the section before the response was lo
 again with the same `name` either creates a second section with a Microsoft-adjusted name or \
 fails as a duplicate, depending on how Microsoft resolves the clash. List the parent's sections \
 with onenote_list_sections first and look for a section already named `name` before calling \
-this again. The answer's `uri` is this new section's handle: pass it to onenote_create_page to \
-write the first page into it, or to onenote_list_pages to confirm it holds none yet.\
+this again. Microsoft can refuse this write with a 403 that looks exactly like a missing \
+permission when `parent` names a section group — even one this same account just created and \
+can create sections in elsewhere — as observed on a test tenant; if that happens, create the \
+section directly under the notebook instead, or copy an existing section into that group with \
+onenote_copy_section, which Microsoft did accept. The answer's `uri` is this new section's \
+handle: pass it to onenote_create_page to write the first page into it, or to onenote_list_pages \
+to confirm it holds none yet.\
 """
 
 _NOT_A_PARENT_HANDLE = (
@@ -151,17 +155,19 @@ async def create_section(
     answer_pending: bool = False,
 ) -> CreatedSection | InputRequiredResult:
     assert 1 <= len(name) <= MAX_NAME_CHARACTERS, f"name is bounded by the schema, got {len(name)}"
-    handle = _parent_handle(parent)
-    about = write_state_for("create_section", _parent_id(handle), name)
+    handle = onenote_container_handle(parent)
+    if handle is None:
+        raise ToolError(_NOT_A_PARENT_HANDLE)
+    about = write_state_for("create_section", handle.uri, name)
 
     created: OnenoteSection | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        audience = await _audience_of(client, handle)
-        if answer_pending or audience.reaches_others:
+        container = await container_audience(client, handle)
+        if answer_pending or container.notebook.reaches_others:
             with not_graph():
-                answer = await confirm(_question(name, audience), about)
+                answer = await confirm(_question(name, handle, container), about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
@@ -176,33 +182,19 @@ async def create_section(
     return _answer(created, handle)
 
 
-def _parent_handle(parent: str) -> OnenoteNotebookHandle | OnenoteSectionGroupHandle:
-    notebook = onenote_notebook_handle(parent)
-    if notebook is not None:
-        return notebook
-    group = onenote_section_group_handle(parent)
-    if group is not None:
-        return group
-    raise ToolError(_NOT_A_PARENT_HANDLE)
-
-
-def _parent_id(handle: OnenoteNotebookHandle | OnenoteSectionGroupHandle) -> str:
-    if isinstance(handle, OnenoteNotebookHandle):
-        return handle.notebook_id
-    return handle.section_group_id
-
-
-async def _audience_of(
-    client: GraphServiceClient, handle: OnenoteNotebookHandle | OnenoteSectionGroupHandle
-) -> NotebookAudience:
-    if isinstance(handle, OnenoteNotebookHandle):
-        return await notebook_audience(client, handle.notebook_id)
-    return await section_group_audience(client, handle.section_group_id)
-
-
-def _question(name: str, audience: NotebookAudience) -> str:
-    nb = audience.name or _UNNAMED_NOTEBOOK
-    return f"Create the section {name!r} in the notebook {nb!r}, {audience.reason}?"
+def _question(
+    name: str,
+    handle: OnenoteNotebookHandle | OnenoteSectionGroupHandle,
+    container: ContainerAudience,
+) -> str:
+    nb = container.notebook.name or _UNNAMED_NOTEBOOK
+    if isinstance(handle, OnenoteSectionGroupHandle):
+        group = container.name or _UNNAMED_SECTION_GROUP
+        return (
+            f"Create the section {name!r} in the section group {group!r} of the notebook "
+            + f"{nb!r}, {container.notebook.reason}?"
+        )
+    return f"Create the section {name!r} in the notebook {nb!r}, {container.notebook.reason}?"
 
 
 async def _post_section(
@@ -258,7 +250,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "onenote:///notebooks/{id} from an onenote_list_notebooks row, a "
                     + "onenote_find_notebook_from_url answer, or a onenote_create_notebook "
                     + "answer; or onenote:///sectiongroups/{id} from an onenote_list_sections "
-                    + "row, or a onenote_create_section_group answer."
+                    + "row, or a onenote_create_section_group answer. A section group can refuse "
+                    + "this write with a 403 that looks exactly like a missing permission, as "
+                    + "observed on a test tenant for a group created moments earlier; create "
+                    + "directly under the notebook instead if that happens."
                 ),
             ),
         ],

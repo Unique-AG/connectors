@@ -8,7 +8,7 @@ from msgraph.generated.models.onenote_page_preview import OnenotePagePreview
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step
+from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import onenote_page_handle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -26,14 +26,13 @@ _DESCRIPTION = """\
 Get a short preview of ONE OneNote page: a text snippet and, when Microsoft has one, an address \
 for a preview image. Pass the `page` handle from an onenote_list_pages row, or from what \
 onenote_create_page just wrote. `preview_text` is not the whole page: Microsoft indexes only the \
-first lines it finds worth showing, up to 300 characters, and that index lags a create or an \
-edit the same way a page's title does — on a test tenant, a page's indexed text can still be \
-stale days after the words themselves changed. Use onenote_read_page instead when you need the \
-page's real, current content. `preview_image_url` is a Graph resource address, not a picture: it \
-opens only with this connector's own sign-in token, so neither you nor the person you are \
-talking with can fetch it directly. Pass it to onenote_read_resource to fetch the image itself. \
-Either field can come back null, and often both do, when Microsoft's index has nothing yet or \
-the page holds no image.\
+first lines it finds worth showing, up to 300 characters. On a test tenant this snippet already \
+reflected edits made moments earlier; use onenote_read_page instead when you need the page's \
+real, current content with certainty. `preview_image_url` is a Graph resource address, not a \
+picture: this connector reads it through its own sign-in, by passing it to \
+onenote_read_resource. Treat it as an address, not a picture you or the person you are talking \
+with can open directly. Either field can come back null, and often both do, when Microsoft's \
+index has nothing yet or the page holds no image.\
 """
 
 _NOT_A_PAGE_HANDLE = (
@@ -64,18 +63,16 @@ class PagePreview(BaseModel):
     preview_text: str | None = Field(
         description=(
             "A short text snippet from the page, up to 300 characters, exactly as Microsoft's "
-            + "index holds it. This is not the whole page, and that index lags a create or an "
-            + "edit: a page written or changed moments ago can show stale or empty text here. "
-            + "Use onenote_read_page for the page's real, current content. Null when Microsoft's "
-            + "index has nothing yet."
+            + "index holds it. This is not the whole page. Use onenote_read_page for the page's "
+            + "real, current content with certainty. Null when Microsoft's index has nothing yet."
         )
     )
     preview_image_url: str | None = Field(
         description=(
             "A Graph resource address for a preview image of this page, not a picture itself. "
-            + "It opens only with this connector's own sign-in token. Pass it to "
-            + "onenote_read_resource to fetch the image. Null when Microsoft found no image to "
-            + "preview."
+            + "Pass it to onenote_read_resource, which reads it through this connector's own "
+            + "sign-in, to fetch the image. Treat it as an address, not a picture. Null when "
+            + "Microsoft found no image to preview."
         )
     )
 
@@ -85,7 +82,7 @@ async def preview_page(client: GraphServiceClient, *, page: str) -> PagePreview:
     if handle is None:
         raise ToolError(_NOT_A_PAGE_HANDLE)
 
-    with graph_errors(TOOL_NAME), graph_step(STEP_PREVIEW):
+    with graph_errors(TOOL_NAME, step=STEP_PREVIEW):
         fetched = await client.me.onenote.pages.by_onenote_page_id(handle.page_id).preview.get()
 
     assert fetched is not None, "Graph answered a page preview with no preview"
