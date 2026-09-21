@@ -103,6 +103,7 @@ class TestPeopleForOrganizationQuery:
         assert listing.people[0].job_title == "Tax Director"
         assert listing.people[0].categories == ("Investor", "Decision Maker")
         assert listing.people[0].is_key_employee is True
+        assert listing.people[0].url is None
         assert listing.former_omitted == 0
         assert listing.people_omitted == 0
         query = dict(route.calls.last.request.url.params)
@@ -113,6 +114,30 @@ class TestPeopleForOrganizationQuery:
         assert any(
             request.url.path.endswith("/entityRelationships")
             for request in recorded_requests(respx.calls)
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_configured_ui_origin_puts_a_person_url_on_every_row(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_EMPLOYEES_URL).mock(
+            return_value=_employees_page(
+                ("p1", {"name": "Glenn, Phil"}),
+                included=[
+                    _person_link("er-current", person_id="p1", type_id=EMPLOYEE_TYPE),
+                    *relationship_types(EMPLOYEE_TYPE),
+                ],
+            )
+        )
+        respx.get(_ER_URL).mock(return_value=_er_page(included=[]))
+
+        listing = await make_get_people_for_organization_query(
+            client, ui_base_url="https://tenant.example.test"
+        ).run(organization_id=_ORG, include_former=False)
+
+        assert listing.people[0].url == (
+            "https://tenant.example.test/backstop/crm/ManagePerson.action?display=&party_id=p1"
         )
 
     @pytest.mark.asyncio

@@ -20,6 +20,7 @@ from backstop_mcp.features.activity_writes import (
     get_attach_email_command_factory,
     get_attach_file_command_factory,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import BASE_URL, client_factory, credential, recorded_json_bodies
 from tests.server.tools.helpers import object_dict
 
@@ -63,9 +64,16 @@ def _decode_backstop_data(data: str) -> bytes:
     return gzip.decompress(base64.urlsafe_b64decode(padded))
 
 
-def make_command(client: BackstopClient) -> AttachFileCommand:
+def make_command(
+    client: BackstopClient,
+    *,
+    build_entity_link_util: BuildEntityLinkUtil | None = None,
+) -> AttachFileCommand:
+    util = build_entity_link_util or BuildEntityLinkUtil(ui_base_url=None)
     return get_attach_file_command_factory(
-        attach_document_command=get_attach_document_command_factory(client),
+        attach_document_command=get_attach_document_command_factory(
+            client, build_entity_link_util=util
+        ),
         attach_email_command=get_attach_email_command_factory(client),
     )
 
@@ -186,6 +194,7 @@ class TestAttachFileCommand:
 
         assert result.id == _EMAIL_ID
         assert result.kind == "email"
+        assert result.url is None
         body = recorded_json_bodies(route)[0]
         attributes = _attributes(body)
         assert attributes["emailFormat"] == "eml"
@@ -201,6 +210,19 @@ class TestAttachFileCommand:
                 "resourceLink": f"/people/{_PARTY_ID}",
             }
         ]
+
+    @respx.mock
+    async def test_email_confirmation_has_no_url_even_when_ui_origin_is_set(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(f"{BASE_URL}/emails").mock(return_value=_created("emails", _EMAIL_ID))
+
+        result = await make_command(
+            client,
+            build_entity_link_util=BuildEntityLinkUtil(ui_base_url="https://tenant.example.test"),
+        ).run(activity=_email(), party_id=_PARTY_ID, author=_AUTHOR)
+
+        assert result.url is None
 
     @respx.mock
     async def test_over_cap_file_does_not_call_backstop(

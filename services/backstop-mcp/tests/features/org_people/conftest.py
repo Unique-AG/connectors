@@ -10,6 +10,7 @@ from backstop_mcp.features.org_people import (
     GetPeopleForOrganizationQuery,
     GetPersonQuery,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import (
     build_employment_index_factory,
     client_factory,
@@ -61,6 +62,7 @@ def make_get_people_for_organization_query(
     client: BackstopClient,
     *,
     employment_index_factory: EmploymentIndexFactory | None = None,
+    ui_base_url: str | None = None,
 ) -> GetPeopleForOrganizationQuery:
     return GetPeopleForOrganizationQuery(
         client=client,
@@ -69,4 +71,5 @@ def make_get_people_for_organization_query(
             if employment_index_factory is not None
             else build_employment_index_factory()
         ),
+        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=ui_base_url),
     )

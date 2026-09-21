@@ -90,6 +90,9 @@ async def get_opportunities_by_ids(
 
     Stage history is omitted unless `include_stage_history` is true. A full 50-id batch without
     history is ~37,000 tokens; further batching is the caller's job.
+
+    Call like: {"ids": ["<id from a search_opportunities row>"],
+    "custom_field_names": ["Master Pipeline Status"]}
     """
     opportunity_ids = coerce_ids(ids)
     logger.info(

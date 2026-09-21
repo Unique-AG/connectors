@@ -16,6 +16,7 @@ from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.accounts import PartyAccountsResolvedResponse
 from backstop_mcp.features.accounts.tools.get_accounts_for_party import get_accounts_for_party
 from backstop_mcp.features.resolution import NotFoundResponse
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.features.accounts.conftest import make_get_holdings_query
 from tests.features.party_resolver.helpers import (
@@ -32,6 +33,7 @@ _ACCOUNT_ID = "27871657"
 _TABLE_URL = f"{BASE_URL}/bsg-account-table-data"
 _ACCOUNTS_URL = f"{BASE_URL}/accounts"
 _ORG_URL = f"{BASE_URL}/organizations/{_ORG_ID}"
+_NO_UI_LINKS = BuildEntityLinkUtil(ui_base_url=None)
 
 
 def _ref(resource_id: str, resource_type: str, **extra: object) -> dict[str, object]:
@@ -176,6 +178,7 @@ async def _call(client: BackstopClient, *, include_closed: bool = False) -> obje
         resolve_party_query=make_resolve_party_query(client),
         get_party_name_query=make_get_party_name_query(client),
         get_holdings_query=make_get_holdings_query(client),
+        build_entity_link_util=_NO_UI_LINKS,
     )
 
 
@@ -273,6 +276,7 @@ class TestOwnsNothingIsVerified:
                 resolve_party_query=make_resolve_party_query(client),
                 get_party_name_query=make_get_party_name_query(client),
                 get_holdings_query=make_get_holdings_query(client),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PartyAccountsResolvedResponse,
         )
@@ -297,6 +301,7 @@ class TestOwnsNothingIsVerified:
                 resolve_party_query=make_resolve_party_query(client),
                 get_party_name_query=make_get_party_name_query(client),
                 get_holdings_query=make_get_holdings_query(client),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             NotFoundResponse,
         )
@@ -322,6 +327,7 @@ class TestOwnsNothingIsVerified:
                 resolve_party_query=make_resolve_party_query(client),
                 get_party_name_query=make_get_party_name_query(client),
                 get_holdings_query=make_get_holdings_query(client),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PartyAccountsResolvedResponse,
         )
@@ -345,6 +351,7 @@ class TestOwnsNothingIsVerified:
             resolve_party_query=make_resolve_party_query(client),
             get_party_name_query=make_get_party_name_query(client),
             get_holdings_query=make_get_holdings_query(client),
+            build_entity_link_util=_NO_UI_LINKS,
         )
 
         assert not confirm.called
@@ -366,6 +373,7 @@ class TestOwnsNothingIsVerified:
                 resolve_party_query=make_resolve_party_query(client),
                 get_party_name_query=make_get_party_name_query(client),
                 get_holdings_query=make_get_holdings_query(client),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             PartyAccountsResolvedResponse,
         )
@@ -410,6 +418,7 @@ class TestResolution:
                 resolve_party_query=make_resolve_party_query(client),
                 get_party_name_query=make_get_party_name_query(client),
                 get_holdings_query=make_get_holdings_query(client),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             NotFoundResponse,
         )

@@ -35,6 +35,7 @@ from backstop_mcp.features.opportunities.responses import (
     SearchOpportunitiesResolvedResponse,
     SearchOpportunityRowResponse,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +58,14 @@ class SearchOpportunitiesQuery:
         client: BackstopClient,
         map_opportunity_to_response_util: MapOpportunityToResponseUtil,
         custom_fields_service: CustomFieldsService,
+        build_entity_link_util: BuildEntityLinkUtil,
     ) -> None:
         self._client: BackstopClient = client
         self.map_opportunity_to_response_util: MapOpportunityToResponseUtil = (
             map_opportunity_to_response_util
         )
         self._custom_fields_service: CustomFieldsService = custom_fields_service
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(
         self,
@@ -106,6 +109,9 @@ class SearchOpportunitiesQuery:
                     api_include_resources=pages.included,
                     custom_fields_filters=CustomFieldFilters(),
                     include_stage_history=False,
+                    url=self._build_entity_link_util.canonical_url(
+                        target=OpportunityLinkTarget(entity_id=opportunity.id),
+                    ),
                 )
                 investor = InvestorFromOpportunityResponse.from_included(
                     included.first(

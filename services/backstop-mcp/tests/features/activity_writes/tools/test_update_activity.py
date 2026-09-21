@@ -20,6 +20,7 @@ from backstop_mcp.features.activity_writes import (
     get_update_task_command_factory,
 )
 from backstop_mcp.features.activity_writes.tools.update_activity import update_activity
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.helpers import (
     BASE_URL,
@@ -44,15 +45,23 @@ async def client() -> AsyncGenerator[BackstopClient]:
 
 def make_command(client: BackstopClient) -> UpdateActivityCommand:
     return get_update_activity_command_factory(
-        update_note_command=get_update_note_command_factory(client),
+        update_note_command=get_update_note_command_factory(
+            client, build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None)
+        ),
         update_meeting_or_call_command=get_update_meeting_or_call_command_factory(
-            client, time_zones_service=time_zones_service(client)
+            client,
+            time_zones_service=time_zones_service(client),
+            build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
         ),
         update_task_command=get_update_task_command_factory(
-            client, system_users_service=system_users_service(client)
+            client,
+            system_users_service=system_users_service(client),
+            build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
         ),
         update_email_command=get_update_email_command_factory(client),
-        update_document_command=get_update_document_command_factory(client),
+        update_document_command=get_update_document_command_factory(
+            client, build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None)
+        ),
     )
 
 

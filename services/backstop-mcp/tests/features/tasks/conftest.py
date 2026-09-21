@@ -4,6 +4,7 @@ import pytest
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.tasks import GetTasksForPartyQuery
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import client_factory, credential
 
 
@@ -14,5 +15,10 @@ async def client() -> AsyncGenerator[BackstopClient]:
     await factory.aclose()
 
 
-def make_get_tasks_for_party_query(client: BackstopClient) -> GetTasksForPartyQuery:
-    return GetTasksForPartyQuery(client=client)
+def make_get_tasks_for_party_query(
+    client: BackstopClient, *, ui_base_url: str | None = None
+) -> GetTasksForPartyQuery:
+    return GetTasksForPartyQuery(
+        client=client,
+        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=ui_base_url),
+    )

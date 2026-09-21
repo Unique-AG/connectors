@@ -18,6 +18,7 @@ from backstop_mcp.features.activity_writes.commands.extract_collection import ex
 from backstop_mcp.features.activity_writes.responses import UpdatedActivityResponse
 from backstop_mcp.features.activity_writes.update_activity_input import UpdateTaskInput
 from backstop_mcp.features.system_users import SystemUsersService
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, TaskLinkTarget
 from backstop_mcp.utils import parse_activity_handle
 
 logger = logging.getLogger(__name__)
@@ -28,9 +29,16 @@ _Document = BackstopApiSingleResourceDocument[TaskAttributes]
 class UpdateTaskCommand:
     """Update a task via `PATCH /tasks/{id}`."""
 
-    def __init__(self, *, client: BackstopClient, system_users_service: SystemUsersService) -> None:
+    def __init__(
+        self,
+        *,
+        client: BackstopClient,
+        system_users_service: SystemUsersService,
+        build_entity_link_util: BuildEntityLinkUtil,
+    ) -> None:
         self._client: BackstopClient = client
         self._system_users_service: SystemUsersService = system_users_service
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, activity: UpdateTaskInput) -> UpdatedActivityResponse:
         handle = parse_activity_handle(activity.activity_id)
@@ -59,4 +67,10 @@ class UpdateTaskCommand:
         )
         document = await self._client.patch(path, schema=_Document, json=payload)
         logger.info("activity_writes.task.updated", extra={"id": document.data.id})
-        return UpdatedActivityResponse(id=document.data.id, resource_type="tasks")
+        return UpdatedActivityResponse(
+            id=document.data.id,
+            resource_type="tasks",
+            url=self._build_entity_link_util.canonical_url(
+                target=TaskLinkTarget(task_id=document.data.id),
+            ),
+        )

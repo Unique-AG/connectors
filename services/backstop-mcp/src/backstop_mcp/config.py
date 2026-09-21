@@ -4,6 +4,7 @@ from datetime import timedelta
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from typing import Annotated, ClassVar, Self, TypedDict, cast
+from urllib.parse import urlparse
 
 from pydantic import (
     BeforeValidator,
@@ -204,6 +205,11 @@ class BackstopConfig(BaseSettings):
 
     base_url: HttpUrlStr = "https://api.backstopsolutions.com"
 
+    # CRM UI origin for deep links (`{ui_base}/backstop/...`). Unset means this deployment
+    # does not emit UI links, unless `base_url` is already the tenant CRM host — never guess
+    # a host from the shared `api.backstopsolutions.com` API. See `effective_ui_base_url`.
+    ui_base_url: HttpUrlStr | None = None
+
     # httpx's undocumented default is ~5s; ordinary CRUD calls get a saner explicit timeout.
     default_timeout_seconds: float = Field(default=30.0, gt=0)
     # /reports and /{entity}/{id}/analytics can legitimately take up to ~30s per 500 records.
@@ -380,6 +386,25 @@ class BackstopConfig(BaseSettings):
             items = cast(list[object], value)
             return tuple(str(item).strip() for item in items if str(item).strip())
         return value
+
+    @property
+    def effective_ui_base_url(self) -> str | None:
+        """CRM UI origin to join `/backstop/...` onto, or None when this deploy has none.
+
+        An explicit `ui_base_url` always wins. Otherwise a `base_url` whose host is not the
+        shared API host (`api.backstopsolutions.com`) is *assumed* to be the tenant CRM host,
+        because that is how a tenant-hosted deployment is configured and one deployment serves
+        one tenant. The assumption is deliberately broad: any other gateway host (a regional or
+        staging API endpoint) would also be treated as a UI origin and would emit links that do
+        not load. Set `BACKSTOP_UI_BASE_URL` explicitly on any deployment that is not
+        tenant-hosted. The shared API host is never rewritten into a UI host.
+        """
+        if self.ui_base_url is not None:
+            return self.ui_base_url
+        host = urlparse(self.base_url).hostname
+        if host is not None and host != "api.backstopsolutions.com":
+            return self.base_url
+        return None
 
 
 class ActivityHistoryConfig(BaseSettings):

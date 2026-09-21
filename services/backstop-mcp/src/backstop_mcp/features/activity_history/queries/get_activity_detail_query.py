@@ -40,6 +40,10 @@ from backstop_mcp.features.activity_history.internal_dto import (
     attachments_from_stored,
 )
 from backstop_mcp.features.activity_history.responses import ActivityDetailResponse
+from backstop_mcp.features.ui_links import (
+    BuildEntityLinkUtil,
+    activity_link_target,
+)
 from backstop_mcp.utils import ParsedActivityHandle
 
 logger = logging.getLogger(__name__)
@@ -51,8 +55,11 @@ _MeetingSpecificDocument = BackstopApiSingleResourceDocument[MeetingSpecificAttr
 class GetActivityDetailQuery:
     """Full body, and meeting extras only when the handle or detail type says they apply."""
 
-    def __init__(self, *, client: BackstopClient) -> None:
+    def __init__(
+        self, *, client: BackstopClient, build_entity_link_util: BuildEntityLinkUtil
+    ) -> None:
         self._client: BackstopClient = client
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(
         self, *, activity_id: str, handle: ParsedActivityHandle
@@ -83,11 +90,22 @@ class GetActivityDetailQuery:
             else:
                 specifics = None
                 attendees = ()
+        target = activity_link_target(
+            activity_type=detail.type,
+            entity_activity_details_id=resource_id,
+        )
         return ActivityDetailResponse.from_detail(
             activity_id=activity_id,
             detail=detail,
             specifics=specifics,
             attendees=attendees,
+            url=(
+                None
+                if target is None
+                else self._build_entity_link_util.canonical_url(
+                    target=target,
+                )
+            ),
         )
 
     async def _fetch_activity_detail(self, resource_id: str) -> ActivityDetailDto:

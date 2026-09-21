@@ -22,29 +22,44 @@ from backstop_mcp.features.activity_writes.commands import (
 )
 from backstop_mcp.features.system_users import SystemUsersService, get_system_users_service
 from backstop_mcp.features.time_zones import TimeZonesService, get_time_zones_service
+from backstop_mcp.features.ui_links import (
+    BuildEntityLinkUtil,
+    get_build_entity_link_util_factory,
+)
 
 
 @lru_cache(maxsize=1)
 def get_log_note_command_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> LogNoteCommand:
-    return LogNoteCommand(client=client)
+    return LogNoteCommand(client=client, build_entity_link_util=build_entity_link_util)
 
 
 @lru_cache(maxsize=1)
 def get_log_meeting_or_call_command_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     time_zones_service: TimeZonesService = Depends(get_time_zones_service),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> LogMeetingOrCallCommand:
-    return LogMeetingOrCallCommand(client=client, time_zones_service=time_zones_service)
+    return LogMeetingOrCallCommand(
+        client=client,
+        time_zones_service=time_zones_service,
+        build_entity_link_util=build_entity_link_util,
+    )
 
 
 @lru_cache(maxsize=1)
 def get_log_task_command_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     system_users_service: SystemUsersService = Depends(get_system_users_service),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> LogTaskCommand:
-    return LogTaskCommand(client=client, system_users_service=system_users_service)
+    return LogTaskCommand(
+        client=client,
+        system_users_service=system_users_service,
+        build_entity_link_util=build_entity_link_util,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -65,8 +80,9 @@ def get_log_activity_command_factory(
 @lru_cache(maxsize=1)
 def get_attach_document_command_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> AttachDocumentCommand:
-    return AttachDocumentCommand(client=client)
+    return AttachDocumentCommand(client=client, build_entity_link_util=build_entity_link_util)
 
 
 @lru_cache(maxsize=1)
@@ -90,24 +106,35 @@ def get_attach_file_command_factory(
 @lru_cache(maxsize=1)
 def get_update_note_command_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> UpdateNoteCommand:
-    return UpdateNoteCommand(client=client)
+    return UpdateNoteCommand(client=client, build_entity_link_util=build_entity_link_util)
 
 
 @lru_cache(maxsize=1)
 def get_update_meeting_or_call_command_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     time_zones_service: TimeZonesService = Depends(get_time_zones_service),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> UpdateMeetingOrCallCommand:
-    return UpdateMeetingOrCallCommand(client=client, time_zones_service=time_zones_service)
+    return UpdateMeetingOrCallCommand(
+        client=client,
+        time_zones_service=time_zones_service,
+        build_entity_link_util=build_entity_link_util,
+    )
 
 
 @lru_cache(maxsize=1)
 def get_update_task_command_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     system_users_service: SystemUsersService = Depends(get_system_users_service),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> UpdateTaskCommand:
-    return UpdateTaskCommand(client=client, system_users_service=system_users_service)
+    return UpdateTaskCommand(
+        client=client,
+        system_users_service=system_users_service,
+        build_entity_link_util=build_entity_link_util,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -120,8 +147,9 @@ def get_update_email_command_factory(
 @lru_cache(maxsize=1)
 def get_update_document_command_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> UpdateDocumentCommand:
-    return UpdateDocumentCommand(client=client)
+    return UpdateDocumentCommand(client=client, build_entity_link_util=build_entity_link_util)
 
 
 @lru_cache(maxsize=1)

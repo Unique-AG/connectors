@@ -168,6 +168,14 @@ class OpportunityResponse(OmitNoneModel):
     )
 
     id: str = Field(description="Backstop id of the opportunity.")
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this deal (no tab). Omitted when this deployment "
+            "has no UI origin. Echo it; never invent one. Call build_backstop_links for "
+            "tabs or a layout."
+        ),
+    )
     name: StrippedStr | None = Field(
         default=None,
         description="Name of the deal, usually 'investor - fund' — e.g. 'Koch - CATS Select'.",
@@ -285,6 +293,7 @@ class OpportunityResponse(OmitNoneModel):
         stage_id: str | None,
         stage_history: tuple[StageChangeResponse, ...],
         custom_field_values: tuple[ResolvedCustomFieldValueResponse, ...],
+        url: str | None,
     ) -> Self:
         """Project one `opportunities` resource, naming its current stage and its history.
 
@@ -300,6 +309,7 @@ class OpportunityResponse(OmitNoneModel):
                 "stage_id": stage_id,
                 "stage_history": stage_history,
                 "custom_field_values": custom_field_values,
+                "url": url,
             }
         )
 
@@ -467,6 +477,14 @@ class SearchOpportunityRowResponse(OmitNoneModel):
             "Backstop id of the opportunity. Always populated, even when omitted from `fields`."
         ),
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this deal (no tab). Not in the default fieldset — "
+            "select `url` to get it, since one URL per row is dead weight on a wide walk. "
+            "Omitted when this deployment has no UI origin. Echo it; never invent one."
+        ),
+    )
     name: str | None = Field(default=None, description="Deal name, usually 'investor - fund'.")
     stage: str | None = Field(default=None, description="The stage the deal is in now.")
     stage_id: str | None = Field(default=None, description="Backstop id of the current stage.")
@@ -517,6 +535,7 @@ class SearchOpportunityRowResponse(OmitNoneModel):
     ) -> Self:
         return cls(
             id=deal.id,
+            url=deal.url,
             name=deal.name,
             stage=deal.stage,
             stage_id=deal.stage_id,

@@ -18,6 +18,7 @@ from backstop_mcp.features.activity_writes import (
 )
 from backstop_mcp.features.activity_writes.tools.delete_activity import delete_activity
 from backstop_mcp.features.elicitation_utils import DELETE, KEEP, DeletionChoice
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import (
     FakeContext,
@@ -75,7 +76,10 @@ class TestDeleteActivity:
                 await delete_activity(
                     ctx_no_elicitation_capability(),
                     activity=DeleteActivityInput(kind="note", activity_id=_NOTE_ID),
-                    get_activity_detail_query=GetActivityDetailQuery(client=client),
+                    get_activity_detail_query=GetActivityDetailQuery(
+                        client=client,
+                        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                    ),
                     delete_activity_command=get_delete_activity_command_factory(client),
                 ),
                 DeletedActivityResponse,
@@ -123,7 +127,10 @@ class TestDeleteActivity:
             await delete_activity(
                 as_context(FakeContext(elicit)),
                 activity=DeleteActivityInput(kind="note", activity_id=_NOTE_ID),
-                get_activity_detail_query=GetActivityDetailQuery(client=client),
+                get_activity_detail_query=GetActivityDetailQuery(
+                    client=client,
+                    build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             ),
             DeletedActivityResponse,
@@ -151,7 +158,10 @@ class TestDeleteActivity:
             await delete_activity(
                 ctx_decline(),
                 activity=DeleteActivityInput(kind="note", activity_id=_NOTE_ID),
-                get_activity_detail_query=GetActivityDetailQuery(client=client),
+                get_activity_detail_query=GetActivityDetailQuery(
+                    client=client,
+                    build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             )
 
@@ -171,7 +181,10 @@ class TestDeleteActivity:
             await delete_activity(
                 ctx_cancel(),
                 activity=DeleteActivityInput(kind="note", activity_id=_NOTE_ID),
-                get_activity_detail_query=GetActivityDetailQuery(client=client),
+                get_activity_detail_query=GetActivityDetailQuery(
+                    client=client,
+                    build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             )
 
@@ -191,7 +204,10 @@ class TestDeleteActivity:
             await delete_activity(
                 ctx_accept(DeletionChoice(choice=KEEP)),
                 activity=DeleteActivityInput(kind="note", activity_id=_NOTE_ID),
-                get_activity_detail_query=GetActivityDetailQuery(client=client),
+                get_activity_detail_query=GetActivityDetailQuery(
+                    client=client,
+                    build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             )
 
@@ -211,7 +227,10 @@ class TestDeleteActivity:
             await delete_activity(
                 ctx_unsupported(),
                 activity=DeleteActivityInput(kind="note", activity_id=_NOTE_ID),
-                get_activity_detail_query=GetActivityDetailQuery(client=client),
+                get_activity_detail_query=GetActivityDetailQuery(
+                    client=client,
+                    build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             )
 
@@ -228,7 +247,10 @@ class TestDeleteActivity:
             await delete_activity(
                 ctx_accept(DeletionChoice(choice=DELETE)),
                 activity=DeleteActivityInput(kind="note", activity_id=_NOTE_ID),
-                get_activity_detail_query=GetActivityDetailQuery(client=client),
+                get_activity_detail_query=GetActivityDetailQuery(
+                    client=client,
+                    build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             )
 
@@ -258,7 +280,10 @@ class TestDeleteActivity:
             await delete_activity(
                 as_context(FakeContext(elicit)),
                 activity=DeleteActivityInput(kind="email", activity_id=f"emails_{_EMAIL_ID}"),
-                get_activity_detail_query=GetActivityDetailQuery(client=client),
+                get_activity_detail_query=GetActivityDetailQuery(
+                    client=client,
+                    build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             ),
             DeletedActivityResponse,

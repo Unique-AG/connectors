@@ -327,6 +327,41 @@ class TestSearchOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_url_is_off_by_default_and_arrives_when_selected(self) -> None:
+        base_url = tenant("so-url")
+        respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                _deal("1", name="Koch - CATS Select", stage_id="42482"),
+                included=_included(),
+                total=1,
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            query = make_search_opportunities_query(
+                client, ui_base_url="https://tenant.example.test"
+            )
+            default_result = tool_model(
+                await search_opportunities(search_opportunities_query=query),
+                SearchOpportunitiesResolvedResponse,
+            )
+            selected_result = tool_model(
+                await search_opportunities(
+                    fields=["name", "url"], search_opportunities_query=query
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        default_rows = object_list(tool_payload(default_result)["rows"])
+        assert "url" not in object_dict(default_rows[0])
+        selected_rows = object_list(tool_payload(selected_result)["rows"])
+        assert object_dict(selected_rows[0])["url"] == (
+            "https://tenant.example.test/backstop/crm/Opportunity.action?display=&entityId=1"
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_catalog_failure_keeps_the_rows(self) -> None:
         base_url = tenant("so-catalog-down")
         respx.get(f"{base_url}/opportunities").mock(

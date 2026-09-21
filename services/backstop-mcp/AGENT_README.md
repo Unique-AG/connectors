@@ -4,6 +4,7 @@ Read this before adding, changing, or refactoring a feature. Two references:
 
 - Reads: [`src/backstop_mcp/features/opportunities/`](src/backstop_mcp/features/opportunities/)
 - Writes: [`src/backstop_mcp/features/activity_writes/`](src/backstop_mcp/features/activity_writes/)
+- UI links (no HTTP): [`src/backstop_mcp/features/ui_links/`](src/backstop_mcp/features/ui_links/)
 
 When this file and a read feature disagree, opportunities wins. When this file and a write
 feature disagree, activity_writes wins. Do not invent a third shape.
@@ -70,6 +71,7 @@ features/<name>/
   dependencies.py          factories; @lru_cache only for process-wide services
   api_responses.py         *Attributes / wire resources — or api_responses/ if this grows
   responses.py             *Response published models — or responses/ if this grows
+  inputs.py                published tool input union when the feature has one
   internal_dto.py          only if you have real *Dto classes
   queries/
     __init__.py
@@ -95,7 +97,7 @@ the same names. Layering still matches the `api_responses*` / `responses*` prefi
 that folder unless the task is the rename. New features use `utils/`.
 
 Vocabulary modules keep those names: `api_responses*`, `internal_dto*`, `responses*`,
-`dependencies.py`, `entity_types.py`, `settings.py`. Every other logic file is named after
+`dependencies.py`, `entity_types.py`, `inputs.py`, `settings.py`. Every other logic file is named after
 the symbol it defines (`get_opportunities_query.py` → `GetOpportunitiesQuery`).
 `tests/test_layering.py` rule 6 enforces that.
 
@@ -376,6 +378,34 @@ type OpportunityGroupBy = Literal["stage", "product", "period", "party"]
 
 Export them from `queries/__init__.py` and the feature `__init__`. Split to a types file
 only when the set is no longer small.
+
+**CRM UI URLs.** `features/ui_links/` owns the grammar. Both utils take `ui_base_url` in
+`__init__` (the cached factories bind `BackstopConfig.effective_ui_base_url`); `run` /
+`canonical_url` do not take an origin. Commands and queries that publish a record `url`
+take `BuildEntityLinkUtil` as a constructor argument. Their factories inject it with
+`Depends(get_build_entity_link_util_factory)`. Tools that have no query/command
+(`get_person`, `get_product`, `get_accounts_for_party`), or that assemble the rows
+themselves (`search_activities`), Depends the util the same way.
+
+DTOs, attributes, and responses never build URLs. They take `url` as a constructor
+argument. List rows whose response is assembled in one classmethod take
+`urls: Mapping[str, str | None]` keyed by row id instead — `from_holdings` (account id)
+and `SearchActivitiesResolvedResponse.from_fetch` (activity row id).
+
+**A wide walk makes `url` opt-in.** Every read publishes a `url`, but on the two sparse
+searches (`search_opportunities`, `search_activities`) it is a selectable `fields` member
+outside the default set: one URL per row is ~100 bytes times up to 20,000 rows for a link
+the caller usually does not want. Bounded per-party lists (`get_tasks_for_party`,
+`get_people_for_party`, `get_activity_history`) publish it unconditionally. An activity
+row whose type has no CRM page — a bare `meeting_call`, or a history row Backstop sent
+without `specificResource` — gets no `url` rather than a guessed one.
+
+`canonical_url` is the no-tab open link. Tabs and layouts are a `build_backstop_links`
+call. When the origin is unset, `url` is `None` — never invent a host from the API
+base. Email attach confirmations stay url-less: the `/emails` id is not a CRM
+`summaryId`. `ActivitySearch.action` is parser-only until a live NBSP check; do not
+emit it. Tests call factories as functions, so they pass
+`BuildEntityLinkUtil(ui_base_url=...)` themselves; `Depends` is not resolved.
 
 ---
 

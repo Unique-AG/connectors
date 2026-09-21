@@ -14,6 +14,10 @@ from backstop_mcp.features.org_people.queries import (
     GetPeopleForOrganizationQuery,
     GetPersonQuery,
 )
+from backstop_mcp.features.ui_links import (
+    BuildEntityLinkUtil,
+    get_build_entity_link_util_factory,
+)
 
 
 @lru_cache(maxsize=1)
@@ -41,7 +45,10 @@ def get_organization_query_factory(
 def get_people_for_organization_query_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     employment_index_factory: EmploymentIndexFactory = Depends(get_employment_index_factory),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> GetPeopleForOrganizationQuery:
     return GetPeopleForOrganizationQuery(
-        client=client, employment_index_factory=employment_index_factory
+        client=client,
+        employment_index_factory=employment_index_factory,
+        build_entity_link_util=build_entity_link_util,
     )
