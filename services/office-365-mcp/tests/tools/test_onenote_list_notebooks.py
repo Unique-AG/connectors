@@ -33,6 +33,11 @@ _CYCLE_A = "1-SYNTHETICCYCLEA0000000000000000000000!202"
 _CYCLE_B = "1-SYNTHETICCYCLEB0000000000000000000000!203"
 _MISSING_PARENT = "1-SYNTHETICMISSINGPARENT0000000000000!204"
 
+_SECTION_ONE = "1-SYNTHETICSECTIONONE00000000000000000!301"
+_SECTION_TWO = "1-SYNTHETICSECTIONTWO00000000000000000!302"
+_SECTION_THREE = "1-SYNTHETICSECTIONTHREE0000000000000000!303"
+_SECTION_FOUR = "1-SYNTHETICSECTIONFOUR00000000000000000!304"
+
 
 def _notebook_payload(
     notebook_id: str,
@@ -400,6 +405,55 @@ class TestWhatItAnswers:
         by_name = {notebook.name: notebook for notebook in result.notebooks}
         assert [s.name for s in by_name["Engineering"].sections] == ["Standups"]
         assert [s.name for s in by_name["Personal"].sections] == ["Journal"]
+
+    @pytest.mark.usefixtures("notebooks_route", "sections_route", "groups_route")
+    async def test_a_short_listing_answers_capped_false(self, client: GraphServiceClient) -> None:
+        result = await lister.list_notebooks(client)
+
+        assert result.capped is False
+
+    @pytest.mark.usefixtures("groups_route", "notebooks_route")
+    async def test_a_sections_collection_at_the_cap_answers_capped_false(
+        self,
+        client: GraphServiceClient,
+        sections_route: respx.Route,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(lister, "MAX_SECTIONS", 3)
+        sections_route.mock(
+            return_value=_page(
+                _section_payload(_SECTION_ONE, display_name="One"),
+                _section_payload(_SECTION_TWO, display_name="Two"),
+                _section_payload(_SECTION_THREE, display_name="Three"),
+            )
+        )
+
+        result = await lister.list_notebooks(client)
+
+        assert result.capped is False
+        assert {s.name for s in result.notebooks[0].sections} == {"One", "Two", "Three"}
+
+    @pytest.mark.usefixtures("groups_route", "notebooks_route")
+    async def test_a_sections_collection_past_the_cap_answers_capped_true(
+        self,
+        client: GraphServiceClient,
+        sections_route: respx.Route,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(lister, "MAX_SECTIONS", 3)
+        sections_route.mock(
+            return_value=_page(
+                _section_payload(_SECTION_ONE, display_name="One"),
+                _section_payload(_SECTION_TWO, display_name="Two"),
+                _section_payload(_SECTION_THREE, display_name="Three"),
+                _section_payload(_SECTION_FOUR, display_name="Four"),
+            )
+        )
+
+        result = await lister.list_notebooks(client)
+
+        assert result.capped is True
+        assert {s.name for s in result.notebooks[0].sections} == {"One", "Two", "Three"}
 
 
 class TestGraphFailures:

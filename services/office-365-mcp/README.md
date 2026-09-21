@@ -384,13 +384,21 @@ run against the test tenant on 2026-09-16 returned a 966 KB PDF from a 6.4 MB Po
 title alone; it cannot see what a page's body says. A page comes back as the HTML Microsoft
 stores, with any image or file reference inside it pointing at Graph and opening only with this
 connector's own sign-in token, and this connector converts none of it. The two write tools are
-additive, ask nobody to confirm because a page in the user's own notebook reaches no one else, and
+additive. Each one resolves the target notebook first, and when that notebook is shared or belongs
+to somebody else it puts the write to the person at the other end through MCP elicitation before
+anything is written, because the page is visible to those people the moment it exists; a page in
+the user's own unshared notebook is written without a question, the way a mail draft is. Both
 send `no_retry()` because a retried create or append duplicates content. `onenote_create_page`
 sends the page as `text/html` through a hand-built request, because the SDK's generated `post`
 would send JSON, which OneNote rejects. `onenote_append_to_page` goes through the SDK's
 `onenotePatchContent` action, whose enum values kiota serialises as `Append`/`After` where
-Microsoft's own examples spell them `append`/`after`; that spelling has not yet been exercised
-against a live tenant.
+Microsoft's own examples spell them `append`/`after`; a live run against the test tenant on
+2026-09-18 accepted that spelling. The same run showed Microsoft's page index lagging a write:
+`title` and `lastModifiedDateTime` on a listed or read page stayed at their old values while the
+page's content was current, and three days later the pages the connector had created still
+listed with an empty `title`. Microsoft documents no delay. The descriptions say so, and they
+send a model to `created_at` and the section rather than to the title when it looks for a page
+it just wrote.
 
 **The Outlook rows are three axes, not one ladder.** Mail content goes `outlook-read` →
 `outlook-write` → `outlook-send`, each row adding one permission to the row above. Mailbox

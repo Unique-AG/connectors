@@ -53,15 +53,16 @@ Find pages across the signed-in user's OneNote notebooks, or inside one section.
 to search every page of every notebook the user owns and every notebook shared with them. Pass a \
 section's `uri` from an onenote_list_notebooks result as `section` to search only that one \
 section's pages. `title_contains` keeps only the pages whose TITLE holds this text, compared \
-without regard to case. It matches the title alone. A page created or renamed in the last \
-minutes can be missed, because Microsoft's page index lags an edit and holds an empty title \
-until it catches up. Microsoft Graph has no full-text search over \
-the words inside a OneNote page for a work or school account, so no value here reaches what a \
-page says, only what it is called. Leave `title_contains` out to list pages instead of searching \
-for one. Rows come back newest change first, and there is no way to ask for a different order. \
-Each row carries a `uri`: pass it to onenote_read_page to read that page. Each row also carries a \
-`section_uri`: pass it back to onenote_list_pages to see that page's siblings, or to \
-onenote_create_page to add a page beside it.\
+without regard to case. It matches the title alone. A page created or renamed recently can be \
+missed, because Microsoft's page index lags an edit and holds an empty title until it catches \
+up; on a test tenant, pages this connector created were still missed three days later, so \
+find such a page by `created_at` or its section instead. Microsoft Graph has no full-text \
+search over the words inside a OneNote page for a work or school account, so no value here \
+reaches what a page says, only what it is called. Leave `title_contains` out to list pages \
+instead of searching for one. Rows come back newest change first, and there is no way to ask \
+for a different order. Each row carries a `uri`: pass it to onenote_read_page to read that page. \
+Each row also carries a `section_uri`: pass it back to onenote_list_pages to see that page's \
+siblings, or to onenote_create_page to add a page beside it.\
 """
 
 _NOT_A_SECTION_HANDLE = (
@@ -192,9 +193,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Keep only the pages whose TITLE contains this text, compared without "
                     + "regard to case. This matches the title alone, and a page created or "
-                    + "renamed in the last minutes can be missed, because Microsoft's page index "
-                    + "lags an edit and holds an empty title until it catches up. Microsoft Graph "
-                    + "has no "
+                    + "renamed recently can be missed, because Microsoft's page index lags an "
+                    + "edit and holds an empty title until it catches up, for days on a test "
+                    + "tenant. Microsoft Graph has no "
                     + "full-text search over what a OneNote page says for a work or school "
                     + "account, so no value here reaches the words inside a page, only its "
                     + "title. Omit it to list pages instead of searching for one."

@@ -65,9 +65,10 @@ _SectionGroupsQuery = SectionGroupsRequestBuilder.SectionGroupsRequestBuilderGet
 
 _DESCRIPTION = """\
 List every OneNote notebook the signed-in user owns, plus every notebook someone else has \
-shared with them, and every section inside each one. This is the starting point for reading or \
-writing OneNote: every other onenote_* tool takes a section's or a page's handle, and a \
-section's handle comes from here. Takes no arguments.
+shared with them, and every section inside each one — unless `capped` is true, in which case a \
+safety cap cut one of those listings short and some notebooks or sections may be missing. This \
+is the starting point for reading or writing OneNote: every other onenote_* tool takes a \
+section's or a page's handle, and a section's handle comes from here. Takes no arguments.
 
 This covers only the notebooks reachable from the signed-in user's own OneNote: the user's own \
 notebooks and the ones shared with them. It does NOT cover a notebook that lives on a \
@@ -103,7 +104,9 @@ class NotebookSection(BaseModel):
             + 'between the notebook and the section: their names joined with " / ", outermost '
             + 'first, for example "Projects / 2026". Null when the section sits directly under '
             + "its notebook, with no section group in between. A section group Microsoft named "
-            + "nothing contributes an empty name to this path."
+            + "nothing contributes an empty name to this path. This path can be cut short when "
+            + "the top-level `capped` is true, because a section group the walk never reached "
+            + "is left out of it."
         )
     )
     is_default: bool | None = Field(
@@ -167,10 +170,12 @@ class Notebook(BaseModel):
     sections: list[NotebookSection] = Field(
         description=(
             "Every section inside this notebook, directly or nested inside a section group, in "
-            + "the order Microsoft returned them. A section Microsoft gave no id for, or whose "
-            + "parent notebook this connector could not match to a notebook in this same answer, "
-            + "is left out instead of being given a handle that would not resolve. An empty list "
-            + "means the notebook holds no section this connector could address."
+            + "the order Microsoft returned them, unless the top-level `capped` is true, in "
+            + "which case a cut happened in one of the three listings behind this answer and "
+            + "this notebook's sections can be incomplete. A section Microsoft gave no id for, "
+            + "or whose parent notebook this connector could not match to a notebook in this "
+            + "same answer, is left out instead of being given a handle that would not resolve. "
+            + "An empty list means the notebook holds no section this connector could address."
         )
     )
 
@@ -178,8 +183,19 @@ class Notebook(BaseModel):
 class Notebooks(BaseModel):
     notebooks: list[Notebook] = Field(
         description=(
-            "Every notebook this call found: the signed-in user's own, and the ones shared with "
-            + "them. Empty when the user has no OneNote notebooks."
+            "Every notebook this call found, unless `capped` is true, in which case a cut "
+            + "happened in one of the three listings behind this answer and this list can be "
+            + "missing some: the signed-in user's own, and the ones shared with them. Empty "
+            + "when the user has no OneNote notebooks."
+        )
+    )
+    capped: bool = Field(
+        description=(
+            "True when a safety cap stopped one of the three listings behind this answer — "
+            + "notebooks, sections, or section groups — while Microsoft still had more of it to "
+            + "give, so some notebooks or sections may be missing above. This is a safety cap, "
+            + "not a `limit` the caller can raise: onenote_list_notebooks takes no arguments. "
+            + "False means the listing is complete."
         )
     )
 
@@ -193,7 +209,9 @@ async def list_notebooks(client: GraphServiceClient) -> Notebooks:
                 )
             )
             assert first_notebooks is not None, "Graph answered notebooks with no collection"
-            notebooks_collected = await collect_pages(first_notebooks, client, limit=MAX_NOTEBOOKS)
+            notebooks_collected = await collect_pages(
+                first_notebooks, client, limit=MAX_NOTEBOOKS, max_scanned=MAX_NOTEBOOKS
+            )
         with graph_step(STEP_SECTIONS):
             first_sections = await client.me.onenote.sections.get(
                 request_configuration=RequestConfiguration[_SectionsQuery](
@@ -203,7 +221,9 @@ async def list_notebooks(client: GraphServiceClient) -> Notebooks:
                 )
             )
             assert first_sections is not None, "Graph answered sections with no collection"
-            sections_collected = await collect_pages(first_sections, client, limit=MAX_SECTIONS)
+            sections_collected = await collect_pages(
+                first_sections, client, limit=MAX_SECTIONS, max_scanned=MAX_SECTIONS
+            )
         with graph_step(STEP_SECTION_GROUPS):
             first_groups = await client.me.onenote.section_groups.get(
                 request_configuration=RequestConfiguration[_SectionGroupsQuery](
@@ -213,19 +233,31 @@ async def list_notebooks(client: GraphServiceClient) -> Notebooks:
                 )
             )
             assert first_groups is not None, "Graph answered section groups with no collection"
-            groups_collected = await collect_pages(first_groups, client, limit=MAX_SECTION_GROUPS)
+            groups_collected = await collect_pages(
+                first_groups, client, limit=MAX_SECTION_GROUPS, max_scanned=MAX_SECTION_GROUPS
+            )
 
-    return _assemble(notebooks_collected.items, sections_collected.items, groups_collected.items)
+    return _assemble(
+        notebooks_collected.items,
+        sections_collected.items,
+        groups_collected.items,
+        capped=notebooks_collected.capped or sections_collected.capped or groups_collected.capped,
+    )
 
 
 def _assemble(
-    notebooks: list[GraphNotebook], sections: list[OnenoteSection], groups: list[SectionGroup]
+    notebooks: list[GraphNotebook],
+    sections: list[OnenoteSection],
+    groups: list[SectionGroup],
+    *,
+    capped: bool,
 ) -> Notebooks:
     groups_by_id = {group.id: group for group in groups if group.id is not None}
     notebook_ids = {notebook.id for notebook in notebooks if notebook.id is not None}
     sections_by_notebook = _sections_by_notebook(sections, groups_by_id, notebook_ids)
     return Notebooks(
-        notebooks=[_notebook_row(notebook, sections_by_notebook) for notebook in notebooks]
+        notebooks=[_notebook_row(notebook, sections_by_notebook) for notebook in notebooks],
+        capped=capped,
     )
 
 

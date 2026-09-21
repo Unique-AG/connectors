@@ -2,10 +2,11 @@ from collections.abc import Mapping
 from typing import Annotated
 
 import httpx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
+from mcp.types import InputRequiredResult
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_patch_action_type import OnenotePatchActionType
 from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
@@ -19,10 +20,23 @@ from msgraph.generated.users.item.onenote.pages.item.onenote_patch_content impor
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
-from office_365_mcp.shared.notes import PAGE_EXPANSIONS, PAGE_FIELDS, PageSummary
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
+from office_365_mcp.shared.notes import (
+    PAGE_EXPANSIONS,
+    PAGE_FIELDS,
+    NotebookAudience,
+    PageSummary,
+    notebook_audience,
+    write_state_for,
+)
+from office_365_mcp.shared.prose import body_opening
+from office_365_mcp.shared.seam import (
+    WRITE_ADDITIVE,
+    Confirm,
+    graph_client_for_caller,
+    person_confirms,
+)
 
 TOOL_NAME = "onenote_append_to_page"
 
@@ -40,25 +54,41 @@ MAX_BODY_CHARACTERS = 500_000
 
 _PageQuery = OnenotePageItemRequestBuilder.OnenotePageItemRequestBuilderGetQueryParameters
 
+_AUDIENCE_PAGE_FIELDS: tuple[str, ...] = ("id", "title")
+_AUDIENCE_PAGE_EXPANSIONS: tuple[str, ...] = ("parentNotebook",)
+
+_APPEND = "append"
+_DO_NOT_APPEND = "do not append"
+_NOTHING_APPENDED = "Nothing was appended."
+
+_UNTITLED_PAGE = "an untitled page"
+_UNNAMED_NOTEBOOK = "an unnamed notebook"
+
 _DESCRIPTION = """\
 Add HTML to the very END of an existing OneNote page's body. Pass the `page` handle from a \
 onenote_list_pages row or a onenote_create_page answer. This tool changes NOTHING that is \
 already on the page: it cannot insert content in the middle of the page, cannot edit a single \
 word that is already there, and cannot delete anything. It only ever adds new content after \
-everything else, the way writing at the bottom of a piece of paper does. Nobody is notified: \
-OneNote sends no alert to anyone when a page changes. `body_html` is HTML: write `<p>`, `<br>`, \
-`<ul>`/`<ol>`/`<li>` and `<table>`/`<tr>`/`<td>` for structure, and escape `&`, `<` and `>` \
-where they must read as themselves. Microsoft strips any `<script>` tag and any CSS out of what \
-you send, and removes an HTML form entirely, so neither one ever reaches the page. There is no \
-argument here that attaches a file or an image, and that absence is deliberate: this connector \
-has no content store, and offering one would let a model attach whatever it chose. This call is \
-NOT SAFE TO RETRY BLINDLY: if it times out, Microsoft may already hold the append, and calling \
-it again with the same `body_html` adds a second copy of it to the page. On a timeout, read the \
-page first with onenote_read_page and look for the block you meant to add; call this tool again \
-only when that block is not there. This tool answers with the page as Microsoft's page index \
-holds it right after the write. That index lags an edit by minutes, so `last_modified_at` and \
-`title` in the answer can still show the values from before this write while onenote_read_page \
-already returns the appended block.\
+everything else, the way writing at the bottom of a piece of paper does. This connector sends \
+no notification when it appends to the page, and Microsoft Graph sends none for it either, but \
+OneNote itself can show the change to people who open the notebook. This tool asks the person \
+at the other end to confirm before adding anything when the page's notebook is shared with \
+other people or belongs to somebody else, or when Microsoft does not report who can see it, \
+because the page is visible to them the moment it is written. A page \
+in the user's own unshared notebook is appended to without a question. `body_html` is HTML: \
+write `<p>`, `<br>`, `<ul>`/`<ol>`/`<li>` and `<table>`/`<tr>`/`<td>` for structure, and escape \
+`&`, `<` and `>` where they must read as themselves. Microsoft strips any `<script>` tag and \
+any CSS out of what you send, and removes an HTML form entirely, so neither one ever reaches \
+the page. There is no argument here that attaches a file or an image, and that absence is \
+deliberate: this connector has no content store, and offering one would let a model attach \
+whatever it chose. This call is NOT SAFE TO RETRY BLINDLY: if it times out, Microsoft may \
+already hold the append, and calling it again with the same `body_html` adds a second copy of \
+it to the page. On a timeout, read the page first with onenote_read_page and look for the \
+block you meant to add; call this tool again only when that block is not there. This tool \
+answers with the page as Microsoft's page index holds it right after the write. That index \
+lags an edit, by minutes or far longer, so `last_modified_at` and `title` in the answer can \
+still show the values from before this write while onenote_read_page already returns the \
+appended block.\
 """
 
 _NOT_A_PAGE_HANDLE = (
@@ -80,20 +110,76 @@ GRAPH_NOT_FOUND = (
 )
 
 
-async def append_to_page(client: GraphServiceClient, *, page: str, body_html: str) -> PageSummary:
+async def append_to_page(
+    client: GraphServiceClient, *, page: str, body_html: str, confirm: Confirm
+) -> PageSummary | InputRequiredResult:
     handle = onenote_page_handle(page)
     if handle is None:
         raise ToolError(_NOT_A_PAGE_HANDLE)
 
+    about = write_state_for(_APPEND, handle.page_id, body_html)
+    refreshed: OnenotePage | None = None
+    asked: InputRequiredResult | None = None
+    refused: str | None = None
     with graph_errors(TOOL_NAME):
-        with graph_step(STEP_APPEND_CONTENT):
-            await _append(client, handle, body_html=body_html)
         with graph_step(STEP_PAGE):
-            refreshed = await _page(client, handle)
+            for_audience = await _page_for_audience(client, handle)
+        audience = await _audience_of(client, for_audience)
+        if audience.reaches_others:
+            with not_graph():
+                answer = await confirm(_question(for_audience, audience, body_html), about)
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
+        if refused is None and asked is None:
+            with graph_step(STEP_APPEND_CONTENT):
+                await _append(client, handle, body_html=body_html)
+            with graph_step(STEP_PAGE):
+                refreshed = await _page(client, handle)
 
+    if asked is not None:
+        return asked
+    if refused is not None:
+        raise ToolError(refused)
+    assert refreshed is not None, "a write neither asked about nor refused wrote nothing"
     summary = PageSummary.from_page(refreshed)
     assert summary is not None, "Graph re-read a page it gave no id, which cannot be addressed"
     return summary
+
+
+async def _audience_of(client: GraphServiceClient, page: OnenotePage) -> NotebookAudience:
+    parent = page.parent_notebook
+    notebook_id = parent.id if parent is not None else None
+    if notebook_id is None:
+        return NotebookAudience(notebook_id=None, name=None, is_shared=None, user_role=None)
+    return await notebook_audience(client, notebook_id)
+
+
+def _question(page: OnenotePage, audience: NotebookAudience, body_html: str) -> str:
+    title = page.title or _UNTITLED_PAGE
+    name = audience.name or _UNNAMED_NOTEBOOK
+    opening = body_opening(body_html)
+    return (
+        f"Append to the page {title!r} in the notebook {name!r}, {audience.reason}? "
+        + f"The new text opens {opening!r}."
+    )
+
+
+def a_person_agrees(ctx: Context) -> Confirm:
+    return person_confirms(
+        ctx, agree=_APPEND, decline=_DO_NOT_APPEND, nothing_happened=_NOTHING_APPENDED
+    )
+
+
+async def _page_for_audience(client: GraphServiceClient, handle: OnenotePageHandle) -> OnenotePage:
+    page = await client.me.onenote.pages.by_onenote_page_id(handle.page_id).get(
+        request_configuration=RequestConfiguration[_PageQuery](
+            query_parameters=_PageQuery(
+                select=list(_AUDIENCE_PAGE_FIELDS), expand=list(_AUDIENCE_PAGE_EXPANSIONS)
+            )
+        )
+    )
+    assert page is not None, "Graph answered a page read with no page"
+    return page
 
 
 async def _append(client: GraphServiceClient, handle: OnenotePageHandle, *, body_html: str) -> None:
@@ -157,6 +243,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
+        ctx: Context,
         client: GraphServiceClient = graph,
-    ) -> PageSummary:
-        return await append_to_page(client, page=page, body_html=body_html)
+    ) -> PageSummary | InputRequiredResult:
+        return await append_to_page(
+            client, page=page, body_html=body_html, confirm=a_person_agrees(ctx)
+        )
