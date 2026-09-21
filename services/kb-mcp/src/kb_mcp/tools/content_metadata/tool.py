@@ -8,11 +8,10 @@ that exist on visible content, so a caller can build a metadata filter.
   which content counts; the tool always returns the full field/value catalog
   for that scope
 
-Mirrors content_tree's structure and reuses its per-user ContentTree cache
-(same walk, same identity/permission handling), since both tools are just
-different views over the same visible-file snapshot. Folder scoping reuses
-search's folder-scope filter builder — same `scope_xxx` ids, same
-admin-filter-never-bypassed semantics.
+Mirrors content_tree's structure and shares its ContentTree cache, keyed by
+company+user+folder scope, since both tools are just different views over the
+same visible-file snapshot. Scoping roots the walk at the requested folders
+rather than filtering afterwards; the admin filter is never bypassed.
 
 Exhaustive for now: every known field and every distinct value it has, with
 no caps — pagination will be added once scale requires it.

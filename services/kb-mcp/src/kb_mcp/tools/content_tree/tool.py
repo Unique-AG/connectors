@@ -468,13 +468,16 @@ async def content_tree(
                 )
 
         cache = get_tree_cache(kb_settings)
+        # A tuple, not a bare id: content_metadata keys the same folder the same
+        # way and both tools share this cache, so the shapes have to match.
+        scoped_root_ids = (root_scope_id,) if root_scope_id else None
 
         async def _construct() -> ContentTree:
-            if root_scope_id:
+            if scoped_root_ids:
                 return ScopedContentTree(
                     company_id=company_id,
                     user_id=user_id,
-                    root_scope_ids=(root_scope_id,),
+                    root_scope_ids=scoped_root_ids,
                 )
             return ContentTree(company_id=company_id, user_id=user_id)
 
@@ -483,7 +486,7 @@ async def content_tree(
         cache_key = (
             settings.authcontext.company_id,
             settings.authcontext.user_id,
-            root_scope_id,
+            scoped_root_ids,
         )
         tree_svc, _ = await cache.get_or_fetch(cache_key, _construct)
 
