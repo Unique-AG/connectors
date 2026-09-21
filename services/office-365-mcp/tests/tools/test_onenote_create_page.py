@@ -358,7 +358,7 @@ class TestSectionName:
 
         _ = await _create(client, section_name="Planning", confirm=capturing)
 
-        assert bound[0] == write_state_for("create", "Planning", _TITLE, _BODY_HTML)
+        assert bound[0] == write_state_for("create", "named", "Planning", _TITLE, _BODY_HTML)
         assert bound[0] != write_state_for("create", "default", _TITLE, _BODY_HTML)
 
     async def test_the_question_names_the_section_name_when_one_is_given(
@@ -725,9 +725,11 @@ class TestThePersonBetweenTheRequestAndThePage:
 
         assert len(asked) == 1
 
-    async def test_a_default_route_with_an_empty_notebooks_collection_asks_nobody(
+    async def test_a_default_route_with_an_empty_notebooks_collection_asks_because_nothing_is_known(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        """An empty listing does not mean an empty target: Graph provisions the default notebook
+        on the create itself, so who can see it is unknown rather than nobody."""
         _ = _no_default_notebook(graph)
         route = _creates(graph, _DEFAULT_ROUTE, _page_payload())
         asked: list[str] = []
@@ -739,7 +741,8 @@ class TestThePersonBetweenTheRequestAndThePage:
 
         _ = await _create(client, confirm=counting)
 
-        assert asked == [], "nothing exists yet, so nobody else could be reached"
+        assert len(asked) == 1
+        assert "whose sharing Microsoft did not report" in asked[0]
         assert route.call_count == 1
 
     async def test_a_default_route_with_a_shared_default_notebook_is_asked_about(
@@ -905,7 +908,7 @@ class TestThePersonBetweenTheRequestAndThePage:
 
         _ = await _create(client, section=_SECTION_URI, confirm=capturing)
 
-        assert bound[0] == write_state_for("create", _SECTION_ID, _TITLE, _BODY_HTML)
+        assert bound[0] == write_state_for("create", "section", _SECTION_ID, _TITLE, _BODY_HTML)
 
 
 def _context(answer: object) -> Context:
@@ -1004,7 +1007,7 @@ class TestTheEraWithNoBackChannel:
         key, state, agree = _the_question(
             await _round(client, confirm=a_person_agrees(_modern_context()))
         )
-        assert state == write_state_for("create", _SECTION_ID, _TITLE, _BODY_HTML)
+        assert state == write_state_for("create", "section", _SECTION_ID, _TITLE, _BODY_HTML)
 
         answer = await _round(
             client,

@@ -190,10 +190,18 @@ _NOTHING_CREATED = "No page was created."
 
 async def _notebook_audience_for(
     client: GraphServiceClient, handle: OnenoteSectionHandle | None
-) -> NotebookAudience | None:
+) -> NotebookAudience:
     if handle is None:
-        return await default_notebook_audience(client)
+        return await default_notebook_audience(client) or UNKNOWN_AUDIENCE
     return await section_audience(client, handle.section_id)
+
+
+def _route(handle: OnenoteSectionHandle | None, section_name: str | None) -> tuple[str, ...]:
+    if handle is not None:
+        return ("section", handle.section_id)
+    if section_name is not None:
+        return ("named", section_name)
+    return ("default",)
 
 
 def _question(
@@ -256,18 +264,15 @@ async def create_page(
     request.set_stream_content(html_bytes, "text/html")
     request.add_request_options(no_retry())
 
-    about = write_state_for(
-        "create", handle.section_id if handle else (section_name or "default"), title, body_html
-    )
+    about = write_state_for("create", *_route(handle, section_name), title, body_html)
     created: OnenotePage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
         audience = await _notebook_audience_for(client, handle)
-        if answer_pending or (audience is not None and audience.reaches_others):
-            heard_by = audience if audience is not None else UNKNOWN_AUDIENCE
+        if answer_pending or audience.reaches_others:
             with not_graph():
-                answer = await confirm(_question(title, body_html, heard_by, section_name), about)
+                answer = await confirm(_question(title, body_html, audience, section_name), about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
