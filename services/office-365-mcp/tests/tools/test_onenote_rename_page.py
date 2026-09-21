@@ -1,0 +1,1033 @@
+import json
+from collections.abc import Mapping, Sequence
+from typing import cast
+
+import httpx
+import pytest
+import respx
+from fastmcp import Context, FastMCP
+from fastmcp.exceptions import ToolError
+from fastmcp.server.elicitation import (
+    AcceptedElicitation,
+    CancelledElicitation,
+    DeclinedElicitation,
+)
+from fastmcp.tools import FunctionTool, Tool
+from mcp.types import (
+    ElicitRequest,
+    ElicitRequestFormParams,
+    ElicitResult,
+    InputRequiredResult,
+    InputResponse,
+)
+from mcp.types.version import LATEST_MODERN_VERSION
+from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
+
+from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
+from office_365_mcp.shared.handles import (
+    OnenotePageHandle,
+    OnenoteSectionHandle,
+    onenote_page_handle,
+)
+from office_365_mcp.shared.notes import write_state_for
+from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Confirm
+from office_365_mcp.tools import onenote_rename_page as renamer
+from office_365_mcp.tools.onenote_rename_page import RenamedPage, a_person_agrees, rename_page
+
+_PAGE_ID = "1-SYNTHETICPAGE00000000000000000000!0-ABCDEF"
+
+_PAGE_URI = OnenotePageHandle(_PAGE_ID).uri
+
+_NEW_TITLE = "Renamed meeting notes"
+
+_PATCH_PATH = f"/me/onenote/pages/{_PAGE_ID}/onenotePatchContent"
+
+_GET_PATH = f"/me/onenote/pages/{_PAGE_ID}"
+
+_NOTEBOOK_ID = "NOTEBOOK1"
+
+_NOTEBOOK_GET_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}"
+
+
+def _page_payload(
+    *,
+    page_id: str | None = _PAGE_ID,
+    title: str | None = "Meeting notes",
+    created: str | None = "2026-01-01T00:00:00Z",
+    last_modified: str | None = "2026-01-05T12:30:00Z",
+    web_url: str | None = "https://onenote.example.invalid/web",
+    client_url: str | None = "https://onenote.example.invalid/client",
+    section: Mapping[str, object] | None = None,
+    notebook: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    return {
+        "id": page_id,
+        "title": title,
+        "createdDateTime": created,
+        "lastModifiedDateTime": last_modified,
+        "links": {
+            "oneNoteWebUrl": {"href": web_url} if web_url is not None else None,
+            "oneNoteClientUrl": {"href": client_url} if client_url is not None else None,
+        },
+        "parentSection": dict(section) if section is not None else None,
+        "parentNotebook": dict(notebook) if notebook is not None else None,
+    }
+
+
+_SECTION = {"id": "SECTION1", "displayName": "General"}
+_NOTEBOOK = {"id": _NOTEBOOK_ID, "displayName": "Work"}
+
+
+def _notebook_payload(
+    *,
+    notebook_id: str = _NOTEBOOK_ID,
+    name: str | None = "Work",
+    is_shared: bool | None = False,
+    user_role: str | None = "Owner",
+) -> dict[str, object]:
+    return {"id": notebook_id, "displayName": name, "isShared": is_shared, "userRole": user_role}
+
+
+def _patches(graph: respx.MockRouter, *, status: int = 204) -> respx.Route:
+    return graph.post(_PATCH_PATH).mock(return_value=httpx.Response(status))
+
+
+def _rereads(graph: respx.MockRouter, payload: Mapping[str, object]) -> respx.Route:
+    return graph.get(_GET_PATH).mock(return_value=httpx.Response(200, json=dict(payload)))
+
+
+def _notebook_route(
+    graph: respx.MockRouter,
+    *,
+    notebook_id: str = _NOTEBOOK_ID,
+    is_shared: bool | None = False,
+    user_role: str | None = "Owner",
+    name: str | None = "Work",
+) -> respx.Route:
+    payload = _notebook_payload(
+        notebook_id=notebook_id, name=name, is_shared=is_shared, user_role=user_role
+    )
+    return graph.get(f"/me/onenote/notebooks/{notebook_id}").mock(
+        return_value=httpx.Response(200, json=payload)
+    )
+
+
+async def _agrees(question: str, about: str) -> str | None:
+    assert question, "the person was asked nothing at all"
+    assert about, "the answer was bound to nothing"
+    return None
+
+
+async def _refuses(question: str, about: str) -> str | None:
+    assert question
+    assert about
+    return "The page was not renamed."
+
+
+async def _rename(
+    client: GraphServiceClient,
+    *,
+    page: str = _PAGE_URI,
+    title: str = _NEW_TITLE,
+    confirm: Confirm = _agrees,
+) -> RenamedPage:
+    answer = await rename_page(client, page=page, title=title, confirm=confirm)
+    assert isinstance(answer, RenamedPage), "this call was answered with a question, not a rename"
+    return answer
+
+
+def _sent(route: respx.Route) -> dict[str, object]:
+    return cast("dict[str, object]", json.loads(route.calls.last.request.content))
+
+
+def _made(route: respx.Route) -> Sequence[Call]:
+    return cast("Sequence[Call]", route.calls)
+
+
+async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
+    mcp: FastMCP = FastMCP(name="schema-under-test")
+    renamer.register(mcp, transport)
+    tool = await mcp.get_tool(renamer.TOOL_NAME)
+    assert tool is not None, "register left the tool off the server"
+    return cast("Mapping[str, object]", tool.parameters), tool
+
+
+class TestWhatItSendsToGraph:
+    async def test_it_patches_the_title_then_rereads_the_page_and_nothing_else(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _patches(graph)
+        page_route = _rereads(graph, _page_payload())
+
+        _ = await _rename(client)
+
+        assert patch.call_count == 1
+        assert page_route.call_count == 2, "the audience pre-read and the post-write re-read"
+        assert len(graph.calls) == 3, "a rename costs the pre-read, the patch and the re-read"
+
+    async def test_the_pre_read_happens_before_the_patch_and_the_reread_after(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _patches(graph)
+        _ = _rereads(graph, _page_payload())
+
+        _ = await _rename(client)
+
+        made = cast("Sequence[Call]", graph.calls)
+        assert [call.request.method for call in made] == ["GET", "POST", "GET"]
+        assert made[0].request.url.path.endswith(_GET_PATH)
+        assert made[1].request.url.path.endswith(_PATCH_PATH)
+        assert made[2].request.url.path.endswith(_GET_PATH)
+
+    async def test_the_patch_is_sent_as_one_replace_command_on_the_title_keyword(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _patches(graph)
+        _ = _rereads(graph, _page_payload())
+
+        _ = await _rename(client, title="A whole new title")
+
+        assert _sent(patch) == {
+            "commands": [{"action": "Replace", "content": "A whole new title", "target": "title"}]
+        }
+
+    async def test_the_patch_content_type_is_json(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _patches(graph)
+        _ = _rereads(graph, _page_payload())
+
+        _ = await _rename(client)
+
+        assert patch.calls.last.request.headers["content-type"] == "application/json"
+
+    async def test_the_reread_asks_for_the_same_fields_a_page_listing_would(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _patches(graph)
+        reread = _rereads(graph, _page_payload())
+
+        _ = await _rename(client)
+
+        query = reread.calls.last.request.url.params
+        assert query["$select"] == "id,title,createdDateTime,lastModifiedDateTime,links"
+        assert query["$expand"] == "parentSection,parentNotebook"
+
+    async def test_the_pre_read_asks_only_for_id_title_and_the_parent_notebook(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_route = _rereads(graph, _page_payload())
+        _ = _patches(graph)
+
+        _ = await _rename(client)
+
+        query = _made(page_route)[0].request.url.params
+        assert query["$select"] == "id,title"
+        assert query["$expand"] == "parentNotebook"
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_rename_is_idempotent_so_the_default_retry_runs(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = graph.post(_PATCH_PATH).mock(side_effect=[httpx.Response(503), httpx.Response(204)])
+        _ = _rereads(graph, _page_payload())
+
+        _ = await _rename(client)
+
+        assert patch.call_count == 2, (
+            "renaming again with the same title is harmless, so it retries"
+        )
+
+
+class TestWhatItRefuses:
+    @pytest.mark.parametrize(
+        "value",
+        [
+            OnenoteSectionHandle("SECTION1").uri,
+            "1-SYNTHETICPAGE00000000000000000000!0-ABCDEF",
+            "https://onenote.example.invalid/page/1-SYNTHETICPAGE",
+            "Meeting notes",
+            "",
+            "   ",
+            "onenote:///pages/",
+            "onenote:///pages/%20",
+        ],
+    )
+    async def test_a_value_that_is_not_a_page_handle_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter, value: str
+    ) -> None:
+        with pytest.raises(ToolError):
+            _ = await _rename(client, page=value)
+
+        assert len(graph.calls) == 0, "a refused handle renames nothing"
+
+    async def test_the_refusal_names_the_tool_that_mints_a_page_handle(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError, match="onenote_list_pages"):
+            _ = await _rename(client, page="Meeting notes")
+
+    async def test_a_section_handle_is_refused_by_name(self, client: GraphServiceClient) -> None:
+        with pytest.raises(ToolError, match="section handle"):
+            _ = await _rename(client, page=OnenoteSectionHandle("SECTION1").uri)
+
+
+class TestWhatItAnswers:
+    async def test_the_answer_is_the_page_as_graph_holds_it_after_the_write(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _patches(graph)
+        _ = _rereads(
+            graph,
+            _page_payload(
+                title="Renamed meeting notes",
+                last_modified="2026-01-09T08:00:00Z",
+                section=_SECTION,
+                notebook=_NOTEBOOK,
+            ),
+        )
+        _ = _notebook_route(graph)
+
+        answer = await _rename(client)
+
+        assert answer.page.uri == _PAGE_URI
+        assert answer.page.title == "Renamed meeting notes"
+        assert answer.page.section_name == "General"
+        assert answer.page.notebook_name == "Work"
+
+    async def test_the_previous_title_comes_from_the_pre_read_not_the_reread(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _patches(graph)
+        graph.get(_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_page_payload(title="Old title")),
+                httpx.Response(200, json=_page_payload(title="Renamed meeting notes")),
+            ]
+        )
+
+        answer = await _rename(client, title="Renamed meeting notes")
+
+        assert answer.previous_title == "Old title"
+        assert answer.page.title == "Renamed meeting notes"
+
+    async def test_previous_title_is_null_when_the_pre_read_named_none(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _patches(graph)
+        graph.get(_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_page_payload(title=None)),
+                httpx.Response(200, json=_page_payload(title="Renamed meeting notes")),
+            ]
+        )
+
+        answer = await _rename(client, title="Renamed meeting notes")
+
+        assert answer.previous_title is None
+
+    async def test_nulls_when_graph_names_no_parent_section_or_notebook(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _patches(graph)
+        _ = _rereads(graph, _page_payload(section=None, notebook=None))
+
+        answer = await _rename(client)
+
+        assert answer.page.section_uri is None
+        assert answer.page.section_name is None
+        assert answer.page.notebook_name is None
+
+    async def test_a_reread_that_names_no_id_is_a_programming_error(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _patches(graph)
+        _ = _rereads(graph, _page_payload(page_id=None))
+
+        with pytest.raises(AssertionError):
+            _ = await _rename(client)
+
+
+class TestGraphFailures:
+    async def test_a_404_on_the_patch_is_a_not_found_and_the_page_is_never_reread(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_route = graph.get(_GET_PATH).mock(
+            return_value=httpx.Response(200, json=_page_payload())
+        )
+        patch = graph.post(_PATCH_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _rename(client)
+
+        assert patch.call_count == 1
+        assert page_route.call_count == 1, "only the pre-read happened; the patch never reread"
+
+    async def test_a_404_on_the_notebook_read_is_a_not_found_and_nothing_is_patched(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_route = graph.get(_GET_PATH).mock(
+            return_value=httpx.Response(200, json=_page_payload(notebook=_NOTEBOOK))
+        )
+        notebook_route = graph.get(_NOTEBOOK_GET_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+            )
+        )
+        patch = graph.post(_PATCH_PATH).mock(return_value=httpx.Response(204))
+
+        with pytest.raises(GraphNotFound):
+            _ = await _rename(client)
+
+        assert page_route.call_count == 1
+        assert notebook_route.call_count == 1
+        assert patch.call_count == 0, "the notebook read failed before anything was renamed"
+
+    async def test_a_403_on_the_patch_is_a_forbidden(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GET_PATH).mock(return_value=httpx.Response(200, json=_page_payload()))
+        _ = graph.post(_PATCH_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "ErrorAccessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await _rename(client)
+
+    async def test_a_404_on_the_reread_is_a_not_found_and_the_patch_was_sent_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _patches(graph, status=204)
+        reread = graph.get(_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_page_payload()),
+                httpx.Response(
+                    404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+                ),
+            ]
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _rename(client)
+
+        assert patch.call_count == 1
+        assert reread.call_count == 2, "the pre-read succeeded; the post-write reread failed"
+
+    async def test_the_call_example_reaches_graph_and_the_pre_read_is_what_a_403_refuses(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        example = cast("Mapping[str, str]", renamer.GRAPH_CALL_EXAMPLE)
+        handle = onenote_page_handle(example["page"])
+        assert handle is not None, "GRAPH_CALL_EXAMPLE's own page value is not a page handle"
+        refused = graph.get(f"/me/onenote/pages/{handle.page_id}").mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "ErrorAccessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await _rename(client, page=example["page"], title=example["title"])
+
+        assert refused.call_count == 1
+
+
+class TestThePersonBetweenTheRenameAndTheOthersInTheNotebook:
+    async def test_the_users_own_unshared_notebook_is_written_to_without_a_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=False, user_role="Owner")
+        patch = _patches(graph)
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _rename(client, confirm=counting)
+
+        assert asked == [], "the user's own private notebook was put to a person anyway"
+        assert patch.call_count == 1
+
+    async def test_the_reads_happen_before_the_write_when_nobody_is_asked(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=False, user_role="Owner")
+        _ = _patches(graph)
+
+        _ = await _rename(client)
+
+        made = cast("Sequence[Call]", graph.calls)
+        assert [call.request.method for call in made] == ["GET", "GET", "POST", "GET"]
+        assert made[0].request.url.path.endswith(_GET_PATH)
+        assert made[1].request.url.path.endswith(_NOTEBOOK_GET_PATH)
+        assert made[2].request.url.path.endswith(_PATCH_PATH)
+        assert made[3].request.url.path.endswith(_GET_PATH)
+
+    async def test_a_shared_notebook_is_asked_about_and_a_refusal_renames_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_route = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        patch = _patches(graph)
+
+        with pytest.raises(ToolError, match="The page was not renamed"):
+            _ = await _rename(client, confirm=_refuses)
+
+        assert patch.call_count == 0
+        assert page_route.call_count == 1, "only the pre-read happened; the reread never followed"
+
+    async def test_a_notebook_the_user_does_not_own_is_asked_about(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=False, user_role="Contributor")
+        patch = _patches(graph)
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _rename(client, confirm=counting)
+
+        assert len(asked) == 1
+        assert patch.call_count == 1
+
+    async def test_a_notebook_with_no_reported_sharing_is_asked_about(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=None, user_role=None)
+        patch = _patches(graph)
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _rename(client, confirm=counting)
+
+        assert len(asked) == 1
+        assert patch.call_count == 1
+
+    async def test_a_page_whose_notebook_graph_does_not_name_is_asked_about(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=None))
+        patch = _patches(graph)
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _rename(client, confirm=counting)
+
+        assert len(asked) == 1, "an unnamed notebook was written to without asking anybody"
+        assert patch.call_count == 1
+
+    async def test_the_notebook_read_asks_for_the_four_audience_fields(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        notebook_route = _notebook_route(graph, is_shared=False, user_role="Owner")
+        _ = _patches(graph)
+
+        _ = await _rename(client)
+
+        query = notebook_route.calls.last.request.url.params
+        assert query["$select"] == "id,displayName,isShared,userRole"
+
+    async def test_a_decline_leaves_both_the_patch_and_the_reread_unsent(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_route = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        patch = _patches(graph)
+
+        with pytest.raises(ToolError):
+            _ = await _rename(client, confirm=_refuses)
+
+        assert patch.call_count == 0
+        assert page_route.call_count == 1
+
+    async def test_the_question_names_the_old_and_new_titles_and_the_notebook(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(title="Old title", notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner", name="Work")
+        _ = _patches(graph)
+        asked: list[str] = []
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            asked.append(question)
+            bound.append(about)
+            return None
+
+        _ = await _rename(client, title="New title", confirm=capturing)
+
+        assert len(asked) == 1
+        question = asked[0]
+        assert "Old title" in question
+        assert "New title" in question
+        assert "Work" in question
+        assert "shared with other people" in question
+        assert bound == [write_state_for("rename", _PAGE_ID, "New title")]
+
+    async def test_the_question_says_who_the_notebook_belongs_to_when_it_is_not_the_user(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=False, user_role="Contributor", name="Work")
+        _ = _patches(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _rename(client, confirm=capturing)
+
+        assert "belongs to somebody else" in asked[0]
+        assert "Contributor" in asked[0]
+
+    async def test_the_question_names_no_notebook_or_page_graph_left_unnamed(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(title=None, notebook=None))
+        _ = _patches(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _rename(client, confirm=capturing)
+
+        assert "an untitled page" in asked[0]
+        assert "an unnamed notebook" in asked[0]
+        assert "whose sharing Microsoft did not report" in asked[0]
+
+    async def test_about_is_the_same_for_two_identical_calls_and_different_for_a_changed_title(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        _ = _patches(graph)
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _rename(client, title="Same title", confirm=capturing)
+        _ = await _rename(client, title="Same title", confirm=capturing)
+        _ = await _rename(client, title="Different title", confirm=capturing)
+
+        assert bound[0] == bound[1]
+        assert bound[2] != bound[0]
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            DeclinedElicitation(),
+            CancelledElicitation(),
+            AcceptedElicitation(data="do not rename"),
+            RuntimeError("elicitation not supported"),
+            ToolError("the client refused the request"),
+        ],
+        ids=["declined", "cancelled", "another-answer", "cannot-ask", "client-error"],
+    )
+    async def test_no_refusal_is_ever_raised(self, answer: object) -> None:
+        confirm = a_person_agrees(_context(answer))
+
+        refusal = await confirm(
+            "Rename 'Meeting notes' to 'New title' in 'Work'?", "synthetic-state"
+        )
+
+        assert isinstance(refusal, str)
+        assert refusal
+
+    async def test_a_refusal_this_tool_words_opens_by_saying_the_page_was_not_renamed(self) -> None:
+        confirm = a_person_agrees(_context(DeclinedElicitation()))
+
+        refusal = await confirm(
+            "Rename 'Meeting notes' to 'New title' in 'Work'?", "synthetic-state"
+        )
+
+        assert isinstance(refusal, str)
+        assert refusal.startswith("The page was not renamed.")
+
+    async def test_agreeing_answers_with_no_refusal(self) -> None:
+        confirm = a_person_agrees(_context(AcceptedElicitation(data="rename")))
+
+        assert await confirm("Rename 'Meeting notes' to 'New title'?", "synthetic-state") is None
+
+
+def _context(answer: object) -> Context:
+    class _Client:
+        request_context: object = None
+
+        async def elicit(self, message: str, response_type: object = None) -> object:
+            assert message
+            assert response_type is not None, "the caller must say what it expects back"
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+
+    return cast("Context", cast("object", _Client()))
+
+
+class _ModernRequest:
+    protocol_version: str = LATEST_MODERN_VERSION
+
+
+def _modern_context(
+    *, answers: Mapping[str, InputResponse] | None = None, state: str | None = None
+) -> Context:
+    class _Client:
+        request_context: _ModernRequest = _ModernRequest()
+        input_responses: Mapping[str, InputResponse] | None = answers
+        request_state: str | None = state
+
+        async def elicit(self, message: str, response_type: object = None) -> object:
+            raise AssertionError(
+                f"a connection with no back-channel was asked {message!r} over it, "
+                + f"expecting {response_type!r} back"
+            )
+
+    return cast("Context", cast("object", _Client()))
+
+
+class TestTheEraWithNoBackChannel:
+    async def test_the_first_round_asks_and_never_reaches_the_write(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        patch = _patches(graph)
+
+        answer = await rename_page(
+            client,
+            page=_PAGE_URI,
+            title=_NEW_TITLE,
+            confirm=a_person_agrees(_modern_context()),
+        )
+
+        assert isinstance(answer, InputRequiredResult)
+        assert answer.request_state == write_state_for("rename", _PAGE_ID, _NEW_TITLE)
+        assert patch.call_count == 0
+
+    async def test_the_first_round_asks_the_question_this_tool_words(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        _ = _patches(graph)
+
+        answer = await rename_page(
+            client,
+            page=_PAGE_URI,
+            title=_NEW_TITLE,
+            confirm=a_person_agrees(_modern_context()),
+        )
+
+        assert isinstance(answer, InputRequiredResult)
+        requests = answer.input_requests or {}
+        request = requests[next(iter(requests))]
+        assert isinstance(request, ElicitRequest)
+        params = request.params
+        assert isinstance(params, ElicitRequestFormParams)
+        assert "Meeting notes" in params.message
+        assert _NEW_TITLE in params.message
+
+    async def test_the_second_round_renames_under_the_id_it_was_agreed_to_by(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        patch = _patches(graph)
+        state = write_state_for("rename", _PAGE_ID, _NEW_TITLE)
+
+        first = await rename_page(
+            client,
+            page=_PAGE_URI,
+            title=_NEW_TITLE,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+
+        answer = await rename_page(
+            client,
+            page=_PAGE_URI,
+            title=_NEW_TITLE,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": "rename"})},
+                    state=state,
+                )
+            ),
+        )
+
+        assert isinstance(answer, RenamedPage)
+        assert patch.call_count == 1
+
+    async def test_an_answer_bound_to_another_request_renames_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        patch = _patches(graph)
+
+        first = await rename_page(
+            client,
+            page=_PAGE_URI,
+            title=_NEW_TITLE,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await rename_page(
+                client,
+                page=_PAGE_URI,
+                title=_NEW_TITLE,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={key: ElicitResult(action="accept", content={"value": "rename"})},
+                        state="synthetic-other-state",
+                    )
+                ),
+            )
+
+        assert patch.call_count == 0
+
+    async def test_a_pending_decline_is_honored_even_when_the_fresh_read_says_private(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        notebook_route = graph.get(_NOTEBOOK_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+        patch = _patches(graph)
+
+        first = await rename_page(
+            client,
+            page=_PAGE_URI,
+            title=_NEW_TITLE,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        state = first.request_state
+        assert state is not None
+
+        with pytest.raises(ToolError, match="The page was not renamed"):
+            _ = await rename_page(
+                client,
+                page=_PAGE_URI,
+                title=_NEW_TITLE,
+                confirm=a_person_agrees(
+                    _modern_context(answers={key: ElicitResult(action="decline")}, state=state)
+                ),
+                answer_pending=True,
+            )
+
+        assert patch.call_count == 0
+        assert notebook_route.call_count == 2
+
+    async def test_a_pending_accept_still_renames_when_the_fresh_read_says_private(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        notebook_route = graph.get(_NOTEBOOK_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+        patch = _patches(graph)
+
+        first = await rename_page(
+            client,
+            page=_PAGE_URI,
+            title=_NEW_TITLE,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        state = first.request_state
+        assert state is not None
+
+        answer = await rename_page(
+            client,
+            page=_PAGE_URI,
+            title=_NEW_TITLE,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": "rename"})},
+                    state=state,
+                )
+            ),
+            answer_pending=True,
+        )
+
+        assert isinstance(answer, RenamedPage)
+        assert patch.call_count == 1
+        assert notebook_route.call_count == 2
+
+
+class TestTheClientThatCannotAsk:
+    async def test_a_client_that_cannot_ask_renames_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        patch = _patches(graph)
+
+        class _CannotAsk:
+            request_context: object = None
+
+            async def elicit(self, message: str, response_type: object = None) -> object:
+                assert message and response_type is not None
+                raise RuntimeError("elicitation not supported")
+
+        confirm = a_person_agrees(cast("Context", cast("object", _CannotAsk())))
+
+        with pytest.raises(ToolError, match="does not support elicitation"):
+            _ = await rename_page(client, page=_PAGE_URI, title=_NEW_TITLE, confirm=confirm)
+
+        assert patch.call_count == 0
+
+
+class TestHowRegisterWiresThePendingAnswer:
+    async def test_register_consults_a_pending_answer_the_fresh_read_alone_would_skip(
+        self, transport: httpx.AsyncClient, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        notebook_route = graph.get(_NOTEBOOK_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+        patch = _patches(graph)
+        mcp: FastMCP = FastMCP(name="wiring-under-test")
+        renamer.register(mcp, transport)
+        tool = await mcp.get_tool(renamer.TOOL_NAME)
+        assert tool is not None, "register left the tool off the server"
+        assert isinstance(tool, FunctionTool)
+
+        first = cast(
+            "RenamedPage | InputRequiredResult",
+            await tool.fn(page=_PAGE_URI, title=_NEW_TITLE, ctx=_modern_context(), client=client),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        state = first.request_state
+        assert state is not None
+
+        with pytest.raises(ToolError, match="The page was not renamed"):
+            _ = cast(
+                "RenamedPage | InputRequiredResult",
+                await tool.fn(
+                    page=_PAGE_URI,
+                    title=_NEW_TITLE,
+                    ctx=_modern_context(answers={key: ElicitResult(action="decline")}, state=state),
+                    client=client,
+                ),
+            )
+
+        assert patch.call_count == 0
+        assert notebook_route.call_count == 2
+
+
+class TestHowItDeclaresItself:
+    def test_the_permission_is_notes_readwrite(self) -> None:
+        assert renamer.GRAPH_PERMISSIONS == ("Notes.ReadWrite",)
+
+    def test_the_call_example_is_a_page_handle_and_title(self) -> None:
+        assert set(renamer.GRAPH_CALL_EXAMPLE) == {"page", "title"}
+
+    async def test_the_call_example_is_accepted_by_the_schema(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert set(renamer.GRAPH_CALL_EXAMPLE) <= set(properties)
+
+    async def test_it_takes_two_arguments_and_no_others(self, transport: httpx.AsyncClient) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert set(properties) == {"page", "title"}
+
+    @pytest.mark.parametrize("word", ["client", "ctx", "context", "token", "graph"])
+    async def test_no_wiring_of_this_server_is_published_as_an_argument(
+        self, transport: httpx.AsyncClient, word: str
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert not [name for name in properties if word in name.casefold()]
+
+    async def test_it_announces_itself_as_a_destructive_write(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        annotations = tool.annotations
+        assert annotations is not None, (
+            "a tool with no annotations joins the write surface by omission"
+        )
+        assert annotations.read_only_hint is WRITE_DESTRUCTIVE["readOnlyHint"]
+        assert annotations.destructive_hint is WRITE_DESTRUCTIVE["destructiveHint"]
+        assert annotations.idempotent_hint is WRITE_DESTRUCTIVE["idempotentHint"]
+
+    async def test_the_description_says_what_it_does_and_does_not_change(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = (tool.description or "").casefold()
+        assert "title" in description
+        assert "onenote_edit_page" in description
+        assert "previous_title" in description
+
+    async def test_the_description_says_when_it_asks_and_when_it_does_not(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = (tool.description or "").casefold()
+        assert "shared with other people" in description
+        assert "belongs to somebody else" in description
+        assert "own unshared notebook" in description
+
+    def test_not_found_advice_points_at_the_lister(self) -> None:
+        assert "onenote_list_pages" in renamer.GRAPH_NOT_FOUND
