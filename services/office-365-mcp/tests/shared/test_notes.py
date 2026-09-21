@@ -5,14 +5,22 @@ import pytest
 import respx
 from msgraph.generated.models.external_link import ExternalLink
 from msgraph.generated.models.notebook import Notebook
+from msgraph.generated.models.onenote_operation import OnenoteOperation
+from msgraph.generated.models.onenote_operation_error import OnenoteOperationError
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_section import OnenoteSection
+from msgraph.generated.models.operation_status import OperationStatus
 from msgraph.generated.models.page_links import PageLinks
 from msgraph.generated.models.section_links import SectionLinks
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.shared import notes
-from office_365_mcp.shared.handles import OnenotePageHandle, OnenoteSectionHandle
+from office_365_mcp.shared.handles import (
+    OnenoteNotebookHandle,
+    OnenoteOperationHandle,
+    OnenotePageHandle,
+    OnenoteSectionHandle,
+)
 
 from .conftest import GRAPH_V1
 
@@ -39,6 +47,8 @@ def _page(
     links: PageLinks | None = _LINKS,
     section: OnenoteSection | None = _SECTION,
     notebook: Notebook | None = _NOTEBOOK,
+    level: int | None = None,
+    order: int | None = None,
 ) -> OnenotePage:
     return OnenotePage(
         id=page_id,
@@ -48,6 +58,8 @@ def _page(
         links=links,
         parent_section=section,
         parent_notebook=notebook,
+        level=level,
+        order=order,
     )
 
 
@@ -102,6 +114,20 @@ class TestFromPage:
         assert summary is not None
         assert summary.section_uri is None
         assert summary.section_name == "Untitled"
+
+    def test_level_and_order_are_null_by_default(self) -> None:
+        summary = notes.PageSummary.from_page(_page())
+
+        assert summary is not None
+        assert summary.level is None
+        assert summary.order is None
+
+    def test_level_and_order_are_mapped_when_graph_sends_them(self) -> None:
+        summary = notes.PageSummary.from_page(_page(level=1, order=3))
+
+        assert summary is not None
+        assert summary.level == 1
+        assert summary.order == 3
 
 
 class TestTheLinksProtocol:
@@ -397,6 +423,260 @@ class TestSectionNotebookId:
         found = await notes.section_notebook_id(client, _AUDIENCE_SECTION_ID)
 
         assert found is None
+
+
+_AUDIENCE_SECTION_GROUP_ID = "1-77777777-7777-4777-8777-777777777777!101"
+
+
+class TestSectionGroupNotebookId:
+    async def test_it_sends_the_exact_select_and_expand(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get(f"/me/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": _AUDIENCE_SECTION_GROUP_ID,
+                    "parentNotebook": {"id": _AUDIENCE_NOTEBOOK_ID},
+                },
+            )
+        )
+
+        _ = await notes.section_group_notebook_id(client, _AUDIENCE_SECTION_GROUP_ID)
+
+        assert route.call_count == 1
+        params = route.calls.last.request.url.params
+        assert params["$select"] == "id"
+        assert params["$expand"] == "parentNotebook"
+
+    async def test_it_answers_the_parent_notebook_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/me/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": _AUDIENCE_SECTION_GROUP_ID,
+                    "parentNotebook": {"id": _AUDIENCE_NOTEBOOK_ID},
+                },
+            )
+        )
+
+        found = await notes.section_group_notebook_id(client, _AUDIENCE_SECTION_GROUP_ID)
+
+        assert found == _AUDIENCE_NOTEBOOK_ID
+
+    async def test_a_section_group_with_no_parent_notebook_answers_none(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/me/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_GROUP_ID})
+        )
+
+        found = await notes.section_group_notebook_id(client, _AUDIENCE_SECTION_GROUP_ID)
+
+        assert found is None
+
+
+class TestSectionAudience:
+    async def test_it_reads_the_parent_notebooks_audience(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/me/onenote/sections/{_AUDIENCE_SECTION_ID}").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": _AUDIENCE_SECTION_ID,
+                    "parentNotebook": {"id": _AUDIENCE_NOTEBOOK_ID},
+                },
+            )
+        )
+        _ = graph.get(f"/me/onenote/notebooks/{_AUDIENCE_NOTEBOOK_ID}").mock(
+            return_value=httpx.Response(200, json=_notebook_payload(_AUDIENCE_NOTEBOOK_ID))
+        )
+
+        audience = await notes.section_audience(client, _AUDIENCE_SECTION_ID)
+
+        assert audience.notebook_id == _AUDIENCE_NOTEBOOK_ID
+
+    async def test_a_section_with_no_parent_notebook_answers_an_unknown_audience(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/me/onenote/sections/{_AUDIENCE_SECTION_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_ID})
+        )
+
+        audience = await notes.section_audience(client, _AUDIENCE_SECTION_ID)
+
+        assert audience == notes.UNKNOWN_AUDIENCE
+
+
+class TestSectionGroupAudience:
+    async def test_it_reads_the_parent_notebooks_audience(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/me/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": _AUDIENCE_SECTION_GROUP_ID,
+                    "parentNotebook": {"id": _AUDIENCE_NOTEBOOK_ID},
+                },
+            )
+        )
+        _ = graph.get(f"/me/onenote/notebooks/{_AUDIENCE_NOTEBOOK_ID}").mock(
+            return_value=httpx.Response(200, json=_notebook_payload(_AUDIENCE_NOTEBOOK_ID))
+        )
+
+        audience = await notes.section_group_audience(client, _AUDIENCE_SECTION_GROUP_ID)
+
+        assert audience.notebook_id == _AUDIENCE_NOTEBOOK_ID
+
+    async def test_a_section_group_with_no_parent_notebook_answers_an_unknown_audience(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/me/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_GROUP_ID})
+        )
+
+        audience = await notes.section_group_audience(client, _AUDIENCE_SECTION_GROUP_ID)
+
+        assert audience == notes.UNKNOWN_AUDIENCE
+
+
+_RESULT_PAGE_ID = "0-55555555-5555-4555-8555-555555555555!101-66666666-6666-4666-8666-666666666666"
+_RESULT_SECTION_ID = (
+    "1-77777777-7777-4777-8777-777777777777!100-88888888-8888-4888-8888-888888888888"
+)
+_RESULT_NOTEBOOK_ID = "1-99999999-9999-4999-8999-999999999999!100"
+
+
+class TestResourceHandleOf:
+    def test_a_page_location_mints_a_page_handle(self) -> None:
+        result = notes.resource_handle_of(
+            f"https://graph.microsoft.com/v1.0/users('u')/onenote/pages/{_RESULT_PAGE_ID}", None
+        )
+
+        assert result == (OnenotePageHandle(_RESULT_PAGE_ID).uri, "page")
+
+    def test_a_section_location_mints_a_section_handle(self) -> None:
+        result = notes.resource_handle_of(
+            f"https://graph.microsoft.com/v1.0/users('u')/onenote/sections/{_RESULT_SECTION_ID}",
+            None,
+        )
+
+        assert result == (OnenoteSectionHandle(_RESULT_SECTION_ID).uri, "section")
+
+    def test_a_notebook_location_mints_a_notebook_handle(self) -> None:
+        result = notes.resource_handle_of(
+            "https://graph.microsoft.com/v1.0/users('u')/onenote/notebooks/"
+            + f"{_RESULT_NOTEBOOK_ID}",
+            None,
+        )
+
+        assert result == (OnenoteNotebookHandle(_RESULT_NOTEBOOK_ID).uri, "notebook")
+
+    def test_resource_id_is_preferred_over_the_id_in_the_location(self) -> None:
+        result = notes.resource_handle_of(
+            f"https://graph.microsoft.com/v1.0/users('u')/onenote/pages/{_RESULT_PAGE_ID}",
+            _RESULT_PAGE_ID,
+        )
+
+        assert result == (OnenotePageHandle(_RESULT_PAGE_ID).uri, "page")
+
+    def test_a_location_with_a_trailing_query_string_answers_none(self) -> None:
+        result = notes.resource_handle_of(
+            f"https://graph.microsoft.com/v1.0/users('u')/onenote/pages/{_RESULT_PAGE_ID}"
+            + "?$select=id",
+            None,
+        )
+
+        assert result is None
+
+    def test_a_section_group_location_answers_none(self) -> None:
+        result = notes.resource_handle_of(
+            "https://graph.microsoft.com/v1.0/users('u')/onenote/sectionGroups/sg-1", None
+        )
+
+        assert result is None
+
+    def test_no_location_answers_none(self) -> None:
+        assert notes.resource_handle_of(None, "some-id") is None
+
+    def test_an_unrecognised_location_answers_none(self) -> None:
+        assert notes.resource_handle_of("https://example.invalid/nothing/here", None) is None
+
+
+class TestResourceIdInUrl:
+    def test_a_dollar_value_suffix_is_stripped(self) -> None:
+        found = notes.resource_id_in(
+            "https://graph.microsoft.com/v1.0/me/onenote/resources/res-1%21A/$value"
+        )
+
+        assert found == "res-1!A"
+
+    def test_a_content_suffix_is_stripped(self) -> None:
+        found = notes.resource_id_in(
+            "https://graph.microsoft.com/v1.0/me/onenote/resources/res-1%21A/content"
+        )
+
+        assert found == "res-1!A"
+
+    def test_a_bare_resource_url_is_accepted(self) -> None:
+        found = notes.resource_id_in(
+            "https://graph.microsoft.com/v1.0/me/onenote/resources/res-1%21A"
+        )
+
+        assert found == "res-1!A"
+
+    def test_a_non_resource_url_answers_none(self) -> None:
+        assert notes.resource_id_in("https://graph.microsoft.com/v1.0/me/onenote/pages/p-1") is None
+        assert notes.resource_id_in("not a url at all") is None
+
+
+class TestOperationSummaryFromOperation:
+    def test_a_completed_copy_carries_the_result_page_handle(self) -> None:
+        op = OnenoteOperation(
+            id="op-1",
+            status=OperationStatus.Completed,
+            percent_complete="100",
+            resource_location=(
+                "https://graph.microsoft.com/v1.0/users('u')/onenote/pages/" + _RESULT_PAGE_ID
+            ),
+            resource_id=_RESULT_PAGE_ID,
+        )
+
+        summary = notes.OperationSummary.from_operation(op)
+
+        assert summary is not None
+        assert summary.uri == OnenoteOperationHandle("op-1").uri
+        assert summary.status == "Completed"
+        assert summary.percent_complete == "100"
+        assert summary.result_uri == OnenotePageHandle(_RESULT_PAGE_ID).uri
+        assert summary.result_kind == "page"
+        assert summary.error_code is None
+        assert summary.error_message is None
+
+    def test_a_failed_copy_carries_the_error(self) -> None:
+        op = OnenoteOperation(
+            id="op-2",
+            status=OperationStatus.Failed,
+            error=OnenoteOperationError(code="20166", message="Something went wrong"),
+        )
+
+        summary = notes.OperationSummary.from_operation(op)
+
+        assert summary is not None
+        assert summary.status == "Failed"
+        assert summary.error_code == "20166"
+        assert summary.error_message == "Something went wrong"
+        assert summary.result_uri is None
+        assert summary.result_kind is None
+
+    def test_an_operation_with_no_id_answers_none(self) -> None:
+        op = OnenoteOperation(id=None, status=OperationStatus.Running)
+
+        assert notes.OperationSummary.from_operation(op) is None
 
 
 class TestWriteStateFor:

@@ -2,7 +2,8 @@
 
 Four schemes, one per product. `teams:///` addresses Microsoft Teams, `outlook:///` addresses a
 mailbox, `sharepoint:///` addresses a file or a folder in OneDrive or SharePoint, and `onenote:///`
-addresses a OneNote section or page. If a mail shape used the Teams scheme, it has to answer
+addresses a OneNote notebook, section group, section, page or long-running operation. If a mail
+shape used the Teams scheme, it has to answer
 `MessageHandle.permission` below, and that answer reaches `teams_read_message`'s declared
 permissions and, from there, the consent screen of every `teams` deployment. The scheme is the
 cheapest place to keep the products apart.
@@ -219,6 +220,33 @@ class OnenotePageHandle:
         return f"onenote:///pages/{_segment(self.page_id)}"
 
 
+@dataclass(frozen=True, slots=True)
+class OnenoteNotebookHandle:
+    notebook_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"onenote:///notebooks/{_segment(self.notebook_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class OnenoteSectionGroupHandle:
+    section_group_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"onenote:///sectiongroups/{_segment(self.section_group_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class OnenoteOperationHandle:
+    operation_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"onenote:///operations/{_segment(self.operation_id)}"
+
+
 # Ids are matched as "anything but a separator", because the spellers above percent-encode each one.
 _CHAT_HANDLE = re.compile(r"\Ateams:///chats/([^/]+)/messages/([^/]+)\Z")
 _CHANNEL_HANDLE = re.compile(r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)\Z")
@@ -237,6 +265,9 @@ _DRIVE_FILE_HANDLE = re.compile(r"\Asharepoint:///files/([^/]+)/([^/]+)\Z")
 _DRIVE_FOLDER_HANDLE = re.compile(r"\Asharepoint:///folders/([^/]+)/([^/]+)\Z")
 _ONENOTE_SECTION_HANDLE = re.compile(r"\Aonenote:///sections/([^/]+)\Z")
 _ONENOTE_PAGE_HANDLE = re.compile(r"\Aonenote:///pages/([^/]+)\Z")
+_ONENOTE_NOTEBOOK_HANDLE = re.compile(r"\Aonenote:///notebooks/([^/]+)\Z")
+_ONENOTE_SECTION_GROUP_HANDLE = re.compile(r"\Aonenote:///sectiongroups/([^/]+)\Z")
+_ONENOTE_OPERATION_HANDLE = re.compile(r"\Aonenote:///operations/([^/]+)\Z")
 
 
 def message_handle(uri: str) -> MessageHandle | None:
@@ -338,6 +369,21 @@ def onenote_section_handle(uri: str) -> OnenoteSectionHandle | None:
 def onenote_page_handle(uri: str) -> OnenotePageHandle | None:
     page_id = _single_id(_ONENOTE_PAGE_HANDLE, uri)
     return None if page_id is None else OnenotePageHandle(page_id)
+
+
+def onenote_notebook_handle(uri: str) -> OnenoteNotebookHandle | None:
+    notebook_id = _single_id(_ONENOTE_NOTEBOOK_HANDLE, uri)
+    return None if notebook_id is None else OnenoteNotebookHandle(notebook_id)
+
+
+def onenote_section_group_handle(uri: str) -> OnenoteSectionGroupHandle | None:
+    section_group_id = _single_id(_ONENOTE_SECTION_GROUP_HANDLE, uri)
+    return None if section_group_id is None else OnenoteSectionGroupHandle(section_group_id)
+
+
+def onenote_operation_handle(uri: str) -> OnenoteOperationHandle | None:
+    operation_id = _single_id(_ONENOTE_OPERATION_HANDLE, uri)
+    return None if operation_id is None else OnenoteOperationHandle(operation_id)
 
 
 def meeting_uri_for(join_web_url: str | None) -> str | None:

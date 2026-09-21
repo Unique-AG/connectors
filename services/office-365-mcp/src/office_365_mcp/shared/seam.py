@@ -28,6 +28,7 @@ from fastmcp.server.elicitation import (
 )
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
+from fastmcp.utilities.types import File
 from mcp.types import (
     CallToolRequestParams,
     ElicitRequest,
@@ -569,3 +570,13 @@ def _diagnostics(failure: GraphFailure) -> str:
         if value is not None
     ]
     return f" ({', '.join(parts)})" if parts else ""
+
+
+class FileFromGraph(File):
+    def __init__(self, content: bytes, *, name: str | None, mime_type: str) -> None:
+        self.mime_type: str = mime_type
+        super().__init__(data=content, name=name)
+
+    @override
+    def _get_mime_type(self) -> str:
+        return self.mime_type

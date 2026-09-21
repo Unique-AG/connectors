@@ -21,11 +21,11 @@ from office_365_mcp.shared.handles import (
     onenote_section_handle,
 )
 from office_365_mcp.shared.notes import (
+    UNKNOWN_AUDIENCE,
     NotebookAudience,
     client_url_of,
     default_notebook_audience,
-    notebook_audience,
-    section_notebook_id,
+    section_audience,
     web_url_of,
     write_state_for,
 )
@@ -155,18 +155,13 @@ _CREATE = "create"
 _DO_NOT_CREATE = "do not create"
 _NOTHING_CREATED = "No page was created."
 
-_UNKNOWN_AUDIENCE = NotebookAudience(notebook_id=None, name=None, is_shared=None, user_role=None)
-
 
 async def _notebook_audience_for(
     client: GraphServiceClient, handle: OnenoteSectionHandle | None
 ) -> NotebookAudience | None:
     if handle is None:
         return await default_notebook_audience(client)
-    parent_id = await section_notebook_id(client, handle.section_id)
-    if parent_id is None:
-        return _UNKNOWN_AUDIENCE
-    return await notebook_audience(client, parent_id)
+    return await section_audience(client, handle.section_id)
 
 
 def _question(title: str, body_html: str, audience: NotebookAudience) -> str:
@@ -219,7 +214,7 @@ async def create_page(
     with graph_errors(TOOL_NAME):
         audience = await _notebook_audience_for(client, handle)
         if answer_pending or (audience is not None and audience.reaches_others):
-            heard_by = audience if audience is not None else _UNKNOWN_AUDIENCE
+            heard_by = audience if audience is not None else UNKNOWN_AUDIENCE
             with not_graph():
                 answer = await confirm(_question(title, body_html, heard_by), about)
             asked = answer if isinstance(answer, InputRequiredResult) else None

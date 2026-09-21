@@ -118,7 +118,7 @@ _HANDLE_FAMILIES: Mapping[str, frozenset[str]] = {
     "teams:///": frozenset({"chats", "teams", "meetings", "transcripts"}),
     "outlook:///": frozenset({"messages", "folders", "drafts", "rules", "calendars", "events"}),
     "sharepoint:///": frozenset({"files", "folders"}),
-    "onenote:///": frozenset({"sections", "pages"}),
+    "onenote:///": frozenset({"sections", "pages", "notebooks", "sectiongroups", "operations"}),
 }
 _HANDLE_SCHEMES: tuple[str, ...] = tuple(_HANDLE_FAMILIES)
 _HANDLE_FAMILY: Mapping[str, re.Pattern[str]] = {

@@ -783,6 +783,7 @@ GRAPH_STEPS = frozenset(
         "section",
         "sections",
         "section_groups",
+        "section_group",
         "pages",
         "page",
         "page_content",

@@ -1,17 +1,23 @@
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
-from typing import Protocol, Self, cast
+from typing import Literal, Protocol, Self, cast
+from urllib.parse import unquote
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.external_link import ExternalLink
 from msgraph.generated.models.notebook import Notebook
+from msgraph.generated.models.onenote_operation import OnenoteOperation
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.users.item.onenote.notebooks.item.notebook_item_request_builder import (
     NotebookItemRequestBuilder,
 )
 from msgraph.generated.users.item.onenote.notebooks.notebooks_request_builder import (
     NotebooksRequestBuilder,
+)
+from msgraph.generated.users.item.onenote.section_groups.item import (
+    section_group_item_request_builder,
 )
 from msgraph.generated.users.item.onenote.sections.item import (
     onenote_section_item_request_builder,
@@ -20,7 +26,12 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_step
-from office_365_mcp.shared.handles import OnenotePageHandle, OnenoteSectionHandle
+from office_365_mcp.shared.handles import (
+    OnenoteNotebookHandle,
+    OnenoteOperationHandle,
+    OnenotePageHandle,
+    OnenoteSectionHandle,
+)
 
 PAGE_FIELDS: tuple[str, ...] = ("id", "title", "createdDateTime", "lastModifiedDateTime", "links")
 PAGE_EXPANSIONS: tuple[str, ...] = ("parentSection", "parentNotebook")
@@ -30,6 +41,7 @@ _DEFAULT_NOTEBOOK_FIELDS: tuple[str, ...] = (*NOTEBOOK_AUDIENCE_FIELDS, "isDefau
 
 STEP_NOTEBOOK = "notebook"
 STEP_SECTION = "section"
+STEP_SECTION_GROUP = "section_group"
 STEP_NOTEBOOKS = "notebooks"
 
 _MAX_NOTEBOOKS = 200
@@ -38,6 +50,8 @@ _NotebookQuery = NotebookItemRequestBuilder.NotebookItemRequestBuilderGetQueryPa
 _NotebooksQuery = NotebooksRequestBuilder.NotebooksRequestBuilderGetQueryParameters
 _SectionItemBuilder = onenote_section_item_request_builder.OnenoteSectionItemRequestBuilder
 _SectionQuery = _SectionItemBuilder.OnenoteSectionItemRequestBuilderGetQueryParameters
+_SectionGroupItemBuilder = section_group_item_request_builder.SectionGroupItemRequestBuilder
+_SectionGroupQuery = _SectionGroupItemBuilder.SectionGroupItemRequestBuilderGetQueryParameters
 
 
 class _Links(Protocol):
@@ -120,6 +134,20 @@ class PageSummary(BaseModel):
             + "notebook."
         )
     )
+    level: int | None = Field(
+        description=(
+            "How deeply this page is indented under another page in its section: 0 for a "
+            + "top-level page, 1 for a page indented one level under it, and so on. Always null "
+            + "unless onenote_list_pages was asked for it with include_level_and_order=true."
+        )
+    )
+    order: int | None = Field(
+        description=(
+            "Where this page sits among the other pages of its section, in Microsoft's own "
+            + "ordering. Always null unless onenote_list_pages was asked for it with "
+            + "include_level_and_order=true."
+        )
+    )
 
     @classmethod
     def from_page(cls, page: OnenotePage) -> Self | None:
@@ -138,6 +166,8 @@ class PageSummary(BaseModel):
             section_uri=None if section_id is None else OnenoteSectionHandle(section_id).uri,
             section_name=section.display_name if section is not None else None,
             notebook_name=notebook.display_name if notebook is not None else None,
+            level=page.level,
+            order=page.order,
         )
 
 
@@ -200,7 +230,7 @@ async def default_notebook_audience(client: GraphServiceClient) -> NotebookAudie
     return _chosen_default(collected.items, capped=collected.capped)
 
 
-_UNKNOWN_AUDIENCE = NotebookAudience(notebook_id=None, name=None, is_shared=None, user_role=None)
+UNKNOWN_AUDIENCE = NotebookAudience(notebook_id=None, name=None, is_shared=None, user_role=None)
 
 
 def _chosen_default(notebooks: list[Notebook], *, capped: bool) -> NotebookAudience | None:
@@ -210,7 +240,7 @@ def _chosen_default(notebooks: list[Notebook], *, capped: bool) -> NotebookAudie
         if notebook.is_default:
             return audience_of(notebook)
     if capped or len(notebooks) > 1:
-        return _UNKNOWN_AUDIENCE
+        return UNKNOWN_AUDIENCE
     return audience_of(notebooks[0])
 
 
@@ -224,6 +254,144 @@ async def section_notebook_id(client: GraphServiceClient, section_id: str) -> st
     assert found is not None, "Graph answered a section read with no section"
     parent = found.parent_notebook
     return parent.id if parent is not None else None
+
+
+async def section_group_notebook_id(
+    client: GraphServiceClient, section_group_id: str
+) -> str | None:
+    with graph_step(STEP_SECTION_GROUP):
+        found = await client.me.onenote.section_groups.by_section_group_id(section_group_id).get(
+            request_configuration=RequestConfiguration[_SectionGroupQuery](
+                query_parameters=_SectionGroupQuery(select=["id"], expand=["parentNotebook"])
+            )
+        )
+    assert found is not None, "Graph answered a section group read with no section group"
+    parent = found.parent_notebook
+    return parent.id if parent is not None else None
+
+
+async def section_audience(client: GraphServiceClient, section_id: str) -> NotebookAudience:
+    notebook_id = await section_notebook_id(client, section_id)
+    if notebook_id is None:
+        return UNKNOWN_AUDIENCE
+    return await notebook_audience(client, notebook_id)
+
+
+async def section_group_audience(
+    client: GraphServiceClient, section_group_id: str
+) -> NotebookAudience:
+    notebook_id = await section_group_notebook_id(client, section_group_id)
+    if notebook_id is None:
+        return UNKNOWN_AUDIENCE
+    return await notebook_audience(client, notebook_id)
+
+
+_RESOURCE_LOCATION = re.compile(r"/onenote/(pages|sections|notebooks)/([^/?#]+)/?\Z")
+
+_RESOURCE_KIND_OF: dict[str, Literal["page", "section", "notebook"]] = {
+    "pages": "page",
+    "sections": "section",
+    "notebooks": "notebook",
+}
+
+
+def resource_handle_of(
+    location: str | None, resource_id: str | None
+) -> tuple[str, Literal["page", "section", "notebook"]] | None:
+    if location is None:
+        return None
+    match = _RESOURCE_LOCATION.search(location)
+    if match is None:
+        return None
+    family, encoded_id = match.groups()
+    resolved_id = resource_id if resource_id is not None else unquote(encoded_id)
+    kind = _RESOURCE_KIND_OF[family]
+    if family == "pages":
+        return OnenotePageHandle(resolved_id).uri, kind
+    if family == "sections":
+        return OnenoteSectionHandle(resolved_id).uri, kind
+    return OnenoteNotebookHandle(resolved_id).uri, kind
+
+
+_RESOURCE_ID_IN_URL = re.compile(r"/onenote/resources/([^/?#]+)(?:/\$value|/content)?\Z")
+
+
+def resource_id_in(url: str) -> str | None:
+    match = _RESOURCE_ID_IN_URL.search(url)
+    return None if match is None else unquote(match.group(1))
+
+
+class OperationSummary(BaseModel):
+    uri: str = Field(
+        description=(
+            "This operation's handle: onenote:///operations/{id}, with the id percent-encoded. "
+            + "Pass it to onenote_get_operation to poll it. Never build one: an operation id "
+            + "alone reaches nothing."
+        )
+    )
+    status: str | None = Field(
+        description=(
+            "Microsoft's own status word for this operation: NotStarted, Running, Completed or "
+            + "Failed. Poll onenote_get_operation with `uri` until this reads Completed or "
+            + "Failed; null when Graph reported none."
+        )
+    )
+    percent_complete: str | None = Field(
+        description=(
+            "How far along Graph says the operation is, as the digits of a percentage. "
+            + "Microsoft reports this as text, not a number. Null while Graph has nothing to "
+            + "report."
+        )
+    )
+    created_at: datetime | None = Field(
+        description="When the operation started, as Graph reported it. Null when Graph gave none."
+    )
+    last_action_at: datetime | None = Field(
+        description=("When Graph last acted on this operation. Null when Graph gave none.")
+    )
+    result_uri: str | None = Field(
+        description=(
+            "The handle of the page, section or notebook this operation produced, once `status` "
+            + "reads Completed. Null until then, and null when Graph named no result."
+        )
+    )
+    result_kind: Literal["page", "section", "notebook"] | None = Field(
+        description=(
+            "What `result_uri` addresses: page, section or notebook. Null exactly when "
+            + "`result_uri` is null."
+        )
+    )
+    error_code: str | None = Field(
+        description=(
+            "Microsoft's error code for this operation, present only when `status` reads "
+            + "Failed. Null otherwise."
+        )
+    )
+    error_message: str | None = Field(
+        description=(
+            "Microsoft's error message for this operation, present only when `status` reads "
+            + "Failed. Null otherwise."
+        )
+    )
+
+    @classmethod
+    def from_operation(cls, op: OnenoteOperation) -> Self | None:
+        if op.id is None:
+            return None
+        result = resource_handle_of(op.resource_location, op.resource_id)
+        result_uri, result_kind = result if result is not None else (None, None)
+        error = op.error
+        return cls(
+            uri=OnenoteOperationHandle(op.id).uri,
+            status=(None if op.status is None else cast("str", cast("object", op.status.value))),
+            percent_complete=op.percent_complete,
+            created_at=op.created_date_time,
+            last_action_at=op.last_action_date_time,
+            result_uri=result_uri,
+            result_kind=result_kind,
+            error_code=error.code if error is not None else None,
+            error_message=error.message if error is not None else None,
+        )
 
 
 def write_state_for(*parts: str) -> str:
