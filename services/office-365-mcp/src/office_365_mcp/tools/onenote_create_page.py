@@ -201,13 +201,13 @@ def _question(
 ) -> str:
     name = audience.name or "an unnamed notebook"
     into_section = (
-        f" into the section {section_name!r}, which Microsoft creates in that notebook when "
-        + "no section has that name yet"
+        f" It goes into the section {section_name!r}, which Microsoft creates in that notebook "
+        + "when no section has that name yet."
         if section_name is not None
         else ""
     )
     return (
-        f"Create the page {title!r} in the notebook {name!r}, {audience.reason}{into_section}? "
+        f"Create the page {title!r} in the notebook {name!r}, {audience.reason}?{into_section} "
         + f"It opens {body_opening(body_html)!r}."
     )
 

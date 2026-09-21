@@ -1022,7 +1022,11 @@ class TestAcceptedOperation:
 
     def test_a_body_only_response_is_parsed_into_a_full_summary(self) -> None:
         body = json.dumps({"id": "op-body", "status": "Running"}).encode()
-        fetched = FetchedResponse(status_code=202, headers={}, content=body)
+        fetched = FetchedResponse(
+            status_code=202,
+            headers={"content-type": "application/json;odata.metadata=minimal"},
+            content=body,
+        )
 
         summary = notes.accepted_operation(fetched)
 
@@ -1034,7 +1038,10 @@ class TestAcceptedOperation:
         body = json.dumps({"id": "op-body-wins", "status": "Completed"}).encode()
         fetched = FetchedResponse(
             status_code=202,
-            headers={"operation-location": _ACCEPTED_OPERATION_LOCATION},
+            headers={
+                "operation-location": _ACCEPTED_OPERATION_LOCATION,
+                "content-type": "application/json",
+            },
             content=body,
         )
 
@@ -1043,6 +1050,22 @@ class TestAcceptedOperation:
         assert summary is not None
         assert summary.uri == OnenoteOperationHandle("op-body-wins").uri
         assert summary.status == "Completed"
+
+    def test_a_body_that_is_not_json_is_left_alone_and_the_header_answers(self) -> None:
+        fetched = FetchedResponse(
+            status_code=202,
+            headers={
+                "operation-location": _ACCEPTED_OPERATION_LOCATION,
+                "content-type": "text/plain",
+            },
+            content=b"Accepted",
+        )
+
+        summary = notes.accepted_operation(fetched)
+
+        assert summary is not None
+        assert summary.uri == OnenoteOperationHandle("op-header").uri
+        assert summary.status is None
 
     def test_neither_a_body_nor_a_header_answers_none(self) -> None:
         fetched = FetchedResponse(status_code=202, headers={}, content=b"")

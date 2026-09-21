@@ -48,7 +48,7 @@ open lately, each with no handle of its own until `onenote_find_notebook_from_ur
 `onenote_list_sections`, one level of sections and section groups directly under a notebook or a
 section group, and `onenote_create_notebook`, `onenote_create_section` and
 `onenote_create_section_group`, which each add one new container at the level they name; and
-`onenote_edit_page`, which appends, inserts, prepends, replaces or deletes a piece of a page
+`onenote_edit_page`, which appends, inserts, prepends or replaces a piece of a page
 through a batch of commands, `onenote_rename_page`, which replaces a page's title, and
 `onenote_delete_page`, the only tool here that removes a page outright; and `onenote_copy_page`,
 `onenote_copy_section` and `onenote_copy_notebook`, which each start a copy Microsoft runs on its

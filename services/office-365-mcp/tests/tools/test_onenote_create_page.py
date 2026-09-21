@@ -377,8 +377,8 @@ class TestSectionName:
 
         assert len(asked) == 1
         assert (
-            "into the section 'Q3 planning', which Microsoft creates in that notebook when no "
-            + "section has that name yet"
+            "? It goes into the section 'Q3 planning', which Microsoft creates in that notebook "
+            + "when no section has that name yet. It opens"
         ) in asked[0]
 
     async def test_the_question_says_nothing_about_a_section_when_none_is_given(

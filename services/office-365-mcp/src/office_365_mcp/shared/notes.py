@@ -451,8 +451,11 @@ class OperationSummary(BaseModel):
     uri: str = Field(
         description=(
             "This operation's handle: onenote:///operations/{id}, with the id percent-encoded. "
-            + "Pass it to onenote_get_operation to poll it. Never build one: an operation id "
-            + "alone reaches nothing."
+            + "When it came from a copy tool's answer, pass it to onenote_get_operation to poll "
+            + "the copy, and keep using that same handle for every poll: the `uri` a poll itself "
+            + "answers with can differ from it, because Microsoft appends the caller's own id to "
+            + "the operation id it reports back, and that longer value is not the one to reuse. "
+            + "Never build one: an operation id alone reaches nothing."
         )
     )
     status: OperationState | None = Field(
@@ -534,9 +537,12 @@ class OperationSummary(BaseModel):
         )
 
 
+_JSON_MEDIA_TYPE = "application/json"
+
+
 def accepted_operation(fetched: FetchedResponse) -> OperationSummary | None:
-    if fetched.content:
-        node = JsonParseNodeFactory().get_root_parse_node("application/json", fetched.content)
+    if fetched.content and fetched.media_type == _JSON_MEDIA_TYPE:
+        node = JsonParseNodeFactory().get_root_parse_node(_JSON_MEDIA_TYPE, fetched.content)
         operation = node.get_object_value(OnenoteOperation)
         if operation.id is not None:
             return OperationSummary.from_operation(operation)
