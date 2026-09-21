@@ -42,7 +42,7 @@ def display_path(path: PathLike) -> str:
     """Join path segments for display labels.
 
     Drops the orphan-folder sentinel and strips ``[`` / ``]`` so folder names
-    like ``[SM]`` cannot break the outer ``[label](url)`` markdown wrapper.
+    like ``[ORG]`` cannot break the outer ``[label](url)`` markdown wrapper.
     """
     return "/".join(display_path_segments(path))
 

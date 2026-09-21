@@ -718,21 +718,21 @@ def test_reference_url_external_chunk_keeps_original_url():
     assert reference_url(chunk) == "https://example.com/doc"
 
 
-def test_markdown_citation_link_escapes_sm_folder_path():
+def test_markdown_citation_link_escapes_bracketed_folder_path():
     """Primary Fix 3 fixture matching the Unique AI stringified paste."""
-    path = "[" + "SM" + "]/AlpenSys/Audit_Report_AlpenSys_FY2023.pdf"
+    path = "[ORG]/Alpha/Audit_Report_FY2023.pdf"
     link = markdown_citation_link(
         path, "unique://content/cont_ioi3voailf7hr011zcp6b7eh"
     )
     assert link == (
-        "[\\[SM\\]/AlpenSys/Audit_Report_AlpenSys_FY2023.pdf]"
+        "[\\[ORG\\]/Alpha/Audit_Report_FY2023.pdf]"
         "(unique://content/cont_ioi3voailf7hr011zcp6b7eh)"
     )
     assert not link.startswith("[[")
 
 
 def test_chunk_to_text_content_escapes_brackets_in_title():
-    title = "[" + "SM" + "]/AlpenSys/notes.txt"
+    title = "[ORG]/Alpha/notes.txt"
     chunk = _make_chunk(
         "body",
         title=title,
@@ -740,8 +740,7 @@ def test_chunk_to_text_content_escapes_brackets_in_title():
     )
     content = chunk_to_text_content(chunk, sequence_number=1)
     assert content.text.startswith(
-        "[\\[SM\\]/AlpenSys/notes.txt]"
-        "(unique://content/cont_abcdefgehijklmnopqrstuvwx)\n"
+        "[\\[ORG\\]/Alpha/notes.txt](unique://content/cont_abcdefgehijklmnopqrstuvwx)\n"
     )
 
 

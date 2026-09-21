@@ -354,9 +354,9 @@ def _pages_suffix(chunk: ContentChunk) -> str:
 def _escape_markdown_link_label(name: str) -> str:
     """Escape ``[`` / ``]`` in labels so CommonMark ``[label](url)`` stays valid.
 
-    Without this, a folder like ``[SM]`` yields ``[[SM]/file.pdf](url)`` — the
+    Without this, a folder like ``[ORG]`` yields ``[[ORG]/file.pdf](url)`` — the
     first ``]`` closes the label early, the ``(url)`` is lost, and clients show a
-    stringified remnant such as ``[SM]/file.pdf — content_id: …``.
+    stringified remnant such as ``[ORG]/file.pdf — content_id: …``.
     """
     return name.replace("[", "\\[").replace("]", "\\]")
 

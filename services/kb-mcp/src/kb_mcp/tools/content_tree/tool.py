@@ -146,7 +146,7 @@ async def _resolve_scope_id(
             ) from exc
         return folder_path
 
-    # Rendering strips "[" and "]", so a folder stored as "[SM]" comes back as
+    # Rendering strips "[" and "]", so a folder stored as "[ORG]" comes back as
     # "SM" and will not resolve; those fall back to filtering the unscoped walk.
     # TODO [proschu2/ean]: not stripping at render time would make every
     # folder_path resolvable, but it changes rendered output — your call.
@@ -169,8 +169,8 @@ def _filtered_to_path_prefix(
 ) -> FolderWalkSnapshot:
     """Fallback for a folder_path that could not be resolved to a scope id.
 
-    Matches display paths (brackets stripped, sentinel dropped) so 'SM/AlpenSys'
-    still finds segments stored as '[SM]'.
+    Matches display paths (brackets stripped, sentinel dropped) so 'ORG/Alpha'
+    still finds segments stored as '[ORG]'.
     """
     prefix = tuple(normalize_path_segment(p) for p in folder_path.strip("/").split("/"))
     return FolderWalkSnapshot(

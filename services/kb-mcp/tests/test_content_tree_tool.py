@@ -367,18 +367,18 @@ async def test_folder_path_prefix_filter_is_case_sensitive_exact_match():
 
 @pytest.mark.asyncio
 async def test_folder_path_filter_matches_display_path_with_brackets_stripped():
-    """Filters use display paths so ``SM/AlpenSys`` matches ``[SM]/AlpenSys``."""
-    sm_folder = "[" + "SM" + "]"
+    """Filters use display paths so ``ORG/Alpha`` matches ``[ORG]/Alpha``."""
+    bracketed_folder = "[ORG]"
     mock_tree = _make_mock_tree(
         snapshot=FakeSnapshot(
             files=[
                 (
                     _make_content_info("c1"),
-                    PurePosixPath(f"{sm_folder}/AlpenSys/a.pdf"),
+                    PurePosixPath(f"{bracketed_folder}/Alpha/a.pdf"),
                 ),
                 (
                     _make_content_info("c2"),
-                    PurePosixPath(f"{sm_folder}/Other/b.pdf"),
+                    PurePosixPath(f"{bracketed_folder}/Other/b.pdf"),
                 ),
                 (_make_content_info("c3"), PurePosixPath("Contracts/c.pdf")),
             ]
@@ -387,7 +387,7 @@ async def test_folder_path_filter_matches_display_path_with_brackets_stripped():
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="list",
-            folder_path="SM/AlpenSys",
+            folder_path="ORG/Alpha",
             config=ContentTreeToolConfig(),
         )
 
@@ -723,18 +723,16 @@ async def test_list_uses_frontend_deep_link_when_scope_known(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_list_strips_brackets_from_sm_folder_path():
-    """``[SM]/AlpenSys/Audit_Report_….pdf`` must emit a clean markdown link."""
+async def test_list_strips_brackets_from_bracketed_folder_path():
+    """``[ORG]/Alpha/Audit_Report_….pdf`` must emit a clean markdown link."""
     info = _make_content_info("cont_ioi3voailf7hr011zcp6b7eh")
-    sm_folder = "[" + "SM" + "]"
+    bracketed_folder = "[ORG]"
     mock_tree = _make_mock_tree(
         snapshot=FakeSnapshot(
             files=[
                 (
                     info,
-                    PurePosixPath(
-                        f"{sm_folder}/AlpenSys/Audit_Report_AlpenSys_FY2023.pdf"
-                    ),
+                    PurePosixPath(f"{bracketed_folder}/Alpha/Audit_Report_FY2023.pdf"),
                 )
             ]
         )
@@ -744,11 +742,11 @@ async def test_list_strips_brackets_from_sm_folder_path():
 
     text = result.content[0].text  # type: ignore[union-attr]
     assert text == (
-        "[SM/AlpenSys/Audit_Report_AlpenSys_FY2023.pdf]"
+        "[ORG/Alpha/Audit_Report_FY2023.pdf]"
         "(unique://content/cont_ioi3voailf7hr011zcp6b7eh) "
         "(content_id=cont_ioi3voailf7hr011zcp6b7eh)"
     )
-    assert "[" + "SM" + "]" not in text
+    assert "[ORG]" not in text
 
 
 @pytest.mark.asyncio
@@ -762,7 +760,7 @@ async def test_list_strips_no_folder_path_sentinel_keeps_unique_link():
                     info,
                     PurePosixPath(
                         "_no_folder_path/"
-                        "Chat_1780557337141_AlpenSys_Shareholder_Letter_H1_2024.pdf"
+                        "Chat_1234567890123_Shareholder_Letter_H1_2024.pdf"
                     ),
                 )
             ]
@@ -774,7 +772,7 @@ async def test_list_strips_no_folder_path_sentinel_keeps_unique_link():
     text = result.content[0].text  # type: ignore[union-attr]
     assert "_no_folder_path" not in text
     assert (
-        "[Chat_1780557337141_AlpenSys_Shareholder_Letter_H1_2024.pdf]"
+        "[Chat_1234567890123_Shareholder_Letter_H1_2024.pdf]"
         "(unique://content/chat_orphan) (content_id=chat_orphan)" in text
     )
 
