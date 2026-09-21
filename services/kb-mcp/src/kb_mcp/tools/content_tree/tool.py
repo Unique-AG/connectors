@@ -147,7 +147,7 @@ async def _resolve_scope_id(
         return folder_path
 
     # Rendering strips "[" and "]", so a folder stored as "[ORG]" comes back as
-    # "SM" and will not resolve; those fall back to filtering the unscoped walk.
+    # "ORG" and will not resolve; those fall back to filtering the unscoped walk.
     # TODO [proschu2/ean]: not stripping at render time would make every
     # folder_path resolvable, but it changes rendered output — your call.
     absolute = "/" + folder_path.strip("/")
