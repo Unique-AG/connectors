@@ -3,9 +3,9 @@
 
 ## Prerequisites
 
-kb-mcp has no knowledge-base data of its own: every tool call is a live proxy to your tenant's
+`kb-mcp` has no knowledge-base data of its own: every tool call is a live proxy to your tenant's
 Unique API, so a Unique platform subscription is a hard requirement, not just a recommendation.
-Where kb-mcp itself runs is flexible: the Helm chart below targets Kubernetes, but the same
+Where `kb-mcp` itself runs is flexible: the Helm chart below targets Kubernetes, but the same
 Docker image runs on any other cloud or locally. What changes between those is the environment
 variables, not the architecture. Zitadel is likewise fixed: it's always the same instance your
 Unique AI tenant already uses, never one you stand up yourself.
@@ -14,13 +14,13 @@ Unique AI tenant already uses, never one you stand up yourself.
   a classic `Ingress`)
 - Helm 3.x with OCI support
 - Postgres 14+ for OAuth-proxy state
-- The public (PKCE) OIDC client id for kb-mcp, registered in your tenant's existing Zitadel
+- The public (PKCE) OIDC client id for `kb-mcp`, registered in your tenant's existing Zitadel
   instance
-- Network access from kb-mcp's pod to the Unique API instance it calls
+- Network access from `kb-mcp`'s pod to the Unique API instance it calls
 
 ## Helm Chart
 
-kb-mcp ships as a standalone Helm chart, published as an OCI artifact alongside every release:
+`kb-mcp` ships as a standalone Helm chart, published as an OCI artifact alongside every release:
 
 ```bash
 helm upgrade --install kb-mcp oci://ghcr.io/unique-ag/connectors/helm/kb-mcp \
@@ -39,7 +39,7 @@ Three values, none with chart defaults:
 | Secret | Purpose |
 |---|---|
 | `ZITADEL_CLIENT_ID` | Public Zitadel OIDC client id (PKCE, not actually secret) |
-| `ZITADEL_JWT_SIGNING_KEY` | Signs kb-mcp's own downstream OAuth-proxy JWTs; never sent to Zitadel |
+| `ZITADEL_JWT_SIGNING_KEY` | Signs `kb-mcp`'s own downstream OAuth-proxy JWTs; never sent to Zitadel |
 | `ENCRYPTION_KEY` | Encrypts OAuth-proxy state at rest in Postgres |
 
 Generate the latter two with `openssl rand -hex 32`. `ZITADEL_CLIENT_ID` comes from registering a
@@ -49,6 +49,9 @@ Deliver them via `envVars[].valueFrom.secretKeyRef`, or, at Unique, via `Externa
 `extraEnvSecrets`.
 
 ## Minimal Values
+
+`mcpConfig.zitadel` has no `clientId` field: `ZITADEL_CLIENT_ID` isn't secret, so it goes in
+`envVars` as a plain value, alongside the two secrets delivered the same way.
 
 ```yaml
 mcpConfig:
@@ -61,6 +64,14 @@ mcpConfig:
 envVars:
   - name: UNIQUE_API_BASE_URL
     value: http://unique-api.<namespace>.svc.cluster.local
+  - name: ZITADEL_CLIENT_ID
+    value: <public PKCE client id>   # not secret, see Required Secrets above
+  - name: ZITADEL_JWT_SIGNING_KEY
+    valueFrom:
+      secretKeyRef: { name: kb-mcp-secrets, key: zitadel-jwt-signing-key }
+  - name: ENCRYPTION_KEY
+    valueFrom:
+      secretKeyRef: { name: kb-mcp-secrets, key: encryption-key }
 
 routes:
   hostname: kb-mcp.<tenant>.unique.app
@@ -71,8 +82,9 @@ routes:
     probe: { enabled: true }
 ```
 
-!!! note "`mcpConfig.zitadel` has no `clientId` field"
-    Deliver `ZITADEL_CLIENT_ID` via `envVars` instead. It isn't secret, so a plain `value:` is fine.
+`DATABASE_URL` isn't listed here: the chart default (`postgresql.enabled: true`) wires it
+automatically from its own CloudNativePG instance. See [PostgreSQL](#PostgreSQL) below for the
+external-database alternative.
 
 ## PostgreSQL
 
@@ -91,12 +103,12 @@ secret env var and setting `postgresql.enabled: false`.
 ## Network Policies
 
 `networkPolicy.enabled` defaults to `false` (`flavor: cilium`); set it to `true` for a default-deny
-`CiliumNetworkPolicy`. kb-mcp needs egress to DNS, the Unique API, Zitadel and the platform gateway
+`CiliumNetworkPolicy`. `kb-mcp` needs egress to DNS, the Unique API, Zitadel and the platform gateway
 (the chart ships a baseline `toFQDNs: ["*.unique.app"]` rule), and its Postgres host if external.
 
 !!! warning "`toEndpoints` rules match the pod port, not the Service port"
     Cilium's eBPF Service DNAT happens *before* a `CiliumNetworkPolicy`'s `toEndpoints` rule is
-    evaluated, so the rule must allow the container's actual listening port. For kb-mcp calling
+    evaluated, so the rule must allow the container's actual listening port. For `kb-mcp` calling
     `node-chat`, that means `node-chat`'s container port (`8080`), not its Service port (`8093`).
 
 The monorepo-wide `internalServices` convention encodes this automatically: a chart declaring
@@ -104,8 +116,8 @@ The monorepo-wide `internalServices` convention encodes this automatically: a ch
 dependency's real pod port, via separate `servicePort`/`podPort` fields.
 
 !!! note "The allowlist is bidirectional"
-    Declaring `dependencies` builds only *kb-mcp's* egress rule. `node-chat` must separately
-    allowlist kb-mcp under its own `internalServices.dependents.kbMcp`, which defaults to
+    Declaring `dependencies` builds only `kb-mcp`'s egress rule. `node-chat` must separately
+    allowlist `kb-mcp` under its own `internalServices.dependents.kbMcp`, which defaults to
     `enabled: false`. Otherwise its ingress policy drops the connection silently, with no
     application error, just a timeout.
 
@@ -126,5 +138,5 @@ dependency's real pod port, via separate `servicePort`/`podPort` fields.
   Set `FASTMCP_CHECK_FOR_UPDATES: "off"`.
 - **Tool calls hang or time out**: the egress rule is probably targeting the Unique API's Service
   port instead of its pod port. See [Network Policies](#Network-Policies).
-- **Server refuses to boot**: kb-mcp requires both `DATABASE_URL` and `ENCRYPTION_KEY` unless
+- **Server refuses to boot**: `kb-mcp` requires both `DATABASE_URL` and `ENCRYPTION_KEY` unless
   `ALLOW_EPHEMERAL_OAUTH_STORAGE=true`.

@@ -1,9 +1,9 @@
 <!-- confluence-page-id: 2744352807 -->
 <!-- confluence-space-key: PUBDOC -->
 
-kb-mcp is a stateless proxy in front of a tenant's Unique knowledge base: every MCP tool call
-resolves to a live call against the Unique API, and no knowledge-base content is stored by kb-mcp
-itself. The only state kb-mcp owns is its own OAuth-proxy bookkeeping in Postgres: client
+`kb-mcp` is a stateless proxy in front of a tenant's Unique knowledge base: every MCP tool call
+resolves to a live call against the Unique API, and no knowledge-base content is stored by `kb-mcp`
+itself. The only state `kb-mcp` owns is its own OAuth-proxy bookkeeping in Postgres: client
 registrations, tokens, and JTI replay-protection mappings.
 
 ## Components
@@ -22,7 +22,7 @@ flowchart LR
 | Component | Purpose |
 |---|---|
 | MCP server (FastMCP, via `unique-mcp`) | Exposes `/mcp` (HTTP MCP) and `/probe`; owns the OAuth-proxy flow and tool routing |
-| Zitadel | OIDC identity provider; kb-mcp registers as a public PKCE client, no client secret |
+| Zitadel | OIDC identity provider; `kb-mcp` registers as a public PKCE client, no client secret |
 | Unique API (`node-chat`) | Source of truth for knowledge-base search, the content tree, and file content, called live via `unique-toolkit` on every tool invocation |
 | Postgres | Durable storage for OAuth-proxy state only; never holds knowledge-base data |
 
@@ -33,19 +33,18 @@ both the env var and the matching egress rule.
 
 ## Authentication Architecture
 
-kb-mcp runs its own OIDC flow, independent of the platform's normal Kong-fronted authentication.
+`kb-mcp` runs its own OIDC flow, independent of the platform's normal Kong-fronted authentication.
 Deployed instances set `routes.auth.jwt: false` at the gateway precisely so the gateway doesn't
 also try to authenticate the request.
 
 ### Token Isolation
 
-The MCP client authenticates to kb-mcp via Zitadel; kb-mcp then calls the Unique API using the
+The MCP client authenticates to `kb-mcp` via Zitadel; `kb-mcp` then calls the Unique API using the
 identity established through that session, not a service-wide credential. Every outbound call
 carries that identity as two headers, `x-user-id` and `x-company-id`, set by `unique-toolkit` from
-the resolved settings. The Unique API enforces that identity on every call, so a `search`,
-`content_tree`, `content_metadata`, or `read_file` result is always scoped to what the calling user
-can already see in the knowledge base. kb-mcp has no broader access of its own to leak. Upstream
-Unique API
+the resolved settings. `kb-mcp` has no broader access of its own to leak; see
+[Permissions](./permissions.md) for how the Unique API turns that identity into a scoped result.
+Upstream Unique API
 credentials (`UNIQUE_APP_ID`/`UNIQUE_APP_KEY`, sent as `Authorization`/`x-app-id`) are only needed
 when the call has to cross the Kong gateway: local development, or a deployment that routes through
 Kong rather than calling `node-chat` directly in-cluster. Direct in-cluster calls carry only the two
@@ -63,12 +62,12 @@ credential.
 ### Token Encryption
 
 `ENCRYPTION_KEY` (a 32-byte hex value, `openssl rand -hex 32`) encrypts OAuth-proxy state at rest
-in Postgres. It is unrelated to `ZITADEL_JWT_SIGNING_KEY`, which signs kb-mcp's own downstream JWTs
+in Postgres. It is unrelated to `ZITADEL_JWT_SIGNING_KEY`, which signs `kb-mcp`'s own downstream JWTs
 rather than protecting stored data.
 
 ## Network Policy Shape
 
-kb-mcp is deployed behind a default-deny `CiliumNetworkPolicy` in every Unique-internal
+`kb-mcp` is deployed behind a default-deny `CiliumNetworkPolicy` in every Unique-internal
 environment. Ingress is limited to the platform gateway
 (`internalServices.dependents.ingressGateway`, on by default in the chart); egress is built up per
 overlay for DNS, the Unique API instance it calls, Zitadel/the platform gateway, and its Postgres
@@ -91,5 +90,5 @@ Unique API.
 
 - [Model Context Protocol specification](https://modelcontextprotocol.io/)
 - [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)
-- [`unique-mcp` on PyPI](https://pypi.org/project/unique-mcp/)
-- [`unique-toolkit` on PyPI](https://pypi.org/project/unique-toolkit/)
+- [`unique-mcp` on GitHub](https://github.com/Unique-AG/ai/tree/main/unique_mcp)
+- [`unique-toolkit` on GitHub](https://github.com/Unique-AG/ai/tree/main/unique_toolkit)
