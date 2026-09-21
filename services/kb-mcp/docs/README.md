@@ -18,16 +18,16 @@ For deployment, configuration, and operational details, see the
 
 ## Quick Summary
 
-**What it does:** Exposes three MCP tools (`search`, `content_tree`, `read_file`) over a tenant's
-Unique knowledge base, backed live by the Unique API.
+**What it does:** Exposes four MCP tools (`search`, `content_tree`, `content_metadata`,
+`read_file`) over a tenant's Unique knowledge base, backed live by the Unique API.
 
 **Deployment:** Kubernetes-based Python (FastMCP) microservice, shipped as a standalone Helm chart;
 also runnable via Docker outside Unique's own clusters.
 
 **Authentication:** MCP-facing OAuth2/OIDC via Zitadel (PKCE, no client secret). Identity is derived
 from that session and passed through to the Unique API, which enforces it. Every tool call runs
-under the calling user's own permissions, so `search`, `content_tree`, and `read_file` only ever
-return knowledge-base content that user could already see.
+under the calling user's own permissions, so `search`, `content_tree`, `content_metadata`, and
+`read_file` only ever return knowledge-base content that user could already see.
 
 **Processing:** Synchronous. Each tool call queries the Unique API and returns immediately.
 `content_tree`'s folder/file listing is the only thing kb-mcp caches, in-memory and per pod;
@@ -39,6 +39,7 @@ search results and file content are never cached.
 |------|---------|
 | `search` | Semantic / internal knowledge-base search |
 | `content_tree` | Browse, list, and fuzzy-search visible folders and files |
+| `content_metadata` | Discover metadata fields/values, to build a `metadata_filter` |
 | `read_file` | Download and return file content by `content_id` |
 
 Which tools are advertised on `/mcp` is configurable per deployment
