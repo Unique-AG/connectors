@@ -9,7 +9,7 @@ from unique_toolkit.experimental.components.content_tree.schemas import (
     PathTrieNode,
 )
 
-from kb_mcp.references import scope_ids_from_folder_id_path
+from kb_mcp.common.references import scope_ids_from_folder_id_path
 
 # Toolkit sentinel for content with no folderIdPath. Strip from labels only;
 # other callers rely on the literal value.

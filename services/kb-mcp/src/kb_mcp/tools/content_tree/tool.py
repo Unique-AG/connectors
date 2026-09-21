@@ -1,8 +1,8 @@
 """Knowledge Base content-tree tool — browse, list, and fuzzy-search visible files.
 
 - CONFIG (admin, per company): ContentTreeToolConfig
-- ENV (process-wide): KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS / _MAX_ENTRIES
-  and KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS / _MAX_TIMEOUT_SECONDS
+- ENV (process-wide): KB_MCP_TREE_CACHE_TTL_SECONDS / _MAX_ENTRIES and
+  KB_MCP_WALK_TIMEOUT_SECONDS / KB_MCP_WALK_MAX_TIMEOUT_SECONDS
 - STATE (LLM, per call): mode required, rest optional per mode
 """
 
@@ -31,19 +31,23 @@ from unique_toolkit.experimental.components.content_tree.schemas import (
     FolderWalkSnapshot,
 )
 
-from kb_mcp.cached_walk import resolve_filtered_snapshot, uniqueql_predicate
-from kb_mcp.correlation import correlation_id
-from kb_mcp.references import (
+from kb_mcp.common.cached_walk import resolve_filtered_snapshot, uniqueql_predicate
+from kb_mcp.common.correlation import correlation_id
+from kb_mcp.common.metadata_filter import (
+    DEFAULT_METADATA_FILTER_STATEMENT,
+    merge_request_metadata_filter,
+    try_parse_llm_metadata_filter,
+)
+from kb_mcp.common.references import (
     METADATA_FILTER_EMPTY_RETRY_HINT,
     MetadataFilterArgument,
     file_reference_url,
     markdown_citation_link,
 )
-from kb_mcp.scoped_walk import ScopedContentTree
+from kb_mcp.common.scoped_walk import ScopedContentTree
+from kb_mcp.common.tree_cache import get_tree_cache
 from kb_mcp.settings import get_settings
-from kb_mcp.tools.content_tree.cache import get_tree_cache
 from kb_mcp.tools.content_tree.config import (
-    DEFAULT_METADATA_FILTER_STATEMENT,
     ContentTreeToolConfig,
     MatchTarget,
 )
@@ -55,10 +59,6 @@ from kb_mcp.tools.content_tree.path_utils import (
     normalize_path_segment,
     path_parts,
     render_tree_with_folder_ids,
-)
-from kb_mcp.tools.search.metadata_filter import (
-    merge_request_metadata_filter,
-    try_parse_llm_metadata_filter,
 )
 
 _LOGGER = logging.getLogger(__name__)

@@ -15,7 +15,10 @@ from unique_toolkit.experimental.components.content_tree.schemas import (
     FolderWalkSnapshot,
 )
 
-from kb_mcp.scoped_walk import ScopedContentTree, walk_visible_paths_via_folders_async
+from kb_mcp.common.scoped_walk import (
+    ScopedContentTree,
+    walk_visible_paths_via_folders_async,
+)
 
 pytestmark = pytest.mark.ai
 
@@ -362,7 +365,7 @@ async def test_scoped_content_tree_walk_is_rooted_at_root_scope_ids():
         company_id="company-1", user_id="user-1", root_scope_ids=["scope_root"]
     )
     mock_factory = _stub_create_scoped_walk()
-    with patch("kb_mcp.scoped_walk.create_scoped_walk", mock_factory):
+    with patch("kb_mcp.common.scoped_walk.create_scoped_walk", mock_factory):
         await tree.resolve_visible_file_paths_via_folders_async()
 
     mock_factory.assert_called_once()
@@ -378,7 +381,7 @@ async def test_scoped_content_tree_caches_repeated_calls():
         company_id="company-1", user_id="user-1", root_scope_ids=["scope_root"]
     )
     mock_factory = _stub_create_scoped_walk()
-    with patch("kb_mcp.scoped_walk.create_scoped_walk", mock_factory):
+    with patch("kb_mcp.common.scoped_walk.create_scoped_walk", mock_factory):
         await tree.resolve_visible_file_paths_via_folders_async()
         await tree.resolve_visible_file_paths_via_folders_async()
 

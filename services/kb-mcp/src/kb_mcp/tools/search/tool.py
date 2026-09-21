@@ -31,8 +31,12 @@ from unique_toolkit.experimental.components.internal_search import (
     KnowledgeBaseInternalSearchService,
 )
 
-from kb_mcp.correlation import correlation_id
-from kb_mcp.references import (
+from kb_mcp.common.correlation import correlation_id
+from kb_mcp.common.metadata_filter import (
+    merge_request_metadata_filter,
+    try_parse_llm_metadata_filter,
+)
+from kb_mcp.common.references import (
     METADATA_FILTER_EMPTY_RETRY_HINT,
     SEARCH_SYSTEM_PROMPT,
     TOOL_DESCRIPTION_CITATION_GUIDANCE,
@@ -44,10 +48,6 @@ from kb_mcp.references import (
 )
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.search.config import SearchToolConfig
-from kb_mcp.tools.search.metadata_filter import (
-    merge_request_metadata_filter,
-    try_parse_llm_metadata_filter,
-)
 from kb_mcp.tools.search.scope_resolver import resolve_scope_ids
 
 _LOGGER = logging.getLogger(__name__)

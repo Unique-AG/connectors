@@ -4,17 +4,9 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 from unique_toolkit._common.pydantic.rjsf_tags import RJSFMetaTag
-from unique_toolkit.content.smart_rules import Operator, Statement, UniqueQLField
+from unique_toolkit.content.smart_rules import UniqueQLField
 
 MatchTarget = Literal["key", "path", "both"]
-
-# Not the field default: UniqueQLField serialises to dict|None against a
-# string|null schema, which breaks admin-UI rendering.
-DEFAULT_METADATA_FILTER_STATEMENT = Statement(
-    operator=Operator.NOT_CONTAINS,
-    path=["folderIdPath"],
-    value="user-memory",
-)
 
 
 class ContentTreeToolConfig(BaseModel):

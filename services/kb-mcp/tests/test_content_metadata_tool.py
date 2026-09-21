@@ -13,10 +13,10 @@ import unique_sdk
 from fastmcp.tools import ToolResult
 from pydantic import SecretStr
 
-from kb_mcp import cached_walk
+from kb_mcp.common import cached_walk
+from kb_mcp.common import tree_cache as ct_cache
 from kb_mcp.tools.content_metadata import ContentMetadataToolConfig, content_metadata
 from kb_mcp.tools.content_metadata.tool import _flatten_metadata_value
-from kb_mcp.tools.content_tree import cache as ct_cache
 
 pytestmark = pytest.mark.ai
 

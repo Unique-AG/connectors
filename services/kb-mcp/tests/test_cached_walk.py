@@ -11,7 +11,7 @@ import pytest
 from unique_toolkit.content.schemas import ContentInfo
 from unique_toolkit.experimental.components.content_tree import FolderWalkSnapshot
 
-from kb_mcp.cached_walk import filter_snapshot, resolve_filtered_snapshot
+from kb_mcp.common.cached_walk import filter_snapshot, resolve_filtered_snapshot
 
 _PDF_ONLY = {"operator": "equals", "path": ["mimeType"], "value": "application/pdf"}
 

@@ -2,6 +2,8 @@
 that exist on visible content, so a caller can build a metadata filter.
 
 - CONFIG (admin, per company): ContentMetadataToolConfig
+- ENV (process-wide): KB_MCP_TREE_CACHE_TTL_SECONDS / _MAX_ENTRIES and
+  KB_MCP_WALK_TIMEOUT_SECONDS / KB_MCP_WALK_MAX_TIMEOUT_SECONDS
 - STATE (LLM, per call): folder_ids/folder_paths/include_subfolders scope
   which content counts; the tool always returns the full field/value catalog
   for that scope
@@ -38,14 +40,16 @@ from unique_mcp import (
 )
 from unique_toolkit.experimental.components.content_tree import ContentTree
 
-from kb_mcp.cached_walk import resolve_filtered_snapshot
-from kb_mcp.correlation import correlation_id
-from kb_mcp.scoped_walk import ScopedContentTree
+from kb_mcp.common.cached_walk import resolve_filtered_snapshot
+from kb_mcp.common.correlation import correlation_id
+from kb_mcp.common.metadata_filter import (
+    DEFAULT_METADATA_FILTER_STATEMENT,
+    merge_request_metadata_filter,
+)
+from kb_mcp.common.scoped_walk import ScopedContentTree
+from kb_mcp.common.tree_cache import get_tree_cache
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_metadata.config import ContentMetadataToolConfig
-from kb_mcp.tools.content_tree.cache import get_tree_cache
-from kb_mcp.tools.content_tree.config import DEFAULT_METADATA_FILTER_STATEMENT
-from kb_mcp.tools.search.metadata_filter import merge_request_metadata_filter
 
 _LOGGER = logging.getLogger(__name__)
 

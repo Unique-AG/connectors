@@ -27,8 +27,9 @@ from unique_toolkit.experimental.resources.feature_flags._ttl_cache import (
     AsyncTTLCache,
 )
 
-from kb_mcp import cached_walk
-from kb_mcp.references import (
+from kb_mcp.common import cached_walk
+from kb_mcp.common import tree_cache as ct_cache
+from kb_mcp.common.references import (
     INVALID_METADATA_FILTER_MESSAGE,
     METADATA_FILTER_ARG_DESCRIPTION,
     METADATA_FILTER_EMPTY_RETRY_HINT,
@@ -36,15 +37,14 @@ from kb_mcp.references import (
     UNIQUEQL_EQUALS_PDF_WRAPPED,
     MetadataFilterArgument,
 )
+from kb_mcp.common.tree_cache import expire_idle_trees
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_tree import (
     ContentTreeToolConfig,
     MatchTarget,
     content_tree,
 )
-from kb_mcp.tools.content_tree import cache as ct_cache
 from kb_mcp.tools.content_tree import tool as ct_module
-from kb_mcp.tools.content_tree.cache import expire_idle_trees
 
 pytestmark = pytest.mark.ai
 
@@ -429,16 +429,16 @@ async def test_cache_reuses_same_content_tree_instance_for_same_identity():
 
 
 def test_cache_settings_default_and_env_override(monkeypatch):
-    assert get_settings().content_tree_cache_max_entries == 24
-    assert get_settings().content_tree_cache_ttl_seconds == 600
+    assert get_settings().tree_cache_max_entries == 24
+    assert get_settings().tree_cache_ttl_seconds == 600
 
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES", "999")
+    monkeypatch.setenv("KB_MCP_TREE_CACHE_MAX_ENTRIES", "999")
     get_settings.cache_clear()
-    assert get_settings().content_tree_cache_max_entries == 999
+    assert get_settings().tree_cache_max_entries == 999
 
-    monkeypatch.setenv("KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS", "60")
+    monkeypatch.setenv("KB_MCP_TREE_CACHE_TTL_SECONDS", "60")
     get_settings.cache_clear()
-    assert get_settings().content_tree_cache_ttl_seconds == 60
+    assert get_settings().tree_cache_ttl_seconds == 60
 
 
 def test_expire_idle_trees_is_noop_when_cache_uninitialized():

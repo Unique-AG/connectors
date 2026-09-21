@@ -15,7 +15,7 @@ from unique_toolkit.experimental.components.internal_search import (
     KnowledgeBaseInternalSearchConfig,
 )
 
-from kb_mcp.references import (
+from kb_mcp.common.references import (
     GENERIC_RESULT_CITATION_INSTRUCTION,
     INVALID_METADATA_FILTER_MESSAGE,
     METADATA_FILTER_ARG_DESCRIPTION,
@@ -645,26 +645,26 @@ async def test_search_returns_error_when_identity_unresolvable():
 def test_is_unique_ai_client_true_for_node_chats_own_client_name():
     ctx = MagicMock()
     ctx.session.client_params.client_info.name = "unique-ai-mcp-client-module-kb-mcp"
-    with patch("kb_mcp.references.get_context", return_value=ctx):
+    with patch("kb_mcp.common.references.get_context", return_value=ctx):
         assert is_unique_ai_client() is True
 
 
 def test_is_unique_ai_client_false_for_generic_client_name():
     ctx = MagicMock()
     ctx.session.client_params.client_info.name = "claude-code"
-    with patch("kb_mcp.references.get_context", return_value=ctx):
+    with patch("kb_mcp.common.references.get_context", return_value=ctx):
         assert is_unique_ai_client() is False
 
 
 def test_is_unique_ai_client_false_when_no_context():
-    with patch("kb_mcp.references.get_context", side_effect=RuntimeError):
+    with patch("kb_mcp.common.references.get_context", side_effect=RuntimeError):
         assert is_unique_ai_client() is False
 
 
 def test_is_unique_ai_client_false_when_client_params_missing():
     ctx = MagicMock()
     ctx.session.client_params = None
-    with patch("kb_mcp.references.get_context", return_value=ctx):
+    with patch("kb_mcp.common.references.get_context", return_value=ctx):
         assert is_unique_ai_client() is False
 
 

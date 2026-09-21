@@ -6,7 +6,7 @@
   "properties": {
     "mcpConfig": {
       "type": "object",
-      "description": "Non-secret configuration for the kb-mcp server, mapped to environment variables. Unique API credentials stay out of values.yaml — deliver them via envVars/secretKeyRef or the overlay's external-secrets. Zitadel uses a public PKCE client (no client secret), but requires ZITADEL_JWT_SIGNING_KEY delivered the same way.",
+      "description": "Non-secret configuration for the kb-mcp server, mapped to environment variables. Unique API credentials stay out of values.yaml \u2014 deliver them via envVars/secretKeyRef or the overlay's external-secrets. Zitadel uses a public PKCE client (no client secret), but requires ZITADEL_JWT_SIGNING_KEY delivered the same way.",
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -23,7 +23,7 @@
             },
             "frontendBaseUrl": {
               "type": "string",
-              "description": "Unique web app origin (the product UI), NOT this MCP. Optional — only used for knowledge-upload deep links in citations. Leave unset to fall back to unique://content/{id} links, e.g. https://<tenant>.unique.app."
+              "description": "Unique web app origin (the product UI), NOT this MCP. Optional \u2014 only used for knowledge-upload deep links in citations. Leave unset to fall back to unique://content/{id} links, e.g. https://<tenant>.unique.app."
             }
           },
           "additionalProperties": false
@@ -41,12 +41,17 @@
         },
         "enabledTools": {
           "type": "array",
-          "description": "MCP tool names to advertise on /mcp — joined into KB_MCP_ENABLED_TOOLS (see kb_mcp.settings.KNOWN_MCP_TOOLS for the allowlist). Server-wide. Empty/unset means all tools. Restart required for changes to take effect.",
+          "description": "MCP tool names to advertise on /mcp \u2014 joined into KB_MCP_ENABLED_TOOLS (see kb_mcp.settings.KNOWN_MCP_TOOLS for the allowlist). Server-wide. Empty/unset means all tools. Restart required for changes to take effect.",
           "items": {
             "type": "string"
           },
           "default": [],
-          "examples": [["search", "read_file"]]
+          "examples": [
+            [
+              "search",
+              "read_file"
+            ]
+          ]
         },
         "search": {
           "type": "object",
@@ -61,13 +66,13 @@
           },
           "additionalProperties": false
         },
-        "contentTree": {
+        "folderWalk": {
           "type": "object",
-          "description": "The content_tree tool's own cache tuning. Only reachable while content_tree is enabled (see enabledTools).",
+          "description": "Folder-walk cache and wait tuning, shared by content_tree and content_metadata. Only reachable while one of those tools is enabled (see enabledTools).",
           "properties": {
             "cache": {
               "type": "object",
-              "description": "Mirrors the app's own defaults (kb_mcp.settings.Settings.content_tree_cache_*) so they stay visible here and stable across app releases.",
+              "description": "Mirrors the app's own defaults (kb_mcp.settings.Settings.tree_cache_*) so they stay visible here and stable across app releases.",
               "properties": {
                 "ttlSeconds": {
                   "type": "integer",

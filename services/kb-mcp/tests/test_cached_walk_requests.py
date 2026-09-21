@@ -12,8 +12,8 @@ import pytest
 import unique_sdk
 from pydantic import SecretStr
 
+from kb_mcp.common import tree_cache as ct_cache
 from kb_mcp.tools.content_tree import ContentTreeToolConfig, content_tree
-from kb_mcp.tools.content_tree import cache as ct_cache
 
 pytestmark = pytest.mark.asyncio
 
