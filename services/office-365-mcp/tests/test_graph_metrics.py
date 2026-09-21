@@ -221,15 +221,7 @@ class TestAGraphCallIsCountedAndTimed:
     async def test_a_transcript_over_the_ceiling_is_counted_under_its_own_status(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """`too_large` is load-bearing and nothing else pins it.
-
-        Two dashboard queries exclude this status, and every one of them is a dead filter if the
-        refusal is recorded as anything else. It is recorded correctly only because
-        the tool raises its `Advised` rewording OUTSIDE the `graph_errors` block: move
-        that one line inward and `_measured` files the refusal under `error`, the exclusions stop
-        matching, a size refusal starts counting against the failure rate, and every other test in
-        the suite still passes. The surface test pins the refusal's wording; this pins its status.
-        """
+        """Two dashboard queries exclude `too_large`, and nothing else pins that status."""
         _ = graph.get(_TRANSCRIPT_PATH).mock(
             return_value=httpx.Response(
                 200,

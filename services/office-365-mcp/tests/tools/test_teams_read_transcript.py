@@ -1,7 +1,4 @@
-"""`teams_read_transcript`: the words that come back, what narrows them, and what is held.
-
-Every transcript here is synthetic: written for these tests, spoken by nobody.
-"""
+"""`teams_read_transcript`: what comes back, what narrows it, what is held. Data is synthetic."""
 
 import tracemalloc
 from collections.abc import AsyncIterator
@@ -44,10 +41,6 @@ _ATTRIBUTION_OFF = {
     }
 }
 
-# Everything the parser has to survive: the `WEBVTT` header, a NOTE block, cue identifier lines, a
-# voice tag with a class, a cue wrapped over two lines, escaped entities, inline markup, a cue
-# nobody was attributed for, an empty one, and the negative offset Microsoft documents for
-# transcription that started mid-conversation.
 TRANSCRIPT_VTT = """WEBVTT
 
 NOTE this transcript is synthetic
@@ -82,7 +75,6 @@ Agreed that works.
 
 
 def _a_long_transcript(turns: int) -> str:
-    """A transcript nobody would read, in the shape of one Microsoft sends."""
     speakers = ("Ada Lovelace", "Grace Hopper", "Charles Babbage")
     return "WEBVTT\n\n" + "\n\n".join(
         f"f1f0c0de-{index:06d}\n"
@@ -109,8 +101,7 @@ def _spoken_at_length(graph: respx.MockRouter, turns: int) -> respx.Route:
 
 
 def _spoken_by_nobody(graph: respx.MockRouter) -> respx.Route:
-    """Serving unattributed bytes to the attributed request would report `speaker_attribution`
-    true, which is the field a caller reads to learn why a speaker filter matched nothing."""
+    """The attributed request has to fail, or `speaker_attribution` reports true."""
 
     def respond(request: httpx.Request) -> httpx.Response:
         if request.headers["accept"] == "text/vtt":
@@ -172,8 +163,7 @@ class TestReadingTheWords:
     async def test_a_tenant_that_forbids_speaker_names_degrades_instead_of_failing(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """Graph's own documented remedy is to ask again for the unattributed format.
-        `services/teams-mcp` hardcodes `Accept: text/vtt` and loses the transcript entirely."""
+        """Graph's own documented remedy is to ask again for the unattributed format."""
         attempts: list[str] = []
 
         def respond(request: httpx.Request) -> httpx.Response:
@@ -202,8 +192,7 @@ class TestReadingTheWords:
     async def test_the_tenant_switch_is_not_retried_in_another_format(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft publishes no request-side workaround for this one, so the retry above must be
-        scoped to the inner code and not to 403."""
+        """No request-side workaround exists, so the retry is scoped to the inner code."""
         route = graph.get(_CONTENT).mock(return_value=httpx.Response(403, json=_TENANT_SWITCH_OFF))
 
         with pytest.raises(GraphForbidden) as raised:
@@ -221,13 +210,7 @@ class TestReadingTheWords:
     async def test_the_accept_header_is_not_added_to_every_other_graph_request(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """kiota's `RequestConfiguration.headers` defaults to ONE `HeadersCollection` shared by
-        every configuration in the process, and the generated builders' own
-        `try_add("Accept", "application/json")` cannot take a polluted default back.
-
-        `shared/identity.py`'s `GET /me` is the witness because it passes a `RequestConfiguration`
-        of its own; a call passing none would keep passing while the leak came back.
-        """
+        """kiota shares one default `HeadersCollection` across the whole process."""
         _spoken(graph)
         profile = graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
 
@@ -237,6 +220,18 @@ class TestReadingTheWords:
         _ = await identity.signed_in_user(client)
 
         assert "text/vtt" not in profile.calls.last.request.headers["accept"]
+
+    async def test_no_content_coding_is_accepted_so_the_declared_length_is_the_transcripts(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        """`Content-Length` counts encoded bytes, and the ceiling is about the decoded ones."""
+        route = _spoken(graph)
+
+        _ = await reader.teams_read_transcript(
+            client, transport, handle=_transcript(), offset=0, limit=200
+        )
+
+        assert route.calls.last.request.headers["accept-encoding"] == "identity"
 
     async def test_an_empty_transcript_is_no_turns_rather_than_a_blank_one(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
@@ -360,8 +355,7 @@ class TestNarrowingWhatComesBack:
         graph: respx.MockRouter,
         speaker: str,
     ) -> None:
-        """A copied name carries the whitespace around it, and a turn's own speaker is stripped at
-        parse time, so the filter is stripped too."""
+        """A turn's own speaker is stripped at parse time, so the filter is stripped too."""
         _spoken(graph)
 
         read = await reader.teams_read_transcript(
@@ -373,8 +367,7 @@ class TestNarrowingWhatComesBack:
     async def test_an_entity_in_a_speaker_name_is_unescaped_like_the_words(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """WebVTT escapes `&` inside a cue payload, so a display name holding one arrives
-        encoded, and a filter written from the reported name would then match nothing."""
+        """WebVTT escapes `&` inside a cue payload, so a name holding one arrives encoded."""
         graph.get(_CONTENT).mock(
             return_value=httpx.Response(
                 200,
@@ -430,8 +423,7 @@ class TestNarrowingWhatComesBack:
     async def test_the_next_offset_of_a_filtered_page_continues_the_filtered_sequence(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """Offset 2 of this transcript is Ada's second turn; offset 2 of what `from_seconds=2.0`
-        matched is the unattributed one."""
+        """Offset 2 of the transcript is not offset 2 of what `from_seconds=2.0` matched."""
         _spoken(graph)
         handle = _transcript()
 
@@ -467,8 +459,7 @@ class TestNarrowingWhatComesBack:
     async def test_a_speaker_filter_in_a_tenant_with_no_speakers_matches_nothing_and_says_why(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """Where the tenant forbids attribution every `speaker` is null, so the filter matches
-        nothing legitimately and only `speaker_attribution` says why."""
+        """Without attribution every `speaker` is null, so the filter matches nothing."""
         _spoken_by_nobody(graph)
 
         read = await reader.teams_read_transcript(
@@ -543,12 +534,7 @@ class TestBoundingWhatIsFetchedAndHeld:
         graph: respx.MockRouter,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Graph declares the length, so this is refused before a byte of it is read.
-
-        `GraphResponseTooLarge` has no branch in the shared remedy table, whose generic tail says
-        Microsoft rejected a bad request — false twice over, and it sends a model off to fix
-        arguments that are fine. So the tool words its own refusal.
-        """
+        """Graph declares the length, so this is refused before a byte of it is read."""
         monkeypatch.setattr(reader, "MAX_TRANSCRIPT_BYTES", 64)
         route = _spoken(graph)
 
@@ -561,10 +547,7 @@ class TestBoundingWhatIsFetchedAndHeld:
         assert f"{len(TRANSCRIPT_VTT.encode())} bytes" in str(raised.value)
         assert "no argument makes it smaller" in str(raised.value)
         assert "rejected this request" not in str(raised.value), "not the seam's generic advice"
-        assert raised.value.__cause__ is None, (
-            "a ToolError chained to a GraphFailure has its message thrown away and the generic "
-            "advice substituted, so this refusal is raised after the failure was handled"
-        )
+        assert raised.value.__cause__ is None, "raised after the failure was handled"
         assert route.called
 
     async def test_a_transcript_of_undeclared_length_is_refused_on_the_bytes_written(
@@ -574,10 +557,7 @@ class TestBoundingWhatIsFetchedAndHeld:
         graph: respx.MockRouter,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Graph sends transcripts chunked, with no `Content-Length` to refuse in advance, so the
-        second enforcement is the one that fires, and it reports the bytes it had counted when
-        it stopped — the helper reads in 64 KiB chunks, so that is the whole of this small
-        body rather than the first 64 bytes of it."""
+        """Graph sends transcripts chunked with no `Content-Length`, so the second guard fires."""
         monkeypatch.setattr(reader, "MAX_TRANSCRIPT_BYTES", 64)
 
         async def chunks() -> AsyncIterator[bytes]:
@@ -611,19 +591,7 @@ class TestBoundingWhatIsFetchedAndHeld:
         assert len(read.turns) == 4, "the ceiling is a limit, not a threshold below it"
 
     def test_a_page_is_read_without_the_whole_transcript_being_held(self, tmp_path: Path) -> None:
-        """The point of the change, and the test that fails if it is undone.
-
-        The synthetic file below is about 2 MB of WebVTT in 20,000 turns. Parsing every turn into
-        a list, filtering that into a second list and slicing twenty out of it — what this tool
-        did before — retains all 20,000 pydantic models and peaks in the tens of MB. A reader that
-        keeps only the page peaks in the tens of KB, so a ceiling three orders of magnitude below
-        the transcript separates the two without pinning an allocator's exact arithmetic.
-
-        It measures the parse alone, on a file written here, because that is the tighter
-        threshold: respx copies a whole body to serve it, so an end-to-end measurement carries a
-        harness floor this one does not. That floor was measured rather than assumed, and the test
-        below spends it to cover the streamed download as well.
-        """
+        """The point of the change, and the test that fails if it is undone."""
         path = tmp_path / "transcript.vtt"
         path.write_text(_a_long_transcript(20_000), encoding="utf-8")
         window = reader._Window(  # pyright: ignore[reportPrivateUsage]
@@ -647,14 +615,7 @@ class TestBoundingWhatIsFetchedAndHeld:
         transport: httpx.AsyncClient,
         graph: respx.MockRouter,
     ) -> None:
-        """The same promise as above, measured through the public function, download included.
-
-        respx holds the body it serves, so this threshold is looser than the parse-only one — it
-        is the harness floor plus the page. It still discriminates. This call peaks at 6.0 MiB;
-        parsing every turn of the same 1.95 MiB transcript into a list, filtering that into a
-        second list and slicing the page out of it peaks at 13.3 MiB, and the ceiling is between
-        them rather than near either.
-        """
+        """The same promise as above, measured through the public function, download included."""
         _spoken_at_length(graph, 20_000)
 
         tracemalloc.start()
@@ -677,12 +638,7 @@ class TestBoundingWhatIsFetchedAndHeld:
         graph: respx.MockRouter,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """What the cap costs when it fires, which no well-formed transcript makes it do.
-
-        Microsoft writes one cue per utterance, so the guard exists for a body with no blank line
-        in it rather than for anything Graph sends. The loss is silent: the turn comes back with
-        its speaker and timings and its words cut, and the cue after it is untouched.
-        """
+        """What the cap costs when it fires."""
         monkeypatch.setattr(reader, "_MAX_BLOCK_CHARACTERS", 256)
         graph.get(_CONTENT).mock(
             return_value=httpx.Response(
@@ -719,13 +675,7 @@ class TestBoundingWhatIsFetchedAndHeld:
         graph: respx.MockRouter,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """The cap bounds the read, not only the count of lines carried into a block.
-
-        Counting between lines bounds nothing when the payload is one line, which is how WebVTT is
-        normally written: a reader that materialised the line first would hold all of it. Measured
-        on an 8 MiB body holding one such cue, that reader peaked at 125.1 MiB against 15.9 MiB
-        here.
-        """
+        """The cap bounds the read, not only the count of lines carried into a block."""
         monkeypatch.setattr(reader, "_MAX_BLOCK_CHARACTERS", 256)
         graph.get(_CONTENT).mock(
             return_value=httpx.Response(
@@ -768,9 +718,7 @@ class TestBoundingWhatIsFetchedAndHeld:
     async def test_a_filtered_page_narrower_than_its_matches_reports_the_next_one(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """Ada's second turn is the fourth turn of the transcript, so a reader that stopped at the
-        page would report no more, and a reader counting the transcript would report the wrong
-        offset."""
+        """Ada's second turn is the fourth turn of the transcript."""
         _spoken(graph)
 
         read = await reader.teams_read_transcript(
@@ -794,15 +742,7 @@ class TestBoundingWhatIsFetchedAndHeld:
 
 
 class TestTheSeparatorAndTheDecodeThatWereMeasured:
-    """The two reading rules that are narrower than the obvious ones, pinned against them.
-
-    A block ends at a line of nothing but spaces and tabs, not at `str.strip()`: every character
-    below is `isspace()`, so the obvious rule would end a block on it and cut a cue in half,
-    losing the turn entirely. And the file is decoded `utf-8-sig`, so a byte-order mark is eaten
-    rather than left in front of the first cue timing, where `^` would no longer match it.
-
-    Every transcript here is synthetic, and written to be read in one way and not another.
-    """
+    """The two reading rules that are narrower than the obvious ones, pinned against them."""
 
     @pytest.mark.parametrize(
         ("name", "separator"),
@@ -843,8 +783,6 @@ class TestTheSeparatorAndTheDecodeThatWereMeasured:
     async def test_a_byte_order_mark_before_the_first_cue_is_eaten_rather_than_read(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """A transcript with no `WEBVTT` header puts the mark in front of the cue timing itself,
-        which is where decoding it as plain UTF-8 costs the first turn."""
         graph.get(_CONTENT).mock(
             return_value=httpx.Response(
                 200,

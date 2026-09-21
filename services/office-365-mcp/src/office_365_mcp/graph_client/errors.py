@@ -89,12 +89,8 @@ class GraphUnavailable(GraphFailure):
 
 
 class GraphResponseTooLarge(GraphFailure):
-    """Graph's answer was larger than the caller agreed to hold.
-
-    Not a failed request: Graph did nothing wrong and every field `_classify` fills is absent,
-    which is why this is raised here rather than produced there. `size` is `None` when the refusal
-    came from the `Content-Length` header and the body was never read.
-    """
+    """Graph's answer was larger than the caller agreed to hold. `size` is `None` when the
+    refusal came from the `Content-Length` header and the body was never read."""
 
     def __init__(self, *, size: int | None, limit: int, declared: int | None) -> None:
         super().__init__(

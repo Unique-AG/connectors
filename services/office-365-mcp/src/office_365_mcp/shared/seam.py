@@ -469,17 +469,7 @@ def _advice(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
 
 
 def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str | None) -> str:
-    """What a caller should do about `failure`, one branch per remedy rather than per status code.
-
-    Every `GraphFailure` needs a branch here, and the fallthrough is why. It says Graph rejected the
-    request as a bad one, which is true of the failures nothing else claims and false of any failure
-    that is not Graph's verdict at all. `GraphResponseTooLarge` is the case that made the point:
-    Graph answered, and this connector declined to hold the answer, so the fallthrough would be a
-    lie about Microsoft and would send a caller to retry arguments that were never the problem. A
-    tool that knows what it was fetching words its own refusal and raises `Advised`, which reaches
-    `GraphAdviceMiddleware` first and overrides this; the branch is what the rest get, and what
-    makes forgetting to write one safe.
-    """
+    """What a caller must do about `failure`, one branch per remedy rather than per status code."""
     if isinstance(failure, GraphThrottled):
         advice = failure.retry_after_seconds
         if advice is None:
@@ -534,11 +524,11 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
         )
     if isinstance(failure, GraphResponseTooLarge):
         return (
-            "Microsoft 365's answer was larger than this connector will hold, so it was not "
-            + f"returned. The limit is {failure.limit} bytes. Nothing about the request is wrong "
-            + "and retrying it unchanged will be refused identically: the size is the content's. "
-            + "Ask for less of it — a narrower window, fewer items, or one item rather than a "
-            + "collection — or reach the content through a tool that reports it as text."
+            "Microsoft 365 answered, but the answer is larger than this connector can hold. "
+            + f"The limit is {failure.limit} bytes. Nothing about the request is wrong. The same "
+            + "request will give the same refusal, so do not retry it. Ask for less content. Use "
+            + "a narrower window, fewer items, or one item instead of a collection. You can also "
+            + "read the content with a tool that returns text."
         )
     if isinstance(failure, GraphPagingUnending):
         # No request failed, so `_diagnostics` has nothing to append and the page count, which is

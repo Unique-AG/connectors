@@ -1,19 +1,4 @@
-"""Every response body here is synthesised. None came from a real tenant.
-
-`download_to_file` is shared, and what it promises is not what a caller can see: a spool file that
-is always gone, a bound on error bodies that does not change how a failure is classified, and two
-size guards that measure the quantity they are guards on. Each of those is a property of a path
-that leaves nothing behind to assert on afterwards, so it is asserted here or nowhere.
-
-`_PAST_THE_ERROR_BOUND` is a padding larger than `download.py`'s `_MAX_ERROR_BODY_BYTES` rather
-than that constant imported. The bound is internal and may move; what these tests hold is that the
-classification is the same on either side of wherever it sits.
-
-`_OPERATION` is here because `download_to_file` raises the SDK's own `ODataError` and `APIError`,
-and `graph_errors` is what turns one into the remedy class a caller actually sees. A claim about
-how a failure is classified is therefore only a claim inside that block, so the classification
-tests open one and the cleanup tests, which are about the file rather than the error, do not.
-"""
+"""`download_to_file`: the spool file, the error-body bound, the size guards. Data is synthetic."""
 
 import asyncio
 import gzip
@@ -58,7 +43,7 @@ def _request_info(client: GraphServiceClient) -> RequestInformation:
 
 
 def _odata(code: str, padding: int = 0) -> bytes:
-    """A Graph error document, optionally padded past the bound on how much of one is read."""
+    """A Graph error document, optionally padded."""
     return b'{"error":{"code":"' + code.encode() + b'","message":"' + b"x" * padding + b'"}}'
 
 
@@ -86,10 +71,7 @@ def _spool(tmp_path: Path) -> Path:
 
 
 class TestTheSpoolFileNeverOutlivesTheBlock:
-    """The pod has a 384Mi limit and `/tmp` is a sized `emptyDir`, so a file left behind is not an
-    untidiness — it is a pod that gets evicted after enough downloads. Every exit from this context
-    manager is its own way to leak one, so every exit is named here.
-    """
+    """Every exit from this context manager is its own way to leak a file."""
 
     async def test_the_directory_is_empty_after_a_download_that_succeeded(
         self,
@@ -183,8 +165,7 @@ class TestTheSpoolFileNeverOutlivesTheBlock:
         graph: respx.MockRouter,
         tmp_path: Path,
     ) -> None:
-        """No file is ever opened on this path, which is worth holding: the status check runs
-        before the spool file exists, and reordering the two would leak one per failure."""
+        """No file is ever opened on this path."""
         _ = graph.get(_PATH).mock(
             return_value=httpx.Response(
                 403,
@@ -228,10 +209,7 @@ class TestTheSpoolFileNeverOutlivesTheBlock:
         graph: respx.MockRouter,
         tmp_path: Path,
     ) -> None:
-        """An MCP client hanging up mid-download cancels the task, and `CancelledError` inherits
-        from `BaseException` rather than `Exception` — exactly the class of unwinding that a
-        cleanup written as `except Exception` would miss.
-        """
+        """`CancelledError` inherits from `BaseException`, not `Exception`."""
         body = _Slowly([b"x" * 4096] * 64, pause=0.01)
         _ = graph.get(_PATH).mock(return_value=httpx.Response(200, stream=body))
         directory = _spool(tmp_path)
@@ -253,12 +231,7 @@ class TestTheSpoolFileNeverOutlivesTheBlock:
 
 
 class TestAFailureIsClassifiedByWhatGraphSaidAboutIt:
-    """The bound on how much of an error body is read is the hazard here. A cut OData document is
-    not a smaller one, it is invalid JSON, and parsing the fragment turns Graph's own 404 into a
-    `JSONDecodeError` — which is a `ValueError`, so `graph_errors` re-raises it untranslated, the
-    step records `error` instead of `not_found`, and the caller gets a stacktrace where they used
-    to get advice.
-    """
+    """The bound on how much of an error body is read is the hazard here."""
 
     @pytest.mark.parametrize(
         ("status", "failure"),
@@ -308,8 +281,7 @@ class TestAFailureIsClassifiedByWhatGraphSaidAboutIt:
         status: int,
         failure: type[Exception],
     ) -> None:
-        """The OData code is lost, and that is the trade this makes on purpose. A `GraphNotFound`
-        without a code still reaches the caller as the advice for a missing item."""
+        """The OData code is lost, and that is the trade this makes on purpose."""
         _ = graph.get(_PATH).mock(
             return_value=httpx.Response(
                 status,
@@ -330,11 +302,7 @@ class TestAFailureIsClassifiedByWhatGraphSaidAboutIt:
 
 
 class TestTheSizeGuardsMeasureTheQuantityTheyGuard:
-    """`Content-Length` counts wire bytes and `aiter_bytes` yields decoded ones, and the transport
-    advertises `gzip, deflate`, so the two are different numbers whenever Graph codes a response.
-    Comparing across them is silent in both directions: a ceiling that stops firing on the real
-    size, and a complete body called truncated.
-    """
+    """`Content-Length` counts wire bytes and `aiter_bytes` yields decoded ones."""
 
     async def test_a_content_coded_body_that_arrived_whole_is_not_called_truncated(
         self,
@@ -343,10 +311,7 @@ class TestTheSizeGuardsMeasureTheQuantityTheyGuard:
         graph: respx.MockRouter,
         tmp_path: Path,
     ) -> None:
-        """Compression that expands rather than shrinks is the case that breaks a naive check:
-        decoded bytes below a `Content-Length` counting coded ones reads exactly like a stream that
-        ended early, and is answered "retry once" for a failure that repeats identically.
-        """
+        """Compression that expands rather than shrinks breaks a naive check."""
         coded = gzip.compress(_BODY)
         assert len(coded) > len(_BODY), "this body has to expand for the test to mean anything"
         _ = graph.get(_PATH).mock(
@@ -374,10 +339,7 @@ class TestTheSizeGuardsMeasureTheQuantityTheyGuard:
         graph: respx.MockRouter,
         tmp_path: Path,
     ) -> None:
-        """A body that fits compressed and does not fit decoded. The header guard cannot see it,
-        so this is the guard that has to, and it counts decoded bytes because decoded bytes are
-        what the caller has to find room for.
-        """
+        """A body that fits compressed and does not fit decoded."""
         oversized = b"x" * (_MAX_BYTES + 1)
         coded = gzip.compress(oversized)
         assert len(coded) < _MAX_BYTES, "a compressible body is the point of this test"

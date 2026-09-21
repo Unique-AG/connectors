@@ -1,101 +1,4 @@
-"""`teams_read_transcript` — speaker-attributed, timestamped turns from a Teams meeting transcript.
-
-The handle holds both ids, so one call reaches `/content`. Taking `meeting_uri` instead
-re-resolves the join URL, spends a second permission, and answers a 403 meaning either failure.
-Declaring `OnlineMeetingTranscript.Read.All` alone lets a tenant withhold `OnlineMeetings.Read`.
-That permission is named in `shared/meetings.py` rather than here or in the tool that mints the
-handle, because `tests/test_layering.py` rule 4 forbids one tool importing another.
-
-**Speaker attribution degrades rather than fails.** A tenant can forbid names, and this then asks
-the same endpoint for the unattributed format; `services/teams-mcp` hardcodes `Accept: text/vtt`
-and loses the transcript entirely. The retry is scoped to the `SpeakerAttributionNotAllowed` inner
-code: the tenant-wide switch that blocks transcripts outright answers with the same 403, and no
-format fixes that one. Both attempts are `graph_step`s inside ONE `graph_errors` for the whole
-call. The raw SDK error carries no inner code until a step block translates it, and two
-`graph_errors` blocks would count the refused first attempt as a `forbidden` operation on a call
-that went on to succeed. The two steps are named apart so the rate of `transcript_unattributed`
-shows how often a tenant's setting costs a caller the speaker names. No operation-level series can
-show that rate.
-
-**The body goes to a file, and the parse retains only the page.** A transcript is the largest
-thing this connector reads: 9.2 MiB of WebVTT measured here held 80,746 turns. Parsing all of it
-into a list, filtering that into a second list and then slicing twenty turns out of the result
-retained 84.9 MiB of Python objects for an answer of twenty, inside a pod limited to 384 MiB — one
-request could fill it. So the response is streamed to a file by `graph_client.download_to_file`,
-and the reader below walks that file one cue block at a time, keeping a turn only when it survives
-the filters and falls inside the requested window. The same twenty turns then cost 0.15 MiB. The
-claim is about what is RETAINED, not about work avoided: the page at offset 11,400, where nothing
-can be skipped, parses every turn before it and measures the same 0.15 MiB.
-
-**The parse reads one match past the window, because that is what `next_offset` asks.** Null means
-this was the last page, and `offset + len(page)` means there is more. "The window is full" does
-not distinguish them, so the loop stops at the first match whose filtered index is
-`offset + len(page)` and reports that index. The three filters apply before paging, so `offset`
-indexes the filtered sequence and not the transcript.
-
-**The ceiling bounds the download, which never had one.** `MAX_TURNS` bounds the answer; nothing
-bounded the fetch. `MAX_TRANSCRIPT_BYTES` is enforced by the helper twice, against the declared
-`Content-Length` before a byte is read and against the bytes actually written, and a transcript
-over it is refused in this tool's own words. It has to be: `GraphResponseTooLarge` has no branch
-in `shared/seam.py`, whose generic tail would tell a caller that Microsoft rejected a bad request,
-which is false twice over. The refusal is worded outside the `graph_errors` block, because a
-`ToolError` raised inside it would be counted as `status="error"` on `graph_operations_total` —
-the label that means this connector is broken — where the escaping `GraphResponseTooLarge` is
-counted `too_large`, which is what happened. The size is a PER-REQUEST ceiling, sized against the
-pod's `/tmp` — a 64 MiB emptyDir shared by every in-flight request — rather than against the
-384 MiB memory limit: the file is node storage and costs the process nothing, but overrunning that
-volume evicts the pod, which is worse than the refusal it would replace. Ten MiB each therefore
-assumes at most six transcript reads in flight at once, and nothing here enforces that: there is no
-semaphore in this service and no request-concurrency cap in its chart. Six is not a bound this
-establishes, it is the concurrency at which the volume stops being large enough, and it is written
-down so that whoever changes either number sees the other. It is strictly further off than what it
-replaces, which reached the memory limit at about two concurrent reads.
-
-**Nothing is cached, and every page still re-downloads the transcript.** `/content` publishes no
-ranged read, so the whole body still crosses the wire on every call, exactly as before. The file
-is deleted when the block reading it closes, and making one outlive a call is a different change:
-Graph re-checks access on every read, so any key would have to name the CALLER as well as the
-transcript, or one user's meeting would be answered to another. What changed here is retention.
-
-**The parse runs inside `graph_errors`, which it did not before.** The file exists only inside the
-download block, so anything the parse raises now lands as `status="error"` on the operation. Two
-things keep that honest. The arguments are validated and the scratch directory is resolved before
-the block is entered, so a bad argument still costs no Graph request. And the reader cannot raise:
-a block with no cue timing is skipped, undecodable bytes are replaced rather than refused, and a
-block is truncated at `_MAX_BLOCK_CHARACTERS` instead of carried whole, because a transcript with
-no blank line in it would otherwise grow one block to the size of the file and rebuild in memory
-the very thing this removes.
-
-**That cap is on the read, not only on the block, because one line can be the whole file.**
-Counting characters between lines bounds how many lines a block carries and nothing else: `for line
-in handle` materialises a line before anything can measure it, and WebVTT normally writes a cue's
-payload on a single line, so the shape that actually threatens this is a cue with no newline in it.
-On an 8 MiB body holding one such cue — under the ceiling, so not refused — a reader guarding only
-between lines peaked at 125.1 MiB, because `from_block` and `_spoken` copy that one string five
-times over; reading through `handle.readline(_MAX_BLOCK_CHARACTERS)` peaked at 15.9 MiB and parsed
-the cue after it unchanged. Graph does not emit such a body, so this is a bound being made true
-rather than a bug being fixed: over seventeen adversarial inputs and the 80,746-turn transcript the
-capped read answered exactly what reading whole lines answered. What the cap does when it fires is
-silent and semantic — the turn still comes back, speaker and timings intact and its words cut
-mid-word, and nothing in the answer says so.
-
-**A block ends at a line of nothing but spaces and tabs, which is narrower than `str.strip()`.**
-That is the rule the whole-text `\n[ \t]*\n` split this replaces encoded, and the difference is
-real: over nineteen adversarial inputs read in both formats — CRLF, a lone CR, a BOM at the start
-and a BOM midway, space, tab, form-feed and vertical-tab separators, runs of three and four
-newlines, no trailing newline, two cues with no blank line between them, invalid UTF-8, a no-break
-space, U+2028, an empty file, a header alone — this reader answered exactly what the old split
-answered in all thirty-eight, and a `str.strip()` reader answered differently in four, splitting a
-block the old one kept whole. `TestTheSeparatorAndTheDecodeThatWereMeasured` holds the four of
-those inputs that a `str.strip()` reader loses, and the BOM that `encoding="utf-8-sig"` eats, so
-the rule is pinned rather than only attested here. `TranscriptTurn.from_block` then drops the
-blank lines, takes the FIRST line that matches `_CUE_TIMING` and joins everything after it as the
-payload, which is why a cue identifier line is harmless and why a block holding two cues yields one
-turn. Opening the file
-with `encoding="utf-8-sig"`, `errors="replace"` and universal newlines reproduces the decode this
-used to do over the whole body at once, incrementally — a character split across two hand-decoded
-chunks would otherwise become a replacement character and silently rename a speaker.
-"""
+"""One page of a Teams meeting transcript, read off a streamed file rather than held whole."""
 
 import html
 import re
@@ -143,83 +46,88 @@ MAX_TURNS = 500
 MAX_TRANSCRIPT_BYTES = 10 * 1024 * 1024
 
 _DESCRIPTION = f"""\
-Returns one Teams meeting transcript's spoken turns, timestamped and speaker-attributed, from \
-the `uri` teams_list_meeting_transcripts reports, for what was said or decided. \
+Returns the spoken turns of one Teams meeting transcript. Use this tool to read what a \
+meeting said or decided. Each turn has a start time and an end time in seconds. Each turn can \
+have a speaker name. Use the `uri` that teams_list_meeting_transcripts reports. \
 teams_read_message is the other reader, and it takes a different handle. `meeting_uri` is not \
 valid for either tool.
 
 Notes:
-- If `speaker_attribution` comes back false, every `speaker` is null and a `speaker` filter \
-matches nothing.
-- Pass `from_seconds` before `to_seconds`. A window that runs backwards matches nothing.
-- Transcripts above {MAX_TRANSCRIPT_BYTES // (1024 * 1024)} MB are refused rather than read in \
-part. No argument makes the call smaller.
+- If `speaker_attribution` is false, every `speaker` is null. A `speaker` filter then matches \
+nothing.
+- `from_seconds` must not be later than `to_seconds`. If `from_seconds` is later than \
+`to_seconds`, this tool refuses the call.
+- If a transcript is larger than {MAX_TRANSCRIPT_BYTES // (1024 * 1024)} MB, this tool refuses \
+it. No argument makes the call smaller.
 """
 
 _NOT_A_TRANSCRIPT_HANDLE = (
-    "teams_read_transcript takes teams:///transcripts/{meeting_id}/{transcript_id} from "
-    + "teams_list_meeting_transcripts. This is not that shape. Call "
-    + "teams_list_meeting_transcripts and use its "
-    + "`uri`, not the meeting's `meeting_uri` or a Teams message handle. Retrying will fail "
-    + "identically."
+    "teams_read_transcript takes the handle teams:///transcripts/{meeting_id}/{transcript_id}. "
+    + "teams_list_meeting_transcripts reports that handle. This value has a different shape. "
+    + "Call teams_list_meeting_transcripts and use its `uri`. Do not use the meeting "
+    + "`meeting_uri`, and do not use a Teams message handle. A retry will fail identically."
 )
 
 _INVERTED_TIME_WINDOW = (
-    "from_seconds is later than to_seconds — no turn matches both. Swap them or drop one. "
-    + "Both are offsets from transcription start, counting up."
+    "from_seconds is later than to_seconds. No turn matches both bounds. Swap the two values, "
+    + "or drop one value. Both values are offsets in seconds from transcription start, and both "
+    + "values increase with time."
 )
 
 _BLANK_SPEAKER = (
-    "blank speaker filter is not treated as no filter: omit it entirely to read every turn, or "
-    + "pass any part of the display name (case-insensitive, matches anywhere)."
+    "A blank speaker filter is not the same as no filter. To read every turn, omit the speaker "
+    + "parameter. To filter, give any part of the speaker name. The match is case-insensitive, "
+    + "and it matches anywhere in the name."
 )
 
 GRAPH_NOT_FOUND = (
-    "Microsoft 365 will not return this transcript. The handle is well formed. Most likely the "
-    + "meeting expires after about 60 days for a one-off. Transcripts age out with it. Call "
-    + "teams_list_meeting_transcripts again to see what remains. If not listed there, retrying "
-    + "will not "
-    + "help."
+    "Microsoft 365 will not return this transcript. The handle is well formed. A one-off "
+    + "meeting expires after about 60 days, and its transcripts expire with it. Call "
+    + "teams_list_meeting_transcripts again to see what remains. If the transcript is not in "
+    + "that list, a retry will not help."
 )
 
 
 def _too_large(refusal: GraphResponseTooLarge) -> str:
-    """The refusal a caller reads, in this tool's words rather than the seam's generic advice.
-
-    `size` is set when the bytes written passed the ceiling and `declared` when `Content-Length`
-    did, and exactly one of them is, so neither is interpolated on its own.
-    """
     counted = refusal.size if refusal.size is not None else refusal.declared
-    measured = "of a size Microsoft did not declare" if counted is None else f"{counted} bytes"
+    measured = (
+        "Microsoft did not declare the size of this transcript."
+        if counted is None
+        else f"This transcript is {counted} bytes."
+    )
     return (
-        f"This transcript is {measured}, and this connector reads at most "
-        + f"{MAX_TRANSCRIPT_BYTES}. No turns were read. Nothing about the request is wrong and no "
-        + "argument makes it smaller: from_seconds, to_seconds and speaker narrow the answer, not "
-        + "the call, and Microsoft publishes no ranged read of a transcript, so every call for "
-        + "any part of it fetches the whole. Report that this meeting's transcript is too long to "
-        + "read here, never that the meeting was silent or that no transcript exists. "
-        + "teams_list_meeting_transcripts still lists it, and the user can open the meeting in "
-        + "Teams and read or download the transcript there."
+        f"{measured} This connector reads at most {MAX_TRANSCRIPT_BYTES} bytes. This tool read "
+        + "no turns. Nothing about the request is wrong, and no argument makes it smaller. "
+        + "from_seconds, to_seconds and speaker narrow the answer, but they do not narrow the "
+        + "call. Microsoft publishes no ranged read of a transcript. Every call for any part of "
+        + "a transcript fetches the whole transcript. Report that this transcript is too long to "
+        + "read here. Do not report that the meeting was silent. Do not report that no "
+        + "transcript exists. teams_list_meeting_transcripts still lists this transcript. The "
+        + "user can open the meeting in Teams, and read or download the transcript there."
     )
 
 
 class TranscriptTurn(BaseModel):
     speaker: str | None = Field(
         description=(
-            "Who spoke, or null if the transcript has no speaker attribution or Microsoft did "
-            "not name this turn."
+            "This value names who spoke. If the transcript has no speaker attribution, this "
+            "value is null. If Microsoft did not name this turn, this value is null."
         )
     )
     start_seconds: float = Field(
         description=(
-            "Turn start in seconds from transcription start, not wall-clock time and not an "
-            "offset from meeting start. This value can be negative. Add it to the `started_at` "
-            "value that teams_list_meeting_transcripts reported for this transcript, to get an "
-            "absolute time."
+            "This value is the turn start. The unit is seconds from transcription start. This "
+            "value is not wall-clock time, and it is not an offset from meeting start. This "
+            "value can be negative. To get an absolute time, add this value to the `started_at` "
+            "value that teams_list_meeting_transcripts reported for this transcript."
         )
     )
-    end_seconds: float = Field(description="Turn end, same scale as `start_seconds`.")
-    text: str = Field(description="Spoken words, with cue markup stripped.")
+    end_seconds: float = Field(
+        description="This value is the turn end. The unit is the unit of `start_seconds`."
+    )
+    text: str = Field(
+        description="This value holds the spoken words. This tool removes the cue markup."
+    )
 
     @classmethod
     def from_block(cls, block: str, *, attributed: bool) -> Self | None:
@@ -247,33 +155,33 @@ class TranscriptTurn(BaseModel):
 
 
 class Transcript(BaseModel):
-    uri: str = Field(description="The handle used to read this, echoed back.")
-    meeting_id: str = Field(description="Meeting Graph id.")
-    transcript_id: str = Field(description="Transcript Graph id.")
+    uri: str = Field(description="This tool echoes back the handle that it read.")
+    meeting_id: str = Field(description="This value is the meeting Graph id.")
+    transcript_id: str = Field(description="This value is the transcript Graph id.")
     speaker_attribution: bool = Field(
         description=(
-            "True if speakers are named, false if the tenant disabled speaker names — every "
-            "`speaker` is null when false. Do not infer who spoke from a turn's content."
+            "If this value is true, the turns name the speakers. If this value is false, the "
+            "tenant disabled speaker names, and every `speaker` is null. Do not infer who spoke "
+            "from the content of a turn."
         )
     )
     turns: list[TranscriptTurn] = Field(
         description=(
-            "Matching turns, or all turns if no filter was passed. Empty means nothing matched, "
-            "not that the meeting was silent."
+            "This list holds the turns that match the filters. If the caller gives no filter, "
+            "this list holds every turn. An empty list means that nothing matched. An empty "
+            "list does not mean that the meeting was silent."
         )
     )
     next_offset: int | None = Field(
         description=(
-            "Offset for the next page of matching turns, or null if this is the last page. Pass "
-            "it back as `offset`, with the same filters, to continue."
+            "The offset of the next page of matching turns. If this page is the last page, this "
+            "value is null. To continue, pass this value back as `offset` with the same filters."
         )
     )
 
 
 @dataclass(frozen=True, slots=True)
 class _Window:
-    """What the caller asked for: the three filters, and the slice of what survives them."""
-
     offset: int
     limit: int
     from_seconds: float | None
@@ -322,11 +230,7 @@ async def _read(
     scratch: Path,
     window: _Window,
 ) -> Transcript:
-    """The page, parsed off a file that exists only inside the download block that wrote it.
-
-    `RequestInformation` is consumed by the send, so the fallback attempt builds its own rather
-    than reusing the refused one — and it has to, because the two carry different `Accept` values.
-    """
+    """The page, parsed off a file that exists only inside the download block that wrote it."""
     endpoint = (
         client.me.online_meetings.by_online_meeting_id(handle.meeting_id)
         .transcripts.by_call_transcript_id(handle.transcript_id)
@@ -364,17 +268,7 @@ async def _read(
 
 
 def _accepting(media_type: str) -> HeadersCollection:
-    """A `HeadersCollection` that asks for `media_type`, built per request rather than shared.
-
-    The generated builder adds its own `Accept` with `try_add`, which does not overwrite, so this
-    one is what goes on the wire.
-
-    It also refuses a content coding. The ceiling is enforced against `Content-Length` before any
-    body is read, and under `gzip` that header counts compressed bytes rather than the transcript
-    the ceiling is about — so the guard would measure one quantity and claim another. A transcript
-    is text and compresses well, so this costs real bandwidth; the alternative is a bound that
-    under-fires by whatever the coding happened to save.
-    """
+    """A `HeadersCollection` that asks for `media_type`, built per request rather than shared."""
     headers = HeadersCollection()
     headers.add("Accept", media_type)
     headers.add(*_NO_CONTENT_CODING)
@@ -398,12 +292,7 @@ def _paged(
 def _page(
     path: Path, *, attributed: bool, window: _Window
 ) -> tuple[list[TranscriptTurn], int | None]:
-    """The window's turns, and the filtered offset of the next match past it when one exists.
-
-    One forward pass over the file. Everything that does not match, and everything that matches
-    before `offset`, is counted and dropped; only the page itself and the one match that proves
-    `next_offset` are ever held.
-    """
+    """The window's turns, and the filtered offset of the next match past it when one exists."""
     wanted = window.speaker.strip().casefold() if window.speaker is not None else None
     page: list[TranscriptTurn] = []
     matched = 0
@@ -420,7 +309,7 @@ def _page(
 
 
 def _matching(turn: TranscriptTurn, *, window: _Window, wanted: str | None) -> bool:
-    """Time by overlap, both bounds inclusive; speaker by case-insensitive substring."""
+    """Time matches by overlap, both bounds inclusive. Speaker matches by substring, folded."""
     return (
         (window.from_seconds is None or turn.end_seconds >= window.from_seconds)
         and (window.to_seconds is None or turn.start_seconds <= window.to_seconds)
@@ -429,11 +318,7 @@ def _matching(turn: TranscriptTurn, *, window: _Window, wanted: str | None) -> b
 
 
 def _blocks(path: Path) -> Iterator[str]:
-    """Cue blocks, one at a time, from a file this never holds more than one block of.
-
-    The size handed to `readline` is what bounds a block whose lines never end; `held` bounds one
-    made of many lines. Both are needed, and neither alone is the cap the module docstring claims.
-    """
+    """Cue blocks, one at a time, from a file this never holds more than one block of."""
     with path.open(encoding="utf-8-sig", errors="replace") as handle:
         block: list[str] = []
         held = 0
@@ -510,8 +395,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 ge=0,
                 description=(
-                    "Turns to skip, starting at 0. Pass the previous response's `next_offset` to "
-                    "continue."
+                    "This value is the number of turns to skip. The first turn is 0. To "
+                    "continue, pass the `next_offset` value of the previous response."
                 ),
             ),
         ] = 0,
@@ -521,8 +406,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_TURNS,
                 description=(
-                    f"Turns to return, at most {MAX_TURNS}. This tool fetches the whole "
-                    "transcript regardless, so a wide `limit` costs less than paging."
+                    "This value is the number of turns to return. The maximum is "
+                    f"{MAX_TURNS}. This tool fetches the whole transcript for every call. One "
+                    "wide `limit` costs less than several pages."
                 ),
             ),
         ] = 200,
@@ -530,8 +416,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             float | None,
             Field(
                 description=(
-                    "Only turns that overlap at or after this moment, in seconds from "
-                    "transcription start. This bound is inclusive. A negative value is legal."
+                    "This tool returns only the turns that overlap at or after this moment. The "
+                    "unit is seconds from transcription start. This bound is inclusive. A "
+                    "negative value is valid."
                 )
             ),
         ] = None,
@@ -539,9 +426,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             float | None,
             Field(
                 description=(
-                    "Only turns that overlap at or before this moment, in the same units as "
-                    "`from_seconds`. This bound is inclusive. Pair it with `from_seconds` to "
-                    "read one stretch."
+                    "This tool returns only the turns that overlap at or before this moment. "
+                    "The unit is the same as the unit of `from_seconds`. This bound is "
+                    "inclusive. To read one window, give this value and `from_seconds` "
+                    "together."
                 )
             ),
         ] = None,
@@ -550,8 +438,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only turns whose speaker name contains this substring, case-insensitive. "
-                    "Omit this parameter to read every speaker. A blank value is invalid."
+                    "This tool returns only the turns whose speaker name contains this "
+                    "substring. The match is case-insensitive. To read every turn, omit "
+                    "this parameter. A blank value is invalid."
                 ),
             ),
         ] = None,
