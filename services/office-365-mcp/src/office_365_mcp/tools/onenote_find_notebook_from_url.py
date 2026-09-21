@@ -46,9 +46,10 @@ the notebook that holds it — confirmed on a test tenant across all of these ad
 there is no need to trim the address down to the notebook first. This tool asks Microsoft \
 directly; it does not search or guess. The `uri` it returns is a notebook handle: pass it to \
 onenote_list_sections to see what the notebook holds, to onenote_create_section or \
-onenote_create_section_group to add to it, or to onenote_copy_section or onenote_copy_notebook \
-as a copy destination. onenote_list_recent_notebooks returns no handle at all, because Microsoft \
-gives none there — call this tool with its `web_url` to get one.\
+onenote_create_section_group to add to it, to onenote_copy_section as `to_notebook`, the \
+destination of a section copy, or to onenote_copy_notebook as `notebook`, the SOURCE that tool \
+copies into the user's own OneDrive. onenote_list_recent_notebooks returns no handle at all, \
+because Microsoft gives none there — call this tool with its `web_url` to get one.\
 """
 
 _OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS = (
@@ -83,7 +84,9 @@ class FoundNotebook(BaseModel):
             "This notebook's handle: onenote:///notebooks/{id}, with the id percent-encoded. "
             + "Pass it to onenote_list_sections, onenote_create_section or "
             + "onenote_create_section_group to work inside this notebook, or to "
-            + "onenote_copy_section or onenote_copy_notebook as a copy destination. Never build "
+            + "onenote_copy_section as `to_notebook`, the destination of a section copy, or to "
+            + "onenote_copy_notebook as `notebook`, the source it copies into the user's own "
+            + "OneDrive. Never build "
             + "one: a notebook id alone reaches nothing."
         )
     )

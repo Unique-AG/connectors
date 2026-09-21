@@ -78,7 +78,10 @@ List every OneNote notebook the signed-in user owns, plus every notebook someone
 shared with them, and every section inside each one — unless `capped` is true, in which case a \
 safety cap cut one of those listings short and some notebooks or sections may be missing. This \
 is the starting point for reading or writing OneNote: every other onenote_* tool takes a \
-section's, a notebook's or a page's handle, and every one of those handles comes from here. \
+notebook's, a section group's, a section's or a page's handle. Notebook and section handles \
+come from here; onenote_list_sections mints section group handles, onenote_list_pages and \
+onenote_create_page mint page handles, and onenote_find_notebook_from_url and the three create \
+tools mint the handle of what they resolved or created. \
 `name_contains` keeps only the notebooks whose name holds this text, compared without regard to \
 case. `shared` keeps only notebooks that are (true) or are not (false) shared with anyone else. \
 `role` keeps only notebooks where the signed-in user holds exactly this access level: Owner, \

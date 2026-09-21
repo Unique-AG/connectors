@@ -234,7 +234,7 @@ def _nobody_to_ask(nothing_happened: str) -> str:
         + "client on the other end does not support elicitation, so there was nobody to "
         + "ask. This is a property of the client and not of the request: retrying will "
         + "fail the same way. Tell the user that their client cannot confirm this, and "
-        + f"that they can do it in Outlook instead. {_ASK_AGAIN}"
+        + f"that they can do it in the Microsoft 365 app itself instead. {_ASK_AGAIN}"
     )
 
 

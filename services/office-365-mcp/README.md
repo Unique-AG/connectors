@@ -410,12 +410,14 @@ run against the test tenant on 2026-09-16 returned a 966 KB PDF from a 6.4 MB Po
 `$search` is absent from the OneNote query-options table, so `onenote_list_pages` filters on the
 title alone; it cannot see what a page's body says. A page comes back as the HTML Microsoft
 stores, with any image or file reference inside it pointing at Graph and opening only with this
-connector's own sign-in token, and this connector converts none of it. The two write tools are
-additive. Each one resolves the target notebook first, and when that notebook is shared or belongs
-to somebody else it puts the write to the person at the other end through MCP elicitation before
-anything is written, because the page is visible to those people the moment it exists; a page in
-the user's own unshared notebook is written without a question, the way a mail draft is. Both
-send `no_retry()` because a retried create or append duplicates content. `onenote_create_page`
+connector's own sign-in token, and this connector converts none of it. Every write tool resolves
+the target notebook first, and when that notebook is shared or belongs to somebody else it puts
+the write to the person at the other end through MCP elicitation before anything is written,
+because the page is visible to those people the moment it exists; an additive write into the
+user's own unshared notebook happens without a question, the way a mail draft is. A page delete
+and a `replace` edit ask always. Every non-idempotent write (create, append, insert, prepend,
+copy) sends `no_retry()` because a retried one duplicates content; the rename and the delete are
+idempotent and keep the SDK's default retry. `onenote_create_page`
 sends the page as `text/html` through a hand-built request, because the SDK's generated `post`
 would send JSON, which OneNote rejects. `onenote_append_to_page` goes through the SDK's
 `onenotePatchContent` action, whose enum values kiota serialises as `Append`/`After` where
