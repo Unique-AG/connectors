@@ -34,6 +34,7 @@ from office_365_mcp.shared.prose import body_opening
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
+    answer_pending,
     graph_client_for_caller,
     person_confirms,
 )
@@ -102,16 +103,22 @@ _NOT_A_PAGE_HANDLE = (
 )
 
 GRAPH_NOT_FOUND = (
-    "Microsoft 365 did not find this page. The handle is well formed, so the argument is not "
-    + "the problem. The page was most likely deleted, or moved to another section, and either "
-    + "one gives it a new id that this handle does not name. Nothing was appended. Find the "
-    + "page again with onenote_list_pages, and take the `uri` from that new result. This same "
+    "Microsoft 365 could not complete this append. The handle is well formed, so the argument "
+    + "is not the problem. The page was most likely deleted or moved to another section, "
+    + "either of which gives it a new id that this handle does not name — or the notebook "
+    + "holding the page could not be read. Either way, nothing was appended. Find the page "
+    + "again with onenote_list_pages, and take the `uri` from that new result. This same "
     + "handle fails the same way every time, so do not retry it."
 )
 
 
 async def append_to_page(
-    client: GraphServiceClient, *, page: str, body_html: str, confirm: Confirm
+    client: GraphServiceClient,
+    *,
+    page: str,
+    body_html: str,
+    confirm: Confirm,
+    answer_pending: bool = False,
 ) -> PageSummary | InputRequiredResult:
     handle = onenote_page_handle(page)
     if handle is None:
@@ -125,7 +132,7 @@ async def append_to_page(
         with graph_step(STEP_PAGE):
             for_audience = await _page_for_audience(client, handle)
         audience = await _audience_of(client, for_audience)
-        if audience.reaches_others:
+        if answer_pending or audience.reaches_others:
             with not_graph():
                 answer = await confirm(_question(for_audience, audience, body_html), about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
@@ -247,5 +254,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         client: GraphServiceClient = graph,
     ) -> PageSummary | InputRequiredResult:
         return await append_to_page(
-            client, page=page, body_html=body_html, confirm=a_person_agrees(ctx)
+            client,
+            page=page,
+            body_html=body_html,
+            confirm=a_person_agrees(ctx),
+            answer_pending=answer_pending(ctx),
         )

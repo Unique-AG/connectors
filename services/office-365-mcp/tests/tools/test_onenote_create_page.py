@@ -8,7 +8,7 @@ import pytest
 import respx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from fastmcp.tools import Tool
+from fastmcp.tools import FunctionTool, Tool
 from mcp.types import (
     ElicitRequest,
     ElicitRequestFormParams,
@@ -838,10 +838,19 @@ def _modern_context(
 
 
 async def _round(
-    client: GraphServiceClient, *, confirm: Confirm, section: str | None = _SECTION_URI
+    client: GraphServiceClient,
+    *,
+    confirm: Confirm,
+    section: str | None = _SECTION_URI,
+    answer_pending: bool = False,
 ) -> CreatedPage | InputRequiredResult:
     return await create_page(
-        client, title=_TITLE, body_html=_BODY_HTML, section=section, confirm=confirm
+        client,
+        title=_TITLE,
+        body_html=_BODY_HTML,
+        section=section,
+        confirm=confirm,
+        answer_pending=answer_pending,
     )
 
 
@@ -947,3 +956,109 @@ class TestTheEraWithNoBackChannel:
             )
 
         assert create.call_count == 0
+
+    async def test_a_pending_decline_is_honored_even_when_the_fresh_read_says_private(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads_section_parent(graph, _NOTEBOOK_ID)
+        notebook_route = graph.get(_NOTEBOOK_ROUTE).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+        create = graph.post(_SECTION_ROUTE).mock(return_value=httpx.Response(201))
+        key, state, _agree = _the_question(
+            await _round(client, confirm=a_person_agrees(_modern_context()))
+        )
+
+        with pytest.raises(ToolError, match="did not agree") as raised:
+            _ = await _round(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(answers={key: ElicitResult(action="decline")}, state=state)
+                ),
+                answer_pending=True,
+            )
+
+        assert str(raised.value).startswith("No page was created.")
+        assert create.call_count == 0
+        assert notebook_route.call_count == 2
+
+    async def test_a_pending_accept_still_creates_when_the_fresh_read_says_private(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads_section_parent(graph, _NOTEBOOK_ID)
+        notebook_route = graph.get(_NOTEBOOK_ROUTE).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+        create = graph.post(_SECTION_ROUTE).mock(
+            return_value=httpx.Response(201, json=_page_payload())
+        )
+        key, state, agree = _the_question(
+            await _round(client, confirm=a_person_agrees(_modern_context()))
+        )
+
+        answer = await _round(
+            client,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": agree})},
+                    state=state,
+                )
+            ),
+            answer_pending=True,
+        )
+
+        assert isinstance(answer, CreatedPage)
+        assert create.call_count == 1
+        assert notebook_route.call_count == 2
+
+
+class TestHowRegisterWiresThePendingAnswer:
+    async def test_register_consults_a_pending_answer_the_fresh_read_alone_would_skip(
+        self, transport: httpx.AsyncClient, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads_section_parent(graph, _NOTEBOOK_ID)
+        notebook_route = graph.get(_NOTEBOOK_ROUTE).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+        create = graph.post(_SECTION_ROUTE).mock(return_value=httpx.Response(201))
+        mcp: FastMCP = FastMCP(name="wiring-under-test")
+        creator.register(mcp, transport)
+        tool = await mcp.get_tool(creator.TOOL_NAME)
+        assert tool is not None, "register left the tool off the server"
+        assert isinstance(tool, FunctionTool)
+
+        first = cast(
+            "CreatedPage | InputRequiredResult",
+            await tool.fn(
+                title=_TITLE,
+                body_html=_BODY_HTML,
+                section=_SECTION_URI,
+                ctx=_modern_context(),
+                client=client,
+            ),
+        )
+        key, state, _agree = _the_question(first)
+
+        with pytest.raises(ToolError, match="did not agree"):
+            _ = cast(
+                "CreatedPage | InputRequiredResult",
+                await tool.fn(
+                    title=_TITLE,
+                    body_html=_BODY_HTML,
+                    section=_SECTION_URI,
+                    ctx=_modern_context(answers={key: ElicitResult(action="decline")}, state=state),
+                    client=client,
+                ),
+            )
+
+        assert create.call_count == 0
+        assert notebook_route.call_count == 2

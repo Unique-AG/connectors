@@ -12,7 +12,7 @@ from fastmcp.server.elicitation import (
     CancelledElicitation,
     DeclinedElicitation,
 )
-from fastmcp.tools import Tool
+from fastmcp.tools import FunctionTool, Tool
 from mcp.types import (
     ElicitRequest,
     ElicitRequestFormParams,
@@ -380,6 +380,26 @@ class TestGraphFailures:
 
         assert patch.call_count == 1
         assert page_route.call_count == 1, "only the pre-read happened; the patch never reread"
+
+    async def test_a_404_on_the_notebook_read_is_a_not_found_and_nothing_is_patched(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_route = graph.get(_GET_PATH).mock(
+            return_value=httpx.Response(200, json=_page_payload(notebook=_NOTEBOOK))
+        )
+        notebook_route = graph.get(_NOTEBOOK_GET_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+            )
+        )
+        patch = graph.post(_PATCH_PATH).mock(return_value=httpx.Response(204))
+
+        with pytest.raises(GraphNotFound):
+            _ = await _append(client)
+
+        assert page_route.call_count == 1
+        assert notebook_route.call_count == 1
+        assert patch.call_count == 0, "the notebook read failed before anything was appended"
 
     async def test_a_403_on_the_patch_is_a_forbidden(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -812,6 +832,85 @@ class TestTheEraWithNoBackChannel:
 
         assert patch.call_count == 0
 
+    async def test_a_pending_decline_is_honored_even_when_the_fresh_read_says_private(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        notebook_route = graph.get(_NOTEBOOK_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+        patch = _patches(graph)
+
+        first = await append_to_page(
+            client,
+            page=_PAGE_URI,
+            body_html=_BODY_HTML,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        state = first.request_state
+        assert state is not None
+
+        with pytest.raises(ToolError, match="Nothing was appended"):
+            _ = await append_to_page(
+                client,
+                page=_PAGE_URI,
+                body_html=_BODY_HTML,
+                confirm=a_person_agrees(
+                    _modern_context(answers={key: ElicitResult(action="decline")}, state=state)
+                ),
+                answer_pending=True,
+            )
+
+        assert patch.call_count == 0
+        assert notebook_route.call_count == 2
+
+    async def test_a_pending_accept_still_appends_when_the_fresh_read_says_private(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        notebook_route = graph.get(_NOTEBOOK_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+        patch = _patches(graph)
+
+        first = await append_to_page(
+            client,
+            page=_PAGE_URI,
+            body_html=_BODY_HTML,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        state = first.request_state
+        assert state is not None
+
+        answer = await append_to_page(
+            client,
+            page=_PAGE_URI,
+            body_html=_BODY_HTML,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": "append"})},
+                    state=state,
+                )
+            ),
+            answer_pending=True,
+        )
+
+        assert isinstance(answer, PageSummary)
+        assert patch.call_count == 1
+        assert notebook_route.call_count == 2
+
 
 class TestTheClientThatCannotAsk:
     async def test_a_client_that_cannot_ask_appends_nothing(
@@ -834,6 +933,51 @@ class TestTheClientThatCannotAsk:
             _ = await append_to_page(client, page=_PAGE_URI, body_html=_BODY_HTML, confirm=confirm)
 
         assert patch.call_count == 0
+
+
+class TestHowRegisterWiresThePendingAnswer:
+    async def test_register_consults_a_pending_answer_the_fresh_read_alone_would_skip(
+        self, transport: httpx.AsyncClient, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
+        notebook_route = graph.get(_NOTEBOOK_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_notebook_payload(is_shared=True, user_role="Owner")),
+                httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner")),
+            ]
+        )
+        patch = _patches(graph)
+        mcp: FastMCP = FastMCP(name="wiring-under-test")
+        appender.register(mcp, transport)
+        tool = await mcp.get_tool(appender.TOOL_NAME)
+        assert tool is not None, "register left the tool off the server"
+        assert isinstance(tool, FunctionTool)
+
+        first = cast(
+            "PageSummary | InputRequiredResult",
+            await tool.fn(
+                page=_PAGE_URI, body_html=_BODY_HTML, ctx=_modern_context(), client=client
+            ),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        state = first.request_state
+        assert state is not None
+
+        with pytest.raises(ToolError, match="Nothing was appended"):
+            _ = cast(
+                "PageSummary | InputRequiredResult",
+                await tool.fn(
+                    page=_PAGE_URI,
+                    body_html=_BODY_HTML,
+                    ctx=_modern_context(answers={key: ElicitResult(action="decline")}, state=state),
+                    client=client,
+                ),
+            )
+
+        assert patch.call_count == 0
+        assert notebook_route.call_count == 2
 
 
 class TestHowItDeclaresItself:

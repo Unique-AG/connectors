@@ -302,6 +302,16 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
     return confirm
 
 
+def answer_pending(ctx: Context) -> bool:
+    """True when this call carries an answer to a confirmation asked on an earlier call.
+
+    A fresh audience read is taken on every call, and it can disagree with the one the question
+    was asked from. Callers must consult `confirm` whenever an answer is pending, rather than
+    trusting this call's own read to decide whether one is owed.
+    """
+    return (ctx.input_responses or {}).get(_CONFIRMATION) is not None
+
+
 class Advised(ToolError):
     """A tool error whose message is already the advice below, so the middleware leaves it alone.
 

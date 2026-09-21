@@ -33,6 +33,7 @@ from office_365_mcp.shared.prose import body_opening
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
+    answer_pending,
     graph_client_for_caller,
     person_confirms,
 )
@@ -154,6 +155,8 @@ _CREATE = "create"
 _DO_NOT_CREATE = "do not create"
 _NOTHING_CREATED = "No page was created."
 
+_UNKNOWN_AUDIENCE = NotebookAudience(notebook_id=None, name=None, is_shared=None, user_role=None)
+
 
 async def _notebook_audience_for(
     client: GraphServiceClient, handle: OnenoteSectionHandle | None
@@ -162,7 +165,7 @@ async def _notebook_audience_for(
         return await default_notebook_audience(client)
     parent_id = await section_notebook_id(client, handle.section_id)
     if parent_id is None:
-        return NotebookAudience(notebook_id=None, name=None, is_shared=None, user_role=None)
+        return _UNKNOWN_AUDIENCE
     return await notebook_audience(client, parent_id)
 
 
@@ -188,6 +191,7 @@ async def create_page(
     section: str | None = None,
     now: Callable[[], datetime] = _now,
     confirm: Confirm,
+    answer_pending: bool = False,
 ) -> CreatedPage | InputRequiredResult:
     assert 1 <= len(title) <= MAX_TITLE_CHARACTERS, (
         f"title is bounded by the schema, got {len(title)}"
@@ -214,9 +218,10 @@ async def create_page(
     refused: str | None = None
     with graph_errors(TOOL_NAME):
         audience = await _notebook_audience_for(client, handle)
-        if audience is not None and audience.reaches_others:
+        if answer_pending or (audience is not None and audience.reaches_others):
+            heard_by = audience if audience is not None else _UNKNOWN_AUDIENCE
             with not_graph():
-                answer = await confirm(_question(title, body_html, audience), about)
+                answer = await confirm(_question(title, body_html, heard_by), about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
@@ -336,4 +341,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             body_html=body_html,
             section=section,
             confirm=a_person_agrees(ctx),
+            answer_pending=answer_pending(ctx),
         )
