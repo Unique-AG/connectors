@@ -318,11 +318,14 @@ names `Notes.Create` as the least-privileged permission there, because `Notes.Cr
 creating pages, notebooks and sections, and a read-only preset must not put a write grant on its
 consent screen. `onenote_create_page` declares `Notes.Create` and `onenote_append_to_page`
 declares `Notes.ReadWrite`, each the least-privileged permission Microsoft documents for its own
-request. Every new read tool takes the same trade the list did: `onenote_preview_page`,
-`onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`,
-`onenote_list_sections` and `onenote_get_operation` all declare `Notes.Read` although Microsoft's
-own table names `Notes.Create` as each one's least-privileged permission, for the identical
-reason — `onenote-read` must stay a read-only consent screen. The three creation tools,
+request. Four of the new read tools take the same trade the list did:
+`onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections` and
+`onenote_get_operation` declare `Notes.Read` although Microsoft's own table names `Notes.Create`
+as each one's least-privileged permission, for the identical reason — `onenote-read` must stay a
+read-only consent screen. `onenote_read_resource` declares the least-privileged permission
+Microsoft documents for its own request, and the page-preview endpoint has no published
+permissions table at all, so `onenote_preview_page` inherits `Notes.Read` from the rest of the
+preset. The three creation tools,
 `onenote_create_notebook`, `onenote_create_section` and `onenote_create_section_group`, and the
 three copy tools, `onenote_copy_page`, `onenote_copy_section` and `onenote_copy_notebook`, declare
 `Notes.Create`, the least-privileged permission Microsoft documents for each of those requests.
@@ -374,7 +377,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `sharepoint-read` | the above, plus listing one level of a folder and returning one file itself, or the PDF Microsoft converts it to | + `sharepoint_browse_folder`, `sharepoint_read_file` | `User.Read`, `Files.Read.All` | 1 |
 | `onenote-read` | list every notebook, its sections and section groups, find or read a page or preview it, fetch an image a page points at, resolve a web address to a notebook, and list the notebooks Microsoft has seen the user open lately | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections` | `User.Read`, `Notes.Read` | 0 |
 | `onenote-write` | the above, plus creating a notebook, a section or a section group, creating a page or appending to, editing or renaming one, and copying a page, a section or a notebook and polling the copy | + `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`, `onenote_get_operation` | + `Notes.Create`, `Notes.ReadWrite` | 0 |
-| `onenote-delete` | the above, plus deleting a page outright | + `onenote_delete_page` | `Notes.Read`, `Notes.Create`, `Notes.ReadWrite` | 0 |
+| `onenote-delete` | the above, plus deleting a page outright | + `onenote_delete_page` | + none: the same four as the row above | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
@@ -441,15 +444,18 @@ parse one, the rule `tests/test_layering.py` already held the first two families
 OpenAPI description, and a kiota request silently drops a query variable its own template does not
 name. So each goes through `graph_client.request_with_query`, which extends the template's `{?...}`
 component — or appends one when the template has none — and writes the raw name straight into
-`query_parameters`; the caller adds the typed `$select`/`$expand`/`$top` on top afterwards, through
-the usual `RequestConfiguration`.
+`query_parameters`; the caller hands the typed `$select`/`$expand`/`$top`/`$orderby` to the same
+helper's `typed` parameter, so no tool spells kiota's percent-encoded wire names itself.
 
 **`onenote_read_resource` reads a resource's bytes together with its real media type**, which none
 of the SDK's typed methods hand back — the generated `content.get()` decodes the body and discards
-the `Content-Type` header on the way. `graph_client.fetch_content` adds kiota's own
-`NativeResponseHandler` to the request so `send_primitive_async` returns the raw `httpx.Response`
-instead of a decoded body, then calls the adapter's own `throw_failed_responses` by hand so a 404
-or a 429 still becomes an `ODataError` and reaches `graph_errors` exactly as every other call does.
+the `Content-Type` header on the way. `graph_client.fetch_response` sends a request its caller
+has marked with `native_response()`, kiota's own `NativeResponseHandler`, so
+`send_primitive_async` returns the raw `httpx.Response` instead of a decoded body, then calls the
+adapter's own `throw_failed_responses` by hand so a 404 or a 429 still becomes an `ODataError` and
+reaches `graph_errors` exactly as every other call does. The copy tools send their `POST` the same
+way, because Microsoft documents their `202` as an empty body with an `Operation-Location` header,
+which the typed `post()` would decode to `None`.
 `sharepoint_read_file`'s `_FileFromGraph` moved into `shared/seam.py`, public as `FileFromGraph`,
 so this tool could answer with the same `File` shape without importing another tool.
 
@@ -457,24 +463,25 @@ so this tool could answer with the same `File` shape without importing another t
 `onenote_copy_section` and `onenote_copy_notebook` each start a copy Microsoft runs on its own side
 and answer with an `OperationSummary`: a `status` of `NotStarted`, `Running`, `Completed` or
 `Failed`, and, once it reaches `Completed`, a `result_uri` handle for the new page, section or
-notebook. `onenote_get_operation` polls that handle. Microsoft expires an operation id after some
-time it does not document, so a 404 there means the copy finished long ago or the id was never
-valid, not that anything failed just now.
+notebook. `onenote_get_operation` polls that handle. Microsoft documents no retention for an
+operation, so a 404 there says only that Graph holds no record of it now; the result, if there
+was one, is found with the listing tools.
 
 **Two of the new writes ask every time, regardless of who owns the notebook.**
 `onenote_delete_page` confirms unconditionally, because Microsoft Graph keeps no recycle bin for a
 OneNote page — once Graph accepts the delete, the page is gone. `onenote_edit_page` confirms
-unconditionally whenever any command in its batch is a `replace` or a `delete`, the two actions
-that throw away what was already at `target`; `append`, `insert` and `prepend` follow the same
-confirm-only-when-the-notebook-reaches-others rule the rest of the write tools use.
+unconditionally whenever any command in its batch is a `replace`, the one action that throws away
+what was already at `target`; `append`, `insert` and `prepend` follow the same
+confirm-only-when-the-notebook-reaches-others rule the rest of the write tools use. Microsoft's
+schema also lists a `delete` action, but its service refused it on every attempt against the test
+tenant (400, code 20122), so the tool does not offer it.
 
-**Team and site notebooks stay out of scope.** Every tool here reaches only `/me/onenote`. The
-`/groups/{id}/onenote` and `/sites/{id}/onenote` surfaces, and the `groupId`/`siteId`/
-`siteCollectionId` copy destinations, need `Notes.Read.All` or `Notes.ReadWrite.All` in place of
-the delegated `Notes.*` permissions every preset here asks for, so adding them changes what a
-tenant consents to and wants its own live probe first, not a permission guessed from the docs.
-Renaming or deleting a notebook, a section or a section group is absent for a plainer reason: Graph
-v1.0 documents no such call.
+**Team and site notebooks stay out of scope.** Every tool here reaches only `/me/onenote`. Team
+and site notebooks live under `/groups/{id}/onenote` and `/sites/{id}/onenote`, which no tool
+here reaches; the copy endpoints document a `groupId` destination and no site destination at all.
+Either would need its own live probe to settle what a tenant actually has to consent to, so
+neither is in this PR. Renaming or deleting a notebook, a section or a section group is absent for
+a plainer reason: Graph v1.0 documents no such call.
 
 **The Outlook rows are three axes, not one ladder.** Mail content goes `outlook-read` →
 `outlook-write` → `outlook-send`, each row adding one permission to the row above. Mailbox
