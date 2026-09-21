@@ -607,12 +607,18 @@ def _optional_type(schema: object) -> dict[str, object]:
 # Every tool that bounds a search by time, and the pair of bounds it publishes. Two tests above
 # read this: one holds each bound to a date OR a moment, the other refuses a date-shaped argument
 # that is missing from here. Adding a windowed tool means adding a row.
-_WINDOWED_TOOLS: Mapping[str, tuple[str, str]] = {
+_WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_list_mail": ("received_after", "received_before"),
     "outlook_list_events": ("starts_on", "ends_on"),
     "outlook_search_mail": ("received_after", "received_before"),
     "teams_search_messages": ("sent_after", "sent_before"),
     "sharepoint_search_files": ("modified_after", "modified_before"),
+    "onenote_list_pages": (
+        "modified_after",
+        "modified_before",
+        "created_after",
+        "created_before",
+    ),
 }
 
 
@@ -675,6 +681,15 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_create_event_on_behalf",
         "onenote_create_page",
         "onenote_append_to_page",
+        "onenote_create_notebook",
+        "onenote_create_section",
+        "onenote_create_section_group",
+        "onenote_edit_page",
+        "onenote_rename_page",
+        "onenote_delete_page",
+        "onenote_copy_page",
+        "onenote_copy_section",
+        "onenote_copy_notebook",
     }
 )
 

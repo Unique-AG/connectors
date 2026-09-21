@@ -328,6 +328,64 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "sharepoint_read_file": {"file": ("sharepoint_search_files", "sharepoint_browse_folder")},
     "onenote_read_page": {"page": ("onenote_list_pages",)},
     "onenote_append_to_page": {"page": ("onenote_list_pages", "onenote_create_page")},
+    "onenote_preview_page": {"page": ("onenote_list_pages", "onenote_create_page")},
+    "onenote_read_resource": {"resource": ("onenote_read_page", "onenote_preview_page")},
+    "onenote_find_notebook_from_url": {
+        "web_url": ("onenote_list_notebooks", "onenote_list_recent_notebooks")
+    },
+    "onenote_list_sections": {
+        "parent": (
+            "onenote_list_notebooks",
+            "onenote_find_notebook_from_url",
+            "onenote_list_sections",
+            "onenote_create_notebook",
+            "onenote_create_section_group",
+        )
+    },
+    "onenote_create_section": {
+        "parent": (
+            "onenote_list_notebooks",
+            "onenote_find_notebook_from_url",
+            "onenote_list_sections",
+            "onenote_create_notebook",
+            "onenote_create_section_group",
+        )
+    },
+    "onenote_create_section_group": {
+        "parent": (
+            "onenote_list_notebooks",
+            "onenote_find_notebook_from_url",
+            "onenote_list_sections",
+            "onenote_create_notebook",
+            "onenote_create_section_group",
+        )
+    },
+    "onenote_edit_page": {"page": ("onenote_list_pages", "onenote_create_page")},
+    "onenote_rename_page": {"page": ("onenote_list_pages", "onenote_create_page")},
+    "onenote_delete_page": {"page": ("onenote_list_pages", "onenote_create_page")},
+    "onenote_copy_page": {
+        "page": ("onenote_list_pages", "onenote_create_page"),
+        "to_section": ("onenote_list_notebooks", "onenote_list_sections", "onenote_create_section"),
+    },
+    "onenote_copy_section": {
+        "section": ("onenote_list_notebooks", "onenote_list_sections", "onenote_create_section"),
+        "to_notebook": (
+            "onenote_list_notebooks",
+            "onenote_find_notebook_from_url",
+            "onenote_create_notebook",
+        ),
+        "to_section_group": ("onenote_list_sections", "onenote_create_section_group"),
+    },
+    "onenote_copy_notebook": {
+        "notebook": (
+            "onenote_list_notebooks",
+            "onenote_find_notebook_from_url",
+            "onenote_create_notebook",
+        )
+    },
+    "onenote_get_operation": {
+        "operation": ("onenote_copy_page", "onenote_copy_section", "onenote_copy_notebook")
+    },
 }
 
 
@@ -374,6 +432,11 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "onenote_list_pages": frozenset({"title_contains"}),
     "onenote_create_page": frozenset({"title", "body_html"}),
     "onenote_append_to_page": frozenset({"body_html"}),
+    "onenote_create_notebook": frozenset({"name"}),
+    "onenote_create_section": frozenset({"name"}),
+    "onenote_create_section_group": frozenset({"name"}),
+    "onenote_edit_page": frozenset({"commands", "target", "action"}),
+    "onenote_rename_page": frozenset({"title"}),
 }
 
 
@@ -650,12 +713,18 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     ),
     (ToolsPreset.SHAREPOINT_SEARCH, ("User.Read", "Files.Read.All"), 1, 3),
     (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 4),
-    (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read"), 0, 4),
+    (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read"), 0, 9),
     (
         ToolsPreset.ONENOTE_WRITE,
         ("User.Read", "Notes.Read", "Notes.Create", "Notes.ReadWrite"),
         0,
-        6,
+        20,
+    ),
+    (
+        ToolsPreset.ONENOTE_DELETE,
+        ("User.Read", "Notes.Read", "Notes.Create", "Notes.ReadWrite"),
+        0,
+        21,
     ),
 )
 

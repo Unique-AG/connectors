@@ -789,6 +789,20 @@ GRAPH_STEPS = frozenset(
         "page_content",
         "create_page",
         "append_content",
+        "preview",
+        "resource_content",
+        "notebook_from_url",
+        "recent_notebooks",
+        "create_notebook",
+        "create_section",
+        "create_section_group",
+        "edit_content",
+        "rename_page",
+        "delete_page",
+        "copy_page",
+        "copy_section",
+        "copy_notebook",
+        "operation",
     }
 )
 

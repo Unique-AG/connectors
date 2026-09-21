@@ -352,6 +352,22 @@ run "preset_onenote_write" {
   }
 }
 
+run "preset_onenote_delete" {
+  variables {
+    tools_preset = "onenote-delete"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite"
+    error_message = "onenote-delete composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == []
+    error_message = "every delegated Notes.* permission Microsoft publishes needs no administrator, so onenote-delete asks for none even with three of them; this composed ${join(",", local.admin_consent)}"
+  }
+}
+
 run "the_order_is_the_registrys_and_never_the_callers" {
   variables {
     tools_enabled = ["teams_read_message", "teams_list_chats"]

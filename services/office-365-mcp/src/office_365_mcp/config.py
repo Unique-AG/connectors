@@ -101,6 +101,7 @@ class ToolsPreset(StrEnum):
     SHAREPOINT_READ = "sharepoint-read"
     ONENOTE_READ = "onenote-read"
     ONENOTE_WRITE = "onenote-write"
+    ONENOTE_DELETE = "onenote-delete"
 
 
 class AppConfig(BaseSettings):

@@ -238,6 +238,96 @@
           "permissions": [
             "Notes.ReadWrite"
           ]
+        },
+        {
+          "name": "onenote_preview_page",
+          "permissions": [
+            "Notes.Read"
+          ]
+        },
+        {
+          "name": "onenote_read_resource",
+          "permissions": [
+            "Notes.Read"
+          ]
+        },
+        {
+          "name": "onenote_find_notebook_from_url",
+          "permissions": [
+            "Notes.Read"
+          ]
+        },
+        {
+          "name": "onenote_list_recent_notebooks",
+          "permissions": [
+            "Notes.Read"
+          ]
+        },
+        {
+          "name": "onenote_list_sections",
+          "permissions": [
+            "Notes.Read"
+          ]
+        },
+        {
+          "name": "onenote_create_notebook",
+          "permissions": [
+            "Notes.Create"
+          ]
+        },
+        {
+          "name": "onenote_create_section",
+          "permissions": [
+            "Notes.Create"
+          ]
+        },
+        {
+          "name": "onenote_create_section_group",
+          "permissions": [
+            "Notes.Create"
+          ]
+        },
+        {
+          "name": "onenote_edit_page",
+          "permissions": [
+            "Notes.ReadWrite"
+          ]
+        },
+        {
+          "name": "onenote_rename_page",
+          "permissions": [
+            "Notes.ReadWrite"
+          ]
+        },
+        {
+          "name": "onenote_copy_page",
+          "permissions": [
+            "Notes.Create"
+          ]
+        },
+        {
+          "name": "onenote_copy_section",
+          "permissions": [
+            "Notes.Create"
+          ]
+        },
+        {
+          "name": "onenote_copy_notebook",
+          "permissions": [
+            "Notes.Create"
+          ]
+        },
+        {
+          "name": "onenote_get_operation",
+          "permissions": [
+            "Notes.Read"
+          ]
+        },
+        {
+          "name": "onenote_delete_page",
+          "permissions": [
+            "Notes.ReadWrite"
+          ]
         }
       ],
       "tool_names": [
@@ -277,7 +367,22 @@
         "onenote_list_pages",
         "onenote_read_page",
         "onenote_create_page",
-        "onenote_append_to_page"
+        "onenote_append_to_page",
+        "onenote_preview_page",
+        "onenote_read_resource",
+        "onenote_find_notebook_from_url",
+        "onenote_list_recent_notebooks",
+        "onenote_list_sections",
+        "onenote_create_notebook",
+        "onenote_create_section",
+        "onenote_create_section_group",
+        "onenote_edit_page",
+        "onenote_rename_page",
+        "onenote_copy_page",
+        "onenote_copy_section",
+        "onenote_copy_notebook",
+        "onenote_get_operation",
+        "onenote_delete_page"
       ],
       "always_on": "get_me",
       "presets": {
@@ -391,14 +496,55 @@
         "onenote-read": [
           "onenote_list_notebooks",
           "onenote_list_pages",
-          "onenote_read_page"
+          "onenote_read_page",
+          "onenote_preview_page",
+          "onenote_read_resource",
+          "onenote_find_notebook_from_url",
+          "onenote_list_recent_notebooks",
+          "onenote_list_sections"
         ],
         "onenote-write": [
           "onenote_list_notebooks",
           "onenote_list_pages",
           "onenote_read_page",
+          "onenote_preview_page",
+          "onenote_read_resource",
+          "onenote_find_notebook_from_url",
+          "onenote_list_recent_notebooks",
+          "onenote_list_sections",
           "onenote_create_page",
-          "onenote_append_to_page"
+          "onenote_append_to_page",
+          "onenote_create_notebook",
+          "onenote_create_section",
+          "onenote_create_section_group",
+          "onenote_edit_page",
+          "onenote_rename_page",
+          "onenote_copy_page",
+          "onenote_copy_section",
+          "onenote_copy_notebook",
+          "onenote_get_operation"
+        ],
+        "onenote-delete": [
+          "onenote_list_notebooks",
+          "onenote_list_pages",
+          "onenote_read_page",
+          "onenote_preview_page",
+          "onenote_read_resource",
+          "onenote_find_notebook_from_url",
+          "onenote_list_recent_notebooks",
+          "onenote_list_sections",
+          "onenote_create_page",
+          "onenote_append_to_page",
+          "onenote_create_notebook",
+          "onenote_create_section",
+          "onenote_create_section_group",
+          "onenote_edit_page",
+          "onenote_rename_page",
+          "onenote_copy_page",
+          "onenote_copy_section",
+          "onenote_copy_notebook",
+          "onenote_get_operation",
+          "onenote_delete_page"
         ]
       },
       "requestable_permissions": [
