@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.1.5](https://github.com/Unique-AG/connectors/compare/kb-mcp@0.1.4...kb-mcp@0.1.5) (2026-09-21)
+
+
+### Features
+
+* **kb-mcp:** add the content_metadata tool and scope the folder walk ([#1079](https://github.com/Unique-AG/connectors/issues/1079)) ([c563a03](https://github.com/Unique-AG/connectors/commit/c563a0334e9f15d0d61c42006cdd1129b8175ff5))
+* **kb-mcp:** allow UniqueQL metadata filters and read_file token overrides ([#1014](https://github.com/Unique-AG/connectors/issues/1014)) ([4788898](https://github.com/Unique-AG/connectors/commit/4788898044f443cf7c9bfbc91c6a39b44b7b17e5))
+
+
+### Bug Fixes
+
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** align the Python image build layouts ([#1038](https://github.com/Unique-AG/connectors/issues/1038)) ([ecdffb6](https://github.com/Unique-AG/connectors/commit/ecdffb656c2f9ed98217c2f4215b33bb9751efd9))
+
+
+### Dependencies
+
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** remove pip from the Python images ([#1033](https://github.com/Unique-AG/connectors/issues/1033)) ([3c0c51f](https://github.com/Unique-AG/connectors/commit/3c0c51f0feb886f41fcc7c6728cea9c040e30741))
+* bump basedpyright in /packages/mcp-credential-auth ([#1026](https://github.com/Unique-AG/connectors/issues/1026)) ([61f0ddd](https://github.com/Unique-AG/connectors/commit/61f0dddee8a171e7d8f0398c5f23ada73f7a8b2f))
+* bump mcp in /services/backstop-mcp ([#1024](https://github.com/Unique-AG/connectors/issues/1024)) ([f0f626f](https://github.com/Unique-AG/connectors/commit/f0f626fda57d873a783d7eac16e67e23f3393c02))
+* bump pydantic-settings in /services/kb-mcp ([#999](https://github.com/Unique-AG/connectors/issues/999)) ([265bacf](https://github.com/Unique-AG/connectors/commit/265bacfb93ccfeda2c0ff6da71cf47457a5deafd))
+* bump ruff in /packages/mcp-credential-auth ([#1028](https://github.com/Unique-AG/connectors/issues/1028)) ([bb44f5a](https://github.com/Unique-AG/connectors/commit/bb44f5a5fce11f7022bb67d12f647a25336dddb4))
+* bump starlette in /services/backstop-mcp ([#1007](https://github.com/Unique-AG/connectors/issues/1007)) ([5f680b5](https://github.com/Unique-AG/connectors/commit/5f680b52b18891b35875a04d37acd0ad2e5ab49b))
+* **hello-mcp,kb-mcp,office-365-mcp:** apply Debian security updates in the Python runtime images ([#1022](https://github.com/Unique-AG/connectors/issues/1022)) ([83a61f8](https://github.com/Unique-AG/connectors/commit/83a61f88d73645a607300ac9dc7ae424a5b29294))
+* pin lxml to 6.1.3, bump kiota ([#1050](https://github.com/Unique-AG/connectors/issues/1050)) ([122c820](https://github.com/Unique-AG/connectors/commit/122c820f8a4a0e150318d4c58c587bd4cd0b8919))
+
 ## [0.1.4](https://github.com/Unique-AG/connectors/compare/kb-mcp@0.1.3...kb-mcp@0.1.4) (2026-09-11)
 
 
