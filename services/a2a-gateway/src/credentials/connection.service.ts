@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { typeid } from 'typeid-js';
 import { AuthorizationService } from '../auth/authorization.service.js';
 import type { RequestIdentity } from '../auth/identity.guard.js';
-import { ConnectionRepository } from '../drizzle/gateway.repository.js';
+import { ConnectionRepository } from '../drizzle/connection.repository.js';
 import type { ConnectionConfiguration } from './credential-profile.js';
 import { CredentialVault } from './credential-vault.js';
 import { EgressService } from './egress.service.js';

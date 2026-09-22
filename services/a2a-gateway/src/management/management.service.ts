@@ -1,13 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AuthorizationService } from '../auth/authorization.service.js';
 import type { RequestIdentity } from '../auth/identity.guard.js';
-import { PublicationRepository } from '../drizzle/gateway.repository.js';
-
-export interface PublicationConfiguration {
-  enabled: boolean;
-  card: Record<string, unknown>;
-  skills: unknown[];
-}
+import { PublicationRepository } from '../drizzle/publication.repository.js';
+import type { PublicationConfiguration } from './publication-configuration.js';
 
 @Injectable()
 export class ManagementService {
@@ -20,7 +15,11 @@ export class ManagementService {
 
   public async getPublication(identity: RequestIdentity, assistantId: string) {
     await this.authorization.manageSpace(identity, assistantId);
-    return this.publications.findByAssistant(identity.companyId, assistantId);
+    const publication = await this.publications.findByAssistant(identity.companyId, assistantId);
+    if (!publication) {
+      throw new NotFoundException('publication not found');
+    }
+    return publication;
   }
 
   public async putPublication(

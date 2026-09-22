@@ -11,15 +11,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { z } from 'zod';
 import { KongIdentityGuard, requestIdentity } from '../auth/identity.guard.js';
 import { ManagementService } from './management.service.js';
-
-const publicationWrite = z.object({
-  enabled: z.boolean(),
-  card: z.record(z.string(), z.unknown()).default({}),
-  skills: z.array(z.unknown()).default([]),
-});
+import { publicationWriteSchema } from './publication-configuration.js';
 
 @Controller('management')
 @UseGuards(KongIdentityGuard)
@@ -40,7 +34,7 @@ export class ManagementController {
     @Body() body: unknown,
   ) {
     const identity = requestIdentity(request);
-    const parsedInput = publicationWrite.safeParse(body);
+    const parsedInput = publicationWriteSchema.safeParse(body);
     if (!parsedInput.success) {
       throw new BadRequestException('invalid publication configuration');
     }

@@ -10,7 +10,7 @@ import type { RequestIdentity } from './identity.guard.js';
 
 const assistantSchema = z.object({
   id: z.string().min(1),
-  executionProvider: z.enum(['NATIVE', 'A2A']).optional(),
+  executionProvider: z.enum(['NATIVE', 'A2A']),
 });
 const capabilitiesSchema = z.object({
   configured: z.boolean(),

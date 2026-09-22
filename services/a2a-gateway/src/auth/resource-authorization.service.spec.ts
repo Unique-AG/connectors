@@ -2,7 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it, vi } from 'vitest';
 import type { GatewayDatabase } from '../drizzle/drizzle.module.js';
-import { UniqueInternalError } from '../unique/unique-internal.client.js';
+import { UniqueInternalError } from '../unique/unique-internal.error.js';
 import type { AuthorizationService } from './authorization.service.js';
 import { ResourceAuthorizationService } from './resource-authorization.service.js';
 

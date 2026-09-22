@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { DRIZZLE, type GatewayDatabase } from '../drizzle/drizzle.module.js';
 import { contexts } from '../drizzle/schema/contexts.table.js';
 import { publications } from '../drizzle/schema/publications.table.js';
-import { UniqueInternalError } from '../unique/unique-internal.client.js';
+import { UniqueInternalError } from '../unique/unique-internal.error.js';
 import { AuthorizationService } from './authorization.service.js';
 import type { RequestIdentity } from './identity.guard.js';
 

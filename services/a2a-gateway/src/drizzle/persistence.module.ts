@@ -6,12 +6,11 @@ import { UniqueModule } from '../unique/unique.module.js';
 import { PgTaskStore } from '../a2a-server/pg-task.store.js';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { CredentialVault } from '../credentials/credential-vault.js';
+import { ConnectionRepository } from './connection.repository.js';
+import { ContextRepository } from './context.repository.js';
 import { DrizzleModule } from './drizzle.module.js';
-import {
-  ConnectionRepository,
-  ExecutionRepository,
-  PublicationRepository,
-} from './gateway.repository.js';
+import { ExecutionRepository } from './execution.repository.js';
+import { PublicationRepository } from './publication.repository.js';
 
 @Module({
   imports: [
@@ -26,6 +25,7 @@ import {
     ResourceAuthorizationService,
     CredentialVault,
     ConnectionRepository,
+    ContextRepository,
     ExecutionRepository,
     PgTaskStore,
     PublicationRepository,
@@ -34,6 +34,7 @@ import {
     ResourceAuthorizationService,
     CredentialVault,
     ConnectionRepository,
+    ContextRepository,
     ExecutionRepository,
     PgTaskStore,
     PublicationRepository,

@@ -21,7 +21,7 @@ export class InternalController {
       version: '0.0.0',
       protocolVersions: ['1.0'],
       features: {
-        inbound: false,
+        inbound: true,
         outbound: false,
       },
     } as const;
