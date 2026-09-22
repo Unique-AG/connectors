@@ -18,7 +18,7 @@
 | --- | --- | --- |
 | `text` parts | ✅ | ✅ |
 | `data` parts (JSON) | ✅ as input (forwarded as fenced JSON in the message text; schema answers for elicitation) · ✅ as output (references, structured elicitation schema) | ✅ input → JSON text; ✅ output → rendered as fenced JSON in the assistant message |
-| `file` parts, inline bytes | ✅ up to `MAX_INLINE_FILE_BYTES` (default 10 MB) → uploaded to the chat | ✅ same limit, remote file uploaded to the chat |
+| `file` parts, inline bytes | ✅ uploaded to the chat (bounded by Kong/body limits and core ingestion limits) | ✅ remote file uploaded to the chat, `MAX_REMOTE_FILE_BYTES` |
 | `file` parts, URI | ✅ outbound artifacts via Kong-fronted gateway download URL · ❌ inbound URI fetch (client must send bytes) | ✅ download through egress guard, `MAX_REMOTE_FILE_BYTES` |
 | Streaming (SSE) | ✅ | ✅ when card declares `streaming`, else poll |
 | `SubscribeToTask` | ✅ (event-bus backed, D-07) | ✅ if peer supports, else poll |

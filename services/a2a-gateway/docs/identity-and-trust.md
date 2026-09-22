@@ -1,6 +1,6 @@
 # Identity and trust
 
-Rule: **the gateway never validates JWTs**. Every JWT-authenticated surface is reached through Kong, which validates the Zitadel token and stamps `x-user-id`, `x-company-id`, `x-user-roles`. `AUTH_MODE=development` allows unauthenticated local requests; in any other mode a request without identity headers is rejected.
+Rule: **the gateway never validates JWTs**. Every JWT-authenticated surface is reached through Kong, which validates the Zitadel token and stamps `x-user-id`, `x-company-id`, `x-user-roles` and `x-client-id` (OAuth client, from `azp`). `AUTH_MODE=development` allows unauthenticated local requests; in any other mode a request without identity headers is rejected.
 
 ## Inbound: external client → published space
 
@@ -20,15 +20,15 @@ sequenceDiagram
     Zitadel-->>Agent: access token (human user)
     Agent->>Kong: POST /a2a/agents/{pub} · Bearer token · A2A-Version 1.0
     Kong->>Kong: validate JWT, strip inbound x-user-*, stamp identity headers
-    Kong->>GW: request · x-user-id, x-company-id, x-user-roles
-    GW->>GW: KongIdentityGuard: headers present; principal classification (Q16)
+    Kong->>GW: request · x-user-id, x-company-id, x-user-roles, x-client-id
+    GW->>GW: KongIdentityGuard: x-user-id + x-company-id present
     GW->>Chat: space use access(assistantId) · x-user-id, x-company-id
     Chat-->>GW: allowed / denied
     GW->>Chat: messageCreate … x-user-id, x-company-id
 ```
 
 - Principal = the human Kong identified. Never taken from the request body, A2A metadata or query parameters.
-- Machine/service principals must be rejected (KRA-22 / Q16: Kong-forwarded user type, or a one-time user lookup via scope-management).
+- **Human principals only** (D-18): requests without `x-user-id` are rejected; machine-to-machine is out of scope. `x-client-id` is stored on the task for per-client attribution and quotas.
 - A valid token is required per **request** (`SendMessage`, `GetTask`, SSE open). A running task continues when the token expires because core calls use the header identity. Reconnect requires a fresh token for the **same user**.
 - Roles are forwarded as stamped by Kong; for calls where the gateway omits them, `node-chat`'s guard resolves roles from scope-management (same path `unique-api` uses).
 - Push-notification webhooks: outbound only, credentials from `TaskPushNotificationConfig.authentication`, URL passes egress policy, payload = task id + state (no content).

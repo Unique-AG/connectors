@@ -47,6 +47,7 @@ erDiagram
         text id PK "A2A taskId"
         text company_id
         text user_id
+        text client_id "Kong x-client-id"
         text context_id FK
         text state
         text user_message_id UK
@@ -113,7 +114,7 @@ erDiagram
 | Recovery after crash | `tasks.state`, `executions.state`, `status_timestamp`; worker re-polls non-terminal executions older than `RECOVERY_AFTER` |
 | Retention | `tasks.expires_at` (`TASK_RETENTION_DAYS`), artifacts cascade; `executions` kept for attribution (`EXECUTION_RETENTION_DAYS`) |
 | Revocation | `publications.disabled_at` → running tasks finish, new sends rejected; core space deletion → reconcile disables publication |
-| Attribution / quotas | `executions.user_id`, `tasks.user_id`, counters derived by query, no content stored beyond `task_snapshot` (which excludes Unique-internal fields) |
+| Attribution / quotas | `executions.user_id`, `tasks.user_id`, `tasks.client_id` (external OAuth client), counters derived by query, no content stored beyond `task_snapshot` (which excludes Unique-internal fields) |
 
 ## Task store
 
