@@ -27,6 +27,16 @@ describe('loadConfig', () => {
     ).toThrow(/development authentication is forbidden/);
   });
 
+  it.each([
+    'http://id.example',
+    'https://user:password@id.example',
+    'https://id.example?token=secret',
+  ])('rejects insecure public OAuth configuration %s', (url) => {
+    expect(() =>
+      loadConfig({ ...requiredEnvironment, NODE_ENV: 'production', ZITADEL_ISSUER: url }),
+    ).toThrow();
+  });
+
   it('rejects missing required dependencies', () => {
     expect(() => loadConfig({ ...requiredEnvironment, AMQP_URL: undefined })).toThrow(/AMQP_URL/);
   });

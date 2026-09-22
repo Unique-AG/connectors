@@ -21,7 +21,8 @@
 | D-15 | Public agent card unauthenticated (Kong route without JWT plugin) but minimal; catalog, extended card and RPC behind Kong JWT; `publicationId` typeid is the URL segment (no slugs). | Discovery must work before auth. | *agreed* |
 | D-16 | All ids are **typeid** (`typeid-js`): `pub_`, `conn_`, `ctx_`, `task_`, `art_`, `exec_`, `pnc_`, `rctx_`. A2A `contextId`/`taskId` are the typeids verbatim (spec treats ids as opaque, server-generated). | Sortable, prefixed, self-describing. | *agreed* |
 | D-17 | Multi-tenant capable (`company_id` everywhere) but one deployment per Unique installation. | Matches other connectors. | *agreed* |
-| D-18 | **Human principals only.** Inbound calls are attributed per user **and** per OAuth client (`x-client-id` from Kong, stored on `tasks.client_id`). Machine principals are out of scope; no classification logic needed beyond requiring `x-user-id`. | Project scope: no machine-to-machine initially. | *agreed* |
+| D-18 | **Existing user OAuth flow.** Clients use Unique's normal Zitadel authorization-code/PKCE login and access tokens. Reuse Kong validation and trusted identity headers; no Zitadel actions, custom principal claims or Lua changes. Machine-to-machine onboarding is out of scope; no separate human/machine token-classification policy is introduced. | KRA-12 clarification. | *agreed* |
+| D-19 | **Deployment is entitlement.** No paid-access setting or billing integration. A configured, reachable gateway plus the rollout flag enables new use. Disabling the flag blocks new configuration/runs, retains connections and lets active runs finish with ongoing authorization; read/cancel/revoke remain allowed. | KRA-12 clarification. | *agreed* |
 
 ### KRA-19 absurd spike
 

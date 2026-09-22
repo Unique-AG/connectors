@@ -3,7 +3,7 @@ import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 
-const commonIdentityHeaders = ['x-user-id', 'x-company-id', 'x-user-roles'] as const;
+const commonIdentityHeaders = ['x-user-id', 'x-company-id'] as const;
 
 export interface RequestIdentity {
   companyId: string;
@@ -15,7 +15,12 @@ export function requestIdentity(request: Request): RequestIdentity {
   const companyId = request.headers['x-company-id'];
   const userId = request.headers['x-user-id'];
   const roles = request.headers['x-user-roles'];
-  if (typeof companyId !== 'string' || typeof userId !== 'string') {
+  if (
+    typeof companyId !== 'string' ||
+    !companyId.trim() ||
+    typeof userId !== 'string' ||
+    !userId.trim()
+  ) {
     throw new UnauthorizedException('trusted identity headers are required');
   }
   return {
@@ -46,6 +51,9 @@ abstract class IdentityGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     if (!hasHeaders(request, this.requiredHeaders)) {
       throw new UnauthorizedException('trusted identity headers are required');
+    }
+    if (request.headers['x-service-id']) {
+      throw new UnauthorizedException('service identities are not supported');
     }
     return true;
   }

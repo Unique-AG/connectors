@@ -1,6 +1,8 @@
 import { AesGcmEncryptionModule } from '@unique-ag/aes-gcm-encryption';
 import { Module } from '@nestjs/common';
 
+import { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
+import { UniqueModule } from '../unique/unique.module.js';
 import { PgTaskStore } from '../a2a-server/pg-task.store.js';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { CredentialVault } from '../credentials/credential-vault.js';
@@ -14,12 +16,14 @@ import {
 @Module({
   imports: [
     DrizzleModule,
+    UniqueModule,
     AesGcmEncryptionModule.registerAsync({
       inject: [GATEWAY_CONFIG],
       useFactory: (config: GatewayConfig) => ({ key: config.encryptionKey }),
     }),
   ],
   providers: [
+    ResourceAuthorizationService,
     CredentialVault,
     ConnectionRepository,
     ExecutionRepository,
@@ -27,6 +31,7 @@ import {
     PublicationRepository,
   ],
   exports: [
+    ResourceAuthorizationService,
     CredentialVault,
     ConnectionRepository,
     ExecutionRepository,

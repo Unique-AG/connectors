@@ -36,9 +36,25 @@ describe('UniqueInternalClient', () => {
       'content-type': 'application/json',
       'x-company-id': 'company-1',
       'x-user-id': 'user-1',
-      'x-user-roles': 'SPACE_MANAGER',
     });
     expect(request.headers).not.toHaveProperty('x-service-id');
+  });
+
+  it('uses the existing object-authorized core management query', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ data: { assistantByCompany: { id: 'assistant-1' } } }));
+    vi.stubGlobal('fetch', fetchMock);
+    await new UniqueInternalClient(config).verifySpaceManagement(identity, 'assistant-1');
+    const [url, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe('http://node-chat/graphql');
+    expect(JSON.parse(String(request.body))).toEqual({
+      query:
+        'query A2aManagedAssistant($assistantId: String!) { assistantByCompany(assistantId: $assistantId) { id name } }',
+      variables: { assistantId: 'assistant-1' },
+    });
+    expect(request.headers).not.toHaveProperty('x-user-roles');
+    expect(request.redirect).toBe('error');
   });
 
   it('normalizes authorization errors without retrying them', async () => {

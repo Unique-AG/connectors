@@ -1,0 +1,15 @@
+{{- if .Values.kong.enabled }}
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ include "a2a-gateway.fullname" . }}-auth
+plugin: unique-jwt-auth
+config:
+  allowed_iss:
+    - {{ required "config.zitadelIssuer is required" .Values.config.zitadelIssuer | quote }}
+  zitadel_project_id: {{ required "kong.projectId is required" .Values.kong.projectId | quote }}
+  uri_param_names: []
+  cookie_names: []
+  header_names: [authorization]
+  claims_to_verify: [exp, nbf]
+{{- end }}

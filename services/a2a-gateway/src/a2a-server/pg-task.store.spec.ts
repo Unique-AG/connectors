@@ -1,5 +1,7 @@
 import { ServerCallContext } from '@a2a-js/sdk/server';
+import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import type { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
 import { loadConfig } from '../config/config.js';
 import type { GatewayDatabase } from '../drizzle/drizzle.module.js';
 import { PgTaskStore } from './pg-task.store.js';
@@ -19,7 +21,10 @@ function context(companyId: string, userId: string): ServerCallContext {
   return new ServerCallContext({
     tenant: companyId,
     user: { isAuthenticated: true, userName: userId },
-    state: new Map([['headers', { 'x-client-id': 'client-1' }]]),
+    state: new Map<string, unknown>([
+      ['headers', { 'x-client-id': 'client-1' }],
+      ['publicationId', 'pub-1'],
+    ]),
   });
 }
 
@@ -36,10 +41,32 @@ const config = loadConfig({
 });
 
 describe('PgTaskStore', () => {
+  it('rechecks context, route publication and current space access before returning a task', async () => {
+    const findFirst = vi
+      .fn()
+      .mockResolvedValue({ contextId: 'ctx-1', taskSnapshot: { id: 'task-1' } });
+    const authorization = { context: vi.fn() };
+    const store = new PgTaskStore(
+      { query: { tasks: { findFirst } } } as unknown as GatewayDatabase,
+      config,
+      authorization as unknown as ResourceAuthorizationService,
+    );
+    expect(await store.load('task-1', context('company-1', 'user-1'))).toEqual({ id: 'task-1' });
+    expect(authorization.context).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId: 'company-1', userId: 'user-1' }),
+      'pub-1',
+      'ctx-1',
+    );
+    authorization.context.mockRejectedValue(new NotFoundException());
+    expect(await store.load('task-1', context('company-1', 'user-1'))).toBeUndefined();
+  });
+
   it('scopes reads to both company and effective user', async () => {
     const findFirst = vi.fn().mockResolvedValue(undefined);
     const database = { query: { tasks: { findFirst } } } as unknown as GatewayDatabase;
-    const store = new PgTaskStore(database, config);
+    const store = new PgTaskStore(database, config, {
+      context: vi.fn(),
+    } as unknown as ResourceAuthorizationService);
 
     await store.load('task-1', context('company-1', 'user-1'));
     await store.load('task-1', context('company-2', 'user-2'));

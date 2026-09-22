@@ -1,57 +1,39 @@
-import { BadRequestException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import type { AuthorizationService } from '../auth/authorization.service.js';
 import type { PublicationRepository } from '../drizzle/gateway.repository.js';
-import type { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { ManagementService } from './management.service.js';
 
-const identity = { companyId: 'company-1', userId: 'user-1', roles: ['SPACE_MANAGER'] };
-
-function service(assistant: unknown) {
+const identity = { companyId: 'company-1', userId: 'user-1', roles: [] };
+function subject() {
   const publications = { upsert: vi.fn(), findByAssistant: vi.fn(), disable: vi.fn() };
-  const unique = { getAssistant: vi.fn().mockResolvedValue(assistant) };
+  const authorization = { publishSpace: vi.fn(), manageSpace: vi.fn() };
   return {
     service: new ManagementService(
       publications as unknown as PublicationRepository,
-      unique as unknown as UniqueInternalClient,
+      authorization as unknown as AuthorizationService,
     ),
     publications,
+    authorization,
   };
 }
-
 describe('ManagementService', () => {
-  it('rejects publishing an externally executed space', async () => {
-    const subject = service({ executionProvider: 'A2A' });
-
+  it('checks publication authorization on every write and does not persist denied writes', async () => {
+    const { service, authorization, publications } = subject();
+    await service.putPublication(identity, 'assistant-1', { enabled: true, card: {}, skills: [] });
+    authorization.publishSpace.mockRejectedValue(new ForbiddenException());
     await expect(
-      subject.service.putPublication(identity, 'assistant-1', {
-        enabled: true,
-        card: {},
-        skills: [],
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(subject.publications.upsert).not.toHaveBeenCalled();
+      service.putPublication(identity, 'assistant-1', { enabled: true, card: {}, skills: [] }, 1),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(publications.upsert).toHaveBeenCalledTimes(1);
+    expect(authorization.publishSpace).toHaveBeenCalledTimes(2);
   });
-
-  it('maps validated publication configuration to persistence', async () => {
-    const subject = service({ executionProvider: 'NATIVE' });
-    subject.publications.upsert.mockResolvedValue({ id: 'pub-1' });
-
-    await subject.service.putPublication(
-      identity,
-      'assistant-1',
-      { enabled: true, card: { name: 'Agent' }, skills: ['search'] },
-      2,
-    );
-
-    expect(subject.publications.upsert).toHaveBeenCalledWith(
-      identity,
-      {
-        assistantId: 'assistant-1',
-        enabled: true,
-        cardOverrides: { name: 'Agent' },
-        skills: ['search'],
-      },
-      2,
-    );
+  it('checks access on reads and disable even without a feature gate', async () => {
+    const { service, authorization, publications } = subject();
+    await service.getPublication(identity, 'assistant-1');
+    await service.disablePublication(identity, 'assistant-1');
+    expect(authorization.manageSpace).toHaveBeenCalledTimes(2);
+    expect(publications.disable).toHaveBeenCalledWith('company-1', 'assistant-1');
+    expect(authorization.publishSpace).not.toHaveBeenCalled();
   });
 });

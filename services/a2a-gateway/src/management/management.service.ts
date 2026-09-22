@@ -1,7 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { AuthorizationService } from '../auth/authorization.service.js';
 import type { RequestIdentity } from '../auth/identity.guard.js';
 import { PublicationRepository } from '../drizzle/gateway.repository.js';
-import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 
 export interface PublicationConfiguration {
   enabled: boolean;
@@ -9,21 +9,18 @@ export interface PublicationConfiguration {
   skills: unknown[];
 }
 
-function isExternalAssistant(value: unknown): boolean {
-  return (
-    typeof value === 'object' && value !== null && Reflect.get(value, 'executionProvider') === 'A2A'
-  );
-}
-
 @Injectable()
 export class ManagementService {
+  private readonly logger = new Logger(ManagementService.name);
+
   public constructor(
     private readonly publications: PublicationRepository,
-    private readonly unique: UniqueInternalClient,
+    private readonly authorization: AuthorizationService,
   ) {}
 
-  public getPublication(companyId: string, assistantId: string) {
-    return this.publications.findByAssistant(companyId, assistantId);
+  public async getPublication(identity: RequestIdentity, assistantId: string) {
+    await this.authorization.manageSpace(identity, assistantId);
+    return this.publications.findByAssistant(identity.companyId, assistantId);
   }
 
   public async putPublication(
@@ -32,11 +29,8 @@ export class ManagementService {
     configuration: PublicationConfiguration,
     expectedVersion?: number,
   ) {
-    const assistant = await this.unique.getAssistant(identity, assistantId);
-    if (isExternalAssistant(assistant)) {
-      throw new BadRequestException('an A2A-backed space cannot be published');
-    }
-    return this.publications.upsert(
+    await this.authorization.publishSpace(identity, assistantId);
+    const publication = await this.publications.upsert(
       identity,
       {
         assistantId,
@@ -46,9 +40,23 @@ export class ManagementService {
       },
       expectedVersion,
     );
+    this.logger.log({
+      action: 'publication.configure',
+      companyId: identity.companyId,
+      userId: identity.userId,
+      assistantId,
+    });
+    return publication;
   }
 
-  public disablePublication(companyId: string, assistantId: string): Promise<void> {
-    return this.publications.disable(companyId, assistantId);
+  public async disablePublication(identity: RequestIdentity, assistantId: string): Promise<void> {
+    await this.authorization.manageSpace(identity, assistantId);
+    await this.publications.disable(identity.companyId, assistantId);
+    this.logger.log({
+      action: 'publication.disable',
+      companyId: identity.companyId,
+      userId: identity.userId,
+      assistantId,
+    });
   }
 }

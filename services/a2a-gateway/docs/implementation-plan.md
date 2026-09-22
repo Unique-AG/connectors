@@ -53,15 +53,21 @@ services/a2a-gateway/
 | `ZITADEL_ISSUER` | only for `securitySchemes.openIdConnectUrl` in agent cards |
 | `UNIQUE_CHAT_URL`, `UNIQUE_SCOPE_MANAGEMENT_URL`, `UNIQUE_INGESTION_URL` | core internal endpoints |
 | `ENCRYPTION_KEY` | credential vault |
-| `EGRESS_ALLOWED_HOSTS?` | optional allow-list for remote agents/push URLs (private ranges always blocked) |
+| `EGRESS_ALLOWED_HOSTS` | exact operator-approved hostnames for credential-bearing remote/token requests; empty denies all |
 | `MAX_REMOTE_FILE_BYTES`, `SYNC_WAIT_MAX_MS`, `STREAM_TIMEOUT_MS` | limits (inbound file size is bounded by Kong/body limits and core ingestion) |
 | `TASK_RETENTION_DAYS`, `EXECUTION_RETENTION_DAYS`, `PUSH_MAX_FAILURES`, `RECONCILE_INTERVAL` | lifecycle |
 | `WORKER_ENABLED` | run absurd workers in this replica |
 
 Missing required config → readiness fails; no surface is mounted without its guard.
 
+## KRA-12 integration boundaries
+
+Implemented on current surfaces: human-identity guard/bootstrap, publication/connection management authorization, encrypted shared credentials, tenant/owner/publication-scoped task storage and core deployment/rollout capability contract. See [OAuth onboarding](./oauth-onboarding.md).
+
+Pending later epics: real cards/catalog/RPC/task/artifact handlers, connection test/delete, UI, and core external-space model/dispatch/clone/import paths. KRA-30 must add `executionProvider`/`a2aConnectionId` to the core assistant queries before credential-provider invocation can succeed (it currently fails closed). Wire the shared authorization services into those paths and test active-run completion/reconnect/cancellation there. External-space publication prevention cannot be validated end-to-end until that core model exists.
+
 ## Outside this service
 
 - **Kong** (P-02): routes for card (no auth), `/a2a/*`, `/management/*` (JWT → identity headers + `x-client-id` from `azp`, strip inbound identity headers), CORS for the frontend; NetworkPolicy for `/internal/*`.
-- **Core** (P-03): KRA-30 (`executionProvider`, `a2aConnectionId`, dispatch, cancel, elicitation-response callback), KRA-25 (`A2A_GATEWAY_URL`, flag, entitlement, `a2aCapabilities`), KRA-27 (space settings UI → management surface), elicitation events on `EVENT_BUS`.
+- **Core** (P-03): KRA-30 (`executionProvider`, `a2aConnectionId`, dispatch, cancel, elicitation-response callback), KRA-25 (`A2A_GATEWAY_URL`, rollout flag, `a2aCapabilities`), KRA-27 (space settings UI → management surface), elicitation events on `EVENT_BUS`.
 - **RabbitMQ** (P-04): gateway user with rights to declare its own queues and bind to `EVENT_BUS`.

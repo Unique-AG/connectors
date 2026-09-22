@@ -31,6 +31,12 @@ config:
 
 secretRef: a2a-gateway
 
+kong:
+  enabled: false
+  projectId: ""
+  parentRefs: []
+  hostnames: []
+
 resources:
   requests:
     cpu: 100m

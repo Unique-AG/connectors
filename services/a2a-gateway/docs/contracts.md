@@ -47,7 +47,8 @@ Caller: Unique frontend directly (not via core) through Kong (JWT → identity h
 | `PUT` | `/management/publications/{assistantId}` | caller manages the space; space is native (`executionProvider != A2A`); body: `enabled`, `card` (allowed fields), `skills` |
 | `DELETE` | `/management/publications/{assistantId}` | same; running tasks finish, new sends rejected |
 | `GET/POST/PUT/DELETE` | `/management/connections[/{id}]` | roles `ADMIN_SPACE_WRITE` or `SPACE_MANAGER`; credentials write-only (never returned) |
-| `POST` | `/management/connections/{id}/test` | fetch + validate remote Agent Card, store negotiated capabilities, return supported interaction matrix |
+| `POST` | `/management/connections/{id}/test` | fetch + validate remote Agent Card, store negotiated capabilities, return supported interaction matrix (pending) |
+| `DELETE` | `/management/connections/{id}/credentials` | revoke credentials and disable the connection; requires `If-Match`; retains configuration |
 
 All writes are idempotent (`If-Match` on `version`).
 
@@ -70,7 +71,7 @@ All calls carry `x-user-id` + `x-company-id` (roles resolved by the target's `Ac
 
 | Need | Existing operation (node-chat unless noted) | Status |
 | --- | --- | --- |
-| Space lookup, use/manage access | GraphQL `assistants`/`assistantByUser`, `spaceManagerVerify` (scope-management) | exists |
+| Space lookup, use/manage access | GraphQL `assistantByUser` / `assistantByCompany` (node-chat); roles resolved live by core | exists |
 | Create chat / message | GraphQL `messageCreate` (as in `SpaceMessageCreate`) with `correlation` for sub-agent calls | exists |
 | Run events | RabbitMQ `EVENT_BUS` (topic): `unique.chat.assistant-message.{created,update,stream.chunk,finished}`, `unique.chat.user-message.created` | exists (D-07); gateway declares its own queue |
 | Elicitation events | — (node-chat emits them in-process only) | **gap**: publish `unique.chat.elicitation.{created,responded,expired}` on `EVENT_BUS` (P-03) |
@@ -86,7 +87,7 @@ All calls carry `x-user-id` + `x-company-id` (roles resolved by the target's `Ac
 
 Core adds:
 
-- `A2A_GATEWAY_URL` (node-chat env) + `FEATURE_FLAG_ENABLE_A2A_<ticket>` + company entitlement.
+- `A2A_GATEWAY_URL` (node-chat env) + `FEATURE_FLAG_ENABLE_A2A`. Deployment is entitlement; there is no separate paid-access setting.
 - `Assistant.executionProvider: NATIVE | A2A` and `Assistant.a2aConnectionId` (reference only).
-- GraphQL `a2aCapabilities(companyId)` → `{ available, reason?: NOT_DEPLOYED | UNREACHABLE | DISABLED | NOT_ENTITLED }` for the frontend; evaluates flag/entitlement and probes `/internal/capabilities` (short TTL cache, outage ≠ deletion).
+- GraphQL `a2aCapabilities` (tenant/user from request identity, no arguments) → `{ configured, enabled, available, retryable, reason?: NOT_DEPLOYED | UNREACHABLE | DISABLED }`; evaluates the current rollout flag and probes `/internal/capabilities` (5s reachability cache, outage ≠ deletion).
 - Server-side gate on publish/configure/invoke for both direct chat and sub-agent execution.

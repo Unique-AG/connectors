@@ -1,57 +1,50 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import type { Request } from 'express';
 import { describe, expect, it, vi } from 'vitest';
-import type { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { ManagementController } from './management.controller.js';
 import type { ManagementService } from './management.service.js';
 
 const request = {
-  headers: {
-    'x-company-id': 'company-1',
-    'x-user-id': 'user-1',
-    'x-user-roles': 'SPACE_MANAGER',
-  },
+  headers: { 'x-company-id': 'company-1', 'x-user-id': 'user-1' },
 } as unknown as Request;
-
-function controller(access: unknown) {
+function subject() {
   const management = {
     putPublication: vi.fn(),
     getPublication: vi.fn(),
     disablePublication: vi.fn(),
   };
-  const unique = {
-    verifySpaceManagement: vi.fn().mockResolvedValue(access),
-    getAssistant: vi.fn(),
-  };
   return {
-    controller: new ManagementController(
-      management as unknown as ManagementService,
-      unique as unknown as UniqueInternalClient,
-    ),
+    controller: new ManagementController(management as unknown as ManagementService),
     management,
   };
 }
-
 describe('ManagementController', () => {
-  it('checks object-level management access before writing', async () => {
-    const subject = controller({ canWrite: false });
-
-    await expect(
-      subject.controller.putPublication(request, 'assistant-1', undefined, {
-        enabled: true,
-        card: {},
-        skills: [],
-      }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(subject.management.putPublication).not.toHaveBeenCalled();
-  });
-
   it('validates publication configuration before calling the service', async () => {
-    const subject = controller({ canWrite: true });
-
+    const { controller, management } = subject();
     await expect(
-      subject.controller.putPublication(request, 'assistant-1', undefined, { enabled: 'yes' }),
+      controller.putPublication(request, 'assistant-1', undefined, { enabled: 'yes' }),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(subject.management.putPublication).not.toHaveBeenCalled();
+    expect(management.putPublication).not.toHaveBeenCalled();
+  });
+  it.each(['', '0', '-1', '"1', '1"', '1.5', '9007199254740992'])(
+    'rejects invalid If-Match %s',
+    async (version) => {
+      await expect(
+        subject().controller.putPublication(request, 'assistant-1', version, { enabled: true }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    },
+  );
+  it('derives identity from headers, not input', async () => {
+    const { controller, management } = subject();
+    await controller.putPublication(request, 'assistant-1', '"2"', {
+      enabled: true,
+      companyId: 'other',
+    });
+    expect(management.putPublication).toHaveBeenCalledWith(
+      { companyId: 'company-1', userId: 'user-1', roles: [] },
+      'assistant-1',
+      { enabled: true, card: {}, skills: [] },
+      2,
+    );
   });
 });

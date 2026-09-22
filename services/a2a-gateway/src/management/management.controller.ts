@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   Headers,
   Param,
@@ -14,7 +13,6 @@ import {
 import type { Request } from 'express';
 import { z } from 'zod';
 import { KongIdentityGuard, requestIdentity } from '../auth/identity.guard.js';
-import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { ManagementService } from './management.service.js';
 
 const publicationWrite = z.object({
@@ -23,23 +21,15 @@ const publicationWrite = z.object({
   skills: z.array(z.unknown()).default([]),
 });
 
-function canWrite(value: unknown): boolean {
-  return typeof value === 'object' && value !== null && Reflect.get(value, 'canWrite') === true;
-}
-
 @Controller('management')
 @UseGuards(KongIdentityGuard)
 export class ManagementController {
-  public constructor(
-    private readonly management: ManagementService,
-    private readonly unique: UniqueInternalClient,
-  ) {}
+  public constructor(private readonly management: ManagementService) {}
 
   @Get('publications/:assistantId')
   public async getPublication(@Req() request: Request, @Param('assistantId') assistantId: string) {
     const identity = requestIdentity(request);
-    await this.unique.getAssistant(identity, assistantId);
-    return this.management.getPublication(identity.companyId, assistantId);
+    return this.management.getPublication(identity, assistantId);
   }
 
   @Put('publications/:assistantId')
@@ -50,17 +40,16 @@ export class ManagementController {
     @Body() body: unknown,
   ) {
     const identity = requestIdentity(request);
-    const access = await this.unique.verifySpaceManagement(identity, assistantId);
-    if (!canWrite(access)) {
-      throw new ForbiddenException('space management access required');
-    }
     const parsedInput = publicationWrite.safeParse(body);
     if (!parsedInput.success) {
       throw new BadRequestException('invalid publication configuration');
     }
     const input = parsedInput.data;
     const expectedVersion = ifMatch === undefined ? undefined : Number(ifMatch.replaceAll('"', ''));
-    if (ifMatch !== undefined && !Number.isSafeInteger(expectedVersion)) {
+    if (
+      ifMatch !== undefined &&
+      (!/^(?:[1-9]\d*|"[1-9]\d*")$/.test(ifMatch) || !Number.isSafeInteger(expectedVersion))
+    ) {
       throw new BadRequestException('If-Match must contain a numeric publication version');
     }
     return this.management.putPublication(identity, assistantId, input, expectedVersion);
@@ -72,10 +61,6 @@ export class ManagementController {
     @Param('assistantId') assistantId: string,
   ): Promise<void> {
     const identity = requestIdentity(request);
-    const access = await this.unique.verifySpaceManagement(identity, assistantId);
-    if (!canWrite(access)) {
-      throw new ForbiddenException('space management access required');
-    }
-    await this.management.disablePublication(identity.companyId, assistantId);
+    await this.management.disablePublication(identity, assistantId);
   }
 }
