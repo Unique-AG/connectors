@@ -10,6 +10,7 @@ from typing import override
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
+from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from mcp.types import Icon
 from starlette.middleware import Middleware
 from unique_mcp.logging import configure_logging
@@ -99,7 +100,10 @@ def main() -> None:
         instructions=SERVER_INSTRUCTIONS_CITATION_GUIDANCE,
         icons=[_server_icon()],
         auth=oidc_proxy,
-        providers=[FileSystemProvider(Path(__file__).parent / "tools")],
+        providers=[
+            FileSystemProvider(Path(__file__).parent / "tools"),
+            SkillsDirectoryProvider(Path(__file__).parent / "skills"),
+        ],
         lifespan=tree_cache_expire_lifespan,
     )
     apply_enabled_tools(mcp, settings)

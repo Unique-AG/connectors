@@ -39,6 +39,29 @@
 ## Generated Files
 - Don't create README files for generated code
 
+## Agent Skills
+
+- A skill a service serves to its own clients lives in that service's package, at
+  `services/<svc>/src/<pkg>/skills/<name>/SKILL.md`, and is wired up with
+  `SkillsDirectoryProvider`. Only `src/` reaches the wheel and therefore the runtime image, and
+  the path resolves the same under `uv run` as it does installed, so one location serves both.
+- `.claude-plugin/marketplace.json` is what makes `npx skills add Unique-AG/connectors` find
+  them. Discovery walks known root containers only, so a skill outside one is invisible without
+  an entry here. Add a plugin per service, pointing at the package directory.
+- Name a skill for a Unique service `unique-<service>`. The installed directory is a flat
+  namespace shared across every repo a user installs from, so the prefix prevents collisions.
+  A skill about a third-party API keeps that vendor's name.
+- A skill that is an internal build aid rather than something we ship needs
+  `metadata.internal: true` in its frontmatter. This repo is public, and without it the skill is
+  listed to anyone who runs the CLI. Set `INSTALL_INTERNAL_SKILLS=1` to see them.
+- Frontmatter `name` must equal the directory name. The server names a skill after its directory
+  while the CLI reads frontmatter, and the CLI falls back to the directory name in places, so the
+  two only agree if you keep them identical. A test enforces this.
+- A skill that is only a build aid for this repo, and that no service serves, stays in
+  `.claude/skills/`. That is a discovery container, so it still needs `metadata.internal: true`.
+  `.cursor/skills/` is not a discovery container, so a copy there is for Cursor itself and the
+  CLI never sees it.
+
 ## Formatting
 
 - `ruff` owns `.py`. `biome` owns everything else it can parse, in every service and package,
