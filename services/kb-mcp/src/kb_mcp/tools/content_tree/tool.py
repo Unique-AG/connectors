@@ -74,7 +74,7 @@ def _with_incomplete_notice(complete: bool, body: str) -> str:
     return ("" if complete else _INCOMPLETE_NOTICE) + body
 
 
-def _with_truncation_notice(body: str, *, shown: int, total: int) -> str:
+def _with_truncation_notice(body: str, *, shown: int, total: int, noun: str) -> str:
     """Distinct from the incomplete notice: there is more, but it was not asked for.
 
     Incomplete means the walk is still running; truncated means it finished and
@@ -83,9 +83,18 @@ def _with_truncation_notice(body: str, *, shown: int, total: int) -> str:
     if shown >= total:
         return body
     return (
-        f"Showing the first {shown} of {total} files. Raise `limit`, narrow "
-        "`folder_path`, or set folders_only=true to see the rest.\n\n"
+        f"Showing the first {shown} of {total} {noun}. Raise `limit` or narrow "
+        "`folder_path` to see the rest.\n\n"
     ) + body
+
+
+def _with_limit_reached_notice(body: str, *, shown: int, limit: int, noun: str) -> str:
+    """For list/search: unlike tree mode, the true total isn't always known
+    (a bounded SDK query only returns up to `limit`), so this signals "there
+    may be more" without a total count `_with_truncation_notice` would need."""
+    if shown < limit:
+        return body
+    return f"Showing {shown} {noun}. Raise `limit` to see more.\n\n" + body
 
 
 def _with_empty_metadata_filter_hint(
@@ -103,6 +112,7 @@ def _mode_misuse_error(
     match_on: MatchTarget | None,
     min_score: float | None,
     case_sensitive: bool | None,
+    folders_only: bool,
 ) -> str | None:
     """A param from the wrong mode silently doing nothing gives the caller no
     signal it made a mistake — surface it instead of quietly ignoring it."""
@@ -120,6 +130,12 @@ def _mode_misuse_error(
                 f"under mode='{mode}'. Call content_tree(mode='search', query=...) "
                 f"to filter, or drop them to browse with mode='{mode}'."
             )
+    if mode != "tree" and folders_only:
+        return (
+            f"folders_only only applies to mode='tree' and is ignored under "
+            f"mode='{mode}'. Call content_tree(mode='tree', folders_only=true) to "
+            f"see just the folder structure, or drop it to browse with mode='{mode}'."
+        )
     return None
 
 
@@ -324,8 +340,9 @@ async def content_tree(
         int | None,
         Field(
             description=(
-                "Maximum files/matches to return. In mode='tree' it caps the "
-                "files rendered, and the output says when it truncated."
+                "Maximum files/matches to return. In mode='tree' it also caps "
+                "folders (files too, unless folders_only=true), each reported "
+                "separately if it truncated."
             )
         ),
     ] = None,
@@ -397,13 +414,14 @@ async def content_tree(
     that folder. A folder shows no id until the walk reaches a file beneath it;
     if the one you need is missing, re-run with a larger max_depth
     (folders_only=true keeps this cheap — it only hides files from the rendered
-    lines, not from the walk that discovers ids). Capped at `limit` files; the
-    output says so when it truncated.
+    lines, not from the walk that discovers ids). Capped at `limit` files and,
+    by default, the same number of folders; either says so when it truncated.
     - mode='list': flat listing; each result's content_id is needed for a later
-    read_file call.
+    read_file call. Capped at `limit`; says so when it truncated.
     - mode='search': query*, min_score, match_on, case_sensitive — fuzzy
     filename/path lookup when you know roughly what a file is called but not
     where it is — not for finding files by their content, use search for that.
+    Capped at `limit`; says when there may be more to raise it for.
     'list' and 'search' rows start with a markdown link that opens the file
     in the Unique knowledge base — paste it as-is when referring the user to
     a file; use the content_id for read_file calls.
@@ -433,6 +451,7 @@ async def content_tree(
             match_on=match_on,
             min_score=min_score,
             case_sensitive=case_sensitive,
+            folders_only=folders_only,
         )
         if misuse_error is not None:
             return ToolResult(
@@ -530,16 +549,20 @@ async def content_tree(
             snapshot = _filtered_to_path_prefix(snapshot, folder_path)
 
         if mode == "tree":
-            # A silently truncated tree reads as authoritative structure, so the
-            # model reports a cut-off folder as nonexistent. Cap it, and say so.
+            # Files and folders each get their own cap and notice (never one
+            # shared count), but `limit` sizes both by default so a small ask stays small.
             tree_limit = limit if limit is not None else config.default_tree_limit
-            rendered = snapshot
+            rendered_files = snapshot.files
             if not folders_only and len(snapshot.files) > tree_limit:
-                rendered = FolderWalkSnapshot(
-                    files=snapshot.files[:tree_limit],
-                    folder_paths=snapshot.folder_paths,
-                    complete=snapshot.complete,
-                )
+                rendered_files = snapshot.files[:tree_limit]
+            rendered_folder_paths = snapshot.folder_paths
+            if len(snapshot.folder_paths) > tree_limit:
+                rendered_folder_paths = snapshot.folder_paths[:tree_limit]
+            rendered = FolderWalkSnapshot(
+                files=rendered_files,
+                folder_paths=rendered_folder_paths,
+                complete=snapshot.complete,
+            )
             tree_body = _with_empty_metadata_filter_hint(
                 render_tree_with_folder_ids(
                     rendered,
@@ -554,10 +577,22 @@ async def content_tree(
                 complete=snapshot.complete,
                 llm_filter=parsed_llm_filter,
             )
+            # Directory counts, not folder_paths list lengths: a folder also
+            # renders via any surviving file in it, so the slice above alone doesn't bound this.
+            total_dirs = len(snapshot.to_trie().walk_trie_nodes()) - 1
+            shown_dirs = len(rendered.to_trie().walk_trie_nodes()) - 1
             text = _with_incomplete_notice(
                 snapshot.complete,
                 _with_truncation_notice(
-                    tree_body, shown=len(rendered.files), total=len(snapshot.files)
+                    _with_truncation_notice(
+                        tree_body,
+                        shown=len(rendered_files),
+                        total=len(snapshot.files),
+                        noun="files",
+                    ),
+                    shown=shown_dirs,
+                    total=total_dirs,
+                    noun="folders",
                 ),
             )
             _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)
@@ -566,9 +601,8 @@ async def content_tree(
         if mode == "list":
             # No post-walk path filtering: folder_path already rooted the walk,
             # so everything in the snapshot is in scope.
-            rows = list(snapshot.files)
             effective_limit = limit if limit is not None else config.default_limit
-            rows = rows[:effective_limit]
+            rows = list(snapshot.files)[:effective_limit]
             frontend_base_url = kb_settings.frontend_base_url_str()
             lines = [
                 f"{_file_link(content_info, path, frontend_base_url)} "
@@ -581,7 +615,12 @@ async def content_tree(
                 complete=snapshot.complete,
                 llm_filter=parsed_llm_filter,
             )
-            text = _with_incomplete_notice(snapshot.complete, body)
+            text = _with_incomplete_notice(
+                snapshot.complete,
+                _with_truncation_notice(
+                    body, shown=len(rows), total=len(snapshot.files), noun="files"
+                ),
+            )
             _LOGGER.info(
                 "content_tree complete correlation_id=%s mode=%s result_count=%d",
                 cid,
@@ -640,7 +679,12 @@ async def content_tree(
             complete=snapshot.complete,
             llm_filter=parsed_llm_filter,
         )
-        text = _with_incomplete_notice(snapshot.complete, body)
+        text = _with_incomplete_notice(
+            snapshot.complete,
+            _with_limit_reached_notice(
+                body, shown=len(matches), limit=effective_limit, noun="matches"
+            ),
+        )
         _LOGGER.info(
             "content_tree complete correlation_id=%s mode=%s result_count=%d",
             cid,

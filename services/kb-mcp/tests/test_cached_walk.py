@@ -11,7 +11,11 @@ import pytest
 from unique_toolkit.content.schemas import ContentInfo
 from unique_toolkit.experimental.components.content_tree import FolderWalkSnapshot
 
-from kb_mcp.common.cached_walk import filter_snapshot, resolve_filtered_snapshot
+from kb_mcp.common.cached_walk import (
+    filter_snapshot,
+    resolve_filtered_snapshot,
+    sorted_by_depth,
+)
 
 _PDF_ONLY = {"operator": "equals", "path": ["mimeType"], "value": "application/pdf"}
 
@@ -53,6 +57,53 @@ def test_no_filter_returns_the_snapshot_untouched():
     snapshot = _snapshot()
 
     assert filter_snapshot(snapshot, None) is snapshot
+
+
+def test_sorted_by_depth_orders_shallowest_first_then_lexicographic():
+    """Discovery order interleaves concurrent branches unpredictably; slicing
+    needs a stable, breadth-biased order to slice from instead."""
+    snapshot = FolderWalkSnapshot(
+        files=[
+            (_content("deep", "text/plain"), PurePosixPath("a/b/c/deep.txt")),
+            (_content("shallow", "text/plain"), PurePosixPath("z.txt")),
+            (_content("mid", "text/plain"), PurePosixPath("a/mid.txt")),
+        ],
+        folder_paths=[
+            PurePosixPath("a/b/c"),
+            PurePosixPath("a"),
+            PurePosixPath("a/b"),
+        ],
+        complete=True,
+    )
+
+    result = sorted_by_depth(snapshot)
+
+    assert [info.id for info, _ in result.files] == ["shallow", "mid", "deep"]
+    assert result.folder_paths == [
+        PurePosixPath("a"),
+        PurePosixPath("a/b"),
+        PurePosixPath("a/b/c"),
+    ]
+
+
+def test_sorted_by_depth_does_not_mutate_the_input():
+    """The input may be the live snapshot a background walk is still
+    appending to; sorting it in place would corrupt that shared state."""
+    snapshot = FolderWalkSnapshot(
+        files=[
+            (_content("b", "text/plain"), PurePosixPath("z.txt")),
+            (_content("a", "text/plain"), PurePosixPath("a.txt")),
+        ],
+        folder_paths=[PurePosixPath("z"), PurePosixPath("a")],
+        complete=True,
+    )
+    original_files = list(snapshot.files)
+    original_folders = list(snapshot.folder_paths)
+
+    sorted_by_depth(snapshot)
+
+    assert snapshot.files == original_files
+    assert snapshot.folder_paths == original_folders
 
 
 @pytest.mark.asyncio

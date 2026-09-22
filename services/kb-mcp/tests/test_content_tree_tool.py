@@ -294,6 +294,42 @@ async def test_list_mode_with_min_score_errors():
 
 
 @pytest.mark.asyncio
+async def test_list_mode_with_folders_only_errors_instead_of_ignoring_it():
+    """folders_only has no effect outside mode='tree'; list has no folder
+    concept at all, so silently ignoring it would hide the caller's mistake."""
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
+        result = await content_tree(
+            mode="list", folders_only=True, config=ContentTreeToolConfig()
+        )
+
+    assert isinstance(result, ToolResult)
+    assert result.is_error is True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "folders_only" in text
+    assert "mode='tree'" in text
+    mock_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_search_mode_with_folders_only_errors_instead_of_ignoring_it():
+    """Same gap as list: search has no folder concept either."""
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
+        result = await content_tree(
+            mode="search",
+            query="a.pdf",
+            folders_only=True,
+            config=ContentTreeToolConfig(),
+        )
+
+    assert isinstance(result, ToolResult)
+    assert result.is_error is True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "folders_only" in text
+    assert "mode='tree'" in text
+    mock_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_search_mode_accepts_folder_path():
     """folder_path scopes every mode now, not just list."""
     mock_tree = _make_mock_tree(
@@ -412,7 +448,21 @@ async def test_limit_none_falls_back_to_config_default_limit():
         )
 
     text = result.content[0].text  # type: ignore[union-attr]
-    assert len(text.splitlines()) == 2
+    assert "first 2 of 5 files" in text
+    assert len([line for line in text.splitlines() if "content_id=" in line]) == 2
+
+
+@pytest.mark.asyncio
+async def test_list_mode_below_limit_reports_no_truncation():
+    rows = [(_make_content_info("c0"), PurePosixPath("file0.pdf"))]
+    mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=rows))
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="list", limit=5, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Raise `limit`" not in text
 
 
 @pytest.mark.asyncio
@@ -1184,6 +1234,94 @@ async def test_tree_mode_caps_files_and_says_it_truncated():
 
     text = result.content[0].text  # type: ignore[union-attr]
     assert "first 2 of 5" in text
+    assert "folders_only=true" not in text
+
+
+@pytest.mark.asyncio
+async def test_tree_limit_caps_folders_too_by_default():
+    """A caller-supplied `limit` sizes the folder cap too, so a small ask for
+    files doesn't come back wrapped in a near-unbounded folder tree."""
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(folder_paths=[PurePosixPath(f"d{i}") for i in range(5)])
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree", limit=2, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "first 2 of 5 folders" in text
+
+
+@pytest.mark.asyncio
+async def test_tree_folders_only_limit_caps_folders():
+    """Under folders_only, `limit` has no files to cap, so it caps folders."""
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(folder_paths=[PurePosixPath(f"d{i}") for i in range(5)])
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree", folders_only=True, limit=2, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "first 2 of 5 folders" in text
+
+
+@pytest.mark.asyncio
+async def test_tree_mode_caps_folders_with_no_files_present():
+    """folder_paths lists every visited directory regardless of `limit`, so it
+    needs its own cap and its own notice, even with zero files to cap."""
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(folder_paths=[PurePosixPath(f"d{i}") for i in range(5)])
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree",
+            config=ContentTreeToolConfig(default_tree_limit=2),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "first 2 of 5 folders" in text
+    assert "Raise `limit` or narrow `folder_path`" in text
+
+
+@pytest.mark.asyncio
+async def test_tree_folders_only_still_reports_folder_truncation():
+    """Unlike the file cap, the folder cap keeps biting under folders_only=true:
+    that mode exists to show folder structure, so it must still be capped."""
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(folder_paths=[PurePosixPath(f"d{i}") for i in range(5)])
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree",
+            folders_only=True,
+            config=ContentTreeToolConfig(default_tree_limit=2),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "first 2 of 5 folders" in text
+
+
+@pytest.mark.asyncio
+async def test_tree_folder_notice_counts_dirs_a_surviving_file_still_renders():
+    """A folder sliced out of folder_paths still renders if one of its files
+    survives the file cap, so the notice must count it as shown, not hidden."""
+    snapshot = FakeSnapshot(
+        files=[(_make_content_info("c0"), PurePosixPath("d4/f.pdf"))],
+        folder_paths=[PurePosixPath(f"d{i}") for i in range(5)],
+    )
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree",
+            config=ContentTreeToolConfig(default_tree_limit=2),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "d4" in text
+    assert "first 3 of 5 folders" in text
 
 
 @pytest.mark.asyncio
@@ -1279,6 +1417,43 @@ async def test_incomplete_search_still_applies_the_llm_filter():
     text = result.content[0].text  # type: ignore[union-attr]
     assert "c_pdf" in text
     assert "c_txt" not in text
+
+
+@pytest.mark.asyncio
+async def test_search_mode_reports_limit_reached_without_a_false_total():
+    """The SDK-bounded fast path only ever returns up to `limit`, so it can
+    never claim an exact total: the notice must say "may be more", not a
+    number it doesn't actually know."""
+    matches = [
+        _real_fuzzy_match(_real_content(f"c{i}", f"f{i}.pdf", "application/pdf"), 0.9)
+        for i in range(3)
+    ]
+    mock_tree = _make_mock_tree()
+    mock_tree.search_visible_files_fuzzy_async = AsyncMock(return_value=matches)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="search", query="f", limit=3, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Showing 3 matches. Raise `limit` to see more." in text
+    assert " of " not in text
+
+
+@pytest.mark.asyncio
+async def test_search_mode_below_limit_reports_nothing():
+    """Fewer matches than `limit` means that's genuinely everything: no
+    notice, since there is nothing more to raise `limit` for."""
+    matches = [_real_fuzzy_match(_real_content("c0", "f0.pdf", "application/pdf"), 0.9)]
+    mock_tree = _make_mock_tree()
+    mock_tree.search_visible_files_fuzzy_async = AsyncMock(return_value=matches)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="search", query="f", limit=3, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Raise `limit`" not in text
 
 
 @pytest.mark.asyncio
