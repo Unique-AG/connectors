@@ -6,18 +6,21 @@ from pydantic import BaseModel, Field
 from unique_toolkit._common.pydantic.rjsf_tags import RJSFMetaTag
 from unique_toolkit.content.smart_rules import UniqueQLField
 
-# System-assigned per-file identifiers, not business/domain metadata a
-# caller would ever build a search filter on — excluded from the catalog by
-# default so they don't drown out fields actually worth filtering on.
+# Fields the platform stamps on content itself (per-file identifiers, source
+# links, owners), not business/domain metadata a caller would
+# ever build a search filter on — excluded from the catalog by default so
+# they don't drown out fields actually worth filtering on.
 _DEFAULT_EXCLUDED_FIELDS = [
-    "folderIdPath",
     "key",
+    "url",
     "title",
     "folderId",
     "mimeType",
     "companyId",
     "contentId",
     "validAsOf",
+    "folderIdPath",
+    "externalFileOwner",
 ]
 
 

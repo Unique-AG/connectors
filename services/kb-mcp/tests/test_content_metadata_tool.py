@@ -189,15 +189,16 @@ async def test_excludes_folder_id_path_by_default():
 
 @pytest.mark.asyncio
 async def test_excludes_all_system_assigned_fields_by_default():
-    """key/title/folderId/mimeType/companyId/contentId/validAsOf are
-    per-file identifiers stamped on every piece of content, not business
-    metadata worth building a search filter on — none of them should ever
-    show up in the catalog unless an admin explicitly re-includes them."""
+    """Fields the platform stamps on content itself (identifiers, source
+    links, owners) are not business metadata worth building a
+    search filter on — none of them should ever show up in the catalog unless
+    an admin explicitly re-includes them."""
     mock_tree = _make_mock_tree(
         snapshot=FakeSnapshot(
             files=_files(
                 {
                     "key": "hello_world.docx",
+                    "url": None,
                     "title": "hello_world.docx",
                     "folderId": "scope_vfr2hptka5em83v5kxtw6t2y",
                     "folderIdPath": "uniquepathid://scope_vfr2hptka5em83v5kxtw6t2y",
@@ -208,6 +209,7 @@ async def test_excludes_all_system_assigned_fields_by_default():
                     "companyId": "225319369280852798",
                     "contentId": "cont_yfco7ld0rgoq3h4cqlazgyuz",
                     "validAsOf": "2026-09-11T12:31:21.256Z",
+                    "externalFileOwner": None,
                     "department": "Legal",
                 }
             )
@@ -579,7 +581,7 @@ async def test_cache_reuses_same_content_tree_instance_for_same_identity():
 
 
 @pytest.mark.asyncio
-async def test_incomplete_snapshot_appends_notice():
+async def test_incomplete_snapshot_leads_with_notice():
     mock_tree = _make_mock_tree(
         snapshot=FakeSnapshot(files=_files({"department": "Legal"}), complete=False)
     )
@@ -589,7 +591,34 @@ async def test_incomplete_snapshot_appends_notice():
         result = await content_metadata(config=ContentMetadataToolConfig())
 
     assert len(result.content) == 2  # type: ignore[arg-type]
-    assert result.content[1].text.startswith("This scan is incomplete.")  # type: ignore[union-attr]
+    assert result.content[0].text.startswith("This scan is incomplete.")  # type: ignore[union-attr]
+    assert json.loads(result.content[1].text) == [{"department": ["Legal"]}]  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("counts_only", [False, True])
+async def test_incomplete_snapshot_does_not_claim_requested_fields_are_absent(
+    counts_only: bool,
+):
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(files=_files({"department": "Legal"}), complete=False)
+    )
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(
+            fields=["department", "region"],
+            counts_only=counts_only,
+            config=ContentMetadataToolConfig(),
+        )
+
+    texts = [block.text for block in result.content]  # type: ignore[union-attr]
+    assert len(texts) == 2
+    assert texts[0].startswith("This scan is incomplete.")
+    assert json.loads(texts[1]) == (
+        [{"department": 1}] if counts_only else [{"department": ["Legal"]}]
+    )
+    assert not any("No values found" in text for text in texts)
 
 
 @pytest.mark.asyncio
@@ -714,3 +743,135 @@ async def test_one_unresolvable_path_fails_the_call_rather_than_narrowing_it():
     assert result.is_error is True
     assert "Bad" in result.content[0].text  # type: ignore[union-attr]
     scoped.assert_not_called()
+
+
+def _rich_snapshot() -> FakeSnapshot:
+    return FakeSnapshot(
+        files=_files(
+            {"department": "Legal", "status": "draft", "region": "EU"},
+            {"department": "Finance", "status": "approved"},
+            {"department": "Legal"},
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_fields_limits_the_catalog_to_the_requested_fields():
+    mock_tree = _make_mock_tree(snapshot=_rich_snapshot())
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(
+            fields=["status", "region"], config=ContentMetadataToolConfig()
+        )
+
+    assert _payload(result) == [{"status": ["draft", "approved"]}, {"region": ["EU"]}]
+    assert len(result.content) == 1
+
+
+@pytest.mark.asyncio
+async def test_counts_only_returns_distinct_value_counts_most_widely_used_first():
+    mock_tree = _make_mock_tree(snapshot=_rich_snapshot())
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(
+            counts_only=True, config=ContentMetadataToolConfig()
+        )
+
+    assert _payload(result) == [{"department": 2}, {"status": 2}, {"region": 1}]
+
+
+@pytest.mark.asyncio
+async def test_counts_only_combines_with_fields():
+    mock_tree = _make_mock_tree(snapshot=_rich_snapshot())
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(
+            fields=["region", "department"],
+            counts_only=True,
+            config=ContentMetadataToolConfig(),
+        )
+
+    assert _payload(result) == [{"department": 2}, {"region": 1}]
+
+
+@pytest.mark.asyncio
+async def test_counts_only_still_hides_admin_excluded_fields():
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(files=_files({"key": "a.pdf", "department": "Legal"}))
+    )
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(
+            counts_only=True, config=ContentMetadataToolConfig()
+        )
+
+    assert _payload(result) == [{"department": 1}]
+
+
+@pytest.mark.asyncio
+async def test_requesting_an_admin_excluded_field_does_not_reveal_it():
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(files=_files({"key": "a.pdf", "department": "Legal"}))
+    )
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(
+            fields=["key"], config=ContentMetadataToolConfig()
+        )
+
+    assert _payload(result) == []
+    assert "'key'" in result.content[1].text  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_requested_fields_with_no_values_are_named_in_a_notice():
+    mock_tree = _make_mock_tree(snapshot=_rich_snapshot())
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(
+            fields=["Department", "status", "Department"],
+            config=ContentMetadataToolConfig(),
+        )
+
+    assert _payload(result) == [{"status": ["draft", "approved"]}]
+    notice = result.content[1].text  # type: ignore[union-attr]
+    assert "['Department']" in notice
+    assert "counts_only=true" in notice
+
+
+@pytest.mark.asyncio
+async def test_empty_fields_list_returns_every_field():
+    mock_tree = _make_mock_tree(snapshot=_rich_snapshot())
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(fields=[], config=ContentMetadataToolConfig())
+
+    assert [next(iter(entry)) for entry in _payload(result)] == [
+        "department",
+        "status",
+        "region",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_counts_only_counts_each_list_element_as_a_distinct_value():
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=_files({"tags": ["a", "b"]}, {"tags": ["b", "c"]}, {"tags": "a"})
+        )
+    )
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(
+            counts_only=True, config=ContentMetadataToolConfig()
+        )
+
+    assert _payload(result) == [{"tags": 3}]
