@@ -1,6 +1,6 @@
 # Data model
 
-PostgreSQL, drizzle-orm (convention: `teams-mcp`). Every table has `company_id`, `created_at`, `updated_at`; all queries filter on `company_id`. Ids are `typeid` strings with table prefixes.
+PostgreSQL, drizzle-orm (convention: `teams-mcp`). Every table has `company_id`, `created_at`, `updated_at`; all queries filter on `company_id`. Ids are typeids (`typeid-js`): `pub_`, `conn_`, `ctx_`, `task_`, `art_`, `pnc_`, `exec_`, `rctx_`. A2A `contextId`/`taskId` are the typeids verbatim.
 
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%
@@ -119,11 +119,15 @@ erDiagram
 
 `PgTaskStore implements TaskStore` from `@a2a-js/sdk` (`save`, `load`, `list` with `ServerCallContext`): `context.user` → `(companyId, userId)`; `task_snapshot` is the protocol `Task` as served to clients, the mapping columns are ours.
 
-## Worker jobs (pg-boss, same database)
+## Workflows (absurd, same database)
 
-| Job | Trigger | Idempotency key |
-| --- | --- | --- |
-| `outbound.poll` | remote without streaming, or stream dropped | `executionId` |
-| `push.deliver` | task status change with configs | `taskId:statusTimestamp:configId` |
-| `reconcile.publications` | schedule | singleton |
-| `retention.expire` | schedule | singleton |
+`absurd.sql` and its released migrations are applied through our drizzle migration folder; absurd tables live in their own schema. Queue: `a2a-gateway`.
+
+| Task | Trigger | Steps / suspension | Idempotency |
+| --- | --- | --- | --- |
+| `outbound.run` | `POST /internal/executions` | `send` → (`stream` \| `poll` + `sleep`) → `awaitEvent(elicitation:<executionId>)` when `INPUT_REQUIRED`/`AUTH_REQUIRED` → `finalize` (files, references, `completedAt`) | `executions.user_message_id` unique; spawn key = `executionId` |
+| `push.deliver` | task status change with configs | single step, retried with backoff, disabled after `PUSH_MAX_FAILURES` | `taskId:statusTimestamp:configId` |
+| `reconcile` | cron pattern (`RECONCILE_INTERVAL`) | compare non-terminal tasks/executions with core; disable publications of deleted/changed spaces | singleton |
+| `retention` | cron pattern (daily) | expire tasks/artifacts/executions | singleton |
+
+Cancel (`/internal/executions/{id}/cancel`, inbound `CancelTask`) emits `cancel:<id>`; the running task races its remote call against that event and calls `CancelTask` on the peer.
