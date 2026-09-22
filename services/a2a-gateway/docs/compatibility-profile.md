@@ -40,4 +40,4 @@ Not designed for up front (D-09). When a real peer is onboarded, the connection 
 ## Conformance
 
 - Server: [a2a-tck](https://github.com/a2aproject/a2a-tck) mandatory suite in CI against a local gateway with a stubbed core; [a2a-inspector](https://github.com/a2aproject/a2a-inspector) for manual checks.
-- Client: contract tests against `@a2a-js/sdk` sample servers and a recorded LangSmith fixture.
+- Client: contract tests against `@a2a-js/sdk` sample servers; fixtures per onboarded peer added in KRA-44.
