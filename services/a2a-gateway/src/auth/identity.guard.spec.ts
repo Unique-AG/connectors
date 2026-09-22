@@ -2,7 +2,7 @@ import type { ExecutionContext } from '@nestjs/common';
 import { UnauthorizedException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 import type { GatewayConfig } from '../config/config.js';
-import { KongIdentityGuard } from './identity.guard.js';
+import { ClusterIdentityGuard, KongIdentityGuard } from './identity.guard.js';
 
 function context(headers: Record<string, string | undefined>): ExecutionContext {
   return {
@@ -40,9 +40,28 @@ describe('KongIdentityGuard', () => {
     }
   });
 
-  it('allows the explicit development mode', () => {
-    const guard = new KongIdentityGuard({ authMode: 'development' } as GatewayConfig);
+  it('accepts trusted internal headers in explicit development mode', () => {
+    const guard = new ClusterIdentityGuard({ authMode: 'development' } as GatewayConfig);
 
-    expect(guard.canActivate(context({}))).toBe(true);
+    expect(guard.canActivate(context({ 'x-user-id': 'user', 'x-company-id': 'company' }))).toBe(
+      true,
+    );
+  });
+
+  it('derives identity from the bearer token only in explicit development mode', () => {
+    const guard = new KongIdentityGuard({ authMode: 'development' } as GatewayConfig);
+    const headers: Record<string, string> = {
+      authorization: `Bearer ignored.${Buffer.from(
+        JSON.stringify({
+          sub: 'user',
+          'urn:zitadel:iam:user:resourceowner:id': 'company',
+        }),
+      ).toString('base64url')}.ignored`,
+    };
+
+    expect(guard.canActivate(context(headers))).toBe(true);
+    expect(headers['x-user-id']).toBe('user');
+    expect(headers['x-company-id']).toBe('company');
+    expect(() => guard.canActivate(context({}))).toThrow(UnauthorizedException);
   });
 });

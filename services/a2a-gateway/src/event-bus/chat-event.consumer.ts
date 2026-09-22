@@ -2,7 +2,7 @@ import { hostname } from 'node:os';
 import { RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
-import { EVENT_BUS_EXCHANGE } from './event-bus.module.js';
+import { EVENT_BUS_EXCHANGE } from './event-bus.constants.js';
 
 const eventSchema = z.discriminatedUnion('type', [
   z.object({

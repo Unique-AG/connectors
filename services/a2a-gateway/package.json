@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "build": "nest build",
+    "predev": "pnpm --filter @unique-ag/aes-gcm-encryption build",
     "dev": "nest start --watch",
     "debug": "nest start --debug --watch",
     "codegen": "echo \"No codegen for this server\"",
@@ -28,6 +29,7 @@
     "@a2a-js/sdk": "1.2.0",
     "@golevelup/nestjs-rabbitmq": "catalog:",
     "@nestjs/common": "12.0.4",
+    "@nestjs/config": "catalog:",
     "@nestjs/core": "12.0.4",
     "@nestjs/platform-express": "12.0.4",
     "@nestjs/terminus": "12.1.0",

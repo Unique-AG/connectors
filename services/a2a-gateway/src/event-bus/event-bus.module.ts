@@ -2,8 +2,7 @@ import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { Module } from '@nestjs/common';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { ChatEventConsumer } from './chat-event.consumer.js';
-
-export const EVENT_BUS_EXCHANGE = 'unique.event-bus';
+import { EVENT_BUS_EXCHANGE } from './event-bus.constants.js';
 
 @Module({
   imports: [

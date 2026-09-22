@@ -26,6 +26,7 @@ config:
   uniqueChatUrl: ""
   uniqueScopeManagementUrl: ""
   uniqueIngestionUrl: ""
+  corsAllowedOrigins: []
   workerEnabled: true
   workerConcurrency: 4
 
