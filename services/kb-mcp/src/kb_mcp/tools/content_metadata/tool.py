@@ -5,16 +5,18 @@ that exist on visible content, so a caller can build a metadata filter.
 - ENV (process-wide): KB_MCP_TREE_CACHE_TTL_SECONDS / _MAX_ENTRIES and
   KB_MCP_WALK_TIMEOUT_SECONDS / KB_MCP_WALK_MAX_TIMEOUT_SECONDS
 - STATE (LLM, per call): folder_ids/folder_paths/include_subfolders scope
-  which content counts; the tool always returns the full field/value catalog
-  for that scope
+  which content counts; fields narrows the catalog to named fields and
+  counts_only swaps the values for their distinct count, so a caller can
+  survey what exists before asking for a potentially huge value list
 
 Mirrors content_tree's structure and shares its ContentTree cache, keyed by
 company+user+folder scope, since both tools are just different views over the
 same visible-file snapshot. Scoping roots the walk at the requested folders
 rather than filtering afterwards; the admin filter is never bypassed.
 
-Exhaustive for now: every known field and every distinct value it has, with
-no caps — pagination will be added once scale requires it.
+Exhaustive for now: every known field (or every requested one) and every
+distinct value it has, with no caps — pagination will be added once scale
+requires it.
 """
 
 import asyncio
@@ -57,6 +59,14 @@ _INCOMPLETE_NOTICE = (
     "background; call content_metadata again (same arguments) to get the "
     "complete picture — that follow-up is usually instant from cache."
 )
+
+
+def _missing_fields_notice(missing: Sequence[str]) -> str:
+    return (
+        f"No values found for requested fields: {list(missing)}. Field names "
+        "are case-sensitive; call content_metadata with counts_only=true to "
+        "see which fields exist."
+    )
 
 
 async def _unreadable_folder_ids(
@@ -160,7 +170,12 @@ _META = merge_tool_meta(
             "metadata filter for search — not for searching content "
             "itself. Returns JSON: a list of single-key objects, e.g. "
             '[{"department": ["Legal", "Finance"]}], one per known field, '
-            "listing every distinct value found. Optionally scope it to "
+            "listing every distinct value found. On a large knowledge base, "
+            "call it first with counts_only=true to get each field name with "
+            'its number of distinct values (e.g. [{"department": 12}]), then '
+            "again with fields set to the ones you need so you only receive "
+            "their values. Optionally "
+            "scope it to "
             "one or more folders with folder_ids (same as search's), or to "
             "one or more folders by exact path with folder_paths if you "
             "don't have scope_xxx ids in hand. If the result says the scan "
@@ -221,6 +236,28 @@ async def content_metadata(
             )
         ),
     ] = True,
+    fields: Annotated[
+        list[str] | None,
+        Field(
+            description=(
+                "Only return these metadata fields, by exact (case-sensitive) "
+                "name as listed by a counts_only=true call. Omit (null) to "
+                "return every field; an empty list returns no fields."
+            )
+        ),
+    ] = None,
+    counts_only: Annotated[
+        bool,
+        Field(
+            description=(
+                "If true, return each field name with its number of "
+                "distinct values instead of the values themselves — e.g. "
+                '[{"department": 12}], most widely used field first. Use it '
+                "to see what fields exist, and how big each value list is, "
+                "before requesting values for a few of them with fields."
+            )
+        ),
+    ] = False,
     refresh: Annotated[
         bool,
         Field(
@@ -250,7 +287,9 @@ async def content_metadata(
     content (optionally scoped to folder_ids), so a caller can build a
     metadata filter for search. Returns JSON: a list of single-key objects
     mapping a field name to every distinct value found, e.g.
-    [{"department": ["Legal", "Finance"]}] — one entry per known field.
+    [{"department": ["Legal", "Finance"]}] — one entry per known field, or
+    per requested field when fields is set. With counts_only, returns each
+    field's distinct-value count instead, e.g. [{"department": 12}].
     Exhaustive: every field and value the scope has, not a sample. Values
     here describe what filtering is *possible*, not a guarantee today's
     search tool accepts an arbitrary metadata filter — check with the
@@ -373,6 +412,8 @@ async def content_metadata(
         )
 
         excluded = set(config.excluded_fields)
+        # [] is a request for no fields, not an omission.
+        requested = set(fields) if fields is not None else None
         field_file_counts: Counter[str] = Counter()
         field_value_counts: defaultdict[str, Counter[Any]] = defaultdict(Counter)
 
@@ -381,6 +422,8 @@ async def content_metadata(
             for meta_field, raw_value in item_metadata.items():
                 if meta_field in excluded:
                     continue
+                if requested is not None and meta_field not in requested:
+                    continue
                 values = _flatten_metadata_value(raw_value)
                 if not values:
                     continue
@@ -388,21 +431,43 @@ async def content_metadata(
                 for value in values:
                     field_value_counts[meta_field][value] += 1
 
-        payload = [
-            {
-                meta_field: [
-                    value
-                    for value, _count in field_value_counts[meta_field].most_common()
-                ]
-            }
-            for meta_field, _file_count in field_file_counts.most_common()
+        ranked_fields = [
+            meta_field for meta_field, _file_count in field_file_counts.most_common()
         ]
+        payload: list[dict[str, Any]] = (
+            [
+                {meta_field: len(field_value_counts[meta_field])}
+                for meta_field in ranked_fields
+            ]
+            if counts_only
+            else [
+                {
+                    meta_field: [
+                        value
+                        for value, _count in field_value_counts[
+                            meta_field
+                        ].most_common()
+                    ]
+                }
+                for meta_field in ranked_fields
+            ]
+        )
 
-        content: list[TextContent] = [
-            TextContent(type="text", text=json.dumps(payload))
-        ]
-        if not snapshot.complete:
-            content.append(TextContent(type="text", text=_INCOMPLETE_NOTICE))
+        # Leads, so the caller reads the catalog as partial before reading it.
+        content: list[TextContent] = (
+            []
+            if snapshot.complete
+            else [TextContent(type="text", text=_INCOMPLETE_NOTICE)]
+        )
+        content.append(TextContent(type="text", text=json.dumps(payload)))
+        # Only a finished scan can say a field is absent; a partial one may
+        # simply not have reached the files that carry it. Deduplicated in
+        # request order, so the notice echoes what was asked.
+        missing = [f for f in dict.fromkeys(fields or []) if f not in field_file_counts]
+        if missing and snapshot.complete:
+            content.append(
+                TextContent(type="text", text=_missing_fields_notice(missing))
+            )
 
         _LOGGER.info(
             "content_metadata complete correlation_id=%s field_count=%d",
