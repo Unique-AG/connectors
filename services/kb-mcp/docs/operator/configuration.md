@@ -30,8 +30,9 @@ one signs tokens, the other protects stored data.
 startup rather than falling back.
 
 `DATABASE_URL` is always delivered as a Kubernetes secret, never a plaintext value, regardless of
-which Postgres you're pointing at: `url.fromSecret` against the chart's own CloudNativePG-managed
-secret for an in-cluster database, or your own secret for an external one. See
+which Postgres you're pointing at: `url.fromSecret` against the secret your own CloudNativePG
+`Cluster` generates for an in-cluster database, or one you create yourself for an external one.
+The chart neither creates nor owns that secret either way. See
 [PostgreSQL](../operator/deployment.md#PostgreSQL) for both paths.
 
 !!! warning "Rotating a secret logs everyone out"
