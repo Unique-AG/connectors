@@ -111,11 +111,8 @@ volumeMounts:
   - name: tmp
     mountPath: /tmp
 
-# OAuth proxy storage. Settings refuses to boot without a durable DATABASE_URL
-# from this block and ENCRYPTION_KEY from envVars above.
-# A Unique cluster with in-cluster CloudNativePG sets host and url like this.
-# Without the operator, set postgresql.enabled to false and pass DATABASE_URL
-# through extraEnvSecrets.
+# OAuth proxy storage. Settings refuses to boot without DATABASE_URL here and ENCRYPTION_KEY from envVars.
+# A Unique cluster with CloudNativePG sets host and url below. Without the operator, disable postgresql and pass DATABASE_URL via extraEnvSecrets.
 postgresql:
   enabled: true
   connection:
