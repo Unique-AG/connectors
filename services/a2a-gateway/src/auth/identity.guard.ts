@@ -5,6 +5,26 @@ import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 
 const commonIdentityHeaders = ['x-user-id', 'x-company-id', 'x-user-roles'] as const;
 
+export interface RequestIdentity {
+  companyId: string;
+  userId: string;
+  roles: string[];
+}
+
+export function requestIdentity(request: Request): RequestIdentity {
+  const companyId = request.headers['x-company-id'];
+  const userId = request.headers['x-user-id'];
+  const roles = request.headers['x-user-roles'];
+  if (typeof companyId !== 'string' || typeof userId !== 'string') {
+    throw new UnauthorizedException('trusted identity headers are required');
+  }
+  return {
+    companyId,
+    userId,
+    roles: typeof roles === 'string' ? roles.split(',').map((role) => role.trim()) : [],
+  };
+}
+
 function hasHeaders(request: Request, names: readonly string[]): boolean {
   return names.every((name) => {
     const value = request.headers[name];
