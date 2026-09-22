@@ -31,7 +31,7 @@ flowchart LR
     Client -.->|auth code + PKCE| Zitadel
     Client -->|"Bearer (human OAuth)"| Kong
     FE -->|Bearer| Kong
-    Kong -->|"x-user-id / x-company-id / x-user-roles"| Pub & Mgmt
+    Kong -->|"x-user-id / x-company-id / x-user-roles / x-client-id"| Pub & Mgmt
     Chat -->|"effective user headers"| Int
     Pub & Mgmt & Int --> Core
     Core --> DB
@@ -82,7 +82,7 @@ flowchart TB
     subgraph Infra
         Auth["KongIdentityGuard ·<br/>ClusterIdentityGuard"]
         UC["UniqueInternalClient<br/>(identity preserving)"]
-        Bus["EventBusSubscriber<br/>(amqplib)"]
+        Bus["EventBusSubscriber<br/>(@golevelup/nestjs-rabbitmq)"]
         Store["PgTaskStore + repositories<br/>(drizzle)"]
         Wf["WorkflowModule (absurd)"]
         Sec["CredentialVault<br/>(aes-gcm-encryption)"]
