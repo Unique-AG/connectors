@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../config/config.js';
-import { UniqueInternalClient, UniqueInternalError } from './unique-internal.client.js';
+import { UniqueInternalClient } from './unique-internal.client.js';
+import { UniqueInternalError } from './unique-internal.error.js';
 
 const config = loadConfig({
   NODE_ENV: 'test',
@@ -28,7 +29,11 @@ describe('UniqueInternalClient', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await new UniqueInternalClient(config).getMessage(identity, 'message-1');
+    const result = await new UniqueInternalClient(config).getMessage(
+      identity,
+      'chat-1',
+      'message-1',
+    );
 
     expect(result).toEqual({ id: 'message-1' });
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
@@ -50,7 +55,7 @@ describe('UniqueInternalClient', () => {
     expect(url.toString()).toBe('http://node-chat/graphql');
     expect(JSON.parse(String(request.body))).toEqual({
       query:
-        'query A2aManagedAssistant($assistantId: String!) { assistantByCompany(assistantId: $assistantId) { id name } }',
+        'query A2aManagedAssistant($assistantId: String!) { assistantByCompany(assistantId: $assistantId) { id name executionProvider } }',
       variables: { assistantId: 'assistant-1' },
     });
     expect(request.headers).not.toHaveProperty('x-user-roles');

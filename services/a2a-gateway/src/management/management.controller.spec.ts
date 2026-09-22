@@ -38,12 +38,17 @@ describe('ManagementController', () => {
     const { controller, management } = subject();
     await controller.putPublication(request, 'assistant-1', '"2"', {
       enabled: true,
+      card: { name: 'Published space', description: 'Description' },
       companyId: 'other',
     });
     expect(management.putPublication).toHaveBeenCalledWith(
       { companyId: 'company-1', userId: 'user-1', roles: [] },
       'assistant-1',
-      { enabled: true, card: {}, skills: [] },
+      {
+        enabled: true,
+        card: { name: 'Published space', description: 'Description' },
+        skills: [],
+      },
       2,
     );
   });

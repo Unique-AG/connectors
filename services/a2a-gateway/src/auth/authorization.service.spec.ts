@@ -13,8 +13,10 @@ function subject() {
     getCapabilities: vi
       .fn()
       .mockResolvedValue({ configured: true, enabled: true, available: true, retryable: false }),
-    verifySpaceManagement: vi.fn().mockResolvedValue({ id: 'assistant-1' }),
-    getAssistant: vi.fn().mockResolvedValue({ id: 'assistant-1' }),
+    verifySpaceManagement: vi
+      .fn()
+      .mockResolvedValue({ id: 'assistant-1', executionProvider: 'NATIVE' }),
+    getAssistant: vi.fn().mockResolvedValue({ id: 'assistant-1', executionProvider: 'NATIVE' }),
     getPermissions: vi
       .fn()
       .mockResolvedValue({ uiPermissions: { canAccessSpaceManagement: true } }),

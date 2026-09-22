@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { RequestIdentity } from '../auth/identity.guard.js';
-import { PublicationRepository } from '../drizzle/gateway.repository.js';
-import { UniqueInternalClient, UniqueInternalError } from '../unique/unique-internal.client.js';
+import { PublicationRepository } from '../drizzle/publication.repository.js';
+import { UniqueInternalClient } from '../unique/unique-internal.client.js';
+import { UniqueInternalError } from '../unique/unique-internal.error.js';
 
 export interface PublicationReconciliation {
   assistantId: string;

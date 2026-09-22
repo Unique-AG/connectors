@@ -6,7 +6,8 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AuthorizationService } from '../auth/authorization.service.js';
 import { loadConfig } from '../config/config.js';
-import type { ConnectionRepository, ExecutionRepository } from '../drizzle/gateway.repository.js';
+import type { ConnectionRepository } from '../drizzle/connection.repository.js';
+import type { ExecutionRepository } from '../drizzle/execution.repository.js';
 import type { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { ConnectionService } from './connection.service.js';
 import { credentialProfile } from './credential-profile.js';

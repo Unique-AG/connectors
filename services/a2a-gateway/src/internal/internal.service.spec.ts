@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PublicationRepository } from '../drizzle/gateway.repository.js';
-import {
-  type UniqueInternalClient,
-  UniqueInternalError,
-} from '../unique/unique-internal.client.js';
+import type { PublicationRepository } from '../drizzle/publication.repository.js';
+import type { UniqueInternalClient } from '../unique/unique-internal.client.js';
+import { UniqueInternalError } from '../unique/unique-internal.error.js';
 import { InternalService } from './internal.service.js';
 
 const identity = { companyId: 'company-1', userId: 'user-1', roles: [] };

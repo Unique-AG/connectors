@@ -1,26 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
+import { UniqueInternalError } from './unique-internal.error.js';
 
 export interface EffectiveIdentity {
   companyId: string;
   userId: string;
   roles: string[];
-}
-
-export class UniqueInternalError extends Error {
-  public constructor(
-    message: string,
-    public readonly code:
-      | 'UNAUTHORIZED'
-      | 'NOT_FOUND'
-      | 'CONFLICT'
-      | 'UNAVAILABLE'
-      | 'INVALID_RESPONSE',
-    public readonly retryable: boolean,
-  ) {
-    super(message);
-  }
 }
 
 const graphQlResponse = z.object({
@@ -57,7 +43,7 @@ export class UniqueInternalClient {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `query A2aAssistant($assistantId: String!) { assistantByUser(assistantId: $assistantId) { id name } }`,
+      `query A2aAssistant($assistantId: String!) { assistantByUser(assistantId: $assistantId) { id name executionProvider } }`,
       { assistantId },
       'assistantByUser',
     );
@@ -67,7 +53,7 @@ export class UniqueInternalClient {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `query A2aManagedAssistant($assistantId: String!) { assistantByCompany(assistantId: $assistantId) { id name } }`,
+      `query A2aManagedAssistant($assistantId: String!) { assistantByCompany(assistantId: $assistantId) { id name executionProvider } }`,
       { assistantId },
       'assistantByCompany',
     );
@@ -95,33 +81,51 @@ export class UniqueInternalClient {
 
   public createMessage(
     identity: EffectiveIdentity,
-    input: Record<string, unknown>,
+    assistantId: string,
+    chatId: string | undefined,
+    text: string,
   ): Promise<unknown> {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `mutation A2aMessageCreate($input: MessageCreateInput!) { messageCreate(input: $input) { id chatId } }`,
-      { input },
+      `mutation A2aMessageCreate($assistantId: String, $chatId: String, $input: MessageCreateInput!) {
+        messageCreate(assistantId: $assistantId, chatId: $chatId, input: $input) {
+          id chatId messages { id }
+        }
+      }`,
+      { assistantId, chatId, input: { role: 'USER', text } },
       'messageCreate',
     );
   }
 
-  public getMessage(identity: EffectiveIdentity, messageId: string): Promise<unknown> {
+  public getMessage(
+    identity: EffectiveIdentity,
+    chatId: string,
+    messageId: string,
+  ): Promise<unknown> {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `query A2aMessage($messageId: ID!) { message(messageId: $messageId) { id completedAt stoppedStreamingAt segments } }`,
-      { messageId },
+      `query A2aMessage($chatId: String!, $messageId: String!) {
+        message(chatId: $chatId, messageId: $messageId) { id text completedAt stoppedStreamingAt segments }
+      }`,
+      { chatId, messageId },
       'message',
     );
   }
 
-  public stopMessage(identity: EffectiveIdentity, messageId: string): Promise<unknown> {
+  public stopMessage(
+    identity: EffectiveIdentity,
+    chatId: string,
+    messageId: string,
+  ): Promise<unknown> {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `mutation A2aMessageStop($messageId: ID!) { messageStopStreaming(messageId: $messageId) { id stoppedStreamingAt } }`,
-      { messageId },
+      `mutation A2aMessageStop($chatId: String!, $messageId: String!) {
+        messageStopStreaming(chatId: $chatId, messageId: $messageId) { id stoppedStreamingAt }
+      }`,
+      { chatId, messageId },
       'messageStopStreaming',
     );
   }
