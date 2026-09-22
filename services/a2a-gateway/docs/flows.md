@@ -10,9 +10,10 @@ sequenceDiagram
     participant GW as a2a-gateway
     participant DB as gateway DB
     participant Chat as node-chat
+    participant MQ as RabbitMQ EVENT_BUS
 
-    C->>GW: SendStreamingMessage(contextId?, parts) · Bearer
-    GW->>GW: verify token, resolve publication (enabled?)
+    C->>GW: SendStreamingMessage(contextId?, parts) · via Kong (identity headers)
+    GW->>GW: resolve publication (enabled?)
     GW->>Chat: space use access · x-user-id/x-company-id
     Chat-->>GW: ok
     GW->>DB: upsert context (chatId or null), check no active task
@@ -21,9 +22,8 @@ sequenceDiagram
     Chat-->>GW: userMessage {id, chatId}
     GW->>DB: create task SUBMITTED, context.chatId
     GW-->>C: SSE: Task
-    GW->>Chat: run events (see D-07)
-    loop events
-        Chat-->>GW: stream chunk / update / elicitation pending / finished
+    loop events matched by chatId / messageId
+        MQ-->>GW: assistant-message created / stream.chunk / update / finished · elicitation created
         GW->>DB: update task snapshot
         GW-->>C: SSE: TaskStatusUpdateEvent / TaskArtifactUpdateEvent
     end
@@ -42,7 +42,7 @@ sequenceDiagram
     participant GW as a2a-gateway
     participant Chat as node-chat
 
-    Chat-->>GW: elicitation pending (FORM schema | URL)
+    Chat-->>GW: unique.chat.elicitation.created (FORM schema | URL) via EVENT_BUS
     GW-->>C: status INPUT_REQUIRED (data part = schema) | AUTH_REQUIRED (url)
     C->>GW: SendMessage(taskId, contextId, data part = answer) | (taskId, text "done")
     GW->>Chat: elicitationRespond(id, ACCEPTED, content) · same user
@@ -72,6 +72,7 @@ sequenceDiagram
     Chat->>GW: POST /internal/executions {connectionId, chatId, messages, parts} · user headers
     GW->>GW: load connection + negotiated caps, resolve remote contextId for chatId
     GW-->>Chat: 202 {executionId}
+    Note over GW: absurd task outbound.run starts
     alt streaming supported
         GW->>R: SendStreamingMessage(contextId?, parts) · connection credential
         R-->>GW: SSE task events
@@ -84,8 +85,10 @@ sequenceDiagram
     end
     alt INPUT_REQUIRED / AUTH_REQUIRED
         GW->>Chat: elicitationCreate(FORM schema | URL) + message text
+        Note over GW: task suspends on awaitEvent(elicitation:executionId)
         U->>Chat: answers elicitation
-        Chat-->>GW: (D-08) elicitation ACCEPTED
+        Chat->>GW: POST /internal/executions/{id}/elicitation-response
+        GW->>GW: emitEvent → task resumes
         GW->>R: SendMessage(taskId, answer)
     end
     R-->>GW: COMPLETED + artifacts
@@ -104,6 +107,7 @@ Unchanged for core: the Conduct `SubAgentTool` sends a message with `correlation
 
 ## Recovery
 
-- Gateway restart during inbound task: task stays `WORKING`; `GetTask`/`SubscribeToTask` re-derive state from core message state (poll) — no second `messageCreate` (unique `user_message_id`).
-- Gateway restart during outbound execution: worker resumes `outbound.poll` for non-terminal executions; if the remote lacks `GetTask` continuity the execution fails with a clear message in the chat.
+- Gateway restart during inbound task: task stays `WORKING`; the new replica's bus queue receives subsequent events; on reconnect `GetTask`/`SubscribeToTask` re-derive missed state from core message state — no second `messageCreate` (unique `user_message_id`).
+- Gateway restart during outbound execution: absurd re-runs the task from its last checkpoint (`sent` → `polling`/`awaiting`); if the remote lacks `GetTask` continuity the execution fails with a clear message in the chat.
+- Missed bus events (queue is per replica, auto-delete): the reconciliation job compares non-terminal tasks/executions against core message state every `RECONCILE_INTERVAL`.
 - Core unreachable: inbound requests fail with `-32603` + `ErrorInfo.reason = UPSTREAM_UNAVAILABLE`; outbound updates are retried, then the execution fails.

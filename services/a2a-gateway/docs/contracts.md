@@ -4,12 +4,14 @@ Three gateway surfaces, one set of core operations the gateway consumes, and one
 
 ## 1. Public A2A surface (`/a2a`)
 
+All rows except the public card are behind Kong (JWT → `x-user-id`, `x-company-id`, `x-user-roles`). Clients still send `Authorization: Bearer <Zitadel token>`; the gateway only sees the headers.
+
 | Path | Auth | Purpose |
 | --- | --- | --- |
-| `GET /a2a/agents` | Bearer | Unique-specific catalog: published spaces the caller may **use** (checked live against core). Returns `{ agents: [{ publicationId, name, description, cardUrl }] }`. |
+| `GET /a2a/agents` | Kong JWT | Unique-specific catalog: published spaces the caller may **use** (checked live against core). Returns `{ agents: [{ publicationId, name, description, cardUrl }] }`. |
 | `GET /a2a/agents/{publicationId}/.well-known/agent-card.json` | none | Public Agent Card. Contains only Space-Admin-approved fields (name, description, skills, modes, security schemes, `supportedInterfaces`). Fields hidden by the admin are omitted. |
-| `POST /a2a/agents/{publicationId}` | Bearer | JSON-RPC 2.0 endpoint, `A2A-Version: 1.0`. |
-| `GET /a2a/agents/{publicationId}/files/{artifactFileId}` | Bearer | Download of a file artifact produced by the space. Authorised like `GetTask` on the owning task. |
+| `POST /a2a/agents/{publicationId}` | Kong JWT | JSON-RPC 2.0 endpoint, `A2A-Version: 1.0`. |
+| `GET /a2a/agents/{publicationId}/files/{artifactFileId}` | Kong JWT | Download of a file artifact produced by the space. Authorised like `GetTask` on the owning task. |
 
 Supported JSON-RPC methods (v1.0 names only, see [compatibility-profile](./compatibility-profile.md)):
 `SendMessage`, `SendStreamingMessage` (SSE), `GetTask`, `ListTasks`, `CancelTask`, `SubscribeToTask` (SSE), `CreateTaskPushNotificationConfig`, `GetTaskPushNotificationConfig`, `ListTaskPushNotificationConfigs`, `DeleteTaskPushNotificationConfig`, `GetExtendedAgentCard`.
@@ -37,7 +39,7 @@ Never exposed: internal tool traces, prompts, `debugInfo`, model names, assistan
 
 ## 2. Management surface (`/management`)
 
-Caller: Unique frontend through Kong (Kong validates the Zitadel JWT and stamps `x-user-id`, `x-company-id`, `x-user-roles`). The gateway authorises object-level access **against core** (assistant manage access) before every write.
+Caller: Unique frontend directly (not via core) through Kong (JWT → identity headers). The gateway authorises object-level access **against core** (assistant manage access) before every write.
 
 | Method | Path | Rule |
 | --- | --- | --- |
@@ -58,7 +60,7 @@ Cluster-local only. Caller: `node-chat` with effective-user headers (`x-user-id`
 | `GET` | `/internal/capabilities` | `{ version, protocolVersions: ["1.0"], features: {...} }` — used by core to decide whether A2A UI/API is available |
 | `POST` | `/internal/executions` | Start outbound run: `{ connectionId, chatId, userMessageId, assistantMessageId, assistantId, parts }`. Returns `{ executionId }` immediately; gateway streams results back into the chat. |
 | `POST` | `/internal/executions/{executionId}/cancel` | User stopped the message in Unique → `CancelTask` on the remote |
-| `POST` | `/internal/executions/{executionId}/elicitation-response` | Optional: core-side elicitation answered → forwarded as follow-up message with the remote `taskId` (alternative: gateway polls `Elicitation` state — see [decisions](./decisions.md)) |
+| `POST` | `/internal/executions/{executionId}/elicitation-response` | Core-side elicitation answered/declined/expired → `{ elicitationId, action, content? }`; gateway emits the workflow event, the suspended run continues with a follow-up message carrying the remote `taskId` (D-08) |
 | `GET` | `/internal/connections/{connectionId}` | Redacted connection summary + negotiated capabilities for the space settings UI |
 | `POST` | `/internal/publications/reconcile` | Core notifies space deletion/type change; gateway disables the publication |
 
@@ -70,15 +72,15 @@ All calls carry `x-user-id` + `x-company-id` (roles resolved by the target's `Ac
 | --- | --- | --- |
 | Space lookup, use/manage access | GraphQL `assistants`/`assistantByUser`, `spaceManagerVerify` (scope-management) | exists |
 | Create chat / message | GraphQL `messageCreate` (as in `SpaceMessageCreate`) with `correlation` for sub-agent calls | exists |
-| Run events (stream) | REST `POST /space-message-events/stream` (SSE) | exists, **experimental** (feature flag `…EXPERIMENTAL_ENDPOINTS_UN_21060`), in-process event tap, 1 h timeout, cannot re-attach |
-| Poll run state | GraphQL `messages`/`message` (`stoppedStreamingAt`, `completedAt`, segments) | exists |
+| Run events | RabbitMQ `EVENT_BUS` (topic): `unique.chat.assistant-message.{created,update,stream.chunk,finished}`, `unique.chat.user-message.created` | exists (D-07); gateway declares its own queue |
+| Elicitation events | — (node-chat emits them in-process only) | **gap**: publish `unique.chat.elicitation.{created,responded,expired}` on `EVENT_BUS` (P-03) |
+| Poll run state (cache miss / recovery) | GraphQL `messages`/`message` (`stoppedStreamingAt`, `completedAt`, segments) | exists |
 | Cancel | GraphQL `messageStopStreaming` | exists |
 | Elicitation read/respond | GraphQL `elicitationGetPending`, `elicitationGetById`, `elicitationRespond` | exists |
 | Elicitation create (outbound `input-required`) | GraphQL `elicitationCreate` | exists |
 | Write assistant message (outbound results) | GraphQL `messagePublicUpdate` / message stream chunk path used by external modules | exists (verify streaming path) |
 | Chat file upload / download | `contentUpsertByChat` + ingestion upload (node-ingestion), content download URL | exists |
-| Stable, re-attachable run event contract | — | **gap**: needed for `SubscribeToTask`; options in [decisions D-07](./decisions.md) |
-| Outbound execution hook | — | **gap**: core must dispatch `executionProvider = A2A` spaces to `/internal/executions` (KRA-30) |
+| Outbound execution hook | — | **gap**: core must dispatch `executionProvider = A2A` spaces to `/internal/executions`, forward stop → `/cancel`, and elicitation outcome → `/elicitation-response` (KRA-30) |
 
 ## 5. Core capability contract (KRA-25, KRA-30)
 
