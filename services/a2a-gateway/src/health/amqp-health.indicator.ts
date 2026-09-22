@@ -1,7 +1,7 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Injectable } from '@nestjs/common';
 import { type HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-import { EVENT_BUS_EXCHANGE } from '../event-bus/event-bus.module.js';
+import { EVENT_BUS_EXCHANGE } from '../event-bus/event-bus.constants.js';
 
 @Injectable()
 export class AmqpHealthIndicator {

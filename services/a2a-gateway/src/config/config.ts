@@ -21,6 +21,34 @@ const configSchema = z
     UNIQUE_SCOPE_MANAGEMENT_URL: url,
     UNIQUE_INGESTION_URL: url,
     ENCRYPTION_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/, 'ENCRYPTION_KEY must be 32-byte hex'),
+    CORS_ALLOWED_ORIGINS: z
+      .string()
+      .optional()
+      .transform(
+        (value) =>
+          value
+            ?.split(',')
+            .map((origin) => origin.trim())
+            .filter(Boolean) ?? [],
+      )
+      .pipe(
+        z.array(
+          z.url().transform((origin, context) => {
+            const parsed = new URL(origin);
+            if (
+              parsed.username ||
+              parsed.password ||
+              parsed.pathname !== '/' ||
+              parsed.search ||
+              parsed.hash
+            ) {
+              context.addIssue({ code: 'custom', message: 'CORS origins must not contain a path' });
+              return z.NEVER;
+            }
+            return parsed.origin;
+          }),
+        ),
+      ),
     EGRESS_ALLOWED_HOSTS: z
       .string()
       .optional()
@@ -87,6 +115,7 @@ const configSchema = z
     uniqueScopeManagementUrl: config.UNIQUE_SCOPE_MANAGEMENT_URL,
     uniqueIngestionUrl: config.UNIQUE_INGESTION_URL,
     encryptionKey: config.ENCRYPTION_KEY,
+    corsAllowedOrigins: config.CORS_ALLOWED_ORIGINS,
     egressAllowedHosts: config.EGRESS_ALLOWED_HOSTS,
     maxRemoteFileBytes: config.MAX_REMOTE_FILE_BYTES,
     syncWaitMaxMs: config.SYNC_WAIT_MAX_MS,

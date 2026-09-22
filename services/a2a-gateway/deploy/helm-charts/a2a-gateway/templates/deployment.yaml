@@ -42,6 +42,8 @@ spec:
               value: {{ required "config.uniqueScopeManagementUrl is required" .Values.config.uniqueScopeManagementUrl | quote }}
             - name: UNIQUE_INGESTION_URL
               value: {{ required "config.uniqueIngestionUrl is required" .Values.config.uniqueIngestionUrl | quote }}
+            - name: CORS_ALLOWED_ORIGINS
+              value: {{ join "," .Values.config.corsAllowedOrigins | quote }}
             - name: WORKER_ENABLED
               value: {{ .Values.config.workerEnabled | quote }}
             - name: WORKER_CONCURRENCY

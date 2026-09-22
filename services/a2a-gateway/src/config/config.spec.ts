@@ -19,6 +19,7 @@ describe('loadConfig', () => {
     expect(config.authMode).toBe('kong');
     expect(config.workerEnabled).toBe(true);
     expect(config.databaseUrl.protocol).toBe('postgresql:');
+    expect(config.corsAllowedOrigins).toEqual([]);
   });
 
   it('rejects development authentication in production', () => {
@@ -35,6 +36,21 @@ describe('loadConfig', () => {
     expect(() =>
       loadConfig({ ...requiredEnvironment, NODE_ENV: 'production', ZITADEL_ISSUER: url }),
     ).toThrow();
+  });
+
+  it('accepts only clean CORS origins', () => {
+    expect(
+      loadConfig({
+        ...requiredEnvironment,
+        CORS_ALLOWED_ORIGINS: 'http://localhost:3006,https://admin.example.com',
+      }).corsAllowedOrigins,
+    ).toEqual(['http://localhost:3006', 'https://admin.example.com']);
+    expect(() =>
+      loadConfig({
+        ...requiredEnvironment,
+        CORS_ALLOWED_ORIGINS: 'https://admin.example.com/path',
+      }),
+    ).toThrow(/CORS origins/);
   });
 
   it('rejects missing required dependencies', () => {
