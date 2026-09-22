@@ -1,6 +1,8 @@
 ---
 name: backstop-api
 description: Explains how Backstop's JSON:API-style REST responses work — the relationships/links envelope, resolving a person/organization to an id, following relationships to related data (activities, notes, entity-relationships, ...), the `?include=` side-loading param, mandatory pagination, and the write-payload rules this instance taught (parent `resourceType`, identity as relationships, required fields swagger omits). Use this EVERY TIME you need to understand how some Backstop entity works or where its data comes from — before reading the Backstop swagger or Elevio help articles, adding a backstop-mcp tool/feature that walks relationships or writes a record, or exploring the live Backstop API.
+metadata:
+  internal: true
 ---
 
 # The Backstop REST API
