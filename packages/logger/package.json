@@ -27,7 +27,7 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@nestjs/common": "^11",
+    "@nestjs/common": "^11 || ^12",
     "nestjs-pino": "^5",
     "pino-http": "^11"
   }

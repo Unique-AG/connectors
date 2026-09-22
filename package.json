@@ -41,6 +41,14 @@
   },
   "packageManager": "pnpm@10.34.5",
   "pnpm": {
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "@golevelup/nestjs-rabbitmq>@nestjs/common": "12",
+        "@golevelup/nestjs-rabbitmq>@nestjs/core": "12",
+        "@golevelup/nestjs-discovery>@nestjs/common": "12",
+        "@golevelup/nestjs-discovery>@nestjs/core": "12"
+      }
+    },
     "overrides": {
       "esbuild": "0.28.2",
       "esbuild@<0.25.0": "0.28.2",
