@@ -1,4 +1,5 @@
 {
+  "services/a2a-gateway": "0.0.0",
   "services/sharepoint-connector": "3.1.2",
   "services/teams-mcp": "0.4.10",
   "services/confluence-connector": "3.0.1",

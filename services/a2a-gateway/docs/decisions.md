@@ -23,6 +23,17 @@
 | D-17 | Multi-tenant capable (`company_id` everywhere) but one deployment per Unique installation. | Matches other connectors. | *agreed* |
 | D-18 | **Human principals only.** Inbound calls are attributed per user **and** per OAuth client (`x-client-id` from Kong, stored on `tasks.client_id`). Machine principals are out of scope; no classification logic needed beyond requiring `x-user-id`. | Project scope: no machine-to-machine initially. | *agreed* |
 
+### KRA-19 absurd spike
+
+`absurd-sdk` 0.5.0 covers the four spike questions without custom scheduling code:
+
+- `cancelTask` persists cancellation; running work observes it at the next checkpoint or heartbeat.
+- `awaitEvent` has a durable timeout and raises `TimeoutError`; no separate deadline task is needed.
+- `startWorker({ concurrency })` bounds parallel work per replica.
+- task registrations and spawns expose maximum attempts plus fixed, exponential or disabled retry policies.
+
+The gateway therefore keeps absurd as the only workflow engine. It owns one `a2a-gateway` queue, starts workers only when `WORKER_ENABLED=true`, and closes the worker and shared PostgreSQL pool through Nest lifecycle hooks.
+
 ## Prerequisites outside this service
 
 - **P-01** Upgrade `packages/logger`, `packages/probe`, `packages/aes-gcm-encryption` to NestJS 12 peers (`^12`, or `^11 || ^12` while other services stay on 11); verify a single `@nestjs/common` instance under pnpm. Add a pnpm `peerDependencyRules.allowedVersions` entry for `@golevelup/nestjs-rabbitmq`/`nestjs-discovery` → `@nestjs/*@12` until [#1259](https://github.com/golevelup/nestjs/issues/1259) is released; remove afterwards.

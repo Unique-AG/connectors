@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "a2a-gateway.fullname" . }}
+  labels:
+    {{- include "a2a-gateway.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "a2a-gateway.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations: {{ toYaml .Values.podAnnotations | nindent 8 }}
+      labels:
+        {{- include "a2a-gateway.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}{{ toYaml . | nindent 8 }}{{- end }}
+    spec:
+      serviceAccountName: {{ include "a2a-gateway.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: a2a-gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: {{ .Values.service.port | quote }}
+            - name: AUTH_MODE
+              value: {{ .Values.config.authMode | quote }}
+            - name: PUBLIC_BASE_URL
+              value: {{ required "config.publicBaseUrl is required" .Values.config.publicBaseUrl | quote }}
+            - name: ZITADEL_ISSUER
+              value: {{ required "config.zitadelIssuer is required" .Values.config.zitadelIssuer | quote }}
+            - name: UNIQUE_CHAT_URL
+              value: {{ required "config.uniqueChatUrl is required" .Values.config.uniqueChatUrl | quote }}
+            - name: UNIQUE_SCOPE_MANAGEMENT_URL
+              value: {{ required "config.uniqueScopeManagementUrl is required" .Values.config.uniqueScopeManagementUrl | quote }}
+            - name: UNIQUE_INGESTION_URL
+              value: {{ required "config.uniqueIngestionUrl is required" .Values.config.uniqueIngestionUrl | quote }}
+            - name: WORKER_ENABLED
+              value: {{ .Values.config.workerEnabled | quote }}
+            - name: WORKER_CONCURRENCY
+              value: {{ .Values.config.workerConcurrency | quote }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secretRef }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}

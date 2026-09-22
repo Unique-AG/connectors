@@ -17,7 +17,7 @@
     "typescript": "catalog:"
   },
   "peerDependencies": {
-    "@nestjs/common": "^11",
+    "@nestjs/common": "^11 || ^12",
     "@nestjs/swagger": "^11"
   }
 }
