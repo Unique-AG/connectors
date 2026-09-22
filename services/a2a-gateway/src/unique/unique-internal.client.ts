@@ -57,7 +57,7 @@ export class UniqueInternalClient {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `query A2aAssistant($assistantId: ID!) { assistantByUser(assistantId: $assistantId) { id name description executionProvider } }`,
+      `query A2aAssistant($assistantId: String!) { assistantByUser(assistantId: $assistantId) { id name } }`,
       { assistantId },
       'assistantByUser',
     );
@@ -65,11 +65,31 @@ export class UniqueInternalClient {
 
   public verifySpaceManagement(identity: EffectiveIdentity, assistantId: string): Promise<unknown> {
     return this.graphql(
+      this.config.uniqueChatUrl,
+      identity,
+      `query A2aManagedAssistant($assistantId: String!) { assistantByCompany(assistantId: $assistantId) { id name } }`,
+      { assistantId },
+      'assistantByCompany',
+    );
+  }
+
+  public getCapabilities(identity: EffectiveIdentity): Promise<unknown> {
+    return this.graphql(
+      this.config.uniqueChatUrl,
+      identity,
+      `query A2aCapabilities { a2aCapabilities { configured enabled available retryable reason } }`,
+      {},
+      'a2aCapabilities',
+    );
+  }
+
+  public getPermissions(identity: EffectiveIdentity): Promise<unknown> {
+    return this.graphql(
       this.config.uniqueScopeManagementUrl,
       identity,
-      `query A2aSpaceManagerVerify($assistantId: ID!) { spaceManagerVerify(assistantId: $assistantId) { canRead canWrite } }`,
-      { assistantId },
-      'spaceManagerVerify',
+      `query A2aPermissions { getUserPermissions { uiPermissions { canAccessSpaceManagement } } }`,
+      {},
+      'getUserPermissions',
     );
   }
 
@@ -185,17 +205,13 @@ export class UniqueInternalClient {
           'content-type': 'application/json',
           'x-company-id': identity.companyId,
           'x-user-id': identity.userId,
-          'x-user-roles': identity.roles.join(','),
         },
         body: JSON.stringify({ query, variables }),
         signal: AbortSignal.timeout(this.config.dependencyTimeoutMs),
+        redirect: 'error',
       });
-    } catch (error) {
-      throw new UniqueInternalError(
-        error instanceof Error ? error.message : 'Unique internal request failed',
-        'UNAVAILABLE',
-        true,
-      );
+    } catch {
+      throw new UniqueInternalError('Unique internal request failed', 'UNAVAILABLE', true);
     }
     if (!response.ok) {
       const code = errorCode(response.status);
@@ -224,7 +240,7 @@ export class UniqueInternalClient {
             : extensionCode === 'CONFLICT'
               ? 'CONFLICT'
               : 'INVALID_RESPONSE';
-      throw new UniqueInternalError(firstError.message, code, false);
+      throw new UniqueInternalError('Unique internal operation failed', code, false);
     }
     const result = parsed.data.data?.[resultKey];
     if (result === undefined || result === null) {

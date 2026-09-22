@@ -51,6 +51,22 @@ const configSchema = z
     DEPENDENCY_TIMEOUT_MS: z.coerce.number().int().positive().default(2_000),
   })
   .superRefine((config, context) => {
+    for (const key of ['PUBLIC_BASE_URL', 'ZITADEL_ISSUER'] as const) {
+      const value = config[key];
+      if (
+        value.username ||
+        value.password ||
+        value.search ||
+        value.hash ||
+        (config.NODE_ENV === 'production' && value.protocol !== 'https:')
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: [key],
+          message: 'public OAuth URLs must be clean HTTPS URLs in production',
+        });
+      }
+    }
     if (config.NODE_ENV === 'production' && config.AUTH_MODE === 'development') {
       context.addIssue({
         code: 'custom',

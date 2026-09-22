@@ -34,6 +34,6 @@ export class InternalController {
       throw new BadRequestException('invalid publication reconciliation request');
     }
     const identity = requestIdentity(request);
-    await this.internal.reconcilePublication(identity.companyId, parsed.data);
+    await this.internal.reconcilePublication(identity, parsed.data);
   }
 }

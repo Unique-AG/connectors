@@ -45,7 +45,7 @@ flowchart LR
 | Concern | Owner |
 | --- | --- |
 | Spaces (assistants), chats, messages, files, elicitations, lifecycle, permissions, roles | **core** |
-| Feature flag + entitlement evaluation | **core** (gateway trusts core's decision on its internal surface; re-checks on management/public surfaces via core) |
+| Deployment + rollout flag evaluation | **core**; gateway re-checks via core for new use. Deployment is entitlement; no separate paid-access setting. |
 | JWT validation | **Kong** (never the gateway) |
 | Publication of a native space (enabled, agent-card customisation, publication id) | **gateway** |
 | Remote connections (URL, credential reference, negotiated capabilities) | **gateway** |
@@ -111,4 +111,4 @@ flowchart TB
 - Independently deployable Helm chart under `services/a2a-gateway/deploy`, same pattern as `teams-mcp`.
 - Requires: PostgreSQL, RabbitMQ (platform event bus, read on `EVENT_BUS`), cluster-local reach to `node-chat`, `node-scope-management`, `node-ingestion`; egress to configured remote agents and push URLs only.
 - **All external traffic enters through Kong**: `/a2a/agents/*/.well-known/agent-card.json` without auth; `/a2a/*` and `/management/*` with Kong JWT validation → identity headers (inbound `x-user-*` stripped). `/internal/*` is cluster-local only (NetworkPolicy from `node-chat`). The gateway has no public ingress of its own.
-- No gateway → no A2A: core gates every A2A UI/API on `A2A_GATEWAY_URL` being configured **and** `/internal/capabilities` answering **and** the tenant feature/entitlement.
+- No gateway → no A2A: core gates every A2A UI/API on `A2A_GATEWAY_URL` being configured **and** `/internal/capabilities` answering **and** the rollout flag. A temporary outage is retryable and never deletes configuration.

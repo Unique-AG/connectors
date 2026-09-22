@@ -28,9 +28,9 @@ sequenceDiagram
 ```
 
 - Principal = the human Kong identified. Never taken from the request body, A2A metadata or query parameters.
-- **Human principals only** (D-18): requests without `x-user-id` are rejected; machine-to-machine is out of scope. `x-client-id` is stored on the task for per-client attribution and quotas.
+- **Existing user OAuth flow** (D-18): reuse normal Zitadel login and Kong token validation without custom principal claims or changes to Zitadel. Caller-supplied identity headers must not be trusted; use only Kong-stamped identity. Machine-to-machine onboarding is out of scope. `x-client-id` is stored on tasks for attribution.
 - A valid token is required per **request** (`SendMessage`, `GetTask`, SSE open). A running task continues when the token expires because core calls use the header identity. Reconnect requires a fresh token for the **same user**.
-- Roles are forwarded as stamped by Kong; for calls where the gateway omits them, `node-chat`'s guard resolves roles from scope-management (same path `unique-api` uses).
+- Gateway → core calls omit role headers, so core resolves current roles from scope-management instead of trusting stale token roles.
 - Push-notification webhooks: outbound only, credentials from `TaskPushNotificationConfig.authentication`, URL passes egress policy, payload = task id + state (no content).
 
 ## Outbound: Unique user → remote agent
@@ -45,7 +45,7 @@ sequenceDiagram
     participant Remote as Remote A2A agent
 
     User->>Chat: message in A2A External Agent space
-    Chat->>Chat: core authz (space use access, entitlement, feature flag)
+    Chat->>Chat: core authz (space use access, deployment, rollout flag)
     Chat->>GW: POST /internal/executions · x-user-id, x-company-id, x-user-roles
     GW->>GW: ClusterIdentityGuard; verify executionProvider = A2A via core; load connection (companyId scoped)
     GW->>Remote: SendStreamingMessage · shared connection credential
@@ -53,7 +53,7 @@ sequenceDiagram
     GW->>Chat: message update / stream chunks · x-user-id, x-company-id
 ```
 
-- Shared connection credentials (per connection, per company): `none | bearer | api_key | oauth2_client_credentials`. Encrypted at rest with `@unique-ag/aes-gcm-encryption`; never returned by any API; never logged.
+- Shared connection credentials (per connection, per company): explicit `none | bearer | api_key | oauth2_client_credentials`. Encrypted with tenant/connection/origin binding; management responses expose only type and `remotePermissions: shared`. Rotation replaces the entire profile with `If-Match`; revocation disables without deleting configuration. Operator-configured `EGRESS_ALLOWED_HOSTS` is mandatory (empty denies all); HTTPS only, no redirects, bounded responses. Workload OAuth tokens are cached by connection/version, refreshed before expiry and never persisted.
 - The remote agent sees **no** Unique user identity (no per-user OAuth in this delivery). Attribution stays in the gateway (`executions.user_id`).
 - Sub-agent calls arrive as ordinary messages with `correlation` — same path, same authz, correlation stored on the execution.
 

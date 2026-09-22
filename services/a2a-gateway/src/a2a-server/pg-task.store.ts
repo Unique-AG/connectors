@@ -1,9 +1,11 @@
 import type { ListTasksRequest, ListTasksResponse, Task } from '@a2a-js/sdk';
 import type { ServerCallContext, TaskStore } from '@a2a-js/sdk/server';
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import { and, count, desc, eq, gte, lt, or, type SQL } from 'drizzle-orm';
+import { Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { and, count, desc, eq, gte, inArray, lt, or, type SQL } from 'drizzle-orm';
+import { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { DRIZZLE, type GatewayDatabase } from '../drizzle/drizzle.module.js';
+import { contexts } from '../drizzle/schema/contexts.table.js';
 import { tasks } from '../drizzle/schema/tasks.table.js';
 
 interface PageCursor {
@@ -15,6 +17,8 @@ function identity(context: ServerCallContext): {
   companyId: string;
   userId: string;
   clientId: string;
+  publicationId: string;
+  roles: string[];
 } {
   const companyId = context.tenant;
   const userId = context.user?.isAuthenticated ? context.user.userName : undefined;
@@ -23,10 +27,18 @@ function identity(context: ServerCallContext): {
     typeof headers === 'object' && headers !== null && 'x-client-id' in headers
       ? Reflect.get(headers, 'x-client-id')
       : undefined;
-  if (!companyId || !userId) {
+  const publicationId = context.state.get('publicationId');
+  if (
+    !companyId ||
+    !userId ||
+    typeof clientId !== 'string' ||
+    !clientId ||
+    typeof publicationId !== 'string' ||
+    !publicationId
+  ) {
     throw new UnauthorizedException('authenticated tenant and user required');
   }
-  return { companyId, userId, clientId: typeof clientId === 'string' ? clientId : 'unknown' };
+  return { companyId, userId, clientId, publicationId, roles: [] };
 }
 
 function decodeCursor(token: string): PageCursor | undefined {
@@ -70,10 +82,12 @@ export class PgTaskStore implements TaskStore {
   public constructor(
     @Inject(DRIZZLE) private readonly database: GatewayDatabase,
     @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
+    private readonly authorization: ResourceAuthorizationService,
   ) {}
 
   public async save(task: Task, context: ServerCallContext): Promise<void> {
     const owner = identity(context);
+    await this.authorization.context(owner, owner.publicationId, task.contextId);
     const statusTimestamp = new Date(task.status?.timestamp ?? Date.now());
     const expiresAt = new Date(statusTimestamp);
     expiresAt.setUTCDate(expiresAt.getUTCDate() + this.config.taskRetentionDays);
@@ -102,7 +116,11 @@ export class PgTaskStore implements TaskStore {
           expiresAt,
           updatedAt: new Date(),
         },
-        setWhere: and(eq(tasks.companyId, owner.companyId), eq(tasks.userId, owner.userId)),
+        setWhere: and(
+          eq(tasks.companyId, owner.companyId),
+          eq(tasks.userId, owner.userId),
+          eq(tasks.contextId, task.contextId),
+        ),
       })
       .returning({ id: tasks.id });
     if (!saved) {
@@ -113,14 +131,25 @@ export class PgTaskStore implements TaskStore {
   public async load(taskId: string, context: ServerCallContext): Promise<Task | undefined> {
     const owner = identity(context);
     const row = await this.database.query.tasks.findFirst({
-      columns: { taskSnapshot: true },
+      columns: { taskSnapshot: true, contextId: true },
       where: and(
         eq(tasks.id, taskId),
         eq(tasks.companyId, owner.companyId),
         eq(tasks.userId, owner.userId),
       ),
     });
-    return row?.taskSnapshot as Task | undefined;
+    if (!row) {
+      return undefined;
+    }
+    try {
+      await this.authorization.context(owner, owner.publicationId, row.contextId);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        return undefined;
+      }
+      throw error;
+    }
+    return row.taskSnapshot as unknown as Task;
   }
 
   public async list(
@@ -128,8 +157,25 @@ export class PgTaskStore implements TaskStore {
     context: ServerCallContext,
   ): Promise<ListTasksResponse> {
     const owner = identity(context);
+    await this.authorization.publication(owner, owner.publicationId);
     const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 50));
-    const filters: SQL[] = [eq(tasks.companyId, owner.companyId), eq(tasks.userId, owner.userId)];
+    const filters: SQL[] = [
+      eq(tasks.companyId, owner.companyId),
+      eq(tasks.userId, owner.userId),
+      inArray(
+        tasks.contextId,
+        this.database
+          .select({ id: contexts.id })
+          .from(contexts)
+          .where(
+            and(
+              eq(contexts.companyId, owner.companyId),
+              eq(contexts.userId, owner.userId),
+              eq(contexts.publicationId, owner.publicationId),
+            ),
+          ),
+      ),
+    ];
     if (params.contextId) {
       filters.push(eq(tasks.contextId, params.contextId));
     }
