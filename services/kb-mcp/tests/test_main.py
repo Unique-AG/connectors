@@ -104,3 +104,11 @@ def test_skill_tools_fully_enabled_requires_every_tool_the_skill_uses(monkeypatc
     monkeypatch.delenv("KB_MCP_ENABLED_TOOLS")
     get_settings.cache_clear()
     assert skill_tools_fully_enabled(get_settings()) is True
+
+
+def test_server_instructions_points_at_the_skill_only_when_available():
+    from kb_mcp.common.references import SERVER_INSTRUCTIONS_SKILL_POINTER
+    from kb_mcp.main import server_instructions
+
+    assert SERVER_INSTRUCTIONS_SKILL_POINTER in server_instructions(True)
+    assert SERVER_INSTRUCTIONS_SKILL_POINTER not in server_instructions(False)

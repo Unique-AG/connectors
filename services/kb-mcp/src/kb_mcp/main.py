@@ -20,7 +20,10 @@ from unique_toolkit.monitoring import configure_tracing
 from unique_toolkit.monitoring.memory import start_memory_trimmer
 
 from kb_mcp.auth import build_auth
-from kb_mcp.common.references import SERVER_INSTRUCTIONS_CITATION_GUIDANCE
+from kb_mcp.common.references import (
+    SERVER_INSTRUCTIONS_CITATION_GUIDANCE,
+    SERVER_INSTRUCTIONS_SKILL_POINTER,
+)
 from kb_mcp.common.tree_cache import expire_idle_trees_loop
 from kb_mcp.health import PoolHealthMiddleware
 from kb_mcp.http_client import install_pooled_http_client
@@ -62,6 +65,13 @@ def skill_tools_fully_enabled(settings: Settings) -> bool:
     """A narrower KB_MCP_ENABLED_TOOLS allowlist would advertise a skill
     naming tools not on tools/list."""
     return _SKILL_REQUIRED_TOOLS <= settings.enabled_tools
+
+
+def server_instructions(skill_available: bool) -> str:
+    """Point at the skill resource only if it's actually being served."""
+    if not skill_available:
+        return SERVER_INSTRUCTIONS_CITATION_GUIDANCE
+    return f"{SERVER_INSTRUCTIONS_CITATION_GUIDANCE}\n\n{SERVER_INSTRUCTIONS_SKILL_POINTER}"
 
 
 def apply_enabled_tools(mcp: FastMCP, settings: Settings) -> None:
@@ -109,13 +119,14 @@ def main() -> None:
 
     oidc_proxy = build_auth(settings)
 
+    skill_available = skill_tools_fully_enabled(settings)
     providers: list[Provider] = [FileSystemProvider(Path(__file__).parent / "tools")]
-    if skill_tools_fully_enabled(settings):
+    if skill_available:
         providers.append(SkillsDirectoryProvider(Path(__file__).parent / "skills"))
 
     mcp = FastMCP(
         "Unique Knowledge Base Search MCP",
-        instructions=SERVER_INSTRUCTIONS_CITATION_GUIDANCE,
+        instructions=server_instructions(skill_available),
         icons=[_server_icon()],
         auth=oidc_proxy,
         providers=providers,
