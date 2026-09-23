@@ -98,7 +98,7 @@ Default:
 | `UNIQUE_MCP_PUBLIC_BASE_URL` | Public URL MCP clients and OAuth use; must match `routes.hostname` |
 | `UNIQUE_API_BASE_URL` | Base URL of the Unique API this instance calls |
 | `ZITADEL_BASE_URL` | Zitadel instance base URL |
-| `ZITADEL_CLIENT_ID` | Public PKCE client id, not a secret |
+| `ZITADEL_CLIENT_ID` | Public PKCE client id, not a secret. In Helm, set `mcpConfig.zitadel.clientId` instead; the chart emits this variable from it |
 | `ZITADEL_JWT_SIGNING_KEY` | Signs `kb-mcp`'s own downstream OAuth-proxy JWTs; never sent to Zitadel |
 | `DATABASE_URL` | Postgres connection string for OAuth-proxy state |
 | `ENCRYPTION_KEY` | Encrypts that state at rest |

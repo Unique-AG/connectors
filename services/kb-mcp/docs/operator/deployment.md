@@ -38,20 +38,23 @@ Three values, none with chart defaults:
 
 | Secret | Purpose |
 |---|---|
-| `ZITADEL_CLIENT_ID` | Public Zitadel OIDC client id (PKCE, not actually secret) |
+| `mcpConfig.zitadel.clientId` | Public Zitadel OIDC client id (PKCE, not actually secret) |
 | `ZITADEL_JWT_SIGNING_KEY` | Signs `kb-mcp`'s own downstream OAuth-proxy JWTs; never sent to Zitadel |
 | `ENCRYPTION_KEY` | Encrypts OAuth-proxy state at rest in Postgres |
 
-Generate the latter two with `openssl rand -hex 32`. `ZITADEL_CLIENT_ID` comes from registering a
-public (PKCE) application in Zitadel with redirect URI `{publicBaseUrl}/auth/callback`.
+Generate the latter two with `openssl rand -hex 32`. `mcpConfig.zitadel.clientId` comes from
+registering a public (PKCE) application in Zitadel with redirect URI
+`{publicBaseUrl}/auth/callback`.
 
-Deliver them via `envVars[].valueFrom.secretKeyRef`, or, at Unique, via `ExternalSecret`s through
-`extraEnvSecrets`.
+The two secrets go through `envVars[].valueFrom.secretKeyRef`, or, at Unique, through
+`ExternalSecret`s via `extraEnvSecrets`.
+
+!!! warning "Don't also set ZITADEL_CLIENT_ID via envVars"
+    The chart already emits `ZITADEL_CLIENT_ID` from `mcpConfig.zitadel.clientId` when that field
+    is set. Adding it again under `envVars` declares the same variable twice in the container spec,
+    which Kubernetes rejects the pod for.
 
 ## Minimal Values
-
-`mcpConfig.zitadel` has no `clientId` field: `ZITADEL_CLIENT_ID` isn't secret, so it goes in
-`envVars` as a plain value, alongside the two secrets delivered the same way.
 
 ```yaml
 mcpConfig:
@@ -60,12 +63,11 @@ mcpConfig:
     publicBaseUrl: https://kb-mcp.<tenant>.unique.app   # must match routes.hostname
   zitadel:
     baseUrl: https://id.<tenant>.example.com
+    clientId: <public PKCE client id>   # not secret, see Required Secrets above
 
 envVars:
   - name: UNIQUE_API_BASE_URL
     value: http://unique-api.<namespace>.svc.cluster.local
-  - name: ZITADEL_CLIENT_ID
-    value: <public PKCE client id>   # not secret, see Required Secrets above
   - name: ZITADEL_JWT_SIGNING_KEY
     valueFrom:
       secretKeyRef: { name: kb-mcp-secrets, key: zitadel-jwt-signing-key }
