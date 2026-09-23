@@ -552,9 +552,14 @@ async def content_tree(
             # Files and folders each get their own cap and notice (never one
             # shared count), but `limit` sizes both by default so a small ask stays small.
             tree_limit = limit if limit is not None else config.default_tree_limit
-            rendered_files = snapshot.files
-            if not folders_only and len(snapshot.files) > tree_limit:
-                rendered_files = snapshot.files[:tree_limit]
+            # folder_paths already lists every folder, files or not, so dropping
+            # files here (not capping them) stops one from re-adding a cut folder.
+            if folders_only:
+                rendered_files = []
+            else:
+                rendered_files = snapshot.files
+                if len(snapshot.files) > tree_limit:
+                    rendered_files = snapshot.files[:tree_limit]
             rendered_folder_paths = snapshot.folder_paths
             if len(snapshot.folder_paths) > tree_limit:
                 rendered_folder_paths = snapshot.folder_paths[:tree_limit]
@@ -566,9 +571,8 @@ async def content_tree(
             tree_body = _with_empty_metadata_filter_hint(
                 render_tree_with_folder_ids(
                     rendered,
-                    # Ids come from the full snapshot, not the truncated one: a
-                    # folder whose files all fall past the cap would otherwise
-                    # lose the folder_id callers need to scope a follow-up call.
+                    # Ids come from the full snapshot, not the truncated one, or a
+                    # cut folder would lose the folder_id a follow-up call needs.
                     folder_scope_ids(snapshot.files),
                     max_depth=max_depth,
                     show_files=not folders_only,
@@ -581,18 +585,19 @@ async def content_tree(
             # renders via any surviving file in it, so the slice above alone doesn't bound this.
             total_dirs = len(snapshot.to_trie().walk_trie_nodes()) - 1
             shown_dirs = len(rendered.to_trie().walk_trie_nodes()) - 1
+            # No file notice under folders_only: rendered_files is empty by
+            # design there, not truncated, so "shown of total" would misreport.
+            if not folders_only:
+                tree_body = _with_truncation_notice(
+                    tree_body,
+                    shown=len(rendered_files),
+                    total=len(snapshot.files),
+                    noun="files",
+                )
             text = _with_incomplete_notice(
                 snapshot.complete,
                 _with_truncation_notice(
-                    _with_truncation_notice(
-                        tree_body,
-                        shown=len(rendered_files),
-                        total=len(snapshot.files),
-                        noun="files",
-                    ),
-                    shown=shown_dirs,
-                    total=total_dirs,
-                    noun="folders",
+                    tree_body, shown=shown_dirs, total=total_dirs, noun="folders"
                 ),
             )
             _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)

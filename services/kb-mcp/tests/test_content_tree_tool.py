@@ -891,7 +891,8 @@ async def test_tree_forwards_clamped_timeout_to_via_folders_api():
 @pytest.mark.asyncio
 async def test_tree_folders_only_hides_files_in_the_render():
     snapshot = FakeSnapshot(
-        files=[(_make_content_info("f1"), PurePosixPath("Docs/a.pdf"))]
+        files=[(_make_content_info("f1"), PurePosixPath("Docs/a.pdf"))],
+        folder_paths=[PurePosixPath("Docs")],
     )
     mock_tree = _make_mock_tree(snapshot=snapshot)
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
@@ -912,7 +913,10 @@ async def test_tree_folders_only_still_shows_folder_id():
         "nda", metadata={"folderIdPath": "uniquepathid://scope_legal"}
     )
     mock_tree = _make_mock_tree(
-        snapshot=FakeSnapshot(files=[(info, PurePosixPath("Legal/nda.pdf"))])
+        snapshot=FakeSnapshot(
+            files=[(info, PurePosixPath("Legal/nda.pdf"))],
+            folder_paths=[PurePosixPath("Legal")],
+        )
     )
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
@@ -1302,6 +1306,28 @@ async def test_tree_folders_only_still_reports_folder_truncation():
 
     text = result.content[0].text  # type: ignore[union-attr]
     assert "first 2 of 5 folders" in text
+
+
+@pytest.mark.asyncio
+async def test_tree_folders_only_files_do_not_resurrect_a_capped_folder():
+    """Under folders_only, a file's own path must not pull a sliced-out
+    folder back into the render: files are dropped there, not capped, since
+    folder_paths already lists every folder, files or not."""
+    snapshot = FakeSnapshot(
+        files=[(_make_content_info("f0"), PurePosixPath("d4/f0.pdf"))],
+        folder_paths=[PurePosixPath(f"d{i}") for i in range(5)],
+    )
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree",
+            folders_only=True,
+            config=ContentTreeToolConfig(default_tree_limit=2),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "first 2 of 5 folders" in text
+    assert "d4" not in text
 
 
 @pytest.mark.asyncio
