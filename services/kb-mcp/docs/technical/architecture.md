@@ -13,7 +13,7 @@ registrations, tokens, and JTI replay-protection mappings.
 flowchart LR
     Client["MCP Client"] -->|"HTTP MCP + OAuth"| KbMcp["kb-mcp"]
     KbMcp -->|"OIDC / PKCE"| Zitadel["Zitadel"]
-    KbMcp -->|"search / content_tree / content_metadata / read_file"| NodeChat["Unique API (node-chat)"]
+    KbMcp -->|"search / content_tree / content_metadata / read_file"| NodeChat["Unique API"]
     KbMcp -->|"OAuth-proxy state"| Postgres[("Postgres")]
 ```
 
@@ -23,7 +23,7 @@ flowchart LR
 |---|---|
 | MCP server (FastMCP, via `unique-mcp`) | Exposes `/mcp` (HTTP MCP) and `/probe`; owns the OAuth-proxy flow and tool routing |
 | Zitadel | OIDC identity provider; `kb-mcp` registers as a public PKCE client, no client secret |
-| Unique API (`node-chat`) | Source of truth for knowledge-base search, the content tree, and file content, called live via `unique-toolkit` on every tool invocation |
+| Unique API | Source of truth for knowledge-base search, the content tree, and file content, called live via `unique-toolkit` on every tool invocation |
 | Postgres | Durable storage for OAuth-proxy state only; never holds knowledge-base data |
 
 In a Kubernetes deployment, the call to the Unique API is wired through the monorepo-wide
@@ -47,9 +47,9 @@ the resolved settings. `kb-mcp` has no broader access of its own to leak; see
 Upstream Unique API
 credentials (`UNIQUE_APP_ID`/`UNIQUE_APP_KEY`, sent as `Authorization`/`x-app-id`) are only needed
 when the call has to cross the Kong gateway: local development, or a deployment that routes through
-Kong rather than calling `node-chat` directly in-cluster. Direct in-cluster calls carry only the two
-identity headers: the network policy is what limits who can reach `node-chat` at all, not an app
-credential.
+Kong rather than calling the Unique API directly in-cluster. Direct in-cluster calls carry only the
+two identity headers: the network policy is what limits who can reach the Unique API at all, not an
+app credential.
 
 ### Token Storage
 
