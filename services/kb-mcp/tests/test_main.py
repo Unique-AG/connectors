@@ -72,3 +72,15 @@ def test_apply_enabled_tools_disables_hidden_names(monkeypatch):
         names={"content_tree", "content_metadata"},
         components={"tool"},
     )
+
+
+def test_server_icon_is_a_readable_webp_data_uri():
+    import base64
+
+    from kb_mcp.main import _server_icon
+
+    icon = _server_icon()
+    assert icon.mime_type == "image/webp"
+    header, _, payload = icon.src.partition(",")
+    assert header == "data:image/webp;base64"
+    assert base64.b64decode(payload).startswith(b"RIFF")
