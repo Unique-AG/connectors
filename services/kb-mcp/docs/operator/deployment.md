@@ -34,20 +34,20 @@ Unique's own deployments reference it from ArgoCD by `targetRevision: kb-mcp@<ve
 
 ## Required Secrets
 
-Three values, none with chart defaults:
+Two values, generated with `openssl rand -hex 32`, neither with a chart default:
 
 | Secret | Purpose |
 |---|---|
-| `mcpConfig.zitadel.clientId` | Public Zitadel OIDC client id (PKCE, not actually secret) |
 | `ZITADEL_JWT_SIGNING_KEY` | Signs `kb-mcp`'s own downstream OAuth-proxy JWTs; never sent to Zitadel |
 | `ENCRYPTION_KEY` | Encrypts OAuth-proxy state at rest in Postgres |
 
-Generate the latter two with `openssl rand -hex 32`. `mcpConfig.zitadel.clientId` comes from
-registering a public (PKCE) application in Zitadel with redirect URI
-`{publicBaseUrl}/auth/callback`.
+Deliver them through `envVars[].valueFrom.secretKeyRef`, or, at Unique, through `ExternalSecret`s
+via `extraEnvSecrets`.
 
-The two secrets go through `envVars[].valueFrom.secretKeyRef`, or, at Unique, through
-`ExternalSecret`s via `extraEnvSecrets`.
+You'll also need `mcpConfig.zitadel.clientId`, the public (PKCE) OIDC client id for `kb-mcp`,
+registered in Zitadel with redirect URI `{publicBaseUrl}/auth/callback`. It isn't a secret, it's a
+plain chart value; see [Configuration](./configuration.md#Required) for the full required-variable
+reference.
 
 ## Minimal Values
 
