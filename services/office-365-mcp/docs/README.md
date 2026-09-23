@@ -183,3 +183,64 @@ admin consent, in the same order. Compare the two permission lists, line for lin
 list names a permission that the Terraform output does not, every sign-in fails at the authorize
 step. If the Terraform output names more permissions than the pod uses, the tenant carries
 standing access that no tool spends.
+
+## Limitations
+
+office-365-mcp is meant to replace two other services: teams-mcp and outlook-semantic-mcp. It
+works differently: every tool call reaches Microsoft Graph directly, and it stores nothing
+beyond an OAuth token. This section names what a reader gains and loses per service. Neither
+service has a formal deprecation date yet, and both remain in active development. This section
+is a comparison of the current state, not a finished handover. A comment in teams-mcp's message
+data states that its fields were "shaped to match the fields" office-365-mcp uses for the same
+resource.
+
+### Compared to teams-mcp
+
+Not yet possible in office-365-mcp:
+
+- office-365-mcp cannot send or reply to a Teams message. teams-mcp has two tools:
+  send_chat_message and send_channel_message.
+- No answer from a tool includes message reactions. teams-mcp's message data includes them.
+- A search hit needs a second call, to teams_read_message, for the full body. teams-mcp's
+  search answers with the full body in one call.
+- office-365-mcp cannot run a permanent, webhook-driven pipeline that captures a meeting
+  transcript into Unique's knowledge base, as teams-mcp does with ingest_meeting and
+  start_kb_integration. That function needs a database and a live subscription. A stateless
+  server holds neither.
+
+Already true today, and teams-mcp cannot:
+
+- office-365-mcp reads the replies inside a channel thread. teams-mcp's matching tool answers
+  with the root post only, per its own tool description.
+- office-365-mcp reads a meeting transcript, and a recording's metadata, live, on request. It
+  needs no database and no separate configuration. teams-mcp can only start, stop, or read a
+  pipeline's status. No tool there reads a transcript's words through MCP.
+- office-365-mcp turns the raw HTML from Teams into plain text: a name after @, a list, or an
+  attachment marked in place. It turns a system event, such as "members joined," into a plain
+  sentence. teams-mcp answers with the raw HTML instead.
+
+### Compared to outlook-semantic-mcp
+
+Not yet possible in office-365-mcp:
+
+- office-365-mcp cannot read a shared or delegated mailbox. Every mail tool here reaches only
+  the signed-in user's own mailbox. outlook-semantic-mcp finds and reaches a delegated
+  mailbox on its own.
+- office-365-mcp cannot search the words inside an attachment. It matches only an
+  attachment's file name, not its contents. outlook-semantic-mcp ingests the whole message
+  and its attachments into a search index.
+- office-365-mcp cannot change or cancel an event that already exists, or answer an
+  invitation. It can only create a new event.
+- office-365-mcp cannot add an attachment to a draft.
+
+Already true today, and outlook-semantic-mcp cannot:
+
+- office-365-mcp sends a message outright. outlook-semantic-mcp only drafts one. Its README
+  says that sending "requires a separate action by the user or a future tool."
+- office-365-mcp marks a message read or unread, sets its flag or its importance, and moves
+  it into another folder. Neither service can erase a message outright. This move comes
+  closest.
+- office-365-mcp reads every message of one conversation across folders, in one call.
+  outlook-semantic-mcp reads one message at a time only.
+- office-365-mcp reads and changes the automatic reply, and turns an inbox rule off.
+  outlook-semantic-mcp has no tool for either.
