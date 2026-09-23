@@ -6,9 +6,35 @@
 `kb-mcp` advertises up to four MCP tools on `/mcp`. `KB_MCP_ENABLED_TOOLS` (env) or
 `mcpConfig.enabledTools` (Helm) narrows the set; unset means all four. A restart is required.
 
-Each tool also carries an admin configuration set in the Unique admin UI, not through environment
-variables. Admin values are the floor: a caller may narrow them, never widen them. See
-[Permissions](./permissions.md).
+Each tool also carries an admin configuration, normally set from inside the Unique AI app rather
+than an environment variable; see
+[Configuration: Admin Configuration](../operator/configuration.md#Admin-Configuration) for where
+that setting actually lives. Admin values are the floor: a caller may narrow them, never widen
+them. See [Permissions](./permissions.md).
+
+## How the Calling LLM Picks Arguments
+
+Tool descriptions tell the LLM exactly where an argument's value has to come from, not just its
+type. `search`'s `folder_ids`, for example, only accepts a `scope_xxx` id copied verbatim from a
+`folder_id` annotation in a prior `content_tree(mode='tree')` result, never a folder name, a path,
+or a `scope_xxx` lifted from a citation link (that's the file's own folder, not necessarily the one
+the user meant). `metadata_filter`'s `path` is one of the fixed fields (`mimeType`, `key`, `title`,
+`validAsOf`) or a custom field name, typically one the LLM already saw in a `content_metadata` call.
+
+That's why a discovery call often precedes the tool that uses its output:
+
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+flowchart LR
+    Q["User question"] --> Scoped{"Folder or field\nalready known?"}
+    Scoped -->|No| Discover["content_tree / content_metadata\ndiscover folder ids, field names"]
+    Discover --> Use
+    Scoped -->|Yes| Use["search / content_tree\nfolder_ids, metadata_filter"]
+    Use --> Read["read_file\nfull content by content_id"]
+```
+
+Nothing forces that order. A well-scoped question can call `search` directly with no `folder_ids`
+or `metadata_filter` at all: an unrestricted search is the default and correct for most requests.
 
 ### `search`
 

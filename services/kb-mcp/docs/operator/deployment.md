@@ -135,14 +135,15 @@ and setting `postgresql.enabled: false`, bypassing the `postgresql.connection` c
 !!! warning "`toEndpoints` rules match the pod port, not the Service port"
     Cilium's eBPF Service DNAT happens *before* a `CiliumNetworkPolicy`'s `toEndpoints` rule is
     evaluated, so the rule must allow the container's actual listening port. For `kb-mcp` calling
-    `node-chat`, that means `node-chat`'s container port (`8080`), not its Service port (`8093`).
+    the Unique API directly in-cluster, that means the Unique API's container port (`8080`), not
+    its Service port (`8093`).
 
 The monorepo-wide `internalServices` convention encodes this automatically: a chart declaring
 `internalServices.dependencies.<key>` gets both the env var and a matching egress rule targeting the
 dependency's real pod port, via separate `servicePort`/`podPort` fields.
 
 !!! note "The allowlist is bidirectional"
-    Declaring `dependencies` builds only `kb-mcp`'s egress rule. `node-chat` must separately
+    Declaring `dependencies` builds only `kb-mcp`'s egress rule. The Unique API must separately
     allowlist `kb-mcp` under its own `internalServices.dependents.kbMcp`, which defaults to
     `enabled: false`. Otherwise its ingress policy drops the connection silently, with no
     application error, just a timeout.

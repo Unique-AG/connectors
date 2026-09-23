@@ -5,12 +5,12 @@
 
 The Knowledge Base MCP Server (`kb-mcp`) gives MCP clients access to a tenant's Unique knowledge
 base: semantic/internal search, browsing the content tree, and reading file content by id. It is a
-stateless, read-only proxy: every tool call queries the Unique API (`node-chat`) live, and nothing
-is written back into the knowledge base.
+stateless, read-only proxy: every tool call queries the Unique API live, and nothing is written
+back into the knowledge base.
 
 Authentication is its own OIDC flow against Zitadel (a public PKCE client, no client secret),
-independent of the platform's normal Kong-fronted authentication. Deployed instances call
-`node-chat` directly in-cluster, bypassing the Kong hairpin where possible.
+independent of the platform's normal Kong-fronted authentication. Deployed instances can call the
+Unique API directly in-cluster, bypassing the Kong hairpin where possible.
 
 For deployment, configuration, and operational details, see the
 [IT Operator Guide](./operator/README.md). For the full tool reference and architecture, see the
