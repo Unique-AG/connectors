@@ -11,7 +11,7 @@ follows is the order to call them in and how each one feeds the next.
 | Tool | Answers |
 | --- | --- |
 | `search` | "What does the knowledge base say about X?" |
-| `content_tree` | "What files and folders exist here?" |
+| `content_tree` | "What files/folders exist, and where are they?" |
 | `content_metadata` | "Which metadata fields can I filter on?" |
 | `read_file` | "Show me this specific document." |
 
@@ -20,9 +20,15 @@ follows is the order to call them in and how each one feeds the next.
 These two get confused constantly. The wrong pick still returns something, so
 it looks fine and simply runs slower than it should.
 
-Use `search` for questions about what documents *say*. Use `content_tree`
-for questions about which documents *exist*. "What is our parental leave
-policy" is a search. "Which policies do we have" is a content tree.
+`search` looks inside document content: a fact, a number, a clause, the
+wording of a policy. `content_tree` looks at structure: which files exist,
+what they're named, where they sit — never what's written inside them.
+"What is our parental leave policy" needs the wording, so it's a search.
+"Which policies do we have" needs a list, so it's a content tree.
+
+`content_tree(mode='search')` also matches on filename, fuzzily. It can find
+a file named "Parental Leave Policy.pdf" from a rough guess at the name. It
+still cannot tell you what the policy says — that's `search`'s job.
 
 When a request touches both, and names no folder, search first with no
 scope: it answers most questions on its own, and an unrestricted search is
@@ -37,43 +43,53 @@ the walk at that folder. A rooted walk is fast. Retrieving the whole tree and
 discarding most of it afterwards is slow.
 
 A folder id is a `scope_` value that appears as a `(folder_id=scope_...)`
-annotation in `content_tree(mode='tree')` output. Get it there, then pass
-it back, either as `folder_path` on a later `content_tree` call or as
-`folder_ids` on a `search`.
+annotation in `content_tree(mode='tree')` output — and only there. `mode='list'`
+and `mode='search'` return `content_id` for files, never a folder's `scope_`
+id. Get the id from a `mode='tree'` call, then pass it back, either as
+`folder_path` on a later `content_tree` call or as `folder_ids` on a `search`.
 
 Two traps:
 
-- A folder shows no id until the walk reaches a file beneath it. If the
-  folder you need has no id, re-run with a larger `max_depth`. Setting
-  `folders_only=true` keeps that cheap, because it hides files from the
-  rendered output without narrowing the walk that discovers the ids.
+- A folder shows no id until the walk reaches a file beneath it. Re-run with
+  a larger `max_depth`, and if you already hold a shallower ancestor's id,
+  root the re-run there with `folder_path` instead of walking from the top
+  again. Don't guess a large `max_depth` defensively — a truncated tree says
+  so, so start shallow (2 is a reasonable first try) and grow only if the
+  folder you need is still missing. `folders_only=true` keeps a deep walk
+  cheap either way, since it only hides files from the rendered lines, not
+  from the walk that discovers ids.
 - Never assemble a `scope_` value yourself, and never reuse one lifted from
   a citation or document link in an earlier result. Those point at whatever
   leaf folder a file happens to sit in, which is rarely the folder that was
   asked about. With no id in hand, omit the parameter and search everything.
 
-## Call content_metadata before writing a metadata_filter
+## Call content_metadata before filtering on a custom field
 
-`content_metadata` returns every field name and every distinct value in
-scope, exhaustively rather than as a sample. Read it and you know which
-`path` keys exist. Skip it and you are guessing at field names, and a filter
-naming a field that does not exist returns nothing, which reads exactly like
-a knowledge base with no matching content.
+This is only for a custom field the user names, something like `documentType`
+or `department`. A few keys always exist and need no discovery: `mimeType`,
+`title`, `validAsOf`. Filter on those directly.
 
-Two things it does not promise. Values describe what filtering is
-*possible*, not that this tenant's search accepts any filter you build from
-them. And an empty result after filtering is more often a bad filter than an
-empty knowledge base, so drop the filter and retry before reporting nothing
-found.
+For anything else, call `content_metadata` first. It returns every field name
+and every distinct value in scope, exhaustively rather than as a sample. Read
+it and you know which `path` keys exist. Skip it and you are guessing at a
+field name, and a filter naming a field that does not exist returns nothing —
+which reads exactly like a knowledge base with no matching content.
+
+Two things it does not promise. Many knowledge bases carry little or no
+custom taxonomy, so an empty result is normal, not a failure — fall back to
+a scoped `search` or a `content_tree(mode='search')` filename lookup rather
+than forcing a filter that isn't there. And an empty result after filtering
+is more often a bad filter than an empty knowledge base, so drop the filter
+and retry before reporting nothing found.
 
 ## Worked example
 
 "What did we change in the 2031 supplier terms? Only look in Contracts."
 
 ```text
-1. content_tree(mode='tree', folders_only=true, max_depth=3)
+1. content_tree(mode='tree', folders_only=true, max_depth=2)
    → locate the Contracts line, copy its (folder_id=scope_...) annotation
-     verbatim
+     verbatim; re-run with a larger max_depth only if Contracts isn't there yet
 
 2. content_metadata(folder_ids=['scope_...'])
    → returns e.g. [{"documentType": ["Terms", "Amendment"]}]
@@ -88,9 +104,14 @@ found.
 4. read_file(content_id='...') for any hit worth quoting in full
 ```
 
-Step 2 is skippable when you are not filtering. Step 1 is not skippable if
-the user named a folder, because step 3 needs an id that only step 1 can
-give you.
+Step 2 is skippable when you are not filtering, and it usually isn't worth
+doing unless the folder holds enough files of that type that an unfiltered
+search would be noisy — a scoped `search` on `folder_ids` alone is often
+enough on its own. Step 1 is not skippable if the user named a folder,
+because step 3 needs an id that only step 1 can give you.
+
+Two more worked examples, for relationship-management and fund-reporting
+questions, are in [references/examples.md](references/examples.md).
 
 ## Things that go wrong
 
