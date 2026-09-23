@@ -36,11 +36,13 @@ own code default.
 ```
 
 `service_config` also covers query mode, multi-query, and reranking, deep enough that the admin
-UI's own form is the practical way to set the rest.
+UI's own form is the practical way to set the rest. Full shape:
+[`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/search/config.py).
 
 #### `content_tree`
 
 `UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_CONTENT_TREE_TOOL_CONFIG`
+([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/content_tree/config.py))
 
 ```json
 { "default_tree_limit": 500, "default_match_on": "key" }
@@ -49,6 +51,7 @@ UI's own form is the practical way to set the rest.
 #### `content_metadata`
 
 `UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_CONTENT_METADATA_TOOL_CONFIG`
+([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/content_metadata/config.py))
 
 ```json
 {
@@ -65,6 +68,7 @@ alongside any of your own, or the catalog narrows to just what you passed.
 #### `read_file`
 
 `UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_READ_FILE_TOOL_CONFIG`
+([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/read_file/config.py))
 
 ```json
 { "max_tokens_per_call": 4000 }
