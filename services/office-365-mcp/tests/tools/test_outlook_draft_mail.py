@@ -1,5 +1,6 @@
 """Every payload here is synthesised. No draft in this file was ever created in a real mailbox."""
 
+import base64
 import json
 from collections.abc import Mapping, Sequence
 from typing import cast
@@ -14,9 +15,20 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphUnavailable
 from office_365_mcp.shared.handles import mail_draft_handle, mail_message_handle
+from office_365_mcp.shared.mail import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, MailAttachmentInput
 from office_365_mcp.shared.seam import WRITE_ADDITIVE
 from office_365_mcp.tools import outlook_draft_mail as drafter
 from office_365_mcp.tools.outlook_draft_mail import MailDraft
+
+# A one-pixel GIF, so `content_bytes` decodes into real, if pointless, bytes.
+_TINY_FILE = base64.b64encode(bytes.fromhex("47494638396101000100")).decode()
+
+
+def _attachment(
+    name: str = "budget.pdf", content_type: str = "application/pdf", content_bytes: str = _TINY_FILE
+) -> MailAttachmentInput:
+    return MailAttachmentInput(name=name, content_type=content_type, content_bytes=content_bytes)
+
 
 _DRAFT_ID = "AAMkAGI2SYNTHETIC-draft-0001="
 
@@ -73,6 +85,7 @@ async def _draft(client: GraphServiceClient, **overrides: object) -> MailDraft:
         subject=cast("str", arguments["subject"]),
         body_html=cast("str", arguments["body_html"]),
         cc=cast("Sequence[str]", arguments.get("cc", ())),
+        attachments=cast("Sequence[MailAttachmentInput]", arguments.get("attachments", ())),
     )
 
 
@@ -262,24 +275,33 @@ class TestTheAddressesItRefuses:
 
 
 class TestTheSchemaItPublishes:
-    async def test_it_takes_four_arguments_and_no_others(
-        self, transport: httpx.AsyncClient
-    ) -> None:
+    async def test_it_takes_six_arguments_and_no_others(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"to", "subject", "body_html", "cc"}
+        assert set(properties) == {"to", "subject", "body_html", "cc", "attachments", "mailbox"}
 
-    @pytest.mark.parametrize("word", ["attach", "bcc", "blind", "file", "upload", "drive", "url"])
-    async def test_no_argument_offers_an_attachment_a_blind_copy_or_markup(
+    @pytest.mark.parametrize("word", ["bcc", "blind", "file", "upload", "drive", "url"])
+    async def test_no_argument_offers_a_blind_copy_a_fetch_or_markup(
         self, transport: httpx.AsyncClient, word: str
     ) -> None:
         """The absence of the argument is the control: a runtime refusal would still publish the
-        argument, and a published argument is an invitation the model takes."""
+        argument, and a published argument is an invitation the model takes. `attachments` is the
+        one deliberate exception, covered by its own tests below, and is never in this list."""
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert not [name for name in properties if word in name.casefold()]
+
+    async def test_attachments_is_the_only_argument_naming_a_file(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        """`attachments` itself is the one argument allowed to say "file" or "attach" — checked
+        by name, so a second argument reaching the same capability is still caught."""
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert [name for name in properties if "attach" in name.casefold()] == ["attachments"]
 
     async def test_at_least_one_recipient_is_required_and_ten_is_the_ceiling(
         self, transport: httpx.AsyncClient
@@ -317,7 +339,9 @@ class TestTheSchemaItPublishes:
 
 class TestHowItDeclaresItself:
     def test_the_permission_is_the_one_microsoft_documents_for_creating_a_message(self) -> None:
-        assert drafter.GRAPH_PERMISSIONS == ("Mail.ReadWrite",)
+        """`Mail.ReadWrite.Shared` is what Microsoft's shared-folder walkthrough names for
+        writing a message into a mailbox other than `/me`."""
+        assert drafter.GRAPH_PERMISSIONS == ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
     async def test_it_announces_itself_as_a_write_that_destroys_nothing(
         self, transport: httpx.AsyncClient
@@ -332,19 +356,51 @@ class TestHowItDeclaresItself:
         assert annotations.destructive_hint is WRITE_ADDITIVE["destructiveHint"]
         assert annotations.idempotent_hint is WRITE_ADDITIVE["idempotentHint"]
 
-    async def test_the_description_says_it_cannot_send_and_cannot_attach(
+    async def test_the_description_says_it_cannot_send_and_names_the_attachment_ceiling(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """What a model is told it cannot do is the only place these limits exist for it: nothing
-        downstream re-reads the tool file."""
+        """What a model is told it cannot do — and, now, what it CAN attach and how much of it —
+        is the only place these limits exist for it: nothing downstream re-reads the tool file."""
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""
         lowered = description.casefold()
         assert "cannot send" in lowered
-        assert "cannot attach a file" in lowered
         assert "bcc" in lowered
         assert "outlook_find_recipient" in description
+        assert f"up to {MAX_ATTACHMENTS}" in lowered
+        assert "url" in lowered
+
+
+class TestMailboxTargeting:
+    async def test_no_mailbox_drafts_into_the_signed_in_users_own_mailbox(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+
+        _ = await _draft(client)
+
+        assert route.called
+
+    async def test_a_mailbox_drafts_into_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post("/users/alex@example.invalid/messages").mock(
+            return_value=httpx.Response(201, json=_created())
+        )
+
+        answer = await drafter.draft_mail(
+            client,
+            to=[_ADA],
+            subject=_SUBJECT,
+            body_html=_BODY,
+            mailbox="alex@example.invalid",
+        )
+
+        assert route.called
+        handle = mail_draft_handle(answer.uri)
+        assert handle is not None
+        assert handle.draft_id == _DRAFT_ID
 
 
 class TestWhatItAnswers:
@@ -423,8 +479,119 @@ class TestWhatItAnswers:
 
         assert answer.cc == []
 
-    def test_no_attachment_is_addressable_in_the_answer_at_all(self) -> None:
-        assert not [name for name in MailDraft.model_fields if "attach" in name.casefold()]
+    def test_attachments_is_the_only_field_naming_an_attachment(self) -> None:
+        assert [name for name in MailDraft.model_fields if "attach" in name.casefold()] == [
+            "attachments"
+        ]
+
+
+class TestAttachments:
+    async def test_a_default_call_attaches_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+
+        answer = await _draft(client)
+
+        assert "attachments" not in _sent(route)
+        assert answer.attachments == []
+
+    async def test_an_attachment_reaches_graph_inside_the_same_create(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+
+        _ = await _draft(client, attachments=[_attachment(name="budget.pdf")])
+
+        assert route.call_count == 1, "one draft, one request — the attachment travels with it"
+        sent = cast("list[dict[str, object]]", _sent(route)["attachments"])
+        assert len(sent) == 1
+        assert sent[0]["name"] == "budget.pdf"
+        assert sent[0]["contentType"] == "application/pdf"
+        assert sent[0]["@odata.type"] == "#microsoft.graph.fileAttachment"
+
+    async def test_content_bytes_reaches_graph_as_the_same_base64_it_was_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+
+        _ = await _draft(client, attachments=[_attachment(content_bytes=_TINY_FILE)])
+
+        sent = cast("list[dict[str, object]]", _sent(route)["attachments"])
+        assert sent[0]["contentBytes"] == _TINY_FILE
+
+    async def test_several_attachments_keep_their_order(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+
+        _ = await _draft(
+            client, attachments=[_attachment(name="one.pdf"), _attachment(name="two.pdf")]
+        )
+
+        sent = cast("list[dict[str, object]]", _sent(route)["attachments"])
+        assert [one["name"] for one in sent] == ["one.pdf", "two.pdf"]
+
+    async def test_invalid_base64_is_refused_before_anything_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+
+        with pytest.raises(ToolError, match="not.*valid base64"):
+            _ = await _draft(client, attachments=[_attachment(content_bytes="not base64 at all!")])
+
+        assert route.call_count == 0, "a refused attachment creates nothing in the mailbox"
+
+    async def test_a_file_at_or_past_the_ceiling_is_refused_before_anything_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+        oversized = base64.b64encode(b"x" * MAX_ATTACHMENT_BYTES).decode()
+
+        with pytest.raises(ToolError, match="3 MB"):
+            _ = await _draft(client, attachments=[_attachment(content_bytes=oversized)])
+
+        assert route.call_count == 0
+
+    async def test_a_file_just_under_the_ceiling_is_accepted(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+        fits = base64.b64encode(b"x" * (MAX_ATTACHMENT_BYTES - 1)).decode()
+
+        _ = await _draft(client, attachments=[_attachment(content_bytes=fits)])
+
+        assert route.call_count == 1
+
+    async def test_an_attachment_list_outside_the_schema_is_a_programming_error(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(AssertionError):
+            _ = await _draft(client, attachments=[_attachment()] * (MAX_ATTACHMENTS + 1))
+
+    async def test_the_answer_reports_name_type_and_decoded_size_not_the_bytes(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph, _created())
+
+        answer = await _draft(client, attachments=[_attachment(name="budget.pdf")])
+
+        assert len(answer.attachments) == 1
+        one = answer.attachments[0]
+        assert one.name == "budget.pdf"
+        assert one.content_type == "application/pdf"
+        assert one.size == len(base64.b64decode(_TINY_FILE))
+        assert not hasattr(one, "content_bytes")
+
+    async def test_the_schema_bounds_attachments_the_same_way_as_recipients(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        attachments = cast("Mapping[str, object]", properties["attachments"])
+        assert attachments["default"] == []
+        assert attachments["maxItems"] == MAX_ATTACHMENTS
 
     def test_no_blind_copy_is_addressable_in_the_answer_at_all(self) -> None:
         assert not [name for name in MailDraft.model_fields if "bcc" in name.casefold()]

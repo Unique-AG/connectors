@@ -12,6 +12,35 @@ refused with `SearchWithFilter` — a live probe on 2026-09-10 matched `received
 `received>=today-5` returned nothing silently and `received:"last week"` was a 400. `$search` does
 not reach drafts in Deleted Items, so a window here under-returns where `outlook_list_mail` does
 not.
+
+**`mailbox` re-points every request from `/me` to `/users/{id}`, `translateExchangeIds` included.**
+Microsoft's shared-folder walkthrough names `Mail.Read.Shared` as what authorizes the search itself
+(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders). The id exchange needs no
+second permission: Microsoft lists `User.Read` as valid, if not least-privileged, for
+`POST /users/{id}/translateExchangeIds` too, and this file already holds it for the `/me` route.
+
+**`attachment_name` is the only route to an attachment here, and it is a route to its NAME.**
+Investigated: does `$search` on `/me/messages` reach an attachment's own text, the way it reaches
+`from`, `subject` and `body`? No, checked against Microsoft's own reference rather than assumed.
+The searchable-email-property table names `attachment` as "Names of files attached to an email
+message" and nothing else (https://learn.microsoft.com/en-us/graph/search-query-parameter); the
+Exchange KQL property table this file's own `attachment:` clause cites lists the identical
+wording and no second, content-bearing property alongside it
+(https://learn.microsoft.com/en-us/Exchange/policy-and-compliance/ediscovery/message-properties-and-search-operators).
+Unscoped `query` fares no better: the same reference states plainly that a search naming no
+property "targets these default properties: from, subject, and body" — attachment content is not
+among them either way a term reaches this endpoint. The one Graph surface that does read inside an
+attachment is `POST /search/query`, the Microsoft Search API
+(https://learn.microsoft.com/en-us/graph/search-concept-messages: "applies to the body and
+attachments of messages") — which is the same endpoint the top of this file already rules out,
+and for the same reason stated there, now sharper: its own documented "known limitations" say
+"you can access only the signed-in user's own mailbox. Searching delegated mailboxes is not
+supported", and `mailbox` above exists precisely to reach one. Switching this tool to it would
+trade every delegated-mailbox search away for attachment content in the caller's own mailbox
+alone — a different tool's trade, not an extension of this one. So there is no Graph capability
+this tool can reach that indexes attachment content without this connector running its own
+ingestion, which is out of scope; `attachment_name` remains a file-name match and nothing else,
+and `query` never sees inside a file no matter how it is phrased.
 """
 
 from collections.abc import Mapping
@@ -31,13 +60,19 @@ from msgraph.generated.users.item.messages.messages_request_builder import Messa
 from msgraph.generated.users.item.translate_exchange_ids.translate_exchange_ids_post_request_body import (  # noqa: E501
     TranslateExchangeIdsPostRequestBody,
 )
+from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared import kql
 from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailSummary
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.seam import (
+    MAILBOX_FIELD,
+    READ_ONLY,
+    graph_client_for_caller,
+    graph_mailbox,
+)
 from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "outlook_search_mail"
@@ -46,7 +81,9 @@ STEP_SEARCH = "mail_search"
 STEP_IDS = "mail_ids"
 
 # `User.Read` covers the id exchange, which is the only call that 403s without it.
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "User.Read")
+# `Mail.Read.Shared` is what Microsoft's shared-folder walkthrough names for `mailbox`; see the
+# module docstring for why the id exchange needs no `.Shared` permission of its own.
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "User.Read", "Mail.Read.Shared")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 
@@ -63,7 +100,7 @@ Notes:
 `received_after` and `received_before` narrow that criterion but never substitute for one, and \
 all given criteria must match (AND).
 - `received_before` must fall on or after `received_after`. A reversed pair returns nothing.
-- Searches only the signed-in user's own mailbox, never a shared or delegated one.
+- Searches the signed-in user's own mailbox unless `mailbox` names a shared or delegated one.
 """
 
 
@@ -125,6 +162,7 @@ async def search_mail(
     received_after: date | datetime | None = None,
     received_before: date | datetime | None = None,
     limit: int,
+    mailbox: str | None = None,
 ) -> MailSearchResults:
     assert 1 <= limit <= MAX_RESULTS, f"limit is bounded by the schema, got {limit}"
     asked = _query_string(criteria)
@@ -133,10 +171,11 @@ async def search_mail(
     if runs_backwards(received_after, received_before):
         raise ToolError(_WINDOW_RUNS_BACKWARDS)
     search = " AND ".join([asked, *_window_terms(received_after, received_before)])
+    reached = graph_mailbox(client, mailbox)
 
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_SEARCH):
-            page = await client.me.messages.get(
+            page = await reached.messages.get(
                 request_configuration=RequestConfiguration(
                     query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
                         search=kql.as_search_value(search),
@@ -146,7 +185,7 @@ async def search_mail(
                 )
             )
         found = [message for message in (page.value if page is not None else None) or []]
-        stable = await _stable_ids(client, found)
+        stable = await _stable_ids(reached, found)
 
     return MailSearchResults(
         messages=[
@@ -158,7 +197,7 @@ async def search_mail(
     )
 
 
-async def _stable_ids(client: GraphServiceClient, found: list[Message]) -> dict[str, str]:
+async def _stable_ids(reached: UserItemRequestBuilder, found: list[Message]) -> dict[str, str]:
     """Each hit's mutable id, mapped to one that survives after the mailbox files the message.
 
     A hit Graph fails to translate is dropped rather than handed back with its mutable id.
@@ -167,7 +206,7 @@ async def _stable_ids(client: GraphServiceClient, found: list[Message]) -> dict[
     if not raw:
         return {}
     with graph_step(STEP_IDS):
-        translated = await client.me.translate_exchange_ids.post(
+        translated = await reached.translate_exchange_ids.post(
             TranslateExchangeIdsPostRequestBody(
                 input_ids=raw,
                 source_id_type=ExchangeIdFormat.RestId,
@@ -261,8 +300,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Words to find in the subject, the body, or an attachment's text. Every "
-                    + "word must appear, in any order. Quote a run to require adjacency. "
+                    "Words to find in the subject or the body — NOT an attachment's text, which "
+                    + "this tool cannot reach; use `attachment_name` for a file's name instead. "
+                    + "Every word must appear, in any order. Quote a run to require adjacency. "
                     + '`"purchase order"` matches only side by side. `purchase order` matches '
                     + "both words anywhere. This tool reads search operators in this text "
                     + "literally, and never executes them as commands."
@@ -362,6 +402,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = 25,
+        mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> MailSearchResults:
         return await search_mail(
@@ -377,6 +418,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             received_after=received_after,
             received_before=received_before,
             limit=limit,
+            mailbox=mailbox,
         )
 
     _require_a_criterion(mcp.add_tool(outlook_search_mail))

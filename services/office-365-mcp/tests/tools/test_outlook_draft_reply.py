@@ -1,11 +1,13 @@
 """Every payload here is synthesised. No draft in this file was ever created in a real mailbox.
 
 The rules this file is about are the ones the tool's shape is: there is no reply-all and no way to
-spell one, `to` belongs to a forward and nowhere else, no Cc, Bcc or attachment argument exists,
-the recipients reported come off Microsoft's answer, neither write is retried, and a fill that
-fails is reported as the addressed empty draft it leaves behind rather than raised over.
+spell one, `to` belongs to a forward and nowhere else, no Cc or Bcc argument exists, a new
+attachment can only be bytes already in the call and never a fetch, the recipients reported come
+off Microsoft's answer, no write is retried, and a fill or an attachment that fails is reported as
+the addressed draft it leaves behind rather than raised over.
 """
 
+import base64
 import json
 from collections.abc import Mapping, Sequence
 from typing import cast
@@ -20,9 +22,20 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphUnavailable
 from office_365_mcp.shared.handles import MailMessageHandle, mail_draft_handle, mail_message_handle
+from office_365_mcp.shared.mail import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, MailAttachmentInput
 from office_365_mcp.shared.seam import WRITE_ADDITIVE
 from office_365_mcp.tools import outlook_draft_reply as replier
 from office_365_mcp.tools.outlook_draft_reply import MailReplyDraft, MailReplyMode
+
+# A one-pixel GIF, so `content_bytes` decodes into real, if pointless, bytes.
+_TINY_FILE = base64.b64encode(bytes.fromhex("47494638396101000100")).decode()
+
+
+def _attachment(
+    name: str = "budget.pdf", content_type: str = "application/pdf", content_bytes: str = _TINY_FILE
+) -> MailAttachmentInput:
+    return MailAttachmentInput(name=name, content_type=content_type, content_bytes=content_bytes)
+
 
 _MESSAGE_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 
@@ -112,6 +125,28 @@ def _fills(graph: respx.MockRouter, payload: dict[str, object] | None = None) ->
     )
 
 
+def _attached(
+    *, name: str = "budget.pdf", content_type: str = "application/pdf"
+) -> dict[str, object]:
+    """What Graph answers one `POST .../attachments` call with: the `attachment` it stored."""
+    return {
+        "@odata.type": "#microsoft.graph.fileAttachment",
+        "id": f"AAMkAGI2SYNTHETIC-attachment-{name}",
+        "name": name,
+        "contentType": content_type,
+        "size": len(base64.b64decode(_TINY_FILE)),
+        "isInline": False,
+    }
+
+
+def _attaches(graph: respx.MockRouter, *payloads: dict[str, object]) -> respx.Route:
+    """One route for every `POST .../attachments` call this test expects, answered in order."""
+    responses = [httpx.Response(201, json=payload) for payload in payloads] or [
+        httpx.Response(201, json=_attached())
+    ]
+    return graph.post(f"{_FILL}/attachments").mock(side_effect=responses)
+
+
 async def _reply(client: GraphServiceClient, **overrides: object) -> MailReplyDraft:
     """One valid call, so a test that is about something else says only that thing."""
     arguments: dict[str, object] = {
@@ -126,6 +161,7 @@ async def _reply(client: GraphServiceClient, **overrides: object) -> MailReplyDr
         mode=cast("MailReplyMode", arguments["mode"]),
         body_html=cast("str", arguments["body_html"]),
         to=cast("Sequence[str]", arguments.get("to", ())),
+        attachments=cast("Sequence[MailAttachmentInput]", arguments.get("attachments", ())),
     )
 
 
@@ -401,12 +437,17 @@ class TestTheModesAndAddressesItRefuses:
 
 
 class TestTheSchemaItPublishes:
-    async def test_it_takes_four_arguments_and_no_others(
-        self, transport: httpx.AsyncClient
-    ) -> None:
+    async def test_it_takes_six_arguments_and_no_others(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)
 
-        assert set(_properties(parameters)) == {"message_ref", "mode", "body_html", "to"}
+        assert set(_properties(parameters)) == {
+            "message_ref",
+            "mode",
+            "body_html",
+            "to",
+            "attachments",
+            "mailbox",
+        }
 
     async def test_the_only_modes_it_offers_are_reply_and_forward(
         self, transport: httpx.AsyncClient
@@ -421,15 +462,24 @@ class TestTheSchemaItPublishes:
         assert cast("Sequence[str]", published["MailReplyMode"]["enum"]) == list(replier.MODES)
         assert list(replier.MODES) == ["reply", "forward"]
 
-    @pytest.mark.parametrize(
-        "word", ["cc", "bcc", "blind", "all", "attach", "file", "upload", "drive"]
-    )
-    async def test_no_argument_offers_a_copy_an_attachment_or_markup(
+    @pytest.mark.parametrize("word", ["cc", "bcc", "blind", "all", "file", "upload", "drive"])
+    async def test_no_argument_offers_a_copy_or_markup(
         self, transport: httpx.AsyncClient, word: str
     ) -> None:
+        """`attachments` is the one deliberate exception, covered by its own tests below, and is
+        never in this list."""
         parameters, _tool = await _registered(transport)
 
         assert not [name for name in _properties(parameters) if word in name.casefold()]
+
+    async def test_attachments_is_the_only_argument_naming_a_file(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        assert [name for name in _properties(parameters) if "attach" in name.casefold()] == [
+            "attachments"
+        ]
 
     async def test_the_message_the_mode_and_the_text_are_required_and_to_is_not(
         self, transport: httpx.AsyncClient
@@ -467,11 +517,14 @@ class TestTheSchemaItPublishes:
 
 class TestHowItDeclaresItself:
     def test_the_permission_is_the_one_microsoft_documents_for_these_writes(self) -> None:
-        assert replier.GRAPH_PERMISSIONS == ("Mail.ReadWrite",)
+        """`Mail.ReadWrite.Shared` is what Microsoft's shared-folder walkthrough names for
+        writing a message into a mailbox other than `/me`."""
+        assert replier.GRAPH_PERMISSIONS == ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
-    def test_the_two_writes_are_named_as_their_own_steps(self) -> None:
+    def test_the_three_writes_are_named_as_their_own_steps(self) -> None:
         assert replier.STEP_CREATE_REPLY == "create_reply"
         assert replier.STEP_FILL_REPLY == "fill_reply"
+        assert replier.STEP_ATTACH_REPLY == "attach_reply"
 
     async def test_it_announces_itself_as_a_write_that_destroys_nothing(
         self, transport: httpx.AsyncClient
@@ -497,13 +550,13 @@ class TestHowItDeclaresItself:
         assert "cannot send" in lowered
         assert "the user presses send in outlook" in lowered
 
-    async def test_the_description_says_a_forward_brings_the_attachments_this_tool_cannot_add(
+    async def test_the_description_says_a_forward_brings_its_own_attachments_regardless(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "or an attachment argument" in lowered
+        assert "regardless of `attachments`" in lowered
 
         # This fact is about interpreting `mode: "forward"`, so it lives on that argument now
         # rather than in the tool-level description.
@@ -516,7 +569,16 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "neither mode offers reply-all, cc, bcc" in lowered
+        assert "neither mode offers reply-all, cc, or bcc" in lowered
+
+    async def test_the_description_names_the_attachment_ceiling(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        lowered = (tool.description or "").casefold()
+        assert f"up to {MAX_ATTACHMENTS}" in lowered
+        assert "url" in lowered
 
     def test_the_known_issue_the_second_write_exists_for_is_cited(self) -> None:
         """The fill looks removable until you know Microsoft drops the comment, so the citation is
@@ -527,6 +589,41 @@ class TestHowItDeclaresItself:
 
     def test_a_stale_handle_is_told_where_to_find_the_message_again(self) -> None:
         assert "outlook_search_mail" in replier.GRAPH_NOT_FOUND
+
+
+class TestMailboxTargeting:
+    async def test_no_mailbox_replies_in_the_signed_in_users_own_mailbox(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        created = _creates(graph)
+        filled = _fills(graph)
+
+        _ = await _reply(client)
+
+        assert created.called
+        assert filled.called
+
+    async def test_a_mailbox_replies_in_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        created = graph.post(
+            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D/createReply"
+        ).mock(return_value=httpx.Response(201, json=_draft()))
+        filled = graph.patch(
+            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-reply-draft-0001%3D"
+        ).mock(return_value=httpx.Response(200, json=_filled()))
+
+        answer = await replier.draft_reply(
+            client,
+            message_ref=_MESSAGE_REF,
+            mode="reply",
+            body_html=_BODY,
+            mailbox="alex@example.invalid",
+        )
+
+        assert created.called
+        assert filled.called
+        assert answer.body_written is True
 
 
 class TestWhatItAnswers:
@@ -607,10 +704,164 @@ class TestWhatItAnswers:
 
         assert answer.web_link is None
 
-    def test_no_attachment_or_blind_copy_is_addressable_in_the_answer_at_all(self) -> None:
+    def test_attachments_and_attachment_failure_are_the_only_attachment_fields(self) -> None:
         fields = [name.casefold() for name in MailReplyDraft.model_fields]
-        assert not [name for name in fields if "attach" in name]
+        assert {name for name in fields if "attach" in name} == {
+            "attachments",
+            "attachment_failure",
+        }
         assert not [name for name in fields if "bcc" in name]
+
+
+class TestNewAttachments:
+    async def test_a_default_call_attaches_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+        _ = _fills(graph)
+        attach = _attaches(graph)
+
+        answer = await _reply(client)
+
+        assert attach.call_count == 0
+        assert answer.attachments == []
+        assert answer.attachment_failure is None
+
+    async def test_a_new_attachment_is_its_own_call_after_the_fill(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _creates(graph)
+        fill = _fills(graph)
+        attach = _attaches(graph, _attached(name="budget.pdf"))
+
+        _ = await _reply(client, attachments=[_attachment(name="budget.pdf")])
+
+        assert create.call_count == 1
+        assert fill.call_count == 1
+        assert attach.call_count == 1
+        sent = cast("dict[str, object]", json.loads(attach.calls.last.request.content))
+        assert sent["name"] == "budget.pdf"
+        assert sent["contentType"] == "application/pdf"
+        assert sent["@odata.type"] == "#microsoft.graph.fileAttachment"
+
+    async def test_attaching_asks_for_immutable_ids_and_never_retries(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+        _ = _fills(graph)
+        attach = _attaches(graph)
+
+        _ = await _reply(client, attachments=[_attachment()])
+
+        assert 'IdType="ImmutableId"' in attach.calls.last.request.headers["Prefer"]
+
+    async def test_several_new_attachments_are_sent_in_order_one_call_each(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+        _ = _fills(graph)
+        attach = _attaches(graph, _attached(name="one.pdf"), _attached(name="two.pdf"))
+
+        answer = await _reply(
+            client, attachments=[_attachment(name="one.pdf"), _attachment(name="two.pdf")]
+        )
+
+        assert attach.call_count == 2
+        assert [one.name for one in answer.attachments] == ["one.pdf", "two.pdf"]
+
+    async def test_a_forward_can_both_carry_the_original_and_attach_something_new(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _creates(graph, _CREATE_FORWARD)
+        fill = _fills(graph)
+        attach = _attaches(graph, _attached(name="budget.pdf"))
+
+        _ = await _reply(
+            client, mode="forward", to=[_GRACE], attachments=[_attachment(name="budget.pdf")]
+        )
+
+        assert create.call_count == 1
+        assert fill.call_count == 1
+        assert attach.call_count == 1
+
+    async def test_invalid_base64_is_refused_before_anything_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _creates(graph)
+        fill = _fills(graph)
+        attach = _attaches(graph)
+
+        with pytest.raises(ToolError, match="not.*valid base64"):
+            _ = await _reply(client, attachments=[_attachment(content_bytes="not base64!!!")])
+
+        assert create.call_count == 0, "a refused attachment creates nothing at all"
+        assert fill.call_count == 0
+        assert attach.call_count == 0
+
+    async def test_a_file_at_or_past_the_ceiling_is_refused_before_anything_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _creates(graph)
+        oversized = base64.b64encode(b"x" * MAX_ATTACHMENT_BYTES).decode()
+
+        with pytest.raises(ToolError, match="3 MB"):
+            _ = await _reply(client, attachments=[_attachment(content_bytes=oversized)])
+
+        assert create.call_count == 0
+
+    async def test_an_attachment_list_outside_the_schema_is_a_programming_error(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(AssertionError):
+            _ = await _reply(client, attachments=[_attachment()] * (MAX_ATTACHMENTS + 1))
+
+    async def test_a_refused_attachment_answers_what_landed_before_it_rather_than_raising(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """By the time this runs, the create — and maybe the fill — already happened, so raising
+        would report a mailbox that did not change, when it did."""
+        _ = _creates(graph)
+        _ = _fills(graph)
+        _ = graph.post(f"{_FILL}/attachments").mock(
+            side_effect=[
+                httpx.Response(201, json=_attached(name="one.pdf")),
+                httpx.Response(403, json=_REFUSED),
+            ]
+        )
+
+        answer = await _reply(
+            client, attachments=[_attachment(name="one.pdf"), _attachment(name="two.pdf")]
+        )
+
+        assert [one.name for one in answer.attachments] == ["one.pdf"]
+        assert answer.attachment_failure is not None
+        # The draft and its text are unaffected by an attachment that did not land.
+        assert answer.body_written is True
+
+    async def test_a_refused_attachment_stops_rather_than_trying_the_rest(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+        _ = _fills(graph)
+        attach = graph.post(f"{_FILL}/attachments").mock(
+            return_value=httpx.Response(403, json=_REFUSED)
+        )
+
+        answer = await _reply(
+            client, attachments=[_attachment(name="one.pdf"), _attachment(name="two.pdf")]
+        )
+
+        assert attach.call_count == 1, "the second file is never attempted after the first fails"
+        assert answer.attachments == []
+
+    async def test_the_schema_bounds_attachments_the_same_way_as_recipients(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        attachments = _properties(parameters)["attachments"]
+        assert attachments["default"] == []
+        assert attachments["maxItems"] == MAX_ATTACHMENTS
 
 
 class TestWhenTheTextCannotBeWritten:

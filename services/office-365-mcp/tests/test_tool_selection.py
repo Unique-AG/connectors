@@ -416,8 +416,15 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "outlook_find_recipient": frozenset({"query"}),
     "outlook_mark_mail": frozenset({"is_read", "flagged", "importance"}),
     "outlook_move_mail": frozenset({"destination"}),
-    "outlook_draft_mail": frozenset({"subject", "body_html"}),
-    "outlook_draft_reply": frozenset({"mode", "body_html"}),
+    # `content_bytes`, `content_type` and `name` are each `attachments` entry's own required
+    # fields (`MailAttachmentInput`), and no tool mints a file: the caller supplies one, or there
+    # is no `attachments` argument at all, which is why the argument itself is optional.
+    "outlook_draft_mail": frozenset(
+        {"subject", "body_html", "content_bytes", "content_type", "name"}
+    ),
+    "outlook_draft_reply": frozenset(
+        {"mode", "body_html", "content_bytes", "content_type", "name"}
+    ),
     "outlook_set_automatic_reply": frozenset({"status"}),
     "outlook_disable_mail_rule": frozenset({"enabled"}),
     "outlook_list_events": frozenset({"starts_on", "ends_on", "time_zone", "subject_contains"}),

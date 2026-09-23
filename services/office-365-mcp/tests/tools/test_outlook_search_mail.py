@@ -1,15 +1,20 @@
 """Every response body here is synthesised. None came from a real mailbox."""
 
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta, timezone
+from typing import cast
 
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphThrottled
 from office_365_mcp.shared.handles import MailMessageHandle
+from office_365_mcp.tools import outlook_search_mail as searcher
 from office_365_mcp.tools.outlook_search_mail import (
     CRITERIA,
     MAX_RESULTS,
@@ -641,6 +646,41 @@ class TestWhatItRefuses:
             await search_mail(client, SearchCriteria(query="invoice"), limit=limit)
 
 
+class TestMailboxTargeting:
+    async def test_no_mailbox_searches_the_signed_in_users_own_one(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(client, SearchCriteria(query="invoice"), limit=25)
+
+        assert searched.called
+
+    async def test_a_mailbox_searches_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        searched = graph.get("/users/alex@example.invalid/messages").mock(
+            return_value=httpx.Response(200, json={"value": [_message(_REST_ID)]})
+        )
+        translated = graph.post("/users/alex@example.invalid/translateExchangeIds").mock(
+            return_value=httpx.Response(200, json=_translation({_REST_ID: _STABLE_ID}))
+        )
+
+        found = await search_mail(
+            client, SearchCriteria(query="invoice"), limit=25, mailbox="alex@example.invalid"
+        )
+
+        assert searched.called
+        assert translated.called
+        assert found.messages[0].uri == MailMessageHandle(_STABLE_ID).uri
+
+    def test_the_permission_is_the_one_microsoft_documents_for_a_shared_mailbox(self) -> None:
+        """`Mail.Read.Shared` is what Microsoft's shared-folder walkthrough names for searching a
+        mailbox other than `/me`; `User.Read` already covers the id exchange there too."""
+        assert searcher.GRAPH_PERMISSIONS == ("Mail.Read", "User.Read", "Mail.Read.Shared")
+
+
 class TestWhatAGraphFailureBecomes:
     async def test_a_refused_search_is_a_forbidden(
         self, client: GraphServiceClient, searched: respx.Route
@@ -659,3 +699,48 @@ class TestWhatAGraphFailureBecomes:
 
         with pytest.raises(GraphThrottled):
             await search_mail(client, SearchCriteria(query="invoice"), limit=25)
+
+
+async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
+    """The published schema, which is the surface a model actually reads."""
+    mcp: FastMCP = FastMCP(name="schema-under-test")
+    searcher.register(mcp, transport)
+    tool = await mcp.get_tool(searcher.TOOL_NAME)
+    assert tool is not None, "register left the tool off the server"
+    return cast("Mapping[str, object]", tool.parameters), tool
+
+
+class TestAttachmentContentIsNotSearchable:
+    """outlook_search_mail's own `attachment:` clause, and Graph's `$search` generally, index an
+    attachment's file NAME only. This is investigated and cited here, not assumed: see the module
+    docstring for why `POST /search/query`, the one Graph surface that does read inside an
+    attachment, is not a route this tool can take once it targets a shared mailbox too."""
+
+    async def test_the_query_field_does_not_claim_to_reach_attachment_text(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        description = cast("str", properties["query"]["description"]).casefold()
+        assert "attachment" in description
+        assert "not" in description
+        assert "attachment_name" in cast("str", properties["query"]["description"])
+
+    async def test_the_module_docstring_cites_what_was_checked(self) -> None:
+        docstring = searcher.__doc__ or ""
+        assert "learn.microsoft.com/en-us/graph/search-query-parameter" in docstring
+        assert "learn.microsoft.com/en-us/graph/search-concept-messages" in docstring
+        assert "Searching delegated mailboxes is not" in docstring
+
+    async def test_an_attachment_name_search_still_matches_on_the_name_property_only(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        """The behaviour this investigation leaves unchanged, proven the same way the rest of
+        this file proves what reaches Graph: on the wire, not by reading the source."""
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(client, SearchCriteria(attachment_name="budget.pdf"), limit=25)
+
+        assert searched.calls.last.request.url.params["$search"] == '"attachment:budget.pdf"'

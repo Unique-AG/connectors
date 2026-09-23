@@ -13,6 +13,7 @@ risks a gateway timeout. `body` alone on twenty-five messages is tens of thousan
 nobody asked for.
 """
 
+import base64
 import re
 from typing import Literal, Self
 
@@ -47,6 +48,31 @@ PREVIEW_CHARACTERS = 255
 # silently reads the whole string as a name.
 ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
+# Shared by outlook_draft_mail and outlook_draft_reply, the only two tools that attach a file.
+# `outlook_send_draft` needs neither: it cannot touch an attachment at all, by the same absent-
+# argument control it applies to everything else about the message.
+MAX_ATTACHMENTS = 10
+
+# Microsoft's own ceiling for a `fileAttachment` added the way this connector adds one — inside a
+# message create, or through one `POST .../attachments` call — rather than through an upload
+# session: "This operation limits the size of the attachment you can add to under 3 MB"
+# (https://learn.microsoft.com/en-us/graph/outlook-large-attachments). Measured against the
+# DECODED bytes, which is what that ceiling counts; a caller's base64 text runs a third longer.
+MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024
+
+# Reused verbatim by both attaching tools, for the reason `MAILBOX_FIELD` in `shared/seam.py` is:
+# one text every caller agrees with, not one chance per tool to drift from the other.
+ATTACHMENTS_FIELD: str = (
+    f"Files to attach, at most {MAX_ATTACHMENTS}. Each entry is Graph's own small-attachment "
+    + "shape: `name` (the file name shown to the recipient), `content_type` (a MIME type, for "
+    + "example `application/pdf`), and `content_bytes` (the file's own bytes, base64-encoded — "
+    + "`contentBytes` on the wire). Every entry's DECODED size must be under "
+    + f"{MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB, Microsoft's own ceiling for this path "
+    + "(https://learn.microsoft.com/en-us/graph/outlook-large-attachments). A file over that needs "
+    + "an upload session, which this connector does not offer: tell the user to attach it from "
+    + "Outlook directly instead. Omit this, or pass an empty list, for a draft with no attachment."
+)
+
 
 # The well-known folder names Graph accepts in a URL path are the seven of seventeen that a
 # person says out loud. They are locale-independent, so `inbox` reaches the Inbox of a mailbox in
@@ -71,6 +97,48 @@ type WellKnownFolder = Literal[
     "junkemail",
     "clutter",
 ]
+
+
+class MailAttachmentInput(BaseModel):
+    """One small file a caller wants attached, exactly as the schema takes it: Graph's own
+    `fileAttachment` shape, minus the parts Graph fills in itself (`id`, `size`, `isInline`)."""
+
+    name: str = Field(min_length=1, description="The file name, shown to the recipient verbatim.")
+    content_type: str = Field(
+        min_length=1, description="The file's MIME type, for example `application/pdf`."
+    )
+    content_bytes: str = Field(
+        min_length=1,
+        description="The file's own bytes, base64-encoded — Graph's own `contentBytes` shape.",
+    )
+
+
+class MailAttachmentSummary(BaseModel):
+    """One attachment as a tool left it. Name, MIME type and decoded size are inert data Graph
+    stores verbatim rather than something it decides, unlike a recipient Graph can resolve or drop
+    — so there is no discrepancy here for a read-back to catch, and a caller can trust this."""
+
+    name: str = Field(description="The file name, exactly as given.")
+    content_type: str = Field(description="The MIME type, exactly as given.")
+    size: int = Field(description="The attachment's decoded size, in bytes.")
+
+
+def decode_attachment(content_bytes: str) -> bytes | None:
+    """`content_bytes` as the raw bytes Graph's `fileAttachment.contentBytes` wants, or `None`
+    when it is not valid base64.
+
+    `validate=True` refuses a string with non-alphabet characters rather than silently discarding
+    them, which is what plain `base64.b64decode` does: a caller's corrupted or truncated base64
+    would otherwise decode into fewer, wrong bytes instead of failing here, at the one point that
+    can still refuse before anything reaches Graph.
+    """
+    try:
+        return base64.b64decode(content_bytes, validate=True)
+    except ValueError:
+        # `binascii.Error` is a `ValueError` subclass, which is what `validate=True` raises for
+        # non-alphabet characters; a bare string with no valid characters at all raises the plain
+        # base `ValueError` instead, so both are caught here rather than the narrower type alone.
+        return None
 
 
 class MailAddress(BaseModel):
