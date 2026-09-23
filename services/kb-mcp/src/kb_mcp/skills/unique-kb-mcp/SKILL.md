@@ -53,11 +53,13 @@ Two traps:
 - A folder shows no id until the walk reaches a file beneath it. Re-run with
   a larger `max_depth`, and if you already hold a shallower ancestor's id,
   root the re-run there with `folder_path` instead of walking from the top
-  again. Don't guess a large `max_depth` defensively — a truncated tree says
-  so, so start shallow (2 is a reasonable first try) and grow only if the
-  folder you need is still missing. `folders_only=true` keeps a deep walk
-  cheap either way, since it only hides files from the rendered lines, not
-  from the walk that discovers ids.
+  again. Don't guess a large `max_depth` defensively — a cut-off branch
+  renders as `… (N dirs below)`, so start shallow (2 is a reasonable first
+  try) and grow only if the folder you need is still missing. `folders_only=true`
+  keeps a deep walk cheap either way, since it only hides files from the
+  rendered lines, not from the walk that discovers ids. This is separate
+  from `truncated`, which means the *file* cap was hit, not the depth one —
+  its fix is `limit` or `folder_path`, not `max_depth`.
 - Never assemble a `scope_` value yourself, and never reuse one lifted from
   a citation or document link in an earlier result. Those point at whatever
   leaf folder a file happens to sit in, which is rarely the folder that was
