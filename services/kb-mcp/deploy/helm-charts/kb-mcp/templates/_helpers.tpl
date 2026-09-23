@@ -3,9 +3,9 @@ Chart-specific helpers. Generic identity/label helpers are provided by the base 
 */}}
 
 {{/*
-mcpConfig environment variables — non-secret fields with tenant-specific values.
-Secrets, the Zitadel client ID, and ZITADEL_JWT_SIGNING_KEY (never sent to
-Zitadel) stay in envVars/secret refs.
+mcpConfig environment variables: non-secret fields with tenant-specific values.
+Secrets and ZITADEL_JWT_SIGNING_KEY (never sent to Zitadel) stay in
+envVars or secret refs.
 */}}
 {{- define "chart.config.mcpEnv" -}}
 {{- if .Values.mcpConfig.app.publicBaseUrl }}
@@ -19,6 +19,10 @@ Zitadel) stay in envVars/secret refs.
 {{- if .Values.mcpConfig.zitadel.baseUrl }}
 - name: ZITADEL_BASE_URL
   value: {{ tpl .Values.mcpConfig.zitadel.baseUrl . | quote }}
+{{- end }}
+{{- if .Values.mcpConfig.zitadel.clientId }}
+- name: ZITADEL_CLIENT_ID
+  value: {{ tpl .Values.mcpConfig.zitadel.clientId . | quote }}
 {{- end }}
 {{- if .Values.mcpConfig.enabledTools }}
 - name: KB_MCP_ENABLED_TOOLS

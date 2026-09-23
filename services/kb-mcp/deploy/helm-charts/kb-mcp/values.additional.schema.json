@@ -30,11 +30,15 @@
         },
         "zitadel": {
           "type": "object",
-          "description": "Zitadel OIDC issuer (non-secret). Set the public client ID and ZITADEL_JWT_SIGNING_KEY via envVars/secretKeyRef or overlay external-secrets; PKCE means no client secret is required, but the JWT signing key replaces it for FastMCP's own downstream tokens.",
+          "description": "Zitadel OIDC issuer (non-secret). Set the public PKCE client ID on clientId. Deliver ZITADEL_JWT_SIGNING_KEY via envVars/secretKeyRef or overlay external-secrets; PKCE means no client secret is required, but the JWT signing key replaces it for FastMCP's own downstream tokens.",
           "properties": {
             "baseUrl": {
               "type": "string",
               "description": "Zitadel issuer base URL, e.g. https://id.<tenant>.unique.app."
+            },
+            "clientId": {
+              "type": "string",
+              "description": "Public PKCE client ID for this MCP's Zitadel application."
             }
           },
           "additionalProperties": false
