@@ -49,11 +49,6 @@ registering a public (PKCE) application in Zitadel with redirect URI
 The two secrets go through `envVars[].valueFrom.secretKeyRef`, or, at Unique, through
 `ExternalSecret`s via `extraEnvSecrets`.
 
-!!! warning "Don't also set ZITADEL_CLIENT_ID via envVars"
-    The chart already emits `ZITADEL_CLIENT_ID` from `mcpConfig.zitadel.clientId` when that field
-    is set. Adding it again under `envVars` declares the same variable twice in the container spec,
-    which Kubernetes rejects the pod for.
-
 ## Minimal Values
 
 ```yaml
@@ -63,7 +58,7 @@ mcpConfig:
     publicBaseUrl: https://kb-mcp.<tenant>.unique.app   # must match routes.hostname
   zitadel:
     baseUrl: https://id.<tenant>.example.com
-    clientId: <public PKCE client id>   # not secret, see Required Secrets above
+    clientId: <public PKCE client id>   # PKCE, not secret
 
 envVars:
   - name: UNIQUE_API_BASE_URL
