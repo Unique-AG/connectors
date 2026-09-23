@@ -167,6 +167,12 @@
           ]
         },
         {
+          "name": "outlook_list_categories",
+          "permissions": [
+            "MailboxSettings.Read"
+          ]
+        },
+        {
           "name": "outlook_list_calendars",
           "permissions": [
             "Calendars.Read",
@@ -367,6 +373,7 @@
         "outlook_send_draft",
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",
+        "outlook_list_categories",
         "outlook_list_calendars",
         "outlook_list_events",
         "outlook_read_event",
@@ -471,7 +478,8 @@
           "outlook_send_draft"
         ],
         "outlook-mailbox": [
-          "outlook_get_mailbox_settings"
+          "outlook_get_mailbox_settings",
+          "outlook_list_categories"
         ],
         "outlook-automate": [
           "outlook_get_mailbox_settings",
@@ -585,8 +593,7 @@
         "Files.Read.All",
         "Notes.Read",
         "Notes.Create",
-        "Notes.ReadWrite",
-        "Calendars.ReadBasic"
+        "Notes.ReadWrite"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -598,10 +605,13 @@
         "OnlineMeetingTranscript.Read.All": true,
         "OnlineMeetingRecording.Read.All": true,
         "Mail.Read": false,
+        "Mail.Read.Shared": false,
         "People.Read": false,
         "MailboxSettings.Read": false,
         "Mail.ReadWrite": false,
+        "Mail.ReadWrite.Shared": false,
         "Mail.Send": false,
+        "Mail.Send.Shared": false,
         "Mail.ReadBasic": false,
         "MailboxSettings.ReadWrite": false,
         "Calendars.Read": false,

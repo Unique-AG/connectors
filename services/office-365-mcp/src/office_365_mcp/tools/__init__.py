@@ -49,6 +49,7 @@ from office_365_mcp.tools import (
     outlook_find_recipient,
     outlook_get_mailbox_settings,
     outlook_list_calendars,
+    outlook_list_categories,
     outlook_list_events,
     outlook_list_mail,
     outlook_mark_mail,
@@ -169,6 +170,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_send_draft,
     outlook_set_automatic_reply,
     outlook_disable_mail_rule,
+    outlook_list_categories,
     outlook_list_calendars,
     outlook_list_events,
     outlook_read_event,
@@ -282,7 +284,10 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_draft_reply",
         "outlook_send_draft",
     ),
-    "outlook-mailbox": ("outlook_get_mailbox_settings",),
+    # `outlook_list_categories` asks for `MailboxSettings.Read` alone, the identical permission
+    # `outlook_get_mailbox_settings` already asks for — a category list is mailbox configuration,
+    # not mail content, so it belongs on this row rather than widening `outlook-read`'s ask.
+    "outlook-mailbox": ("outlook_get_mailbox_settings", "outlook_list_categories"),
     "outlook-automate": (
         "outlook_get_mailbox_settings",
         "outlook_set_automatic_reply",

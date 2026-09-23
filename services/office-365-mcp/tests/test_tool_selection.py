@@ -673,7 +673,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         0,
         7,
     ),
-    (ToolsPreset.OUTLOOK_MAILBOX, ("User.Read", "MailboxSettings.Read"), 0, 2),
+    (ToolsPreset.OUTLOOK_MAILBOX, ("User.Read", "MailboxSettings.Read"), 0, 3),
     (
         ToolsPreset.OUTLOOK_WRITE,
         (
