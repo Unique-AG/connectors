@@ -39,7 +39,7 @@ not the file itself.
 ```
 
 No `content_metadata` step, and no `metadata_filter`, either. The folder
-scope alone narrows this enough — most fund-reporting folders don't hold
+scope alone narrows this enough. Most fund-reporting folders don't hold
 thousands of files, so an unfiltered search inside the right folder is
 already precise. Reach for a filter only when the folder is large enough
 that an unfiltered search comes back noisy, and prefer a stable key like
