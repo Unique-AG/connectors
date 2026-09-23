@@ -10,7 +10,6 @@
   defense against a duplicate, and Microsoft documents no comparison rule for it.
 """
 
-import html
 import re
 import uuid
 from collections.abc import Sequence
@@ -46,6 +45,8 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle
 from office_365_mcp.shared.mail import MailAddress
+from office_365_mcp.shared.prose import body_opening as body_opening
+from office_365_mcp.shared.prose import cut_for_a_question as cut_for_a_question
 from office_365_mcp.shared.window import closes_at, opens_at
 
 STEP_CALENDAR = "calendar"
@@ -112,15 +113,6 @@ WALL_CLOCK = re.compile(r"\A\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]
 ZONE_NAME = r"^[A-Za-z0-9][A-Za-z0-9 _./+-]*$"
 
 MAX_ZONE_CHARACTERS = 64
-
-# A "<" followed by a space, a digit or a symbol stays text: `<[^>]+>` would silently delete the
-# rest of `Budget < 5000 EUR`.
-_A_TAG = re.compile(r"<(?:!--.*?--|/?[A-Za-z][^<>]*)>", re.DOTALL)
-
-# Script and style go with their contents: CSS filling the cut hides the words a recipient reads.
-_A_HIDDEN_ELEMENT = re.compile(r"<(script|style)\b[^<>]*>.*?</\1\s*>", re.DOTALL | re.IGNORECASE)
-
-_PREVIEW_CHARACTERS = 120
 
 # Aliases of the classes rather than `type` statements, because each one is also constructed.
 _DefaultCalendarQuery = CalendarRequestBuilder.CalendarRequestBuilderGetQueryParameters
@@ -674,22 +666,9 @@ def _whole_days(draft: EventDraft) -> str:
 
 
 def _body_described(body_html: str) -> str:
-    preview = _previewed(body_html)
+    preview = body_opening(body_html)
     counted = f"with a body of {len(body_html)} characters"
     return f"{counted} that starts {preview!r}" if preview else counted
-
-
-def _previewed(body_html: str) -> str:
-    """`html.unescape` runs after the strip, so `&lt;p&gt;` reads as the text somebody escaped
-    rather than as a tag."""
-    read = _A_HIDDEN_ELEMENT.sub(" ", body_html)
-    return cut_for_a_question(" ".join(html.unescape(_A_TAG.sub(" ", read)).split()))
-
-
-def cut_for_a_question(text: str) -> str:
-    if len(text) <= _PREVIEW_CHARACTERS:
-        return text
-    return f"{text[:_PREVIEW_CHARACTERS]}…"
 
 
 def event_body(draft: EventDraft, *, transaction_id: str) -> Event:

@@ -99,6 +99,9 @@ class ToolsPreset(StrEnum):
     OUTLOOK_CALENDAR_DELEGATE = "outlook-calendar-delegate"
     SHAREPOINT_SEARCH = "sharepoint-search"
     SHAREPOINT_READ = "sharepoint-read"
+    ONENOTE_READ = "onenote-read"
+    ONENOTE_WRITE = "onenote-write"
+    ONENOTE_DELETE = "onenote-delete"
 
 
 class AppConfig(BaseSettings):

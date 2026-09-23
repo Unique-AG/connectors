@@ -5,7 +5,8 @@ proxy and the On-Behalf-Of exchange, and this module only sends the result as a 
 """
 
 from collections.abc import Mapping
-from typing import override
+from dataclasses import dataclass
+from typing import Protocol, cast, override
 from urllib.parse import urlparse
 
 import httpx
@@ -14,12 +15,18 @@ from kiota_abstractions.authentication import (
     AllowedHostsValidator,
     BaseBearerTokenAuthenticationProvider,
 )
+from kiota_abstractions.method import Method
+from kiota_abstractions.native_response_handler import NativeResponseHandler
+from kiota_abstractions.request_information import RequestInformation
 from kiota_abstractions.request_option import RequestOption
+from kiota_http.httpx_request_adapter import HttpxRequestAdapter
 from kiota_http.kiota_client_factory import KiotaClientFactory
 from kiota_http.middleware.middleware import BaseMiddleware
+from kiota_http.middleware.options.response_handler_option import ResponseHandlerOption
 from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
 from kiota_http.middleware.url_replace_handler import UrlReplaceHandler
 from kiota_http.observability_options import ObservabilityOptions
+from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.graph_request_adapter import GraphRequestAdapter
 from msgraph.graph_request_adapter import options as sdk_middleware_options
 from msgraph.graph_service_client import GraphServiceClient
@@ -223,6 +230,100 @@ def no_retry() -> list[RequestOption]:
     package does not hand out one that two requests share.
     """
     return [RetryHandlerOption(max_retries=0, should_retry=False)]
+
+
+def native_response() -> list[RequestOption]:
+    return [ResponseHandlerOption(NativeResponseHandler())]
+
+
+class TypedQueryParameters(Protocol):
+    def get_query_parameter(self, original_name: str) -> str: ...
+
+
+def request_with_query(
+    method: Method,
+    url_template: str,
+    path_parameters: Mapping[str, object],
+    *,
+    query: Mapping[str, str],
+    typed: TypedQueryParameters | None = None,
+) -> RequestInformation:
+    request = RequestInformation(
+        method, _template_naming(url_template, query), dict(path_parameters)
+    )
+    for name, value in query.items():
+        request.query_parameters[name] = value
+    if typed is not None:
+        request.set_query_string_parameters_from_raw_object(typed)
+    return request
+
+
+def _template_naming(url_template: str, query: Mapping[str, str]) -> str:
+    assert all(not name.startswith(("$", "%24")) for name in query), (
+        f"a raw query name must not spell a typed OData parameter: {sorted(query)}"
+    )
+    head, marker, tail = url_template.rpartition("{?")
+    if marker:
+        assert tail.endswith("}"), f"a template opened with {{? must close with }}: {url_template}"
+        existing = tail[:-1].split(",") if tail[:-1] else []
+        added = [name for name in query if name not in existing]
+        if not added:
+            return url_template
+        return f"{head}{marker}{','.join([*existing, *added])}}}"
+    added = list(dict.fromkeys(query))
+    if not added:
+        return url_template
+    return f"{url_template}{{?{','.join(added)}}}"
+
+
+@dataclass(frozen=True, slots=True)
+class FetchedResponse:
+    status_code: int
+    headers: Mapping[str, str]
+    content: bytes
+
+    @property
+    def media_type(self) -> str | None:
+        content_type = self.headers.get("content-type")
+        return None if content_type is None else content_type.split(";", 1)[0].strip().lower()
+
+
+async def fetch_response(
+    client: GraphServiceClient, request: RequestInformation
+) -> FetchedResponse:
+    adapter = cast("HttpxRequestAdapter", client.request_adapter)
+    assert isinstance(adapter, HttpxRequestAdapter), (
+        "fetch_response needs the concrete HttpxRequestAdapter for its response-handler and "
+        + "tracing hooks, which the abstract RequestAdapter does not carry"
+    )
+    option = request.request_options.get(ResponseHandlerOption.get_key())
+    assert isinstance(option, ResponseHandlerOption) and isinstance(
+        option.response_handler, NativeResponseHandler
+    ), (
+        "fetch_response reads status, headers and bytes off the raw response, so the caller "
+        + "must add native_response() to its own request before calling this"
+    )
+    response = cast(
+        "object",
+        await adapter.send_primitive_async(  # pyright: ignore[reportUnknownMemberType]
+            request, "bytes", {"XXX": ODataError}
+        ),
+    )
+    assert isinstance(response, httpx.Response), (
+        "the native response handler must hand back the raw httpx.Response, not a decoded body"
+    )
+    span = adapter.start_tracing_span(request, "fetch_response")
+    try:
+        await adapter.throw_failed_responses(  # pyright: ignore[reportUnknownMemberType]
+            response, {"XXX": ODataError}, span, span
+        )
+    finally:
+        span.end()
+    return FetchedResponse(
+        status_code=response.status_code,
+        headers=dict(response.headers.items()),
+        content=response.content,
+    )
 
 
 def create_graph_transport(settings: GraphSettings) -> httpx.AsyncClient:

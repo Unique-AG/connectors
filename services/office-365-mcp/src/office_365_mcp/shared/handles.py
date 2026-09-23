@@ -1,10 +1,12 @@
 """The handle grammar: every shape this connector mints, the parser, and the speller.
 
-Three schemes, one per product. `teams:///` addresses Microsoft Teams, `outlook:///` addresses a
-mailbox, and `sharepoint:///` addresses a file or a folder in OneDrive or SharePoint. If a mail
-shape used the Teams scheme, it has to answer `MessageHandle.permission` below, and that answer
-reaches `teams_read_message`'s declared permissions and, from there, the consent screen of every
-`teams` deployment. The scheme is the cheapest place to keep the products apart.
+Four schemes, one per product. `teams:///` addresses Microsoft Teams, `outlook:///` addresses a
+mailbox, `sharepoint:///` addresses a file or a folder in OneDrive or SharePoint, and `onenote:///`
+addresses a OneNote notebook, section group, section, page or long-running operation. If a mail
+shape used the Teams scheme, it has to answer
+`MessageHandle.permission` below, and that answer reaches `teams_read_message`'s declared
+permissions and, from there, the consent screen of every `teams` deployment. The scheme is the
+cheapest place to keep the products apart.
 
 This is the only module that spells or parses these URIs. tests/test_layering.py enforces that.
 A second speller does not look like a disagreement. It looks like a handle that one tool produced
@@ -200,6 +202,51 @@ class DriveFolderHandle:
         return f"sharepoint:///folders/{_segment(self.drive_id)}/{_segment(self.item_id)}"
 
 
+@dataclass(frozen=True, slots=True)
+class OnenoteSectionHandle:
+    section_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"onenote:///sections/{_segment(self.section_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class OnenotePageHandle:
+    page_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"onenote:///pages/{_segment(self.page_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class OnenoteNotebookHandle:
+    notebook_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"onenote:///notebooks/{_segment(self.notebook_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class OnenoteSectionGroupHandle:
+    section_group_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"onenote:///sectiongroups/{_segment(self.section_group_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class OnenoteOperationHandle:
+    operation_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"onenote:///operations/{_segment(self.operation_id)}"
+
+
 # Ids are matched as "anything but a separator", because the spellers above percent-encode each one.
 _CHAT_HANDLE = re.compile(r"\Ateams:///chats/([^/]+)/messages/([^/]+)\Z")
 _CHANNEL_HANDLE = re.compile(r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)\Z")
@@ -216,6 +263,11 @@ _CALENDAR_HANDLE = re.compile(r"\Aoutlook:///calendars/([^/]+)\Z")
 _EVENT_HANDLE = re.compile(r"\Aoutlook:///events/([^/]+)/([^/]+)\Z")
 _DRIVE_FILE_HANDLE = re.compile(r"\Asharepoint:///files/([^/]+)/([^/]+)\Z")
 _DRIVE_FOLDER_HANDLE = re.compile(r"\Asharepoint:///folders/([^/]+)/([^/]+)\Z")
+_ONENOTE_SECTION_HANDLE = re.compile(r"\Aonenote:///sections/([^/]+)\Z")
+_ONENOTE_PAGE_HANDLE = re.compile(r"\Aonenote:///pages/([^/]+)\Z")
+_ONENOTE_NOTEBOOK_HANDLE = re.compile(r"\Aonenote:///notebooks/([^/]+)\Z")
+_ONENOTE_SECTION_GROUP_HANDLE = re.compile(r"\Aonenote:///sectiongroups/([^/]+)\Z")
+_ONENOTE_OPERATION_HANDLE = re.compile(r"\Aonenote:///operations/([^/]+)\Z")
 
 
 def message_handle(uri: str) -> MessageHandle | None:
@@ -307,6 +359,38 @@ def drive_file_handle(uri: str) -> DriveFileHandle | None:
 def drive_folder_handle(uri: str) -> DriveFolderHandle | None:
     ids = _two_ids(_DRIVE_FOLDER_HANDLE, uri)
     return None if ids is None else DriveFolderHandle(*ids)
+
+
+def onenote_section_handle(uri: str) -> OnenoteSectionHandle | None:
+    section_id = _single_id(_ONENOTE_SECTION_HANDLE, uri)
+    return None if section_id is None else OnenoteSectionHandle(section_id)
+
+
+def onenote_page_handle(uri: str) -> OnenotePageHandle | None:
+    page_id = _single_id(_ONENOTE_PAGE_HANDLE, uri)
+    return None if page_id is None else OnenotePageHandle(page_id)
+
+
+def onenote_notebook_handle(uri: str) -> OnenoteNotebookHandle | None:
+    notebook_id = _single_id(_ONENOTE_NOTEBOOK_HANDLE, uri)
+    return None if notebook_id is None else OnenoteNotebookHandle(notebook_id)
+
+
+def onenote_section_group_handle(uri: str) -> OnenoteSectionGroupHandle | None:
+    section_group_id = _single_id(_ONENOTE_SECTION_GROUP_HANDLE, uri)
+    return None if section_group_id is None else OnenoteSectionGroupHandle(section_group_id)
+
+
+def onenote_operation_handle(uri: str) -> OnenoteOperationHandle | None:
+    operation_id = _single_id(_ONENOTE_OPERATION_HANDLE, uri)
+    return None if operation_id is None else OnenoteOperationHandle(operation_id)
+
+
+def onenote_container_handle(uri: str) -> OnenoteNotebookHandle | OnenoteSectionGroupHandle | None:
+    notebook = onenote_notebook_handle(uri)
+    if notebook is not None:
+        return notebook
+    return onenote_section_group_handle(uri)
 
 
 def meeting_uri_for(join_web_url: str | None) -> str | None:

@@ -4,9 +4,14 @@ This package knows nothing about Teams, mail, calendars, or the service config.
 """
 
 from office_365_mcp.graph_client.client import (
+    FetchedResponse,
+    TypedQueryParameters,
     create_graph_transport,
+    fetch_response,
     graph_client_for,
+    native_response,
     no_retry,
+    request_with_query,
 )
 from office_365_mcp.graph_client.download import Downloaded, download_to_file
 from office_365_mcp.graph_client.errors import (
@@ -47,6 +52,7 @@ __all__ = [
     "GRAPH_THROTTLED_TOTAL",
     "CollectedItems",
     "Downloaded",
+    "FetchedResponse",
     "GraphCollection",
     "GraphFailure",
     "GraphForbidden",
@@ -56,12 +62,16 @@ __all__ = [
     "GraphSettings",
     "GraphThrottled",
     "GraphUnavailable",
+    "TypedQueryParameters",
     "collect_pages",
     "create_graph_transport",
     "download_to_file",
+    "fetch_response",
     "graph_client_for",
     "graph_errors",
     "graph_step",
+    "native_response",
     "no_retry",
     "not_graph",
+    "request_with_query",
 ]

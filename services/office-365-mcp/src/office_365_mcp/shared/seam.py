@@ -28,6 +28,7 @@ from fastmcp.server.elicitation import (
 )
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
+from fastmcp.utilities.types import File
 from mcp.types import (
     CallToolRequestParams,
     ElicitRequest,
@@ -82,6 +83,12 @@ WRITE_DESTRUCTIVE: dict[str, bool] = {
     "idempotentHint": False,
     "openWorldHint": True,
 }
+WRITE_DESTRUCTIVE_IDEMPOTENT: dict[str, bool] = {
+    "readOnlyHint": False,
+    "destructiveHint": True,
+    "idempotentHint": True,
+    "openWorldHint": True,
+}
 
 # This is what a tool file's own permissions are checked against. Without it, a misspelling like
 # `Chat.Raed` is only ever compared with itself: Entra rejects an unknown scope at the authorize
@@ -108,6 +115,9 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
         "Files.Read.All",
+        "Notes.Read",
+        "Notes.Create",
+        "Notes.ReadWrite",
     }
 )
 
@@ -224,7 +234,7 @@ def _nobody_to_ask(nothing_happened: str) -> str:
         + "client on the other end does not support elicitation, so there was nobody to "
         + "ask. This is a property of the client and not of the request: retrying will "
         + "fail the same way. Tell the user that their client cannot confirm this, and "
-        + f"that they can do it in Outlook instead. {_ASK_AGAIN}"
+        + f"that they can do it in the Microsoft 365 app itself instead. {_ASK_AGAIN}"
     )
 
 
@@ -298,6 +308,16 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
         return asked(question, about) if _modern_protocol(ctx) else await elicited(question)
 
     return confirm
+
+
+def answer_pending(ctx: Context) -> bool:
+    """True when this call carries an answer to a confirmation asked on an earlier call.
+
+    A fresh audience read is taken on every call, and it can disagree with the one the question
+    was asked from. Callers must consult `confirm` whenever an answer is pending, rather than
+    trusting this call's own read to decide whether one is owed.
+    """
+    return (ctx.input_responses or {}).get(_CONFIRMATION) is not None
 
 
 class Advised(ToolError):
@@ -443,6 +463,7 @@ def _token_advice(failure: BaseException, permissions: tuple[str, ...]) -> str:
 
 
 _TOO_MANY_REQUESTS = 429
+_CONFLICT = 409
 
 # Graph's inner error code for the tenant switch, branched on rather than the message text, as
 # Microsoft's transcript reference instructs twice. `services/teams-mcp` met this switch first
@@ -541,6 +562,13 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
             + "if the list matters; if it happens again, stop and report it, because the list "
             + "cannot be read while Microsoft answers this way."
         )
+    if failure.status == _CONFLICT:
+        return (
+            "Microsoft 365 refused this request because it conflicts with something that already "
+            + "exists there, most often a name already taken at that level. The same arguments "
+            + "fail the same way: change the name, or find the existing item with a listing tool "
+            + "first."
+        )
     return (
         "Microsoft 365 rejected this request. This is a bad request rather than an outage or a "
         + "permission problem, so retrying it unchanged will fail identically."
@@ -566,3 +594,13 @@ def _diagnostics(failure: GraphFailure) -> str:
         if value is not None
     ]
     return f" ({', '.join(parts)})" if parts else ""
+
+
+class FileFromGraph(File):
+    def __init__(self, content: bytes, *, name: str | None, mime_type: str) -> None:
+        self.mime_type: str = mime_type
+        super().__init__(data=content, name=name)
+
+    @override
+    def _get_mime_type(self) -> str:
+        return self.mime_type

@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Annotated, Literal, override
+from typing import Annotated, Literal
 
 import httpx
 from fastmcp import FastMCP
@@ -19,7 +19,7 @@ from pydantic import Field
 from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.files import ITEM_FIELDS
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.seam import READ_ONLY, FileFromGraph, graph_client_for_caller
 
 TOOL_NAME = "sharepoint_read_file"
 
@@ -104,16 +104,6 @@ _PDF_MEDIA_TYPE = "application/pdf"
 type ConvertTo = Literal["pdf"]
 
 
-class _FileFromGraph(File):
-    def __init__(self, content: bytes, *, name: str | None, mime_type: str) -> None:
-        self.mime_type: str = mime_type
-        super().__init__(data=content, name=name)
-
-    @override
-    def _get_mime_type(self) -> str:
-        return self.mime_type
-
-
 async def sharepoint_read_file(
     client: GraphServiceClient, *, file: str, convert_to: ConvertTo | None = None
 ) -> File:
@@ -153,8 +143,8 @@ async def _fetched(
         if len(body) > MAX_BYTES:
             return _too_large(size=len(body), web_url=item.web_url)
         if convert_to is None:
-            return _FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
-        return _FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE)
+            return FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
+        return FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE)
 
 
 async def _item(client: GraphServiceClient, handle: DriveFileHandle) -> DriveItem | None:

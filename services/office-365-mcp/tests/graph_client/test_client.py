@@ -2,7 +2,10 @@ import httpx
 import pytest
 import respx
 from kiota_abstractions.base_request_configuration import RequestConfiguration
+from kiota_abstractions.method import Method
+from kiota_abstractions.request_information import RequestInformation
 from kiota_abstractions.request_option import RequestOption
+from msgraph.generated.users.item.onenote.pages.pages_request_builder import PagesRequestBuilder
 from msgraph.generated.users.item.send_mail.send_mail_post_request_body import (
     SendMailPostRequestBody,
 )
@@ -10,13 +13,34 @@ from msgraph.graph_request_adapter import options as sdk_middleware_options
 from msgraph.graph_service_client import GraphServiceClient
 from msgraph_core import GraphClientFactory
 
-from office_365_mcp.graph_client import GraphSettings, create_graph_transport, no_retry
+from office_365_mcp.graph_client import (
+    GraphNotFound,
+    GraphSettings,
+    GraphThrottled,
+    create_graph_transport,
+    fetch_response,
+    graph_errors,
+    native_response,
+    no_retry,
+    request_with_query,
+)
 from office_365_mcp.graph_client.client import (
     _CallerTokenProvider,  # pyright: ignore[reportPrivateUsage]
 )
 from tests.conftest import RecordedSleeps
 
 from .conftest import CALLER_TOKEN, GRAPH_V1
+
+
+def _resource_content_request(
+    client: GraphServiceClient, resource_id: str, *, native: bool = True
+) -> RequestInformation:
+    builder = client.me.onenote.resources.by_onenote_resource_id(resource_id).content
+    request = RequestInformation(Method.GET, builder.url_template, builder.path_parameters)
+    request.headers.try_add("Accept", "application/octet-stream, application/json")
+    if native:
+        request.add_request_options(native_response())
+    return request
 
 
 def _handler_chain(transport: httpx.AsyncClient) -> list[str]:
@@ -163,3 +187,218 @@ class TestANonIdempotentCallIsNotRetried:
             )
 
         assert route.call_count == 1
+
+
+class TestRequestWithQuery:
+    """`request_with_query` is the only way a raw, untyped OData parameter (`pagelevel`,
+    `includeIDs`, `sectionName`, …) reaches the wire: the SDK's typed query-parameter classes
+    have no field for any of them, and setting one straight on `query_parameters` without first
+    naming it in the url template's `{?…}` list is silently dropped."""
+
+    def test_it_extends_an_existing_query_block_and_keeps_the_typed_params(
+        self, client: GraphServiceClient
+    ) -> None:
+        pages = client.me.onenote.pages
+
+        request = request_with_query(
+            Method.GET, pages.url_template, pages.path_parameters, query={"pagelevel": "true"}
+        )
+        request.query_parameters["%24select"] = ["title", "id"]
+        request.query_parameters["%24top"] = 5
+        request.path_parameters["baseurl"] = GRAPH_V1
+
+        url = str(request.url)
+        assert url.startswith(f"{GRAPH_V1}/users/me-token-to-replace/onenote/pages?")
+        assert "pagelevel=true" in url
+        assert "%24select=title,id" in url
+        assert "%24top=5" in url
+
+    def test_it_appends_a_new_query_block_when_the_template_has_none(
+        self, client: GraphServiceClient
+    ) -> None:
+        content = client.me.onenote.pages.by_onenote_page_id("abc").content
+
+        request = request_with_query(
+            Method.GET,
+            content.url_template,
+            content.path_parameters,
+            query={"includeIDs": "true", "preAuthenticated": "true"},
+        )
+        request.path_parameters["baseurl"] = GRAPH_V1
+
+        extended_template = request.url_template
+        assert extended_template is not None
+        assert extended_template.endswith("{?includeIDs,preAuthenticated}")
+        url = str(request.url)
+        assert "includeIDs=true" in url
+        assert "preAuthenticated=true" in url
+
+    def test_a_raw_name_already_in_the_template_is_not_duplicated(
+        self, client: GraphServiceClient
+    ) -> None:
+        pages = client.me.onenote.pages
+        once = request_with_query(
+            Method.GET, pages.url_template, pages.path_parameters, query={"pagelevel": "true"}
+        )
+        once_template = once.url_template
+        assert once_template is not None
+
+        twice = request_with_query(
+            Method.GET, once_template, pages.path_parameters, query={"pagelevel": "false"}
+        )
+
+        assert twice.url_template == once_template
+        assert once_template.count("pagelevel") == 1
+
+    def test_typed_parameters_reach_the_wire_alongside_a_raw_name(
+        self, client: GraphServiceClient
+    ) -> None:
+        pages = client.me.onenote.pages
+        typed = PagesRequestBuilder.PagesRequestBuilderGetQueryParameters(
+            select=["id", "title"],
+            expand=["parentNotebook"],
+            top=5,
+            filter="title eq 'x'",
+            orderby=["lastModifiedDateTime desc"],
+            skip=10,
+        )
+
+        request = request_with_query(
+            Method.GET,
+            pages.url_template,
+            pages.path_parameters,
+            query={"pagelevel": "true"},
+            typed=typed,
+        )
+        request.path_parameters["baseurl"] = GRAPH_V1
+
+        url = str(request.url)
+        assert url.startswith(f"{GRAPH_V1}/users/me-token-to-replace/onenote/pages?")
+        assert "pagelevel=true" in url
+        assert "%24select=id,title" in url
+        assert "%24expand=parentNotebook" in url
+        assert "%24top=5" in url
+        assert "%24filter=title%20eq%20%27x%27" in url
+        assert "%24orderby=lastModifiedDateTime%20desc" in url
+        assert "%24skip=10" in url
+
+    def test_no_typed_parameters_means_no_odata_keys_on_the_wire(
+        self, client: GraphServiceClient
+    ) -> None:
+        pages = client.me.onenote.pages
+
+        request = request_with_query(
+            Method.GET, pages.url_template, pages.path_parameters, query={"pagelevel": "true"}
+        )
+        request.path_parameters["baseurl"] = GRAPH_V1
+
+        url = str(request.url)
+        assert "pagelevel=true" in url
+        assert "%24select" not in url
+
+    def test_a_typed_odata_name_is_refused(self, client: GraphServiceClient) -> None:
+        pages = client.me.onenote.pages
+
+        with pytest.raises(AssertionError):
+            request_with_query(
+                Method.GET, pages.url_template, pages.path_parameters, query={"$select": "id"}
+            )
+
+        with pytest.raises(AssertionError):
+            request_with_query(
+                Method.GET, pages.url_template, pages.path_parameters, query={"%24select": "id"}
+            )
+
+
+class TestFetchResponse:
+    """`fetch_response` is the only route to a Graph response's raw status, headers and bytes: the
+    SDK's normal `.content.get()` deserialises straight to `bytes` and throws everything else away.
+    """
+
+    async def test_a_success_carries_the_status_bytes_and_the_content_type(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me/onenote/resources/res-1/content").mock(
+            return_value=httpx.Response(
+                200, content=b"\x89PNG\r\n", headers={"Content-Type": "image/png; charset=binary"}
+            )
+        )
+
+        fetched = await fetch_response(client, _resource_content_request(client, "res-1"))
+
+        assert fetched.status_code == 200
+        assert fetched.content == b"\x89PNG\r\n"
+        assert fetched.media_type == "image/png"
+
+    async def test_no_content_type_header_is_none(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me/onenote/resources/res-1/content").mock(
+            return_value=httpx.Response(200, content=b"body")
+        )
+
+        fetched = await fetch_response(client, _resource_content_request(client, "res-1"))
+
+        assert fetched.media_type is None
+
+    async def test_headers_come_back_lower_cased(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me/onenote/resources/res-1/content").mock(
+            return_value=httpx.Response(
+                202, content=b"", headers={"Operation-Location": "https://graph.invalid/op/1"}
+            )
+        )
+
+        fetched = await fetch_response(client, _resource_content_request(client, "res-1"))
+
+        assert fetched.headers["operation-location"] == "https://graph.invalid/op/1"
+
+    async def test_it_does_not_mutate_the_request_it_is_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me/onenote/resources/res-1/content").mock(
+            return_value=httpx.Response(200, content=b"body")
+        )
+        request = _resource_content_request(client, "res-1")
+        before = dict(request.request_options)
+
+        _ = await fetch_response(client, request)
+
+        assert dict(request.request_options) == before
+
+    async def test_a_request_missing_native_response_is_refused(
+        self, client: GraphServiceClient
+    ) -> None:
+        request = _resource_content_request(client, "res-1", native=False)
+
+        with pytest.raises(AssertionError):
+            await fetch_response(client, request)
+
+    async def test_a_404_error_body_raises_an_error_this_package_can_classify(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me/onenote/resources/res-1/content").mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound), graph_errors("test_fetch_response"):
+            await fetch_response(client, _resource_content_request(client, "res-1"))
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_429_with_retry_after_is_classified_as_throttled(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me/onenote/resources/res-1/content").mock(
+            return_value=httpx.Response(
+                429,
+                headers={"Retry-After": "12"},
+                json={"error": {"code": "TooManyRequests", "message": "throttled"}},
+            )
+        )
+
+        with pytest.raises(GraphThrottled) as excinfo, graph_errors("test_fetch_response"):
+            await fetch_response(client, _resource_content_request(client, "res-1"))
+        assert excinfo.value.retry_after_seconds == 12

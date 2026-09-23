@@ -1,0 +1,376 @@
+from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
+from html import escape
+from typing import Annotated
+
+import httpx
+from fastmcp import Context, FastMCP
+from fastmcp.exceptions import ToolError
+from kiota_abstractions.method import Method
+from mcp.types import InputRequiredResult
+from msgraph.generated.models.o_data_errors.o_data_error import ODataError
+from msgraph.generated.models.onenote_page import OnenotePage
+from msgraph.graph_service_client import GraphServiceClient
+from pydantic import BaseModel, Field
+
+from office_365_mcp.graph_client import (
+    graph_errors,
+    graph_step,
+    no_retry,
+    not_graph,
+    request_with_query,
+)
+from office_365_mcp.shared.handles import (
+    OnenotePageHandle,
+    OnenoteSectionHandle,
+    onenote_section_handle,
+)
+from office_365_mcp.shared.notes import (
+    UNKNOWN_AUDIENCE,
+    NotebookAudience,
+    client_url_of,
+    default_notebook_audience,
+    section_audience,
+    web_url_of,
+    write_state_for,
+)
+from office_365_mcp.shared.prose import body_opening
+from office_365_mcp.shared.seam import (
+    WRITE_ADDITIVE,
+    Confirm,
+    answer_pending,
+    graph_client_for_caller,
+    person_confirms,
+)
+
+TOOL_NAME = "onenote_create_page"
+
+STEP_CREATE = "create_page"
+
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Create",)
+
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
+    "title": "Synthetic note",
+    "body_html": "<p>Synthetic body.</p>",
+}
+
+MAX_TITLE_CHARACTERS = 255
+
+MAX_BODY_CHARACTERS = 500_000
+
+MAX_SECTION_NAME_CHARACTERS = 50
+
+_FORBIDDEN_SECTION_NAME_CHARACTERS = "? * / : < > | & # ' % ~"
+
+GRAPH_NOT_FOUND = (
+    "Microsoft 365 will not create this page. If this call named a `section`, the handle is well "
+    + "formed, so the section was most likely deleted, moved into a different notebook, which "
+    + "gives it a new handle, or the notebook holding it could not be read: call "
+    + "onenote_list_notebooks again and take a fresh `uri` for the section from that result, "
+    + "because this same handle fails the same way again. If it named "
+    + "none, the request went to the user's own default notebook, and Microsoft reports it has no "
+    + "such thing, which most often means OneNote has never been set up for this account. No "
+    + "other argument here fixes that: tell the user to open OneNote once, then try again later."
+)
+
+_NOT_A_SECTION_HANDLE = (
+    "onenote_create_page takes a section handle in `section`, if it is given at all. It looks "
+    + "like onenote:///sections/{id}, and it comes from the `uri` of a section in an "
+    + "onenote_list_notebooks result. Copy it exactly. A section name is not a handle, and "
+    + "neither is a notebook name, a path, a web address or a bare id. Omit `section` entirely "
+    + "to create the page in the default section of the default notebook instead."
+)
+
+_BOTH_SECTION_AND_SECTION_NAME = (
+    "onenote_create_page takes at most one of `section` and `section_name`: they are two "
+    + "different ways to pick the section this page is written into. `section` addresses any "
+    + "section in any notebook by its handle; `section_name` picks a section by name, only ever "
+    + "inside the signed-in user's default notebook, and Microsoft creates a section by that "
+    + "name there when none already matches. Pass one or the other, never both, or omit both to "
+    + "write into the default section of the default notebook."
+)
+
+_DESCRIPTION = """\
+Writes a new page into the signed-in user's OneNote. There is no way to attach a file or an \
+image. onenote_append_to_page adds to a page later. OneNote can show the change to everyone who \
+opens the notebook.
+
+Notes:
+- This tool asks the user to agree before it writes into a notebook that is shared with other \
+people or belongs to somebody else. A page in the user's own unshared notebook is written without \
+a question.
+- Pass at most one of `section` and `section_name`. Omit both, and the page lands in the default \
+section of the default notebook.
+- If a call times out, do not call this tool again first. Before you call again, make sure that \
+onenote_list_pages does not show the page. Judge by `created_at`: a new title can stay empty for \
+days.
+"""
+
+
+class CreatedPage(BaseModel):
+    uri: str = Field(
+        description=(
+            "This new page's handle: onenote:///pages/{id}, with the id percent-encoded. Pass "
+            + "it to onenote_read_page to read the page back, or to onenote_append_to_page to "
+            + "add more to it."
+        )
+    )
+    title: str | None = Field(
+        description=(
+            "What Microsoft stored, read from its response and not from the `title` argument. "
+            + "Read it to the user."
+        )
+    )
+    web_url: str | None = Field(
+        description=(
+            "The address that opens this page in OneNote on the web, for a person to follow. "
+            + "This connector cannot read a page from it."
+        )
+    )
+    client_url: str | None = Field(
+        description=(
+            "The address that opens this page in the OneNote desktop app, if the person has it "
+            + "installed."
+        )
+    )
+    created_at: datetime | None = Field(
+        description=(
+            "When the page was created, as Graph reported it. Null when Graph recorded none."
+        )
+    )
+    section_uri: str | None = Field(
+        description=(
+            "The handle of the section this page was written into: onenote:///sections/{id}. "
+            + "This is the `section` argument's own handle when one was given, though "
+            + "Microsoft's own response can name a different section instead. Null when "
+            + "`section` was omitted and `section_name` created a new section."
+        )
+    )
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+_CREATE = "create"
+_DO_NOT_CREATE = "do not create"
+_NOTHING_CREATED = "No page was created."
+
+
+async def _notebook_audience_for(
+    client: GraphServiceClient, handle: OnenoteSectionHandle | None
+) -> NotebookAudience:
+    if handle is None:
+        return await default_notebook_audience(client) or UNKNOWN_AUDIENCE
+    return await section_audience(client, handle.section_id)
+
+
+def _route(handle: OnenoteSectionHandle | None, section_name: str | None) -> tuple[str, ...]:
+    if handle is not None:
+        return ("section", handle.section_id)
+    if section_name is not None:
+        return ("named", section_name)
+    return ("default",)
+
+
+def _question(
+    title: str, body_html: str, audience: NotebookAudience, section_name: str | None
+) -> str:
+    name = audience.name or "an unnamed notebook"
+    into_section = (
+        f" It goes into the section {section_name!r}, which Microsoft creates in that notebook "
+        + "when no section has that name yet."
+        if section_name is not None
+        else ""
+    )
+    return (
+        f"Create the page {title!r} in the notebook {name!r}, {audience.reason}?{into_section} "
+        + f"It opens {body_opening(body_html)!r}."
+    )
+
+
+def a_person_agrees(ctx: Context) -> Confirm:
+    return person_confirms(
+        ctx, agree=_CREATE, decline=_DO_NOT_CREATE, nothing_happened=_NOTHING_CREATED
+    )
+
+
+async def create_page(
+    client: GraphServiceClient,
+    *,
+    title: str,
+    body_html: str,
+    section: str | None = None,
+    section_name: str | None = None,
+    now: Callable[[], datetime] = _now,
+    confirm: Confirm,
+    answer_pending: bool = False,
+) -> CreatedPage | InputRequiredResult:
+    assert 1 <= len(title) <= MAX_TITLE_CHARACTERS, (
+        f"title is bounded by the schema, got {len(title)}"
+    )
+    assert 1 <= len(body_html) <= MAX_BODY_CHARACTERS, (
+        f"body_html is bounded by the schema, got {len(body_html)}"
+    )
+    assert section_name is None or 1 <= len(section_name) <= MAX_SECTION_NAME_CHARACTERS, (
+        f"section_name is bounded by the schema, got {len(section_name or '')}"
+    )
+    if section is not None and section_name is not None:
+        raise ToolError(_BOTH_SECTION_AND_SECTION_NAME)
+    handle = _section_to_write_to(section)
+    html_bytes = _envelope(title, body_html, now()).encode("utf-8")
+
+    pages = (
+        client.me.onenote.pages
+        if handle is None
+        else client.me.onenote.sections.by_onenote_section_id(handle.section_id).pages
+    )
+    raw_query: dict[str, str] = {"sectionName": section_name} if section_name is not None else {}
+    request = request_with_query(
+        Method.POST, pages.url_template, pages.path_parameters, query=raw_query
+    )
+    request.headers.try_add("Accept", "application/json")
+    request.set_stream_content(html_bytes, "text/html")
+    request.add_request_options(no_retry())
+
+    about = write_state_for("create", *_route(handle, section_name), title, body_html)
+    created: OnenotePage | None = None
+    asked: InputRequiredResult | None = None
+    refused: str | None = None
+    with graph_errors(TOOL_NAME):
+        audience = await _notebook_audience_for(client, handle)
+        if answer_pending or audience.reaches_others:
+            with not_graph():
+                answer = await confirm(_question(title, body_html, audience, section_name), about)
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
+        if refused is None and asked is None:
+            with graph_step(STEP_CREATE):
+                created = await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
+                    request, OnenotePage, {"XXX": ODataError}
+                )
+
+    if asked is not None:
+        return asked
+    if refused is not None:
+        raise ToolError(refused)
+    assert created is not None, "Graph answered a page create with no page"
+    return _answer(created, handle)
+
+
+def _section_to_write_to(section: str | None) -> OnenoteSectionHandle | None:
+    if section is None:
+        return None
+    handle = onenote_section_handle(section)
+    if handle is None:
+        raise ToolError(_NOT_A_SECTION_HANDLE)
+    return handle
+
+
+def _envelope(title: str, body_html: str, created_at: datetime) -> str:
+    return (
+        "<!DOCTYPE html><html><head><title>"
+        + escape(title)
+        + '</title><meta name="created" content="'
+        + created_at.isoformat(timespec="seconds")
+        + '" /></head><body>'
+        + body_html
+        + "</body></html>"
+    )
+
+
+def _answer(page: OnenotePage, handle: OnenoteSectionHandle | None) -> CreatedPage:
+    assert page.id is not None, "Graph created a page it gave no id, which cannot be addressed"
+    parent = page.parent_section
+    parent_id = parent.id if parent is not None else None
+    if parent_id is not None:
+        section_uri = OnenoteSectionHandle(parent_id).uri
+    elif handle is not None:
+        section_uri = handle.uri
+    else:
+        section_uri = None
+    return CreatedPage(
+        uri=OnenotePageHandle(page.id).uri,
+        title=page.title,
+        web_url=web_url_of(page.links),
+        client_url=client_url_of(page.links),
+        created_at=page.created_date_time,
+        section_uri=section_uri,
+    )
+
+
+def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
+
+    @mcp.tool(
+        name=TOOL_NAME,
+        title="Create a Page",
+        description=_DESCRIPTION,
+        annotations=WRITE_ADDITIVE,
+    )
+    async def onenote_create_page(
+        title: Annotated[
+            str,
+            Field(
+                min_length=1,
+                max_length=MAX_TITLE_CHARACTERS,
+                description=(
+                    "The new page's title, as the user writes it. This tool places it in the "
+                    + "page's own `<head><title>`. The answer's `title` is what Microsoft "
+                    + "stored. Read it from the answer, not from this argument."
+                ),
+            ),
+        ],
+        body_html: Annotated[
+            str,
+            Field(
+                min_length=1,
+                max_length=MAX_BODY_CHARACTERS,
+                description=(
+                    f"The page content, as HTML, up to {MAX_BODY_CHARACTERS:,} characters "
+                    + "(Microsoft Graph refuses a request over 4 MB). A newline is not a line "
+                    + "break. Write `<p>`, `<br>`, `<h1>` to `<h6>`, `<ul>`, `<ol>`, `<li>`, "
+                    + "`<table>`, `<b>` and `<i>` for structure. Microsoft removes JavaScript, "
+                    + "CSS and forms. Escape `&`, `<` and `>` where they must read as "
+                    + "themselves."
+                ),
+            ),
+        ],
+        ctx: Context,
+        section: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The section to create the page in, as the `uri` of a section from an "
+                    + "onenote_list_notebooks result: onenote:///sections/{id}. A section name, "
+                    + "a notebook name and a web address are not handles."
+                ),
+            ),
+        ] = None,
+        section_name: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                max_length=MAX_SECTION_NAME_CHARACTERS,
+                description=(
+                    "A name for the section, in the signed-in user's default notebook only. If "
+                    + "no section matches, Microsoft creates one. A typo makes a new, almost "
+                    + "empty section, with `section_uri` null in the answer. Look it up with "
+                    + "onenote_list_sections, by name. Microsoft documents no naming rule, but a "
+                    + "section's own rule can apply: at most 50 characters, none of "
+                    + f"{_FORBIDDEN_SECTION_NAME_CHARACTERS}."
+                ),
+            ),
+        ] = None,
+        client: GraphServiceClient = graph,
+    ) -> CreatedPage | InputRequiredResult:
+        return await create_page(
+            client,
+            title=title,
+            body_html=body_html,
+            section=section,
+            section_name=section_name,
+            confirm=a_person_agrees(ctx),
+            answer_pending=answer_pending(ctx),
+        )

@@ -551,7 +551,7 @@ def _object(value: object) -> dict[str, object]:
 # token tool-shaped. Written out rather than derived from TOOL_NAMES on purpose: a derived
 # pattern could not tell prose naming a tool that does not exist — a typo — from prose naming
 # one this deployment merely left out, and the first is the failure worth catching.
-_TOOL_MENTION = re.compile(r"\b(?:get|teams|outlook)_[a-z]+(?:_[a-z]+)*\b")
+_TOOL_MENTION = re.compile(r"\b(?:get|teams|outlook|onenote)_[a-z]+(?:_[a-z]+)*\b")
 
 
 def _described(schema: Mapping[str, object] | None) -> list[str]:
@@ -607,12 +607,18 @@ def _optional_type(schema: object) -> dict[str, object]:
 # Every tool that bounds a search by time, and the pair of bounds it publishes. Two tests above
 # read this: one holds each bound to a date OR a moment, the other refuses a date-shaped argument
 # that is missing from here. Adding a windowed tool means adding a row.
-_WINDOWED_TOOLS: Mapping[str, tuple[str, str]] = {
+_WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_list_mail": ("received_after", "received_before"),
     "outlook_list_events": ("starts_on", "ends_on"),
     "outlook_search_mail": ("received_after", "received_before"),
     "teams_search_messages": ("sent_after", "sent_before"),
     "sharepoint_search_files": ("modified_after", "modified_before"),
+    "onenote_list_pages": (
+        "modified_after",
+        "modified_before",
+        "created_after",
+        "created_before",
+    ),
 }
 
 
@@ -673,6 +679,17 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_disable_mail_rule",
         "outlook_create_event",
         "outlook_create_event_on_behalf",
+        "onenote_create_page",
+        "onenote_append_to_page",
+        "onenote_create_notebook",
+        "onenote_create_section",
+        "onenote_create_section_group",
+        "onenote_edit_page",
+        "onenote_rename_page",
+        "onenote_delete_page",
+        "onenote_copy_page",
+        "onenote_copy_section",
+        "onenote_copy_notebook",
     }
 )
 
