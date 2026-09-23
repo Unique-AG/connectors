@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.3](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.2...office-365-mcp@0.2.3) (2026-09-23)
+
+
+### Features
+
+* **office-365-mcp:** add OneNote read, write and delete tools ([#1072](https://github.com/Unique-AG/connectors/issues/1072)) ([de6cb8a](https://github.com/Unique-AG/connectors/commit/de6cb8a92fd5a18792c65a6e4386a0394eedc7a9))
+* **office-365-mcp:** read a transcript page without holding the transcript ([#1076](https://github.com/Unique-AG/connectors/issues/1076)) ([2c4740c](https://github.com/Unique-AG/connectors/commit/2c4740c9e17c4aedcfa4c6c532e073f2062bd214))
+
+
+### Bug Fixes
+
+* **office-365-mcp:** allow egress to sharepoint.com and svc.ms ([#1073](https://github.com/Unique-AG/connectors/issues/1073)) ([b3fd819](https://github.com/Unique-AG/connectors/commit/b3fd81969f2f4ce1d68cf196f5802fe5dc4b7269))
+
+
+### Dependencies
+
+* bump fastmcp[azure] in /services/office-365-mcp ([#1070](https://github.com/Unique-AG/connectors/issues/1070)) ([9a155b2](https://github.com/Unique-AG/connectors/commit/9a155b29b061f1695c26333b5ddb231cd64f932a))
+* bump unique-toolkit[monitoring,otel] in /services/office-365-mcp ([#1069](https://github.com/Unique-AG/connectors/issues/1069)) ([9ee5127](https://github.com/Unique-AG/connectors/commit/9ee512721a837fa049495c2c538ad8848be3fd26))
+* bump uvicorn[standard] in /services/* ([#1067](https://github.com/Unique-AG/connectors/issues/1067)) ([3b93279](https://github.com/Unique-AG/connectors/commit/3b93279c15e729feb9c62ce807134fd762f86432))
+
 ## [0.2.2](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.1...office-365-mcp@0.2.2) (2026-09-18)
 
 
