@@ -168,18 +168,13 @@ _META = merge_tool_meta(
             "Discover what metadata fields and values exist on the "
             "knowledge base's visible content, so a caller can build a "
             "metadata filter for search — not for searching content "
-            "itself. Returns JSON: a list of single-key objects, e.g. "
-            '[{"department": ["Legal", "Finance"]}], one per known field, '
-            "listing every distinct value found. On a large knowledge base, "
-            "call it first with counts_only=true to get each field name with "
-            'its number of distinct values (e.g. [{"department": 12}]), then '
-            "again with fields set to the ones you need so you only receive "
-            "their values. Optionally "
-            "scope it to "
-            "one or more folders with folder_ids (same as search's), or to "
-            "one or more folders by exact path with folder_paths if you "
-            "don't have scope_xxx ids in hand. If the result says the scan "
-            "is incomplete, call this tool again; do not tell the user "
+            "itself. On a large knowledge base, call counts_only=true "
+            "first to see field sizes, then fields to fetch only the "
+            "ones you need. Optionally scope it to one or more folders "
+            "with folder_ids (same as search's), or to one or more "
+            "folders by exact path with folder_paths if you don't have "
+            "scope_xxx ids in hand. If the result says the scan is "
+            "incomplete, call this tool again; do not tell the user "
             "missing fields/values do not exist."
         ),
     },
@@ -453,16 +448,15 @@ async def content_metadata(
             ]
         )
 
-        # Leads, so the caller reads the catalog as partial before reading it.
+        # Leads so the caller sees "incomplete" before the data.
         content: list[TextContent] = (
             []
             if snapshot.complete
             else [TextContent(type="text", text=_INCOMPLETE_NOTICE)]
         )
         content.append(TextContent(type="text", text=json.dumps(payload)))
-        # Only a finished scan can say a field is absent; a partial one may
-        # simply not have reached the files that carry it. Deduplicated in
-        # request order, so the notice echoes what was asked.
+        # Only report missing fields once the scan is complete — a partial one
+        # just hasn't reached them yet.
         missing = [f for f in dict.fromkeys(fields or []) if f not in field_file_counts]
         if missing and snapshot.complete:
             content.append(
