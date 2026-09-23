@@ -8,39 +8,39 @@ onto typed values under `mcpConfig`. See `values.schema.json` for field-level de
 [Minimal Values](./deployment.md#Minimal-Values).
 
 Tool behavior is configured separately: per-tool environment variables are documented with the
-tools they affect in [Tools](../technical/tools.md). Business rules per tool (a `metadata_filter`,
-a folder allowlist, a result `limit`) are configured differently. See Admin Configuration below.
+tools they affect in [Tools](../technical/tools.md). Business rules per tool are configured
+differently, see Admin Configuration below.
 
 ### Admin Configuration
 
-When Unique AI itself calls `kb-mcp` as the MCP host, it injects each tool's admin-configured
-settings into every call automatically: an admin changes them from inside the Unique AI app, and
-nothing on `kb-mcp`'s side needs a restart or redeploy.
+Business rules per tool, a `metadata_filter`, a folder allowlist, a result `limit`, live in one of
+two places depending on who's calling.
 
-A client with no such host, a standalone deployment, Claude Desktop, Cursor, has nowhere to inject
-them from, so the same settings fall back to an environment variable instead, one per tool, each
-holding a JSON object shaped like that tool's config. Only the fields you set need to appear: a
-field left out keeps its own class default, and the variable left unset keeps all of them.
+#### Unique AI
 
-#### `search`
+Injected into every call automatically from the admin's settings in the Unique AI app. Nothing to
+set here; changes take effect immediately, no restart.
+
+#### Other Clients
+
+A standalone deployment, Claude Desktop, Cursor: no app to inject settings, so each tool falls back
+to an environment variable instead, a JSON object shaped like that tool's config. Only the fields
+you set need to appear; anything left out keeps its own class default, and the variable left unset
+keeps all of them.
+
+##### `search`
 
 `UNIQUE_MCP_TOOL_SEARCH_TOOL_CONFIG`
+([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/search/config.py))
 
-The default is deep (query mode, multi-query, reranking, LLM selection), so the admin UI's own
-form is the practical way to set most of it; see
-[`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/search/config.py)
-for the full shape. A partial override, changing just the filter and the result limit:
+Top-level defaults (`post_processing.chunk_relevancy_sort_config`'s own LLM-selection fields are
+omitted here; it's disabled by default):
 
 ```json
-{
-  "service_config": {
-    "metadata_filter": { "path": ["mimeType"], "operator": "equals", "value": "application/pdf" },
-    "filtering": { "limit": 50, "score_threshold": 0.3 }
-  }
-}
+{"service_config": {"search": {"search_type": "COMBINED", "search_language": "english", "max_search_strings": 10}, "filtering": {"score_threshold": 0.0, "limit": 200}, "scope_ids": null, "metadata_filter": {"operator": "isNotNull", "value": "", "path": ["folderId"]}, "reranker_config": null}, "post_processing": {"chunk_relevancy_sort_config": {"enabled": false}, "max_tokens_for_sources": 30000, "percentage_of_input_tokens_for_sources": 0.4, "chunked_sources": true, "metadata_chunk_sections": {}}}
 ```
 
-#### `content_tree`
+##### `content_tree`
 
 `UNIQUE_MCP_TOOL_CONTENT_TREE_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/content_tree/config.py))
@@ -48,18 +48,10 @@ for the full shape. A partial override, changing just the filter and the result 
 Defaults:
 
 ```json
-{
-  "metadata_filter": null,
-  "default_limit": 50,
-  "default_tree_limit": 1000,
-  "default_min_score": 0.6,
-  "default_match_on": "both",
-  "default_case_sensitive": false,
-  "max_concurrent_scope_lookups": 25
-}
+{"metadata_filter": null, "default_limit": 50, "default_tree_limit": 1000, "default_min_score": 0.6, "default_match_on": "both", "default_case_sensitive": false, "max_concurrent_scope_lookups": 25}
 ```
 
-#### `content_metadata`
+##### `content_metadata`
 
 `UNIQUE_MCP_TOOL_CONTENT_METADATA_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/content_metadata/config.py))
@@ -67,20 +59,13 @@ Defaults:
 Defaults:
 
 ```json
-{
-  "metadata_filter": null,
-  "excluded_fields": [
-    "key", "url", "title", "folderId", "mimeType",
-    "companyId", "contentId", "validAsOf", "folderIdPath", "externalFileOwner"
-  ],
-  "max_concurrent_scope_lookups": 25
-}
+{"metadata_filter": null, "excluded_fields": ["key", "url", "title", "folderId", "mimeType", "companyId", "contentId", "validAsOf", "folderIdPath", "externalFileOwner"], "max_concurrent_scope_lookups": 25}
 ```
 
 `excluded_fields` replaces this list rather than adding to it: repeat the entries above alongside
 any of your own, or the catalog narrows to just what you passed.
 
-#### `read_file`
+##### `read_file`
 
 `UNIQUE_MCP_TOOL_READ_FILE_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/read_file/config.py))
@@ -88,7 +73,7 @@ any of your own, or the catalog narrows to just what you passed.
 Default:
 
 ```json
-{ "max_tokens_per_call": 8000 }
+{"max_tokens_per_call": 8000}
 ```
 
 ### Required
