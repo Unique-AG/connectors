@@ -63,21 +63,30 @@ changed, call again with `refresh=true` instead of waiting it out. See
 
 Discovers what metadata fields and values exist on the knowledge base's visible content, so a
 caller can build a `metadata_filter` for `search` or `content_tree` instead of guessing one.
-Returns every known field with its distinct values, e.g. `[{"department": ["Legal", "Finance"]}]`.
+Returns every known field with its distinct values, e.g. `[{"department": ["Legal", "Finance"]}]`,
+or with `counts_only`, just the count of distinct values per field.
 
 | Argument | Purpose |
 |---|---|
 | `folder_ids` | Restrict the catalog to these folders; a `scope_xxx` id from `content_tree`'s output |
 | `folder_paths` | Same, by exact path (e.g. `Contracts/2024`) instead of an id; mutually exclusive with `folder_ids` |
 | `include_subfolders` | Whether the catalog includes files in subfolders (default `true`) |
+| `fields` | Only return these fields, by exact case-sensitive name; omit for every field, `[]` for none |
+| `counts_only` | Return each field's distinct-value count instead of the values themselves, e.g. `[{"department": 12}]` |
 | `refresh` | Drop this caller's cached snapshot and rescan (~20s) |
 | `timeout` | Seconds to wait before returning a partial catalog |
 
-Exhaustive by design: every known field and value in scope, not a sample, with no pagination yet.
-Eight system fields (`key`, `title`, `folderId`, `mimeType`, `companyId`, `contentId`,
-`validAsOf`, `folderIdPath`) are excluded from the catalog by default, admin-configurable. They're
-all valid to filter on too (`search` and `content_tree` already take a folder or a mimetype
-directly); the catalog exists to surface the less obvious, organisation-specific metadata instead.
+Exhaustive by design: every known field (or every requested one) and every distinct value in scope,
+not a sample, with no pagination yet. On a large knowledge base, call `counts_only=true` first to
+see what fields exist and how big each is, then `fields` to fetch only the ones needed.
+
+Ten platform-stamped fields (`key`, `url`, `title`, `folderId`, `mimeType`, `companyId`,
+`contentId`, `validAsOf`, `folderIdPath`, `externalFileOwner`) are excluded from the catalog by
+default, admin-configurable: identifiers, source links, and owners a caller doesn't typically
+build a filter around. Excluding a field from the catalog doesn't stop it from being used in a
+`metadata_filter` directly, folder and mimetype filtering both work that way already; the catalog
+just doesn't advertise them as a starting point.
+
 Unlike `search` and `content_tree`, it takes no caller `metadata_filter`: only the admin one
 applies, since the tool exists to discover what a filter could say, not to apply one.
 
