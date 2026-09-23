@@ -178,6 +178,18 @@
           ]
         },
         {
+          "name": "outlook_check_availability",
+          "permissions": [
+            "Calendars.ReadBasic"
+          ]
+        },
+        {
+          "name": "outlook_suggest_meeting_times",
+          "permissions": [
+            "Calendars.Read.Shared"
+          ]
+        },
+        {
           "name": "outlook_create_event",
           "permissions": [
             "Calendars.ReadWrite"
@@ -189,6 +201,24 @@
             "Calendars.Read",
             "Calendars.Read.Shared",
             "Calendars.ReadWrite.Shared"
+          ]
+        },
+        {
+          "name": "outlook_update_event",
+          "permissions": [
+            "Calendars.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_cancel_event",
+          "permissions": [
+            "Calendars.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_respond_to_invite",
+          "permissions": [
+            "Calendars.ReadWrite"
           ]
         },
         {
@@ -359,8 +389,13 @@
         "outlook_list_calendars",
         "outlook_list_events",
         "outlook_read_event",
+        "outlook_check_availability",
+        "outlook_suggest_meeting_times",
         "outlook_create_event",
         "outlook_create_event_on_behalf",
+        "outlook_update_event",
+        "outlook_cancel_event",
+        "outlook_respond_to_invite",
         "sharepoint_search_files",
         "sharepoint_browse_folder",
         "sharepoint_read_file",
@@ -470,19 +505,31 @@
         "outlook-calendar": [
           "outlook_list_calendars",
           "outlook_list_events",
-          "outlook_read_event"
+          "outlook_read_event",
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times"
         ],
         "outlook-calendar-write": [
           "outlook_list_calendars",
           "outlook_list_events",
           "outlook_read_event",
-          "outlook_create_event"
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times",
+          "outlook_create_event",
+          "outlook_update_event",
+          "outlook_cancel_event",
+          "outlook_respond_to_invite"
         ],
         "outlook-calendar-delegate": [
           "outlook_list_calendars",
           "outlook_list_events",
           "outlook_read_event",
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times",
           "outlook_create_event",
+          "outlook_update_event",
+          "outlook_cancel_event",
+          "outlook_respond_to_invite",
           "outlook_create_event_on_behalf"
         ],
         "sharepoint-search": [
@@ -566,6 +613,7 @@
         "MailboxSettings.ReadWrite",
         "Calendars.Read",
         "Calendars.Read.Shared",
+        "Calendars.ReadBasic",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
         "Files.Read.All",
@@ -591,6 +639,7 @@
         "MailboxSettings.ReadWrite": false,
         "Calendars.Read": false,
         "Calendars.Read.Shared": false,
+        "Calendars.ReadBasic": false,
         "Calendars.ReadWrite": false,
         "Calendars.ReadWrite.Shared": false,
         "Files.Read.All": true,
