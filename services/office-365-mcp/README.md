@@ -1,70 +1,13 @@
 # office-365-mcp
 
-An MCP server for Microsoft 365 via Microsoft Graph API.
-
-Users sign in with their own Microsoft account and the server acts as them. It exposes fifty-two
-MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
-most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
-channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
-`teams_search_messages`, full-text search across every Teams message they can see; `teams_read_message`,
-one of those messages in full; `teams_list_meeting_transcripts`, whether a Teams meeting was
-transcribed and a handle for each transcript; `teams_read_transcript`, what was said in one of those
-meetings as speaker-attributed, timestamped turns; and `teams_list_meeting_recordings`, whether a meeting
-was recorded, how long each recording runs and who may download it; and `outlook_search_mail`,
-which finds a message in the signed-in user's own Outlook mailbox, and `outlook_read_mail`,
-which reads one of those in full; and `outlook_browse_folders`, one level of the mail folder
-tree; and `outlook_find_recipient`, which resolves a name to the address it sends from — each
-one a file of its own — plus `outlook_read_thread`, every message of one conversation this
-mailbox holds; `outlook_list_mail`, the newest messages of one folder in receipt order; and
-`outlook_get_mailbox_settings`, which shows the inbox rules, the automatic reply and the
-categories; and `outlook_mark_mail`, the first tool here that changes anything; and
-`outlook_move_mail`, which files messages into a folder and is how this connector erases one; and
-`outlook_draft_mail`, which composes a draft it cannot send; and `outlook_draft_reply`,
-which drafts a reply or a forward from a message this connector found; and `outlook_send_draft`,
-the only tool here that puts mail on the wire; and `outlook_set_automatic_reply`,
-which turns the out-of-office on for a bounded window or off; and `outlook_disable_mail_rule`,
-which switches one inbox rule off and cannot switch one on; and `outlook_list_calendars`,
-every calendar this mailbox reaches, the user's own and every one another person delegated;
-and `outlook_list_events`, what sits on one of those calendars between two dates; and
-`outlook_read_event`, one of those events in full with every attendee and their answer; and
-`outlook_create_event`, which puts one event on the user's own calendar and sends the
-invitations as it does; and `outlook_create_event_on_behalf`, which does the same on a calendar
-somebody delegated, under that person's name; and `sharepoint_search_files`, which finds a file the
-user can already open, in their OneDrive or on any SharePoint site and names the sites its
-matches sit on; and `sharepoint_browse_folder`,
-which lists one level of one folder; and `sharepoint_read_file`, which returns one file as
-Microsoft stores it, or asks Microsoft to convert a document to PDF first; and
-`onenote_list_notebooks`, every notebook the signed-in user owns or one shared with them, and each
-one's sections with the section groups they sit in; and `onenote_list_pages`, the newest pages of one section or of
-every notebook the user owns or has shared with them, matched on title alone; and `onenote_read_page`, one of those
-pages as the HTML Microsoft stores it; and `onenote_create_page`, which writes a brand-new page
-into a section or the user's default notebook; and `onenote_append_to_page`, which adds HTML to
-the end of a page that already exists; and `onenote_preview_page`, the few lines Microsoft indexes
-for a page plus its preview image address, and `onenote_read_resource`, which fetches the binary
-an image or object address inside a page's HTML points at, and `onenote_find_notebook_from_url`,
-which resolves a OneNote web or client address — a notebook's, a section's or a page's own — to a
-notebook handle, and `onenote_list_recent_notebooks`, the notebooks Microsoft has seen the user
-open lately, each with no handle of its own until `onenote_find_notebook_from_url` mints one; and
-`onenote_list_sections`, one level of sections and section groups directly under a notebook or a
-section group, and `onenote_create_notebook`, `onenote_create_section` and
-`onenote_create_section_group`, which each add one new container at the level they name; and
-`onenote_edit_page`, which appends, inserts, prepends or replaces a piece of a page
-through a batch of commands, `onenote_rename_page`, which replaces a page's title, and
-`onenote_delete_page`, the only tool here that removes a page outright; and `onenote_copy_page`,
-`onenote_copy_section` and `onenote_copy_notebook`, which each start a copy Microsoft runs on its
-own side and hand back an operation handle, and `onenote_get_operation`, which polls one of those
-handles for its result,
-and more land in later PRs, stacked on top of this one, one tool per PR.
-
-An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
-user to consent to are exactly the union of what those tools need — see **Tool surface** below.
+For what this service offers, and how permissions and deployment work, read `docs/README.md`.
 
 ## Layout
 
 ```
 src/office_365_mcp/
   app.py                 Compose the app.
-  config.py              Config classes.
+  config.py              Configuration classes.
   auth.py                Entra auth setup.
   logging.py metrics.py  Cross-cutting utilities.
   graph_client/          Microsoft Graph transport (official SDK).
@@ -73,683 +16,188 @@ src/office_365_mcp/
   server/                /ready and /manifest endpoints (not tools).
 ```
 
-This service owns no database schema or migrations. Its only table (oauth_kv) is created by the OAuth store.
-
-**A tool is a file.** `tools/get_me.py` owns the tool name, description, Graph permissions, arguments,
-output shape, Graph request, and error messages. A new tool is one file plus one line in the registry.
-No base class, no decorator. A tool module publishes `TOOL_NAME`, `GRAPH_PERMISSIONS` and `register`.
-
-`tools/__init__.py` is the central registry. `resolve()` turns an operator's selection into both
-halves of one answer: the tool modules to register, and the union of their `GRAPH_PERMISSIONS` as the
-scope list sign-in asks for. Both are derived from the tool modules themselves, never written by
-hand. Entra must receive every Graph permission at startup—a forgotten one cannot be obtained
-later—so `create_app` resolves once and hands the same `Selection` to `build_auth` and
-`register_tools`. `tests/test_app.py` reads the tool *files* from disk to verify that every
-registered tool's permissions reach the consent screen.
-
-**`shared/` is what a file-per-tool costs.** Two files are free to disagree, and this package is the
-list of things they must not: `handles.py` (the `teams:///` grammar — every shape this connector
-mints, its parser and its speller, and the permission each Teams surface is read under),
-`messages.py` (what a Teams message is — the shape it is answered in, the sender normalised out of
-every identity shape Graph answers with, the Teams HTML a body is unwound from, and the test for
-"did a person write this", so that the same message found by one tool and read by another is one
-type normalised by one function rather than two that agree), `meetings.py` (how a meeting is
-reached — a join URL resolved to the meeting it identifies, which occurrence of a series a time
-window means, and how far "newest first" holds), `identity.py` (who the signed-in user
-is — `get_me` reports
-it, and it is the fact every other answer gets correlated against, so a second tool asking with a
-`GET /me` of its own would be a second answer to one question) and `seam.py` (the Graph client a
-tool is handed, with the per-tool On-Behalf-Of token inside it, and the Graph-failure-to-advice
-mapping, because a model reads every refusal on this server as one voice). A
-thing belongs there when two tools would otherwise each need a copy *and* a difference between the
-copies would be a bug a caller could see — a handle one tool minted and another answers 404 to, two
-answers to "who am I", a refusal that sounds like a different server. What does not belong there is
-anything one tool could own — a description, an argument, an answer shape, a request, a refusal.
-
-**`handles.py` spells one segment per family, and four families spell two.** Every `teams:///`
-family and every `outlook:///` mail family names a single id, and so does a calendar: Microsoft
-documents that a container type supports no immutable id, because its regular ids
-*"were already constant"*. An event is `outlook:///events/{calendar}/{event}`, two
-segments, because an event id is only meaningful beside the calendar it was read from — Graph
-answers a different id for the same meeting in a delegated copy — and the read is addressed as
-`/me/calendars/{calendar}/events/{event}` with both halves. `teams:///transcripts/{a}/{b}` is the
-same shape for the same reason.
-
-The layering rules are that **`shared/` imports no tool module, and only `shared/seam.py` imports
-FastMCP** — the seam is where the framework is spoken, which is what keeps it out of the handle
-grammar and the rest of the vocabulary; that **`graph_client/` imports nothing of this application
-at all**, taking its own frozen `GraphSettings` instead of reading config; that **`tools/` imports
-`shared/`, `graph_client/` and FastMCP and nothing else of this package** — not `server/`, or the
-tool file is one in name only; that **no tool module imports another tool module**, which is what
-independent means and is the rule the whole layout exists for; that **only `create_app` constructs a
-config**, so nothing downstream can quietly re-read the environment and disagree with the app it
-runs in; that **`shared/handles.py` is the only module that builds or parses a `teams:///`, `outlook:///`,
-`sharepoint:///` or `onenote:///` URI** (showing the shape to a model in a description, an `examples=` or a
-refusal is prose and is not that); and that **a package is entered through its `__init__`** — `graph_client/`, `server/` and
-`tools/` each publish an `__all__`, and `shared/` deliberately does not, being a grouping whose
-modules are the units and whose consumers say which one they depend on at the import line.
-
-`tests/test_layering.py` enforces them, and each rule is paired with a guard that fails if the rule
-has gone vacuous — an empty tree to walk, a missing file to forbid reaching past, a framework
-nothing imports any more, a second tool module that stopped existing so that "another tool module"
-named nothing, a package with no `__all__` to insist on. One rule of the finished set is still
-absent for exactly that reason and is named in that module: nothing may address a single meeting
-recording, which needs a recordings listing to be the surface it protects. It arrives with the tool
-that lists them, and the numbering is the finished one so that arriving costs a class.
-
-## Auth
-
-Entra via FastMCP's AzureProvider. FastMCP handles OAuth 2.1: /authorize, PKCE, callback, refresh, and
-On-Behalf-Of exchange. This service chooses the app registration and state store only.
-
-The provider mounts these endpoints (must be reachable unauthenticated, not behind an ingress prefix):
-```
-/authorize  /token  /register  /auth/callback  /consent
-/.well-known/oauth-authorization-server
-/.well-known/oauth-protected-resource/mcp
-```
-
-**App registration requirements.** Missing values here do not always stop the provider from
-starting. Some only make every login fail, with no startup error:
-
-- A **Web platform** redirect URI of exactly `$PUBLIC_BASE_URL/auth/callback`
-- An Application ID URI (defaults to `api://$ENTRA_CLIENT_ID`) exposing the scope **access_as_user**
-  (Entra omits OIDC scopes from the scp claim, so a custom scope is the only gate)
-- `"requestedAccessTokenVersion": 2` in the manifest
-- A client secret (ENTRA_CLIENT_SECRET required for On-Behalf-Of)
-- A tenant: one tenant's ID, or `organizations` for a multi-tenant registration
-  (`sign_in_audience = "AzureADMultipleOrgs"` in the Terraform module). Under `organizations` any
-  Entra tenant's users can sign in; each access token is accepted only if its `iss` is
-  `https://login.microsoftonline.com/{tid}/v2.0` for its own `tid`, and the On-Behalf-Of
-  exchange is made against that tenant, as Microsoft's rules for multi-tenant token validation and
-  for the exchange both require. There is no tenant allowlist: consent in the user's own
-  tenant is the gate. `common` and `consumers` are rejected at startup, because personal Microsoft
-  accounts have no Microsoft 365 mailbox or Teams to read.
-
-**Graph permissions.** Tools declare what they need. `create_app` passes the union of the *selected*
-tools' permissions to the provider as `additional_authorize_scopes`. Entra issues one token per
-resource. The code exchange asks for this service's scope only. Tools redeem Graph permissions per
-call via On-Behalf-Of. A permission never requested at sign-in cannot be consented to.
-
-| Permission | Type | Admin consent | Used by |
-| --- | --- | --- | --- |
-| `User.Read` | Delegated | No | `get_me`, `teams_list_meeting_recordings` (the organizer-only check), `outlook_search_mail` (the id exchange), `outlook_find_recipient` (the signed-in user every row's `external` is judged against), `outlook_list_calendars` (whose calendar a row is) |
-| `Chat.Read` | Delegated | No | `teams_list_chats`, `teams_search_messages`, `teams_read_message` (chats) |
-| `Team.ReadBasic.All` | Delegated | No | `teams_list_my_teams` |
-| `Channel.ReadBasic.All` | Delegated | No | `teams_list_channels` |
-| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `teams_browse_channel`, `teams_search_messages`, `teams_read_message` (channels) |
-| `OnlineMeetings.Read` | Delegated | No | `teams_list_meeting_transcripts`, `teams_list_meeting_recordings` (resolving a join URL to a meeting) |
-| `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `teams_list_meeting_transcripts`, `teams_read_transcript` |
-| `OnlineMeetingRecording.Read.All` | Delegated | **Yes** | `teams_list_meeting_recordings` |
-| `Mail.Read` | Delegated | No | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient` (the fallback), `outlook_read_thread`, `outlook_list_mail` |
-| `People.Read` | Delegated | No | `outlook_find_recipient` |
-| `MailboxSettings.Read` | Delegated | No | `outlook_get_mailbox_settings` |
-| `Mail.ReadWrite` | Delegated | No | `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` |
-| `Mail.Send` | Delegated | No | `outlook_send_draft` |
-| `Mail.ReadBasic` | Delegated | No | `outlook_send_draft` (the pre-read) |
-| `MailboxSettings.ReadWrite` | Delegated | No | `outlook_set_automatic_reply`, `outlook_disable_mail_rule` |
-| `Calendars.Read` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event_on_behalf` (the pre-read) |
-| `Calendars.Read.Shared` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event_on_behalf` (the pre-read) |
-| `Calendars.ReadWrite` | Delegated | No | `outlook_create_event` |
-| `Calendars.ReadWrite.Shared` | Delegated | No | `outlook_create_event_on_behalf` |
-| `Files.Read.All` | Delegated | **Yes** | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_read_file` |
-| `Notes.Read` | Delegated | No | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections`, `onenote_get_operation`, `onenote_copy_page` |
-| `Notes.Create` | Delegated | No | `onenote_create_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook` |
-| `Notes.ReadWrite` | Delegated | No | `onenote_append_to_page`, `onenote_edit_page`, `onenote_rename_page`, `onenote_delete_page` |
-
-`Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
-is a separate scope from the broad message permission below on purpose: a tenant that refuses
-`ChannelMessage.Read.All` can still list its teams, and `teams_list_my_teams`' own 403 names only the
-permission its own request needed rather than sending an administrator after one that was never
-missing.
-
-`Chat.Read` rather than the least-privileged `Chat.ReadBasic` because listing chats by recency needs
-`$expand=lastMessagePreview`, and a message preview is a message — which "read the names and members
-of chats" does not cover. It is spelled in `shared/handles.py` rather than in the tool file, because
-which Teams surface a permission covers is the handle grammar's knowledge; the tool still declares
-its own tuple, which is what its 403 is worded from.
-
-The two rows a tool appears in *parenthesised* are the per-surface case, and it is the reason
-`MessageHandle.permission` exists. Graph's permissions for a message read are per surface, so
-`teams_read_message` has to redeem both — the token is exchanged before the tool sees its argument — while
-its 403 names only the one the read was actually made under. Naming both there would be the same
-defect as naming none: an administrator handed two names may grant the one that was never missing.
-
-**Transcripts need a tenant setting as well as a permission, and this is the one that surprises
-people.** Microsoft Graph access to Teams meeting transcripts is off by default and *"agents and
-apps can't access meeting transcripts, regardless of app-level permissions"* until a Teams
-administrator turns it on — Teams admin centre → Meetings → Meeting settings → Transcript API
-access, or `Set-CsTeamsMeetingConfiguration -EnableGraphTranscriptAccess $true -Identity Global`.
-There is no Graph API to set it and no request-side workaround, so it is an onboarding step next to
-admin consent rather than something this connector can fix; `services/teams-mcp` learned this in PR
-#762 and `docs/recordings-and-transcripts/operator.md` documents it. Until it is on, every call to
-`teams_list_meeting_transcripts` and `teams_read_transcript` fails with that remedy named — and only those two:
-Microsoft scopes the setting to transcript resources, so nothing else here is affected. The
-neighbouring `-EnableAttributedTranscripts` setting is *not* a prerequisite: when it is off,
-`teams_read_transcript` degrades to Microsoft's unattributed format and reports `speaker_attribution:
-false` rather than failing.
-
-**That setting does not cover recordings, and the asymmetry is why they are a separate tool.**
-Microsoft scopes it to transcript resources only — the change-notification reference says so in as
-many words — and neither recordings reference page publishes a tenant control or an inner error code
-of its own. So in a default tenant (the switch off, admin consent granted) `teams_list_meeting_transcripts`
-answers `403` while `teams_list_meeting_recordings` answers normally, which one combined artifact tool
-could not do without either failing the whole call or growing a status per artifact — and the
-per-artifact status is exactly what makes the "read `status` first" shape unreadable.
-`OnlineMeetingRecording.Read.All` needs admin consent in its own right and separately from the
-transcript permission, so a tenant can grant either without the other. Each tool names only the
-permissions its own request needs, and it names all of them, because neither Graph nor Entra says
-which one is missing.
-
-**A recording is answered as metadata and availability; its bytes are never returned, by anything
-here.** Graph streams an MP4 inline with no ranged contract on that path, a Teams meeting can run
-thirty hours, and a model cannot watch video — so a tool that returned one would be a defect wearing
-a feature's clothes. `recordingContentUrl` is no better: it opens only with this connector's own
-bearer token, so passing it on is either useless or a token leak. What `teams_list_meeting_recordings`
-answers is "there is a 47-minute recording from Tuesday, only the organizer can download it, and
-here is the transcript instead" — existence, start and end, a derived `duration_seconds` (Microsoft
-publishes no duration property at all), and `content_correlation_id`, which is Microsoft's own link
-to the transcript of the same call — and which `teams_list_meeting_transcripts` takes back as an
-argument, so "the words of that recording" is one hop rather than a guess between occurrences. It
-is the one artifact filter Microsoft publishes a `$filter` example for, and only on the transcripts
-collection, which is why the two listers' arguments differ by exactly that one.
-Layering rule 7 forbids any module from addressing a single
-recording, because that is the only door to those bytes and the change that opens it looks like a
-convenience. The organizer-only rule is reported rather than recited: Microsoft permits only the
-meeting organizer to download a recording under delegated access, the *metadata* is not so
-restricted, and answering "there is no recording" for a participant would be a wrong answer nobody
-could detect — so an unreachable recording is always listed, with `content_access` saying which side
-of the rule this user is on.
-
-The two meeting permissions are separate scopes and are granted independently, which is the point of
-asking for both: `OnlineMeetings.Read` is the least privilege Microsoft documents for resolving a
-join URL to a meeting and needs no administrator, while reading a transcript resource needs one.
-A tenant can grant the first and withhold the second. Neither Graph's 403 nor Entra's AADSTS65001
-says which of the two is missing, so every refusal names both. Only the lister spends both —
-`teams_read_transcript` is handed a meeting id somebody already resolved, so it declares the
-admin-consented one alone and still answers in a tenant that withholds `OnlineMeetings.Read`.
-
-`ChannelMessage.Read.All` is the broad one, and it is requested deliberately. `Chat.Read` alone is
-enough for Graph to *accept* a `chatMessage` search, but Microsoft documents that a search never
-returns more than the equivalent GET would, and every channel-message GET in v1.0 requires
-`ChannelMessage.Read.All` — so without it a search silently covers chats only and reports nothing
-missing. Asking for it at sign-in makes a tenant that withholds it fail visibly at consent rather
-than serve half an answer per query. It is also what `teams_browse_channel` spends on its one request, and
-what `teams_read_message` needs for a channel message. It is the first permission here that needs an
-administrator, and the first row where one tool needs two: neither Graph's 403 nor Entra's
-AADSTS65001 says which of the two was missing, so
-`teams_search_messages` names both in every refusal — handed one name, an administrator may grant the
-permission that was never missing and watch the identical failure. A search has no choice about
-that, because a search happens before anything knows which surface a hit will be on; a *read* does,
-which is why its 403 names one. `shared/seam.py` writes the same names out once more, by hand, as
-`REQUESTABLE_PERMISSIONS`: every other check compares the tool files against a list derived from
-those same files, so a misspelling is on both sides of the comparison and holds — and Entra rejects
-an authorize request carrying a scope it does not know, which fails every sign-in for every user.
-Adding a name there is the deliberate act this table records.
-
-**`Mail.Read` is the first permission here that needs no administrator and still reads a message
-body.** Microsoft publishes `AdminConsentRequired: No` for every delegated `Mail.*` permission, so
-an Outlook read surface costs a tenant nothing an administrator has to sign, where every Teams
-preset past `teams-chat` costs one. That is Microsoft's rule about the permission and not a promise
-about a tenant: a tenant running a restricted user-consent policy still stops an unprivileged user
-at "Need admin approval", and nothing in this service's logs says so.
-
-`Mail.ReadBasic` is deliberately not used *by the read surface*. It withholds `body`, `previewBody`, attachments and
-extended properties, and a hit list with no preview is a list of subjects a model cannot triage —
-so it would buy a second name on the consent screen and no narrower access to anything read here.
-
-The channel inventory is two permissions, and they are separate scopes on purpose:
-`Channel.ReadBasic.All` lists a team's channels, `ChannelMessage.Read.All` reads what was posted in
-one. Each is the least-privileged permission Microsoft documents for its collection. A tenant
-refusing the message permission still lists teams and channels, and each tool's 403 names only the
-permission its own request needed.
-
-**`Files.Read.All` needs an administrator, and that is Microsoft's rule and not a choice made
-here.** The three file tools read through it. `sharepoint_search_files` searches with Microsoft's
-Search API, and that API does not accept the narrower `Files.Read` for files. So there is no
-cheaper permission for a search across sites. Microsoft applies each file's own access control
-inside the search, and a user therefore gets back only files they can already open. The permission
-lets the connector ask about any file; it does not let a user read a file they could not read
-before.
-
-**Every delegated `Notes.*` permission Microsoft publishes needs no administrator.**
-`onenote_list_notebooks` declares `Notes.Read`, even though Microsoft's list-notebooks table
-names `Notes.Create` as the least-privileged permission there, because `Notes.Create` also grants
-creating pages, notebooks and sections, and a read-only preset must not put a write grant on its
-consent screen. `onenote_create_page` declares `Notes.Create` and `onenote_append_to_page`
-declares `Notes.ReadWrite`, each the least-privileged permission Microsoft documents for its own
-request. Four of the new read tools take the same trade the list did:
-`onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections` and
-`onenote_get_operation` declare `Notes.Read` although Microsoft's own table names `Notes.Create`
-as each one's least-privileged permission, for the identical reason — `onenote-read` must stay a
-read-only consent screen. `onenote_read_resource` declares the least-privileged permission
-Microsoft documents for its own request, and the page-preview endpoint has no published
-permissions table at all, so `onenote_preview_page` inherits `Notes.Read` from the rest of the
-preset. The three creation tools,
-`onenote_create_notebook`, `onenote_create_section` and `onenote_create_section_group`, and the
-three copy tools, `onenote_copy_page`, `onenote_copy_section` and `onenote_copy_notebook`, declare
-`Notes.Create`, the least-privileged permission Microsoft documents for each of those requests.
-`onenote_copy_page` declares `Notes.Read` as well: before it puts a copy into a shared notebook to
-a person, it reads the page's title, and Microsoft documents no page read under `Notes.Create`.
-`onenote_edit_page`, `onenote_rename_page` and `onenote_delete_page` declare `Notes.ReadWrite`,
-because Microsoft names no narrower permission for `onenotePatchContent` or for deleting a page.
-
-**State.** Every token is a reference token re-validated on each request. State location decides
-whether a restart or second replica causes loss. FastMCP defaults to an encrypted file tree in
-process home. This service uses Postgres. The store creates table oauth_kv on first use. The
-database user needs CREATE on its schema. No migration exists because the columns are the store
-library's to define and keep in sync — a revision duplicating them would be ours to keep in sync,
-which breaks when the library changes its schema. Rows are encrypted with a key derived from the
-client secret. Rotating the secret requires each signed-in user to re-login once. A decryption
-failure is a cache miss, not an error. Widening the tool surface costs the same re-login, for the
-same reason: the authorize request changes.
-
-## Tool surface
-
-Which tools a deployment runs, and therefore which delegated permissions every one of its users is
-asked to consent to. Set **exactly one** of:
-
-```bash
-TOOLS_PRESET=teams                       # a named surface
-TOOLS_ENABLED=get_me                     # or name the tools
-```
-
-Both set is a startup error naming which to remove. Neither set is a startup error too: there is
-**no default**, because a default of "every tool" would make the widest consent screen what a
-deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-word but chosen value.
-
-| preset | what it can do | tools besides `get_me` | permissions | admin consents |
-| --- | --- | --- | --- | :-: |
-| `teams-chat` | name the live conversations — not read them | `teams_list_chats` | `User.Read`, `Chat.Read` | 0 |
-| `teams-messages` | find a message anywhere and read it in full | `teams_list_chats`, `teams_search_messages`, `teams_read_message` | + `ChannelMessage.Read.All` | 1 |
-| `teams-channels` | walk a team's channels and read what was posted | `teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel` | `User.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All` | 1 |
-| `teams-transcripts` | find a meeting and read what was said | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | 1 |
-| `teams-recordings` | say whether a meeting was recorded and who may get at it | `teams_list_chats`, `teams_list_meeting_recordings` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | 1 |
-| `teams-meetings` | both of the above for one meeting | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | + both meeting permissions | 2 |
-| `teams` | every Teams tool | the nine of them | all eight | 3 |
-| `outlook-read` | find a message, read it in full, walk the folder tree, read a thread, list a folder in receipt order, and resolve a name to an address | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
-| `outlook-write` | the read surface, plus marking, filing and drafting | + `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | + `Mail.ReadWrite` | 0 |
-| `outlook-send` | the above, plus sending a draft the user can already read | + `outlook_send_draft` | + `Mail.Send`, `Mail.ReadBasic` | 0 |
-| `outlook-mailbox` | say what is quietly acting on the mailbox — the rules, the automatic reply, the categories | `outlook_get_mailbox_settings` | `User.Read`, `MailboxSettings.Read` | 0 |
-| `outlook-automate` | the above, plus setting the automatic reply and switching an inbox rule off | + `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | + `MailboxSettings.ReadWrite` | 0 |
-| `outlook-calendar` | name every calendar this mailbox reaches, own and delegated, read what sits on one between two dates, and read one event in full | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` | `User.Read`, `Calendars.Read`, `Calendars.Read.Shared` | 0 |
-| `outlook-calendar-write` | the read tier, plus creating one event on the user's own calendar and inviting people to it | + `outlook_create_event` | + `Calendars.ReadWrite` | 0 |
-| `outlook-calendar-delegate` | the above, plus creating an event on a calendar somebody delegated, as that person | + `outlook_create_event_on_behalf` | + `Calendars.ReadWrite.Shared` | 0 |
-| `sharepoint-search` | find a file in the user's OneDrive or on a SharePoint site, and say where it is | `sharepoint_search_files` | `User.Read`, `Files.Read.All` | 1 |
-| `sharepoint-read` | the above, plus listing one level of a folder and returning one file itself, or the PDF Microsoft converts it to | + `sharepoint_browse_folder`, `sharepoint_read_file` | `User.Read`, `Files.Read.All` | 1 |
-| `onenote-read` | list every notebook, its sections and section groups, find or read a page or preview it, fetch an image a page points at, resolve a web address to a notebook, and list the notebooks Microsoft has seen the user open lately | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections` | `User.Read`, `Notes.Read` | 0 |
-| `onenote-write` | the above, plus creating a notebook, a section or a section group, creating a page or appending to, editing or renaming one, and copying a page, a section or a notebook and polling the copy | + `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`, `onenote_get_operation` | + `Notes.Create`, `Notes.ReadWrite` | 0 |
-| `onenote-delete` | the above, plus deleting a page outright | + `onenote_delete_page` | + none: the same four as the row above | 0 |
-
-`get_me` is always on, which is why no preset lists it — each of those rows is one
-tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
-is and the only one that asks for **no** administrator, and the reason it costs nothing is exactly
-that it cannot read a *chat* message — the two tools that can (`teams_search_messages`, `teams_read_message`)
-both declare `ChannelMessage.Read.All`, which an administrator has to grant even though the message
-is a chat. Reading chat messages is `teams-messages`.
-
-Every preset is a named set written out by hand, `teams` included, each with a test asserting what
-it costs a tenant and that every *argument* its tools require can be minted by another member of
-the same preset. `teams` names the nine Teams tools rather than the registry, and that is the one
-line of maintenance this table buys: a preset derived from the registry would take in the first
-tool of another product on the day it lands, put that tool's permission on the consent screen of
-every `teams` deployment, and cost every signed-in user a fresh sign-in — with no edit for anyone
-to review. `tests/test_tool_selection.py` refuses a derived preset, and refuses a registered tool
-that no preset names. The names carry a product axis from the
-start: the `outlook-*` and then the `sharepoint-*` and then the `onenote-*` rows joined the table
-as those tools landed, and no name already in it had to be re-cut.
-
-**Microsoft Graph cannot turn a document into text, so this connector does not pretend to.**
-There is no endpoint for it. The complete method list of the file resource has none, in the stable
-version or the preview one, and a search result carries only a short broken-up snippet.
-`sharepoint_read_file` therefore returns the file itself. What Graph does offer is a conversion to
-PDF, run on Microsoft's own servers, and the tool exposes that as `convert_to`. Ask for it when the
-goal is to read what a document says: a Word or PowerPoint file is a zip archive a reader cannot
-use, and the PDF carries the text. This connector converts nothing itself, in either case. A live
-run against the test tenant on 2026-09-16 returned a 966 KB PDF from a 6.4 MB PowerPoint file.
-
-**OneNote has no full-text search through Microsoft Graph for a work or school account.**
-`$search` is absent from the OneNote query-options table, so `onenote_list_pages` filters on the
-title alone; it cannot see what a page's body says. A page comes back as the HTML Microsoft
-stores, with any image or file reference inside it pointing at Graph and opening only with this
-connector's own sign-in token, and this connector converts none of it. Every write tool resolves
-the target notebook first, and when that notebook is shared or belongs to somebody else it puts
-the write to the person at the other end through MCP elicitation before anything is written,
-because the page is visible to those people the moment it exists; an additive write into the
-user's own unshared notebook happens without a question, the way a mail draft is. A page delete
-and a `replace` edit ask always. Every non-idempotent write (create, append, insert, prepend,
-copy) sends `no_retry()` because a retried one duplicates content; the rename and the delete are
-idempotent and keep the SDK's default retry. `onenote_create_page`
-sends the page as `text/html` through a hand-built request, because the SDK's generated `post`
-would send JSON, which OneNote rejects. `onenote_append_to_page` goes through the SDK's
-`onenotePatchContent` action, whose enum values kiota serialises as `Append`/`After` where
-Microsoft's own examples spell them `append`/`after`; a live run against the test tenant on
-2026-09-18 accepted that spelling. The same run showed Microsoft's page index lagging a write:
-`title` and `lastModifiedDateTime` on a listed or read page stayed at their old values while the
-page's content was current, and three days later the pages the connector had created still
-listed with an empty `title`. Microsoft documents no delay. The descriptions say so, and they
-send a model to `created_at` and the section rather than to the title when it looks for a page
-it just wrote.
-
-**Three more OneNote handle families joined this PR: notebooks, section groups and
-operations.** `onenote:///notebooks/{id}` addresses a notebook, minted by `onenote_list_notebooks`,
-`onenote_find_notebook_from_url` and `onenote_create_notebook`; `onenote:///sectiongroups/{id}`
-addresses a section group, minted by `onenote_list_sections` and `onenote_create_section_group`;
-and `onenote:///operations/{id}` addresses a long-running copy, minted by `onenote_copy_page`,
-`onenote_copy_section` and `onenote_copy_notebook` and read by `onenote_get_operation`. Each is one
-segment, the shape the section and page families already had, and only `shared/handles.py` spells
-or parses one — a tool calls `OnenoteXHandle(id).uri` to mint one and `onenote_x_handle(text)` to
-parse one, the rule `tests/test_layering.py` already held the first two families to.
-
-**Three arguments ride on Graph query parameters the generated SDK does not know about.**
-`onenote_list_pages`'s `include_level_and_order` sends `pagelevel=true`, `onenote_read_page`'s
-`include_ids` sends `includeIDs=true`, and `onenote_create_page`'s `section_name` sends
-`sectionName=...`. None of the three is named in the URI template kiota generated from Graph's
-OpenAPI description, and a kiota request silently drops a query variable its own template does not
-name. So each goes through `graph_client.request_with_query`, which extends the template's `{?...}`
-component — or appends one when the template has none — and writes the raw name straight into
-`query_parameters`; the caller hands the typed `$select`/`$expand`/`$top`/`$orderby` to the same
-helper's `typed` parameter, so no tool spells kiota's percent-encoded wire names itself.
-
-**`onenote_read_resource` reads a resource's bytes together with its real media type**, which none
-of the SDK's typed methods hand back — the generated `content.get()` decodes the body and discards
-the `Content-Type` header on the way. `graph_client.fetch_response` sends a request its caller
-has marked with `native_response()`, kiota's own `NativeResponseHandler`, so
-`send_primitive_async` returns the raw `httpx.Response` instead of a decoded body, then calls the
-adapter's own `throw_failed_responses` by hand so a 404 or a 429 still becomes an `ODataError` and
-reaches `graph_errors` exactly as every other call does. The copy tools send their `POST` the same
-way, because Microsoft documents their `202` as an empty body with an `Operation-Location` header,
-which the typed `post()` would decode to `None`.
-`sharepoint_read_file`'s `_FileFromGraph` moved into `shared/seam.py`, public as `FileFromGraph`,
-so this tool could answer with the same `File` shape without importing another tool.
-
-**A copy does not finish inside the call that starts it.** `onenote_copy_page`,
-`onenote_copy_section` and `onenote_copy_notebook` each start a copy Microsoft runs on its own side
-and answer with an `OperationSummary`: a `status` of `NotStarted`, `Running`, `Completed` or
-`Failed`, and, once it reaches `Completed`, a `result_uri` handle for the new page, section or
-notebook. `onenote_get_operation` polls that handle. Microsoft documents no retention for an
-operation, so a 404 there says only that Graph holds no record of it now; the result, if there
-was one, is found with the listing tools.
-
-**Two of the new writes ask every time, regardless of who owns the notebook.**
-`onenote_delete_page` confirms unconditionally, because Microsoft Graph keeps no recycle bin for a
-OneNote page — once Graph accepts the delete, the page is gone. `onenote_edit_page` confirms
-unconditionally whenever any command in its batch is a `replace`, the one action that throws away
-what was already at `target`; `append`, `insert` and `prepend` follow the same
-confirm-only-when-the-notebook-reaches-others rule the rest of the write tools use. Microsoft's
-schema also lists a `delete` action, but its service refused it on every attempt against the test
-tenant (400, code 20122), so the tool does not offer it.
-
-**Team and site notebooks stay out of scope.** Every tool here reaches only `/me/onenote`. Team
-and site notebooks live under `/groups/{id}/onenote` and `/sites/{id}/onenote`, which no tool
-here reaches; the copy endpoints document a `groupId` destination and no site destination at all.
-Either would need its own live probe to settle what a tenant actually has to consent to, so
-neither is in this PR. Renaming or deleting a notebook, a section or a section group is absent for
-a plainer reason: Graph v1.0 documents no such call.
-
-**The Outlook rows are three axes, not one ladder.** Mail content goes `outlook-read` →
-`outlook-write` → `outlook-send`, each row adding one permission to the row above. Mailbox
-configuration goes `outlook-mailbox` → `outlook-automate`, and touches no `Mail.*` permission at
-all. Calendars start at `outlook-calendar` and touch neither. The axes never meet, because they are
-unrelated: an out-of-office reply has nothing to do with sending mail as the user, a
-forwarding-rule audit has nothing to do with reading one, and a calendar read has nothing to do
-with any of them. A single cumulative chain made `outlook-automate` require `Mail.Send`, which is
-the defect this shape exists to prevent. A deployment that wants two axes names the tools in
-`TOOLS_ENABLED`.
-
-**The calendar axis carries `Calendars.Read.Shared` on its read tier, and that is why it is one
-ladder.** A calendar another person delegated arrives as a plain row of `GET /me/calendars`, and
-Microsoft names `Calendars.Read.Shared` as the least privileged permission for reading that row. So
-a deployment that reads the signed-in user's own calendars pays the same two permissions as one
-that reads a colleague's, and cutting the read tier in two buys a tenant nothing at all. Writing is
-where the tiers earn their names.
-
-**A create sends, and there is no draft to inspect first.** Microsoft states that a create with
-attendees mails invitations to all of them, that this keeps the organizer's and the attendees'
-views consistent, and that it *"can't be configured"*. `isDraft` on an event is an unsent-*updates*
-flag and not a state a client asks for. So the two creating tools are the only calendar tools that
-reach a person outside the mailbox, and this connector cannot recall what they sent. Each one reads
-the calendar first, then puts the event to the user through MCP elicitation before anything is
-written, and a decline creates nothing. The question names the subject, the start, the end, the
-zone, whether the event covers whole days, the place, whether it is a Teams meeting, how the body
-opens and every address: all of it is bound into the id the answer authorizes, and none of it is
-visible to the person anywhere else.
-`outlook_create_event` asks unless the event names nobody and no place. An empty attendee list is
-a private appointment nobody is told about, and a `location` reaches Graph as nothing but text:
-Microsoft books a room only as an attendee a caller adds, documents nothing about a display name
-that names one, and so leaves no way to rule out that a room's mailbox was reached. Both tools
-answer `invitations_sent` off the attendees Graph stored rather than off the arguments. On a
-2026-07-28 connection, which has no channel for a server to ask a person anything, the tool
-answers with the question instead and a client that can elicit calls it again with the answer,
-and nothing is written before an accept that is bound to the same request.
-
-**`outlook-calendar-delegate` is the tier to argue about, and one tool wide.** Microsoft's
-delegated route is `POST /me/calendars/{delegated-calendar-id}/events` under
-`Calendars.ReadWrite.Shared`, and Microsoft states of its own worked example that the organizer is
-the calendar owner, that the delegate's identity appears only in the sender property of the
-event message, and that no property of the returned event names the delegate. So recipients see an
-invitation from the owner and the signed-in user appears nowhere in the event. That is Exchange
-behaving as designed, and it is also the whole of the argument for putting this tool behind its own
-preset name. `outlook_create_event_on_behalf` reads the calendar first, refuses when `can_edit` is
-false, and always asks the person at the other end to confirm, naming the owner. That pre-read is
-declared twice, as `Calendars.Read` and as `Calendars.Read.Shared`, because Microsoft names the
-first on `calendar-get` and the second on the delegated-create walkthrough for the same request.
-The read tier already carries both, so the delegate tier still costs a tenant one permission.
-
-**`outlook-mailbox` is two tools and one permission on purpose.** `outlook_get_mailbox_settings`
-answers "is something forwarding my mail?", and a tenant that wants that answer should not have to
-grant the ability to read a message body to get it. It also cannot answer its own headline question
-completely, and says so in every response: Exchange mailbox forwarding set with
-`Set-Mailbox -ForwardingSmtpAddress` is invisible to every endpoint this connector can call, so an
-empty rule list is not evidence that mail is not being forwarded.
-
-**A write tier asks for `Mail.Read` and `Mail.ReadWrite` both, and that is deliberate.**
-`Mail.ReadWrite` supersedes `Mail.Read`, so a consent screen carrying a reader and a writer shows
-two mail permissions where one would do. `resolve()` unions what the *selected tools* declare and
-each tool declares what its own request needs, which is what makes a 403 name the permission that
-was actually missing rather than the widest one in the deployment — the same reason
-`Team.ReadBasic.All` is separate from `ChannelMessage.Read.All` above. Collapsing them here would
-buy one line on a consent screen and cost every refusal its precision.
-
-**Zero admin consents is not zero administrator.** Every delegated Outlook permission here is
-published by Microsoft as `AdminConsentRequired: No`, and so is every delegated `Calendars.*`
-permission, so the preset table's last column is honestly zero for every Outlook row. A tenant
-running a restricted user-consent policy still stops an unprivileged user at "Need admin
-approval", and nothing in this service's logs says so.
-
-**`outlook-send` is the tier to argue about, and it is one tool wide.** `outlook_send_draft` takes
-an `outlook:///drafts/{id}` handle and nothing else, and only `outlook_draft_mail` and
-`outlook_draft_reply` mint one — so it can send what this connector composed in the same session
-and cannot send a message a reader found. It takes no recipient, subject or body argument either:
-what leaves the mailbox is exactly what a person can already read in their Drafts folder. Microsoft's
-one-shot `POST /me/sendMail` is deliberately never used, because it is the only send that can set
-`saveToSentItems: false` and leave no trace anywhere, and it answers `202` with an empty body so
-nothing can be reported about what it did. On a 2026-07-28 connection, which has no channel for a
-server to ask a person anything mid-call, the tool answers with the question instead and a client
-that can elicit calls it again with the answer — so nothing is sent before an accept bound to that
-same question.
-
-**`MailboxSettings.ReadWrite` is the permission to read hardest, and its display text does not say
-so.** Entra shows it as "Read and write user mailbox settings". It is also the only delegated
-permission that can create an inbox rule, and Microsoft's own worked example for that endpoint is
-`forwardTo` together with `stopProcessingRules` — a standing instruction that copies mail out of
-the tenant, survives the conversation that made it, and needs no `Mail.Send` anywhere in the
-deployment. Nothing here creates a rule, and `outlook_set_automatic_reply` refuses `alwaysEnabled`
-for the same family of reason: a reply with no end date outlives the session and fires at every
-future sender. `outlook-automate` is the one tier where "0 admin consents" is the least
-interesting number in the row.
-
-The `teams-transcripts` row is the one this knob was built for: reading meeting transcripts costs
-**one** admin consent and does not drag in `ChannelMessage.Read.All`, the permission to read every
-channel message in the tenant. It does need one thing no permission can carry — Graph access to Teams
-transcripts is a tenant-wide Teams setting, off by default, that only a Teams administrator can turn
-on (Teams admin centre → Meetings → Meeting settings → Transcript API access). `teams_list_meeting_recordings`
-is **not** behind that switch, which is why the two are separately selectable.
-
-Nothing stops a hand-written `TOOLS_ENABLED` from enabling a tool whose arguments nothing in the
-selection can mint — `teams_read_transcript` without `teams_list_meeting_transcripts`, say. That is deliberate:
-a tool that takes a `teams:///` handle names the tool that mints it in its own refusal, on first use,
-and the alternative is a declaration on every tool file plus a validator to read it. (A tool that
-takes a plain Graph id, like `teams_list_channels`, answers a fabricated one with the generic "check the id
-came from a tool response verbatim".) The presets we ship are checked, per argument.
-
-`get_me` is **always on**, whatever the selection. It is how the server resolves "me"—the identity
-every other answer is correlated against—and `User.Read` is the least-privileged delegated permission
-Microsoft publishes and needs no administrator. So `TOOLS_ENABLED` lists only the rest, presets need
-not mention it, and **no deployment asks for zero permissions**: every one asks for at least
-`User.Read`. Naming it explicitly is accepted, not an error.
-
-An unknown tool name, an unknown preset, an empty list, both variables, or neither each aborts
-startup and names the remedy. A typo never quietly costs a tool.
-
-**The manifest.** At startup, and on `GET /manifest`, the server prints what it resolved to: the
-tools, the exact delegated permissions in Entra's spelling, and which of them need admin consent.
-That list is what an operator hands their Entra administrator, and it is the only place it is written
-down—so it is worth reading before the first sign-in rather than after. A scope the app registration
-does not carry fails at the *authorize* hop, for every user, with nothing in this service's logs:
-Azure omits Graph scopes from the session token, so the server cannot check its own ask against the
-registration. The manifest prints no consent URL; provisioning the registration is out of scope.
-
-The manifest also warns when an exposed tool's description points a model at a tool this deployment
-does not expose. It only warns—tool prose references its siblings densely, and requiring every
-mention would drag permissions into a deployment that wanted none of them.
-
-Narrowing a live deployment is free. Widening one adds a permission to the authorize request, so
-every signed-in user meets AADSTS65001 on the new tool until they sign in again.
-
-In Helm, this rides the chart's existing `env:` map. `values.yaml` deliberately defaults neither
-variable, and `values.schema.json` requires exactly one and carries the preset names as an `enum`, so
-a missing or misspelled selection fails `helm install` instead of crash-looping a pod.
-
-## Microsoft Graph
-
-`graph_client/` wraps the official msgraph-sdk. It does not acquire tokens. FastMCP's On-Behalf-Of
-exchange hands the caller's Graph token as a string; this package sends it.
-
-- **One transport, many callers.** `create_graph_transport(settings)` builds the `httpx.AsyncClient`
-  (connection pool + SDK middleware) once. `graph_client_for(transport, token)` wraps it per call.
-  Per-call clients cause TLS handshakes and leak pools.
-
-- **Throttling is the SDK's.** Its retry middleware waits out Retry-After on 429/503/504 three
-  times, on asyncio.sleep, so a wait never blocks the event loop. This is Graph's documented
-  contract. Nothing here re-implements it. There is no rate limiter. What is added is the typed
-  outcome: throttling that outlasts the retries reaches callers as GraphThrottled with
-  retry_after_seconds, not a status code to re-interpret. Graph rate limits with a 503 as well as
-  with a 429, and Retry-After is the only thing that says which it did — so a 5xx carrying that
-  header is GraphThrottled and the same status without it is GraphUnavailable. Counted as an
-  outage, throttling sends an operator after an incident when the remedy is quota.
-
-- **How long a call may take** is `GRAPH_REQUEST_TIMEOUT_SECONDS` (30), `GRAPH_CONNECT_TIMEOUT_SECONDS`
-  (10) and `GRAPH_MAX_RETRIES` (3), translated into `GraphSettings` at the composition root — nothing
-  under `graph_client/` reads the environment. What an operator is turning is the worst case of one
-  tool call: the request timeout times `GRAPH_MAX_RETRIES + 1` attempts, before any Retry-After wait,
-  per Graph call, and a paged walk makes several.
-
-- **Errors are four types (four remedies):** `GraphThrottled` (429, or a retriable 5xx that named a
-  delay), `GraphForbidden` (401/403), `GraphNotFound` (404), `GraphUnavailable` (a 5xx with nothing
-  to wait for, unreachable, or an SDK failure carrying no response at all). Wrap a tool's Graph work
-  with `with graph_errors(TOOL_NAME):`, and each Graph call inside it with `with graph_step(STEP):`.
-
-- **Two levels of measurement, and why both.** `graph_operations_total` and
-  `graph_operation_duration_seconds` count one *tool call*; `graph_steps_total` and
-  `graph_step_duration_seconds` count one *Graph call inside it*. The operation says a tool got
-  slower, the step says which of its Graph calls did — `teams_list_meeting_recordings` makes three. Both
-  labels are names chosen in code and never read off a URL, which is a hard rule rather than a
-  preference: a Graph URL here is made of almost nothing but chat, message and meeting ids, and a
-  label taken off one is a time series per id. `tests/test_graph_metrics.py` enforces that over every
-  module and pins the step vocabulary to an exact set, so adding a step is a deliberate act.
-
-- **Paging follows @odata.nextLink** via `collect_pages`, with item and scan caps. A channel's
-  messages are the exception and are not walked at all: Graph allows about one request a second on
-  a given channel for the whole app across the tenant, so `teams_browse_channel` makes exactly one and
-  `$top` is its window. Search uses from/size offsets.
-
-
-- **An empty page carrying a next link means keep going, and the walk is ours because of it.**
-  Microsoft documents both halves: "A page of results might contain zero or more results", and read
-  on "until the `@odata.nextLink` property is no longer returned"
-  ([paging](https://learn.microsoft.com/en-us/graph/paging)). The stop condition is the absence of
-  the link, never an empty `value`. The SDK's `PageIterator.enumerate` returns `False` for a page
-  whose `value` is empty and its `iterate` reads that as the end of the collection — so a collection
-  Graph answers `[1 item + nextLink]`, `[nothing + nextLink]`, `[3 more]` came back as one item.
-  This is not hypothetical on this service's own endpoints: a
-  [known issue](https://learn.microsoft.com/en-us/graph/known-issues) has `getAllRecordings` and
-  `getAllTranscripts` returning "a `200 OK` response with an empty collection and an
-  `@odata.nextLink`", with the published workaround "Continue following `@odata.nextLink` even when
-  the collection is empty." Every list-shaped tool here says "that is all of it" by coming back short
-  of `limit`, so believing an empty page does not merely lose items: it turns a window with more
-  behind it into a claim that there is not. `collect_pages` walks through them, bounds a *run* of
-  them (`MAX_EMPTY_PAGES`, and it is not pooled with the scan cap: an empty page spends no scan
-  budget, so a shared budget is no bound on empty pages at all), and raises `GraphPagingUnending`
-  rather than answering short — because a short answer means a cap.
-
-- **A calendar answers "next week" through `calendarView` and never through `/me/events`.**
-  Microsoft says the events collection holds single instance meetings and series masters, and that
-  a calendar view returns the occurrences, exceptions and single instances inside a time range. So
-  a weekly series shows once per week in `outlook_list_events` and once in total in the other
-  collection. `startDateTime` and `endDateTime` are required, and Microsoft states that both are
-  read with the offset written into the value and are not affected by `Prefer: outlook.timezone`,
-  so this connector renders each bound with the offset of the zone the caller named.
-
-- **Times come back in UTC, and this connector converts them here rather than in Exchange.**
-  Graph's `start` and `end` are a naive wall-clock string beside a zone name, and Microsoft states
-  that without `Prefer: outlook.timezone` those values are returned in UTC. That header is sent
-  nowhere. Every answer reports Graph's own two values verbatim and adds the same instant converted
-  with `zoneinfo`, so nothing is lost, and a zone name Exchange rejects cannot fail a whole call.
-  The `dateTime` string carries seven fractional digits, which is one more than
-  `datetime.fromisoformat` accepts.
-
-- **There is no draft state for an event, so a create sends.** Microsoft states that creating an
-  event with attendees mails invitations to all of them and that this *"can't be configured"*, and
-  that `isDraft` marks unsent *updates* rather than an unsent event. An event with an empty
-  attendee list notifies nobody, though a `location` can still name a room's mailbox and Microsoft
-  documents no way to rule that out. So the two creating tools ask a person first, through MCP
-  elicitation, showing both bounds, the zone, whether the event covers whole days, the place, the
-  Teams setting and the body beside the guest list, and nothing here recalls an invitation.
-  `outlook_create_event` asks unless the event names nobody and no place; the delegated create
-  asks either way.
-
-- **Every create carries a `transactionId` and is never retried.** Microsoft publishes the property
-  as the way a client app stops the server from acting twice on one retried POST, and publishes no
-  rule for what a duplicate does. Both halves are therefore used: the id is a uuid5 over the target
-  (the user's own calendar, or the delegated calendar's id) and every value the request carried, so
-  the same request composes the same id, and a request that differs in subject, time, zone, place,
-  body, attendees or the Teams setting composes another. The request also opts out of the SDK's
-  retry middleware. One 503 that Graph already acted on is one invitation rather than four.
-
-- **A calendar id and an event id are mailbox-scoped.** Microsoft states that a share recipient's
-  calendar and event ids used against another mailbox return an error, so only the local-copy
-  routes are used — `/me/calendars/{id}` and `/me/calendars/{id}/events/{id}` — and nothing here
-  addresses `/users/{id}/...`. The same meeting therefore carries a different event id in a
-  delegated copy than in the owner's own mailbox, which is why an event handle names its calendar
-  too. An event read or minted here sends `Prefer: IdType="ImmutableId"`; a container type carries
-  no immutable id, and Microsoft says its regular ids were already constant.
-
-- **Trap:** The SDK bearer provider does not consult the allowed-hosts validator, so the host and
-  scheme checks live in `_CallerTokenProvider` itself. The live exposure is `@odata.nextLink`: a next
-  link re-enters `send_async` and therefore re-authenticates, so a link pointing off Graph would be
-  handed the caller's delegated token. Redirects cannot reach it — the auth provider is consulted
-  once per logical request, before the middleware pipeline the redirect handler loops inside.
+This service owns no database schema and no migrations. The OAuth store creates the service's
+only table, `oauth_kv`.
+
+**A tool is one file.** For example, `tools/get_me.py` owns:
+
+- the tool name
+- the description
+- the Graph permissions
+- the arguments
+- the output shape
+- the Graph request
+- the error messages
+
+A new tool needs one file and one line in the registry. A tool needs no base class and no
+decorator. A tool module publishes three names: `TOOL_NAME`, `GRAPH_PERMISSIONS`, and `register`.
+
+The file `tools/__init__.py` is the central registry. Its function `resolve()` reads an operator's
+selection and returns two things:
+
+- the tool modules to register
+- the union of their `GRAPH_PERMISSIONS`, as the scope list that sign-in asks for
+
+The tool modules derive both lists. No person writes them by hand.
+
+Entra must receive every Graph permission at startup. A forgotten permission cannot be obtained
+later. For this reason, `create_app` resolves the selection once, then hands the same `Selection`
+object to `build_auth` and to `register_tools`.
+
+The test file `tests/test_app.py` reads the tool files from disk. It does this to make sure that
+every registered tool's permissions reach the consent screen.
+
+**The `shared/` package is what a file-per-tool design costs.** Two tool files can otherwise
+disagree about a shared fact. The `shared/` package lists every fact they must not disagree about:
+
+- `handles.py` owns the `teams:///` grammar:
+  - every shape this connector mints
+  - the parser for each shape
+  - the writer for each shape
+  - the permission that each Teams surface reads under
+- `messages.py` owns what a Teams message is:
+  - the shape a message is answered in
+  - the sender, normalized out of every identity shape Graph answers with
+  - the Teams HTML that a message body is unwound from
+  - the test for "did a person write this"
+
+  One function normalizes this type. So the same message, found by one tool and read by another
+  tool, is one type, not two types that must separately agree.
+- `meetings.py` owns how a meeting is reached:
+  - a join URL, resolved to the meeting it identifies
+  - which occurrence of a series a time window means
+  - how far "newest first" holds
+- `identity.py` owns who the signed-in user is. The tool `get_me` reports this identity, and every
+  other answer is correlated against it. This file stops two tools from giving two different
+  answers to "who am I".
+- `seam.py` owns the Graph client a tool receives, with its per-tool On-Behalf-Of token inside it,
+  and the mapping from a Graph failure to advice. A model reads every refusal on this server as one
+  voice, so this mapping must live in one place.
+
+A fact belongs in `shared/` under one condition. Two tools each need their own copy of the fact,
+and a difference between the two copies is a bug a caller can see. Examples are:
+
+- a handle that one tool mints, which another tool answers with a 404 error
+- two different answers to "who am I"
+- a refusal that sounds like it comes from a different server
+
+When only one tool owns a fact, that fact does not belong in `shared/`. Examples are:
+
+- a description
+- an argument
+- an answer shape
+- a request
+- a refusal
+
+**`handles.py` writes one URL segment for each handle family. Four families use two segments
+instead of one.**
+
+Every `teams:///` family, and every `outlook:///` mail family, names a single id. A calendar handle
+also names a single id. Microsoft states that a container type has no immutable id, because its
+regular ids "were already constant".
+
+An event handle is `outlook:///events/{calendar}/{event}`, two segments. An event id is meaningful
+only next to the calendar it was read from. Graph answers a different id for the same meeting in a
+delegated copy. The read request needs both halves: `/me/calendars/{calendar}/events/{event}`.
+`teams:///transcripts/{a}/{b}` uses the same two-segment shape, for the same reason.
+
+This layout follows seven layering rules:
+
+1. `shared/` imports no tool module. Only `shared/seam.py` imports FastMCP. This keeps the
+   framework out of the handle grammar and the rest of the shared vocabulary.
+2. `graph_client/` imports nothing from this application. It uses its own frozen `GraphSettings`
+   object, instead of reading the configuration.
+3. `tools/` imports only `shared/`, `graph_client/`, and FastMCP, and nothing else from this
+   package, not even `server/`. A tool file that imports `server/` is a tool file in name only.
+4. No tool module imports another tool module. This is what makes each tool independent, and it is
+   the reason this layout exists.
+5. Only `create_app` constructs a configuration object. Nothing downstream can read the environment
+   again on its own and disagree with the app it runs in.
+6. `shared/handles.py` is the only module that builds or parses a `teams:///`, `outlook:///`,
+   `sharepoint:///`, or `onenote:///` URI. Showing the shape of a URI to a model, in a description,
+   an `examples=` field, or a refusal message, is prose. It is not building or parsing a URI.
+7. A package is entered through its `__init__` file. The packages `graph_client/`, `server/`, and
+   `tools/` each publish an `__all__` list. The `shared/` package deliberately does not. It is a
+   grouping whose modules are the real units. Each consumer states which module it depends on, at
+   the import line.
+
+The test file `tests/test_layering.py` enforces every rule above, and each rule has its own guard.
+When a rule has nothing real behind it, the rule has gone vacuous, and its guard fails. Examples of
+a vacuous rule are:
+
+- an empty file tree to walk
+- a missing file that the rule forbids reaching past
+- a framework that nothing imports any more
+- a second tool module that no longer exists, so "another tool module" names nothing
+- a package that publishes no `__all__` list
+
+One more rule stops any module from addressing a single meeting recording. Both ways to reach one
+recording are defects. Its content is a video that can run thirty hours, and its
+`recordingContentUrl` is a Graph URL that only this connector's own token opens. The tool
+`tools/teams_list_meeting_recordings.py` returns metadata and availability only, never the recording
+itself, and `tests/test_layering.py` enforces this as a failing test.
+
+## Code generation
+
+The Python tool registry, `office_365_mcp.tools`, is the one source of truth for this service. Two
+scripts generate files from it, so no person writes those files by hand.
+
+The script `scripts/render-terraform-registry.py` generates
+`deploy/terraform/azure/office-365-mcp-entra-application/registry.generated.tf.json`. It imports
+the tool modules, the always-on tool, and the presets from `office_365_mcp.tools`. It also imports
+the admin-consent table from `office_365_mcp.server.manifest`, and the requestable-permission list
+from `office_365_mcp.shared.seam`. Run it with `--check` to find drift between the Python source
+and the generated Terraform file. CI uses this mode.
+
+The repo-root script `scripts/render-values-schema.sh` generates this chart's
+`deploy/helm-charts/office-365-mcp/values.schema.json`. It merges a shared base Helm schema with
+this chart's own `values.additional.schema.json`. It also has a `--check` mode. CI runs this mode
+across every chart in the repository, not only this one.
+
+Two tables are the exception. Developers keep them by hand, and no script generates them. This is
+the real, bounded risk of drift.
+
+- `NEEDS_ADMIN_CONSENT`, in `server/manifest.py`. When the manifest renders, a runtime assertion
+  makes sure that every permission has an entry. No build-time check exists for it.
+- `REQUESTABLE_PERMISSIONS`, in `shared/seam.py`. Convention and tests keep it correct, not
+  generation.
+
+The function `_stale_promises()`, in `server/manifest.py`, reads every selected tool's description.
+When a description names a tool that the current deployment does not expose, `_stale_promises()`
+warns about it, and does not fail the build. This is a deliberate design choice, not a gap. Read the
+docstring near that function for why.
 
 ## Logs
 
-Every line is one pino-json object on **stderr**, at `LOG_LEVEL` (default `info`), which is what the
-chart's `logging.unique.app/format: pino-json` pod label promises the log pipeline. Nothing is
-written to stdout: uvicorn's access lines, FastMCP's own lines and Python warnings are all routed
-through the same handler, because each one arrives outside that contract by default —
-`src/office_365_mcp/logging.py` says how and why for each.
+Every log line is one pino-json object, on **stderr**. An operator sets the level with the
+`LOG_LEVEL` variable (default `info`). This matches what the chart's pod label,
+`logging.unique.app/format: pino-json`, promises the log pipeline.
 
-Every line carries `correlation_id`, so a line can always be grouped: the trace id of the active
-span, else the MCP request id of the message being handled, else the id of the HTTP request, else the
-id of this process's boot. `trace_id`, `request_id`, `session_id` and `http_request_id` appear beside
-it when they are known. An `x-request-id` from a gateway is used as-is.
+Nothing goes to stdout. By default, three other sources write outside this contract: uvicorn's
+access lines, FastMCP's own lines, and Python warnings. This service routes all three through the
+same handler instead, onto stderr as pino-json. The file `src/office_365_mcp/logging.py` states how
+and why, for each of the three.
 
-Secrets never reach a line. A field whose name reads like a credential (`Authorization`,
-`x-api-key`, `client_secret`, however it is spelled) is replaced with `[Redacted]`, nested inside an
-`extra=` as well; so is a value shaped like one — a bearer token, a JWT, a password in a URL, a
-credential in a query string — wherever it appears, including inside an exception's stack. Two
-independent nets, because a secret with an innocent name and an innocent-looking secret are
-different failures.
+Every line carries a `correlation_id` field, so a reader can always group a line with its related
+lines. The value comes from the first of these that exists:
+
+1. the trace id of the active span
+2. else, the MCP request id of the message this line is about
+3. else, the id of the HTTP request
+4. else, the id of this process's own boot
+
+When the service knows `trace_id`, `request_id`, `session_id`, or `http_request_id`, these fields
+appear beside `correlation_id`. This service uses an `x-request-id` header from a gateway as-is.
+
+No secret reaches a log line. Two independent nets remove secrets, because a credential with an
+innocent-sounding field name, and an innocent-looking credential value, are two different failures:
+
+- **By field name.** A field can have a name similar to a credential name. Examples are
+  `Authorization`, `x-api-key`, and `client_secret`, in any spelling. This service replaces that
+  field's value with `[Redacted]`. This also applies inside an `extra=` mapping.
+- **By value shape.** A value can have the shape of a credential. Examples are a bearer token, a
+  JWT, a password in a URL, and a credential in a query string. This service replaces that value
+  with `[Redacted]` wherever it appears, including inside an exception's stack trace.
 
 ## Run locally
 
@@ -760,37 +208,49 @@ uv sync
 uv run office-365-mcp
 ```
 
-No migration needed. The database needs an empty schema the app user can CREATE in. The OAuth
-store creates its table on first use.
+This service needs no migration. The database needs an empty schema, and the app user must have
+CREATE rights in it. The OAuth store creates its table the first time the service uses it.
 
-- MCP endpoint: `http://localhost:9544/mcp` (HTTP, authenticated)
-- Health: `GET /health` (liveness via unique_mcp.monitoring.setup_ops)
-- Probe: `GET /probe` (process-up via setup_ops)
-- Ready: `GET /ready` (503 when Postgres unreachable; asks the OAuth store, the only connection
-  a sign-in depends on. A different connection could report ready while sign-in still fails.)
-- Manifest: `GET /manifest` (the resolved tool surface and the exact permissions sign-in asks for;
-  unauthenticated, and it leaks nothing—the same scopes are in the authorize URL already)
-- Metrics: `GET /metrics` (Prometheus via setup_ops). Beside unique_toolkit's own HTTP series, four
-  say what this connector asked Microsoft Graph for: `graph_requests_total{operation,status}`,
-  `graph_request_duration_seconds{operation}`, `graph_throttled_total{operation,retried}` and
-  `graph_pages_scanned{operation}`. `operation` is the tool's own name and never a URL — a label
-  taken off a Graph URL would be one time series per chat. `status` is the remedy the failure needs
-  (`forbidden`, `not_found`, `throttled`, `unavailable`), not the HTTP code. `retried` says whether
-  the SDK spent its retries on the throttling or refused the wait Graph asked for.
-- Traces: off unless an `OTEL_*` variable says where to send them. `OTEL_TRACES_EXPORTER=console`
-  prints spans to stderr; an `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` sends them to a collector and
-  needs nothing else. `.env.example` lists the knobs, the chart wires them from
-  `internalServices.dependencies.otelTraces.enabled`. Latency stays on `/metrics` only: the ASGI
-  instrumentation's own duration histogram is switched off so one series measures it. No span
-  carries a Graph URL: the SDK sets the full URL as `url.full` by default in two places—the request
-  span and the URL replacer's own span—and both are closed, because a Graph URL here is a chat,
-  message or transcript id and almost nothing else. The request span keeps `url.uri_template`,
-  which is what a latency breakdown groups by.
+Once the service runs, it exposes these endpoints:
+
+- **MCP endpoint**, `http://localhost:9544/mcp`. HTTP, authenticated.
+- **Health**, `GET /health`. Reports liveness, through `unique_mcp.monitoring.setup_ops`.
+- **Probe**, `GET /probe`. Reports that the process is up, through `setup_ops`.
+- **Ready**, `GET /ready`. When Postgres is unreachable, this returns 503. It asks only the OAuth
+  store, because that is the only connection a sign-in depends on. Even when sign-in still fails, a
+  different connection can report ready.
+- **Manifest**, `GET /manifest`. Returns the resolved tool surface and the exact permissions that
+  sign-in asks for. It needs no authentication, and it leaks nothing: the authorize URL already
+  carries the same scopes.
+- **Metrics**, `GET /metrics`. Prometheus, through `setup_ops`. Beside `unique_toolkit`'s own HTTP
+  series, four metrics report what this connector asked Microsoft Graph for:
+  - `graph_requests_total{operation,status}`
+  - `graph_request_duration_seconds{operation}`
+  - `graph_throttled_total{operation,retried}`
+  - `graph_pages_scanned{operation}`
+
+  The label `operation` is always the tool's own name, never a URL. A label taken from a Graph URL
+  creates one time series for each chat, so this service does not use one. The label `status` names
+  the remedy a failure needs, for example `forbidden`, `not_found`, `throttled`, or `unavailable`,
+  rather than the HTTP status code. The label `retried` states whether the SDK spent its retries on
+  the throttling, or refused the wait that Graph asked for.
+- **Traces**. Off, unless an `OTEL_*` variable states where to send them.
+  - `OTEL_TRACES_EXPORTER=console` prints spans to stderr.
+  - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` sends spans to a collector, and needs no other
+    configuration.
+  - The file `.env.example` lists this configuration. The chart sets it from
+    `internalServices.dependencies.otelTraces.enabled`.
+  - Latency stays on `/metrics` only. This service switches off the ASGI instrumentation's own
+    duration histogram, so only one series measures latency.
+  - No span carries a Graph URL. By default, the SDK sets the full URL as `url.full` in two places:
+    the request span, and the URL replacer's own span. This service switches off both, because a
+    Graph URL here is almost always a chat id, a message id, or a transcript id. The request span
+    keeps `url.uri_template` instead, which is the field a latency breakdown groups by.
 
 ## Tests
 
-Integration tests start a Postgres container (Docker must be running). The app under test
-creates the one table it needs, as in production.
+Integration tests start a Postgres container. Docker must run for this. The app under test creates
+the one table it needs, the same way production does.
 
 ```bash
 uv run pytest
