@@ -24,7 +24,7 @@ field left out keeps its own class default, and the variable left unset keeps al
 
 #### `search`
 
-`UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_SEARCH_TOOL_CONFIG`
+`UNIQUE_MCP_TOOL_SEARCH_TOOL_CONFIG`
 
 The default is deep (query mode, multi-query, reranking, LLM selection), so the admin UI's own
 form is the practical way to set most of it; see
@@ -42,7 +42,7 @@ for the full shape. A partial override, changing just the filter and the result 
 
 #### `content_tree`
 
-`UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_CONTENT_TREE_TOOL_CONFIG`
+`UNIQUE_MCP_TOOL_CONTENT_TREE_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/content_tree/config.py))
 
 Defaults:
@@ -61,7 +61,7 @@ Defaults:
 
 #### `content_metadata`
 
-`UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_CONTENT_METADATA_TOOL_CONFIG`
+`UNIQUE_MCP_TOOL_CONTENT_METADATA_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/content_metadata/config.py))
 
 Defaults:
@@ -82,7 +82,7 @@ any of your own, or the catalog narrows to just what you passed.
 
 #### `read_file`
 
-`UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_READ_FILE_TOOL_CONFIG`
+`UNIQUE_MCP_TOOL_READ_FILE_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/read_file/config.py))
 
 Default:
