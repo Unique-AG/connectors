@@ -77,6 +77,11 @@ it and you know which `path` keys exist. Skip it and you are guessing at a
 field name, and a filter naming a field that does not exist returns nothing.
 That reads exactly like a knowledge base with no matching content.
 
+On a large scope, call it with `counts_only=true` first: field names and how
+many distinct values each has, no value lists. Then call again with
+`fields=['the one you need']` to fetch just that field's values. Two cheap
+calls beat one call whose value lists you never asked for and don't need.
+
 Two things it does not promise. Many knowledge bases carry little or no
 custom taxonomy, so an empty result is normal, not a failure. Fall back to
 a scoped `search` or a `content_tree(mode='search')` filename lookup rather
