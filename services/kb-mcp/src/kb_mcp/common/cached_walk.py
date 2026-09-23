@@ -88,4 +88,4 @@ async def resolve_filtered_snapshot(
         timeout=timeout,
         max_concurrent_directory_listings=max_concurrent_directory_listings,
     )
-    return sorted_by_depth(filter_snapshot(snapshot, post_filter))
+    return filter_snapshot(snapshot, post_filter)
