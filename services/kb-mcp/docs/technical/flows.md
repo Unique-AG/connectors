@@ -44,7 +44,7 @@ sequenceDiagram
     participant K as kb-mcp
     participant U as Unique API
 
-    C->>K: search(query, folder_ids?, metadata_filter?)
+    C->>K: search(search_string, folder_ids?, metadata_filter?)
     K->>K: Parse filter (invalid UniqueQL returns a tool error)
     K->>K: Resolve user + company from session
     K->>K: AND admin filter, admin scopes, folder_ids, caller filter
@@ -78,8 +78,8 @@ the cached walk.
 
 `read_file` downloads content by `content_id` and returns it up to `max_tokens_per_call` (admin
 default 8000). Larger files are split into virtual pages of that size, selectable with `start_page`
-and `end_page`. A caller may request fewer tokens than the admin default; a larger request is
-clamped without error.
+and `end_page`. A caller may raise or lower that default; if the file still doesn't fit in one call
+and no page range was given, the call errors instead of silently truncating.
 
 ## Related Documentation
 
