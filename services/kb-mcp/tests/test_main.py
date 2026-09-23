@@ -84,3 +84,16 @@ def test_server_icon_is_a_readable_webp_data_uri():
     header, _, payload = icon.src.partition(",")
     assert header == "data:image/webp;base64"
     assert base64.b64decode(payload).startswith(b"RIFF")
+
+
+def test_skill_tools_fully_enabled_requires_every_known_tool(monkeypatch):
+    from kb_mcp.main import skill_tools_fully_enabled
+    from kb_mcp.settings import get_settings
+
+    monkeypatch.setenv("KB_MCP_ENABLED_TOOLS", "search,read_file")
+    get_settings.cache_clear()
+    assert skill_tools_fully_enabled(get_settings()) is False
+
+    monkeypatch.delenv("KB_MCP_ENABLED_TOOLS")
+    get_settings.cache_clear()
+    assert skill_tools_fully_enabled(get_settings()) is True

@@ -24,8 +24,11 @@ Use `search` for questions about what documents *say*. Use `content_tree`
 for questions about which documents *exist*. "What is our parental leave
 policy" is a search. "Which policies do we have" is a content tree.
 
-When you want both, search first. It answers most questions on its own,
-and an unrestricted search is the correct default.
+When a request touches both, and names no folder, search first with no
+scope: it answers most questions on its own, and an unrestricted search is
+the correct default. When the request also names a folder, get its
+`folder_id` before searching, so the scope in the `search` call matches the
+scope the user actually asked about.
 
 ## Scope with a folder_id, do not filter afterwards
 

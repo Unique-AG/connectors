@@ -10,6 +10,7 @@ from typing import override
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
+from fastmcp.server.providers.base import Provider
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from mcp.types import Icon
 from starlette.middleware import Middleware
@@ -23,7 +24,7 @@ from kb_mcp.common.references import SERVER_INSTRUCTIONS_CITATION_GUIDANCE
 from kb_mcp.common.tree_cache import expire_idle_trees_loop
 from kb_mcp.health import PoolHealthMiddleware
 from kb_mcp.http_client import install_pooled_http_client
-from kb_mcp.settings import ENV_FILE, Settings, get_settings
+from kb_mcp.settings import ENV_FILE, KNOWN_MCP_TOOLS, Settings, get_settings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,6 +49,12 @@ class _DowngradeMemoryTrimNoise(logging.Filter):
             record.levelno = logging.DEBUG
             record.levelname = logging.getLevelName(logging.DEBUG)
         return True
+
+
+def skill_tools_fully_enabled(settings: Settings) -> bool:
+    """The skill's worked example calls all four tools, so a narrower
+    KB_MCP_ENABLED_TOOLS allowlist would advertise tools not on tools/list."""
+    return settings.enabled_tools == KNOWN_MCP_TOOLS
 
 
 def apply_enabled_tools(mcp: FastMCP, settings: Settings) -> None:
@@ -95,15 +102,16 @@ def main() -> None:
 
     oidc_proxy = build_auth(settings)
 
+    providers: list[Provider] = [FileSystemProvider(Path(__file__).parent / "tools")]
+    if skill_tools_fully_enabled(settings):
+        providers.append(SkillsDirectoryProvider(Path(__file__).parent / "skills"))
+
     mcp = FastMCP(
         "Unique Knowledge Base Search MCP",
         instructions=SERVER_INSTRUCTIONS_CITATION_GUIDANCE,
         icons=[_server_icon()],
         auth=oidc_proxy,
-        providers=[
-            FileSystemProvider(Path(__file__).parent / "tools"),
-            SkillsDirectoryProvider(Path(__file__).parent / "skills"),
-        ],
+        providers=providers,
         lifespan=tree_cache_expire_lifespan,
     )
     apply_enabled_tools(mcp, settings)
