@@ -29,23 +29,37 @@ honoured.
 Identity is resolved per call from the OIDC session, never from a tool argument. An MCP client
 cannot ask `kb-mcp` to act as somebody else.
 
-On top of that identity, four filters are combined with `AND` before the query reaches the Unique
-API:
+On top of that identity, four filters combine with `AND` before the query reaches the Unique API,
+each of them optional:
 
-| Filter | Set by | Optional |
-|---|---|---|
-| Admin `metadata_filter` (UniqueQL) | Unique admin UI, per tool | Yes |
-| Admin `scope_ids` | Unique admin UI, folder allowlist | Yes |
-| `folder_ids` | The calling LLM, per call | Yes |
-| `metadata_filter` (UniqueQL) | The calling LLM, per call | Yes |
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+flowchart TD
+    AF["Admin metadata_filter\nUnique admin UI, per tool"]
+    AS["Admin scope_ids\nUnique admin UI, folder allowlist"]
+    CF["folder_ids\nthe calling LLM, per call"]
+    CM["metadata_filter\nthe calling LLM, per call"]
+    AND(("AND"))
+    Id["Caller identity\nfrom the OIDC session"]
+    API["Unique API\nenforces the caller's own permissions"]
+    Result["Result: only ever narrowed"]
 
-Because the combination is an `AND`, every filter can only ever narrow the result set. An LLM
-cannot widen its own reach by supplying a permissive filter, and it cannot reach outside the user's
-permissions in the first place: those are enforced upstream, not by these filters.
+    AF --> AND
+    AS --> AND
+    CF --> AND
+    CM --> AND
+    AND --> API
+    Id --> API
+    API --> Result
+```
 
-`content_metadata` is the one exception to the last row: it takes `folder_ids`/`folder_paths` but
-no caller `metadata_filter`, only the admin one. It exists to discover what a filter could say, not
-to apply one.
+Because the combination is an `AND`, an LLM can't widen its own reach by supplying a permissive
+filter, and it can't reach outside the user's own permissions in the first place: those are
+enforced upstream by the Unique API, not by these filters.
+
+`content_metadata` is the one exception: it takes `folder_ids`/`folder_paths` but no caller
+`metadata_filter`, only the admin one. It exists to discover what a filter could say, not to apply
+one.
 
 !!! note "An empty result is ambiguous"
     A search returning nothing may mean the user has no matching content, or that an admin
