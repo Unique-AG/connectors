@@ -108,7 +108,7 @@ def _arguments(tool: Tool) -> Mapping[str, Mapping[str, object]]:
 
 
 async def _registered(transport: httpx.AsyncClient) -> Tool:
-    """The tool as `register` declares it, schema patch and all."""
+    """The tool exactly as `register` declares it."""
     mcp: FastMCP[None] = FastMCP("Mark Mail Under Test")
     register(mcp, transport)
     tool = await mcp.get_tool(TOOL_NAME)

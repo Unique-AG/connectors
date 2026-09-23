@@ -566,7 +566,7 @@ class TestWhatItRefuses:
 
         assert searched.call_count == 0
 
-    async def test_the_refusal_names_every_criterion_the_schema_publishes(
+    async def test_the_refusal_names_every_criterion_search_criteria_defines(
         self, client: GraphServiceClient
     ) -> None:
         """A criterion added to `SearchCriteria` reaches `CRITERIA`, and through it this refusal,
