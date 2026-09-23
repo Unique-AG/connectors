@@ -84,3 +84,31 @@ def test_server_icon_is_a_readable_webp_data_uri():
     header, _, payload = icon.src.partition(",")
     assert header == "data:image/webp;base64"
     assert base64.b64decode(payload).startswith(b"RIFF")
+
+
+def test_skill_required_tools_are_known_tool_names():
+    from kb_mcp.main import _SKILL_REQUIRED_TOOLS
+    from kb_mcp.settings import KNOWN_MCP_TOOLS
+
+    assert _SKILL_REQUIRED_TOOLS <= KNOWN_MCP_TOOLS
+
+
+def test_skill_tools_fully_enabled_requires_every_tool_the_skill_uses(monkeypatch):
+    from kb_mcp.main import skill_tools_fully_enabled
+    from kb_mcp.settings import get_settings
+
+    monkeypatch.setenv("KB_MCP_ENABLED_TOOLS", "search,read_file")
+    get_settings.cache_clear()
+    assert skill_tools_fully_enabled(get_settings()) is False
+
+    monkeypatch.delenv("KB_MCP_ENABLED_TOOLS")
+    get_settings.cache_clear()
+    assert skill_tools_fully_enabled(get_settings()) is True
+
+
+def test_server_instructions_points_at_the_skill_only_when_available():
+    from kb_mcp.common.references import SERVER_INSTRUCTIONS_SKILL_POINTER
+    from kb_mcp.main import server_instructions
+
+    assert SERVER_INSTRUCTIONS_SKILL_POINTER in server_instructions(True)
+    assert SERVER_INSTRUCTIONS_SKILL_POINTER not in server_instructions(False)

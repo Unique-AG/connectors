@@ -1,0 +1,12 @@
+{
+  "name": "connectors",
+  "owner": {
+    "name": "Unique-AG"
+  },
+  "plugins": [
+    {
+      "name": "kb-mcp",
+      "source": "./services/kb-mcp/src/kb_mcp"
+    }
+  ]
+}

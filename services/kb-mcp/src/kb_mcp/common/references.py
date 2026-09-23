@@ -179,6 +179,15 @@ SERVER_INSTRUCTIONS_CITATION_GUIDANCE = (
     "stay `folder_ids` from `content_tree` — UniqueQL is not for folders."
 )
 
+# Resources are pull-based, unlike a tool schema; `instructions` is the field
+# clients may auto-inject, so it's what bootstraps a client into fetching one.
+SERVER_INSTRUCTIONS_SKILL_POINTER = (
+    "This server also serves an MCP resource, skill://unique-kb-mcp/SKILL.md, "
+    "documenting how to sequence content_tree, content_metadata, search and "
+    "read_file together. List and read it before your first call if your "
+    "client supports MCP resources — it is not loaded automatically."
+)
+
 MIME_TYPE_PDF = "application/pdf"
 MIME_TYPE_JSON = "application/json"
 MIME_TYPE_TEXT_PLAIN = "text/plain"
