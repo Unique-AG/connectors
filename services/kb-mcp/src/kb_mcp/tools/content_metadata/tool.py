@@ -488,7 +488,7 @@ async def content_metadata(
             if snapshot.complete
             else []
         )
-        page = _value_limit(limit, config.max_values_per_field)
+        value_limit = _value_limit(limit, config.max_values_per_field)
         if counts_only:
             output = ContentMetadataOutput(
                 complete=snapshot.complete,
@@ -505,7 +505,7 @@ async def content_metadata(
             truncation: list[str] = []
             for meta_field in ranked_fields:
                 counter = field_value_counts[meta_field]
-                shown = [value for value, _count in counter.most_common(page)]
+                shown = [value for value, _count in counter.most_common(value_limit)]
                 metadata.append({meta_field: shown})
                 if len(shown) < len(counter):
                     truncation.append(
