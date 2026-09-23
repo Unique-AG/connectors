@@ -29,7 +29,8 @@ own code default.
 ```json
 {
   "service_config": {
-    "metadata_filter": { "path": ["mimeType"], "operator": "equals", "value": "application/pdf" }
+    "metadata_filter": { "path": ["mimeType"], "operator": "equals", "value": "application/pdf" },
+    "filtering": { "limit": 50, "score_threshold": 0.3 }
   }
 }
 ```
