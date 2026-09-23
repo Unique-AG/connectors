@@ -1,6 +1,6 @@
 # kb-mcp
 
-Knowledge Base Search MCP — search Unique knowledge bases, browse the content
+Unique Knowledge Base Search MCP — search Unique knowledge bases, browse the content
 tree, and read files. Migrated from `unique-ag/ai` tutorials (`mcp_search`).
 
 Auth is Zitadel OIDC via [`unique-mcp`](https://pypi.org/project/unique-mcp/).

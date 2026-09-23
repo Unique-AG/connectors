@@ -1,13 +1,16 @@
 import asyncio
+import base64
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
+from functools import cache
 from pathlib import Path
 from typing import override
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
+from mcp.types import Icon
 from starlette.middleware import Middleware
 from unique_mcp.logging import configure_logging
 from unique_mcp.monitoring import setup_ops
@@ -22,6 +25,16 @@ from kb_mcp.http_client import install_pooled_http_client
 from kb_mcp.settings import ENV_FILE, Settings, get_settings
 
 _LOGGER = logging.getLogger(__name__)
+
+_LOGO_PATH = Path(__file__).parent / "assets" / "logo.webp"
+
+
+@cache
+def _server_icon() -> Icon:
+    """The connect-time icon: the OAuth consent page and serverInfo.icons both
+    read FastMCP's `icons=`, and fall back to FastMCP's own logo without it."""
+    logo_b64 = base64.b64encode(_LOGO_PATH.read_bytes()).decode("ascii")
+    return Icon(src=f"data:image/webp;base64,{logo_b64}", mime_type="image/webp")
 
 
 class _DowngradeMemoryTrimNoise(logging.Filter):
@@ -82,8 +95,9 @@ def main() -> None:
     oidc_proxy = build_auth(settings)
 
     mcp = FastMCP(
-        "Knowledge Base Search",
+        "Unique Knowledge Base Search MCP",
         instructions=SERVER_INSTRUCTIONS_CITATION_GUIDANCE,
+        icons=[_server_icon()],
         auth=oidc_proxy,
         providers=[FileSystemProvider(Path(__file__).parent / "tools")],
         lifespan=tree_cache_expire_lifespan,
