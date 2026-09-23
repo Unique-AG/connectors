@@ -8,15 +8,27 @@ onto typed values under `mcpConfig`. See `values.schema.json` for field-level de
 [Minimal Values](./deployment.md#Minimal-Values).
 
 Tool behavior is configured separately: per-tool environment variables are documented with the
-tools they affect in [Tools](../technical/tools.md), and the rest is set by an admin in the Unique
-admin UI.
+tools they affect in [Tools](../technical/tools.md). Business rules per tool (a `metadata_filter`,
+a folder allowlist, a result `limit`) are configured differently. See Admin Configuration below.
+
+### Admin Configuration
+
+When Unique AI itself calls `kb-mcp` as the MCP host, it injects each tool's admin-configured
+settings into every call automatically: an admin changes them from inside the Unique AI app, and
+nothing on `kb-mcp`'s side needs a restart or redeploy.
+
+A client with no such host, a standalone deployment, Claude Desktop, Cursor, has nowhere to inject
+them from, so the same settings fall back to an environment variable instead:
+`UNIQUE_MCP_TOOL_<SERVER>_<CONFIG>_CONFIG`, holding a JSON object matching that tool's config shape.
+For `search` on this server that's `UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_SEARCH_TOOL_CONFIG`.
+Unset either way, the tool falls back to its own code default.
 
 ### Required
 
 | Variable | Description |
 |---|---|
 | `UNIQUE_MCP_PUBLIC_BASE_URL` | Public URL MCP clients and OAuth use; must match `routes.hostname` |
-| `UNIQUE_API_BASE_URL` | Base URL of the Unique API (`node-chat`) this instance calls |
+| `UNIQUE_API_BASE_URL` | Base URL of the Unique API this instance calls |
 | `ZITADEL_BASE_URL` | Zitadel instance base URL |
 | `ZITADEL_CLIENT_ID` | Public PKCE client id, not a secret |
 | `ZITADEL_JWT_SIGNING_KEY` | Signs `kb-mcp`'s own downstream OAuth-proxy JWTs; never sent to Zitadel |
