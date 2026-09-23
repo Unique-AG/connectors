@@ -569,9 +569,9 @@ class TestWhatItRefuses:
     async def test_the_refusal_names_every_criterion_the_schema_publishes(
         self, client: GraphServiceClient
     ) -> None:
-        """A criterion added to `SearchCriteria` reaches the schema's `anyOf` automatically, so it
-        has to reach the refusal too. Otherwise a client is turned away by a rule whose list of
-        ways out is missing the one it wanted."""
+        """A criterion added to `SearchCriteria` reaches `CRITERIA`, and through it this refusal,
+        automatically. Otherwise a client is turned away by a rule whose list of ways out is
+        missing the one it wanted."""
         with pytest.raises(ToolError) as refusal:
             await search_mail(client, SearchCriteria(), limit=25)
 
@@ -584,7 +584,7 @@ class TestWhatItRefuses:
     ) -> None:
         """A window with nothing to search for is outlook_list_mail's question: it orders by
         receipt and reaches the drafts this index does not. So the bounds are outside
-        `SearchCriteria`, which is what both the `anyOf` and this refusal are derived from, and a
+        `SearchCriteria`, which is what `CRITERIA` and this refusal are both derived from, and a
         date cannot satisfy "at least one criterion"."""
         with pytest.raises(ToolError, match="at least one of"):
             await search_mail(

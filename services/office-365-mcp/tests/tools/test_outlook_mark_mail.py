@@ -22,7 +22,6 @@ from office_365_mcp.shared import identity
 from office_365_mcp.shared.handles import MailMessageHandle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE
 from office_365_mcp.tools.outlook_mark_mail import (
-    CHANGES,
     GRAPH_PERMISSIONS,
     MAX_MESSAGES,
     TOOL_NAME,
@@ -106,10 +105,6 @@ def _sent(route: respx.Route) -> Mapping[str, object]:
 
 def _arguments(tool: Tool) -> Mapping[str, Mapping[str, object]]:
     return cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
-
-
-def _constraint(tool: Tool, keyword: str) -> object:
-    return cast("Mapping[str, object]", tool.parameters)[keyword]
 
 
 async def _registered(transport: httpx.AsyncClient) -> Tool:
@@ -414,16 +409,6 @@ class TestWhatItRefusesBeforeWritingAnything:
             _ = await mark_mail(client, message_refs=_REFS[:1], change=MarkChange())
 
         assert route.call_count == 0
-
-    async def test_the_schema_asks_for_at_least_one_of_the_three(
-        self, transport: httpx.AsyncClient
-    ) -> None:
-        """FastMCP validates against the signature rather than against this, which is why the
-        runtime refusal above exists as well."""
-        tool = await _registered(transport)
-
-        assert _constraint(tool, "anyOf") == [{"required": [name]} for name in CHANGES]
-        assert set(CHANGES) == {"is_read", "flagged", "importance"}
 
     @pytest.mark.parametrize(
         "not_a_message",
