@@ -48,11 +48,21 @@ HTTP connection pool. Helm deployments can set the same values under
 |------|---------|
 | `search` | Semantic / internal KB search |
 | `content_tree` | Browse / list / fuzzy-search visible folders & files |
+| `content_metadata` | Discover metadata fields/values to build a `search` filter |
 | `read_file` | Download and return file content by `content_id` |
 
 Which tools are advertised on `/mcp` is configurable via `KB_MCP_ENABLED_TOOLS`
-(unset = all three) — see `.env.example` / `mcpConfig.enabledTools` in the Helm
+(unset = all four) — see `.env.example` / `mcpConfig.enabledTools` in the Helm
 chart.
+
+## Agent skill
+
+The server also serves `unique-kb-mcp` as an MCP resource (`skill://unique-kb-mcp/SKILL.md`),
+documenting how to use the four tools together. It's only served when all
+four tools are enabled. A narrower `KB_MCP_ENABLED_TOOLS` withholds it
+instead of advertising a skill that names tools which aren't there. The
+same skill is installable with
+`npx skills add Unique-AG/connectors` via the repo-root `.claude-plugin/marketplace.json`.
 
 ## Tests
 
