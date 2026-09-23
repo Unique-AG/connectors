@@ -330,7 +330,7 @@ async def content_metadata(
     config: ContentMetadataToolConfig = Depends(
         get_tool_config(ContentMetadataToolConfig)
     ),
-) -> ContentMetadataOutput | ToolResult:
+) -> ToolResult:
     """Discover metadata fields and values on the knowledge base's visible
     content (optionally scoped to folder_ids), so a caller can build a
     metadata filter for search. Returns one JSON object with complete, an
@@ -525,7 +525,11 @@ async def content_metadata(
             cid,
             field_count,
         )
-        return output
+        payload = output.model_dump()
+        return ToolResult(
+            content=[TextContent(type="text", text=output.model_dump_json())],
+            structured_content=payload,
+        )
     except Exception as exc:
         _LOGGER.exception(
             "content_metadata error correlation_id=%s error_type=%s",

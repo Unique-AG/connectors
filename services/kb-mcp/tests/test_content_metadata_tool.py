@@ -16,10 +16,7 @@ from pydantic import SecretStr
 from kb_mcp.common import cached_walk
 from kb_mcp.common import tree_cache as ct_cache
 from kb_mcp.tools.content_metadata import ContentMetadataToolConfig, content_metadata
-from kb_mcp.tools.content_metadata.tool import (
-    ContentMetadataOutput,
-    _flatten_metadata_value,
-)
+from kb_mcp.tools.content_metadata.tool import _flatten_metadata_value
 
 pytestmark = pytest.mark.ai
 
@@ -118,11 +115,7 @@ def _files(*metadata_dicts: dict) -> list[tuple[MagicMock, PurePosixPath]]:
     ]
 
 
-def _body(result: ToolResult | ContentMetadataOutput) -> dict[str, Any]:
-    if isinstance(result, ContentMetadataOutput):
-        dumped = result.model_dump()
-        assert isinstance(dumped, dict)
-        return dumped
+def _body(result: ToolResult) -> dict[str, Any]:
     assert result.content is not None
     assert len(result.content) == 1
     parsed = json.loads(result.content[0].text)  # type: ignore[union-attr]
@@ -130,7 +123,7 @@ def _body(result: ToolResult | ContentMetadataOutput) -> dict[str, Any]:
     return parsed
 
 
-def _payload(result: ToolResult | ContentMetadataOutput) -> list[dict[str, Any]]:
+def _payload(result: ToolResult) -> list[dict[str, Any]]:
     body = _body(result)
     catalog = body["metadata"] if "metadata" in body else body["metadata_counts"]
     assert isinstance(catalog, list)
@@ -174,7 +167,7 @@ async def test_returns_json_list_of_single_key_field_to_values_objects():
     ):
         result = await content_metadata(config=ContentMetadataToolConfig())
 
-    assert isinstance(result, ContentMetadataOutput)
+    assert isinstance(result, ToolResult)
     body = _body(result)
     assert body["complete"] is True
     assert "notice" not in body
