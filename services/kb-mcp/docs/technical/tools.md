@@ -9,8 +9,9 @@
 Each tool also carries an admin configuration, normally set from inside the Unique AI app rather
 than an environment variable; see
 [Configuration: Admin Configuration](../operator/configuration.md#Admin-Configuration) for where
-that setting actually lives. Admin values are the floor: a caller may narrow them, never widen
-them. See [Permissions](./permissions.md).
+that setting actually lives. Only the admin `metadata_filter` and folder allowlist are a floor a
+caller can't widen, see [Permissions](./permissions.md). Numeric ones, `limit`, `score_threshold`,
+`max_tokens_per_call`, are defaults: a caller may raise or lower them per call.
 
 ## How the Calling LLM Picks Arguments
 
@@ -124,8 +125,10 @@ views over the same visible-file snapshot.
 Returns file content by `content_id`, as surfaced by `content_tree` or `search`.
 
 `max_tokens_per_call` (admin default `8000`) bounds one response. Larger files are split into
-virtual pages of that size, selected with `start_page` and `end_page`. A caller may request fewer
-tokens; a larger request is clamped without error.
+virtual pages of that size, selected with `start_page` and `end_page`. A caller may raise or
+lower it, it's a default, not a cap; if the file still doesn't fit in one call and no page range
+was given, the call returns an error instead of silently truncating, naming the file's total
+token/page count so the caller can pick a range.
 
 ## Related Documentation
 
