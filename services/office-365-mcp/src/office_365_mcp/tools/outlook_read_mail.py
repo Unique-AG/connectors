@@ -31,6 +31,11 @@ of its own. A hand-rolled stripper can turn a `<script>` block or a conditional 
 that reads as prose from the sender. This tool never sends `Prefer: outlook.allow-unsafe-html`,
 which asks Graph to stop sanitising at all.
 
+**`mailbox` re-points the one request this tool makes from `/me` to `/users/{id}`.** Microsoft's
+shared-folder walkthrough names `Mail.Read.Shared` as what authorizes reading a message this way
+(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders); nothing else in this
+file changes, because `graph_mailbox` is the whole of the branch.
+
 **Three things this deliberately does not ask for.** `internetMessageHeaders` is not selected,
 and that omission is the whole of the control. The routing headers are a message's most forgeable
 part. They carry servers, addresses, and spam verdicts nobody asked about. This tool fetches no
@@ -65,13 +70,18 @@ from office_365_mcp.shared.mail import (
     MailAddress,
     MailSummary,
 )
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.seam import (
+    MAILBOX_FIELD,
+    READ_ONLY,
+    graph_client_for_caller,
+    graph_mailbox,
+)
 
 TOOL_NAME = "outlook_read_mail"
 
 STEP_MESSAGE = "mail_message"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "Mail.Read.Shared")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
@@ -95,10 +105,11 @@ MAX_BODY_CHARACTERS = 25000
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = f"""\
-Reads one message in the signed-in user's own mailbox, in full. This shows everyone on it, \
-when it was sent, and what the sender actually wrote. It answers anything the \
-{PREVIEW_CHARACTERS}-character preview of a search hit does not. outlook_read_thread is the \
-sibling for every message of the conversation. Call this tool for one message alone.
+Reads one message, in full, in the signed-in user's own mailbox or, with `mailbox`, a shared or \
+delegated one. This shows everyone on it, when it was sent, and what the sender actually wrote. \
+It answers anything the {PREVIEW_CHARACTERS}-character preview of a search hit does not. \
+outlook_read_thread is the sibling for every message of the conversation. Call this tool for one \
+message alone.
 
 Notes:
 - Never returns an attachment's contents or the message's routing headers.
@@ -201,11 +212,15 @@ _NO_BODY = _Body(
 )
 
 
-async def read_mail(client: GraphServiceClient, *, handle: MailMessageHandle) -> MailMessage:
-    """The message `handle` addresses, in one request."""
+async def read_mail(
+    client: GraphServiceClient, *, handle: MailMessageHandle, mailbox: str | None = None
+) -> MailMessage:
+    """The message `handle` addresses, in one request, in `mailbox` or the signed-in user's own."""
     with graph_errors(TOOL_NAME), graph_step(STEP_MESSAGE):
-        message = await client.me.messages.by_message_id(handle.message_id).get(
-            request_configuration=_request()
+        message = (
+            await graph_mailbox(client, mailbox)
+            .messages.by_message_id(handle.message_id)
+            .get(request_configuration=_request())
         )
 
     assert message is not None, "Graph answered a message read with no message"
@@ -302,9 +317,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
+        mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> MailMessage:
         handle = mail_message_handle(uri)
         if handle is None:
             raise ToolError(_BAD_HANDLE)
-        return await read_mail(client, handle=handle)
+        return await read_mail(client, handle=handle, mailbox=mailbox)

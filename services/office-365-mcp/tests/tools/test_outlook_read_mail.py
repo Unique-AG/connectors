@@ -10,6 +10,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
+from office_365_mcp.tools import outlook_read_mail as reader
 from office_365_mcp.tools.outlook_read_mail import MAX_BODY_CHARACTERS, MailMessage, read_mail
 from office_365_mcp.tools.outlook_search_mail import SearchCriteria, search_mail
 
@@ -348,6 +349,36 @@ class TestWhatItRefuses:
         """What the tool refuses on before it reaches Graph. A folder, a draft and a rule are
         addressable under the same scheme and none of them is a message."""
         assert mail_message_handle(uri) is None
+
+
+class TestMailboxTargeting:
+    async def test_no_mailbox_reads_the_signed_in_users_own_one(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`_reads` mounts its mock at `/me/messages/{id}`, so a call this route never sees a
+        request never reached `/me` at all."""
+        route = _reads(graph, _payload(body=_body("hello")))
+
+        _ = await read_mail(client, handle=_HANDLE)
+
+        assert route.called
+
+    async def test_a_mailbox_reads_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get(
+            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+        ).mock(return_value=httpx.Response(200, json=_payload(body=_body("hello"))))
+
+        answer = await read_mail(client, handle=_HANDLE, mailbox="alex@example.invalid")
+
+        assert route.called
+        assert answer.body == "hello"
+
+    def test_the_permission_is_the_one_microsoft_documents_for_a_shared_mailbox(self) -> None:
+        """`Mail.Read.Shared` is what Microsoft's shared-folder walkthrough names for reading a
+        message in a mailbox other than `/me`."""
+        assert reader.GRAPH_PERMISSIONS == ("Mail.Read", "Mail.Read.Shared")
 
 
 class TestTheFailuresItPassesOn:

@@ -41,6 +41,12 @@ defaults to 3.
 that `outlook_search_mail` and `outlook_list_mail` mint. Graph reads a path id in whichever id
 space the request declares. Without this header, Graph reads the immutable id as a `RestId`, and
 every row becomes a 404. `outlook_read_mail` sends the same header, for the same reason.
+
+**`mailbox`, given once, re-points every PATCH in the batch from `/me` to `/users/{id}`.**
+`Mail.ReadWrite.Shared` is Microsoft's own permission for writing messages in a shared or
+delegated mailbox (https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders). One
+`mailbox` argument marks every message of one call, never a mix — a batch that names messages
+across two mailboxes in one call is not a shape this tool accepts.
 """
 
 from collections.abc import Mapping, Sequence
@@ -59,18 +65,24 @@ from msgraph.generated.models.followup_flag import FollowupFlag
 from msgraph.generated.models.followup_flag_status import FollowupFlagStatus
 from msgraph.generated.models.importance import Importance
 from msgraph.generated.models.message import Message
+from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, graph_client_for_caller
+from office_365_mcp.shared.seam import (
+    MAILBOX_FIELD,
+    WRITE_DESTRUCTIVE,
+    graph_client_for_caller,
+    graph_mailbox,
+)
 
 TOOL_NAME = "outlook_mark_mail"
 
 STEP_MARK = "mark_message"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message_refs": ["outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"],
@@ -91,14 +103,17 @@ _FLAG_STATUS: Mapping[bool, FollowupFlagStatus] = {
 }
 
 _DESCRIPTION = f"""\
-This tool marks up to {MAX_MESSAGES} messages in the signed-in user's own mailbox as read or \
-unread, flags them for follow-up, or sets their importance.
+This tool marks up to {MAX_MESSAGES} messages, in the signed-in user's own mailbox or, with \
+`mailbox`, one shared or delegated mailbox, as read or unread, flags them for follow-up, or \
+sets their importance.
 
 Notes:
 - Pass at least one of `is_read`, `flagged`, and `importance`. Setting `flagged` to false also \
 discards the follow-up dates (start, due, completed) that Outlook stored with the flag.
 - `message_refs` takes the exact `uri` value from a tool result. A subject line, an email \
 address, and an Outlook web link are not handles.
+- `mailbox`, when given, applies to every message in `message_refs`. All of them must be in \
+that one mailbox.
 - The change is immediate and cannot be undone. This tool writes and reports each message on \
 its own row. Read the rows rather than only the counts.
 """
@@ -219,7 +234,11 @@ CHANGES: tuple[str, ...] = tuple(field.name for field in fields(MarkChange))
 
 
 async def mark_mail(
-    client: GraphServiceClient, *, message_refs: Sequence[str], change: MarkChange
+    client: GraphServiceClient,
+    *,
+    message_refs: Sequence[str],
+    change: MarkChange,
+    mailbox: str | None = None,
 ) -> MarkedMail:
     """`change` applied to each of `message_refs`, one request and one row per message."""
     assert 1 <= len(message_refs) <= MAX_MESSAGES, (
@@ -228,9 +247,10 @@ async def mark_mail(
     if change.is_nothing:
         raise ToolError(_NOTHING_TO_CHANGE)
     handles = _handles(message_refs)
+    reached = graph_mailbox(client, mailbox)
 
     with graph_errors(TOOL_NAME):
-        marked = [await _mark_one(client, handle=handle, change=change) for handle in handles]
+        marked = [await _mark_one(reached, handle=handle, change=change) for handle in handles]
 
     return MarkedMail(
         messages=marked,
@@ -254,7 +274,7 @@ def _handles(message_refs: Sequence[str]) -> list[MailMessageHandle]:
 
 
 async def _mark_one(
-    client: GraphServiceClient, *, handle: MailMessageHandle, change: MarkChange
+    reached: UserItemRequestBuilder, *, handle: MailMessageHandle, change: MarkChange
 ) -> MarkedMessage:
     """One PATCH, and its own outcome, whichever way it went.
 
@@ -264,7 +284,7 @@ async def _mark_one(
     """
     try:
         with graph_step(STEP_MARK):
-            updated = await client.me.messages.by_message_id(handle.message_id).patch(
+            updated = await reached.messages.by_message_id(handle.message_id).patch(
                 _patch_body(change), request_configuration=_request()
             )
     except GraphFailure as failure:
@@ -398,12 +418,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 )
             ),
         ] = None,
+        mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> MarkedMail:
         return await mark_mail(
             client,
             message_refs=message_refs,
             change=MarkChange(is_read=is_read, flagged=flagged, importance=importance),
+            mailbox=mailbox,
         )
 
     _require_a_change(mcp.add_tool(outlook_mark_mail))

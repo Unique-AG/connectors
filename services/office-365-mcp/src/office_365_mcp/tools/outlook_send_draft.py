@@ -59,6 +59,18 @@ means nothing in particular.
 
 **No blind copy is read or reported**, which matches the draft this sends: `outlook_draft_mail`
 declares no `bcc` argument at all, so a draft that reaches here has none to report.
+
+**`mailbox` re-points both requests from `/me` to `/users/{id}`, and the pre-read is why this file
+declares `Mail.Read.Shared` rather than a `.Shared` twin of `Mail.ReadBasic`.** Microsoft never
+published `Mail.ReadBasic.Shared`
+(https://learn.microsoft.com/en-us/graph/permissions-reference) — `Mail.ReadBasic` has no `.Shared`
+counterpart at all — so the least-privileged permission this file can hold for the pre-read of a
+message in another mailbox is `Mail.Read`'s own shared variant, one step up from what it costs to
+read the signed-in user's own draft. The send itself is `Mail.Send.Shared`
+(https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user), and Exchange still
+requires Full Access on `mailbox` together with Send As or Send on Behalf, which this connector
+cannot see. `draft_ref` must name a draft in `mailbox` — a handle `outlook_draft_mail` or
+`outlook_draft_reply` minted for a different mailbox 404s here, the same as any other stale handle.
 """
 
 from collections.abc import Awaitable, Callable, Mapping
@@ -76,6 +88,7 @@ from msgraph.generated.models.message import Message
 from msgraph.generated.users.item.messages.item.message_item_request_builder import (
     MessageItemRequestBuilder,
 )
+from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -83,9 +96,11 @@ from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_
 from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.seam import (
+    MAILBOX_FIELD,
     WRITE_DESTRUCTIVE,
     Confirmed,
     graph_client_for_caller,
+    graph_mailbox,
     person_confirms,
 )
 
@@ -94,7 +109,14 @@ TOOL_NAME = "outlook_send_draft"
 STEP_READ_DRAFT = "read_draft"
 STEP_SEND_DRAFT = "send_draft"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Send", "Mail.ReadBasic")
+# `Mail.Read.Shared`, not a `.Shared` twin of `Mail.ReadBasic`: Microsoft publishes no
+# `Mail.ReadBasic.Shared`. See the module docstring.
+GRAPH_PERMISSIONS: tuple[str, ...] = (
+    "Mail.Send",
+    "Mail.ReadBasic",
+    "Mail.Send.Shared",
+    "Mail.Read.Shared",
+)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "draft_ref": "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D"
@@ -110,8 +132,9 @@ _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-This tool sends a draft from the signed-in user's own Drafts folder, created by \
-outlook_draft_mail or outlook_draft_reply, onto the wire under the user's own address.
+This tool sends a draft, created by outlook_draft_mail or outlook_draft_reply, from the Drafts \
+folder of the signed-in user's own mailbox, or, with `mailbox`, a shared or delegated one, onto \
+the wire under that mailbox's own address.
 
 Notes:
 - This action cannot be undone. This connector has no recall or unsend function, and nothing \
@@ -122,6 +145,8 @@ the drafting tool answered with.
 - This tool accepts only a handle of the drafts family (`outlook:///drafts/{id}`). It refuses \
 a message handle from outlook_search_mail, outlook_list_mail, or outlook_read_thread, and it \
 refuses a message that is already sent rather than sending it again.
+- `mailbox` must be the same mailbox `draft_ref` was drafted into. Pass the same `mailbox` that \
+outlook_draft_mail or outlook_draft_reply was called with.
 """
 
 _NOT_A_DRAFT_HANDLE = (
@@ -242,9 +267,9 @@ def a_person_agrees(ctx: Context) -> _Confirm:
 
 
 async def send_draft(
-    client: GraphServiceClient, *, draft_ref: str, confirm: _Confirm
+    client: GraphServiceClient, *, draft_ref: str, confirm: _Confirm, mailbox: str | None = None
 ) -> MailSent | InputRequiredResult:
-    """Read the draft `draft_ref` addresses, put it to a person, then send it.
+    """Read the draft `draft_ref` addresses in `mailbox`, put it to a person, then send it.
 
     `confirm` has no default. The read is what makes the question answerable, so the confirmation
     belongs between the two requests, and a caller that could omit it would be back to a promise
@@ -253,11 +278,12 @@ async def send_draft(
     An `InputRequiredResult` is the question, returned unsent for a client to answer and re-call.
     """
     handle = _handle_for(draft_ref)
+    reached = graph_mailbox(client, mailbox)
 
     asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_READ_DRAFT):
-            draft = await client.me.messages.by_message_id(handle.draft_id).get(
+            draft = await reached.messages.by_message_id(handle.draft_id).get(
                 request_configuration=_read_request()
             )
         refused: str | None = _ALREADY_SENT
@@ -266,7 +292,7 @@ async def send_draft(
                 answer = await confirm(draft)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
-        sent_at = await _send(client, handle) if refused is None and asked is None else None
+        sent_at = await _send(reached, handle) if refused is None and asked is None else None
 
     # This function decides inside the block above, and raises every refusal outside it.
     # `graph_errors` treats a `ToolError` that escapes it as a Graph operation that failed for a
@@ -292,10 +318,10 @@ def _handle_for(draft_ref: str) -> MailDraftHandle:
     raise ToolError(_NOT_A_DRAFT_HANDLE)
 
 
-async def _send(client: GraphServiceClient, handle: MailDraftHandle) -> datetime:
+async def _send(reached: UserItemRequestBuilder, handle: MailDraftHandle) -> datetime:
     """The send itself, and when Microsoft accepted it. Answers 202 with an empty body."""
     with graph_step(STEP_SEND_DRAFT):
-        await client.me.messages.by_message_id(handle.draft_id).send.post(
+        await reached.messages.by_message_id(handle.draft_id).send.post(
             request_configuration=_send_request()
         )
     return datetime.now(UTC)
@@ -364,6 +390,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         ctx: Context,
+        mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> MailSent | InputRequiredResult:
-        return await send_draft(client, draft_ref=draft_ref, confirm=a_person_agrees(ctx))
+        return await send_draft(
+            client, draft_ref=draft_ref, confirm=a_person_agrees(ctx), mailbox=mailbox
+        )

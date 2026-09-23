@@ -783,13 +783,17 @@ class TestTheFailuresItPassesOn:
 
 
 class TestTheSchemaItPublishes:
-    async def test_it_takes_one_argument_and_no_others(self, transport: httpx.AsyncClient) -> None:
-        """One argument is the whole safety story: what is sent is what the user can already read
-        in their Drafts folder, because nothing here can change it."""
+    async def test_it_takes_two_arguments_and_only_one_is_required(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        """`draft_ref` is the whole safety story for what gets sent: what is sent is what the
+        user can already read in their Drafts folder, because nothing here can change it.
+        `mailbox` only says which mailbox that draft is in, and defaults to the signed-in user's
+        own."""
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"draft_ref"}
+        assert set(properties) == {"draft_ref", "mailbox"}
         assert cast("Sequence[str]", parameters["required"]) == ["draft_ref"]
 
     @pytest.mark.parametrize(
@@ -807,14 +811,58 @@ class TestTheSchemaItPublishes:
         assert not [name for name in properties if word in name.casefold()]
 
 
+class TestMailboxTargeting:
+    async def test_no_mailbox_reads_and_sends_from_the_signed_in_users_own_mailbox(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, _draft())
+        send = _sends(graph)
+
+        _ = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
+
+        assert read.called
+        assert send.called
+
+    async def test_a_mailbox_reads_and_sends_from_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = graph.get(
+            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-draft-0001%3D"
+        ).mock(return_value=httpx.Response(200, json=_draft()))
+        send = graph.post(
+            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-draft-0001%3D/send"
+        ).mock(return_value=httpx.Response(202))
+
+        sent = _mail_sent(
+            await send_draft(
+                client,
+                confirm=_agrees,
+                draft_ref=_DRAFT_REF,
+                mailbox="alex@example.invalid",
+            )
+        )
+
+        assert read.called
+        assert send.called
+        assert sent.to
+
+
 class TestHowItDeclaresItself:
     def test_the_permissions_are_the_least_privileged_ones_for_the_two_calls_it_makes(
         self,
     ) -> None:
         """Mail.Send is the only delegated permission Microsoft publishes for the send, and
         Mail.ReadBasic is the least privileged one for the pre-read. The token is minted for
-        exactly these, so declaring Mail.Send alone would 403 on the tool's own read."""
-        assert sender.GRAPH_PERMISSIONS == ("Mail.Send", "Mail.ReadBasic")
+        exactly these, so declaring Mail.Send alone would 403 on the tool's own read.
+        `Mail.Send.Shared` is Microsoft's permission for sending from another mailbox.
+        `Mail.Read.Shared`, not a `.Shared` twin of `Mail.ReadBasic`, covers the pre-read there:
+        Microsoft publishes no `Mail.ReadBasic.Shared`."""
+        assert sender.GRAPH_PERMISSIONS == (
+            "Mail.Send",
+            "Mail.ReadBasic",
+            "Mail.Send.Shared",
+            "Mail.Read.Shared",
+        )
 
     def test_its_two_steps_are_the_two_calls_it_makes(self) -> None:
         assert sender.STEP_READ_DRAFT == "read_draft"
@@ -833,15 +881,17 @@ class TestHowItDeclaresItself:
         assert annotations.destructive_hint is WRITE_DESTRUCTIVE["destructiveHint"]
         assert annotations.idempotent_hint is WRITE_DESTRUCTIVE["idempotentHint"]
 
-    async def test_the_description_says_it_sends_as_the_user_and_cannot_be_undone(
+    async def test_the_description_says_it_sends_as_the_mailbox_and_cannot_be_undone(
         self, transport: httpx.AsyncClient
     ) -> None:
         """What a model is told is the only place these limits exist for it: nothing downstream
-        re-reads the tool file."""
+        re-reads the tool file. "That mailbox's own address" rather than "the user's own": once
+        `mailbox` can name a shared or delegated mailbox, the address on the wire is not always
+        the signed-in user's."""
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "user's own address" in lowered
+        assert "own address" in lowered
         assert "cannot be undone" in lowered
 
     async def test_the_description_says_a_person_is_asked_before_anything_is_sent(

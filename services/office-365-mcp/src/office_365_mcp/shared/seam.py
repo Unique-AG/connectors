@@ -37,6 +37,7 @@ from mcp.types import (
     InputRequiredResult,
 )
 from mcp.types.version import MODERN_PROTOCOL_VERSIONS
+from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import (
@@ -104,10 +105,13 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "OnlineMeetingTranscript.Read.All",
         "OnlineMeetingRecording.Read.All",
         "Mail.Read",
+        "Mail.Read.Shared",
         "People.Read",
         "MailboxSettings.Read",
         "Mail.ReadWrite",
+        "Mail.ReadWrite.Shared",
         "Mail.Send",
+        "Mail.Send.Shared",
         "Mail.ReadBasic",
         "MailboxSettings.ReadWrite",
         "Calendars.Read",
@@ -199,6 +203,47 @@ def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> 
         return graph_client_for(transport, access_token)
 
     return Depends(client_for_this_call)
+
+
+def graph_mailbox(client: GraphServiceClient, mailbox: str | None) -> UserItemRequestBuilder:
+    """The mailbox a call reaches: the signed-in user's own when `mailbox` is None, or the
+    mailbox `mailbox` names — its user principal name or its Entra object id — when given.
+
+    TRAP: `client.me` and `client.users.by_user_id(...)` answer with the SAME generated type,
+    `UserItemRequestBuilder`. `client.me` is a property that fixes that type's id path parameter
+    to a sentinel, `"me-token-to-replace"`, which this SDK's own request adapter rewrites to `/me`
+    on the wire (`msgraph/graph_service_client.py`); `by_user_id` fixes the identical parameter to
+    whatever `mailbox` names instead (`msgraph/generated/users/users_request_builder.py`). So this
+    function has nothing to branch on beyond which id to fix, and every reader and writer that
+    calls it reaches `.messages`, `.mailFolders`, `.translateExchangeIds` and the rest through the
+    object this returns, with no copy of the `None` check and nothing to keep in sync when Graph
+    adds another one of those collections.
+
+    A `.Shared` permission is what lets the token this call carries name a mailbox other than
+    `/me` at all; it is not what lets `mailbox` resolve to a mailbox that answers. Exchange also
+    requires the signed-in user to hold real access to it — a folder shared with them, a full
+    delegation, or, to send, Full Access together with Send As or Send on Behalf
+    (https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders). This connector
+    cannot see or check that mailbox-level grant. Graph answers a caller who holds the Graph
+    permission but not the Exchange one with the same 403 as a caller who holds neither, and
+    `graph_tool_errors` words both identically, because Graph does not say which is missing.
+    """
+    if mailbox is None:
+        return client.me
+    return client.users.by_user_id(mailbox)
+
+
+# Reused verbatim by every tool whose Pydantic model threads a mailbox through to `graph_mailbox`,
+# so that what "omit it" means and what actually authorizes reaching another mailbox is one text
+# every one of them agrees with, not one chance per tool to drift from the others.
+MAILBOX_FIELD: str = (
+    "A shared or delegated mailbox to act on instead of the signed-in user's own, as its user "
+    + "principal name or its Entra object id. Omit it for the signed-in user's own mailbox. This "
+    + "reaches another mailbox only where Exchange grants the signed-in user access to it — a "
+    + "shared folder, a full delegation, or, to send, Full Access together with Send As or Send "
+    + "on Behalf. A mailbox the signed-in user cannot reach this way answers with a permission "
+    + "refusal, never a wrong mailbox."
+)
 
 
 # What a refusal says last, so a model does not read "no" as "ask again": MCP gives a server no way

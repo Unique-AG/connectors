@@ -35,6 +35,18 @@ entirely.
 documents the collection as "the rules that apply to the user's Inbox folder"
 (https://learn.microsoft.com/en-us/graph/api/mailfolder-list-messagerules), so the well-known name
 `inbox` is the address rather than a folder handle a caller passes in.
+
+**This tool takes no `mailbox` argument.** Microsoft publishes no `.Shared` variant of
+`MailboxSettings.Read` — the permissions reference lists only `MailboxSettings.Read` and
+`MailboxSettings.ReadWrite`, delegated, with no `.Shared` sibling
+(https://learn.microsoft.com/en-us/graph/permissions-reference) — and this connector holds only
+delegated permissions, never application ones. Multiple independent reports of
+`GET /users/{id}/mailboxSettings` and `GET /users/{id}/mailFolders/inbox/messageRules` under a
+delegated `MailboxSettings.Read` token confirm the practical consequence: Graph answers 403 for
+any `{id}` but the caller's own, Full Access mailbox permission notwithstanding
+(https://github.com/microsoftgraph/msgraph-sdk-powershell/issues/2966). Application permissions
+are the only documented route to another mailbox's settings or rules, and this connector's
+On-Behalf-Of design never holds one. A `mailbox` argument here would be silently unreachable.
 """
 
 from collections.abc import Mapping

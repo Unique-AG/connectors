@@ -686,9 +686,44 @@ class TestTheSchemaItPublishes:
         assert tool.annotations.idempotent_hint is False
 
 
+class TestMailboxTargeting:
+    async def test_no_mailbox_moves_mail_in_the_signed_in_users_own_mailbox(
+        self, client: GraphServiceClient, archive: respx.Route, first_move: respx.Route
+    ) -> None:
+        _ = await mover.move_mail(
+            client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
+        )
+
+        assert archive.called
+        assert first_move.called
+
+    async def test_a_mailbox_moves_mail_in_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        folder = graph.get(f"/users/alex@example.invalid/mailFolders/{_ARCHIVE_ID}").mock(
+            return_value=httpx.Response(200, json=_folder_payload())
+        )
+        move = graph.post(
+            f"/users/alex@example.invalid/messages/{quote(_FIRST_ID, safe='')}/move"
+        ).mock(return_value=_moved(_FIRST_MOVED_ID))
+
+        moved = await mover.move_mail(
+            client,
+            message_refs=[MailMessageHandle(_FIRST_ID).uri],
+            folder_ref=_ARCHIVE_REF,
+            mailbox="alex@example.invalid",
+        )
+
+        assert folder.called
+        assert move.called
+        assert moved.messages[0].moved is True
+
+
 class TestWhatItSaysAboutItself:
     def test_the_permission_is_the_write_one_microsoft_documents(self) -> None:
-        assert mover.GRAPH_PERMISSIONS == ("Mail.ReadWrite",)
+        """`Mail.ReadWrite.Shared` is what Microsoft's shared-folder walkthrough names for
+        writing a message in a mailbox other than `/me`."""
+        assert mover.GRAPH_PERMISSIONS == ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
     def test_the_description_teaches_that_this_is_how_a_message_is_deleted(self) -> None:
         """There is no delete tool. A model that does not read it here will either refuse to remove

@@ -468,6 +468,34 @@ class TestWhatItRefusesBeforeWritingAnything:
         assert "2, 4" in str(refused.value)
 
 
+class TestMailboxTargeting:
+    async def test_no_mailbox_writes_the_signed_in_users_own_one(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _writes(graph, 0)
+
+        _ = await mark_mail(client, message_refs=_REFS[:1], change=MarkChange(is_read=True))
+
+        assert route.called
+
+    async def test_a_mailbox_writes_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.patch(
+            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+        ).mock(return_value=httpx.Response(200, json=_updated()))
+
+        answer = await mark_mail(
+            client,
+            message_refs=_REFS[:1],
+            change=MarkChange(is_read=True),
+            mailbox="alex@example.invalid",
+        )
+
+        assert route.called
+        assert answer.messages[0].changed is True
+
+
 class TestHowItDeclaresItself:
     async def test_it_says_it_writes_and_that_the_write_can_destroy(
         self, transport: httpx.AsyncClient
@@ -482,7 +510,9 @@ class TestHowItDeclaresItself:
         assert WRITE_DESTRUCTIVE["destructiveHint"] is True
 
     def test_it_asks_for_the_permission_that_can_write(self) -> None:
-        assert GRAPH_PERMISSIONS == ("Mail.ReadWrite",)
+        """`Mail.ReadWrite.Shared` is what Microsoft's shared-folder walkthrough names for
+        writing a message in a mailbox other than `/me`."""
+        assert GRAPH_PERMISSIONS == ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
     async def test_it_tells_a_caller_the_mailbox_changes_and_that_nothing_here_undoes_it(
         self, transport: httpx.AsyncClient

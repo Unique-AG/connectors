@@ -30,6 +30,17 @@ here says which rule and why, instead of handing back a Graph error about an id.
 `GRAPH_MAX_RETRIES` defaults to 3. Disabling twice is harmless. Getting answered by a different
 response than the one that was applied is not, because this tool's answer is what it claims the
 mailbox now holds.
+
+**This tool takes no `mailbox` argument.** Microsoft publishes no `.Shared` variant of
+`MailboxSettings.ReadWrite` (https://learn.microsoft.com/en-us/graph/permissions-reference), and
+this connector holds only delegated permissions, never application ones. Delegated
+`MailboxSettings.ReadWrite` reaches `PATCH /me/mailFolders/inbox/messageRules/{id}` alone;
+reports of the identical call against `/users/{id}/...` for another mailbox — Full Access
+notwithstanding — come back 403
+(https://github.com/microsoftgraph/msgraph-sdk-powershell/issues/2966). See
+`outlook_get_mailbox_settings`'s module docstring for the full citation. A `mailbox` argument
+here would be silently unreachable — the one tool in this file where that silently-unreachable
+call would also be the one turning off a forwarding rule the user asked to stop.
 """
 
 from collections.abc import Mapping

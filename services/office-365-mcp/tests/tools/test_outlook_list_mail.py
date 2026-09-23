@@ -979,6 +979,32 @@ class TestTheSchemaItPublishes:
         assert tool.parameters["properties"]["folder"]["default"] == "inbox"
 
 
+class TestMailboxTargeting:
+    async def test_no_mailbox_lists_the_signed_in_users_own_mailbox(
+        self, client: GraphServiceClient, inbox: respx.Route, inbox_messages: respx.Route
+    ) -> None:
+        _ = await lister.list_mail(client, limit=25)
+
+        assert inbox.called
+        assert inbox_messages.called
+
+    async def test_a_mailbox_lists_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        folder = graph.get("/users/alex@example.invalid/mailFolders/inbox").mock(
+            return_value=httpx.Response(200, json=_folder_payload())
+        )
+        messages = graph.get("/users/alex@example.invalid/mailFolders/inbox/messages").mock(
+            return_value=_page(_message_payload(_FIRST_ID))
+        )
+
+        listed = await lister.list_mail(client, limit=25, mailbox="alex@example.invalid")
+
+        assert folder.called
+        assert messages.called
+        assert listed.messages[0].uri == MailMessageHandle(_FIRST_ID).uri
+
+
 class TestGraphFailures:
     async def test_a_refused_folder_read_stops_before_the_messages_are_asked_for(
         self, client: GraphServiceClient, graph: respx.MockRouter, inbox_messages: respx.Route
@@ -1004,7 +1030,9 @@ class TestGraphFailures:
             _ = await lister.list_mail(client, limit=25)
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
-        assert lister.GRAPH_PERMISSIONS == ("Mail.Read",)
+        """`Mail.Read.Shared` is what Microsoft's shared-folder walkthrough names for listing
+        messages in a mailbox other than `/me`."""
+        assert lister.GRAPH_PERMISSIONS == ("Mail.Read", "Mail.Read.Shared")
 
     def test_a_folder_that_will_not_resolve_is_answered_with_both_recoveries(self) -> None:
         """A 404 here is not the default "check you copied the id" advice: one way in is a handle

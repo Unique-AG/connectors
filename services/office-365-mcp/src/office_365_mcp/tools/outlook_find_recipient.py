@@ -26,6 +26,16 @@ while their real address sits elsewhere. So the address comes off `scoredEmailAd
 on the people path, and off `emailAddress.address` on the mailbox one. This tool still *asks* for
 the sign-in name, because a caller who typed one deserves an `exact` match. This tool matches
 against it, and never answers with it.
+
+**This tool takes no `mailbox` argument, on purpose.** `client.me.people` is Microsoft's relevance
+list for the SIGNED-IN caller: who they correspond with, their reporting line, their org chart
+proximity. Pointing that same call at `/users/{id}/people` would not answer "who can this shared
+mailbox address" — it would answer a different, unrelated question, that other person's own
+relevance list, which `People.Read` does not even authorize a caller to read on someone else's
+behalf. The mailbox fallback this tool also reads is scoped to the signed-in user's own
+correspondence for the same reason: `ever_corresponded` is a claim about this connector's own
+caller, not about a shared mailbox's history. A `mailbox` argument here would silently change the
+question that `outcome` and `ever_corresponded` claim to answer.
 """
 
 import re

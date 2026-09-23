@@ -379,6 +379,29 @@ class TestWhatItRefuses:
             _ = await browser.browse_folders(client, parent="Inbox", limit=25)
 
 
+class TestMailboxTargeting:
+    async def test_no_mailbox_browses_the_signed_in_users_own_mailbox(
+        self, client: GraphServiceClient, top_level: respx.Route
+    ) -> None:
+        top_level.mock(return_value=_page(_folder_payload(_INBOX_ID)))
+
+        _ = await browser.browse_folders(client, limit=25)
+
+        assert top_level.called
+
+    async def test_a_mailbox_browses_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get("/users/alex@example.invalid/mailFolders").mock(
+            return_value=_page(_folder_payload(_INBOX_ID))
+        )
+
+        listed = await browser.browse_folders(client, limit=25, mailbox="alex@example.invalid")
+
+        assert route.called
+        assert listed.folders[0].uri == MailFolderHandle(_INBOX_ID).uri
+
+
 class TestGraphFailures:
     async def test_a_refusal_arrives_classified_for_the_tool_to_explain(
         self, client: GraphServiceClient, top_level: respx.Route
@@ -393,7 +416,9 @@ class TestGraphFailures:
             _ = await browser.browse_folders(client, limit=25)
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
-        assert browser.GRAPH_PERMISSIONS == ("Mail.Read",)
+        """`Mail.Read.Shared` is what Microsoft's shared-folder walkthrough names for reading a
+        folder in a mailbox other than `/me`."""
+        assert browser.GRAPH_PERMISSIONS == ("Mail.Read", "Mail.Read.Shared")
 
     def test_a_stale_folder_handle_is_answered_with_the_recovery_that_works(self) -> None:
         """A 404 here is not the default "check you copied the id" advice: the id was this

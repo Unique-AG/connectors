@@ -8,6 +8,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
+from office_365_mcp.tools import outlook_read_thread as reader
 from office_365_mcp.tools.outlook_read_thread import MAX_MESSAGES, read_thread
 
 _ANCHOR_ID = "AAMkAGI2SYNTHETIC-anchor-0001="
@@ -270,6 +271,40 @@ class TestWhatItAnswers:
 
         assert result.messages == []
         assert thread.call_count == 0
+
+
+class TestMailboxTargeting:
+    async def test_no_mailbox_reads_the_signed_in_users_own_one(
+        self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
+    ) -> None:
+        anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
+        thread.mock(return_value=httpx.Response(200, json={"value": [_message(_ANCHOR_ID)]}))
+
+        result = await read_thread(client, handle=_HANDLE)
+
+        assert anchor.called
+        assert "signed-in user's own mailbox" in result.searched_scope
+
+    async def test_a_mailbox_reads_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        anchor = graph.get(f"/users/alex@example.invalid/messages/{_ANCHOR_ID}").mock(
+            return_value=httpx.Response(200, json=_anchor_body())
+        )
+        thread = graph.get("/users/alex@example.invalid/messages").mock(
+            return_value=httpx.Response(200, json={"value": [_message(_ANCHOR_ID)]})
+        )
+
+        result = await read_thread(client, handle=_HANDLE, mailbox="alex@example.invalid")
+
+        assert anchor.called
+        assert thread.called
+        assert "alex@example.invalid" in result.searched_scope
+
+    def test_the_permission_is_the_one_microsoft_documents_for_a_shared_mailbox(self) -> None:
+        """`Mail.Read.Shared` is what Microsoft's shared-folder walkthrough names for reading a
+        thread in a mailbox other than `/me`."""
+        assert reader.GRAPH_PERMISSIONS == ("Mail.Read", "Mail.Read.Shared")
 
 
 class TestWhatItRefuses:

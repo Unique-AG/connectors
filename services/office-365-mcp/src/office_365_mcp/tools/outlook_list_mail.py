@@ -9,6 +9,11 @@ re-checks those two on every row. `Prefer: IdType="ImmutableId"` because the ids
 become handles, and a `RestId` one 404s once Outlook files the message. `$skip` inside an
 `@odata.nextLink` counts items the service enumerated rather than items returned, so the link is
 followed whole and never parsed.
+
+**`mailbox` re-points every request from `/me` to `/users/{id}`.** Microsoft's own example for
+this scenario lists exactly this collection —
+`GET /users/{Garth-userId}/mailfolders('Inbox')/messages` — under `Mail.Read.Shared`
+(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders).
 """
 
 from collections.abc import Callable, Mapping
@@ -41,7 +46,12 @@ from office_365_mcp.shared.mail import (
     WellKnownFolder,
 )
 from office_365_mcp.shared.odata import odata_literal
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.seam import (
+    MAILBOX_FIELD,
+    READ_ONLY,
+    graph_client_for_caller,
+    graph_mailbox,
+)
 from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "outlook_list_mail"
@@ -49,7 +59,7 @@ TOOL_NAME = "outlook_list_mail"
 STEP_FOLDER = "mail_folder"
 STEP_MESSAGES = "folder_messages"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "Mail.Read.Shared")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"folder": "inbox"}
 
@@ -81,10 +91,10 @@ _FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQuery
 _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Lists the newest messages of one mail folder in the signed-in user's mailbox, newest received \
-first. This suits a folder's recent, unread, or date-windowed mail, in filing order. \
-outlook_search_mail is the sibling for relevance-ranked search across mailbox content — not \
-receipt order — and its index does not reach unsent drafts.
+Lists the newest messages of one mail folder, newest received first — the signed-in user's own \
+mailbox, or, with `mailbox`, a shared or delegated one. This suits a folder's recent, unread, or \
+date-windowed mail, in filing order. outlook_search_mail is the sibling for relevance-ranked \
+search across mailbox content — not receipt order — and its index does not reach unsent drafts.
 
 Notes:
 - Pass exactly one of `folder` or `folder_ref`, never both.
@@ -177,16 +187,18 @@ async def list_mail(
     received_before: date | datetime | None = None,
     from_address: str | None = None,
     limit: int,
+    mailbox: str | None = None,
 ) -> FolderMessages:
     """The newest `limit` messages of one folder, and that folder's own counts."""
     assert 1 <= limit <= MAX_RESULTS, f"limit must be within 1..{MAX_RESULTS}, got {limit}"
     _refuse_a_backwards_window(received_after, received_before)
     sender = _one_address(from_address)
     address = _folder_address(folder, folder_ref)
+    reached = graph_mailbox(client, mailbox)
 
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_FOLDER):
-            found = await client.me.mail_folders.by_mail_folder_id(address).get(
+            found = await reached.mail_folders.by_mail_folder_id(address).get(
                 request_configuration=RequestConfiguration[_FolderQuery](
                     query_parameters=_FolderQuery(select=list(_FOLDER_FIELDS))
                 )
@@ -194,7 +206,7 @@ async def list_mail(
         assert found is not None, "Graph answered a mail folder read with no folder"
         headers = _headers()
         with graph_step(STEP_MESSAGES):
-            first_page = await client.me.mail_folders.by_mail_folder_id(address).messages.get(
+            first_page = await reached.mail_folders.by_mail_folder_id(address).messages.get(
                 request_configuration=RequestConfiguration[_MessagesQuery](
                     query_parameters=_MessagesQuery(
                         select=list(SUMMARY_FIELDS),
@@ -465,6 +477,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = 25,
+        mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> FolderMessages:
         return await list_mail(
@@ -476,6 +489,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             received_before=received_before,
             from_address=from_address,
             limit=limit,
+            mailbox=mailbox,
         )
 
     _one_folder_at_a_time(mcp.add_tool(outlook_list_mail))

@@ -25,6 +25,11 @@ immutable-id page says container ids "were already constant"
 `mailFolder` id can change after certain actions, such as a copy or a move. Two pages, one
 contradiction, so nothing here promises a handle survives: `uri` names re-browsing as the recovery,
 which is what works under either reading.
+
+**`mailbox` re-points both request builders from `/me` to `/users/{id}`.** Microsoft's own example
+for this scenario reads exactly this collection —
+`GET /users/{Garth-userId}/mailfolders('Inbox')` — under `Mail.Read.Shared`
+(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders).
 """
 
 from collections.abc import Mapping
@@ -42,18 +47,24 @@ from msgraph.generated.users.item.mail_folders.item.child_folders.child_folders_
 from msgraph.generated.users.item.mail_folders.mail_folders_request_builder import (
     MailFoldersRequestBuilder,
 )
+from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors
 from office_365_mcp.shared.handles import MailFolderHandle, mail_folder_handle
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.seam import (
+    MAILBOX_FIELD,
+    READ_ONLY,
+    graph_client_for_caller,
+    graph_mailbox,
+)
 
 TOOL_NAME = "outlook_browse_folders"
 
 STEP = "mail_folders"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "Mail.Read.Shared")
 
 # No arguments at all is a valid call for this tool. It is the one that reaches Graph without a
 # handle from a previous response: the top of the mailbox.
@@ -94,8 +105,9 @@ _FoldersQuery = MailFoldersRequestBuilder.MailFoldersRequestBuilderGetQueryParam
 _ChildFoldersQuery = ChildFoldersRequestBuilder.ChildFoldersRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Lists the folders immediately under one level of the signed-in user's mail folder tree, with a \
-handle for each. This shows what folders exist and how large they are.
+Lists the folders immediately under one level of a mail folder tree, with a handle for each — \
+the signed-in user's own mailbox, or, with `mailbox`, a shared or delegated one. This shows what \
+folders exist and how large they are.
 
 Notes:
 - Returns one level only, never the tree: a folder whose `child_folder_count` is above zero has \
@@ -194,13 +206,15 @@ async def browse_folders(
     parent: str | None = None,
     include_hidden: bool = False,
     limit: int,
+    mailbox: str | None = None,
 ) -> MailFolderLevel:
     assert 1 <= limit <= MAX_FOLDERS, f"limit must be within 1..{MAX_FOLDERS}, got {limit}"
     handle = _parent_folder(parent)
+    reached = graph_mailbox(client, mailbox)
 
     with graph_errors(TOOL_NAME, step=STEP):
         first_page = await _first_page(
-            client, parent=handle, include_hidden=include_hidden, limit=limit
+            reached, parent=handle, include_hidden=include_hidden, limit=limit
         )
         assert first_page is not None, "Graph answered a folder listing with no collection"
         # No request header needs resupply per page: `includeHiddenFolders` is a query option.
@@ -224,7 +238,7 @@ def _parent_folder(parent: str | None) -> MailFolderHandle | None:
 
 
 async def _first_page(
-    client: GraphServiceClient,
+    reached: UserItemRequestBuilder,
     *,
     parent: MailFolderHandle | None,
     include_hidden: bool,
@@ -237,7 +251,7 @@ async def _first_page(
     """
     hidden = _INCLUDE_HIDDEN if include_hidden else None
     if parent is None:
-        return await client.me.mail_folders.get(
+        return await reached.mail_folders.get(
             request_configuration=RequestConfiguration[_FoldersQuery](
                 query_parameters=_FoldersQuery(
                     select=list(_FOLDER_FIELDS),
@@ -246,7 +260,7 @@ async def _first_page(
                 )
             )
         )
-    return await client.me.mail_folders.by_mail_folder_id(parent.folder_id).child_folders.get(
+    return await reached.mail_folders.by_mail_folder_id(parent.folder_id).child_folders.get(
         request_configuration=RequestConfiguration[_ChildFoldersQuery](
             query_parameters=_ChildFoldersQuery(
                 select=list(_FOLDER_FIELDS),
@@ -302,8 +316,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = 50,
+        mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> MailFolderLevel:
         return await browse_folders(
-            client, parent=parent, include_hidden=include_hidden, limit=limit
+            client, parent=parent, include_hidden=include_hidden, limit=limit, mailbox=mailbox
         )

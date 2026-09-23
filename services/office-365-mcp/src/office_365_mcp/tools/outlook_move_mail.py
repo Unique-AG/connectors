@@ -42,6 +42,13 @@ because Graph can leave that annotation out of a narrowed answer: the SDK then h
 discriminator, builds a plain `MailFolder`, and a type check alone lets the folder through. The
 check also falls back to the properties only a search folder declares, which the SDK keeps in
 `additional_data` when it did not recognise them.
+
+**`mailbox` re-points every request — the destination read included — from `/me` to
+`/users/{id}`.** `Mail.ReadWrite.Shared` is Microsoft's permission for writing messages in a
+shared or delegated mailbox
+(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders). One `mailbox` covers
+the whole call: the destination and every message in `message_refs` are read and moved within
+that one mailbox, never split across two.
 """
 
 from collections.abc import Mapping, Sequence
@@ -61,6 +68,7 @@ from msgraph.generated.models.mail_search_folder import MailSearchFolder
 from msgraph.generated.users.item.messages.item.move.move_post_request_body import (
     MovePostRequestBody,
 )
+from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -72,14 +80,19 @@ from office_365_mcp.shared.handles import (
     mail_message_handle,
 )
 from office_365_mcp.shared.mail import WellKnownFolder
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, graph_client_for_caller
+from office_365_mcp.shared.seam import (
+    MAILBOX_FIELD,
+    WRITE_DESTRUCTIVE,
+    graph_client_for_caller,
+    graph_mailbox,
+)
 
 TOOL_NAME = "outlook_move_mail"
 
 STEP_DESTINATION = "destination_folder"
 STEP_MOVE = "move_message"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
 # A well-known destination, so the first Graph call this makes is the move itself. If the
 # example named a folder handle instead, the call fails at the folder read, before it reaches
@@ -125,7 +138,8 @@ _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _DESCRIPTION = f"""\
 This tool moves up to {MAX_MESSAGES} messages into another folder in the mailbox of the \
-signed-in user, the only way this connector erases mail.
+signed-in user, or, with `mailbox`, a shared or delegated one — the only way this connector \
+erases mail.
 
 Notes:
 - Pass exactly one of `destination` or `folder_ref`, never both.
@@ -134,6 +148,8 @@ recoverable in Deleted Items, because this server has no permanent-erase operati
 - `message_refs` takes the `uri` of an outlook_search_mail, outlook_list_mail, or \
 outlook_read_thread result. A subject line, an email address, an Outlook web link, and a bare \
 message id are not handles.
+- `mailbox`, when given, applies to the destination and to every message in `message_refs`. \
+All of them must be in that one mailbox.
 """
 
 _BOTH_DESTINATIONS = (
@@ -283,6 +299,7 @@ async def move_mail(
     message_refs: Sequence[str],
     destination: WellKnownFolder | None = None,
     folder_ref: str | None = None,
+    mailbox: str | None = None,
 ) -> MailMoved:
     """Move each of `message_refs` into one folder, reporting every message's own outcome."""
     assert 1 <= len(message_refs) <= MAX_MESSAGES, (
@@ -290,13 +307,14 @@ async def move_mail(
     )
     handles = _message_handles(message_refs)
     wanted = _destination_asked_for(destination, folder_ref)
+    reached = graph_mailbox(client, mailbox)
 
     with graph_errors(TOOL_NAME):
-        target = await _destination(client, wanted)
+        target = await _destination(reached, wanted)
         attempts = (
             []
             if isinstance(target, _Unusable)
-            else [await _move_one(client, handle=handle, into=target) for handle in handles]
+            else [await _move_one(reached, handle=handle, into=target) for handle in handles]
         )
         _raise_when_nothing_moved(attempts)
 
@@ -338,7 +356,7 @@ def _destination_asked_for(
 
 
 async def _destination(
-    client: GraphServiceClient, wanted: WellKnownFolder | MailFolderHandle
+    reached: UserItemRequestBuilder, wanted: WellKnownFolder | MailFolderHandle
 ) -> _Destination | _Unusable:
     """The folder to move into, read from Graph when a handle named it.
 
@@ -352,7 +370,7 @@ async def _destination(
     # and hands back a plain `MailFolder`, and the check below never fires. A whole folder is a
     # small answer, and this is one folder once per call.
     with graph_step(STEP_DESTINATION):
-        folder = await client.me.mail_folders.by_mail_folder_id(wanted.folder_id).get()
+        folder = await reached.mail_folders.by_mail_folder_id(wanted.folder_id).get()
     assert folder is not None, "Graph answered a mail folder read with no folder"
     if _is_search_folder(folder):
         return _Unusable(_SEARCH_FOLDER_DESTINATION)
@@ -375,7 +393,7 @@ def _is_search_folder(folder: MailFolder) -> bool:
 
 
 async def _move_one(
-    client: GraphServiceClient, *, handle: MailMessageHandle, into: _Destination
+    reached: UserItemRequestBuilder, *, handle: MailMessageHandle, into: _Destination
 ) -> _Attempt:
     """One message, one request. A refusal is caught rather than raised here, so the messages
     moved before it survive into the answer. `_raise_when_nothing_moved` decides whether it
@@ -383,7 +401,7 @@ async def _move_one(
     """
     try:
         with graph_step(STEP_MOVE):
-            moved = await client.me.messages.by_message_id(handle.message_id).move.post(
+            moved = await reached.messages.by_message_id(handle.message_id).move.post(
                 MovePostRequestBody(destination_id=into.folder_id),
                 request_configuration=_move_request(),
             )
@@ -489,6 +507,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
+        mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> MailMoved:
         return await move_mail(
@@ -496,6 +515,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             message_refs=message_refs,
             destination=destination,
             folder_ref=folder_ref,
+            mailbox=mailbox,
         )
 
     _exactly_one_destination(mcp.add_tool(outlook_move_mail))

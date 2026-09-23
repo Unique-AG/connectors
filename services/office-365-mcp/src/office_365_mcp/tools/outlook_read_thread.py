@@ -7,6 +7,12 @@ https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/757, and that is the
 evidence. Graph ignores an unsupported `$filter` rather than refusing it, so every call selects
 `conversationId` back and refuses an answer carrying a foreign conversation. There is no
 `$orderby`: beside this `$filter` it answers `InefficientFilter`, so the sort happens here.
+
+**`mailbox` re-points both requests from `/me` to `/users/{id}`.** `Mail.Read.Shared` is
+Microsoft's own permission for reading messages in a shared or delegated mailbox
+(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders); `searched_scope` below
+still names the mailbox that was actually searched, own or delegated, so the caveat about what a
+"complete" thread means stays true of whichever one it is.
 """
 
 from collections.abc import Mapping
@@ -29,14 +35,19 @@ from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailSummary
 from office_365_mcp.shared.odata import odata_literal
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.seam import (
+    MAILBOX_FIELD,
+    READ_ONLY,
+    graph_client_for_caller,
+    graph_mailbox,
+)
 
 TOOL_NAME = "outlook_read_thread"
 
 STEP_ANCHOR = "thread_anchor"
 STEP_THREAD = "thread_messages"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "Mail.Read.Shared")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
@@ -56,10 +67,11 @@ type _AnchorQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryP
 type _ThreadQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Reads every message of one conversation held in the signed-in user's mailbox, oldest first. It \
-starts from any one message of the conversation. This answers "what happened in this thread" \
-or "did I ever reply". outlook_read_mail is the sibling for one message alone. When the whole \
-conversation matters, use this tool.
+Reads every message of one conversation held in the signed-in user's mailbox, or, with \
+`mailbox`, a shared or delegated one, oldest first. It starts from any one message of the \
+conversation. This answers "what happened in this thread" or "did I ever reply". \
+outlook_read_mail is the sibling for one message alone. When the whole conversation matters, \
+use this tool.
 
 Notes:
 - Searches every folder that holds a copy of the conversation, including Sent Items, not just \
@@ -112,19 +124,22 @@ class MailThread(BaseModel):
     )
 
 
-async def read_thread(client: GraphServiceClient, *, handle: MailMessageHandle) -> MailThread:
+async def read_thread(
+    client: GraphServiceClient, *, handle: MailMessageHandle, mailbox: str | None = None
+) -> MailThread:
+    reached = graph_mailbox(client, mailbox)
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_ANCHOR):
-            anchor = await client.me.messages.by_message_id(handle.message_id).get(
+            anchor = await reached.messages.by_message_id(handle.message_id).get(
                 request_configuration=_anchor_request()
             )
         assert anchor is not None, "Graph answered a message read with no message"
         conversation = anchor.conversation_id
         if conversation is None:
-            return _answer([], complete=True)
+            return _answer([], complete=True, mailbox=mailbox)
 
         with graph_step(STEP_THREAD):
-            page = await client.me.messages.get(request_configuration=_thread_request(conversation))
+            page = await reached.messages.get(request_configuration=_thread_request(conversation))
 
     found = list((page.value if page is not None else None) or [])
     # A page can come back short of `$top` and still carry a next link, so the link is the signal.
@@ -132,7 +147,7 @@ async def read_thread(client: GraphServiceClient, *, handle: MailMessageHandle) 
     _make_sure_the_filter_was_applied(
         found, conversation=conversation, anchor=handle.message_id, truncated=truncated
     )
-    return _answer(found, complete=not truncated)
+    return _answer(found, complete=not truncated, mailbox=mailbox)
 
 
 def _make_sure_the_filter_was_applied(
@@ -151,7 +166,7 @@ def _make_sure_the_filter_was_applied(
         raise ToolError(_FILTER_IGNORED)
 
 
-def _answer(found: list[Message], *, complete: bool) -> MailThread:
+def _answer(found: list[Message], *, complete: bool, mailbox: str | None) -> MailThread:
     ordered = sorted(found, key=_received_at)
     return MailThread(
         messages=[
@@ -161,13 +176,20 @@ def _answer(found: list[Message], *, complete: bool) -> MailThread:
         ],
         message_count=len(ordered),
         complete=complete,
-        searched_scope=(
-            "The signed-in user's own mailbox, every folder of it including Sent Items, Deleted "
-            + "Items and Junk Email. Not searched: any other participant's mailbox, a shared or "
-            + "delegated mailbox, and an in-place archive, which Microsoft Graph does not support "
-            + "at all. A message that was never delivered here, or that was permanently deleted, "
-            + "is absent. Nobody can tell it apart from one that never existed."
-        ),
+        searched_scope=_searched_scope(mailbox),
+    )
+
+
+def _searched_scope(mailbox: str | None) -> str:
+    """`mailbox` is echoed here rather than left implicit: the caller named it, so the one place
+    this answer says what was searched is where a wrong or stale mailbox becomes visible."""
+    whose = "The signed-in user's own mailbox" if mailbox is None else f"The mailbox {mailbox!r}"
+    return (
+        f"{whose}, every folder of it including Sent Items, Deleted Items and Junk Email. Not "
+        + "searched: any other participant's mailbox, any other shared or delegated mailbox, and "
+        + "an in-place archive, which Microsoft Graph does not support at all. A message that was "
+        + "never delivered here, or that was permanently deleted, is absent. Nobody can tell it "
+        + "apart from one that never existed."
     )
 
 
@@ -227,9 +249,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
+        mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> MailThread:
         handle = mail_message_handle(uri)
         if handle is None:
             raise ToolError(_BAD_HANDLE)
-        return await read_thread(client, handle=handle)
+        return await read_thread(client, handle=handle, mailbox=mailbox)

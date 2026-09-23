@@ -71,19 +71,22 @@
           "name": "outlook_search_mail",
           "permissions": [
             "Mail.Read",
-            "User.Read"
+            "User.Read",
+            "Mail.Read.Shared"
           ]
         },
         {
           "name": "outlook_read_mail",
           "permissions": [
-            "Mail.Read"
+            "Mail.Read",
+            "Mail.Read.Shared"
           ]
         },
         {
           "name": "outlook_browse_folders",
           "permissions": [
-            "Mail.Read"
+            "Mail.Read",
+            "Mail.Read.Shared"
           ]
         },
         {
@@ -97,13 +100,15 @@
         {
           "name": "outlook_read_thread",
           "permissions": [
-            "Mail.Read"
+            "Mail.Read",
+            "Mail.Read.Shared"
           ]
         },
         {
           "name": "outlook_list_mail",
           "permissions": [
-            "Mail.Read"
+            "Mail.Read",
+            "Mail.Read.Shared"
           ]
         },
         {
@@ -115,32 +120,38 @@
         {
           "name": "outlook_mark_mail",
           "permissions": [
-            "Mail.ReadWrite"
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
           ]
         },
         {
           "name": "outlook_move_mail",
           "permissions": [
-            "Mail.ReadWrite"
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
           ]
         },
         {
           "name": "outlook_draft_mail",
           "permissions": [
-            "Mail.ReadWrite"
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
           ]
         },
         {
           "name": "outlook_draft_reply",
           "permissions": [
-            "Mail.ReadWrite"
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
           ]
         },
         {
           "name": "outlook_send_draft",
           "permissions": [
             "Mail.Send",
-            "Mail.ReadBasic"
+            "Mail.ReadBasic",
+            "Mail.Send.Shared",
+            "Mail.Read.Shared"
           ]
         },
         {
@@ -558,11 +569,14 @@
         "OnlineMeetingTranscript.Read.All",
         "OnlineMeetingRecording.Read.All",
         "Mail.Read",
+        "Mail.Read.Shared",
         "People.Read",
         "MailboxSettings.Read",
         "Mail.ReadWrite",
+        "Mail.ReadWrite.Shared",
         "Mail.Send",
         "Mail.ReadBasic",
+        "Mail.Send.Shared",
         "MailboxSettings.ReadWrite",
         "Calendars.Read",
         "Calendars.Read.Shared",
@@ -571,7 +585,8 @@
         "Files.Read.All",
         "Notes.Read",
         "Notes.Create",
-        "Notes.ReadWrite"
+        "Notes.ReadWrite",
+        "Calendars.ReadBasic"
       ],
       "needs_admin_consent": {
         "User.Read": false,
