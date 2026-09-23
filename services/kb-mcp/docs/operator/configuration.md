@@ -18,10 +18,56 @@ settings into every call automatically: an admin changes them from inside the Un
 nothing on `kb-mcp`'s side needs a restart or redeploy.
 
 A client with no such host, a standalone deployment, Claude Desktop, Cursor, has nowhere to inject
-them from, so the same settings fall back to an environment variable instead:
-`UNIQUE_MCP_TOOL_<SERVER>_<CONFIG>_CONFIG`, holding a JSON object matching that tool's config shape.
-For `search` on this server that's `UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_SEARCH_TOOL_CONFIG`.
-Unset either way, the tool falls back to its own code default.
+them from, so the same settings fall back to an environment variable instead, one per tool, each
+holding a JSON object shaped like that tool's config. Unset either way, the tool falls back to its
+own code default.
+
+#### `search`
+
+`UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_SEARCH_TOOL_CONFIG`
+
+```json
+{
+  "service_config": {
+    "metadata_filter": { "path": ["mimeType"], "operator": "equals", "value": "application/pdf" }
+  }
+}
+```
+
+`service_config` also covers query mode, multi-query, and reranking, deep enough that the admin
+UI's own form is the practical way to set the rest.
+
+#### `content_tree`
+
+`UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_CONTENT_TREE_TOOL_CONFIG`
+
+```json
+{ "default_tree_limit": 500, "default_match_on": "key" }
+```
+
+#### `content_metadata`
+
+`UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_CONTENT_METADATA_TOOL_CONFIG`
+
+```json
+{
+  "excluded_fields": [
+    "key", "url", "title", "folderId", "mimeType",
+    "companyId", "contentId", "validAsOf", "folderIdPath", "externalFileOwner"
+  ]
+}
+```
+
+`excluded_fields` replaces the default list rather than adding to it: repeat the fields above
+alongside any of your own, or the catalog narrows to just what you passed.
+
+#### `read_file`
+
+`UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_READ_FILE_TOOL_CONFIG`
+
+```json
+{ "max_tokens_per_call": 4000 }
+```
 
 ### Required
 
