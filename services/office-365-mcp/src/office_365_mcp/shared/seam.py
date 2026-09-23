@@ -116,6 +116,7 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "MailboxSettings.ReadWrite",
         "Calendars.Read",
         "Calendars.Read.Shared",
+        "Calendars.ReadBasic",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
         "Files.Read.All",

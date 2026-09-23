@@ -253,6 +253,22 @@ _INVITING: Mapping[str, object] = {
     "attendees": [_ONE_ATTENDEE],
 }
 
+# The five tools this file's own sweeps deliberately do not call: each already has its own
+# dedicated `tests/tools/test_outlook_*.py` file asserting its Graph mechanics in full. Naming
+# them here, rather than folding them into `_CALENDAR_TOOLS`, keeps the sweeps below testing
+# exactly what they tested before this preset grew — that the original five never cascade into a
+# cancel, a response, or an availability lookup — while still making the preset's wider surface an
+# assertion a reviewer sees, not a silent drift.
+_NEWER_CALENDAR_TOOLS: frozenset[str] = frozenset(
+    {
+        "outlook_check_availability",
+        "outlook_suggest_meeting_times",
+        "outlook_update_event",
+        "outlook_cancel_event",
+        "outlook_respond_to_invite",
+    }
+)
+
 # The two calls that reach a person. The delegated create asks whether it invites anybody or not,
 # because it writes into somebody else's day either way.
 _THE_TWO_CREATES: tuple[tuple[str, Mapping[str, object]], ...] = (
@@ -266,14 +282,18 @@ _THE_TWO_CREATES: tuple[tuple[str, Mapping[str, object]], ...] = (
 
 @pytest.mark.usefixtures("obo")
 class TestTheWholeCalendarSurfaceStaysInsideIt:
-    async def test_all_five_tools_are_registered_together(
+    async def test_the_whole_calendar_surface_is_registered_together(
         self, every_calendar_tool: Client[FastMCPTransport]
     ) -> None:
         """Guards the guard. Against a server missing a tool, every assertion below holds by not
-        calling it."""
+        calling it. Lists `_NEWER_CALENDAR_TOOLS` by name, deliberately, so that widening the
+        `outlook-calendar-delegate` preset again is an edit to this assertion that a reviewer
+        sees, exactly as adding one of the original five already was."""
         listed = {tool.name for tool in await every_calendar_tool.list_tools()}
 
-        assert listed == {ALWAYS_ON} | {name for name, _arguments in _CALENDAR_TOOLS}
+        assert listed == (
+            {ALWAYS_ON} | {name for name, _arguments in _CALENDAR_TOOLS} | _NEWER_CALENDAR_TOOLS
+        )
 
     async def test_every_tool_answers_on_the_call_the_registry_publishes(
         self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter

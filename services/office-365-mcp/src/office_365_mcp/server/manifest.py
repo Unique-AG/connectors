@@ -55,9 +55,10 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Mail.ReadBasic": False,
     "MailboxSettings.ReadWrite": False,
     # Microsoft publishes AdminConsentRequired: No for every delegated Calendars permission, the
-    # two `.Shared` ones included.
+    # two `.Shared` ones and `ReadBasic` included.
     "Calendars.Read": False,
     "Calendars.Read.Shared": False,
+    "Calendars.ReadBasic": False,
     "Calendars.ReadWrite": False,
     "Calendars.ReadWrite.Shared": False,
     "Files.Read.All": True,
