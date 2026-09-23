@@ -809,6 +809,7 @@ GRAPH_STEPS = frozenset(
         "mailbox_settings",
         "mail_rules",
         "mail_categories",
+        "categories",
         "mark_message",
         "move_message",
         "destination_folder",
