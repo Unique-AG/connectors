@@ -24,7 +24,7 @@ from kb_mcp.common.references import SERVER_INSTRUCTIONS_CITATION_GUIDANCE
 from kb_mcp.common.tree_cache import expire_idle_trees_loop
 from kb_mcp.health import PoolHealthMiddleware
 from kb_mcp.http_client import install_pooled_http_client
-from kb_mcp.settings import ENV_FILE, KNOWN_MCP_TOOLS, Settings, get_settings
+from kb_mcp.settings import ENV_FILE, Settings, get_settings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,10 +51,17 @@ class _DowngradeMemoryTrimNoise(logging.Filter):
         return True
 
 
+# What unique-kb-mcp/SKILL.md documents, not "every tool that exists" —
+# a future tool the skill never mentions must not gate it.
+_SKILL_REQUIRED_TOOLS = frozenset(
+    {"content_tree", "content_metadata", "search", "read_file"}
+)
+
+
 def skill_tools_fully_enabled(settings: Settings) -> bool:
-    """The skill's worked example calls all four tools, so a narrower
-    KB_MCP_ENABLED_TOOLS allowlist would advertise tools not on tools/list."""
-    return settings.enabled_tools == KNOWN_MCP_TOOLS
+    """A narrower KB_MCP_ENABLED_TOOLS allowlist would advertise a skill
+    naming tools not on tools/list."""
+    return _SKILL_REQUIRED_TOOLS <= settings.enabled_tools
 
 
 def apply_enabled_tools(mcp: FastMCP, settings: Settings) -> None:

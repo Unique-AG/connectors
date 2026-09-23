@@ -86,7 +86,14 @@ def test_server_icon_is_a_readable_webp_data_uri():
     assert base64.b64decode(payload).startswith(b"RIFF")
 
 
-def test_skill_tools_fully_enabled_requires_every_known_tool(monkeypatch):
+def test_skill_required_tools_are_known_tool_names():
+    from kb_mcp.main import _SKILL_REQUIRED_TOOLS
+    from kb_mcp.settings import KNOWN_MCP_TOOLS
+
+    assert _SKILL_REQUIRED_TOOLS <= KNOWN_MCP_TOOLS
+
+
+def test_skill_tools_fully_enabled_requires_every_tool_the_skill_uses(monkeypatch):
     from kb_mcp.main import skill_tools_fully_enabled
     from kb_mcp.settings import get_settings
 
