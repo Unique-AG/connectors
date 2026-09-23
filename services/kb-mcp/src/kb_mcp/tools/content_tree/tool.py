@@ -9,6 +9,8 @@
 import logging
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Annotated, Literal
 
 import unique_sdk
@@ -31,7 +33,11 @@ from unique_toolkit.experimental.components.content_tree.schemas import (
     FolderWalkSnapshot,
 )
 
-from kb_mcp.common.cached_walk import resolve_filtered_snapshot, uniqueql_predicate
+from kb_mcp.common.cached_walk import (
+    resolve_filtered_snapshot,
+    sorted_by_depth,
+    uniqueql_predicate,
+)
 from kb_mcp.common.correlation import correlation_id
 from kb_mcp.common.metadata_filter import (
     DEFAULT_METADATA_FILTER_STATEMENT,
@@ -203,6 +209,98 @@ def _filtered_to_path_prefix(
             if tuple(display_path_segments(path)[: len(prefix)]) == prefix
         ],
         complete=snapshot.complete,
+    )
+
+
+def _parts(path: PathLike) -> tuple[str, ...]:
+    return tuple(path_parts(path))
+
+
+def _is_printed(parts: tuple[str, ...], max_depth: int | None) -> bool:
+    """Whether the render prints this folder or file as its own line. It
+    expands a directory only above max_depth, so both cut off at the same length."""
+    return max_depth is None or len(parts) <= max_depth
+
+
+def _printed_dirs(
+    files: Sequence[tuple[ContentInfo, PathLike]],
+    folder_paths: Sequence[PathLike],
+    max_depth: int | None,
+) -> set[tuple[str, ...]]:
+    """Every directory the render prints as its own line: each ancestor of a
+    file or folder (the folder included), down to max_depth."""
+    dirs = [_parts(path)[:-1] for _info, path in files] + [
+        _parts(path) for path in folder_paths
+    ]
+    return {
+        d[:depth]
+        for d in dirs
+        for depth in range(1, len(d) + 1)
+        if _is_printed(d[:depth], max_depth)
+    }
+
+
+@dataclass(frozen=True)
+class _CappedTree:
+    snapshot: FolderWalkSnapshot
+    shown_files: int
+    total_files: int
+    shown_dirs: int
+    total_dirs: int
+
+
+def _cap_tree(
+    snapshot: FolderWalkSnapshot,
+    *,
+    limit: int,
+    max_depth: int | None,
+    folders_only: bool,
+) -> _CappedTree:
+    """Cap the printed folders and files at `limit` each, and count both.
+
+    The walk goes one level past max_depth, so rows below the cutoff never
+    print and must not spend the cap or inflate a notice. They are kept only
+    under a shown folder, where they feed its "… below" summary; anywhere else
+    they would pull a cut folder back into the render.
+    """
+    # Under folders_only no file renders, so dropping them (not capping them)
+    # stops one from re-adding a cut folder.
+    files = [] if folders_only else snapshot.files
+    printed_files = [row for row in files if _is_printed(_parts(row[1]), max_depth)]
+    hidden_files = [row for row in files if not _is_printed(_parts(row[1]), max_depth)]
+    hidden_folders = [
+        p for p in snapshot.folder_paths if not _is_printed(_parts(p), max_depth)
+    ]
+
+    kept_files = printed_files[:limit]
+    # Cap printed directories, not folder_paths entries: a folder at the
+    # cutoff may appear only as the parent of a deeper row. Shallowest first,
+    # so every kept directory's parent is kept too.
+    all_dirs = sorted(
+        _printed_dirs(snapshot.files, snapshot.folder_paths, max_depth),
+        key=lambda d: (len(d), d),
+    )
+    # A folder also prints via any kept file in it, so the slice alone
+    # doesn't bound what shows.
+    shown_dirs = set(all_dirs[:limit]) | _printed_dirs(kept_files, [], max_depth)
+
+    def _under_shown_dir(path: PathLike) -> bool:
+        # Only hidden rows get here, so max_depth is set; () is the root.
+        cutoff = _parts(path)[:max_depth]
+        return not cutoff or cutoff in shown_dirs
+
+    rendered = FolderWalkSnapshot(
+        files=kept_files + [row for row in hidden_files if _under_shown_dir(row[1])],
+        folder_paths=[PurePosixPath(*d) for d in shown_dirs]
+        + [p for p in hidden_folders if _under_shown_dir(p)],
+        complete=snapshot.complete,
+    )
+    return _CappedTree(
+        snapshot=rendered,
+        shown_files=len(kept_files),
+        total_files=len(printed_files),
+        shown_dirs=len(shown_dirs),
+        total_dirs=len(all_dirs),
     )
 
 
@@ -548,29 +646,23 @@ async def content_tree(
             assert folder_path is not None
             snapshot = _filtered_to_path_prefix(snapshot, folder_path)
 
+        if mode != "search":
+            # Tree and list slice the snapshot, so give them a stable prefix.
+            # Search ranks its own hits and would discard this order.
+            snapshot = sorted_by_depth(snapshot)
+
         if mode == "tree":
             # Files and folders each get their own cap and notice (never one
             # shared count), but `limit` sizes both by default so a small ask stays small.
-            tree_limit = limit if limit is not None else config.default_tree_limit
-            # folder_paths already lists every folder, files or not, so dropping
-            # files here (not capping them) stops one from re-adding a cut folder.
-            if folders_only:
-                rendered_files = []
-            else:
-                rendered_files = snapshot.files
-                if len(snapshot.files) > tree_limit:
-                    rendered_files = snapshot.files[:tree_limit]
-            rendered_folder_paths = snapshot.folder_paths
-            if len(snapshot.folder_paths) > tree_limit:
-                rendered_folder_paths = snapshot.folder_paths[:tree_limit]
-            rendered = FolderWalkSnapshot(
-                files=rendered_files,
-                folder_paths=rendered_folder_paths,
-                complete=snapshot.complete,
+            capped = _cap_tree(
+                snapshot,
+                limit=limit if limit is not None else config.default_tree_limit,
+                max_depth=max_depth,
+                folders_only=folders_only,
             )
             tree_body = _with_empty_metadata_filter_hint(
                 render_tree_with_folder_ids(
-                    rendered,
+                    capped.snapshot,
                     # Ids come from the full snapshot, not the truncated one, or a
                     # cut folder would lose the folder_id a follow-up call needs.
                     folder_scope_ids(snapshot.files),
@@ -581,23 +673,22 @@ async def content_tree(
                 complete=snapshot.complete,
                 llm_filter=parsed_llm_filter,
             )
-            # Directory counts, not folder_paths list lengths: a folder also
-            # renders via any surviving file in it, so the slice above alone doesn't bound this.
-            total_dirs = len(snapshot.to_trie().walk_trie_nodes()) - 1
-            shown_dirs = len(rendered.to_trie().walk_trie_nodes()) - 1
-            # No file notice under folders_only: rendered_files is empty by
-            # design there, not truncated, so "shown of total" would misreport.
+            # No file notice under folders_only: no files render by design
+            # there, not truncated, so "shown of total" would misreport.
             if not folders_only:
                 tree_body = _with_truncation_notice(
                     tree_body,
-                    shown=len(rendered_files),
-                    total=len(snapshot.files),
+                    shown=capped.shown_files,
+                    total=capped.total_files,
                     noun="files",
                 )
             text = _with_incomplete_notice(
                 snapshot.complete,
                 _with_truncation_notice(
-                    tree_body, shown=shown_dirs, total=total_dirs, noun="folders"
+                    tree_body,
+                    shown=capped.shown_dirs,
+                    total=capped.total_dirs,
+                    noun="folders",
                 ),
             )
             _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)
