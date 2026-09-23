@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import PurePosixPath
 from typing import Any
 
 from unique_toolkit.content.schemas import ContentInfo
@@ -45,6 +46,24 @@ def filter_snapshot(
     return FolderWalkSnapshot(
         files=[(info, path) for info, path in snapshot.files if keep(info)],
         folder_paths=snapshot.folder_paths,
+        complete=snapshot.complete,
+    )
+
+
+def _depth_order_key(path: PurePosixPath) -> tuple[int, str]:
+    """Shallowest first, then lexicographic, so any caller that slices this
+    list gets a stable, breadth-biased prefix instead of whichever branch's
+    concurrent directory listings happened to return first."""
+    return (len(path.parts), str(path))
+
+
+def sorted_by_depth(snapshot: FolderWalkSnapshot) -> FolderWalkSnapshot:
+    """A new snapshot with files and folders in deterministic, shallowest-first
+    order. Never mutates ``snapshot``: it may be the live, shared cache entry
+    a background walk is still appending to."""
+    return FolderWalkSnapshot(
+        files=sorted(snapshot.files, key=lambda row: _depth_order_key(row[1])),
+        folder_paths=sorted(snapshot.folder_paths, key=_depth_order_key),
         complete=snapshot.complete,
     )
 
