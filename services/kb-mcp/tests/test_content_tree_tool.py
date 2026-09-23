@@ -1351,6 +1351,74 @@ async def test_tree_folder_notice_counts_dirs_a_surviving_file_still_renders():
 
 
 @pytest.mark.asyncio
+async def test_tree_folder_cap_ignores_folders_below_max_depth():
+    """The walk goes one level past max_depth, so folders below the cutoff
+    never print: they must not spend the cap or trip the notice, and every
+    shown folder must keep an honest "… below" summary."""
+    snapshot = FakeSnapshot(
+        folder_paths=[PurePosixPath(f"T{i}") for i in range(3)]
+        + [PurePosixPath(f"T{i}/s{j}") for i in range(3) for j in range(10)]
+    )
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree",
+            folders_only=True,
+            max_depth=1,
+            limit=5,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Showing the first" not in text
+    assert text.count("(10 dirs below)") == 3
+
+
+@pytest.mark.asyncio
+async def test_tree_folder_notice_counts_only_printed_folders():
+    snapshot = FakeSnapshot(
+        folder_paths=[PurePosixPath(f"T{i}") for i in range(5)]
+        + [PurePosixPath(f"T{i}/s") for i in range(5)]
+    )
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree",
+            folders_only=True,
+            max_depth=1,
+            limit=2,
+            config=ContentTreeToolConfig(),
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "first 2 of 5 folders" in text
+    # Rows below the cutoff never pull a cut folder back into the render.
+    assert "T4" not in text
+
+
+@pytest.mark.asyncio
+async def test_tree_file_cap_ignores_files_below_max_depth():
+    snapshot = FakeSnapshot(
+        files=[(_make_content_info("top"), PurePosixPath("top.pdf"))]
+        + [
+            (_make_content_info(f"c{i}"), PurePosixPath(f"Docs/f{i}.pdf"))
+            for i in range(5)
+        ],
+        folder_paths=[PurePosixPath("Docs")],
+    )
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree", max_depth=1, limit=2, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Showing the first" not in text
+    assert "top.pdf" in text
+    assert "0 dirs, 5 files below" in text
+
+
+@pytest.mark.asyncio
 async def test_search_does_not_filter_files_it_then_discards(applied_filter):
     """Search re-derives its hits from the fuzzy scorer and never reads the
     snapshot's files, so filtering them is a full pass over the corpus."""
