@@ -26,7 +26,7 @@ def test_package_directory_contains_at_least_one_skill():
 
 @pytest.mark.skipif(not MARKETPLACE.exists(), reason="needs a repo checkout")
 def test_marketplace_manifest_covers_the_packaged_skills():
-    """npx discovery reads only this manifest, so a stale source finds nothing, silently."""
+    """npx discovery reads only this manifest; a stale source finds nothing, with no error."""
     plugins = json.loads(MARKETPLACE.read_text())["plugins"]
     declared = {
         (MARKETPLACE.parents[1] / p["source"] / "skills").resolve() for p in plugins
