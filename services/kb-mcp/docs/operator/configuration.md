@@ -19,12 +19,17 @@ nothing on `kb-mcp`'s side needs a restart or redeploy.
 
 A client with no such host, a standalone deployment, Claude Desktop, Cursor, has nowhere to inject
 them from, so the same settings fall back to an environment variable instead, one per tool, each
-holding a JSON object shaped like that tool's config. Unset either way, the tool falls back to its
-own code default.
+holding a JSON object shaped like that tool's config. Only the fields you set need to appear: a
+field left out keeps its own class default, and the variable left unset keeps all of them.
 
 #### `search`
 
 `UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_SEARCH_TOOL_CONFIG`
+
+The default is deep (query mode, multi-query, reranking, LLM selection), so the admin UI's own
+form is the practical way to set most of it; see
+[`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/search/config.py)
+for the full shape. A partial override, changing just the filter and the result limit:
 
 ```json
 {
@@ -35,17 +40,23 @@ own code default.
 }
 ```
 
-`service_config` also covers query mode, multi-query, and reranking, deep enough that the admin
-UI's own form is the practical way to set the rest. Full shape:
-[`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/search/config.py).
-
 #### `content_tree`
 
 `UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_CONTENT_TREE_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/content_tree/config.py))
 
+Defaults:
+
 ```json
-{ "default_tree_limit": 500, "default_match_on": "key" }
+{
+  "metadata_filter": null,
+  "default_limit": 50,
+  "default_tree_limit": 1000,
+  "default_min_score": 0.6,
+  "default_match_on": "both",
+  "default_case_sensitive": false,
+  "max_concurrent_scope_lookups": 25
+}
 ```
 
 #### `content_metadata`
@@ -53,25 +64,31 @@ UI's own form is the practical way to set the rest. Full shape:
 `UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_CONTENT_METADATA_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/content_metadata/config.py))
 
+Defaults:
+
 ```json
 {
+  "metadata_filter": null,
   "excluded_fields": [
     "key", "url", "title", "folderId", "mimeType",
     "companyId", "contentId", "validAsOf", "folderIdPath", "externalFileOwner"
-  ]
+  ],
+  "max_concurrent_scope_lookups": 25
 }
 ```
 
-`excluded_fields` replaces the default list rather than adding to it: repeat the fields above
-alongside any of your own, or the catalog narrows to just what you passed.
+`excluded_fields` replaces this list rather than adding to it: repeat the entries above alongside
+any of your own, or the catalog narrows to just what you passed.
 
 #### `read_file`
 
 `UNIQUE_MCP_TOOL_KNOWLEDGE_BASE_SEARCH_READ_FILE_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/read_file/config.py))
 
+Default:
+
 ```json
-{ "max_tokens_per_call": 4000 }
+{ "max_tokens_per_call": 8000 }
 ```
 
 ### Required
