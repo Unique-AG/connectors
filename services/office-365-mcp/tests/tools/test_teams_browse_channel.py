@@ -13,7 +13,7 @@ from office_365_mcp.shared.handles import message_handle
 from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST
 from office_365_mcp.tools import teams_browse_channel as browser
 
-from .conftest import GRAPH_V1
+from .conftest import GRAPH_V1, reaction_payload
 
 _TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
 _CHANNEL_ID = "19:general@thread.tacv2"
@@ -34,6 +34,7 @@ def _message_payload(
     message_id: str,
     content: str,
     content_type: str = "html",
+    reactions: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
     return {
         "@odata.type": "#microsoft.graph.chatMessage",
@@ -53,7 +54,7 @@ def _message_payload(
         "body": {"contentType": content_type, "content": content},
         "mentions": [],
         "attachments": [],
-        "reactions": [],
+        "reactions": [dict(reaction) for reaction in reactions],
         "eventDetail": None,
     }
 
@@ -65,8 +66,9 @@ def _post_payload(
     created_at: str = "2026-02-11T09:15:22.31Z",
     replies: Sequence[Mapping[str, object]] = (),
     more_replies: bool = False,
+    reactions: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
-    payload = _message_payload(message_id=message_id, content=content)
+    payload = _message_payload(message_id=message_id, content=content, reactions=reactions)
     payload["createdDateTime"] = created_at
     payload["replies"] = [dict(reply) for reply in replies]
     if more_replies:
@@ -75,9 +77,16 @@ def _post_payload(
 
 
 def _reply_payload(
-    message_id: str, *, root_id: str, created_at: str, content: str = "a synthetic reply"
+    message_id: str,
+    *,
+    root_id: str,
+    created_at: str,
+    content: str = "a synthetic reply",
+    reactions: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
-    payload = _message_payload(message_id=message_id, content=content, content_type="text")
+    payload = _message_payload(
+        message_id=message_id, content=content, content_type="text", reactions=reactions
+    )
     payload["createdDateTime"] = created_at
     payload["replyToId"] = root_id
     return payload
@@ -167,6 +176,96 @@ class TestBrowsingOneChannel:
         assert (post.team_id, post.channel_id) == (_TEAM_ID, _CHANNEL_ID)
         assert post.chat_id is None
         assert post.reply_to_id is None, "a root post answers nothing"
+
+    async def test_reactions_arrive_on_a_post_with_no_widening_of_the_request(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`reactions` is a plain property, not a navigation property behind `$expand`, so it
+        rides in on the same `$top`+`$expand=replies` request every other test here makes."""
+        route = graph.get(_MESSAGES_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _post_payload(
+                            "1770000000000",
+                            reactions=[
+                                reaction_payload(
+                                    reaction_type="\U0001f44d", display_name="Grace Hopper"
+                                )
+                            ],
+                        )
+                    ]
+                },
+            )
+        )
+
+        browsed = await browser.teams_browse_channel(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
+        )
+
+        assert route.calls.last.request.url.params["$expand"] == "replies", (
+            "reactions needed no widening on top of it"
+        )
+        post = browsed.messages[0]
+        assert len(post.reactions) == 1
+        assert post.reactions[0].reaction_type == "\U0001f44d"
+
+    async def test_a_reply_carries_its_own_reactions_too(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get(_MESSAGES_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _post_payload(
+                            "1770000000000",
+                            replies=[
+                                _reply_payload(
+                                    "1770000000001",
+                                    root_id="1770000000000",
+                                    created_at="2026-02-11T10:00:00Z",
+                                    reactions=[reaction_payload(reaction_type="❤️")],
+                                )
+                            ],
+                        )
+                    ]
+                },
+            )
+        )
+
+        browsed = await browser.teams_browse_channel(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
+        )
+
+        reply = browsed.messages[1]
+        assert [reaction.reaction_type for reaction in reply.reactions] == ["❤️"]
+
+    async def test_a_post_nobody_reacted_to_has_an_empty_list(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get(_MESSAGES_PATH).mock(
+            return_value=httpx.Response(200, json={"value": [_post_payload("1770000000000")]})
+        )
+
+        browsed = await browser.teams_browse_channel(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
+        )
+
+        assert browsed.messages[0].reactions == []
 
     async def test_one_browse_is_one_graph_request_whatever_the_channel_holds(
         self, client: GraphServiceClient, graph: respx.MockRouter

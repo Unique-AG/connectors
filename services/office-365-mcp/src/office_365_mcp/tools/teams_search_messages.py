@@ -10,8 +10,21 @@ rather than an `@odata.nextLink`, so `collect_pages` has no part here.
 Graph throttles reads on a chat or channel to one request per second per app per tenant
 (https://learn.microsoft.com/en-us/graph/throttling), and that budget is the app's rather than the
 caller's, so one user's wide sweep degrades every other user in the tenant.
+
+`include_body` trades that budget for fewer round trips: each addressable hit gets its own
+`teams_read_message`-shaped GET — same endpoint, same permissions, same normalisation — capped at
+`_HYDRATION_CONCURRENCY` in flight so a page of `MAX_RESULTS` hits sharing one busy channel cannot
+burn through the app's whole one-a-second allowance on a single call. That still costs up to
+`size` extra requests and however long the slowest of them takes, against the "exactly one Graph
+request" this tool otherwise promises, so it defaults to off: a caller who only wants to know
+*whether* a message exists, or is happy with Microsoft's `summary`, should not pay Graph's latency
+for text nobody asked for. A hit Graph refuses to hydrate — deleted, not visible, or, for a hit on
+a channel reply, addressed under the wrong post (see `MessageHit.uri`) — keeps its `summary` and
+its handle; only `text` and `reactions` are left unset for that hit, exactly as if `include_body`
+had been off just for it.
 """
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass, fields
 from datetime import UTC, date, datetime
@@ -34,16 +47,33 @@ from msgraph.generated.search.query.query_post_response import QueryPostResponse
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
-from office_365_mcp.shared.handles import CHANNEL_PERMISSION, CHAT_PERMISSION, MessageHandle
+from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step
+from office_365_mcp.shared.handles import (
+    CHANNEL_PERMISSION,
+    CHAT_PERMISSION,
+    MessageHandle,
+    message_handle,
+)
 from office_365_mcp.shared.kql import flag, free_text, quoted
-from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST, MessageSender
+from office_365_mcp.shared.messages import (
+    MAX_REPLIES_PER_POST,
+    MessageReaction,
+    MessageSender,
+    TeamsMessage,
+)
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_search_messages"
 
-STEP = "search_query"
+STEP_SEARCH = "search_query"
+# The same two names `teams_read_message` counts its own reads under: `include_body` makes exactly
+# that Graph call, on this tool's behalf, so "reading one chat message" stays one comparable series
+# whichever tool reached it, rather than forking into a second, tool-specific name for an identical
+# request shape. A hit never carries a reply's own handle (see `MessageHit.uri`), so hydration has
+# no third, `channel_reply` path to reuse.
+STEP_CHAT_MESSAGE = "chat_message"
+STEP_CHANNEL_MESSAGE = "channel_message"
 
 # TRAP: `/search/query` accepts `Chat.Read` alone and then silently covers chats only. Requesting
 # both refuses a tenant withholding the broad one at consent time rather than at query time.
@@ -53,6 +83,11 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "release"}
 
 # Graph publishes no `size` ceiling for `chatMessage` — 1000 generally, 25 for `message`/`event`.
 MAX_RESULTS = 50
+
+# Graph throttles a chat or channel to about one request per second per app per tenant (see the
+# module docstring), and that budget is shared with every other caller of this connector, so
+# hydration stays well under it even though `MAX_RESULTS` hits can share one busy channel.
+_HYDRATION_CONCURRENCY = 3
 
 _DESCRIPTION = """\
 This tool searches every Teams message the signed-in user can see, by keyword, sender, mention, \
@@ -65,8 +100,8 @@ Notes:
 - At least one search criterion is required. Every given criterion is ANDed together.
 - It takes no chat or channel scope, and it searches every chat and channel the user can see. \
 Read `channel_id` or `chat_id` on each hit to see where it came from.
-- A hit carries only metadata and Microsoft's `summary` snippet, never the message body. Pass \
-its `uri` to teams_read_message for the actual words.\
+- A hit carries only metadata and Microsoft's `summary` snippet, never the message body, unless \
+`include_body` is set. Pass a hit's `uri` to teams_read_message for the actual words either way.\
 """
 
 
@@ -79,11 +114,13 @@ class MessageHit(BaseModel):
             + "`teams:///chats/{chatId}/messages/{messageId}` or "
             + "`teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}`, with each id "
             + "percent-encoded. Pass it verbatim to teams_read_message, the only route to the "
-            + "full text, the attachments, and the mentions. This value is null when a hit "
-            + "carries neither a chat nor a channel identity, and that hit is then unaddressable. "
-            + "When the hit is a reply, this handle addresses its parent post instead, and "
-            + "teams_read_message then reports that it cannot read the message. Only "
-            + "teams_browse_channel emits a reply's own handle, and it reaches just the newest "
+            + "attachments and the mentions — and, unless `include_body` was set, to the full "
+            + "text too. This value is null when a hit carries neither a chat nor a channel "
+            + "identity, and that hit is then unaddressable, `include_body` included. When the "
+            + "hit is a reply, this handle addresses its parent post instead, and "
+            + "teams_read_message then reports that it cannot read the message — `include_body` "
+            + "hits the same wall and leaves `text` unset for it. Only teams_browse_channel emits "
+            + "a reply's own handle, and it reaches just the newest "
             + f"{MAX_REPLIES_PER_POST} replies of each post, with no further cursor. Outside "
             + "that window, there is no route to the full text, and browsing again returns the "
             + "same window. Report the `summary` with the sender and date. Then stop looking."
@@ -140,6 +177,25 @@ class MessageHit(BaseModel):
             + "messages. It is null for chat messages. Use `uri` for those instead."
         )
     )
+    text: str | None = Field(
+        description=(
+            "The message as plain text, normalised the same way teams_read_message reports it — "
+            + "null unless `include_body` was set. Even then, null does not mean no text: it also "
+            + "covers a hit `include_body` could not hydrate (see `uri`) and a message that "
+            + "genuinely has none, for example a system event or an image-only post. Fall back to "
+            + "`summary`, or call teams_read_message with `uri`, rather than reading a null here "
+            + "as silence."
+        )
+    )
+    reactions: list[MessageReaction] = Field(
+        description=(
+            "Who reacted to this message, and with what — empty unless `include_body` was set "
+            + "and Graph answered. Search's own index carries no reactions at all, so this is "
+            + "populated from the same hydration that fills `text`, and an empty list here has "
+            + "the same three readings `text`'s null does: nobody reacted, `include_body` was "
+            + "not set, or hydration could not reach this hit."
+        )
+    )
 
     @classmethod
     def from_hit(cls, hit: SearchHit) -> Self | None:
@@ -173,6 +229,11 @@ class MessageHit(BaseModel):
             # `ChatMessageImportance` subclasses `str`, so the member is its own wire value.
             importance=resource.importance,
             web_url=resource.web_url,
+            # Filled in by `_hydrated` when `include_body` asked for it. Search's own retrievable
+            # properties for `chatMessage` carry neither
+            # (https://learn.microsoft.com/en-us/graph/search-concept-chat-messages).
+            text=None,
+            reactions=[],
         )
 
 
@@ -269,9 +330,17 @@ def _kql_moment(bound: date | datetime) -> str:
 
 
 async def teams_search_messages(
-    client: GraphServiceClient, *, criteria: SearchCriteria, offset: int, size: int
+    client: GraphServiceClient,
+    *,
+    criteria: SearchCriteria,
+    offset: int,
+    size: int,
+    include_body: bool = False,
 ) -> MessageSearchResults:
-    """One page of matches for `criteria`. Exactly one Graph request, whatever the criteria."""
+    """One page of matches for `criteria`. Exactly one Graph request, whatever the criteria — plus,
+    only when `include_body` is set, one more per addressable hit. See the module docstring for
+    what that second part costs and how a hit it cannot reach is handled.
+    """
     query = _query_string(criteria)
     assert query, (
         "teams_search_messages needs at least one criterion; the tool refuses an empty set"
@@ -289,22 +358,76 @@ async def teams_search_messages(
             )
         ]
     )
-    with graph_errors(TOOL_NAME, step=STEP):
-        response = await client.search.query.post(body)
+    with graph_errors(TOOL_NAME):
+        with graph_step(STEP_SEARCH):
+            response = await client.search.query.post(body)
 
-    assert response is not None, "Graph answered POST /search/query with no response"
-    container = _hits_container(response)
-    hits = (container.hits or []) if container is not None else []
-    more_to_come = bool(container.more_results_available) if container else False
+        assert response is not None, "Graph answered POST /search/query with no response"
+        container = _hits_container(response)
+        hits = (container.hits or []) if container is not None else []
+        more_to_come = bool(container.more_results_available) if container else False
+
+        messages = [
+            message for message in (MessageHit.from_hit(hit) for hit in hits) if message is not None
+        ]
+        if include_body:
+            messages = await _hydrated(client, messages)
 
     return MessageSearchResults(
-        messages=[
-            message for message in (MessageHit.from_hit(hit) for hit in hits) if message is not None
-        ],
+        messages=messages,
         # `moreResultsAvailable` alone is not a next page: a hitless page would hand back the
         # offset it was asked at, and a caller obeying `next_offset` re-requests it forever.
         next_offset=offset + len(hits) if more_to_come and hits else None,
     )
+
+
+async def _hydrated(client: GraphServiceClient, hits: list[MessageHit]) -> list[MessageHit]:
+    """`hits`, each carrying its own `text` and `reactions` where Graph would answer for it.
+
+    Concurrent, bounded to `_HYDRATION_CONCURRENCY`, and per-hit failures are absorbed here rather
+    than raised: one hit Graph refuses — deleted, not visible, or a reply addressed under the wrong
+    post — must not cost the whole page, the same principle `teams_browse_channel` applies to a
+    dropped system message. A failure this connector does not classify still raises, because that
+    is a bug to see rather than a hit to skip.
+    """
+    semaphore = asyncio.Semaphore(_HYDRATION_CONCURRENCY)
+
+    async def hydrated_hit(hit: MessageHit) -> MessageHit:
+        handle = message_handle(hit.uri) if hit.uri is not None else None
+        if handle is None:
+            return hit
+        async with semaphore:
+            try:
+                message = await _fetch(client, handle)
+            except GraphFailure:
+                return hit
+        assert message is not None, "Graph answered a message read with no message"
+        full = TeamsMessage.from_message(message, handle=handle)
+        return hit.model_copy(update={"text": full.text, "reactions": full.reactions})
+
+    return list(await asyncio.gather(*(hydrated_hit(hit) for hit in hits)))
+
+
+async def _fetch(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage | None:
+    """The message `handle` addresses — `teams_read_message`'s own two non-reply branches, since a
+    hit never carries a reply's own handle (see `MessageHit.uri`)."""
+    if handle.chat_id is not None:
+        with graph_step(STEP_CHAT_MESSAGE):
+            return await (
+                client.chats.by_chat_id(handle.chat_id)
+                .messages.by_chat_message_id(handle.message_id)
+                .get()
+            )
+    assert handle.team_id is not None and handle.channel_id is not None, (
+        "a hit's handle addresses either a chat or a team channel"
+    )
+    with graph_step(STEP_CHANNEL_MESSAGE):
+        return await (
+            client.teams.by_team_id(handle.team_id)
+            .channels.by_channel_id(handle.channel_id)
+            .messages.by_chat_message_id(handle.message_id)
+            .get()
+        )
 
 
 def _hits_container(response: QueryPostResponse) -> SearchHitsContainer | None:
@@ -436,6 +559,17 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=f"Results per page, at most {MAX_RESULTS}.",
             ),
         ] = 25,
+        include_body: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Inline each hit's full text and reactions instead of leaving them for a "
+                    + "separate teams_read_message call. This costs up to one more Graph request "
+                    + "per hit on this page, so leave it off for a quick scan of `summary` and "
+                    + "set it only when the words themselves are what this call is for."
+                )
+            ),
+        ] = False,
         client: GraphServiceClient = graph,
     ) -> MessageSearchResults:
         criteria = SearchCriteria(
@@ -456,6 +590,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             criteria=criteria,
             offset=offset,
             size=size,
+            include_body=include_body,
         )
 
     _require_a_criterion(mcp.add_tool(search_teams_messages))

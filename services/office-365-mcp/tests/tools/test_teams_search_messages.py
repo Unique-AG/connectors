@@ -15,7 +15,7 @@ from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST
 from office_365_mcp.tools import teams_search_messages
 from office_365_mcp.tools.teams_search_messages import SearchCriteria
 
-from .conftest import channel_hit, chat_hit, search_response
+from .conftest import channel_hit, chat_hit, message_payload, reaction_payload, search_response
 
 _MENTIONED = UUID("497b7a2a-9e1a-48d7-80e8-2965d2fc3a81")
 
@@ -444,9 +444,15 @@ class TestTheHandleItMints:
         assert described is not None
 
         assert "teams_read_message" in described
-        assert "only route to the full text, the attachments, and the mentions" in described
+        assert "only route to the" in described and "attachments and the mentions" in described
         assert "no tool on this server takes it as an argument" not in described
         assert "no route from here to the message body" not in described
+
+    def test_the_handle_says_include_body_reaches_the_same_wall_for_a_reply(self) -> None:
+        described = teams_search_messages.MessageHit.model_fields["uri"].description
+        assert described is not None
+
+        assert "include_body" in described
 
     def test_the_summary_warns_against_inference_from_truncation(self) -> None:
         described = teams_search_messages.MessageHit.model_fields["summary"].description
@@ -866,3 +872,172 @@ class TestGraphFailures:
             )
 
         assert raised.value.status == 403
+
+
+_CHAT_MESSAGE_PATH = "/chats/19%3Arelease%40thread.v2/messages/1770000000000"
+_CHANNEL_MESSAGE_PATH = (
+    "/teams/8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81/channels/19%3Ageneral%40thread.tacv2"
+    + "/messages/1770000000000"
+)
+
+
+class TestIncludeBody:
+    async def test_left_off_by_default_costs_the_one_request_this_tool_promises(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([chat_hit()]))
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25
+        )
+
+        assert len(graph.calls) == 1, "no hydration request without being asked for one"
+        assert found.messages[0].text is None
+        assert found.messages[0].reactions == []
+
+    async def test_a_chat_hit_is_hydrated_from_the_same_endpoint_teams_read_message_uses(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([chat_hit()]))
+        )
+        read = graph.get(_CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=message_payload(
+                    content="cut the release on Friday",
+                    content_type="text",
+                    reactions=[reaction_payload(reaction_type="\U0001f44d")],
+                ),
+            )
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25, include_body=True
+        )
+
+        assert read.called
+        message = found.messages[0]
+        assert message.text == "cut the release on Friday"
+        assert [reaction.reaction_type for reaction in message.reactions] == ["\U0001f44d"]
+
+    async def test_a_channel_hit_is_hydrated_too(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([channel_hit()]))
+        )
+        read = graph.get(_CHANNEL_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                200, json=message_payload(content="the plan for Friday", content_type="text")
+            )
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25, include_body=True
+        )
+
+        assert read.called
+        assert found.messages[0].text == "the plan for Friday"
+
+    async def test_an_unaddressable_hit_is_never_fetched(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([chat_hit(chat_id=None)]))
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25, include_body=True
+        )
+
+        assert len(graph.calls) == 1, "a hit with no handle has nothing to hydrate from"
+        assert found.messages[0].text is None
+
+    async def test_a_hit_graph_refuses_to_hydrate_keeps_its_summary_and_the_rest_of_the_page(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The shape a search hit on a channel reply produces: Graph 404s the same way
+        `teams_read_message` does for that handle, and it must not cost the whole page."""
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(
+                200,
+                json=search_response(
+                    [
+                        channel_hit(message_id="1770000000001"),
+                        channel_hit(message_id="1770000000002"),
+                    ]
+                ),
+            )
+        )
+        refused_path = (
+            "/teams/8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81/channels/19%3Ageneral%40thread.tacv2"
+            + "/messages/1770000000001"
+        )
+        answered_path = (
+            "/teams/8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81/channels/19%3Ageneral%40thread.tacv2"
+            + "/messages/1770000000002"
+        )
+        graph.get(refused_path).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "NotFound", "message": "Not Found"}}
+            )
+        )
+        graph.get(answered_path).mock(
+            return_value=httpx.Response(200, json=message_payload(message_id="1770000000002"))
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25, include_body=True
+        )
+
+        refused, answered = found.messages
+        assert refused.text is None and refused.reactions == []
+        assert refused.summary is not None, "the snippet survives a hydration that could not"
+        assert refused.uri is not None, "the handle survives too"
+        assert answered.text is not None
+
+    async def test_every_addressable_hit_on_the_page_is_hydrated(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Bounded concurrency must still reach every hit, not only the first
+        `_HYDRATION_CONCURRENCY`."""
+        hit_count = teams_search_messages._HYDRATION_CONCURRENCY + 2  # pyright: ignore[reportPrivateUsage]
+        hits = [chat_hit(message_id=f"177000000{index:04d}") for index in range(hit_count)]
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response(hits))
+        )
+        # A catch-all rather than a route per id: every hit reads a different message id, and the
+        # point here is that every one of them is fetched, not any particular path.
+        read = graph.route(method="GET").mock(
+            return_value=httpx.Response(200, json=message_payload())
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25, include_body=True
+        )
+
+        assert read.call_count == hit_count
+        assert all(message.text is not None for message in found.messages)
+
+    async def test_a_refused_search_is_not_softened_by_include_body(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """A refusal of the search itself is nothing like a refused hydration: nothing was found
+        to hydrate, so it still raises."""
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await teams_search_messages.teams_search_messages(
+                client,
+                criteria=SearchCriteria(query="release"),
+                offset=0,
+                size=25,
+                include_body=True,
+            )

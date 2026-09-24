@@ -11,7 +11,7 @@ from office_365_mcp.shared.handles import MessageHandle
 from office_365_mcp.tools import teams_read_message, teams_search_messages
 from office_365_mcp.tools.teams_search_messages import SearchCriteria
 
-from .conftest import ME, chat_hit, message_payload, search_response
+from .conftest import ME, chat_hit, message_payload, reaction_payload, search_response
 
 _CHAT_ID = "19:release@thread.v2"
 _MESSAGE_ID = "1770000000000"
@@ -261,6 +261,102 @@ class TestWhatItReportsAboutTheMessage:
 
         assert message.reply_to_id == "1770000000001"
         assert message.web_url is not None
+
+
+class TestReactions:
+    async def test_a_reaction_names_what_it_is_who_added_it_and_when(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`reactions` is a plain property of `chatMessage`, not a navigation property behind its
+        own `$expand`, so it arrives with the same query-less request every other test here
+        makes."""
+        route = graph.get(_CHAT_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=message_payload(
+                    reactions=[
+                        reaction_payload(
+                            reaction_type="\U0001f44d",
+                            user_id="00000000-0000-4000-8000-000000000002",
+                            display_name="Grace Hopper",
+                            created_at="2026-02-11T09:20:00Z",
+                        )
+                    ]
+                ),
+            )
+        )
+
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
+
+        assert route.calls.last.request.url.query == b"", "no widening was needed for it"
+        assert len(message.reactions) == 1
+        reaction = message.reactions[0]
+        assert reaction.reaction_type == "\U0001f44d"
+        assert reaction.user_id == "00000000-0000-4000-8000-000000000002"
+        assert reaction.display_name == "Grace Hopper"
+        assert reaction.created_at is not None
+        assert reaction.created_at.isoformat() == "2026-02-11T09:20:00+00:00"
+
+    async def test_a_custom_reaction_is_named_by_its_own_display_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _reads(
+            graph,
+            message_payload(
+                reactions=[reaction_payload(reaction_type="custom", display_name="microsoft_teams")]
+            ),
+        )
+
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
+
+        assert message.reactions[0].reaction_type == "custom"
+
+    async def test_several_reactions_are_all_reported(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _reads(
+            graph,
+            message_payload(
+                reactions=[
+                    reaction_payload(reaction_type="\U0001f44d", user_id="a"),
+                    reaction_payload(reaction_type="❤️", user_id="b"),
+                ]
+            ),
+        )
+
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
+
+        assert [reaction.reaction_type for reaction in message.reactions] == [
+            "\U0001f44d",
+            "❤️",
+        ]
+
+    async def test_a_message_nobody_reacted_to_has_an_empty_list_rather_than_null(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _reads(graph, message_payload())
+
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
+
+        assert message.reactions == []
+
+    async def test_a_reaction_graph_named_no_reactor_for_still_reports_the_reaction(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """An application can react too, and it carries no `user` at all."""
+        _reads(
+            graph,
+            message_payload(
+                reactions=[
+                    reaction_payload(reaction_type="\U0001f44d", user_id=None, display_name=None)
+                ]
+            ),
+        )
+
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
+
+        assert len(message.reactions) == 1
+        assert message.reactions[0].user_id is None
 
 
 class TestTheBodyItNormalises:

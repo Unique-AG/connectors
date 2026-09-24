@@ -53,11 +53,11 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
 _DESCRIPTION = """\
-This tool reads one Teams message in full: the whole text, sender, @-mentions, attachments, and \
-edit or delete status. This tool takes the `uri` of a teams_search_messages hit. A hit carries \
-only a snippet, never the message body, so this tool gives the answer when it depends on what \
-somebody actually said. A message that teams_browse_channel returned is already complete and \
-needs no read.\
+This tool reads one Teams message in full: the whole text, sender, @-mentions, attachments, \
+reactions, and edit or delete status. This tool takes the `uri` of a teams_search_messages hit. A \
+hit carries only a snippet, never the message body, so this tool gives the answer when it depends \
+on what somebody actually said. A message that teams_browse_channel returned is already complete \
+and needs no read.\
 """
 
 _BAD_HANDLE = (
@@ -110,7 +110,7 @@ type _ChannelReplyQuery = ChannelReplyRequestBuilder.ChatMessageItemRequestBuild
 
 async def teams_read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:
     """The message `handle` addresses. One request. The endpoint supports no `$select` or
-    `$expand`, so mentions and attachments always arrive with it.
+    `$expand`, so mentions, attachments, and reactions always arrive with it.
     """
     with graph_errors(TOOL_NAME):
         message = await _get(client, handle)

@@ -149,6 +149,32 @@ TEAMS_SENDER: dict[str, object] = {
 }
 
 
+def reaction_payload(
+    *,
+    reaction_type: str = "\U0001f44d",
+    user_id: str | None = "00000000-0000-4000-8000-000000000002",
+    display_name: str | None = "Grace Hopper",
+    created_at: str = "2026-02-11T09:20:00Z",
+) -> dict[str, object]:
+    """One `chatMessageReaction`. The nested `user.user` shape is Graph's own — the same
+    `teamworkUserIdentity` wrapping every other identity this connector reads."""
+    user = (
+        None
+        if user_id is None and display_name is None
+        else {
+            "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+            "id": user_id,
+            "displayName": display_name,
+        }
+    )
+    return {
+        "reactionType": reaction_type,
+        "displayName": None,
+        "createdDateTime": created_at,
+        "user": {"application": None, "device": None, "user": user},
+    }
+
+
 def chat_hit(
     *,
     chat_id: str | None = "19:release@thread.v2",
@@ -203,6 +229,7 @@ def message_payload(
     web_url: str | None = None,
     mentions: Sequence[Mapping[str, object]] = (),
     attachments: Sequence[Mapping[str, object]] = (),
+    reactions: Sequence[Mapping[str, object]] = (),
     event_detail: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     return {
@@ -223,7 +250,7 @@ def message_payload(
         "body": {"contentType": content_type, "content": content},
         "mentions": [dict(mention) for mention in mentions],
         "attachments": [dict(attachment) for attachment in attachments],
-        "reactions": [],
+        "reactions": [dict(reaction) for reaction in reactions],
         "eventDetail": dict(event_detail) if event_detail is not None else None,
     }
 

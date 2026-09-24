@@ -10,7 +10,9 @@ the tenant. The collection accepts only `$top` and `$expand=replies`. Graph docu
 
 The reply handle minted here follows `shared/handles.py`'s grammar, so `teams_read_message`
 resolves it. The shape is `shared/messages.py`'s, so a browsed post and a read message are one
-type.
+type — reactions included: `reactions` is a plain property of `chatMessage`, not a navigation
+property behind `$expand`, so it arrives on every post and every reply here with nothing widened
+for it (https://learn.microsoft.com/en-us/graph/api/resources/chatmessage).
 """
 
 from collections.abc import Mapping

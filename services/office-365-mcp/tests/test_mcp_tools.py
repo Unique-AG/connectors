@@ -829,6 +829,7 @@ class TestTheToolsThisServerAdvertises:
             "web_url",
             "mentions",
             "attachments",
+            "reactions",
         }
         assert set(_properties(tools["teams_list_meeting_transcripts"].output_schema)) == {
             "status",
@@ -900,6 +901,7 @@ class TestTheToolsThisServerAdvertises:
             ("teams_browse_channel", "include_window_completeness"),
             ("teams_list_meeting_transcripts", "include_scan_completeness"),
             ("teams_list_meeting_recordings", "include_scan_completeness"),
+            ("teams_search_messages", "include_body"),
         ):
             asked_for = _object(_properties(tools[name].input_schema)[flag])
             assert asked_for["default"] is False, f"{name} would report completeness unasked"

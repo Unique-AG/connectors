@@ -14,6 +14,13 @@ internal system sent. Such a message's `body.content` is the literal `<systemEve
 the "Ada joined the chat" sentence is the Teams client's own
 (https://learn.microsoft.com/en-us/graph/system-messages). So a channel listing has to drop these
 on the client side, because Graph offers no server-side `messageType` filter on that collection.
+
+`reactions` is a plain property of `chatMessage`, the same as `mentions` and `attachments`, not a
+navigation property behind its own `$expand`
+(https://learn.microsoft.com/en-us/graph/api/resources/chatmessage). Every read this module backs
+already asks for the resource whole — no tool here sends `$select` — so a reaction sits in the
+response with nothing added to widen for it. The reactor's identity is the same
+`teamworkUserIdentity` shape as a sender's, so it carries no email either.
 """
 
 import html
@@ -27,6 +34,7 @@ from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.generated.models.chat_message_attachment import ChatMessageAttachment
 from msgraph.generated.models.chat_message_from_identity_set import ChatMessageFromIdentitySet
 from msgraph.generated.models.chat_message_mention import ChatMessageMention
+from msgraph.generated.models.chat_message_reaction import ChatMessageReaction
 from msgraph.generated.models.chat_message_type import ChatMessageType
 from msgraph.generated.models.identity import Identity
 from pydantic import BaseModel, Field
@@ -187,6 +195,49 @@ class MessageAttachment(BaseModel):
         )
 
 
+class MessageReaction(BaseModel):
+    """One reaction to a message: what was used, who added it, and when.
+
+    Graph's own emoji reactions carry a Unicode character as `reactionType`; a Teams custom
+    reaction carries `"custom"` instead, with its icon behind `reaction_content_url` — this
+    connector does not download it, the same choice `MessageAttachment.url` makes. A few legacy
+    names (`like`, `angry`, `sad`, `laugh`, `heart`, `surprised`) can still appear from before
+    Teams reactions became free-form emoji.
+    """
+
+    reaction_type: str | None = Field(
+        description=(
+            "What was used to react: a Unicode emoji character, `custom` for a Teams custom "
+            + "reaction, or one of Microsoft's legacy names (`like`, `angry`, `sad`, `laugh`, "
+            + "`heart`, `surprised`)."
+        )
+    )
+    user_id: str | None = Field(
+        description=(
+            "The reactor's Microsoft Entra object id, in the same `teamworkUserIdentity` shape "
+            + "as `sender.user_id` and comparable against it. Null when Graph named nobody, for "
+            + "example a reaction an application added."
+        )
+    )
+    display_name: str | None = Field(
+        description=(
+            "The reactor's name as Teams shows it. Null when Graph did not send one — the same "
+            + "absence `sender.display_name` documents for a federated or external user."
+        )
+    )
+    created_at: datetime | None = Field(description="When this reaction was added.")
+
+    @classmethod
+    def from_reaction(cls, reaction: ChatMessageReaction) -> Self:
+        identity = reaction.user.user if reaction.user is not None else None
+        return cls(
+            reaction_type=reaction.reaction_type,
+            user_id=identity.id if identity is not None else None,
+            display_name=identity.display_name if identity is not None else None,
+            created_at=reaction.created_date_time,
+        )
+
+
 class TeamsMessage(BaseModel):
     """One Teams message, as fully as Microsoft Graph will describe it."""
 
@@ -287,6 +338,12 @@ class TeamsMessage(BaseModel):
             + "and it does not unpack forwarded messages."
         )
     )
+    reactions: list[MessageReaction] = Field(
+        description=(
+            "Who reacted to this message, and with what. Empty when nobody has, or on a "
+            + "message with no reactor Graph named at all."
+        )
+    )
 
     @classmethod
     def from_message(cls, message: ChatMessage, *, handle: MessageHandle) -> Self:
@@ -315,6 +372,9 @@ class TeamsMessage(BaseModel):
             mentions=[MessageMention.from_mention(mention) for mention in mentions],
             attachments=[
                 MessageAttachment.from_attachment(attachment) for attachment in attachments
+            ],
+            reactions=[
+                MessageReaction.from_reaction(reaction) for reaction in (message.reactions or [])
             ],
         )
 
