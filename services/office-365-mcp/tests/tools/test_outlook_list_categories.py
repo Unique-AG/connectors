@@ -29,8 +29,9 @@ def _page(*categories: dict[str, object], next_link: str | None = None) -> httpx
 
 
 def _fields(node: object, at: str, *, root: Mapping[str, object]) -> dict[str, object]:
-    """Pydantic publishes a nested model as a `$ref` into the schema's own `$defs` rather than
-    inline, so a walk that skips it checks only the top level and calls that the whole answer."""
+    """Pydantic publishes a nested model as a `$ref` into the schema's own `$defs` field, not
+    inline. A walk that does not follow the reference inspects only the top level, and it then
+    reports that as the whole answer."""
     schema = _resolved(node, root=root)
     found: dict[str, object] = {}
     properties = schema.get("properties")
@@ -121,10 +122,11 @@ class TestWhatItAnswers:
     async def test_the_color_reads_as_its_wire_value_and_not_the_enum_members_own_repr(
         self, client: GraphServiceClient, categories: respx.Route
     ) -> None:
-        """Regression for the kiota trap `shared/calendar.py`'s `spelled` exists for on a
-        different enum family: `CategoryColor` mixes in `str` without being a `StrEnum`, so a
-        plain `str()` of the deserialized member answers `CategoryColor.Preset3`, not `preset3`,
-        unless the tool reads it through `str.__str__` instead."""
+        """This guards against the same kiota trap that `spelled` in `shared/calendar.py`
+        corrects, here for a different enum family. `CategoryColor` inherits from `str` but is
+        not a `StrEnum`. A plain `str()` call on the deserialized member then returns
+        `CategoryColor.Preset3`, not `preset3`, unless the tool reads the value through
+        `str.__str__` instead."""
         categories.mock(return_value=_page(_category_payload(color="preset3")))
 
         row = (await lister.list_categories(client)).categories[0]
@@ -134,8 +136,8 @@ class TestWhatItAnswers:
     async def test_the_explicit_none_color_is_the_literal_string_not_a_null(
         self, client: GraphServiceClient, categories: respx.Route
     ) -> None:
-        """Graph's `CategoryColor.None_` is a real, assigned value — a category somebody chose
-        not to color — and it must not collapse into the different, rarer case of Graph naming no
+        """Graph's `CategoryColor.None_` is a real, assigned value: a category that somebody chose
+        not to color. It must not collapse into the different, rarer case where Graph names no
         color property at all."""
         categories.mock(return_value=_page(_category_payload(color="none")))
 
@@ -155,8 +157,9 @@ class TestWhatItAnswers:
     async def test_the_pages_of_the_listing_are_followed_rather_than_read_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The cursor route is registered before the bare one, which respx matches in registration
-        order: the bare path matches a `$skiptoken` request too, and answers every page."""
+        """The test registers the cursor route before the bare one. respx matches routes in
+        registration order, so the bare path also matches a `$skiptoken` request and answers
+        every page."""
         graph.get(_CATEGORIES, params={"$skiptoken": "second"}).mock(
             return_value=_page(_category_payload(display_name="Confidential"))
         )
@@ -227,7 +230,8 @@ class TestTheSchemaItPublishes:
         assert tool is not None, "register left the tool off the server"
         answer = cast("Mapping[str, object]", tool.output_schema)
         published = _fields(answer, lister.TOOL_NAME, root=answer)
-        # Guards the guard: a walk that stopped descending passes by finding nothing to check.
+        # This guards the guard: a walk that never goes deeper finds nothing wrong, so it
+        # passes too.
         assert f"{lister.TOOL_NAME}.categories[].color" in published
         undescribed = sorted(
             path
@@ -253,7 +257,8 @@ class TestGraphFailures:
 
     def test_the_permissions_are_the_ones_microsoft_documents(self) -> None:
         """Microsoft's own permissions table for `GET /users/{id}/outlook/masterCategories`
-        names only `MailboxSettings.Read`, delegated, with every higher-privileged alternative
-        "Not available" — there is no `.Shared` sibling to add beside it, unlike the `Mail.*` and
-        `Calendars.*` families this connector's other mailbox-targeting tools use."""
+        names only `MailboxSettings.Read`, delegated. Every higher-privileged alternative is
+        "Not available", and there is no `.Shared` sibling to add beside it. This differs from
+        the `Mail.*` and `Calendars.*` families that this connector's other mailbox-targeting
+        tools use."""
         assert lister.GRAPH_PERMISSIONS == ("MailboxSettings.Read",)

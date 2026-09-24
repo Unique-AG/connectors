@@ -2,9 +2,9 @@
 
 - One permission covers all three actions: `Calendars.ReadWrite`. Microsoft offers no narrower one
   for any of them.
-- These are three DISTINCT actions, not one endpoint with a status field: `/accept`, `/decline`,
-  and `/tentativelyAccept` are separate Graph operations, and this tool dispatches to the one the
-  caller named.
+- These are three DISTINCT actions, not one endpoint with a status field. `/accept`, `/decline`,
+  and `/tentativelyAccept` are separate Graph operations. This tool calls the one the caller
+  named.
 - `sendResponse` defaults to `true` and is what actually mails the organizer. This tool exposes
   only `comment`, not `proposedNewTime`: a caller who wants to propose a new time asks the user to
   do that in Outlook.
@@ -59,9 +59,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this event, and NO RESPONSE WAS RECORDED. The handle is well "
-    + "formed, so this is not a bad argument: the invitation was most likely withdrawn, or the "
-    + "event was moved or deleted, and Graph reports all of these with one 404. Call "
-    + "outlook_list_events again to check whether the invitation is still there before retrying."
+    + "formed, so this is not a bad argument. The invitation was most likely withdrawn, or the "
+    + "event was moved or deleted, and Graph reports all of these with one 404. Before you "
+    + "retry, call outlook_list_events again to find out whether the invitation is still there."
 )
 
 type Response = Literal["accept", "decline", "tentative"]
@@ -84,11 +84,11 @@ _DECLINE = "do not respond"
 _NOTHING_HAPPENED = "No response was sent."
 
 _DESCRIPTION = """\
-Answers one invitation the signed-in user received, by accepting it, declining it, or tentatively \
-accepting it. With `send_response` left at its default of true, this mails the organizer \
-immediately, and nothing here can recall it. This tool answers only an invitation somebody else \
-organizes; outlook_update_event and outlook_cancel_event are the tools for an event the signed-in \
-user organizes.
+This tool answers one invitation the signed-in user received, by accepting it, declining it, or \
+tentatively accepting it. With `send_response` left at its default of true, this mails the \
+organizer immediately, and nothing here can recall it. This tool answers only an invitation \
+somebody else organizes. outlook_update_event and outlook_cancel_event are the tools for an \
+event the signed-in user organizes.
 
 Notes:
 - This tool asks the user to agree before it sends a response that reaches the organizer, and \
@@ -113,8 +113,8 @@ _NOT_A_HANDLE = (
 
 class InvitationResponse(BaseModel):
     """What this call asked Microsoft to record. Every one of the three actions answers `202
-    Accepted` with an empty body, so nothing here is confirmed by reading Microsoft's response —
-    it is what this call requested, read against the event as it stood just before."""
+    Accepted` with an empty body. Nothing here is confirmed by reading Microsoft's response. This
+    is what this call requested, read against the event as it stood just before this call."""
 
     uri: str = Field(
         description="The handle this call was given, echoed back for a reply about this event."
@@ -143,8 +143,8 @@ class InvitationResponse(BaseModel):
         description=(
             "Whether this call asked Microsoft to mail the organizer, echoed from the "
             + "`send_response` argument. True means that mail already went out and CANNOT BE "
-            + "RECALLED here; Microsoft's 202 confirms nothing further about delivery, so this "
-            + "is what was requested, not a receipt."
+            + "RECALLED here. Microsoft's 202 confirms nothing further about delivery. This is "
+            + "what was requested, not a receipt."
         )
     )
 

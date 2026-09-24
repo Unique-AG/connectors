@@ -16,19 +16,19 @@ carries `externalAudience: all` and both reply messages: what was left out survi
 `messagerule-update` (https://learn.microsoft.com/en-us/graph/api/messagerule-update) sends
 `actions` carrying `markImportance` alone, at a rule whose action was `forwardTo`. The response's
 `actions` is `markImportance` alone: what was left out is gone. Neither page says which of the
-two behaviors this endpoint's nested object follows. Sending every property, each taken from the
-argument that named it or from the mailbox's current value, makes the two behaviors produce the
-same object. So this tool never has to answer that question. Without this, an `external_message`
-of None either re-broadcasts whatever text was last in the mailbox, or silently erases it, and
-this tool cannot tell which one happened.
+two behaviors this endpoint's nested object follows. This tool sends every property, each taken
+from the argument that named it or from the mailbox's current value. That makes the two
+behaviors produce the same object, so this tool never has to answer that question. Without this,
+an `external_message` of None either re-broadcasts whatever text was last in the mailbox, or
+silently erases it. This tool cannot tell which one happened.
 
 **An omitted message keeps the text the mailbox already holds. There is no way to clear one.**
 That is the honest reading of the paragraph above, and it is also the only one the SDK can
 express. Kiota's JSON writer drops a property whose value is None, instead of writing an
 explicit null (`kiota_serialization_json/json_serialization_writer.py`). So "send nothing there"
 and "send null there" are the same bytes. `disabled` is how an automatic reply stops. The text
-left behind in the mailbox is inert while the status says so, and this tool reports it either
-way, instead of answering that there is none.
+left behind in the mailbox is inert while the status says so. This tool reports it either way,
+instead of answering that there is none.
 
 **The answer is read off Graph's own response to the write, never off the arguments.**
 Microsoft's Example 1 sends `scheduledStartDateTime` as `2016-03-20T18:00:00.0000000` in UTC,
@@ -160,8 +160,8 @@ class AutomaticReplyReport(BaseModel):
     """The automatic reply as Microsoft 365 now holds it, read off its answer to this write.
 
     Not one field of this is built from the arguments. A tool that echoes them reports a
-    success in exactly the case worth catching: the one where Exchange accepted the request and
-    stored something other than what it was asked for.
+    success in exactly the case worth catching. That is the one where Exchange accepted the
+    request, and stored something other than what it was asked for.
     """
 
     status: ReplyStatus | None = Field(
@@ -297,7 +297,7 @@ def _whole_setting(
 ) -> AutomaticRepliesSetting:
     """Every property of the setting, from the argument that named it or from the mailbox.
 
-    A fresh object rather than the one that was read: `current` is the caller's, and the merge
+    A fresh object rather than the one that was read. `current` is the caller's, and the merge
     behavior this defends against is exactly the kind of thing an in-place edit hides.
     """
     stored = current if current is not None else AutomaticRepliesSetting()

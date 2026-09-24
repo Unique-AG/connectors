@@ -12,24 +12,25 @@ name them. Kiota, the SDK, does not serialize a property that nobody set. So the
 builds contains exactly the properties the call asked to change, and nothing more.
 
 **`destructiveHint` is true. `WRITE_ADDITIVE` is not correct here.** MCP defines a non-destructive
-tool as one that performs "only additive updates". Clearing a follow-up flag is not additive.
-Exchange keeps `startDateTime`, `dueDateTime` and `completedDateTime` on `followupFlag`. This
-tool never reads these three fields. `flagStatus: notFlagged` discards all three. Setting a lower
-importance, or marking a message read, also overwrites state that this tool never read first.
+tool as one that performs "only additive updates". A cleared follow-up flag is not an additive
+change. Exchange keeps `startDateTime`, `dueDateTime` and `completedDateTime` on `followupFlag`.
+This tool never reads these three fields. `flagStatus: notFlagged` discards all three. If a caller
+sets a lower importance, or marks a message read, this tool also overwrites state that it never
+read first.
 
 **Each message gets one PATCH. The answer has one row per message.** A single combined result
 cannot honestly answer "did it work?" for twenty messages with one true or false value. Graph can
 answer 404 for one message whose handle went stale, while it writes the other nineteen without
-error. So each write is its own request. Each failure is caught where it happens, and the caller
-reads the per-message rows. A missing consent cannot produce this shape: the On-Behalf-Of token
-exchange fails before this function runs. So a 403 in one row is about that one message, not
+error. So each write is its own request. This tool catches each failure where it happens, and the
+caller reads the per-message rows. A missing consent cannot produce this shape: the On-Behalf-Of
+token exchange fails before this function runs. So a 403 in one row is about that one message, not
 about the connector's own consent.
 
 **The report comes from the PATCH response, never from the arguments.** Graph answers a message
 PATCH with the updated message. So `isRead`, `flag.flagStatus` and `importance` come back from
 Exchange, and this tool echoes them from there. A tool that reports its own arguments instead
-claims success in exactly the case that needs catching: the case where Exchange accepts the
-request and stores something different, or stores nothing.
+claims success in exactly the case that needs catching. That is the case where Exchange accepts
+the request and stores something different, or stores nothing.
 
 **Every PATCH uses `no_retry()`.** A PATCH of these three properties is idempotent, so double
 application is not the risk. The risk is that the retry logic turns one row into an unknown
@@ -101,8 +102,8 @@ _FLAG_STATUS: Mapping[bool, FollowupFlagStatus] = {
 
 _DESCRIPTION = f"""\
 This tool marks up to {MAX_MESSAGES} messages, in the signed-in user's own mailbox or, with \
-`mailbox`, one shared or delegated mailbox, as read or unread, flags them for follow-up, or \
-sets their importance.
+`mailbox`, one shared or delegated mailbox. It marks them as read or unread, flags them for \
+follow-up, or sets their importance.
 
 Notes:
 - Pass at least one of `is_read`, `flagged`, and `importance`. Setting `flagged` to false also \
@@ -136,7 +137,7 @@ _NOT_A_MESSAGE_HANDLE = (
     + "will fail identically."
 )
 
-_ENTRIES_AT = " The entries that are not, counting from one: "
+_ENTRIES_AT = " The entries that are not, numbered from one: "
 
 
 class MarkedMessage(BaseModel):
@@ -342,10 +343,10 @@ def _importance_of(message: Message | None) -> str | None:
 def _reported(value: FollowupFlagStatus | Importance | None) -> str | None:
     """Microsoft's own spelling for one of the two enums this tool echoes.
 
-    TRAP: `.value` is not the way to read either enum. Every member of the SDK's
-    `FollowupFlagStatus` and `Importance` is declared with a trailing comma. A type checker sees
-    a one-tuple because of this comma, but the `str` mixin unpacks it as constructor arguments,
-    so the member really is the plain string. `str()` is no better. Both enums mix in `str`
+    TRAP: `.value` is not the way to read either enum. The SDK declares every member of
+    `FollowupFlagStatus` and `Importance` with a trailing comma. A type checker sees a one-tuple
+    because of this comma. But the `str` mixin unpacks it as constructor arguments, so the member
+    really is the plain string. `str()` is no better. Both enums mix in `str`
     without being a `StrEnum`, so `str()` answers `FollowupFlagStatus.NotFlagged` instead of
     `notFlagged`.
     """

@@ -1,5 +1,5 @@
-"""Every payload here is synthesised. No calendar entry in this file was ever created for a real
-mailbox, and no address in it resolves anywhere."""
+"""Every payload in this file is synthetic data. This file never creates a calendar entry for a
+real mailbox. No address in this file resolves anywhere."""
 
 import json
 from collections.abc import Mapping, Sequence

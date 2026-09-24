@@ -3,21 +3,21 @@
 It takes one draft handle and nothing else. `outlook:///drafts/{id}` is a handle family of its
 own (`shared/handles.py`), minted only by `outlook_draft_mail` and `outlook_draft_reply`. This
 is this tool's defense, not a formality. Graph gives a draft the same id space as every other
-message, so one shared family lets a message a reader *found* be spelled as a draft, and handed
+message. So one shared family lets a message a reader *found* be spelled as a draft, and handed
 here. Kept apart, "send the mail you just wrote" is expressible, and "send that mail I found" is
-not. This tool sends only a message that the mailbox still reports as a draft, addressed by a
-handle of the drafts family, which only the two drafting tools mint.
+not. This tool sends only a message that the mailbox still reports as a draft. The message must
+be addressed by a handle of the drafts family, which only the two drafting tools mint.
 
 **No argument can change the message.** There is no recipient, subject, body or attachment
 argument. Their absence is the whole safety story: what is sent is exactly what a human can
 already open in their Drafts folder. The model composes, a person can look, and this tool pulls
 the trigger on what is there. An argument that edited the draft on the way out puts words on the
-wire, under the user's own address, that nobody had the chance to read.
+wire, under the user's own address. Nobody gets the chance to read those words first.
 
 **Microsoft's one-shot send is never used here.** `POST /me/sendMail` composes and delivers from
-arguments alone, so no draft exists for anyone to read first. It is the one send that can be
-told to keep no copy in Sent Items, leaving the user's own mailbox with no record that the
-message ever existed. It also answers `202 Accepted` with an empty body, so nothing about the
+arguments alone, so no draft exists for anyone to read first. It is the one send that a caller
+can set to keep no copy in Sent Items. That leaves the user's own mailbox with no record that
+the message ever existed. It also answers `202 Accepted` with an empty body, so nothing about the
 delivery can be echoed back. The flag that suppresses that copy is not merely unused here. It is
 not spellable in this file, because an argument nobody declares is a capability nobody can
 reach. `POST /me/messages/{id}/send` is the send that leaves a trail. Microsoft files the message
@@ -42,8 +42,8 @@ tool nothing, and costs the consent screen a permission that opens every message
 
 **A message that is not a draft is refused rather than sent.** Graph documents this route as
 sending an existing draft, and says nothing at all about what it does to a message that already
-went out. An irreversible action must not rest on undocumented behavior, so `isDraft` is
-selected in the pre-read, and a false answer stops the call before the send.
+went out. An irreversible action must not rest on undocumented behavior. As a result, `isDraft`
+is selected in the pre-read, and a false answer stops the call before the send.
 
 **`no_retry()` on the send is the single most important line in this file.** The SDK's retry
 middleware retries `POST` exactly as readily as `GET`. Its retry statuses are 429, 503 and 504,
@@ -57,7 +57,7 @@ immutable id. Graph reads an id in the path in whichever id space the request de
 the header, the id the draft tool handed out is read as a `RestId`, and answered with a 404 that
 means nothing in particular.
 
-**No blind copy is read or reported**, which matches the draft this sends: `outlook_draft_mail`
+**No blind copy is read or reported.** This matches the draft this tool sends: `outlook_draft_mail`
 declares no `bcc` argument at all, so a draft that reaches here has none to report.
 
 **`mailbox` re-points both requests from `/me` to `/users/{id}`.** Microsoft publishes no
@@ -122,9 +122,9 @@ _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-This tool sends a draft, created by outlook_draft_mail or outlook_draft_reply, from the Drafts \
-folder of the signed-in user's own mailbox, or, with `mailbox`, a shared or delegated one, onto \
-the wire under that mailbox's own address.
+This tool sends a draft onto the wire, under the mailbox's own address. The draft comes from \
+outlook_draft_mail or outlook_draft_reply. It sends from the Drafts folder of the signed-in \
+user's own mailbox, or, with `mailbox`, a shared or delegated one.
 
 Notes:
 - This action cannot be undone. This connector has no recall or unsend function, and nothing \
@@ -155,30 +155,30 @@ _NOT_A_DRAFT_HANDLE = (
 
 _A_MESSAGE_IS_NOT_A_DRAFT = (
     "That is a message handle (outlook:///messages/{id}), and outlook_send_draft will not send "
-    + "it. Nothing was sent. Only a draft THIS CONNECTOR COMPOSED can be sent, which is why a "
+    + "it. Nothing was sent. Only a draft THIS CONNECTOR COMPOSED can be sent. That is why a "
     + "draft has a handle family of its own: outlook:///drafts/{id}, minted by outlook_draft_mail "
-    + "and outlook_draft_reply and by nothing else. A message handle comes from reading the "
+    + "and outlook_draft_reply, and by nothing else. A message handle comes from reading the "
     + "mailbox: a search hit, a folder listing, a thread. So it addresses mail somebody else "
-    + "wrote, or mail that was already sent, and there is no route here from either of those to "
-    + "an outbound message. If the user wants to reply to that message, draft the reply first "
-    + "with outlook_draft_reply, show it to them, and send the draft handle it answers with."
+    + "wrote, or mail that was already sent. Neither one has a route here to an outbound "
+    + "message. If the user wants to reply to that message, draft the reply first with "
+    + "outlook_draft_reply. Show it to them. Then send the draft handle it answers with."
 )
 
 _ALREADY_SENT = (
-    "That draft handle addresses a message Microsoft does not hold as a draft any more, so "
-    + "outlook_send_draft refused it and NOTHING WAS SENT BY THIS CALL. Overwhelmingly, the "
+    "That draft handle addresses a message Microsoft does not hold as a draft any more. So "
+    + "outlook_send_draft refused it, and NOTHING WAS SENT BY THIS CALL. Overwhelmingly, the "
     + "likeliest reason is that the message was already sent: by an earlier call in this "
     + "conversation, or by the user in Outlook. In that case it is already on its way, and "
     + "sending it again delivers a duplicate. Microsoft documents this route as sending an "
     + "existing draft, and does not say what it does to a message that already went out. An "
     + "action that cannot be undone is not worth finding out. Do not retry this handle: it will "
-    + "be refused the same way. Tell the user the mail was probably already sent, and if they "
+    + "be refused the same way. Tell the user the mail was probably already sent. If they "
     + "want a fresh message, compose a new draft with outlook_draft_mail."
 )
 
-# Read by `tools/__init__.py` into the 404 advice table. The default advice, to check the id came
-# from a tool response verbatim, is wrong here because it did: `draft_ref` is a handle this
-# connector minted.
+# Read by `tools/__init__.py` into the 404 advice table. The default advice, to make sure that
+# the id came from a tool response verbatim, is wrong here because it did: `draft_ref` is a
+# handle this connector minted.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return the draft this call named, and NOTHING WAS SENT. The handle "
     + "is well formed, so this is not a bad argument. A draft leaves Drafts once it is sent, and "
@@ -186,7 +186,7 @@ GRAPH_NOT_FOUND = (
     + "404, without saying which one it meant. Never report the mail as sent: this call did not "
     + "send it, and whether an earlier one did is not knowable from here. Retrying will not "
     + "help, and this connector has no other route to that draft. Ask the user whether the mail "
-    + "was already sent, and compose a fresh draft with outlook_draft_mail if it was not."
+    + "was already sent. If it was not, compose a fresh draft with outlook_draft_mail."
 )
 
 
@@ -234,9 +234,10 @@ type _Confirm = Callable[[Message], Awaitable[Confirmed]]
 def a_person_agrees(ctx: Context) -> _Confirm:
     """Ask the caller's own client to put the send to a person, and refuse unless they agree.
 
-    The permission this tool holds is `Mail.ReadBasic`, which Microsoft excludes the body from,
-    so the question names the recipients and the subject and cannot name the body. That is the
-    whole of what this tool can show, and it is what makes "send to these people" answerable.
+    The permission this tool holds is `Mail.ReadBasic`, which Microsoft excludes the body from.
+    As a result, the question names the recipients and the subject, and cannot name the body.
+    That is the whole of what this tool can show, and it is what makes "send to these people"
+    answerable.
     """
     confirm = person_confirms(ctx, agree=SEND, decline=_DO_NOT_SEND, nothing_happened=_NOTHING_SENT)
 
@@ -262,8 +263,8 @@ async def send_draft(
     """Read the draft `draft_ref` addresses in `mailbox`, put it to a person, then send it.
 
     `confirm` has no default. The read is what makes the question answerable, so the confirmation
-    belongs between the two requests, and a caller that could omit it would be back to a promise
-    in a docstring.
+    belongs between the two requests. If a caller omits `confirm`, this guarantee becomes only a
+    promise in a docstring again.
 
     An `InputRequiredResult` is the question, returned unsent for a client to answer and re-call.
     """
@@ -319,7 +320,7 @@ async def _send(reached: UserItemRequestBuilder, handle: MailDraftHandle) -> dat
 
 def _read_request() -> RequestConfiguration[_MessageQuery]:
     """Built per call: kiota's `RequestConfiguration.headers` defaults to one collection shared by
-    every configuration in the process, so a preference added to that leaks onto every Graph call.
+    every configuration in the process. A preference added to that leaks onto every Graph call.
     """
     return RequestConfiguration[_MessageQuery](
         query_parameters=_MessageQuery(select=list(_DRAFT_FIELDS)),
@@ -328,9 +329,9 @@ def _read_request() -> RequestConfiguration[_MessageQuery]:
 
 
 def _send_request() -> RequestConfiguration[QueryParameters]:
-    """`no_retry()`, which is what stops one message being delivered four times: the SDK retries
-    `POST` on 429, 503 and 504 three times by default, and Graph publishes no idempotency key for
-    sending mail, so a retry after a lost response sends the message again.
+    """`no_retry()` stops one message from being delivered four times. The SDK retries `POST` on
+    429, 503, and 504, three times by default. Graph publishes no idempotency key for sending
+    mail. So a retry after a lost response sends the message again.
 
     No request body is built here at all. Microsoft's own reference says one is unnecessary for
     this route. A body is also where a flag that suppresses the copy in Sent Items has to go.
@@ -345,8 +346,8 @@ def _immutable_ids() -> HeadersCollection:
 
 
 def _answer(draft: Message, *, sent_at: datetime) -> MailSent:
-    """Everything but the clock comes off the pre-read, so the transcript records what Microsoft
-    held a moment before the send rather than what this call was asked to send."""
+    """Everything but the clock comes off the pre-read. So the transcript records what Microsoft
+    held a moment before the send, rather than what this call was asked to send."""
     return MailSent(
         to=MailAddress.each_of(draft.to_recipients),
         cc=MailAddress.each_of(draft.cc_recipients),

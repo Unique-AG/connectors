@@ -1,12 +1,13 @@
-"""How a tool is attached to the outside: the Graph client, the token in it, and what a refusal
-becomes. The only file in `shared/` that imports FastMCP.
+"""This module defines how a tool connects to the outside: the Graph client, the token inside
+it, and what a refusal becomes. This is the only file in `shared/` that imports FastMCP.
 
-Trap: the middleware never sees a `GraphFailure` — FastMCP re-raises a tool failure as `ToolError`
-(fastmcp 4.0.2, `fastmcp/server/server.py:1554-1555`) over the dependency engine's `RuntimeError`,
-so causes are matched two links down `__cause__`, by type, never on message text.
+Trap: the middleware never sees a `GraphFailure`. FastMCP re-raises a tool failure as
+`ToolError` (fastmcp 4.0.2, `fastmcp/server/server.py:1554-1555`), over the dependency engine's
+`RuntimeError`. So causes are matched two links down `__cause__`, by type, and never on message
+text.
 
-`person_confirms` is the one place a person is asked before a write, and the one place the protocol
-era decides how (`tests/test_layering.py` rule 9).
+`person_confirms` is the one place where a person is asked before a write, and the one place
+where the protocol era decides how (`tests/test_layering.py` rule 9).
 """
 
 import re
@@ -56,16 +57,16 @@ _GRAPH_SCOPE_PREFIX = "https://graph.microsoft.com/"
 READ_ONLY: dict[str, bool] = {"readOnlyHint": True, "openWorldHint": True}
 
 # This states what a tool that changes a mailbox says about itself. This file writes out every
-# hint rather than leaving one to a default, because MCP's defaults are the permissive ones.
-# `destructiveHint` defaults to true, and `idempotentHint` defaults to false, so an omitted hint
+# hint, instead of leaving one to a default, because MCP's defaults are the permissive ones.
+# `destructiveHint` defaults to true, and `idempotentHint` defaults to false. So an omitted hint
 # reads as the worst case for a tool that is not one, and as nothing at all for a tool that is.
 #
 # TRAP: these are hints, and they gate nothing. MCP's own specification says a client "should
-# never make tool use decisions based on ToolAnnotations received from untrusted servers". What
-# actually stops a write is different. The Terraform module derives the Entra registration's
-# permissions from the same tool selection that the pod runs. So a tool that the selection does
-# not name gets an On-Behalf-Of exchange that fails before its body runs. The annotations are for
-# a client that wants to prompt a human.
+# never make tool use decisions based on ToolAnnotations received from untrusted servers". The
+# real stop on a write is different. The Terraform module derives the permissions of the Entra
+# registration from the same tool selection that the pod runs. So a tool that the selection does
+# not name gets an On-Behalf-Of exchange that fails before its body runs. The annotations exist
+# for a client that wants to prompt a human.
 WRITE_ADDITIVE: dict[str, bool] = {
     "readOnlyHint": False,
     "destructiveHint": False,
@@ -91,9 +92,9 @@ WRITE_DESTRUCTIVE_IDEMPOTENT: dict[str, bool] = {
     "openWorldHint": True,
 }
 
-# This is what a tool file's own permissions are checked against. Without it, a misspelling like
-# `Chat.Raed` is only ever compared with itself: Entra rejects an unknown scope at the authorize
-# endpoint, and one typo stops sign-in for every user of this connector.
+# A tool file's own permissions are compared against this list. Without this list, a
+# misspelling like `Chat.Raed` is only ever compared with itself. Entra rejects an unknown
+# scope at the authorize endpoint, so one typo stops sign-in for every user of this connector.
 REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
     {
         "User.Read",
@@ -134,9 +135,9 @@ def graph_scope(permission: str) -> str:
 class TokenExchangeFailed(Exception):
     """The On-Behalf-Of exchange produced no token.
 
-    This is not a `FastMCPError`. Dependency resolution lets those out unwrapped, and it wraps
-    everything else in a `RuntimeError`. That wrapping is what `GraphAdviceMiddleware` finds this
-    by.
+    This is not a `FastMCPError`. Dependency resolution lets a `FastMCPError` out unwrapped, and
+    wraps everything else in a `RuntimeError`. `GraphAdviceMiddleware` finds this exception by
+    that wrapping.
     """
 
     def __init__(self, *, permissions: tuple[str, ...], cause: BaseException) -> None:
@@ -146,7 +147,8 @@ class TokenExchangeFailed(Exception):
 
 
 class GraphToken(Dependency[str]):
-    """`EntraOBOToken` for a tool's permissions, reporting a refusal as one that knows them."""
+    """This is `EntraOBOToken` for a tool's permissions. It reports a refusal as one that knows
+    the permissions."""
 
     def __init__(self, *permissions: str) -> None:
         assert permissions, "a token is exchanged for at least one permission"
@@ -163,8 +165,9 @@ class GraphToken(Dependency[str]):
         try:
             return await self._exchange.__aenter__()
         except Exception as failure:
-            # Broad: azure-identity raises `ClientAuthenticationError`, `_EntraOBOToken` its own
-            # `RuntimeError`s (fastmcp 4.0.2, `fastmcp/server/auth/providers/azure.py:851,858`).
+            # This except is broad on purpose. azure-identity raises `ClientAuthenticationError`,
+            # and `_EntraOBOToken` raises its own `RuntimeError`
+            # (fastmcp 4.0.2, `fastmcp/server/auth/providers/azure.py:851,858`).
             raise TokenExchangeFailed(permissions=self._permissions, cause=failure) from failure
 
     @override
@@ -178,25 +181,27 @@ class GraphToken(Dependency[str]):
 
 
 def _graph_token(*permissions: str) -> str:
-    """The exchange for these permissions, as the string a tool signature can hold it by.
+    """This is the exchange for these permissions, as the string that a tool signature can hold
+    it by.
 
     `Depends` is annotated to unwrap a factory that returns an async context manager, and
     `GraphToken.__aenter__` produces a `str`. So the parameter default is typed as the token that
     a dependent actually receives.
 
-    The exchange is bound outside the factory deliberately, for one `GraphToken` per
-    registration. Constructing it inside the lambda instead builds a new one on every call.
+    The exchange is bound outside the factory on purpose, for one `GraphToken` for each
+    registration. Building it inside the lambda instead makes a new one on every call.
     """
     exchange = GraphToken(*permissions)
     return Depends(lambda: exchange)
 
 
 def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> GraphServiceClient:
-    """A Graph client that calls as this call's signed-in user. Build inside `register`.
+    """This is a Graph client that calls as the signed-in user of this call. Build it inside
+    `register`.
 
     Trap: the result goes in a parameter default by NAME, `client: GraphServiceClient = graph`,
-    never as the call itself. A call in a default is ruff's B008. Putting the call there instead
-    of the name builds a second exchange on every registration.
+    and never as the call itself. A call in a default is ruff rule B008. Putting the call there,
+    instead of the name, builds a second exchange on every registration.
     """
     token = _graph_token(*permissions)
 
@@ -207,11 +212,12 @@ def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> 
 
 
 def graph_mailbox(client: GraphServiceClient, mailbox: str | None) -> UserItemRequestBuilder:
-    """The mailbox a call reaches: the signed-in user's own when `mailbox` is None, or the
-    mailbox `mailbox` names — its user principal name or its Entra object id — when given.
+    """This is the mailbox that a call reaches. It is the signed-in user's own mailbox when
+    `mailbox` is `None`, or the mailbox that `mailbox` names — its user principal name or its
+    Entra object id — when given.
 
-    A `.Shared` permission lets the token name a mailbox other than `/me`. Exchange also must
-    grant the signed-in user real access to it, which this connector cannot see or check; a
+    A `.Shared` permission lets the token name a mailbox other than `/me`. Exchange must also
+    grant the signed-in user real access to it, and this connector cannot see that grant. A
     missing Exchange grant and a missing Graph permission both come back as the same 403.
     """
     if mailbox is None:
@@ -219,40 +225,42 @@ def graph_mailbox(client: GraphServiceClient, mailbox: str | None) -> UserItemRe
     return client.users.by_user_id(mailbox)
 
 
-# Reused verbatim by every tool that threads a mailbox through to `graph_mailbox`, so the text
-# stays in sync between them.
+# Reused with no change by every tool that threads a mailbox through to `graph_mailbox`, so the
+# text stays the same across all of them.
 MAILBOX_FIELD: str = (
-    "A shared or delegated mailbox to act on instead of the signed-in user's own, as its user "
-    + "principal name or its Entra object id. Omit it for the signed-in user's own mailbox. This "
-    + "reaches another mailbox only where Exchange grants the signed-in user access to it — a "
-    + "shared folder, a full delegation, or, to send, Full Access together with Send As or Send "
-    + "on Behalf. A mailbox the signed-in user cannot reach this way answers with a permission "
-    + "refusal, never a wrong mailbox."
+    "A shared or delegated mailbox to act on, instead of the signed-in user's own mailbox, as "
+    + "its user principal name or its Entra object id. Omit this argument for the signed-in "
+    + "user's own mailbox. This argument reaches another mailbox only where Exchange grants the "
+    + "signed-in user access to it — a shared folder, a full delegation, or, to send mail, Full "
+    + "Access together with Send As or Send on Behalf. A mailbox that the signed-in user cannot "
+    + "reach this way answers with a permission refusal, never a wrong mailbox."
 )
 
 
-# What a refusal says last, so a model does not read "no" as "ask again": MCP gives a server no way
-# to remember that a person already said no to this request.
+# This states what a refusal says last, so a model does not read "no" as "ask again." MCP gives
+# a server no way to remember that a person already said no to this request.
 _ASK_AGAIN = (
     "Do not call this tool again for the same request unless the user asks for it in a new message."
 )
 
-# Answered, never raised: a `ToolError` here crosses `graph_step` and records a person saying no
-# as a Graph failure. Guarded by `tests/test_graph_metrics.py`.
+# This value is answered, never raised. A `ToolError` here would cross `graph_step` and record
+# a person saying no as a Graph failure. `tests/test_graph_metrics.py` guards this.
 type Confirmed = str | InputRequiredResult | None
 
 # `(question, about)`: `about` is what the answer is bound to, and must change whenever the thing
 # being confirmed changes.
 type Confirm = Callable[[str, str], Awaitable[Confirmed]]
 
-# One question per call, so a fixed key is safe; a second question in one call would collide.
+# One question for each call, so a fixed key is safe. A second question in one call would
+# collide.
 _CONFIRMATION = "confirm"
 
 
 def _modern_protocol(ctx: Context) -> bool:
-    """True when the negotiated era has no back-channel to elicit over.
+    """This is true when the negotiated era has no back-channel to elicit over.
 
-    Mirrors the private `Context._is_modern_protocol`, "no request context" included.
+    This mirrors the private `Context._is_modern_protocol`, and includes the "no request
+    context" case.
     """
     request = ctx.request_context
     return request is not None and request.protocol_version in MODERN_PROTOCOL_VERSIONS
@@ -285,10 +293,11 @@ def _another_request(nothing_happened: str) -> str:
 
 
 def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened: str) -> Confirm:
-    """Ask the caller's own client to put `question` to a person; only `agree` lets the call go on.
+    """Ask the caller's own client to put `question` to a person. Only `agree` lets the call go
+    on.
 
-    A 2026-07-28 connection has no back-channel (SEP-2577): the question is returned and answered
-    on a second call, bound to `about`.
+    A 2026-07-28 connection has no back-channel (SEP-2577). The question is returned and
+    answered on a second call, bound to `about`.
     """
     answers = parse_elicit_response_type([agree, decline])
 
@@ -298,8 +307,9 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
         except ToolError as already_a_refusal:
             return str(already_a_refusal)
         except Exception:
-            # Every exception: a client with no elicitation capability is reported differently by
-            # different transports, and none of those is a reason to write anyway.
+            # This catches every exception. A client with no elicitation capability is reported
+            # differently by different transports, and none of those reasons is a reason to
+            # write anyway.
             return _nobody_to_ask(nothing_happened)
         if not isinstance(answer, AcceptedElicitation) or answer.data != agree:
             return _not_agreed(nothing_happened)
@@ -321,15 +331,17 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
             )
         if not isinstance(answered, ElicitResult) or answered.action != "accept":
             return _not_agreed(nothing_happened)
-        # The framework unseals `requestState` only when the re-call carries one, so an accept
-        # that arrives with the field stripped is bound to nothing until this compares it.
+        # The framework unseals `requestState` only when the re-call carries one. So an accept
+        # that arrives with the field stripped is bound to nothing until this function compares
+        # it.
         if ctx.request_state != about:
             return _another_request(nothing_happened)
         try:
             accepted = handle_elicit_accept(answers, answered.content)
         except Exception:
-            # Every exception: the content is the client's, checked against the schema this
-            # question was asked under, and an answer that fails that check agreed to nothing.
+            # This catches every exception. The content belongs to the client. This function
+            # compares it against the schema that this question was asked under, and an answer
+            # that fails that comparison agreed to nothing.
             return _not_agreed(nothing_happened)
         chosen = cast("str", accepted.data)
         return None if chosen == agree else _not_agreed(nothing_happened)
@@ -341,28 +353,32 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
 
 
 def answer_pending(ctx: Context) -> bool:
-    """True when this call carries an answer to a confirmation asked on an earlier call.
+    """This is true when this call carries an answer to a confirmation that an earlier call
+    asked.
 
-    A fresh audience read is taken on every call, and it can disagree with the one the question
-    was asked from. Callers must consult `confirm` whenever an answer is pending, rather than
-    trusting this call's own read to decide whether one is owed.
+    This function takes a fresh audience read on every call, and this read can disagree with
+    the read that the question was asked from. Callers must consult `confirm` whenever an
+    answer is pending, instead of trusting this call's own read to decide whether an answer is
+    owed.
     """
     return (ctx.input_responses or {}).get(_CONFIRMATION) is not None
 
 
 class Advised(ToolError):
-    """A tool error whose message is already the advice below, so the middleware leaves it alone.
+    """This is a tool error whose message is already the advice below, so the middleware leaves
+    it alone.
 
-    This class is public, even though nothing here imports it. `unique_mcp`'s tool metrics label
-    every failed call with `type(error).__name__`, so renaming this class renames an
-    operator-facing metric.
+    This class is public, even though nothing here imports it. The tool metrics of
+    `unique_mcp` label every failed call with `type(error).__name__`. So a rename of this class
+    renames an operator-facing metric.
     """
 
 
 @dataclass(frozen=True, slots=True)
 class ToolAdvice:
-    """What one tool's failures are worded from. Permissions live here, not on the tool: `tags`
-    is a set and loses their order, and `meta` is published to every client in `tools/list`."""
+    """This is what the words for one tool's failures come from. Permissions live here, and not
+    on the tool, because `tags` is a set and loses its order, and `meta` is published to every
+    client in `tools/list`."""
 
     permissions: tuple[str, ...]
     not_found: str | None = None
@@ -372,26 +388,28 @@ _NARROWED_PERMISSIONS = "office_365_mcp.narrowed_permissions"
 
 
 async def narrowed_to(ctx: Context, *permissions: str) -> None:
-    """Say that this call reached Graph under fewer permissions than its tool declares, so its 403
-    names none that was never missing.
+    """Say that this call reached Graph under fewer permissions than its tool declares, so a 403
+    from this call names no permission that was never missing.
 
-    `serializable=False` makes this request state rather than session state. Session state
-    outlives the call by a day. If this used session state instead, it words a second, unrelated
-    call to the same tool from the first call's handle.
+    `serializable=False` makes this request state, instead of session state. Session state
+    outlives the call by a day. If this function used session state instead, it would word a
+    second, unrelated call to the same tool from the handle of the first call.
     """
     assert permissions, "a Graph call is made under at least one permission"
     await ctx.set_state(_NARROWED_PERMISSIONS, permissions, serializable=False)
 
 
 async def _narrowed_permissions(ctx: Context | None) -> tuple[str, ...] | None:
-    """What `narrowed_to` said about this call, or `None` when it said nothing."""
+    """This function returns what `narrowed_to` said about this call, or `None` when it said
+    nothing."""
     if ctx is None:
         return None
     return cast("tuple[str, ...] | None", await ctx.get_state(_NARROWED_PERMISSIONS))
 
 
 class GraphAdviceMiddleware(Middleware):
-    """Answer every refused tool call with the remedy for it, wherever in the call it happened."""
+    """This answers every refused tool call with the remedy for it, wherever in the call the
+    refusal happened."""
 
     def __init__(self, advice: Mapping[str, ToolAdvice]) -> None:
         self._advice: Mapping[str, ToolAdvice] = advice
@@ -414,10 +432,12 @@ class GraphAdviceMiddleware(Middleware):
     def _advised(
         self, error: BaseException, tool: str, narrowed: tuple[str, ...] | None
     ) -> ToolError | None:
-        """The advice for this failure, or `None` to leave the failure exactly as it is.
+        """This function returns the advice for this failure, or `None` to leave the failure
+        exactly as it is.
 
         A token refusal ignores `narrowed`. The exchange happens before the argument is parsed,
-        and it asks for every permission. Naming just one of them hides the one that was refused.
+        and it asks for every permission. Naming just one of the permissions would hide the one
+        that was refused.
         """
         for cause in _causes(error):
             if isinstance(cause, Advised):
@@ -436,9 +456,9 @@ class GraphAdviceMiddleware(Middleware):
 
 
 def _causes(error: BaseException) -> Iterator[BaseException]:
-    """`error` and everything it was raised from, outermost first. This is cycle-safe, because
-    `raise X from Y` accepts a loop, and an unguarded loop hangs the request instead of answering
-    it."""
+    """This function yields `error`, and everything that raised it, outermost first. This is
+    cycle-safe, because `raise X from Y` accepts a loop, and an unguarded loop would hang the
+    request instead of answering it."""
     seen: set[int] = set()
     cause: BaseException | None = error
     while cause is not None and id(cause) not in seen:
@@ -449,13 +469,15 @@ def _causes(error: BaseException) -> Iterator[BaseException]:
 
 @contextmanager
 def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Generator[None]:
-    """Map Graph failures onto actionable tool errors. Name every permission: Graph names none.
+    """Map Graph failures onto tool errors that a caller can act on. Name every permission,
+    because Graph names none.
 
-    No tool opens one directly. `GraphAdviceMiddleware` covers every registered tool from this
-    same function, so this is the escape for a wording that the table cannot carry. It arrives as
-    `Advised`, which the middleware leaves alone, and `tests/shared/test_seam.py` compares the two
-    wordings message for message. `not_found` replaces the default 404 advice, which assumes the
-    id came verbatim from a tool response, rather than being a handle that another tool minted.
+    No tool opens this context manager directly. `GraphAdviceMiddleware` covers every
+    registered tool from this same function, so this context manager is the escape for wording
+    that the table cannot carry. The error arrives as `Advised`, which the middleware leaves
+    alone, and `tests/shared/test_seam.py` compares the two wordings message for message.
+    `not_found` replaces the default 404 advice, which assumes that the id came with no change
+    from a tool response, instead of being a handle that another tool minted.
     """
     assert permissions, "a Graph call is made under at least one permission"
     try:
@@ -468,10 +490,10 @@ _ENTRA_CODE = re.compile(r"AADSTS\d+")
 
 
 def _token_advice(failure: BaseException, permissions: tuple[str, ...]) -> str:
-    """One message for every way the On-Behalf-Of exchange can fail to produce a token. A
-    permission was never consented to (AADSTS65001, overwhelmingly the common one), or this
-    connector's own Entra credentials are wrong. Splitting these into separate messages means
-    classifying Entra error codes that this connector never observed."""
+    """This is one message for every way that the On-Behalf-Of exchange can fail to produce a
+    token. Either a permission was never consented to (AADSTS65001, by far the most common
+    case), or this connector's own Entra credentials are wrong. Splitting these into separate
+    messages would mean classifying Entra error codes that this connector never observed."""
     code = _ENTRA_CODE.search(str(failure))
     diagnostics = code.group() if code is not None else type(failure).__name__
     named = _named(permissions)
@@ -495,9 +517,9 @@ def _token_advice(failure: BaseException, permissions: tuple[str, ...]) -> str:
 _TOO_MANY_REQUESTS = 429
 _CONFLICT = 409
 
-# Graph's inner error code for the tenant switch, branched on rather than the message text, as
-# Microsoft's transcript reference instructs twice. `services/teams-mcp` met this switch first
-# (PR #762).
+# This is Graph's inner error code for the tenant switch. The code branches on this value,
+# instead of on the message text, as Microsoft's transcript reference instructs twice.
+# `services/teams-mcp` met this switch first (PR #762).
 _TRANSCRIPT_ACCESS_DISABLED = "GraphAccessToTranscriptsDisabled"
 
 _TRANSCRIPTS_SWITCHED_OFF = (
@@ -520,7 +542,8 @@ def _advice(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
 
 
 def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str | None) -> str:
-    """What a caller must do about `failure`, one branch per remedy rather than per status code."""
+    """This function returns what a caller must do about `failure`, with one branch for each
+    remedy, instead of one branch for each status code."""
     if isinstance(failure, GraphThrottled):
         advice = failure.retry_after_seconds
         if advice is None:
@@ -534,9 +557,10 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
                 "Microsoft 365 is rate-limiting this connector and asked to be left alone for "
                 + f"{advice:g} seconds. Retry after that, not sooner."
             )
-        # A 5xx that named a delay, which `errors.py` reads as throttling because the delay is the
-        # remedy either way. Quota spent or a service shedding load is not knowable from here, so
-        # the sentence claims only what Graph actually said.
+        # This is a 5xx that named a delay. `errors.py` reads this as throttling, because the
+        # remedy is the same either way. From here, this function cannot know whether the quota
+        # is spent or a service is shedding load. So the sentence claims only what Graph
+        # actually said.
         return (
             "Microsoft 365 declined to serve this request now and asked to be left alone for "
             + f"{advice:g} seconds — it is either rate-limiting this connector or too busy to "
@@ -582,8 +606,8 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
             + "read the content with a tool that returns text."
         )
     if isinstance(failure, GraphPagingUnending):
-        # No request failed, so `_diagnostics` has nothing to append and the page count, which is
-        # the whole of the evidence, goes in the sentence.
+        # No request failed here, so `_diagnostics` has nothing to append. The page count, which
+        # is all of the evidence, goes in the sentence instead.
         return (
             "Microsoft 365 would not finish sending this list: it answered "
             + f"{failure.empty_pages} pages in a row with nothing in them while still saying more "
@@ -612,8 +636,8 @@ def _named(permissions: tuple[str, ...]) -> str:
 
 
 def _diagnostics(failure: GraphFailure) -> str:
-    """The evidence an operator needs. `request_id` is what Microsoft support asks for first, and it
-    is only ever in this one response."""
+    """This function returns the evidence that an operator needs. `request_id` is what Microsoft
+    support asks for first, and it appears only in this one response."""
     parts = [
         f"{label} {value}"
         for label, value in (

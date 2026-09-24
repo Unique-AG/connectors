@@ -11,9 +11,9 @@ report a message as gone for good.
 operation as creating "a new copy of the message in the destination folder" and removing the
 original (https://learn.microsoft.com/en-us/graph/api/message-move). So the answer carries a new
 `uri` for every message that moved. This tool reads that new `uri` from Graph's own response, not
-from the request. The old handle is dead, and not only the one the caller passed in. Every
-earlier hit for that message, from a search, a listing or a thread read, is now stale too, and a
-model holding one has no way to notice.
+from the request. The old handle is dead, and not only the one the caller passed in. This
+staleness reaches every earlier hit for that message, from a search, a listing, or a thread read.
+A model that holds one has no way to notice.
 
 **One request per message. Each is reported on its own.** Graph publishes no batch form of this
 route, so `message_refs` drives a loop, not one call. A partial failure is the ordinary shape of
@@ -30,18 +30,18 @@ default. Graph publishes no idempotency key for this operation.
 **The destination vocabulary is closed.** `WellKnownFolder` in `shared/mail.py` leaves out the
 purge bin, the folder parents, the Outbox and the sync diagnostics folders. No free-form folder
 name is accepted at all: matching a user's own folder by name is how mail gets filed into the
-wrong place. Any other folder is reached by the handle that `outlook_browse_folders` reported for
-it.
+wrong place. A caller reaches any other folder with the handle that `outlook_browse_folders`
+reported for it.
 
 **This call reads the destination handle itself.** It refuses a folder that is hidden, or that is
 a search folder. Mail filed into either one disappears from the user's view, even though it was
-not deleted. This call reads the folder now, instead of trusting an earlier answer, because a
-flag in an earlier answer is a snapshot that the model holds, not a fact about the current
-mailbox. `mailSearchFolder` is a distinct `@odata.type`, not a flag. This read narrows nothing,
-because Graph can leave that annotation out of a narrowed answer: the SDK then has no
-discriminator, builds a plain `MailFolder`, and a type check alone lets the folder through. The
-check also falls back to the properties only a search folder declares, which the SDK keeps in
-`additional_data` when it did not recognise them.
+not deleted. This call reads the folder now, instead of trusting an earlier answer. A flag in an
+earlier answer is only a snapshot that the model holds, not a fact about the current mailbox.
+`mailSearchFolder` is a distinct `@odata.type`, not a flag. This read narrows nothing, because
+Graph can leave that annotation out of a narrowed answer. The SDK then has no discriminator. It
+builds a plain `MailFolder`, and a type check alone lets the folder through. The check also falls
+back to the properties only a search folder declares, which the SDK keeps in `additional_data`
+when it did not recognize them.
 
 **`mailbox` re-points every request — the destination read included — from `/me` to
 `/users/{id}`.** One `mailbox` covers the whole call, never split across two.
@@ -98,13 +98,13 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "destination": "archive",
 }
 
-# The default 404 advice tells the caller to check that the id came from a tool response
+# The default 404 advice tells the caller to make sure that the id came from a tool response
 # verbatim. That advice is wrong here, because it already did: both arguments that can 404
 # carry handles this connector minted itself.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return the item this move addressed, and nothing moved. If "
-    + "`folder_ref` was used, the destination is the likelier cause: the handle is well formed, "
-    + "so the folder was most likely deleted, moved or copied, and given a new id. Call "
+    + "`folder_ref` was used, the destination is the likelier cause: the handle is well formed. "
+    + "So the folder was most likely deleted, moved, or copied, and given a new id. Call "
     + "outlook_browse_folders again, and take the `uri` it reports now. Otherwise, a message "
     + "handle is stale. That is exactly what a stale handle looks like for a message that "
     + "already moved. Find the message again with outlook_search_mail, and move the `uri` that "
@@ -125,17 +125,17 @@ _SEARCH_FOLDER_ONLY: frozenset[str] = frozenset(
 ) - frozenset(MailFolder().get_field_deserializers())
 
 assert _SEARCH_FOLDER_ONLY, (
-    "MailSearchFolder declares no property of its own, so the destination check below would "
-    "accept every search folder silently"
+    "MailSearchFolder declares no property of its own, so the destination check below accepts "
+    "every search folder silently"
 )
 
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 
 _DESCRIPTION = f"""\
-This tool moves up to {MAX_MESSAGES} messages into another folder in the mailbox of the \
-signed-in user, or, with `mailbox`, a shared or delegated one — the only way this connector \
-erases mail.
+This tool moves up to {MAX_MESSAGES} messages into another folder, in the mailbox of the \
+signed-in user or, with `mailbox`, a shared or delegated one. This is the only way this \
+connector erases mail.
 
 Notes:
 - Pass exactly one of `destination` or `folder_ref`, never both.
@@ -177,13 +177,13 @@ _NOT_A_MESSAGE_HANDLE = (
     + "exactly as outlook_search_mail, outlook_list_mail or outlook_read_thread reported them "
     + "in `uri`. One of these is not a handle. A subject line, an email address, an Outlook web "
     + "link and a bare message id are not handles. Neither is a folder, draft or rule handle "
-    + "under the same scheme. This tool checks every handle before any message moves, so "
-    + "nothing moved. Fix the value and call again with the whole batch."
+    + "under the same scheme. This tool makes sure that every handle is valid before any "
+    + "message moves, so nothing moved. Fix the value and call again with the whole batch."
 )
 
 _HIDDEN_DESTINATION = (
     "That folder is hidden from the user in Outlook, so mail moved into it disappears from "
-    + "their view, without being deleted, and outlook_move_mail will not file mail there. "
+    + "their view, without being deleted. outlook_move_mail will not file mail there. "
     + "Nothing was moved. Pick a folder the user can see: outlook_browse_folders lists them, "
     + "and leaves the hidden ones out unless asked for them. If the intent is to remove the "
     + "mail, use `destination` with `deleteditems` instead. The user can undo that from Deleted "
@@ -297,7 +297,7 @@ async def move_mail(
     folder_ref: str | None = None,
     mailbox: str | None = None,
 ) -> MailMoved:
-    """Move each of `message_refs` into one folder, reporting every message's own outcome."""
+    """Move each of `message_refs` into one folder, and report every message's own outcome."""
     assert 1 <= len(message_refs) <= MAX_MESSAGES, (
         f"message_refs is bounded by the schema at 1..{MAX_MESSAGES}, got {len(message_refs)}"
     )
@@ -337,8 +337,9 @@ def _message_handles(message_refs: Sequence[str]) -> tuple[MailMessageHandle, ..
 def _destination_asked_for(
     destination: WellKnownFolder | None, folder_ref: str | None
 ) -> WellKnownFolder | MailFolderHandle:
-    """Which folder was named, refusing both and neither. `destination` carries no default, so an
-    argument that is present here is one a caller spelled out and the pair is unambiguous."""
+    """Which folder was named. This function refuses a call that names both, or names neither.
+    `destination` carries no default, so an argument that is present here is one a caller
+    spelled out, and the pair is unambiguous."""
     if destination is not None and folder_ref is not None:
         raise ToolError(_BOTH_DESTINATIONS)
     if destination is not None:
@@ -356,15 +357,15 @@ async def _destination(
 ) -> _Destination | _Unusable:
     """The folder to move into, read from Graph when a handle named it.
 
-    A well-known name is not read back: Microsoft accepts one as `destinationId` directly, the
+    A well-known name is not read back. Microsoft accepts one as `destinationId` directly, the
     vocabulary is closed, and none of the seven names in it is hidden or a search folder.
     """
     if not isinstance(wanted, MailFolderHandle):
         return _Destination(folder_id=wanted, name=wanted)
-    # No `$select`. Narrowing this read is what hides a search folder: Graph can leave the
-    # `@odata.type` annotation out of a narrowed answer, the SDK then has no discriminator to read
-    # and hands back a plain `MailFolder`, and the check below never fires. A whole folder is a
-    # small answer, and this is one folder once per call.
+    # No `$select` here. Narrowing this read is what hides a search folder. Graph can leave the
+    # `@odata.type` annotation out of a narrowed answer. Then the SDK has no discriminator to
+    # read, so it hands back a plain `MailFolder`, and the check below never fires. A whole
+    # folder is a small answer, and this is one folder once per call.
     with graph_step(STEP_DESTINATION):
         folder = await reached.mail_folders.by_mail_folder_id(wanted.folder_id).get()
     assert folder is not None, "Graph answered a mail folder read with no folder"
@@ -379,9 +380,9 @@ def _is_search_folder(folder: MailFolder) -> bool:
     """Whether Graph answered with a search folder, by either of the two signals it can carry.
 
     The typed answer is the clean one: `@odata.type` names the derived type and the SDK's
-    discriminator hands back a `MailSearchFolder`. Without that annotation the SDK builds a plain
-    `MailFolder` and puts the properties it did not recognise in `additional_data`, so a search
-    folder still names itself there.
+    discriminator hands back a `MailSearchFolder`. Without that annotation, the SDK builds a
+    plain `MailFolder`. It puts the properties that it did not recognize in `additional_data`,
+    so a search folder still names itself there.
     """
     if isinstance(folder, MailSearchFolder):
         return True
@@ -422,9 +423,9 @@ def _move_request() -> RequestConfiguration[QueryParameters]:
     response addresses an id that no longer exists. The SDK retries `POST` by default.
 
     The header is built per call: kiota's `RequestConfiguration.headers` defaults to one collection
-    shared by every configuration in the process, so a preference added to it leaks onto every
-    Graph call. It is what makes the id in the response an immutable one, and therefore a handle in
-    the same id space as every other handle this connector mints.
+    shared by every configuration in the process. A preference added to it leaks onto every Graph
+    call. It is what makes the id in the response an immutable one. That makes it a handle in the
+    same id space as every other handle this connector mints.
     """
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
@@ -432,10 +433,10 @@ def _move_request() -> RequestConfiguration[QueryParameters]:
 
 
 def _raise_when_nothing_moved(attempts: Sequence[_Attempt]) -> None:
-    """A batch in which nothing moved is the call's own failure, so this function raises the
-    first refusal, and the advice middleware gets to word it. Once one message moved, no
-    failure can be raised: an exception discards the only record of which handles are now
-    dead."""
+    """A batch in which nothing moved is the call's own failure. So this function raises the
+    first refusal, and the advice middleware gets to word it. Once one message moved, this
+    function raises nothing more, because an exception here discards the only record of which
+    handles are now dead."""
     if any(attempt.result.moved for attempt in attempts):
         return
     failed = next((attempt.failure for attempt in attempts if attempt.failure is not None), None)
@@ -483,8 +484,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Which well-known folder to move into, by Microsoft's own "
                     + "locale-independent name: `inbox`, `sentitems`, `drafts`, `archive`, "
-                    + "`deleteditems`, `junkemail`, or `clutter`. Every other folder, including "
-                    + "every folder the user made, needs `folder_ref` instead. A folder's own "
+                    + "`deleteditems`, `junkemail`, or `clutter`. Every other folder needs "
+                    + "`folder_ref` instead, even a folder that the user made. A folder's own "
                     + "name is not accepted here. Alternative to `folder_ref`."
                 )
             ),

@@ -1,16 +1,21 @@
 """`outlook_list_mail`: the query it composes, the folder it answers, what it refuses.
 
-The query is most of this file. Microsoft answers `InefficientFilter` to an `$orderby` naming a
-property `$filter` does not, in a different order, or after an unfiltered one, so the assertions
-below pin a construction that cannot break those rules whatever it is passed: `receivedDateTime`
-ordered always, `receivedDateTime` filtered first whenever `$filter` exists at all, and every
-term on another property strictly after it.
+The query is most of this file. Microsoft returns an `InefficientFilter` error for a bad
+`$orderby`. That happens when `$orderby` names a property that `$filter` does not name, names in
+a different order, or names after an unfiltered property.
 
-The narrowing arguments are asserted twice over, and deliberately. `unread_only` and
-`from_address` each reach `$filter` only beside a date, because alone they would leave `$filter`
-naming no ordered property; and each is checked again on the returned rows, because Microsoft
-documents that an unsupported filter can be dropped in silence. So there are two families of test
-here: what goes on the wire, and what the answer holds when the wire is not believed.
+So the assertions below pin one construction. Whatever the tool passes to it, the construction
+cannot break those rules:
+1. `receivedDateTime` is always ordered.
+2. `receivedDateTime` is always the first filtered property, whenever `$filter` exists at all.
+3. Every term on another property comes strictly after it.
+
+The narrowing arguments are asserted twice over, and on purpose. `unread_only` and `from_address`
+each reach `$filter` only beside a date. Alone, either one leaves `$filter` with no ordered
+property. The tool also inspects each of them again on the returned rows, because Microsoft
+documents that Graph can drop an unsupported filter without a warning. So this file has two
+families of test: what goes on the wire, and what the answer holds when the tool does not
+trust it.
 
 Every response body here is synthesised. None came from a real mailbox.
 """
@@ -101,8 +106,8 @@ class TestTheQueryItComposes:
     async def test_it_reads_the_folder_for_the_counts_graph_gives_away_on_it(
         self, client: GraphServiceClient, inbox: respx.Route
     ) -> None:
-        """Microsoft recommends these over counting a folder's messages with `$count` and
-        `$filter`, which it warns can incur significant latency."""
+        """Microsoft recommends these fields over counting a folder's messages with `$count` and
+        `$filter`. Microsoft warns that the count can add significant delay."""
         _ = await lister.list_mail(client, limit=25)
 
         assert inbox.call_count == 1
@@ -144,7 +149,8 @@ class TestTheQueryItComposes:
         received_after: date | None,
         received_before: date | None,
     ) -> None:
-        """A promise of "newest first" kept only for some arguments is worse than none."""
+        """A promise of "newest first" that holds for only some arguments is worse than no
+        promise at all."""
         _ = await lister.list_mail(
             client,
             unread_only=unread_only,
@@ -165,8 +171,8 @@ class TestTheQueryItComposes:
         received_after: date | None,
         received_before: date | None,
     ) -> None:
-        """With no narrowing argument beside them, the two bounds are the whole `$filter`: one
-        property, once or twice, and nothing else."""
+        """With no narrowing argument beside them, the two bounds form the whole `$filter`: one
+        property, named once or twice, and nothing else."""
         _ = await lister.list_mail(
             client, received_after=received_after, received_before=received_before, limit=25
         )
@@ -192,8 +198,9 @@ class TestTheQueryItComposes:
     async def test_a_date_bounds_the_very_property_the_order_is_taken_on(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """Microsoft's rule, and the reason this tool has exactly one orderable property: every
-        property in `$orderby` must also be in `$filter`, in the same order, and first."""
+        """This is Microsoft's rule, and it is the reason why this tool has exactly one orderable
+        property. Every property in `$orderby` must also be in `$filter`, in the same order, and
+        first."""
         _ = await lister.list_mail(client, received_after=date(2026, 3, 4), limit=25)
 
         params = inbox_messages.calls.last.request.url.params
@@ -204,9 +211,9 @@ class TestTheQueryItComposes:
     async def test_a_closing_date_bounds_the_day_after_it_so_that_day_is_covered_whole(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """`lt` the start of the following day, which is how `shared/calendar.py` closes an Outlook
-        date window. A `le` on this day's own last instant has to pick a precision, and drops
-        whatever arrived after it."""
+        """This uses `lt` at the start of the following day. `shared/calendar.py` closes an
+        Outlook date window the same way. A `le` on this day's own last instant must pick a
+        precision, and it drops whatever arrived after that precise instant."""
         _ = await lister.list_mail(client, received_before=date(2026, 3, 4), limit=25)
 
         params = inbox_messages.calls.last.request.url.params
@@ -228,8 +235,8 @@ class TestTheQueryItComposes:
     async def test_one_date_in_both_bounds_asks_for_that_single_day(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """The bound both arguments promise is a whole UTC day, so "what came in on Tuesday" is
-        that date twice. Two first instants would bracket nothing at all."""
+        """The bound that both arguments promise is a whole UTC day, so "what came in on Tuesday"
+        is that one date, given twice. Two first instants bracket nothing at all."""
         _ = await lister.list_mail(
             client, received_after=date(2026, 3, 4), received_before=date(2026, 3, 4), limit=25
         )
@@ -249,9 +256,9 @@ class TestTheQueryItComposes:
         received_before: date | None,
     ) -> None:
         """`isRead` is unordered beside an `$orderby` on `receivedDateTime`. With a date term
-        present it is legal — the third rule asks only that the ordered property come first. Alone
-        it breaks the first rule, because then `$filter` would name no ordered property at all,
-        and that request is a published `InefficientFilter`."""
+        present, it is legal, because the third rule asks only that the ordered property come
+        first. Alone, it breaks the first rule: `$filter` then names no ordered property at all,
+        and Microsoft documents that request as `InefficientFilter`."""
         _ = await lister.list_mail(
             client,
             unread_only=True,
@@ -280,10 +287,10 @@ class TestTheQueryItComposes:
         received_after: date | None,
         received_before: date | None,
     ) -> None:
-        """Microsoft's third rule, asserted over all sixteen argument combinations rather than the
-        ones somebody thought to try: no `receivedDateTime` term may follow a term on any other
-        property. A refactor that reorders the conjuncts composes an `InefficientFilter` out of
-        arguments that are each individually fine."""
+        """This tests Microsoft's third rule over all sixteen argument combinations, not just the
+        ones somebody thought to try. The rule: no `receivedDateTime` term can follow a term on
+        any other property. A refactor that reorders the conjuncts can turn arguments that are
+        each fine on their own into an `InefficientFilter`."""
         _ = await lister.list_mail(
             client,
             unread_only=unread_only,
@@ -326,8 +333,8 @@ class TestTheQueryItComposes:
     async def test_a_moment_with_no_zone_is_read_as_utc_and_not_as_the_servers_own(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """Otherwise the bound would land in whichever zone the pod runs in — one no caller chose
-        and no answer names."""
+        """Otherwise the bound lands in whichever zone the pod runs in: a zone that no caller
+        chose and that no answer names."""
         _ = await lister.list_mail(client, received_after=datetime(2026, 3, 4, 9, 0), limit=25)
 
         assert inbox_messages.calls.last.request.url.params["$filter"] == (
@@ -338,8 +345,8 @@ class TestTheQueryItComposes:
     async def test_a_moment_east_of_utc_is_converted_rather_than_relabelled(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """09:00+02:00 is 07:00 UTC. Stamping `Z` on the wall clock would move the bound two
-        hours, which is the trap `shared/window.py` documents against `as_utc` alone."""
+        """09:00+02:00 is 07:00 UTC. Stamping `Z` directly on the wall-clock value moves the bound
+        two hours. `shared/window.py` documents this as the trap in using `as_utc` alone."""
         _ = await lister.list_mail(
             client,
             received_after=datetime(2026, 3, 4, 9, 0, tzinfo=timezone(timedelta(hours=2))),
@@ -354,9 +361,10 @@ class TestTheQueryItComposes:
     async def test_a_sub_second_bound_keeps_its_precision_on_the_wire(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """Truncating to whole seconds moves both bounds earlier, and both failures are silent: the
-        lower one lets in mail the caller excluded, the upper one shuts out mail the caller
-        included, with `capped` false and nothing to say a row was dropped."""
+        """Truncating to whole seconds moves both bounds earlier. Both failures are silent. The
+        lower bound then lets in mail that the caller excluded. The upper bound then shuts out
+        mail that the caller included. `capped` stays false, and nothing says that the tool
+        dropped a row."""
         _ = await lister.list_mail(
             client,
             received_after=datetime(2026, 3, 4, 9, 0, 0, 750000, tzinfo=UTC),
@@ -373,8 +381,8 @@ class TestTheQueryItComposes:
     async def test_a_whole_second_bound_carries_no_fraction(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """The other half of the rule: precision is kept, never added. A date resolves to midnight,
-        so every date-bounded query still sends the bytes it always did."""
+        """This is the other half of the rule: the tool keeps precision, never adds it. A date
+        resolves to midnight, so every date-bounded query still sends the bytes it always did."""
         _ = await lister.list_mail(
             client, received_after=datetime(2026, 3, 4, 9, 0, tzinfo=UTC), limit=25
         )
@@ -436,8 +444,8 @@ class TestTheQueryItComposes:
     async def test_a_sender_with_no_date_is_left_out_of_the_query_and_still_narrows_the_rows(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """Undated, the term would be the only one in `$filter` and would break the first rule. The
-        row check is what keeps the promise instead, so the answer is narrowed either way."""
+        """If the tool puts this term alone in `$filter`, undated, it breaks the first rule. So
+        the code relies on the row check instead, which narrows the answer either way."""
         inbox_messages.mock(
             return_value=httpx.Response(
                 200,
@@ -461,9 +469,9 @@ class TestTheQueryItComposes:
     async def test_a_row_graph_returned_against_the_filter_is_still_discarded(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """Microsoft documents that an unsupported filter can fail silently. Dropped, the term
-        would put another sender's mail in an answer that named one — so the rows are checked even
-        when the term went on the wire."""
+        """Microsoft documents that an unsupported filter can fail silently. If Graph drops the
+        term, another sender's mail appears in an answer that named one sender. So the tool
+        inspects the rows even when the term went out on the wire."""
         inbox_messages.mock(
             return_value=httpx.Response(
                 200,
@@ -492,8 +500,8 @@ class TestTheQueryItComposes:
     async def test_a_sender_matches_whatever_casing_the_message_carried(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """Exchange echoes the sender's own casing, not the casing that was filtered with, and an
-        SMTP address is case-insensitive. Comparing exactly would drop a row Exchange itself
+        """Exchange echoes the sender's own casing, not the casing that the filter used, and an
+        SMTP address is case-insensitive. An exact comparison drops a row that Exchange itself
         considers a match."""
         inbox_messages.mock(
             return_value=httpx.Response(
@@ -523,8 +531,9 @@ class TestTheQueryItComposes:
     async def test_the_first_page_is_never_reached_by_skipping(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """Graph's own `$skip` in an `@odata.nextLink` counts the items the service enumerated, not
-        the ones it handed back, so it is followed whole and never composed here."""
+        """Graph's own `$skip` inside an `@odata.nextLink` counts the items that the service
+        enumerated, not the ones it handed back. So the tool follows the link whole, and it never
+        builds `$skip` here."""
         _ = await lister.list_mail(client, limit=25)
 
         assert "$skip" not in inbox_messages.calls.last.request.url.params
@@ -533,8 +542,9 @@ class TestTheQueryItComposes:
     async def test_the_listing_asks_for_ids_that_outlive_the_message_being_filed(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
-        """The same preference `outlook_read_mail` sends on the way in: without it these handles
-        would be `RestId`s, which die the moment an inbox rule files the message."""
+        """This is the same preference that `outlook_read_mail` sends on the way in. Without it,
+        these handles are `RestId`s, and a `RestId` dies the moment an inbox rule files the
+        message."""
         _ = await lister.list_mail(client, limit=25)
 
         assert 'IdType="ImmutableId"' in inbox_messages.calls.last.request.headers["Prefer"]
@@ -543,8 +553,9 @@ class TestTheQueryItComposes:
     async def test_the_preference_is_supplied_again_for_every_page(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`PageIterator` starts from an empty header collection, so a page fetched without it
-        would answer in the other id space and mint handles that 404."""
+        """`PageIterator` starts from an empty header collection. So a page that the tool fetches
+        without the preference answers in the other id space, and it mints handles that fail
+        with a 404."""
         cursor = graph.get(_INBOX_MESSAGES, params={"$skiptoken": "second"}).mock(
             return_value=_page(_message_payload(_SECOND_ID))
         )
@@ -562,8 +573,8 @@ class TestTheQueryItComposes:
     async def test_the_preference_does_not_leak_onto_another_request(
         self, client: GraphServiceClient, inbox: respx.Route, inbox_messages: respx.Route
     ) -> None:
-        """Kiota's `RequestConfiguration.headers` default is one collection shared process-wide, so
-        a preference added to it would reach the folder read of every later call."""
+        """Kiota's `RequestConfiguration.headers` default is one collection, shared across the
+        whole process. So a preference added to it reaches the folder read of every later call."""
         _ = await lister.list_mail(client, limit=25)
         _ = await lister.list_mail(client, limit=25)
 
@@ -578,8 +589,8 @@ class TestTheFolderItAddresses:
     async def test_a_well_known_name_reaches_that_folder_by_name(
         self, client: GraphServiceClient, graph: respx.MockRouter, folder: WellKnownFolder
     ) -> None:
-        """The names are locale-independent, so they are sent as Microsoft spells them rather than
-        resolved to an id first."""
+        """The names are locale-independent, so the tool sends them exactly as Microsoft spells
+        them, rather than resolving them to an id first."""
         named = graph.get(f"/me/mailFolders/{folder}").mock(
             return_value=httpx.Response(200, json=_folder_payload())
         )
@@ -732,8 +743,9 @@ class TestWhatItAnswers:
     async def test_the_pages_of_a_folder_are_followed_rather_than_read_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The cursor route is registered before the bare one, which respx matches in registration
-        order: the bare path matches a `$skiptoken` request too and would answer every page."""
+        """The test registers the cursor route before the bare one. respx matches routes in
+        registration order, so the bare path also matches a `$skiptoken` request and answers
+        every page."""
         graph.get(_INBOX_MESSAGES, params={"$skiptoken": "second"}).mock(
             return_value=_page(_message_payload(_SECOND_ID))
         )
@@ -801,8 +813,8 @@ class TestWhatItRefuses:
         graph: respx.MockRouter,
         folder: WellKnownFolder,
     ) -> None:
-        """One call lists one folder, and picking one of the two silently would list a folder
-        nobody asked for."""
+        """One call lists one folder. If the tool silently picks one of the two on its own, it
+        lists a folder that nobody asked for."""
         named = graph.get(f"/me/mailFolders/{folder}")
 
         with pytest.raises(ToolError, match="alternatives"):
@@ -847,8 +859,9 @@ class TestWhatItRefuses:
     async def test_a_backwards_window_is_caught_across_the_two_shapes(
         self, client: GraphServiceClient, inbox: respx.Route
     ) -> None:
-        """Python refuses to order a date against a moment, so the bounds are compared as
-        instants. Left to a direct comparison this raises `TypeError` instead of refusing."""
+        """Python refuses to order a date against a moment, so the tool compares the bounds as
+        instants. A direct comparison between them raises `TypeError` instead of a clear
+        refusal."""
         with pytest.raises(ToolError, match="backwards"):
             _ = await lister.list_mail(
                 client,
@@ -919,7 +932,7 @@ class TestWhatItRefuses:
         self, client: GraphServiceClient, inbox: respx.Route, from_address: str
     ) -> None:
         """`eq` on a display name matches nothing, and Graph answers that with an empty page, not
-        an error — so it reads as "no mail from Bob" for a caller who spelled Bob's name."""
+        an error. So it reads as "no mail from Bob" to a caller who spelled Bob's name."""
         with pytest.raises(ToolError, match="one address"):
             _ = await lister.list_mail(client, from_address=from_address, limit=25)
 
@@ -955,8 +968,8 @@ class TestTheSchemaItPublishes:
     async def test_the_two_ways_in_are_published_as_alternatives(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """FastMCP validates arguments against the signature, so the constraint the runtime refusal
-        enforces has to be said in the schema as well or no client can see it."""
+        """FastMCP validates arguments against the signature. So the schema must also state the
+        constraint that the runtime refusal enforces, or no client can see it."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -1030,11 +1043,12 @@ class TestGraphFailures:
             _ = await lister.list_mail(client, limit=25)
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
-        """`Mail.Read.Shared` is what Microsoft's shared-folder walkthrough names for listing
-        messages in a mailbox other than `/me`."""
+        """`Mail.Read.Shared` is the permission that Microsoft's shared-folder walkthrough names
+        to list messages in a mailbox other than `/me`."""
         assert lister.GRAPH_PERMISSIONS == ("Mail.Read", "Mail.Read.Shared")
 
     def test_a_folder_that_will_not_resolve_is_answered_with_both_recoveries(self) -> None:
-        """A 404 here is not the default "check you copied the id" advice: one way in is a handle
-        this connector minted, the other is a name no id was ever copied from."""
+        """A 404 here is not the usual "make sure that you copied the id" advice. One way in is
+        a handle that this connector minted. The other is a name that no id was ever copied
+        from."""
         assert "outlook_browse_folders" in lister.GRAPH_NOT_FOUND

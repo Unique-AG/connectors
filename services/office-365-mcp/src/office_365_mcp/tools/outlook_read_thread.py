@@ -1,9 +1,9 @@
 """`outlook_read_thread` — every message of one conversation that is in this mailbox.
 
-Microsoft publishes no thread endpoint for a personal mailbox, and the only route from a message's
+Microsoft publishes no thread endpoint for a personal mailbox. The only route from a message's
 `conversationId` to its thread is `$filter=conversationId eq '…'`, which appears in no Microsoft
-document — a Microsoft SDK maintainer confirmed it works in
-https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/757, and that is the whole of the
+document. A Microsoft SDK maintainer reported that it works, in
+https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/757. That is the whole of the
 evidence. Graph ignores an unsupported `$filter` rather than refusing it, so every call selects
 `conversationId` back and refuses an answer carrying a foreign conversation. There is no
 `$orderby`: beside this `$filter` it answers `InefficientFilter`, so the sort happens here.
@@ -71,8 +71,8 @@ outlook_read_mail is the sibling for one message alone. When the whole conversat
 use this tool.
 
 Notes:
-- Searches every folder that holds a copy of the conversation, including Sent Items, not just \
-the anchor message's folder.
+- Searches every folder that holds a copy of the conversation, not just the anchor message's \
+folder — Sent Items included.
 """
 
 _BAD_HANDLE = (
@@ -93,9 +93,10 @@ _FILTER_IGNORED = (
     "Microsoft 365 answered this thread read with messages from other conversations, which means "
     + "it did not apply the filter this tool asked for. `$filter=conversationId` is not in "
     + "Microsoft's documentation. Microsoft documents that Graph ignores an unsupported filter, "
-    + "rather than refuses it, so this connector checks the answer instead of trusting it. This "
-    + "tool reports no thread, because the alternative is an arbitrary slice of the mailbox "
-    + "presented as one. Read the messages individually with outlook_read_mail."
+    + "rather than refuses it. So this connector makes sure that the answer is correct, instead "
+    + "of trusting it. This tool reports no thread, because the alternative is an arbitrary "
+    + "slice of the mailbox presented as one. Read the messages individually with "
+    + "outlook_read_mail."
 )
 
 
@@ -152,9 +153,9 @@ def _make_sure_the_filter_was_applied(
 ) -> None:
     """Refuse an answer Graph did not filter.
 
-    A foreign conversation proves the filter was dropped at any page size. An absent anchor means
-    the filter ran on the wrong value — but only on a whole page: with no `$orderby`, a truncated
-    page can honestly leave the anchor off.
+    A foreign conversation proves that Graph dropped the filter, at any page size. An absent
+    anchor means the filter ran on the wrong value. This applies only on a whole page: with no
+    `$orderby`, a truncated page can honestly leave the anchor off.
     """
     if not found:
         return
@@ -181,7 +182,7 @@ def _searched_scope(mailbox: str | None) -> str:
     """What `read_thread` searched, in words, for the answer's `searched_scope` field."""
     whose = "The signed-in user's own mailbox" if mailbox is None else f"The mailbox {mailbox!r}"
     return (
-        f"{whose}, every folder of it including Sent Items, Deleted Items and Junk Email. Not "
+        f"{whose}, every folder of it — Sent Items, Deleted Items, and Junk Email included. Not "
         + "searched: any other participant's mailbox, any other shared or delegated mailbox, and "
         + "an in-place archive, which Microsoft Graph does not support at all. A message that was "
         + "never delivered here, or that was permanently deleted, is absent. Nobody can tell it "
@@ -190,7 +191,7 @@ def _searched_scope(mailbox: str | None) -> str:
 
 
 def _received_at(message: Message) -> str:
-    """Oldest first, with a draft — which carries no received time — sorting first."""
+    """Oldest first. A draft carries no received time, so it sorts first."""
     return "" if message.received_date_time is None else message.received_date_time.isoformat()
 
 

@@ -1,6 +1,6 @@
-"""Every payload here is synthesised. No file in this suite was ever attached to a real message,
-and `attachment-upload.invalid` is not a Microsoft host: it stands in for the pre-authenticated
-`uploadUrl` `createUploadSession` would otherwise hand back.
+"""Every payload in this file is synthetic data. No attachment in this file ever reaches a
+real message. `attachment-upload.invalid` is not a real Microsoft host. It replaces the
+pre-authenticated `uploadUrl` value that `createUploadSession` returns.
 """
 
 from collections.abc import Sequence
@@ -80,9 +80,10 @@ async def _upload(
 
 
 class TestTheSmallPath:
-    """Under `MAX_ATTACHMENT_BYTES`, the only Graph call is the inline `POST .../attachments` —
-    proven here by never registering `createUploadSession` at all: a call to it would fail with
-    respx's own unmatched-request error rather than anything this file asserts directly.
+    """If the attachment size is less than `MAX_ATTACHMENT_BYTES`, only one Graph call happens:
+    the inline `POST .../attachments` request. This test class never registers a route for
+    `createUploadSession`. If the code calls `createUploadSession`, respx raises its own
+    unmatched-request error instead. No assertion in this file names that error directly.
     """
 
     async def test_a_small_file_attaches_inline_with_no_upload_session(
@@ -112,9 +113,10 @@ class TestTheSmallPath:
 
 
 class TestTheUploadSessionPath:
-    """At or over `MAX_ATTACHMENT_BYTES`, `createUploadSession` runs first, then the file goes to
-    `uploadUrl` in `UPLOAD_CHUNK_BYTES`-sized `PUT`s — every one but the last full-sized, and the
-    last exactly as short as the remainder.
+    """If the attachment size is `MAX_ATTACHMENT_BYTES` or more, `createUploadSession` runs
+    first. Then the file goes to `uploadUrl` in `PUT` requests of `UPLOAD_CHUNK_BYTES` each.
+    Every `PUT` is full size, except the last one. The last `PUT` carries only the remaining
+    bytes.
     """
 
     async def test_a_large_file_is_split_into_correctly_sized_chunks(

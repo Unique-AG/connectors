@@ -1,12 +1,13 @@
-"""The shapes every Outlook calendar tool answers in.
+"""This module defines the shapes that every Outlook calendar tool answers in.
 
-- Graph states an instant as an offset-less `dateTime` plus a separate `timeZone` name, both UTC
-  unless `Prefer: outlook.timezone` is sent, which no tool here sends
+- Graph states an instant as an offset-less `dateTime`, plus a separate `timeZone` name. Both
+  are in UTC, unless a call sends `Prefer: outlook.timezone`, and no tool here sends that header
   (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview).
-- A `timeZone` is often a Windows name such as `W. Europe Standard Time`, which `zoneinfo` cannot
-  resolve, leaving `EventTime.iso` null; all-day bounds are UTC midnight, so `local` names the day.
-- A create sends invitations to every attendee and that "can't be configured"
-  (https://learn.microsoft.com/en-us/graph/api/user-post-events); `transactionId` is the only
+- A `timeZone` is often a Windows name, such as `W. Europe Standard Time`. `zoneinfo` cannot
+  resolve a Windows name, so this leaves `EventTime.iso` null. The bounds of an all-day event
+  are UTC midnight, so `local` names the day.
+- A create sends invitations to every attendee, and that "can't be configured"
+  (https://learn.microsoft.com/en-us/graph/api/user-post-events). `transactionId` is the only
   defense against a duplicate, and Microsoft documents no comparison rule for it.
 """
 
@@ -95,8 +96,9 @@ SUMMARY_FIELDS: tuple[str, ...] = (
     "webLink",
 )
 
-# Graph's own cap is 500 (https://learn.microsoft.com/en-us/graph/api/resources/event); lower here
-# because every address receives an invitation this connector cannot recall.
+# Graph's own cap is 500 (https://learn.microsoft.com/en-us/graph/api/resources/event). This
+# connector sets a lower cap here, because every address receives an invitation that this
+# connector cannot recall.
 MAX_ATTENDEES = 20
 
 MAX_SUBJECT_CHARACTERS = 255
@@ -110,8 +112,9 @@ NOBODY_INVITED_BUT_A_PLACE = (
 MAX_TIMED_EVENT_HOURS = 24
 MAX_ALL_DAY_EVENT_DAYS = 14
 
-# `datetime.fromisoformat` is not this check: since 3.11 it also reads `2026-03-02` and
-# `2026-03-02T24:00` (the next day's midnight), and a create sends the caller's own string.
+# `datetime.fromisoformat` is not this check. Since 3.11, it also reads `2026-03-02` and
+# `2026-03-02T24:00` (the next day's midnight). A create sends the caller's own string, with no
+# change.
 WALL_CLOCK = re.compile(r"\A\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\Z")
 
 # Both name families Graph accepts fit these characters: `W. Europe Standard Time`, `Etc/GMT+2`.
@@ -119,7 +122,8 @@ ZONE_NAME = r"^[A-Za-z0-9][A-Za-z0-9 _./+-]*$"
 
 MAX_ZONE_CHARACTERS = 64
 
-# Aliases of the classes rather than `type` statements, because each one is also constructed.
+# These are aliases of the classes, instead of `type` statements, because each one is also
+# constructed directly.
 _DefaultCalendarQuery = CalendarRequestBuilder.CalendarRequestBuilderGetQueryParameters
 _NamedCalendarQuery = CalendarItemRequestBuilder.CalendarItemRequestBuilderGetQueryParameters
 _EventItemQuery = EventItemRequestBuilder.EventItemRequestBuilderGetQueryParameters
@@ -132,8 +136,9 @@ _TRANSACTION_NAMESPACE = uuid.UUID("eb6f3437-0196-4593-b4d7-a6044db0acdf")
 # Graph answers `responseStatus.time` with `0001-01-01T00:00:00Z` when nobody responded.
 _UNANSWERED_YEAR = 1
 
-# One tuple rather than two classes in the `except`: `ruff format` rewrites the parenthesized form
-# into PEP 758's `except A, B:`, which an older interpreter reads as a syntax error.
+# This is one tuple, instead of two classes, in the `except`. `ruff format` rewrites the
+# parenthesized form into PEP 758's `except A, B:`, and an older interpreter reads that as a
+# syntax error.
 _NO_SUCH_ZONE: tuple[type[Exception], ...] = (ZoneInfoNotFoundError, ValueError)
 
 _AN_EVENT = "#microsoft.graph.event"
@@ -180,8 +185,8 @@ def zone_named(name: str) -> ZoneInfo | None:
 
 
 def event_time(moment: DateTimeTimeZone | None, *, zone: ZoneInfo) -> EventTime | None:
-    """Graph writes `dateTime` with seven fractional digits (`2026-09-07T13:00:00.0000000`), which
-    `datetime.fromisoformat` accepts, keeping the six it has room for."""
+    """Graph writes `dateTime` with seven fractional digits (`2026-09-07T13:00:00.0000000`).
+    `datetime.fromisoformat` accepts this, and keeps the six digits it has room for."""
     if moment is None or moment.date_time is None:
         return None
     return EventTime(
@@ -205,12 +210,13 @@ def _converted(local: str, named: str | None, zone: ZoneInfo) -> str | None:
 def window_bounds(
     starts_on: date | datetime, ends_on: date | datetime, *, zone: ZoneInfo
 ) -> tuple[str, str]:
-    """The two instants `calendarView` requires, rendered with the offset Graph reads them by.
+    """This function returns the two instants that `calendarView` requires, rendered with the
+    offset that Graph reads them by.
 
-    Graph reads these bounds by the offset in the value and not the `Prefer` header
-    (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview), so all of the zone
-    handling is in the string. The window is half-open at the top: a bare `ends_on` closes at the
-    first instant of the day after it, which is what covers that day whole.
+    Graph reads these bounds by the offset in the value, and not by the `Prefer` header
+    (https://learn.microsoft.com/en-us/graph/api/user-list-calendarview). So all of the zone
+    handling is in the string. The window is half-open at the top. A bare `ends_on` closes at
+    the first instant of the day after it, and this is what covers that whole day.
     """
     opens = opens_at(starts_on, zone=zone)
     closes = (
@@ -222,8 +228,8 @@ def window_bounds(
 
 
 def wall_clock(value: str) -> datetime | None:
-    """The parsed value is never sent: Graph reads `dateTime` beside `timeZone`, so reformatting
-    the caller's string changes which instant the event is at."""
+    """This function's parsed value is never sent. Graph reads `dateTime` beside `timeZone`, so
+    a reformat of the caller's string would change which instant the event is at."""
     if WALL_CLOCK.match(value) is None:
         return None
     try:
@@ -233,13 +239,14 @@ def wall_clock(value: str) -> datetime | None:
 
 
 def is_midnight(moment: datetime) -> bool:
-    """Whether `moment` is midnight, where Microsoft requires both bounds of an all-day event
-    (https://learn.microsoft.com/en-us/graph/api/resources/event)."""
+    """This says whether `moment` is midnight. Microsoft requires both bounds of an all-day
+    event to be midnight (https://learn.microsoft.com/en-us/graph/api/resources/event)."""
     return moment.time() == time.min
 
 
 class CalendarSummary(BaseModel):
-    """One calendar of the signed-in user's mailbox, own or delegated."""
+    """This is one calendar of the signed-in user's mailbox, either the user's own or a
+    delegated calendar."""
 
     uri: str = Field(
         description=(
@@ -318,8 +325,8 @@ class CalendarSummary(BaseModel):
     def from_calendar(cls, calendar: Calendar, *, signed_in: User | None) -> Self:
         assert calendar.id is not None, "Graph answered a calendar read with a calendar with no id"
         owner = MailAddress.from_email_address(calendar.owner)
-        # kiota deserializes a provider this SDK has no member for as None inside the list,
-        # whatever the SDK declares, and `spelled` raises on None.
+        # kiota deserializes a provider that this SDK has no member for as `None` inside the
+        # list, no matter what the SDK declares. `spelled` raises an error on `None`.
         providers: Sequence[OnlineMeetingProviderType | None] = (
             calendar.allowed_online_meeting_providers or []
         )
@@ -344,7 +351,7 @@ class CalendarSummary(BaseModel):
 
 
 class EventAttendee(BaseModel):
-    """One person or resource invited to an event, and what they answered."""
+    """This is one person or resource invited to an event, and what that attendee answered."""
 
     name: str | None = Field(
         description=(
@@ -401,7 +408,8 @@ class EventAttendee(BaseModel):
 
 
 class EventSummary(BaseModel):
-    """One event as every calendar tool answers it: enough to choose, never the whole body."""
+    """This is one event, exactly as every calendar tool answers it: enough detail to choose
+    from, never the whole body."""
 
     uri: str = Field(
         description=(
@@ -583,8 +591,9 @@ def spelled(
     | Sensitivity
     | OnlineMeetingProviderType,
 ) -> str:
-    """TRAP: the SDK's calendar enums mix in `str` without being a `StrEnum`, so `str()` answers
-    `ResponseType.None_`, and each member's trailing comma makes `.value` a one-tuple."""
+    """TRAP: the SDK's calendar enums mix in `str`, without being a `StrEnum`. So `str()`
+    answers `ResponseType.None_`, and the trailing comma on each member makes `.value` a
+    one-tuple."""
     return str.__str__(value)
 
 
@@ -592,8 +601,8 @@ _TEAMS_FOR_BUSINESS = spelled(OnlineMeetingProviderType.TeamsForBusiness)
 
 
 def providers_without_teams(calendar: Calendar) -> list[str] | None:
-    """An empty or absent list answers None: that is Graph naming no provider rather than Graph
-    refusing Teams."""
+    """An empty or absent list answers `None`. That means Graph named no provider, and not that
+    Graph refused Teams."""
     providers: Sequence[OnlineMeetingProviderType | None] = (
         calendar.allowed_online_meeting_providers or []
     )
@@ -604,8 +613,9 @@ def providers_without_teams(calendar: Calendar) -> list[str] | None:
 
 
 def resource_addresses(event: Event) -> tuple[str, ...]:
-    """The rooms and equipment already attached to `event` as `resource` attendees. A write that
-    resends `attendees` must carry these forward, or Microsoft un-books the room."""
+    """This function returns the rooms and equipment already attached to `event` as `resource`
+    attendees. A write that resends `attendees` must carry these forward, or Microsoft un-books
+    the room."""
     return tuple(
         attendee.email_address.address
         for attendee in event.attendees or []
@@ -625,15 +635,17 @@ def repeated_address(addresses: Sequence[str]) -> str | None:
 
 
 def immutable_id_headers() -> HeadersCollection:
-    """Built fresh per call: a shared default collection would leak onto every other Graph call."""
+    """This function builds a new collection for each call. A shared default collection would
+    leak onto every other Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
     return headers
 
 
 async def event_of(client: GraphServiceClient, *, calendar_id: str, event_id: str) -> Event:
-    """One event, addressed beside the calendar it lives on. Every write tool that starts from an
-    `EventHandle` reads through this route first, to word its confirmation from real data."""
+    """This function returns one event, addressed beside the calendar that it lives on. Every
+    write tool that starts from an `EventHandle` reads through this route first, to word its
+    confirmation from real data."""
     with graph_step(STEP_EVENT):
         found = (
             await client.me.calendars.by_calendar_id(calendar_id)
@@ -717,8 +729,9 @@ def _body_described(body_html: str) -> str:
 
 
 def event_body(draft: EventDraft, *, transaction_id: str) -> Event:
-    """An unset property is one kiota omits from the payload: `attendees: []` tells Microsoft
-    there are no attendees, and no `attendees` key at all tells it nothing."""
+    """An unset property is one that kiota omits from the payload. `attendees: []` tells
+    Microsoft that there are no attendees, and no `attendees` key at all tells Microsoft
+    nothing."""
     return Event(
         subject=draft.subject,
         body=(
@@ -754,11 +767,11 @@ class EventPatch:
 
 
 def event_patch_body(patch: EventPatch) -> Event:
-    """Only the fields `patch` carries reach the wire; a `None` field leaves Microsoft's stored
-    value untouched instead of clearing it.
+    """Only the fields that `patch` carries reach the wire. A `None` field leaves Microsoft's
+    stored value untouched, instead of clearing it.
 
-    TRAP: `attendees` must stay `None` (omit, keep) or `()` (send `[]`, clear) — never collapsed
-    to `None` for an empty desired list the way `event_body` does for a create.
+    TRAP: `attendees` must stay `None` (omit, keep) or `()` (send `[]`, clear). It must never
+    be collapsed to `None` for an empty desired list, the way `event_body` does for a create.
     """
     assert (patch.attendees is None) == (patch.optional_attendees is None), (
         "attendees and optional_attendees are resolved to a full replacement list together, "
@@ -792,8 +805,8 @@ def confirmation_id_for(target: str, *fields: str) -> str:
 
 
 def transaction_id_for(target: str, draft: EventDraft) -> str:
-    """Microsoft documents no comparison rule for `transactionId`, so every value the caller
-    composed goes into the id; only the order of the two address lists is dropped."""
+    """Microsoft documents no comparison rule for `transactionId`, so every value that the
+    caller composed goes into the id. Only the order of the two address lists is dropped."""
     return confirmation_id_for(
         target,
         draft.subject,
@@ -820,8 +833,8 @@ def _listed(addresses: tuple[str, ...]) -> list[str]:
 
 
 def created_event(created: Event | None) -> Event:
-    """The delegated-create walkthrough answers with an `eventMessage` envelope that the SDK also
-    deserializes into `Event`
+    """The delegated-create walkthrough answers with an `eventMessage` envelope, and the SDK
+    also deserializes this into `Event`
     (https://learn.microsoft.com/en-us/graph/outlook-create-event-in-shared-delegated-calendar)."""
     assert created is not None, (
         "Graph answered the create with no event. The event was created, and any invitations went "
@@ -844,16 +857,18 @@ def invited_attendee(address: str, kind: AttendeeType) -> Attendee:
 
 
 def invited_attendees(required: Sequence[str], optional: Sequence[str]) -> list[Attendee]:
-    """Every attendee a create or an update names, required first. Never includes a resource
-    (room); see `resource_addresses` for carrying one forward on a PATCH."""
+    """This function returns every attendee that a create or an update names, required
+    attendees first. It never includes a resource (room). See `resource_addresses` to carry a
+    resource forward on a PATCH."""
     return [invited_attendee(address, AttendeeType.Required) for address in required] + [
         invited_attendee(address, AttendeeType.Optional) for address in optional
     ]
 
 
 def _is_signed_in(owner: MailAddress | None, signed_in: User | None) -> bool | None:
-    """A calendar owner is stated with either the user's `mail` or their `userPrincipalName`, so
-    comparing only one reports the user's own calendar as somebody else's."""
+    """A calendar owner is stated with either the user's `mail` or the user's
+    `userPrincipalName`. A comparison against only one of these can report the user's own
+    calendar as somebody else's."""
     if signed_in is None or owner is None or owner.address is None:
         return None
     mine = {

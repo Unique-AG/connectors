@@ -22,21 +22,22 @@ connector sends the header for consistency, not because of that claim.
 
 **The text preference is a request. The response is the answer.** Microsoft documents
 `Prefer: outlook.body-content-type="text"` on this collection. The same page also says the
-operation returns message bodies in HTML. Graph confirms an honoured preference with
-`Preference-Applied`. The SDK's typed `get()` hands back the deserialized message and no response
-headers at all. So the confirmation read here is the one that survives deserialization. When it
-converted, `contentType` on the body is `text`. When it did not, `contentType` is `html`. This
-applies per body. This tool reads this confirmation instead of assuming it. It strips no markup
-of its own. A hand-rolled stripper can turn a `<script>` block or a conditional comment into text
-that reads as prose from the sender. This tool never sends `Prefer: outlook.allow-unsafe-html`,
-which asks Graph to stop sanitising at all.
+operation returns message bodies in HTML. Graph signals an honored preference with the
+`Preference-Applied` header. The SDK's typed `get()` hands back the deserialized message and no
+response headers at all. So the sign that this tool reads is the one that survives
+deserialization. When it converted, `contentType` on the body is `text`. When it did not,
+`contentType` is `html`. This applies per body. This tool reads this sign instead of assuming it.
+It strips no markup of its own. A hand-rolled stripper can turn a `<script>` block or a
+conditional comment into text that reads as prose from the sender. This tool never sends
+`Prefer: outlook.allow-unsafe-html`, which asks Graph to stop sanitizing at all.
 
 **`mailbox` re-points the one request this tool makes from `/me` to `/users/{id}`.**
 
-**Three things this deliberately does not ask for.** `internetMessageHeaders` is not selected,
-and that omission is the whole of the control. The routing headers are a message's most forgeable
-part. They carry servers, addresses, and spam verdicts nobody asked about. This tool fetches no
-attachment. `hasAttachments` is a boolean, and there is no route from this tool to a byte of one.
+**Three things this deliberately does not ask for.** This tool does not select
+`internetMessageHeaders`, and that omission is the whole of the control. The routing headers are
+a message's most forgeable part. They carry servers, addresses, and spam verdicts nobody asked
+about. This tool fetches no attachment. `hasAttachments` is a boolean, and there is no route
+from this tool to a byte of one.
 And this tool caps the body rather than paging it, because Graph publishes no way to read the
 rest of one.
 """
@@ -84,7 +85,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
 }
 
-# Everything a summary reads, plus the four properties only a full read needs.
 # `internetMessageHeaders` is absent on purpose. See the module docstring for the reason.
 _MESSAGE_FIELDS: tuple[str, ...] = (
     *SUMMARY_FIELDS,
@@ -125,11 +125,11 @@ _BAD_HANDLE = (
     + "Retrying this value will fail identically."
 )
 
-# The default 404 advice says to check that the id came from a tool response.
+# The default 404 advice says to make sure that the id came from a tool response.
 # That advice does not apply here. This handle already did.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this message. The handle is well formed, so this is not a bad "
-    + "argument. It is also not evidence that the message does not exist: Graph answers 'it was "
+    + "argument. It is also not evidence that the message does not exist. Graph answers 'it was "
     + "deleted', 'it never existed', and 'the signed-in user is not allowed to see it' with one "
     + "404, and does not say which of them it meant. Report that this tool failed to read the "
     + "message, never that it was never sent. Retrying will not help, and this connector has no "
@@ -308,9 +308,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The handle a `uri` field of another tool's result carried, verbatim:\n"
                     + "  outlook:///messages/{message_id}\n"
-                    + "No other shape is readable — a folder, draft, or rule handle addresses "
-                    + "something that is not a message, and a subject line, an email address, an "
-                    + "Outlook web link, or a bare message id is never one."
+                    + "No other shape is readable. A folder, draft, or rule handle addresses "
+                    + "something that is not a message. A subject line, an email address, an "
+                    + "Outlook web link, or a bare message id is never one either."
                 ),
             ),
         ],

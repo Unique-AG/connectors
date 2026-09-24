@@ -1,13 +1,15 @@
-"""The registry of all tools, the selection an operator makes, and the permissions it implies.
+"""This is the registry of all tools, the selection an operator makes, and the permissions that
+the selection implies.
 
-TRAP: derive the scope list from the modules, never hand-write it. A permission not consented at
-sign-in cannot be obtained later — the On-Behalf-Of exchange fails with AADSTS65001 on every tool
-call, before the tool body runs. FastMCP's `enable` and `disable` transforms are no substitute for
-filtering here: they hide a registered tool and leave its scopes computed.
+TRAP: derive the scope list from the modules. Never write it by hand. A permission that is not
+consented at sign-in cannot be obtained later. The On-Behalf-Of exchange then fails with
+AADSTS65001 on every tool call, before the tool body runs. FastMCP's `enable` and `disable`
+transforms are no substitute for filtering here. They hide a registered tool but leave its scopes
+computed.
 
-Order is the registry's, never the operator's, and it is stable via `dict.fromkeys` rather than
-`set`. `TOOLS_ENABLED=a,b` and `b,a` must yield one scope list, because the consent screen and
-every cached On-Behalf-Of token key are keyed by it.
+Order always comes from the registry, never from the operator. It stays stable through
+`dict.fromkeys`, not `set`. `TOOLS_ENABLED=a,b` and `b,a` must yield one scope list, because the
+consent screen and every cached On-Behalf-Of token key are keyed by that list.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -80,10 +82,10 @@ from office_365_mcp.tools import (
 )
 
 # This is the whole of what this package promises. Importing `tools/get_me.py` directly names a
-# tool module outside `_TOOL_MODULES`, the list that every selection is filtered over and that
-# every scope is derived from. `ToolModule` is absent on purpose — `tests/test_layering.py` rule
-# 4 forbids a tool file from importing `office_365_mcp.tools`, so no tool file can name it, even
-# to declare it.
+# tool module outside `_TOOL_MODULES`. That is the list every selection filters over, and the list
+# every scope derives from. `ToolModule` does not appear in `__all__` on purpose.
+# `tests/test_layering.py` rule 4 forbids a tool file from importing `office_365_mcp.tools`, so no
+# tool file can name `ToolModule`, even to declare that it satisfies it.
 __all__ = [
     "ALWAYS_ON",
     "PRESETS",
@@ -98,17 +100,17 @@ __all__ = [
 
 
 class ToolModule(Protocol):
-    """This is the contract that a tool file satisfies. It is checked at the `_TOOL_MODULES`
-    annotation below.
+    """This is the contract that a tool file satisfies. The `_TOOL_MODULES` annotation below checks
+    it.
 
-    TRAP: both read-only properties are read-only on purpose. A mutable protocol attribute
-    demands an exact type, `str` or `Mapping[str, object]`, and tool files write these
-    unannotated.
+    TRAP: both read-only properties are read-only on purpose. A mutable protocol attribute demands
+    an exact type, `str` or `Mapping[str, object]`, and tool files write these fields with no
+    annotation.
 
-    `GRAPH_CALL_EXAMPLE` is arguments that reach Graph, so a startup probe exercises the real
-    call. Its ids are invented, but its shape is one that the tool accepts. An argument that the
-    tool rejects never reaches Graph, so it proves nothing. A tool with more than one reachable
-    call says, in its own file, which one it picked.
+    `GRAPH_CALL_EXAMPLE` holds arguments that reach Graph, so a startup probe can exercise the real
+    call. Its ids are invented, but its shape is one the tool accepts. An argument that the tool
+    rejects never reaches Graph, so it proves nothing. A tool with more than one reachable call
+    names, in its own file, which call it picked.
     """
 
     @property
@@ -125,11 +127,11 @@ class ToolModule(Protocol):
 
 @runtime_checkable
 class _NarrowsItsNotFound(Protocol):
-    """A tool that knows what a 404 on its own argument means. This applies to a minority of
-    tools, so it is runtime-checked.
+    """This marks a tool that knows what a 404 on its own argument means. Only a minority of tools
+    need this, so the check happens at runtime.
 
-    It is left off `ToolModule`, because the default advice is right for the rest. Their
-    arguments are ids that a caller passed in, not handles that this connector minted.
+    `ToolModule` leaves this out, because the default advice fits the rest. Their arguments are
+    ids that a caller passed in, not handles that this connector minted.
     """
 
     @property
@@ -138,12 +140,13 @@ class _NarrowsItsNotFound(Protocol):
 
 @runtime_checkable
 class _NarrowsItsCall(Protocol):
-    """A tool whose `GRAPH_CALL_EXAMPLE` reaches Graph under fewer permissions than it declares.
+    """This marks a tool whose `GRAPH_CALL_EXAMPLE` reaches Graph under fewer permissions than the
+    tool declares.
 
-    Only one tool of them all needs this, so it is runtime-checked and left off `ToolModule`.
-    `teams_read_message` is exchanged for two permissions and reads one surface per call, so its
-    chat example's refusal must name `Chat.Read` and not the channel permission. `narrowed_to` in
-    `shared/seam.py` says the same per call.
+    Only one tool out of all of them needs this, so the check happens at runtime and `ToolModule`
+    leaves it out. `teams_read_message` exchanges for two permissions but reads one surface per
+    call. So its chat example's refusal must name `Chat.Read`, not the channel permission.
+    `narrowed_to` in `shared/seam.py` states the same rule for each call.
     """
 
     @property
@@ -215,20 +218,20 @@ TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES
 
 # This joins every selection. `User.Read` is the least-privileged delegated permission that
 # Microsoft publishes, and it needs no administrator consent. So no preset names `get_me`, and
-# every deployment asks for at least `User.Read`. This is the one deliberate exception to "the
-# selection is exactly these tools".
+# every deployment asks for at least `User.Read`. This is the one deliberate exception to the rule
+# that the selection is exactly the named tools.
 ALWAYS_ON: str = get_me.TOOL_NAME
 
 # What each `config.ToolsPreset` name means.
 #
 # TRAP: permissions do not encode reachability. `teams-messages` without `teams_search_messages`
-# asks for the identical three permissions, and it exposes a `teams_read_message` that nothing in
-# it can address.
+# asks for the same three permissions, and it exposes a `teams_read_message` that nothing in the
+# preset can reach.
 #
-# TRAP: `teams` is written out rather than derived from `TOOL_NAMES`. A derived preset takes in
+# TRAP: `teams` is written out here, not derived from `TOOL_NAMES`. A derived preset takes in
 # every tool that joins the registry. So the first tool of another product puts its permission on
-# the consent screen of every `teams` deployment, without an edit that anybody reviewed. Widening
-# a live deployment costs every signed-in user a fresh sign-in.
+# the consent screen of every `teams` deployment, with no edit that anyone reviewed. Widening a
+# live deployment costs every signed-in user a fresh sign-in.
 PRESETS: Mapping[str, tuple[str, ...]] = {
     "teams": (
         "teams_list_chats",
@@ -256,11 +259,11 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_read_transcript",
         "teams_list_meeting_recordings",
     ),
-    # Two axes, not one ladder. Mail content is read, then write, then send. Mailbox configuration
-    # is read, then write. They are independent. Welding them into one chain is how
-    # `outlook-automate` came to require `Mail.Send` — an out-of-office reply has nothing to do
-    # with sending mail as the user, and a forwarding-rule audit has nothing to do with reading
-    # one. Each row below asks for exactly what its own tools declare.
+    # Two axes, not one ladder. Mail content moves from read, to write, to send. Mailbox
+    # configuration moves from read to write. The two axes are independent. Welding them into one
+    # chain is how `outlook-automate` came to require `Mail.Send`. An out-of-office reply has
+    # nothing to do with sending mail as the user, and a forwarding-rule audit has nothing to do
+    # with reading one. Each row below asks for exactly what its own tools declare.
     "outlook-read": (
         "outlook_search_mail",
         "outlook_read_mail",
@@ -394,12 +397,13 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
 
 @dataclass(frozen=True, slots=True)
 class Selection:
-    """One deployment's tool surface: what is registered, and what sign-in therefore asks for.
+    """This is one deployment's tool surface: what is registered, and what sign-in therefore asks
+    for.
 
-    `permissions` is Entra's own spelling, and `graph_scopes` is the authorize request's
-    spelling. Both are stored rather than derived on demand. The tuple handed to the auth
-    provider is checked by identity, not by equality, and a property that rebuilds it on each
-    call only looks equal.
+    `permissions` uses Entra's own spelling. `graph_scopes` uses the authorize request's spelling.
+    Both are stored, not derived on demand. The auth provider checks the tuple it receives by
+    identity, not by equality. A property that rebuilds the tuple on each call only looks equal to
+    it.
     """
 
     preset: str | None
@@ -409,14 +413,14 @@ class Selection:
 
 
 def resolve(*, preset: str | None, enabled: Sequence[str] | None) -> Selection:
-    """The surface that `preset` or `enabled` names, filtered over the registry in the registry's
-    order.
+    """This builds the surface that `preset` or `enabled` names, filtered over the registry in the
+    registry's order.
 
-    Both routes in are checked against the registry. Without that check, a name this server has
-    no tool for is filtered out in silence. That leaves one tool fewer registered, and one
-    permission fewer on the consent screen, than whoever wrote it believes. `TOOLS_ENABLED`
-    raises because the mistake is the operator's. A preset asserts because the mistake is this
-    file's.
+    Both routes in are checked against the registry. Without that check, a name this server has no
+    tool for is filtered out in silence. That leaves one tool fewer registered, and one permission
+    fewer on the consent screen, than the person who wrote it expects. `TOOLS_ENABLED` raises an
+    error because the mistake belongs to the operator. A preset asserts because the mistake
+    belongs to this file.
     """
     assert (preset is None) != (enabled is None), (
         "exactly one of preset and enabled is a selection, which SurfaceConfig guarantees "
@@ -455,9 +459,9 @@ def _unknown(names: Iterable[str]) -> list[str]:
 
 
 def _every_name_known(enabled: Sequence[str]) -> tuple[str, ...]:
-    """`enabled` unchanged, once every name is known. A typo must never quietly cost a tool. If
-    nothing caught it, `TOOLS_ENABLED=read_transcripts` registers one tool fewer and asks for one
-    permission fewer than its operator believes.
+    """This returns `enabled` unchanged, once every name in it is known. A typo must never quietly
+    cost a tool. If nothing catches the typo, `TOOLS_ENABLED=read_transcripts` registers one tool
+    fewer and asks for one permission fewer than its operator expects.
     """
     unknown = _unknown(enabled)
     if unknown:
@@ -469,9 +473,9 @@ def _every_name_known(enabled: Sequence[str]) -> tuple[str, ...]:
 
 
 def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
-    """What `GraphAdviceMiddleware` words each selected tool's refusals from.
+    """This is what `GraphAdviceMiddleware` uses to word each selected tool's refusals.
 
-    This dictionary is derived from the modules. Hand-writing it instead creates a second copy
+    This dictionary is derived from the modules. Writing it by hand instead creates a second copy
     of which permissions a tool calls under. A disagreement between the two copies causes a 403
     that sends an administrator after a permission that was never missing.
     """
@@ -491,10 +495,11 @@ def _not_found_advice(module: ToolModule) -> str | None:
 
 @dataclass(frozen=True, slots=True)
 class GraphCallExample:
-    """One call through one tool that gets as far as a Graph request, and what its refusal says.
+    """This is one call through one tool that gets as far as a Graph request, plus what its refusal
+    says.
 
-    `arguments` must be a call that the tool accepts. Arguments that it rejects never reach Graph
-    at all.
+    `arguments` must hold a call that the tool accepts. Arguments that the tool rejects never
+    reach Graph at all.
     """
 
     arguments: Mapping[str, object]
@@ -502,13 +507,14 @@ class GraphCallExample:
 
 
 def graph_call_examples(selection: Selection) -> Mapping[str, GraphCallExample]:
-    """One refusable call per selected tool, derived from the modules exactly as the table above
-    is.
+    """This builds one refusable call per selected tool, derived from the modules exactly as the
+    table above is.
 
-    This is exported, although nothing in `src/` calls it. It is the coverage contract for
-    `tests/test_error_mapping.py`, which refuses every registered tool one by one. Hand-written
-    there, the table was a second list of the tools, and a tool registered before its row existed
-    left the file one tool short — the very failure that file exists to prevent.
+    This function is exported, although nothing in `src/` calls it. It is the coverage contract
+    for `tests/test_error_mapping.py`, which refuses every registered tool one by one. When that
+    table was written by hand there instead, it became a second list of the tools. A tool
+    registered before its row existed then left the file one tool short, which is the exact
+    failure this file exists to prevent.
     """
     return {
         module.TOOL_NAME: GraphCallExample(
@@ -527,7 +533,8 @@ def _call_permissions(module: ToolModule) -> tuple[str, ...]:
 
 
 def register_tools(mcp: FastMCP, transport: httpx.AsyncClient, selection: Selection) -> None:
-    """Declare the selected tool modules against `transport`, which each borrows and none owns."""
+    """This declares the selected tool modules against `transport`. Each module borrows
+    `transport`. None of them owns it."""
     for module in _TOOL_MODULES:
         if module.TOOL_NAME in selection.tools:
             module.register(mcp, transport)

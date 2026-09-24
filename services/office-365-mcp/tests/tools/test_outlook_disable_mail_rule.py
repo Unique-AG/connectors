@@ -366,4 +366,4 @@ class TestHowItDeclaresItself:
 
         described = tool.description or ""
         assert "cannot enable a rule" in described
-        assert "one click in Outlook" in described
+        assert "clicks once in Outlook" in described

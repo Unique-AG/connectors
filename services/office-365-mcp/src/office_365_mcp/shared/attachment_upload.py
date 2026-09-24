@@ -1,8 +1,11 @@
-"""Attaching one file, of any size, to a message Graph already created. Under 3 MB, Graph accepts
-a `fileAttachment` in a single `POST .../attachments` call. At or above it, the file goes through
-an upload session instead: `createUploadSession`, then a sequence of `PUT`s to the URL it returns.
-`upload_attachment` is the one function both `outlook_draft_mail` and `outlook_draft_reply` call
-to attach a file either way — the size alone decides which Graph calls happen.
+"""This module attaches one file, of any size, to a message that Graph already created.
+
+Under 3 MB, Graph accepts a `fileAttachment` in one `POST .../attachments` call. At 3 MB or
+more, the file goes through an upload session instead. Graph calls `createUploadSession`, then
+sends a series of `PUT` calls to the URL it returns.
+
+`upload_attachment` is the one function that both `outlook_draft_mail` and `outlook_draft_reply`
+call to attach a file. The file size alone decides which Graph calls happen.
 """
 
 from collections.abc import Iterator
@@ -31,16 +34,16 @@ STEP_ATTACH_INLINE = "attach_inline"
 STEP_CREATE_UPLOAD_SESSION = "create_upload_session"
 STEP_UPLOAD_SESSION_CHUNKS = "upload_session_chunks"
 
-# Graph requires each PUT's byte range to be a multiple of 320 KiB and recommends staying under
-# 4 MiB per request.
+# The byte range of each PUT must be a multiple of 320 KiB. Graph recommends less than 4 MiB
+# for each request.
 UPLOAD_CHUNK_BYTES = 12 * 320 * 1024
 
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _OCTET_STREAM = "application/octet-stream"
 
-# TRAP: the upload-session host has been observed answering an intermediate PUT with
-# 308 Resume Incomplete, which Microsoft's own walkthrough never mentions.
+# TRAP: the upload-session host can answer an intermediate PUT with 308 Resume Incomplete.
+# Microsoft's own walkthrough does not mention this response.
 _RESUME_INCOMPLETE = 308
 
 
@@ -54,16 +57,18 @@ async def upload_attachment(
     content_type: str,
     content: bytes,
 ) -> None:
-    """Attach `content` to the message `message_id` already names, choosing the inline path or
-    the upload-session path by size alone. Raises `GraphFailure` on any refusal and never catches
-    one itself; the caller decides whether a partial success is worth reporting.
+    """Attach `content` to the message that `message_id` names. The function picks the inline
+    path or the upload-session path by size alone.
+
+    The function raises `GraphFailure` on any refusal, and does not catch it. The caller must
+    decide whether a partial success is worth a report.
 
     `mailbox` and `message_id` resolve through `shared.seam.graph_mailbox`. `message_id` must
-    already be in the immutable id space this call requests.
+    already be in the immutable id space that this call requests.
 
-    Asserts `len(content) <= MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION` rather than raising a
-    catchable error: reaching this function with an oversized file is a programming error in the
-    caller, not a bad request for Graph to explain.
+    The function asserts that `len(content) <= MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION`, instead
+    of raising an error that the caller can catch. A file above this size at this point is a
+    programming error in the caller, not a bad request for Graph to explain.
     """
     assert len(content) <= MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION, (
         f"attachment size is bounded at the tool boundary, got {len(content)} bytes"
@@ -80,7 +85,8 @@ async def upload_attachment(
 async def _attach_inline(
     attachments: AttachmentsRequestBuilder, *, name: str, content_type: str, content: bytes
 ) -> None:
-    """The under-3-MB path: one `POST .../attachments` call, Graph's own small-attachment shape."""
+    """This is the path for a file under 3 MB. It uses one `POST .../attachments` call, in
+    Graph's own small-attachment shape."""
     with graph_step(STEP_ATTACH_INLINE):
         await attachments.post(
             FileAttachment(name=name, content_type=content_type, content_bytes=content),
@@ -98,8 +104,9 @@ async def _attach_via_upload_session(
     content_type: str,
     content: bytes,
 ) -> None:
-    """The 3 MB-and-up path: one `createUploadSession` call through the SDK, then the file in
-    ordered chunks through raw `httpx`, until the last one lands."""
+    """This is the path for a file of 3 MB or more. It makes one `createUploadSession` call
+    through the SDK. Then it sends the file in ordered chunks through raw `httpx`, until the
+    last chunk lands."""
     total = len(content)
     with graph_step(STEP_CREATE_UPLOAD_SESSION):
         session = await attachments.create_upload_session.post(
@@ -141,13 +148,15 @@ async def _attach_via_upload_session(
 
 
 def _chunk_ranges(total: int) -> Iterator[tuple[int, int]]:
-    """Every `(start, end)` pair a chunked upload PUTs, `end` exclusive, in ascending order."""
+    """This function yields every `(start, end)` pair that a chunked upload sends in a PUT call,
+    in ascending order. `end` is exclusive."""
     for start in range(0, total, UPLOAD_CHUNK_BYTES):
         yield start, min(start + UPLOAD_CHUNK_BYTES, total)
 
 
 def _immutable_ids() -> HeadersCollection:
-    """Built per call: a shared default collection would leak onto every other Graph call."""
+    """This function builds a new collection for each call. A shared default collection would
+    leak into every other Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
     return headers

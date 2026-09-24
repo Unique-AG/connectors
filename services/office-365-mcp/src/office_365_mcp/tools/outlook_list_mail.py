@@ -1,14 +1,15 @@
 """`outlook_list_mail` — the newest messages of one folder, in receipt order.
 
 Every property in `$orderby` must also appear in `$filter`, in the same order, and before any
-unordered one, or Graph answers 400 `InefficientFilter`
-(https://learn.microsoft.com/en-us/graph/api/user-list-messages): so the `receivedDateTime` bounds
+unordered one. If it does not, Graph answers 400 `InefficientFilter`
+(https://learn.microsoft.com/en-us/graph/api/user-list-messages). So the `receivedDateTime` bounds
 open the `$filter`, and `isRead` and `from` only ever follow one. An unsupported combination can
-also fail *silently* (https://learn.microsoft.com/en-us/graph/query-parameters), so `_keeps`
-re-checks those two on every row. `Prefer: IdType="ImmutableId"` because the ids listed here
-become handles, and a `RestId` one 404s once Outlook files the message. `$skip` inside an
-`@odata.nextLink` counts items the service enumerated rather than items returned, so the link is
-followed whole and never parsed.
+also fail *silently* (https://learn.microsoft.com/en-us/graph/query-parameters). So `_keeps` makes
+sure that both conditions are true for every returned row. This tool also sends
+`Prefer: IdType="ImmutableId"`, because the ids listed here become handles, and a `RestId` one
+404s once Outlook files the message. `$skip` inside an `@odata.nextLink` counts items that the
+service enumerated, rather than items returned. So this tool follows the link whole, and never
+parses it.
 
 **`mailbox` re-points every request from `/me` to `/users/{id}`.**
 """
@@ -65,10 +66,9 @@ GRAPH_NOT_FOUND = (
     + "the caller used `folder_ref`, the handle is well formed. The folder was most likely "
     + "deleted, moved, or copied. Outlook can give a moved or copied folder a new id. So call "
     + "outlook_browse_folders again and take the `uri` it reports now. If the caller used "
-    + "`folder`, this mailbox has no folder by that well-known name: `archive` and `clutter` in "
-    + "particular are absent from mailboxes that never had them, and outlook_browse_folders "
-    + "lists what this mailbox actually has. Retrying with the same argument will fail "
-    + "identically."
+    + "`folder`, this mailbox has no folder by that well-known name. `archive` and `clutter` in "
+    + "particular are absent from a mailbox that never had them. `outlook_browse_folders` lists "
+    + "what this mailbox actually has. Retrying with the same argument will fail identically."
 )
 
 MAX_RESULTS = 50
@@ -165,10 +165,11 @@ class FolderMessages(BaseModel):
         description=(
             "True means more of the folder remains beyond what this call returned. It can also "
             + "mean more of the window that `received_after` and `received_before` opened "
-            + "remains. Either `limit` was reached, or `unread_only` or `from_address` discarded "
-            + "enough non-matching mail to stop the search early. To reach further into a capped "
-            + "window, narrow `received_before`. A higher `received_after` only drops rows this "
-            + "call never reached. False means every match already came back. Compare against "
+            + "remains. Either the call reached `limit`, or `unread_only` or `from_address` "
+            + "discarded enough non-matching mail to stop the search early. To reach further "
+            + "into a capped window, narrow `received_before`. A higher `received_after` only "
+            + "drops rows this call never reached. False means every match already came back. "
+            + "Compare against "
             + "`total_items` and `unread_items` to see how much of the folder this call reached."
         )
     )
@@ -237,8 +238,8 @@ async def list_mail(
 def _folder_address(folder: WellKnownFolder, folder_ref: str | None) -> str:
     """The single path segment that addresses the folder: a well-known name, or a handle's id.
 
-    FastMCP fills the `folder` default in before the body runs, so an explicit `folder="inbox"`
-    beside a `folder_ref` is caught by the schema constraint rather than here.
+    FastMCP fills the `folder` default in before the body runs. So an explicit `folder="inbox"`
+    beside a `folder_ref` is caught by the schema constraint, rather than here.
     """
     if folder_ref is None:
         return folder
@@ -267,11 +268,11 @@ def _query_filter(
     unread_only: bool,
     sender: str | None,
 ) -> str | None:
-    """The `$filter` this tool sends, or None when it would send none.
+    """The `$filter` this tool sends, or None when it sends none.
 
-    The `receivedDateTime` bounds are ordered and must come first; `isRead` and
-    `from/emailAddress/address` are unordered and go on only when a date term did, because alone
-    beside `$orderby=receivedDateTime` they are an `InefficientFilter` 400. Reordering these lines
+    The `receivedDateTime` bounds are ordered and must come first. `isRead` and
+    `from/emailAddress/address` are unordered, and go on only when a date term did. Alone, beside
+    `$orderby=receivedDateTime`, they are an `InefficientFilter` 400. Reordering these lines
     composes that 400 out of arguments that are individually fine.
     """
     dated = _received_within(received_after, received_before)
@@ -312,10 +313,12 @@ def _closing_term(received_before: date | datetime) -> str:
 
 
 def _wire(instant: datetime) -> str:
-    """An instant as the ISO-8601 UTC literal Graph documents, keeping whatever precision it has.
+    """An instant as the ISO-8601 UTC literal that Graph documents. The result keeps whatever
+    precision the instant has.
 
-    Truncating to whole seconds moves the bound silently in both directions, and a row lost at the
-    boundary leaves a well-formed answer with `capped` false and nothing saying it was dropped.
+    A value truncated to whole seconds moves the bound silently in both directions. A row lost at
+    the boundary then leaves a well-formed answer, with `capped` false and no sign that the row
+    was dropped.
     """
     if instant.microsecond:
         return f"{instant:%Y-%m-%dT%H:%M:%S.%f}Z"
@@ -356,8 +359,8 @@ def _sent_by(sender: str) -> Callable[[Message], bool]:
 
 
 def _one_address(from_address: str | None) -> str | None:
-    """The argument as one SMTP address, or a refusal: a display name reaches Graph as an address
-    matching nothing, and `eq` answers that with an empty page rather than an error."""
+    """The argument as one SMTP address, or a refusal. A display name reaches Graph as an address
+    that matches nothing. So `eq` answers that with an empty page rather than an error."""
     if from_address is None:
         return None
     candidate = from_address.strip()
@@ -396,7 +399,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "Which well-known folder to list, by Microsoft's locale-independent name: "
                     + "`inbox`, `sentitems`, `drafts`, `archive`, `deleteditems`, `junkemail`, "
                     + "or `clutter`. Alternative to `folder_ref`, which is required for any "
-                    + "other folder, including one the user made."
+                    + "other folder, even one that the user made."
                 )
             ),
         ] = DEFAULT_FOLDER,

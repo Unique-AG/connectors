@@ -1,18 +1,19 @@
-"""What this deployment resolved to, written for the person who has to act on it.
+"""This deployment prints what it resolved to. Read this before you act on the manifest.
 
-**Nothing in this server can check the ask against the app registration.** The session token's `scp`
-carries only `access_as_user`, because Azure omits Graph scopes from it. A scope the registration
-does not carry fails at the *authorize* hop — an unknown scope outright, a real but unconsented
-admin-consent permission at "Need admin approval" — with nothing in this server's logs either way.
+**This server has no way to compare a request against the app registration.** The session token's
+`scp` claim carries only `access_as_user`, because Azure leaves Graph scopes out of it. A scope the
+registration does not grant fails at the *authorize* step. The failure looks like an unknown scope,
+or like a real but unconsented admin-consent permission stuck at "Need admin approval". This server
+logs nothing in either case.
 
-It prints **no consent URL**. `/.default` consents to whatever the registration happens to carry,
-not to what this deployment asks for, and a scope-matched admin-consent URL needs a `redirect_uri`
-that matches a registered one. The only Web redirect URI office-365-mcp registers is FastMCP's
+The manifest prints **no consent URL**. `/.default` consents to whatever the registration grants,
+not to what this deployment asks for. A scope-matched admin-consent URL needs a `redirect_uri` that
+matches a registered one. The only Web redirect URI that office-365-mcp registers is FastMCP's
 OAuth callback, and that callback treats a *successful* consent as an error.
 
-The description scan only ever **warns**: requiring every mention drags `teams_search_messages`,
-and with it `ChannelMessage.Read.All` and an administrator's signature, into a deployment that
-asked for nothing but `teams_list_chats`.
+The description scan only **warns**. Requiring every mention drags `teams_search_messages` into a
+deployment that asked only for `teams_list_chats`, and with it `ChannelMessage.Read.All` and a need
+for an administrator's signature.
 """
 
 import re
@@ -25,13 +26,15 @@ from fastmcp.tools import Tool
 
 from office_365_mcp.tools import ALWAYS_ON, TOOL_NAMES, Selection
 
-# Not derived and not derivable: needing consent is Microsoft's rule about the permission, and no
-# tool file knows it. The `False` entries are what make the table checkable — one test asserts it
-# answers for every name in `REQUESTABLE_PERMISSIONS`, and a set holding only the names that need
-# consent cannot tell "no" from "nobody said".
+# This table is not derived from tool code, and it cannot be. Needing consent is Microsoft's rule
+# about the permission. No tool file knows this rule.
 #
-# Unlike `REQUESTABLE_PERMISSIONS`, a permission can be named here before a tool declares it:
-# nothing here reaches an authorize request.
+# The `False` entries make the table checkable. One test asserts that it answers for every name in
+# `REQUESTABLE_PERMISSIONS`. A set holding only the names that need consent cannot tell "no" from
+# "nobody said".
+#
+# Unlike `REQUESTABLE_PERMISSIONS`, a permission can appear here before a tool declares it. Nothing
+# here reaches an authorize request.
 NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "User.Read": False,
     "Chat.Read": False,
@@ -42,8 +45,8 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "OnlineMeetingTranscript.Read.All": True,
     "OnlineMeetingRecording.Read.All": True,
     # Microsoft publishes AdminConsentRequired: No for every delegated Mail permission. That is
-    # Microsoft's rule about the permission and not a promise about a tenant: a tenant running a
-    # restricted user-consent policy still stops an unprivileged user at "Need admin approval".
+    # Microsoft's rule about the permission. It is not a promise about a tenant. A tenant that runs
+    # a restricted user-consent policy still stops an unprivileged user at "Need admin approval".
     "Mail.Read": False,
     "Mail.Read.Shared": False,
     "People.Read": False,
@@ -54,8 +57,8 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Mail.Send.Shared": False,
     "Mail.ReadBasic": False,
     "MailboxSettings.ReadWrite": False,
-    # Microsoft publishes AdminConsentRequired: No for every delegated Calendars permission, the
-    # two `.Shared` ones and `ReadBasic` included.
+    # Microsoft publishes AdminConsentRequired: No for every delegated Calendars permission. This
+    # includes the two `.Shared` permissions and `ReadBasic`.
     "Calendars.Read": False,
     "Calendars.Read.Shared": False,
     "Calendars.ReadBasic": False,
@@ -72,7 +75,7 @@ _LINE_WIDTH = 96
 
 
 async def surface_manifest(server: FastMCP, selection: Selection, *, version: str) -> str:
-    """Built on demand, so the `/manifest` route and the startup log line are the same text."""
+    """This runs on demand, so the `/manifest` route and the startup log line always match."""
     consent = tuple(
         permission for permission in selection.permissions if _needs_admin_consent(permission)
     )
@@ -120,8 +123,8 @@ def _row(label: str, value: str) -> str:
 
 
 def _stale_promises(tools: Sequence[Tool], selection: Selection) -> list[str]:
-    """`ALWAYS_ON` can never appear here, because it is registered whatever the selection is, which
-    is what lets the tools that send a model to it go on saying so in every deployment."""
+    """`ALWAYS_ON` never appears here. It is registered no matter what the selection is. This is why
+    the tools that point a model to `ALWAYS_ON` can say so in every deployment."""
     absent = tuple(name for name in TOOL_NAMES if name not in selection.tools)
     notes: list[str] = []
     for tool in tools:
@@ -136,15 +139,15 @@ def _stale_promises(tools: Sequence[Tool], selection: Selection) -> list[str]:
 
 
 def _mentions(prose: str, name: str) -> bool:
-    """Whole word, not substring: `teams_read_message` is not mentioned by prose saying
-    `read_messages`.
-    Tool names are `[a-z_]`, so a word boundary lands where the eye does."""
+    """This matches a whole word, not a substring. Prose that says `read_messages` does not mention
+    `teams_read_message`. Tool names use only `[a-z_]` characters, so a word boundary in the regex
+    falls where a reader sees one."""
     return re.search(rf"\b{re.escape(name)}\b", prose) is not None
 
 
 def _prose_of(tool: Tool) -> str:
-    """An argument's description is where a tool names the tool that mints its handle, so a scan of
-    the tool description alone misses the references that matter most."""
+    """An argument's description is often where a tool names the tool that mints its handle. A scan
+    of the tool description alone misses these references."""
     return " ".join(
         [
             tool.description or "",

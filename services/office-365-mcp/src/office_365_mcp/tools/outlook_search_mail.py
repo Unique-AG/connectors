@@ -2,16 +2,16 @@
 
 `GET /me/messages?$search="…"` rather than `POST /search/query`, which cannot reach a delegated
 mailbox at all (https://learn.microsoft.com/en-us/graph/search-concept-messages).
-`Prefer: IdType="ImmutableId"` is not honoured under `$search` and Graph answers
-`Preference-Applied` anyway, so every hit id is exchanged through `translateExchangeIds`
+`Prefer: IdType="ImmutableId"` is not honored under `$search`, and Graph answers
+`Preference-Applied` anyway. So every hit id is exchanged through `translateExchangeIds`
 (https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/698) before it becomes a handle.
-Paging is undocumented here, so this asks once and `$top` is the window; `$orderby` is ignored
+Paging is undocumented here, so this asks once, and `$top` is the window. `$orderby` is ignored
 silently, so there is none. The date bounds go in the KQL, because a `$filter` beside `$search` is
-refused with `SearchWithFilter` — a live probe on 2026-09-10 matched `received>=`, `received<` and
-`received<=` against the equivalent `receivedDateTime` `$filter` row for row, while
-`received>=today-5` returned nothing silently and `received:"last week"` was a 400. `$search` does
-not reach drafts in Deleted Items, so a window here under-returns where `outlook_list_mail` does
-not.
+refused with `SearchWithFilter`. A live probe on 2026-09-10 matched `received>=`, `received<`, and
+`received<=` against the equivalent `receivedDateTime` `$filter` row for row. In that same probe,
+`received>=today-5` returned nothing silently, and `received:"last week"` was a 400. `$search`
+does not reach drafts in Deleted Items, so a window here under-returns where `outlook_list_mail`
+does not.
 
 **`mailbox` re-points every request from `/me` to `/users/{id}`, `translateExchangeIds` included.**
 
@@ -66,10 +66,10 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 MAX_RESULTS = 50
 
 _DESCRIPTION = """\
-Searches the signed-in user's own mailbox by keyword, sender, recipient, subject, or attachment \
-file name for "find the mail where…" questions and anything about a person. outlook_list_mail \
-is the sibling for a folder's newest mail in receipt order, including drafts. For a plain date \
-window, or when order matters, use it instead.
+This tool searches the signed-in user's own mailbox by keyword, sender, recipient, subject, or \
+attachment file name, for "find the mail where…" questions and anything about a person. \
+outlook_list_mail is the sibling tool for a folder's newest mail in receipt order, including \
+drafts. Use outlook_list_mail instead for a plain date window, or when order matters.
 
 Notes:
 - Needs at least one of `query`, `sender`, `recipient`, `to`, `subject`, or `attachment_name`. \
@@ -228,8 +228,8 @@ def _window_terms(
     """The bounds as KQL comparisons on `received`, at most one per end.
 
     Joined with an explicit `AND`, never a space: two space-separated `received` comparisons are
-    both dropped, answering the criterion's own unbounded matches. Unquoted, because `kql.quoted`
-    would phrase-quote an instant for its colons into a form no probe verified.
+    both dropped, answering the criterion's own unbounded matches. Left unquoted: `kql.quoted`
+    phrase-quotes an instant for its colons, in a form no probe verified.
     """
     terms: list[str] = []
     if received_after is not None:

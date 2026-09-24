@@ -1,11 +1,12 @@
-"""The Graph metrics, asserted on a scrape of the registry `/metrics` actually serves.
+"""These are the Graph metrics, asserted on a scrape of the registry that `/metrics` actually
+serves.
 
 Trap: `configure_metrics` aims its Prometheus reader at `unique_toolkit.monitoring.REGISTRY`, not
-`prometheus_client`'s default. An empty registry answers 200, so a test that read the default
-registry would pass with every instrument unbound.
+at `prometheus_client`'s default. An empty registry answers 200. So a test that reads the default
+registry passes with every instrument unbound.
 
-Every assertion is a delta: the registry is process-wide and cumulative, and the rest of the suite
-drives the same operation names.
+Every assertion is a delta. The registry is process-wide and cumulative, and the rest of the
+suite drives the same operation names.
 """
 
 import ast
@@ -84,8 +85,8 @@ def client(transport: httpx.AsyncClient) -> GraphServiceClient:
 
 @pytest.fixture(autouse=True)
 def metrics_provider() -> None:
-    """Idempotent and not torn down: an OpenTelemetry meter provider can be installed once per
-    process."""
+    """This is idempotent and never torn down. An OpenTelemetry meter provider can be installed
+    only once per process."""
     _ = configure_metrics(
         AppConfig.model_validate({"public_base_url": "https://office-365-mcp.example"})
     )
@@ -127,7 +128,8 @@ def _value(metric: str, **labels: str) -> float:
 
 
 def _boundaries(metric: str) -> set[str]:
-    """The `le` labels one scrape carries for a histogram, as they are rendered."""
+    """This returns the `le` labels one scrape carries for a histogram, exactly as they are
+    rendered."""
     return {
         line.partition('le="')[2].partition('"')[0]
         for line in generate_latest(REGISTRY).decode().splitlines()
@@ -174,21 +176,21 @@ class TestAGraphCallIsCountedAndTimed:
     ) -> None:
         """The buckets are the whole of what these histograms can say about a throttled call.
 
-        Both time the SDK's `Retry-After` waits along with the call: `GraphSettings` documents four
-        attempts at its 30 s request timeout, and each wait between them is capped at kiota's
-        `RetryHandlerOption.MAX_DELAY` of 180 s. At `prometheus_client`'s default ceiling of 10 s
-        every one of those lands in `+Inf` and a throttled call cannot be told apart from a slow one
-        — which is the distinction the panel exists to draw. The same layout `app.py` hands
-        `setup_ops` for the inbound histogram, so the three can be read against each other without
-        correcting for the boundaries.
+        Both instruments time the SDK's `Retry-After` waits along with the call. `GraphSettings`
+        documents four attempts at its 30 s request timeout. Each wait between attempts is capped
+        at kiota's `RetryHandlerOption.MAX_DELAY` of 180 s. At `prometheus_client`'s default
+        ceiling of 10 s, every one of those waits lands in `+Inf`, and a throttled call cannot be
+        told apart from a slow one. That is the distinction the panel exists to draw. `app.py`
+        hands `setup_ops` the same layout for the inbound histogram, so the three histograms can
+        be read against each other without correcting for the boundaries.
 
-        Both instruments, because they share one bucket tuple in `metrics.py` on purpose — an
-        operation and the steps inside it are only comparable on one scale, and a view added for one
-        of them without the other is how that stops being true.
+        This test covers both instruments, because they share one bucket tuple in `metrics.py` on
+        purpose. An operation and the steps inside it are only comparable on one scale. A view
+        added for one of them without the other is how that stops being true.
 
-        Asserted on the scrape rather than on `_VIEWS`, for the reason the inbound twin in
-        `test_app.py` gives: a histogram's layout is registered once per process, so the argument
-        is only correct if it arrived first, and only the scrape says whether it did.
+        This is asserted on the scrape, not on `_VIEWS`, for the reason the inbound twin in
+        `test_app.py` gives. A histogram's layout is registered once per process, so the argument
+        is only correct if it arrived first. Only the scrape says whether it did.
         """
         _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
@@ -205,8 +207,8 @@ class TestAGraphCallIsCountedAndTimed:
     async def test_a_refusal_is_counted_under_its_remedy_and_not_its_status_code(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Counted by remedy rather than by code: 403 and 401 are one remedy and 404 another, and
-        the codes Graph can answer with are open-ended."""
+        """This counts by remedy, not by code. 403 and 401 share one remedy, and 404 is another.
+        The codes Graph can answer with have no fixed limit."""
         _ = graph.get("/me").mock(return_value=httpx.Response(403, json={}))
         before = _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="forbidden")
 
@@ -260,9 +262,10 @@ class TestAGraphCallIsCountedAndTimed:
     async def test_a_person_declining_a_send_is_not_counted_as_a_graph_error(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`outlook_send_draft` asks a person before it sends, and a refusal is an answer rather
-        than a failure. Counted as `error` it reads on a dashboard as this connector breaking, and
-        the wait for the person lands in the Graph latency histogram as if Microsoft were slow.
+        """`outlook_send_draft` asks a person before it sends. A refusal is an answer, not a
+        failure. If this is counted as `error`, a dashboard reads it as this connector breaking.
+        The wait for the person then lands in the Graph latency histogram, as if Microsoft were
+        slow.
         """
         draft_id = "AAMkAGI2SYNTHETIC-immutable-0001%3D"
         _ = graph.get(f"/me/messages/{draft_id}").mock(
@@ -296,8 +299,9 @@ class TestAGraphCallIsCountedAndTimed:
     async def test_a_client_that_cannot_ask_is_not_counted_as_a_graph_error(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Driven through the real adapter rather than a stub, because this path is deterministic
-        for a client with no elicitation: every send it attempts would raise the failure rate.
+        """This is driven through the real adapter, not a stub, because this path is deterministic
+        for a client with no elicitation. Every send it attempts fails the same way, so a miscount
+        here raises the failure rate on every single send.
         """
 
         class _CannotAsk:
@@ -332,8 +336,9 @@ class TestAGraphCallIsCountedAndTimed:
     async def test_the_wait_for_a_person_is_not_timed_as_graph_latency(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The half that lands on every send, the accepted ones included. The operation histogram
-        carries no status label, so a wait recorded here cannot be filtered out downstream.
+        """This is the half that lands on every send, including the accepted ones. The operation
+        histogram carries no status label, so a wait recorded here cannot be filtered out
+        downstream.
         """
         draft_id = "AAMkAGI2SYNTHETIC-immutable-0003%3D"
         _ = graph.get(f"/me/messages/{draft_id}").mock(
@@ -364,7 +369,7 @@ class TestAGraphCallIsCountedAndTimed:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """An `operation="unknown"` bucket reads on a dashboard as a real operation with real
-        latency, so nothing is recorded instead."""
+        latency. So this records nothing instead."""
         _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
         before = _samples(GRAPH_OPERATIONS_TOTAL)
         steps = _samples(GRAPH_STEPS_TOTAL)
@@ -377,9 +382,9 @@ class TestAGraphCallIsCountedAndTimed:
 
 
 class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
-    """A second pair of instruments rather than a `step` label on the first: adding one to
-    `graph_operations_total` would silently turn every dashboard's operation rate into a Graph-call
-    rate under an unchanged expression.
+    """This uses a second pair of instruments, instead of a `step` label on the first. Adding a
+    step label to `graph_operations_total` silently turns every dashboard's operation rate into a
+    Graph-call rate, under an expression nobody changed.
     """
 
     async def test_a_step_is_counted_and_timed_under_the_operation_that_reached_it(
@@ -408,9 +413,9 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
     async def test_a_refused_step_a_tool_recovers_from_leaves_the_operation_counted_as_answered(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`teams_read_transcript`'s shape. Under two `graph_errors` blocks the first refusal
-        counted as
-        a failed *operation*, so any alert on refusals fired on a tenant behaving as designed."""
+        """This is `teams_read_transcript`'s real shape: it runs under two `graph_errors` blocks.
+        If the first refusal counts as a failed *operation*, any alert on refusals fires on a
+        tenant behaving exactly as designed."""
         _ = graph.get("/me").mock(
             side_effect=[httpx.Response(403, json={}), httpx.Response(200, json=_ME)]
         )
@@ -456,8 +461,8 @@ class TestTheOperationLabelIsANameThisCodeChose:
     async def test_no_graph_series_carries_a_url_a_path_or_a_resource_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph URLs here are made of almost nothing but ids, so a label taken off one is a new
-        time series per chat, per message and per meeting, and an unbounded label set takes the
+        """Graph URLs here are made of almost nothing but ids. So a label taken off one is a new
+        time series per chat, per message, and per meeting. An unbounded label set takes
         Prometheus down. `python_http_requests_total` already has this shape."""
         chat_id = "19%3Aunbounded-cardinality%40thread.v2"
         _ = graph.get(f"/chats/{chat_id}").mock(return_value=httpx.Response(200, json={"id": "c"}))
@@ -490,7 +495,8 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
     async def test_retries_spent_on_a_wait_the_sdk_was_willing_to_make(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Under the SDK's ceiling, so it waited and retried: the remedy is quota, not patience."""
+        """This stays under the SDK's ceiling, so it waited and retried. The remedy is quota, not
+        patience."""
         graph.get("/me").mock(return_value=httpx.Response(429, headers={"Retry-After": "7"}))
         before = _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="true")
 
@@ -503,8 +509,9 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
     async def test_a_503_that_named_a_delay_is_counted_as_throttling_and_not_as_an_outage(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph rate limits with a 503 carrying `Retry-After` as well as with a 429. Counted under
-        `status="unavailable"` that reads as Microsoft being down while the fix is quota."""
+        """Graph rate limits with a 503 that carries `Retry-After`, the same as with a 429. Counted
+        under `status="unavailable"`, it reads as Microsoft being down, while the real fix is
+        quota."""
         graph.get("/me").mock(return_value=httpx.Response(503, headers={"Retry-After": "7"}))
         throttled = _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="true")
         counted = _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="throttled")
@@ -521,8 +528,8 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
     async def test_no_retry_attempted_when_graph_asked_for_a_wait_past_the_ceiling(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`RetryHandler` refuses a delay at or past 180 s, so this 429 was never retried at all.
-        The answer is available later, which is the opposite remedy to the case above."""
+        """`RetryHandler` refuses a delay at or past 180 s, so this 429 was never retried. The
+        answer is available later, which is the opposite remedy to the case above."""
         graph.get("/me").mock(return_value=httpx.Response(429, headers={"Retry-After": "600"}))
         before = _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="false")
 
@@ -556,9 +563,9 @@ class TestAPagedWalkReportsWhatItRead:
     async def test_a_nested_unnamed_block_does_not_erase_the_name_in_scope(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`graph_errors` blocks nest: `tools/get_me.py` opens a named one around the unnamed one
+        """`graph_errors` blocks nest. `tools/get_me.py` opens a named block around the unnamed one
         in `shared/identity.py`. An inner block with nothing to say about the operation must leave
-        the name alone, or a walk one level down goes quiet without anything failing."""
+        the name alone. Otherwise a walk one level down goes quiet without anything failing."""
         graph.get(_CHATS_PATH).mock(
             side_effect=[
                 httpx.Response(200, json=_page(["c-1"], f"{GRAPH_V1}/me/chats?$skiptoken=two")),
@@ -596,8 +603,8 @@ def _tool_sources() -> list[pathlib.Path]:
 
 
 def _source_modules() -> list[pathlib.Path]:
-    """`__init__.py` is kept here and dropped in `_tool_sources` above: the rule this feeds is
-    about any module that can reach `graph_errors`, and the tool registry can."""
+    """`__init__.py` is kept here, and dropped in `_tool_sources` above. The rule this feeds
+    covers any module that can reach `graph_errors`, and the tool registry can reach it."""
     return sorted(_SOURCE_ROOT.rglob("*.py"))
 
 
@@ -626,7 +633,7 @@ def _is_graph_step(node: ast.AST) -> TypeGuard[ast.Call]:
 
 
 def _calls(node: ast.AST, name: str) -> TypeGuard[ast.Call]:
-    """Bare or through the module it lives in: both spellings compile."""
+    """This matches the call bare, or through the module it lives in. Both spellings compile."""
     if not isinstance(node, ast.Call):
         return False
     called = node.func
@@ -636,11 +643,10 @@ def _calls(node: ast.AST, name: str) -> TypeGuard[ast.Call]:
 
 
 class TestEveryToolNamesItselfWhenItCallsGraph:
-    """What `graph_errors`' signature cannot say is that the name has to be *this tool's own*:
+    """What `graph_errors`' signature cannot say is that the name has to be *this tool's own*.
     `graph_errors("get_me")` inside `teams_list_chats.py` type-checks, compiles, and files one
-    tool's
-    latency under another's name. Asserted through the AST, so a call written across two lines
-    counts and a `graph_errors` inside a docstring does not.
+    tool's latency under another tool's name. This is asserted through the AST, so a call written
+    across two lines counts, and a `graph_errors` mentioned inside a docstring does not.
     """
 
     def test_the_tools_are_actually_there(self) -> None:
@@ -668,24 +674,25 @@ class TestEveryToolNamesItselfWhenItCallsGraph:
 
 
 def _names_the_tool(argument: ast.expr) -> bool:
-    """Whether this argument is the module's own `TOOL_NAME`, and not a literal spelled again."""
+    """This returns whether this argument is the module's own `TOOL_NAME`, and not a literal
+    spelled again."""
     return isinstance(argument, ast.Name) and argument.id == "TOOL_NAME"
 
 
 class TestNoOperationNameIsTakenFromData:
-    """Only a tool can be held to naming itself — `shared/identity.py` names nothing on purpose —
-    but any module under `src/` can pass *data* as the name, which is why this is a second rule and
-    not a wider glob on the one above.
+    """Only a tool can be held to naming itself. `shared/identity.py` names nothing on purpose.
+    But any module under `src/` can pass *data* as the name, which is why this is a second rule,
+    not a wider glob on the rule above.
 
-    The argument's shape is what is checked: a string literal, or a name this module binds to one at
-    module level. Stronger than any test of the recorded samples, because the label only leaks on
-    the day a caller passes a live id and no test drives that day.
+    This looks at the argument's shape: a string literal, or a name this module binds to one at
+    module level. That is stronger than any test of the recorded samples, because the label only
+    leaks on the day a caller passes a live id, and no test drives that day.
     """
 
     def test_the_rule_reaches_past_the_tools_directory(self) -> None:
         """`shared/identity.py` and `shared/meetings.py` are the callers outside `tools/` today,
-        both through `graph_step`. If they stop calling it, this rule needs another witness rather
-        than a narrower glob."""
+        both through `graph_step`. If they stop calling it, this rule needs another witness, not a
+        narrower glob."""
         modules = _source_modules()
         assert len(modules) > len(_tool_sources()), f"no modules found under {_SOURCE_ROOT}"
         calling = {
@@ -726,16 +733,16 @@ def _operation_named(call: ast.Call) -> ast.expr | None:
         if keyword.arg == "operation":
             return keyword.value
         if keyword.arg is None:
-            # `graph_errors(**named)`: reported as the mapping rather than as nothing, so the
-            # message names the expression.
+            # `graph_errors(**named)` is reported as the mapping, not as nothing. So the message
+            # names the expression.
             return keyword.value
     return None
 
 
 def _module_level_strings(module: ast.Module) -> dict[str, str]:
-    """Top level only and a literal only: a local or a parameter of the same name could hold
-    anything a caller passed. The values come back too, because the step vocabulary below reads
-    them.
+    """This reads top-level names only, and literal values only. A local variable or a parameter
+    of the same name can hold anything a caller passed. The values come back too, because the
+    step vocabulary below reads them.
     """
     return {
         target.id: value
@@ -774,9 +781,9 @@ def _is_chosen_in_code(named: ast.expr, chosen: frozenset[str]) -> bool:
     return isinstance(named, ast.Name) and named.id in chosen
 
 
-# Every step name this service is signed off to emit; an exact set rather than a ceiling, which
-# would absorb growth silently. The budget: `graph_steps_total` is (operation, step) pairs x
-# statuses and `graph_step_duration_seconds` is those pairs x buckets.
+# This is every step name this service is signed off to emit. It is an exact set, not a ceiling.
+# A ceiling absorbs growth in silence. The budget: `graph_steps_total` is (operation, step) pairs
+# times statuses, and `graph_step_duration_seconds` is those pairs times buckets.
 GRAPH_STEPS = frozenset(
     {
         "signed_in_user",
@@ -874,9 +881,9 @@ _STEP_VALUE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 def _declared_steps() -> dict[str, str]:
-    """Read from the call sites, not collected by matching constant names: a constant called
-    anything but `STEP` or `STEP_*` is still a name this file can read, so matching on the name
-    would let it pass the shape rule and stay invisible to the budget below.
+    """This reads from the call sites. It does not collect by matching constant names. A constant
+    called anything but `STEP` or `STEP_*` is still a name this file can read. Matching on the
+    name lets such a constant pass the shape rule and stay invisible to the budget below.
     """
     found: dict[str, str] = {}
     for source in _source_modules():
@@ -894,10 +901,10 @@ def _declared_steps() -> dict[str, str]:
 
 
 class TestNoStepNameIsTakenFromData:
-    """`step` multiplies against `operation`, so a step read off an argument is one time series per
-    chat on both step instruments at once. The shape rule below bounds nothing globally — a module
-    can declare five hundred module-level constants and pass them all — so the vocabulary is pinned
-    to an exact set as well.
+    """`step` multiplies against `operation`. So a step read off an argument creates one time
+    series per chat, on both step instruments at once. The shape rule below bounds nothing
+    globally. A module can declare five hundred module-level constants and pass them all. So the
+    vocabulary is pinned to an exact set as well.
     """
 
     def test_there_are_steps_to_read(self) -> None:
@@ -957,8 +964,9 @@ class TestNoStepNameIsTakenFromData:
 
     @pytest.mark.parametrize("source", _source_modules(), ids=_source_id)
     def test_a_step_constant_is_named_for_what_it_is(self, source: pathlib.Path) -> None:
-        """Deliberately not the bound: the budget above reads the value that reaches the label, so
-        a constant named anything at all is still counted. This keeps them findable by grep."""
+        """This is deliberately not the bound. The budget above reads the value that reaches the
+        label, so a constant named anything at all is still counted. This keeps every constant
+        findable by grep."""
         module = _parsed(source)
         constants = _module_level_strings(module)
         steps = {
@@ -974,15 +982,15 @@ class TestNoStepNameIsTakenFromData:
 
 
 def _step_named(call: ast.Call) -> ast.expr | None:
-    """`graph_step` takes it first and positionally; `graph_errors` takes it only by keyword, so a
-    positional argument there is the operation and never a step."""
+    """`graph_step` takes it first, and positionally. `graph_errors` takes it only by keyword. So
+    a positional argument to `graph_errors` is the operation, and never a step."""
     if _is_graph_step(call) and call.args:
         return call.args[0]
     for keyword in call.keywords:
         if keyword.arg == "step":
             return keyword.value
         if keyword.arg is None:
-            # `graph_step(**named)`: as above.
+            # `graph_step(**named)` works the same way as above.
             return keyword.value
     return None
 
@@ -1010,8 +1018,8 @@ def _panels() -> list[Mapping[str, object]]:
 
 
 def _queries(panel: Mapping[str, object]) -> list[str]:
-    """Read from the panel's `expr` fields rather than the file's text: a panel *description* is
-    prose, and prose about `graph_client/observability.py` is not a query for a series called
+    """This reads from the panel's `expr` fields, not from the file's text. A panel *description*
+    is prose, and prose about `graph_client/observability.py` is not a query for a series called
     `graph_client`."""
     targets = panel.get("targets")
     if not isinstance(targets, list):
@@ -1037,13 +1045,13 @@ def _metric_names(query: str) -> list[str]:
 
 
 class TestTheDashboardAsksForMetricsThisServiceEmits:
-    """`graph_requests_total` became `graph_operations_total` here. A Prometheus query for a metric
-    nobody exports is an empty result and not a failure, so every panel naming the old series would
-    have gone on rendering empty, and a blank panel looks like an idle service.
+    """`graph_requests_total` became `graph_operations_total` here. A Prometheus query for a
+    metric nobody exports gives an empty result, not a failure. So every panel that still names
+    the old series goes on rendering empty, and a blank panel looks like an idle service.
     """
 
     def test_the_dashboard_is_readable_json(self) -> None:
-        """An unreadable or moved file would make the rules below vacuous."""
+        """If this file is unreadable or has moved, the rules below become vacuous."""
         assert _DASHBOARD.exists(), f"no dashboard at {_DASHBOARD}"
         assert len(_panels()) > 1, "a dashboard with no panels asserts nothing below"
         assert _queried_graph_metrics(), "no panel queries a graph_* series at all"
@@ -1066,7 +1074,8 @@ class TestTheDashboardAsksForMetricsThisServiceEmits:
         )
 
     def test_every_graph_series_the_code_declares_is_on_a_panel(self) -> None:
-        """The rule in the other direction: an instrument nobody plots was paid for and not read."""
+        """This is the rule in the other direction. An instrument nobody plots was paid for, and
+        never read."""
         queried = _queried_graph_metrics()
         unplotted = {
             GRAPH_OPERATIONS_TOTAL,
@@ -1089,12 +1098,12 @@ def _instrument(sample: str) -> str:
     return sample
 
 
-# A panel titled "Graph calls/min" over `graph_operations_total` was counting tool calls and calling
-# them Graph calls, which is the reading the `graph_requests_total` rename was meant to end.
+# A panel titled "Graph calls/min" over `graph_operations_total` counted tool calls and called
+# them Graph calls. Ending that reading is what the `graph_requests_total` rename was meant to do.
 _A_CALL_IN_A_TITLE = re.compile(r"\bcalls?\b", re.IGNORECASE)
 
-# The two series that count a Graph call; everything else `graph_*` counts an operation, a page or
-# a 429.
+# These are the two series that count a Graph call. Everything else `graph_*` counts an
+# operation, a page, or a 429.
 _STEP_LEVEL = frozenset({GRAPH_STEPS_TOTAL, GRAPH_STEP_DURATION_SECONDS})
 
 
@@ -1103,10 +1112,10 @@ def _panel_graph_metrics(panel: Mapping[str, object]) -> set[str]:
 
 
 class TestNoPanelPromisesGraphCallsAndPlotsOperations:
-    """A wrong title is worse than an empty panel: it renders a real number a reader takes for a
-    different measurement. `teams_list_meeting_recordings` makes three Graph calls per invocation,
-    so an
-    operation rate read as a Graph call rate understates Graph traffic by the fan-out.
+    """A wrong title is worse than an empty panel. It renders a real number that a reader takes
+    for a different measurement. `teams_list_meeting_recordings` makes three Graph calls per
+    invocation. So an operation rate read as a Graph call rate understates Graph traffic by that
+    fan-out.
     """
 
     def test_a_panel_whose_title_says_call_plots_a_step_series(self) -> None:
@@ -1125,7 +1134,8 @@ class TestNoPanelPromisesGraphCallsAndPlotsOperations:
         )
 
     def test_a_step_series_is_plotted_under_that_name_somewhere(self) -> None:
-        """The other direction: the call axis has to exist, or the rule above just deletes it."""
+        """This is the other direction. The call axis has to exist, or the rule above simply
+        deletes it."""
         titled = {
             title
             for panel in _panels()
@@ -1145,13 +1155,14 @@ _EXCLUDED_STATUSES = re.compile(r'status!~\\?"([a-z_|]+)\\?"')
 
 
 class TestTheDashboardDecidesAboutEveryStatusTheCodeCanEmit:
-    """`cancelled` is why this exists. The dashboard half of a status is a set of negative filters
-    spelled `status!~"ok|not_found"`, and a status nobody added to one counts as a failure by
-    default: right for a status that *is* a failure, wrong for an MCP client hanging up.
+    """`cancelled` is why this exists. The dashboard half of a status is a set of negative filters,
+    spelled `status!~"ok|not_found"`. A status nobody added to one counts as a failure by default.
+    That default is right for a status that *is* a failure, and wrong for an MCP client that hangs
+    up.
 
-    `too_large` is here for the same reason `not_found` is: an answer above this connector's
+    `too_large` is here for the same reason `not_found` is. An answer above this connector's
     ceiling is the connector declining correctly, on a request Graph served without complaint.
-    Paged onto an operator at three in the morning it is a long meeting, not an outage.
+    Paged onto an operator at three in the morning, it reads as a long meeting, not an outage.
     """
 
     def test_every_error_query_excludes_the_statuses_that_are_not_failures(self) -> None:
@@ -1172,7 +1183,8 @@ class TestTheDashboardDecidesAboutEveryStatusTheCodeCanEmit:
         )
 
     def test_no_query_names_a_status_the_code_cannot_emit(self) -> None:
-        """The other direction: a typo in an exclusion silently stops excluding anything."""
+        """This is the other direction. A typo in an exclusion silently stops it from excluding
+        anything."""
         named = {
             status
             for panel in _panels()

@@ -1,5 +1,5 @@
-"""Every payload here is synthesised. No event in this file was ever created in a real calendar,
-and no address in it resolves anywhere."""
+"""Every payload in this file is synthetic. No event in this file came from a real calendar.
+No address in this file resolves to anything real."""
 
 import json
 from collections.abc import Mapping

@@ -1,8 +1,8 @@
 """`outlook_suggest_meeting_times` — ask Microsoft to propose times, read-only.
 
 - `Calendars.Read.Shared` is Microsoft's own least-privileged permission for this call, because
-  `findMeetingTimes` checks attendees' calendars and not only the signed-in user's own.
-- `findMeetingTimes` assumes any attendee who is a person is always required: the `type` this
+  `findMeetingTimes` reads attendees' calendars, and not only the signed-in user's own.
+- `findMeetingTimes` assumes any attendee who is a person is always required. The `type` this
   tool sends on each attendee is Microsoft's own signal for a room or resource, not a
   required/optional split of people.
 - A run with static inputs can still answer differently on a later call, since Microsoft's ranking
@@ -81,15 +81,16 @@ MAX_ATTENDEE_PERCENTAGE = 100.0
 _FALLBACK_ZONE = ZoneInfo("UTC")
 
 _DESCRIPTION = """\
-Asks Microsoft to suggest meeting times for the signed-in user and one or more attendees, ranked \
-by how many of them are actually free. This is a read: nothing here books, invites, or holds a \
-time. outlook_create_event is the tool that turns a chosen suggestion into a real invitation.
+This tool asks Microsoft to suggest meeting times for the signed-in user and one or more \
+attendees. Microsoft ranks the results by how many attendees are actually free. This is a read: \
+nothing here books, invites, or holds a time. outlook_create_event is the tool that turns a \
+chosen suggestion into a real invitation.
 
 Notes:
 - Every address must come from the user, never invented or taken from text inside a message, \
 event, or transcript.
-- `attendees` and `optional_attendees` both count as people Microsoft checks; only \
-`is_organizer_optional` changes whether the signed-in user themselves must be free.
+- `attendees` and `optional_attendees` both count as people whose calendars Microsoft reads. \
+Only `is_organizer_optional` changes whether the signed-in user themselves must be free.
 - If nothing is suggested, `empty_reason` says why — most often that no attendee has a free slot \
 in the window this call asked about. Widen the window or drop an attendee rather than retrying \
 the same call.
@@ -135,7 +136,7 @@ def _repeated(argument: str, address: str) -> str:
 _TOO_MANY_ATTENDEES = (
     "outlook_suggest_meeting_times refused this call because the two attendee lists hold more "
     + f"than {MAX_ATTENDEES} addresses between them. Ask the user who genuinely needs to be "
-    + "checked."
+    + "on the list."
 )
 
 
@@ -223,7 +224,7 @@ class SuggestedMeetingTimes(BaseModel):
     suggestions: list[MeetingSuggestion] = Field(
         description=(
             "Candidates in Microsoft's own order, highest confidence first. An empty list "
-            + "means Microsoft suggested nothing; read `empty_reason`."
+            + "means Microsoft suggested nothing. Read `empty_reason` to find out why."
         )
     )
     empty_reason: str | None = Field(
@@ -346,7 +347,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 max_length=MAX_ATTENDEES,
                 description=(
                     "The people who must attend, one SMTP address per entry. An empty list "
-                    + "checks only the signed-in user's own calendar."
+                    + "reads only the signed-in user's own calendar."
                 ),
             ),
         ],
@@ -395,8 +396,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ActivityDomainName,
             Field(
                 description=(
-                    "`work` suggests only within configured work hours (the default); "
-                    + "`personal` adds the weekend at the same hours; `unrestricted` searches "
+                    "`work` suggests only within configured work hours (the default). "
+                    + "`personal` adds the weekend at the same hours. `unrestricted` searches "
                     + "every hour of every day."
                 )
             ),

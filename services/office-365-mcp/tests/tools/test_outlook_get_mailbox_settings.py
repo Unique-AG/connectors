@@ -537,7 +537,7 @@ class TestWhatItCannotSee:
         stated where the choice is made as well as where the answer arrives."""
         description = settings_tool._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
 
-        assert "Cannot see Exchange mailbox-level forwarding" in description
+        assert "cannot see Exchange mailbox-level forwarding" in description
         assert "does not prove that nobody forwards this mailbox's mail" in description
 
 

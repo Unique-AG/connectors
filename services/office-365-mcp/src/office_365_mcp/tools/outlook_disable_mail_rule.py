@@ -1,38 +1,41 @@
-"""`outlook_disable_mail_rule` — turn one existing inbox rule off, and nothing else.
+"""`outlook_disable_mail_rule` turns one existing inbox rule off, and does nothing else.
 
 **Enabling is the attack. Disabling is the story.** An inbox rule that forwards or redirects
-mail sends copies out of the organization, with no `Mail.Send` anywhere in this deployment and
-no draft for anybody to notice. `MailboxSettings.ReadWrite` is the whole of what it costs. So
-"restore my old partner-forwarding rule", arriving in a mail body or a document this connector
-read, must not be a thing this tool can do. `enabled` is typed `Literal[False]`, which makes
-re-arming an existing forwarding rule unrepresentable in the schema, rather than refused at
-runtime, and there is no argument that can be the other value.
+mail sends copies out of the organization. This deployment has no `Mail.Send` permission
+anywhere, and it creates no draft for anyone to notice. `MailboxSettings.ReadWrite` is the only
+permission it needs. As a result, this tool must not act on an instruction such as "restore my
+old partner-forwarding rule". A mail body or a document that this connector read can carry that
+instruction. The `enabled` field has the type `Literal[False]`. This makes it impossible to
+represent a request to re-arm an existing forwarding rule in the schema, rather than refuse it
+only at runtime. No argument can carry the other value.
 
-**Creating a rule is absent for the same reason, and Microsoft's own example shows why.** The
-worked example on the create endpoint is a rule whose actions are `forwardTo` an address, plus
-`stopProcessingRules: true`. It copies mail to an outside address, and hides itself from every
-rule after it (https://learn.microsoft.com/en-us/graph/api/mailfolder-post-messagerules). A
-model given that tool copies that same shape. This connector registers no tool that creates one.
+**This tool cannot create a rule, for the same reason. Microsoft's own example shows why.** The
+worked example on the create endpoint is a rule with two actions: `forwardTo` an address, and
+`stopProcessingRules: true`. It copies mail to an outside address, and it hides itself from
+every rule that runs after it
+(https://learn.microsoft.com/en-us/graph/api/mailfolder-post-messagerules). A model that uses
+that tool can copy the same shape. This connector registers no tool that creates one.
 
-**The rule is read before it is written, so the transcript records what was turned off.** A
-rule's display name is a label its author chose, not a description. A rule called `Newsletters`
-can forward mail out of the organization. So the answer carries what the rule actually did: the
-addresses it forwarded, redirected and attached mail to, the folder it moved mail to, and
-whether it deleted. Disabling is one click from being undone in Outlook, and a user who cannot
-see what was disabled cannot tell whether undoing it matters.
+**This tool reads the rule before it writes it. As a result, the transcript records what was
+turned off.** A rule's display name is a label its author chose, not a description. A rule
+called `Newsletters` can forward mail out of the organization. As a result, the answer states
+what the rule actually did. It names the addresses the rule forwarded, redirected, or attached
+mail to, the folder it moved mail to, and whether it deleted mail. In Outlook, the user can undo
+this disable action in one click. A user who cannot see what was disabled cannot tell whether
+the undo matters.
 
-**A rule Microsoft marks `isReadOnly` is refused before the write.** Microsoft documents the
-flag as a rule that "cannot be modified or deleted by the rules REST API"
-(https://learn.microsoft.com/en-us/graph/api/messagerule-update), so the PATCH fails. Refusing
-here says which rule and why, instead of handing back a Graph error about an id.
+**This tool refuses a rule that Microsoft Graph marks `isReadOnly`, before the write.** Microsoft
+documents the flag as a rule that "cannot be modified or deleted by the rules REST API"
+(https://learn.microsoft.com/en-us/graph/api/messagerule-update). As a result, the PATCH request
+fails. This refusal names which rule, and why, instead of returning a Graph error about an id.
 
-**`no_retry()` on the PATCH.** The SDK retries every verb on 429, 503 and 504, and
-`GRAPH_MAX_RETRIES` defaults to 3. Disabling twice is harmless. Getting answered by a different
-response than the one that was applied is not, because this tool's answer is what it claims the
+**`no_retry()` on the PATCH.** The SDK retries every verb on responses 429, 503, and 504.
+`GRAPH_MAX_RETRIES` defaults to 3. Disabling the rule twice is harmless. Getting a response that
+does not match what was actually applied is not harmless: this tool's answer states what the
 mailbox now holds.
 
-**This tool takes no `mailbox` argument.** Microsoft publishes no `.Shared` variant of
-`MailboxSettings.ReadWrite`, so a shared mailbox's rules are not reachable this way.
+**This tool takes no `mailbox` argument.** Microsoft Graph publishes no `.Shared` variant of
+`MailboxSettings.ReadWrite`. As a result, this tool cannot reach a shared mailbox's rules.
 """
 
 from collections.abc import Mapping
@@ -68,14 +71,15 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "enabled": False,
 }
 
-# Graph's locale-independent well-known name for the Inbox, which reaches it in a mailbox of any
-# language. Graph hangs `messageRules` off `mailFolder` but documents the collection as the rules
-# that apply to the Inbox, so this is the address rather than a folder handle a caller passes in.
+# This is Graph's locale-independent well-known name for the Inbox. It reaches the Inbox in a
+# mailbox of any language. Graph attaches `messageRules` to `mailFolder`, but documents the
+# collection as the rules that apply to the Inbox. So this is a fixed address, not a folder
+# handle that a caller passes in.
 _INBOX_FOLDER = "inbox"
 
-# Everything the answer reads. `conditions` and `exceptions` are absent deliberately: this
-# reports what the rule did. A truncated reading of which mail it did it to looks like an answer
-# to a question nobody asked.
+# Everything the answer reads. `conditions` and `exceptions` are absent on purpose: this reports
+# what the rule did. A partial reading of which mail it acted on would look like an answer to a
+# question nobody asked.
 _RULE_FIELDS: tuple[str, ...] = (
     "id",
     "displayName",
@@ -84,22 +88,23 @@ _RULE_FIELDS: tuple[str, ...] = (
     "actions",
 )
 
-# Bound rather than aliased with `type`: this is spelled as the query parameters' constructor as
-# well as `RequestConfiguration`'s argument, and a `TypeAliasType` is not callable.
+# This is bound with `=`, not aliased with `type`: it serves as both the query parameters'
+# constructor and `RequestConfiguration`'s argument, and a `TypeAliasType` is not callable.
 _RuleQuery = MessageRuleItemRequestBuilder.MessageRuleItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-This tool turns one existing inbox rule of the signed-in user's mailbox off, immediately and \
-on every device, for "stop that rule forwarding my mail" or "why does my mail get filed, turn \
-that off".
+This tool turns one existing inbox rule of the signed-in user's mailbox off, at once and on \
+every device. Use it for "stop that rule forwarding my mail" or "why does my mail get filed, \
+turn that off".
 
 Notes:
-- This tool can only disable a rule. `enabled` accepts the single value false, so this tool \
-cannot enable a rule or create one. Re-enabling a rule is one click in Outlook (Settings, \
-Mail, Rules).
-- `rule_ref` is the `uri` of a rule as outlook_get_mailbox_settings reports it. Nothing else \
+- This tool can only disable a rule. `enabled` accepts only the value false, so this tool \
+cannot enable a rule or create one. To re-enable a rule, the user clicks once in Outlook \
+(Settings, Mail, Rules).
+- `rule_ref` is the `uri` of a rule, as outlook_get_mailbox_settings reports it. No other tool \
 mints one.
-- This tool refuses a rule that Microsoft marks read-only, because this API cannot change it.
+- This tool refuses a rule that Microsoft Graph marks read-only, because this API cannot change \
+it.
 """
 
 _NOT_A_RULE_HANDLE = (
@@ -125,79 +130,81 @@ _READ_ONLY_RULE = (
 
 
 class DisabledRule(BaseModel):
-    """One rule, as it stood when it was read and as Microsoft 365 answered the write.
+    """One rule, as it stood when it was read, and as Microsoft 365 answered the write.
 
-    What the rule DOES is named field by field rather than handed over as Graph's `actions` object:
-    a model given that object has to infer "this sends copies of my mail out of the organization"
-    from a list of recipients under a key it has to know to look for.
+    This model names what the rule *does* field by field, rather than handing over Graph's
+    `actions` object. A model given that object has to infer "this sends copies of my mail out
+    of the organization" from a list of recipients under a key it must already know to look for.
     """
 
     uri: str = Field(
         description=(
-            "The handle this answer is about, exactly as the request passed it, so a later "
-            + "answer can be about the same rule."
+            "The handle this answer is about, exactly as the request passed it. A later "
+            + "answer can then refer to the same rule."
         )
     )
     display_name: str | None = Field(
         description=(
-            "The rule's name, chosen by whoever created it. It is a label, not a description. "
-            + "A rule called `Newsletters` can forward mail out of the organization. Read the "
-            + "action fields below instead. Null when Microsoft recorded no name."
+            "The rule's name, chosen by whoever created it. It is a label, not a description: "
+            + "a rule called `Newsletters` can forward mail out of the organization. Read the "
+            + "action fields below instead. This field is null when Microsoft Graph recorded "
+            + "no name."
         )
     )
     was_enabled: bool | None = Field(
         description=(
             "Whether the rule was active before this call, read when this tool fetched it. "
-            + "Null when Microsoft did not say. False means that the rule was already off and "
-            + "this call changed nothing. This is worth stating, rather than reporting a "
-            + "change that did not happen."
+            + "This field is null when Microsoft Graph did not say. False means that the rule "
+            + "was already off, and this call changed nothing. This tool states that fact, "
+            + "rather than reporting a change that did not happen."
         )
     )
     is_enabled: bool | None = Field(
         description=(
             "Whether Microsoft 365 now reports the rule as running, read off its own response "
-            + "to the write rather than from the argument. Null when Microsoft returned no "
-            + "rule to read it off. Anything other than false here means that Microsoft 365 "
-            + "disagrees that this call disabled the rule."
+            + "to the write, not from the argument. This field is null when Microsoft Graph "
+            + "returned no rule to read it from. Any value other than false here means that "
+            + "Microsoft 365 disagrees that this call disabled the rule."
         )
     )
     forwarded_to: list[str] = Field(
         description=(
-            "Addresses this rule forwarded a copy of each matching message to. Empty means "
-            + "this rule forwarded nothing. Each entry is the SMTP address Microsoft recorded, "
-            + "or the display name when it recorded no address. An address outside the user's "
-            + "own domain means that copies of their mail left the organization automatically. "
-            + "This already happened, even though the rule is now off."
+            "Addresses this rule forwarded a copy of each matching message to. An empty list "
+            + "means this rule forwarded nothing. Each entry is the SMTP address Microsoft "
+            + "Graph recorded, or the display name when it recorded no address. An address "
+            + "outside the user's own domain means that copies of their mail already left the "
+            + "organization automatically, even though the rule is now off."
         )
     )
     redirected_to: list[str] = Field(
         description=(
             "Addresses this rule redirected each matching message to. A redirect passes the "
-            + "message on with the original sender preserved, so replies go to whoever wrote "
-            + "it rather than to this user. It is harder to notice than a forward, but it is "
-            + "not less serious."
+            + "message on with the original sender kept, so replies go to whoever wrote it, "
+            + "not to this user. It is harder to notice than a forward, but it is not less "
+            + "serious."
         )
     )
     forwarded_as_attachment_to: list[str] = Field(
         description=(
             "Addresses this rule forwarded each matching message to as an attachment. The "
-            + "whole original message travels, headers included. Read it exactly as "
-            + "`forwarded_to`."
+            + "whole original message travels, headers included. Read this field the same way "
+            + "as `forwarded_to`."
         )
     )
     moved_to_folder: str | None = Field(
         description=(
-            "The Graph id of the folder this rule moved matching mail to. Null when the rule "
-            + "moved nothing. This id is opaque. outlook_browse_folders reports the id and "
-            + "name together, to turn this into a folder name."
+            "The Graph id of the folder this rule moved matching mail to. This field is null "
+            + "when the rule moved nothing. The id is opaque on its own: "
+            + "outlook_browse_folders reports the id and the name together, to turn this into "
+            + "a folder name."
         )
     )
     deleted: bool | None = Field(
         description=(
             "True when the rule deleted matching messages, by either of two actions: "
-            + "Microsoft's `delete`, which moves them to Deleted Items where the user can "
+            + "Microsoft's `delete`, which moves them to Deleted Items, where the user can "
             + "still find them, or `permanentDelete`, which does not. This field does not "
-            + "distinguish the two. Null when Microsoft reported neither."
+            + "tell the two apart. It is null when Microsoft Graph reported neither."
         )
     )
 
@@ -222,16 +229,17 @@ class DisabledRule(BaseModel):
 
 
 async def disable_mail_rule(client: GraphServiceClient, *, rule_ref: str) -> DisabledRule:
-    """The rule `rule_ref` names, read and then switched off, reported as what it did."""
+    """The rule that `rule_ref` names. This function reads it, switches it off, and reports what
+    it did."""
     handle = mail_rule_handle(rule_ref)
     if handle is None:
         raise ToolError(_NOT_A_RULE_HANDLE)
 
     with graph_errors(TOOL_NAME):
         before = await _read_rule(client, handle)
-        # This function decides inside the block, and raises outside it. `graph_errors` treats a
-        # `ToolError` that escapes it as a Graph call this seam cannot classify. The read that
-        # happened here succeeded.
+        # This function decides inside the `with` block, and raises outside it. `graph_errors`
+        # treats a `ToolError` that escapes it as a Graph call that this seam cannot classify.
+        # The read above already succeeded.
         after = None if before.is_read_only else await _disable_rule(client, handle)
 
     if before.is_read_only:
@@ -252,9 +260,10 @@ async def _read_rule(client: GraphServiceClient, handle: MailRuleHandle) -> Mess
 
 
 async def _disable_rule(client: GraphServiceClient, handle: MailRuleHandle) -> MessageRule | None:
-    """The one property this tool writes. kiota omits a property that was never set, so the body on
-    the wire is `isEnabled` alone and no action, condition or name of this rule can be touched
-    through it — the absent arguments are the control, not a filter somewhere downstream."""
+    """The one property this tool writes. kiota omits a property that was never set. As a result,
+    the body on the wire holds `isEnabled` alone, and no action, condition, or name of this rule
+    can be touched through it. The absent arguments are the control, not a filter placed
+    somewhere downstream."""
     with graph_step(STEP_DISABLE):
         return await _rule_of(client, handle).patch(
             MessageRule(is_enabled=False),
@@ -271,8 +280,9 @@ def _rule_of(client: GraphServiceClient, handle: MailRuleHandle) -> MessageRuleI
 def _addresses(recipients: list[Recipient] | None) -> list[str]:
     """Where the rule sent mail, one entry per recipient.
 
-    The display name stands in when Microsoft recorded no address, rather than the recipient being
-    dropped: a destination this answer leaves out is a destination the user does not know about.
+    The display name stands in when Microsoft Graph recorded no address, rather than the
+    recipient being dropped. A destination that this answer leaves out is a destination the
+    user does not know about.
     """
     named: list[str] = []
     for recipient in recipients or []:
@@ -286,8 +296,8 @@ def _addresses(recipients: list[Recipient] | None) -> list[str]:
 
 
 def _deletes(actions: MessageRuleActions | None) -> bool | None:
-    """Whether the rule destroyed the message, by either of Graph's two spellings, folded together
-    because both answer "does this rule delete my mail" with yes."""
+    """Whether the rule destroyed the message, by either of Graph's two spellings. This function
+    folds the two together, because both answer "does this rule delete my mail" with yes."""
     if actions is None:
         return None
     said = [flag for flag in (actions.delete, actions.permanent_delete) if flag is not None]
@@ -310,7 +320,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The rule to turn off: the `uri` that outlook_get_mailbox_settings reports "
                     + "on each rule. Call that tool with include=rules to list the mailbox's "
-                    + "rules and their handles. One rule per call. There is no batch."
+                    + "rules and their handles. This tool accepts one rule per call. There is "
+                    + "no batch."
                 )
             ),
         ],
@@ -318,14 +329,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Literal[False],
             Field(
                 description=(
-                    "This value is always false. It is written out rather than assumed, so "
-                    + "that a call reads as what it does."
+                    "This value is always false. This field is written out, rather than "
+                    + "assumed, so that a call reads as what it does."
                 )
             ),
         ],
         client: GraphServiceClient = graph,
     ) -> DisabledRule:
-        # `enabled` is read by the schema rather than by this body: `Literal[False]` is what makes
-        # enabling unrepresentable, so there is nothing left here to branch on.
+        # The schema reads `enabled`, not this function body: `Literal[False]` is what makes
+        # enabling impossible to represent, so there is nothing left here to branch on.
         assert enabled is False, "the schema admits no other value"
         return await disable_mail_rule(client, rule_ref=rule_ref)
