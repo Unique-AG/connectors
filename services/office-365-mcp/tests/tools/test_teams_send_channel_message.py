@@ -121,6 +121,24 @@ class TestThePersonBeforeThePost:
         assert _MESSAGE in asked[0]
         assert "cannot be recalled" in asked[0]
 
+    async def test_the_question_carries_the_destination(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """A person approving a post must see WHERE it goes, not just the text: approving "post
+        this" in a multi-channel conversation should not silently approve the wrong channel."""
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _send(client, confirm=capturing)
+
+        assert len(asked) == 1
+        assert _TEAM_ID in asked[0]
+        assert _CHANNEL_ID in asked[0]
+
     async def test_the_confirmation_happens_before_the_post(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

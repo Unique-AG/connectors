@@ -111,6 +111,23 @@ class TestThePersonBeforeTheSend:
         assert _MESSAGE in asked[0]
         assert "cannot be recalled" in asked[0]
 
+    async def test_the_question_carries_the_destination(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """A person approving a send must see WHERE it goes, not just the text: approving "send
+        this" in a multi-chat conversation should not silently approve the wrong chat."""
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing)
+
+        assert len(asked) == 1
+        assert _CHAT_ID in asked[0]
+
     async def test_the_confirmation_happens_before_the_post(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

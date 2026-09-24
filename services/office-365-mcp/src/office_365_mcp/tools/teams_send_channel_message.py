@@ -109,7 +109,7 @@ async def send_channel_message(
     before a post that nothing here can take back. An `InputRequiredResult` is that question,
     returned unsent for a client with no back-channel to answer and re-call.
     """
-    question = _question(message)
+    question = _question(message, team_id, channel_id)
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME, step=STEP_SEND):
@@ -137,8 +137,11 @@ async def send_channel_message(
     )
 
 
-def _question(message: str) -> str:
-    return f"Post {cut_for_a_question(message)!r} to this channel now? {_CANNOT_BE_RECALLED}"
+def _question(message: str, team_id: str, channel_id: str) -> str:
+    return (
+        f"Post {cut_for_a_question(message)!r} to channel {channel_id!r} in team {team_id!r} "
+        f"now? {_CANNOT_BE_RECALLED}"
+    )
 
 
 def _posted(message: str) -> ChatMessage:
