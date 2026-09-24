@@ -51,8 +51,6 @@ from typing import Annotated
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from fastmcp.tools import Tool
-from fastmcp.tools import tool as tool_metadata
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.headers_collection import HeadersCollection
@@ -103,11 +101,6 @@ GRAPH_NOT_FOUND = (
 )
 
 MAX_MESSAGES = 20
-
-# The two ways to name a destination, spelled once here. The schema constraint and the refusals
-# below must name the same pair. If a rename reaches only one of them, a client is refused by a
-# rule the schema does not publish.
-DESTINATION_ARGUMENTS: tuple[str, str] = ("destination", "folder_ref")
 
 # The properties only a search folder declares, taken from the SDK rather than written out, so a
 # property Microsoft adds later is covered without an edit here.
@@ -442,7 +435,7 @@ def _answer(target: _Destination, attempts: Sequence[_Attempt]) -> MailMoved:
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
-    @tool_metadata(
+    @mcp.tool(
         name=TOOL_NAME,
         title="Move Mail to a Folder",
         description=_DESCRIPTION,
@@ -497,19 +490,3 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             destination=destination,
             folder_ref=folder_ref,
         )
-
-    _exactly_one_destination(mcp.add_tool(outlook_move_mail))
-
-
-def _exactly_one_destination(tool: Tool) -> None:
-    """Say "one of these two, and not neither" in the schema. A Python signature cannot say that.
-
-    The runtime refusals stay. FastMCP validates arguments against the signature, not against
-    this schema, so a client that ignores the constraint still needs to be told. It also needs
-    to be told which of the two mistakes it made, which the schema alone cannot say.
-    """
-    first, second = DESTINATION_ARGUMENTS
-    tool.parameters["oneOf"] = [
-        {"required": [first], "not": {"required": [second]}},
-        {"required": [second], "not": {"required": [first]}},
-    ]

@@ -919,30 +919,6 @@ class TestTheToolsThisServerAdvertises:
             asked_for = _object(_properties(tools[name].input_schema)[flag])
             assert asked_for["default"] is False, f"{name} would report completeness unasked"
 
-    async def test_teams_search_messages_makes_its_criteria_optional_but_not_all_of_them(
-        self, mcp_client: Client[FastMCPTransport]
-    ) -> None:
-        tools = _named(await mcp_client.list_tools())
-        schema = tools["teams_search_messages"].input_schema
-        properties = _properties(schema)
-
-        assert schema.get("required", []) == [], "each criterion is individually optional"
-        alternatives = cast("Sequence[Mapping[str, object]]", schema["anyOf"])
-        required = [cast("Sequence[str]", option["required"]) for option in alternatives]
-        assert [name for (name,) in required] == [
-            "query",
-            "sender",
-            "recipient",
-            "mentions",
-            "sent_after",
-            "sent_before",
-            "has_attachment",
-            "is_read",
-            "mentions_me",
-        ]
-        for (name,) in required:
-            assert name in properties, f"{name} is constrained but is not a parameter"
-
     async def test_teams_search_messages_types_the_parameters_graph_is_fussy_about(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
@@ -1799,8 +1775,8 @@ class TestCallingThem:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
     ) -> None:
-        """FastMCP validates arguments against the signature, not against the advertised schema. So
-        the `anyOf` alone does not stop this."""
+        """OpenAI's function-calling schemas forbid a root-level `anyOf`. So the schema cannot
+        publish "at least one criterion" at all. This refusal is the only thing that stops it."""
         route = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
 
         result = await mcp_client.call_tool(
