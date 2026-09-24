@@ -43,7 +43,7 @@ export class UniqueInternalClient {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `query A2aAssistant($assistantId: String!) { assistantByUser(assistantId: $assistantId) { id name executionProvider } }`,
+      `query A2aAssistant($assistantId: String!) { assistantByUser(assistantId: $assistantId) { id name executionProvider a2aConnectionId } }`,
       { assistantId },
       'assistantByUser',
     );
@@ -53,7 +53,7 @@ export class UniqueInternalClient {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `query A2aManagedAssistant($assistantId: String!) { assistantByCompany(assistantId: $assistantId) { id name executionProvider } }`,
+      `query A2aManagedAssistant($assistantId: String!) { assistantByCompany(assistantId: $assistantId) { id name executionProvider a2aConnectionId } }`,
       { assistantId },
       'assistantByCompany',
     );

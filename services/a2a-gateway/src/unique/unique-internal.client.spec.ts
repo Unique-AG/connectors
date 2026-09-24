@@ -55,11 +55,33 @@ describe('UniqueInternalClient', () => {
     expect(url.toString()).toBe('http://node-chat/graphql');
     expect(JSON.parse(String(request.body))).toEqual({
       query:
-        'query A2aManagedAssistant($assistantId: String!) { assistantByCompany(assistantId: $assistantId) { id name executionProvider } }',
+        'query A2aManagedAssistant($assistantId: String!) { assistantByCompany(assistantId: $assistantId) { id name executionProvider a2aConnectionId } }',
       variables: { assistantId: 'assistant-1' },
     });
     expect(request.headers).not.toHaveProperty('x-user-roles');
     expect(request.redirect).toBe('error');
+  });
+
+  it('requests the connection reference through the user-authorized assistant query', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        data: { assistantByUser: { id: 'assistant-1', a2aConnectionId: 'conn-1' } },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      new UniqueInternalClient(config).getAssistant(identity, 'assistant-1'),
+    ).resolves.toEqual({
+      id: 'assistant-1',
+      a2aConnectionId: 'conn-1',
+    });
+    const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
+    expect(JSON.parse(String(request.body))).toEqual({
+      query:
+        'query A2aAssistant($assistantId: String!) { assistantByUser(assistantId: $assistantId) { id name executionProvider a2aConnectionId } }',
+      variables: { assistantId: 'assistant-1' },
+    });
   });
 
   it('normalizes authorization errors without retrying them', async () => {
