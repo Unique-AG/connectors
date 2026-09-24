@@ -49,21 +49,39 @@ message being forwarded, not this tool attaching anything — and the descriptio
 caller is not surprised by a file they did not send. `attachments` is for a NEW file, on either
 mode, that this tool adds on top of whatever a forward already carries.
 
-**A new attachment is a third write, after the fill, and it is caught rather than raised, the
-same way the fill is.** By the time it runs, the create has already addressed a draft, so a failed
-attachment does not mean nothing happened — it means the draft exists with fewer attachments than
-asked for. This file attaches one file per `POST .../attachments` call, in the order given, and
-stops at the first one Graph refuses rather than skipping ahead to the next: `attachments` and
-`attachment_failure` report exactly how far it got, the same shape `body` and `failure` already
-use for the fill. Unlike `outlook_draft_mail`, each attach call answers with the `attachment`
-Graph actually stored, so `attachments` here is read off that response rather than echoed from the
-request — the general rule the rest of this file follows, and available for free because each
-attach is its own round trip.
+**A new attachment is a write after the fill, one call per file, and each is caught rather than
+raised, the same way the fill is.** By the time any of them run, the create has already addressed
+a draft, so a failed attachment does not mean nothing happened — it means the draft exists with
+fewer attachments than asked for. Every attachment goes through
+`shared.attachment_upload.upload_attachment`, in the order given, and this file stops at the first
+one Graph refuses rather than skipping ahead to the next: `attachments` and `attachment_failure`
+report exactly how far it got, the same shape `body` and `failure` already use for the fill. This
+is deliberately not atomic: a large attachment can fail partway through its own chunked upload
+after an earlier attachment already landed, and there is no way to undo a draft `createReply` or
+`createForward` already addressed, so a caller that wants "all attachments or none" has to check
+`attachment_failure` itself rather than assume this tool ever rolls one back.
 
-**`no_retry()` on every write.** Microsoft publishes no idempotency key for any of these
-operations, and the SDK retries `POST` as readily as `GET`. So a 503 that arrives after Graph
-created the draft leaves a second one, and one that arrives after Graph stored an attachment
-leaves the same file attached twice.
+**Attachments up to Microsoft's real per-item ceiling, not just the single-call one.**
+`upload_attachment` picks Graph's inline `POST .../attachments` or its chunked upload session by
+size alone — see that module for the mechanics this file no longer needs to know — so a file that
+used to be refused outright above 3 MB now attaches like any other file, up to
+`shared.mail.MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION`. Only a file past that real ceiling is
+refused, before the create, the same as before.
+
+**Each attachment summary is read off what this file sent, not off Graph's answer — unlike every
+other field in `MailReplyDraft`.** `upload_attachment` returns nothing on success: past the small
+path, there is no single created `attachment` for a response to hand back, only however many
+chunk `PUT`s landed. Name, MIME type and decoded size are inert data Graph stores verbatim rather
+than something it decides, unlike a recipient Graph can resolve or drop, so there is nothing here
+for a response read-back to catch that the request does not already say — the same reasoning
+`outlook_draft_mail._attachment_summary` already relies on for its own, always-small, attachments.
+
+**`no_retry()` on every write this file makes directly.** Microsoft publishes no idempotency key
+for any of these operations, and the SDK retries `POST` as readily as `GET`. So a 503 that arrives
+after Graph created the draft leaves a second one. The same protection for an attachment now lives
+in `shared.attachment_upload.upload_attachment`, which this file calls instead of posting to
+`.../attachments` itself; see that module for why its `createUploadSession` call carries the same
+guard and its chunk `PUT`s need none.
 
 **The body is sent as HTML.** Microsoft owns what is safe in a message body, and
 this connector adds no filtering of its own. A second filter here drifts from what the API allows
@@ -98,7 +116,6 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.headers_collection import HeadersCollection
-from msgraph.generated.models.attachment import Attachment
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.file_attachment import FileAttachment
@@ -116,10 +133,12 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry
+from office_365_mcp.shared.attachment_upload import upload_attachment
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import (
     ATTACHMENTS_FIELD,
     MAX_ATTACHMENT_BYTES,
+    MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION,
     MAX_ATTACHMENTS,
     ONE_ADDRESS,
     MailAddress,
@@ -138,7 +157,6 @@ TOOL_NAME = "outlook_draft_reply"
 
 STEP_CREATE_REPLY = "create_reply"
 STEP_FILL_REPLY = "fill_reply"
-STEP_ATTACH_REPLY = "attach_reply"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
@@ -184,10 +202,11 @@ addresses it from the original. `mode: "forward"` requires 1 to {MAX_RECIPIENTS}
 `to`, each from the user or from outlook_find_recipient.
 - `body_html` replaces the quoted original that Microsoft seeds the draft with. Write any \
 quoting that the message needs into `body_html` yourself.
-- `attachments` can attach up to {MAX_ATTACHMENTS} small NEW files, each under \
-{MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB decoded, by their own bytes — no URL, drive, or other \
-fetch. A forward separately carries the original message's own attachments regardless of \
-`attachments`; see `mode`.
+- `attachments` can attach up to {MAX_ATTACHMENTS} NEW files, by their own bytes — no URL, \
+drive, or other fetch. A file under {MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB attaches \
+directly; up to {MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION // (1024 * 1024)} MB attaches through \
+an upload session instead, which this tool carries out for you. A forward separately carries \
+the original message's own attachments regardless of `attachments`; see `mode`.
 - `message_ref` must be a message in `mailbox` — the mailbox this call reads the original from \
 and drafts the reply or forward into. Pass the same `mailbox` to outlook_send_draft.
 """
@@ -311,11 +330,14 @@ class MailReplyDraft(BaseModel):
     )
     attachments: list[MailAttachmentSummary] = Field(
         description=(
-            "The NEW files this call attached, in the order given, read off each attach "
-            + "call's own response rather than echoed from the request. Shorter than what "
-            + "`attachments` asked for means `attachment_failure` is set: this tool stops at "
-            + "the first one Graph refuses. Does not include a forward's own copied "
-            + "attachments, which Graph carries automatically and this field never reports."
+            "The NEW files this call attached, in the order given: name, MIME type and "
+            + "decoded size, read off what was sent rather than off Graph's answer, since "
+            + "none of this is something Graph could have resolved or dropped. Shorter than "
+            + "what `attachments` asked for means `attachment_failure` is set: this tool "
+            + "stops at the first one Graph refuses, and the draft still carries whichever "
+            + "ones landed before it — this is not atomic. Does not include a forward's own "
+            + "copied attachments, which Graph carries automatically and this field never "
+            + "reports."
         )
     )
     attachment_failure: str | None = Field(
@@ -337,17 +359,18 @@ class _Fill:
 
 @dataclass(frozen=True, slots=True)
 class _Attached:
-    """What the attachment writes left behind: each attachment Graph accepted, in order, and the
-    first failure, if any. Stops rather than skipping past a refusal: Graph gives no route to ask
-    "did the rest still land", so continuing past one failure would let a transient refusal turn
-    into a silently incomplete attachment list nobody asked for."""
+    """What the attachment writes left behind: a summary of each attachment `upload_attachment`
+    landed, in order, and the first failure, if any. Stops rather than skipping past a refusal:
+    Graph gives no route to ask "did the rest still land", so continuing past one failure would
+    let a transient refusal turn into a silently incomplete attachment list nobody asked for."""
 
-    attached: list[Attachment]
+    attached: list[MailAttachmentSummary]
     failure: GraphFailure | None
 
 
 async def draft_reply(
     client: GraphServiceClient,
+    transport: httpx.AsyncClient,
     *,
     message_ref: str,
     mode: MailReplyMode,
@@ -356,8 +379,10 @@ async def draft_reply(
     attachments: Sequence[MailAttachmentInput] = (),
     mailbox: str | None = None,
 ) -> MailReplyDraft:
-    """Create one draft, write its text, then attach any new files: three non-retriable requests
-    at most, reporting all three."""
+    """Create one draft, write its text, then attach any new files through the shared
+    `upload_attachment` helper, one call per file: at most two non-retriable Graph writes of this
+    file's own, plus one attach per file — inline or chunked, `upload_attachment` decides —
+    reporting all of it."""
     assert len(to) <= MAX_RECIPIENTS, f"the To list is bounded by the schema, got {len(to)}"
     if mode not in MODES:
         raise ToolError(_UNKNOWN_MODE)
@@ -372,7 +397,9 @@ async def draft_reply(
         created = await _create(reached, handle=handle, mode=mode, recipients=recipients)
         assert created.id is not None, "Graph created a draft it gave no id, which cannot be filled"
         fill = await _fill(reached, draft_id=created.id, body_html=body_html)
-        attached = await _attach(reached, draft_id=created.id, files=files)
+        attached = await _attach(
+            client, transport, draft_id=created.id, files=files, mailbox=mailbox
+        )
 
     return _answer(mode, created=created, fill=fill, attached=attached)
 
@@ -402,18 +429,21 @@ def _bad_attachment_base64(name: str) -> str:
 
 def _attachment_too_large(name: str, size: int) -> str:
     mb = size / (1024 * 1024)
-    ceiling = MAX_ATTACHMENT_BYTES // (1024 * 1024)
+    ceiling = MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION // (1024 * 1024)
     return (
         f"outlook_draft_reply could not attach {name!r}: decoded, it is {mb:.1f} MB, at or past "
-        + f"the {ceiling} MB ceiling Microsoft publishes for this inline attachment path "
+        + f"the {ceiling} MB ceiling Microsoft publishes for a single attachment on an Outlook "
+        + "item at all, inline or through an upload session "
         + "(https://learn.microsoft.com/en-us/graph/outlook-large-attachments). No draft was "
-        + "created. This connector has no upload-session route for a larger file: tell the user "
-        + "to attach it from Outlook directly instead."
+        + "created. Tell the user to attach it from Outlook directly instead."
     )
 
 
 def _graph_attachments(attachments: Sequence[MailAttachmentInput]) -> list[FileAttachment]:
-    """Each attachment as Graph's `fileAttachment` shape, once every one of them decodes and fits.
+    """Each attachment as Graph's `fileAttachment` shape, once every one of them decodes and fits
+    under Microsoft's real per-item ceiling — not the smaller, single-call one `upload_attachment`
+    picks between. A file past `MAX_ATTACHMENT_BYTES` and under this one still attaches, through
+    that function's own upload-session path.
 
     Checked and built before either write happens, so a bad entry here raises before the create
     does — the one part of this call that can still fail with nothing in the mailbox to report,
@@ -427,7 +457,7 @@ def _graph_attachments(attachments: Sequence[MailAttachmentInput]) -> list[FileA
         decoded = decode_attachment(attachment.content_bytes)
         if decoded is None:
             raise ToolError(_bad_attachment_base64(attachment.name))
-        if len(decoded) >= MAX_ATTACHMENT_BYTES:
+        if len(decoded) >= MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION:
             raise ToolError(_attachment_too_large(attachment.name, len(decoded)))
         built.append(
             FileAttachment(
@@ -480,32 +510,53 @@ async def _fill(reached: UserItemRequestBuilder, *, draft_id: str, body_html: st
 
 
 async def _attach(
-    reached: UserItemRequestBuilder, *, draft_id: str, files: Sequence[FileAttachment]
+    client: GraphServiceClient,
+    transport: httpx.AsyncClient,
+    *,
+    draft_id: str,
+    files: Sequence[FileAttachment],
+    mailbox: str | None,
 ) -> _Attached:
-    """Each new attachment onto the draft the create just made, one `POST .../attachments` call
-    per file, in order.
+    """Each new attachment onto the draft the create just made, through
+    `shared.attachment_upload.upload_attachment`, one file at a time, in order.
 
     Stops and is caught at the first refusal rather than raised: by the time any of this runs, the
     draft already exists (the fill may have too), so an exception here would report a mailbox that
     did not change, when it did — the same reason `_fill` above catches rather than raises.
     """
-    attached: list[Attachment] = []
+    attached: list[MailAttachmentSummary] = []
     for file in files:
+        assert file.name is not None, "a FileAttachment this file built always carries a name"
+        assert file.content_type is not None, (
+            "a FileAttachment this file built always carries a type"
+        )
+        assert file.content_bytes is not None, (
+            "a FileAttachment this file built always carries bytes"
+        )
         try:
-            with graph_step(STEP_ATTACH_REPLY):
-                created = await reached.messages.by_message_id(draft_id).attachments.post(
-                    file, request_configuration=_request()
-                )
+            await upload_attachment(
+                client,
+                transport,
+                mailbox=mailbox,
+                message_id=draft_id,
+                name=file.name,
+                content_type=file.content_type,
+                content=file.content_bytes,
+            )
         except GraphFailure as failure:
             return _Attached(attached=attached, failure=failure)
-        assert created is not None, "Graph answered an attachment create with no attachment"
-        attached.append(created)
+        attached.append(
+            MailAttachmentSummary(
+                name=file.name, content_type=file.content_type, size=len(file.content_bytes)
+            )
+        )
     return _Attached(attached=attached, failure=None)
 
 
 def _request() -> RequestConfiguration[QueryParameters]:
-    """`no_retry()` because Graph publishes no idempotency key for any of these writes and the SDK
-    retries `POST` by default, so one 503 becomes several drafts, or the same file attached twice.
+    """For the create and the fill — the two writes this file still makes directly. `no_retry()`
+    because Graph publishes no idempotency key for either, and the SDK retries `POST` by default,
+    so one 503 becomes a second draft, or a second identical fill.
 
     The header is built per call: kiota's `RequestConfiguration.headers` defaults to one collection
     shared by every configuration in the process, so a preference added to it leaks onto every
@@ -514,17 +565,6 @@ def _request() -> RequestConfiguration[QueryParameters]:
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
     return RequestConfiguration[QueryParameters](headers=headers, options=no_retry())
-
-
-def _attachment_summary(attachment: Attachment) -> MailAttachmentSummary:
-    """Read off `attachment`, Graph's own answer to the `POST .../attachments` that created it —
-    not off the request, the general rule this file's module docstring gives for why."""
-    assert attachment.name is not None, "an attachment this file created always carries a name"
-    assert attachment.content_type is not None, "an attachment this file created always has a type"
-    assert attachment.size is not None, "an attachment this file created always has a size"
-    return MailAttachmentSummary(
-        name=attachment.name, content_type=attachment.content_type, size=attachment.size
-    )
 
 
 def _answer(
@@ -546,7 +586,7 @@ def _answer(
         body=body,
         body_written=fill.message is not None,
         failure=None if fill.failure is None else str(fill.failure),
-        attachments=[_attachment_summary(one) for one in attached.attached],
+        attachments=attached.attached,
         attachment_failure=None if attached.failure is None else str(attached.failure),
     )
 
@@ -622,6 +662,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     ) -> MailReplyDraft:
         return await draft_reply(
             client,
+            transport,
             message_ref=message_ref,
             mode=mode,
             body_html=body_html,

@@ -53,12 +53,23 @@ ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 # argument control it applies to everything else about the message.
 MAX_ATTACHMENTS = 10
 
-# Microsoft's own ceiling for a `fileAttachment` added the way this connector adds one — inside a
-# message create, or through one `POST .../attachments` call — rather than through an upload
-# session: "This operation limits the size of the attachment you can add to under 3 MB"
+# Microsoft's own ceiling for a `fileAttachment` added through a single `POST .../attachments`
+# call, the cheapest of the two ways this connector attaches a file: "This operation limits the
+# size of the attachment you can add to under 3 MB"
 # (https://learn.microsoft.com/en-us/graph/outlook-large-attachments). Measured against the
-# DECODED bytes, which is what that ceiling counts; a caller's base64 text runs a third longer.
+# DECODED bytes, which is what that ceiling counts; a caller's base64 text runs a third longer. A
+# file at or over this line still attaches — see `MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION` — just
+# not through this single call.
 MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024
+
+# Microsoft's own ceiling for a single attachment on a message at all, inline or not: "you can
+# attach files up to 150 MB to an Outlook message or event item"
+# (https://learn.microsoft.com/en-us/graph/outlook-large-attachments). A file from
+# `MAX_ATTACHMENT_BYTES` up to this line attaches through an upload session instead of the single
+# inline call — `shared.attachment_upload.upload_attachment` is what carries either path out, and
+# the split is invisible above that function. Measured against the same DECODED bytes as
+# `MAX_ATTACHMENT_BYTES`.
+MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION = 150 * 1024 * 1024
 
 # Reused verbatim by both attaching tools, for the reason `MAILBOX_FIELD` in `shared/seam.py` is:
 # one text every caller agrees with, not one chance per tool to drift from the other.
@@ -67,10 +78,13 @@ ATTACHMENTS_FIELD: str = (
     + "shape: `name` (the file name shown to the recipient), `content_type` (a MIME type, for "
     + "example `application/pdf`), and `content_bytes` (the file's own bytes, base64-encoded — "
     + "`contentBytes` on the wire). Every entry's DECODED size must be under "
-    + f"{MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB, Microsoft's own ceiling for this path "
-    + "(https://learn.microsoft.com/en-us/graph/outlook-large-attachments). A file over that needs "
-    + "an upload session, which this connector does not offer: tell the user to attach it from "
-    + "Outlook directly instead. Omit this, or pass an empty list, for a draft with no attachment."
+    + f"{MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION // (1024 * 1024)} MB, Microsoft's own ceiling for "
+    + "a single attachment on an Outlook item "
+    + "(https://learn.microsoft.com/en-us/graph/outlook-large-attachments). A file under "
+    + f"{MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB attaches directly; a larger one attaches "
+    + "through Microsoft's own upload session instead, which this connector carries out for you — "
+    + "this argument takes the same shape either way. Omit this, or pass an empty list, for a "
+    + "draft with no attachment."
 )
 
 
