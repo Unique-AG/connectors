@@ -354,8 +354,8 @@ Which tools a deployment runs, and therefore which delegated permissions every o
 asked to consent to. Set **exactly one** of:
 
 ```bash
-TOOLS_PRESET=teams                       # a named surface
-TOOLS_ENABLED=get_me                     # or name the tools
+TOOLS_PRESET=teams
+TOOLS_ENABLED=get_me
 ```
 
 Both set is a startup error naming which to remove. Neither set is a startup error too: there is
@@ -760,7 +760,7 @@ different failures.
 
 ```bash
 cd services/office-365-mcp
-cp .env.example .env   # fill DB_* and ENTRA_*
+cp .env.example .env
 uv sync
 uv run office-365-mcp
 ```
@@ -804,7 +804,7 @@ uv run pytest
 ## Lint & type-check
 
 ```bash
-uv run ruff check .          # lint
-uv run ruff format .         # format
-uv run basedpyright .        # type check
+uv run ruff check .
+uv run ruff format .
+uv run basedpyright .
 ```

@@ -1,16 +1,3 @@
-"""This is the registry of all tools, the selection that an operator makes, and the permissions
-that selection implies.
-
-TRAP: derive the scope list from the modules. Never hand-write it. A permission that was not
-consented to at sign-in cannot be obtained later. The On-Behalf-Of exchange fails with AADSTS65001
-on every tool call, before the tool body runs. FastMCP's `enable` and `disable` transforms are no
-substitute for filtering here. They hide a registered tool, but they leave its scopes computed.
-
-Order comes from the registry, never from the operator, and `dict.fromkeys` keeps it stable instead
-of a `set`. `TOOLS_ENABLED=a,b` and `b,a` must produce one scope list, because the consent screen
-and every cached On-Behalf-Of token key use it as the key.
-"""
-
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
@@ -76,11 +63,6 @@ from office_365_mcp.tools import (
     teams_send_chat_message,
 )
 
-# This is the whole of what this package promises. Importing `tools/get_me.py` directly names a
-# tool module outside `_TOOL_MODULES`, the list that every selection filters over and that every
-# scope derives from. `ToolModule` is absent from `__all__` on purpose. `tests/test_layering.py`
-# rule 4 forbids a tool file from importing `office_365_mcp.tools`, so no tool file can name
-# `ToolModule`, even to declare that it satisfies it.
 __all__ = [
     "ALWAYS_ON",
     "PRESETS",
@@ -95,19 +77,6 @@ __all__ = [
 
 
 class ToolModule(Protocol):
-    """This is the contract that a tool file satisfies. It is checked at the `_TOOL_MODULES`
-    annotation below.
-
-    TRAP: both read-only properties are read-only on purpose. A mutable protocol attribute
-    demands an exact type, `str` or `Mapping[str, object]`, and tool files write these
-    unannotated.
-
-    `GRAPH_CALL_EXAMPLE` is arguments that reach Graph, so a startup probe exercises the real
-    call. Its ids are invented, but its shape is one that the tool accepts. An argument that the
-    tool rejects never reaches Graph, so it proves nothing. A tool with more than one reachable
-    call says, in its own file, which one it picked.
-    """
-
     @property
     def TOOL_NAME(self) -> str: ...
 
@@ -122,27 +91,12 @@ class ToolModule(Protocol):
 
 @runtime_checkable
 class _NarrowsItsNotFound(Protocol):
-    """A tool that knows what a 404 on its own argument means. This applies to a minority of
-    tools, so it is runtime-checked.
-
-    It is left off `ToolModule`, because the default advice is right for the rest. Their
-    arguments are ids that a caller passed in, not handles that this connector minted.
-    """
-
     @property
     def GRAPH_NOT_FOUND(self) -> str: ...
 
 
 @runtime_checkable
 class _NarrowsItsCall(Protocol):
-    """A tool whose `GRAPH_CALL_EXAMPLE` reaches Graph under fewer permissions than it declares.
-
-    Only one tool of them all needs this, so it is runtime-checked and left off `ToolModule`.
-    `teams_read_message` is exchanged for two permissions and reads one surface per call, so its
-    chat example's refusal must name `Chat.Read` and not the channel permission. `narrowed_to` in
-    `shared/seam.py` says the same per call.
-    """
-
     @property
     def GRAPH_CALL_NARROWS_TO(self) -> tuple[str, ...]: ...
 
@@ -206,22 +160,8 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
 
-# This joins every selection. `User.Read` is the least-privileged delegated permission that
-# Microsoft publishes, and it needs no administrator consent. So no preset names `get_me`, and
-# every deployment asks for at least `User.Read`. This is the one deliberate exception to "the
-# selection is exactly these tools".
 ALWAYS_ON: str = get_me.TOOL_NAME
 
-# What each `config.ToolsPreset` name means.
-#
-# TRAP: permissions do not encode reachability. `teams-messages` without `teams_search_messages`
-# asks for the identical three permissions, and it exposes a `teams_read_message` that nothing in
-# it can address.
-#
-# TRAP: `teams` is written out rather than derived from `TOOL_NAMES`. A derived preset includes
-# every tool that joins the registry. So the first tool of another product puts its permission on
-# the consent screen of every `teams` deployment, without an edit that anybody reviewed. A live
-# deployment that widens its tool set forces a fresh sign-in on every signed-in user.
 PRESETS: Mapping[str, tuple[str, ...]] = {
     "teams": (
         "teams_list_chats",
@@ -249,15 +189,6 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_read_transcript",
         "teams_list_meeting_recordings",
     ),
-    # This is a separate axis from every preset above, not a rung added to `teams`/`teams-messages`.
-    # Those presets stay read-only. `ChatMessage.Send` and `ChannelMessage.Send` never enter a
-    # deployment that asked only to browse or search. Unlike `outlook-send`, sending a Teams message
-    # needs no draft and no read of the target's existing content. `teams_send_chat_message` and
-    # `teams_send_channel_message` take a bare `chat_id`, or a `team_id`/`channel_id` pair. So this
-    # preset pairs them with exactly the tools that mint those ids: `teams_list_chats`,
-    # `teams_list_my_teams`, and `teams_list_channels`. It does not include
-    # `teams_browse_channel`, `teams_search_messages`, or `teams_read_message`, which this axis
-    # does not use.
     "teams-write": (
         "teams_list_chats",
         "teams_list_my_teams",
@@ -265,12 +196,6 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_send_chat_message",
         "teams_send_channel_message",
     ),
-    # These are two axes, not one ladder. Mail content moves through three tiers: read, then write,
-    # then send. Mailbox configuration moves through two tiers: read, then write. The two axes are
-    # independent. A chain that welds them together is why `outlook-automate` once required
-    # `Mail.Send`. An out-of-office reply has nothing to do with sending mail as the user. A
-    # forwarding-rule audit has nothing to do with reading mail. Each row below asks for exactly
-    # what its own tools declare.
     "outlook-read": (
         "outlook_search_mail",
         "outlook_read_mail",
@@ -392,14 +317,6 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
 
 @dataclass(frozen=True, slots=True)
 class Selection:
-    """One deployment's tool surface: what is registered, and what sign-in therefore asks for.
-
-    `permissions` uses Entra's own spelling, and `graph_scopes` uses the authorize request's
-    spelling. Both are stored rather than derived on demand. The tuple handed to the auth provider
-    is checked by identity, not by equality. A property that rebuilds it on each call only looks
-    equal.
-    """
-
     preset: str | None
     tools: tuple[str, ...]
     permissions: tuple[str, ...]
@@ -407,15 +324,6 @@ class Selection:
 
 
 def resolve(*, preset: str | None, enabled: Sequence[str] | None) -> Selection:
-    """This is the surface that `preset` or `enabled` names, filtered over the registry in the
-    registry's order.
-
-    Both entry routes, `preset` and `enabled`, are checked against the registry. If that check is
-    skipped, a name that this server has no tool for is filtered out silently. That leaves one tool
-    fewer registered, and one permission fewer on the consent screen, than the operator believes.
-    `TOOLS_ENABLED` raises an error because the mistake is the operator's. A preset asserts because
-    the mistake belongs to this file.
-    """
     assert (preset is None) != (enabled is None), (
         "exactly one of preset and enabled is a selection, which SurfaceConfig guarantees "
         + f"(got preset={preset!r}, enabled={enabled!r})"
@@ -453,10 +361,6 @@ def _unknown(names: Iterable[str]) -> list[str]:
 
 
 def _every_name_known(enabled: Sequence[str]) -> tuple[str, ...]:
-    """This returns `enabled` unchanged, once every name is known. A typo must never cost a tool
-    silently. If nothing catches it, `TOOLS_ENABLED=read_transcripts` registers one tool fewer and
-    asks for one permission fewer than the operator believes.
-    """
     unknown = _unknown(enabled)
     if unknown:
         raise ValueError(
@@ -467,12 +371,6 @@ def _every_name_known(enabled: Sequence[str]) -> tuple[str, ...]:
 
 
 def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
-    """This is the source that `GraphAdviceMiddleware` uses to word each selected tool's refusals.
-
-    This dictionary is derived from the modules. If this table is hand-written instead, it creates
-    a second copy of which permissions a tool calls under. A disagreement between the two copies
-    causes a 403 that sends an administrator after a permission that was never missing.
-    """
     return {
         module.TOOL_NAME: ToolAdvice(
             permissions=module.GRAPH_PERMISSIONS,
@@ -489,25 +387,11 @@ def _not_found_advice(module: ToolModule) -> str | None:
 
 @dataclass(frozen=True, slots=True)
 class GraphCallExample:
-    """One call through one tool that gets as far as a Graph request, and what its refusal says.
-
-    `arguments` must be a call that the tool accepts. Arguments that it rejects never reach Graph
-    at all.
-    """
-
     arguments: Mapping[str, object]
     permissions: tuple[str, ...]
 
 
 def graph_call_examples(selection: Selection) -> Mapping[str, GraphCallExample]:
-    """This is one refusable call per selected tool, derived from the modules in exactly the same
-    way as the table above.
-
-    This function is exported, although nothing in `src/` calls it. It is the coverage contract for
-    `tests/test_error_mapping.py`, which refuses every registered tool one by one. That file once
-    hand-wrote this table as a second list of the tools. A tool registered before its row existed
-    left the file one tool short. This module exists to prevent exactly that failure.
-    """
     return {
         module.TOOL_NAME: GraphCallExample(
             arguments=module.GRAPH_CALL_EXAMPLE,
@@ -525,7 +409,6 @@ def _call_permissions(module: ToolModule) -> tuple[str, ...]:
 
 
 def register_tools(mcp: FastMCP, transport: httpx.AsyncClient, selection: Selection) -> None:
-    """Declare the selected tool modules against `transport`, which each borrows and none owns."""
     for module in _TOOL_MODULES:
         if module.TOOL_NAME in selection.tools:
             module.register(mcp, transport)

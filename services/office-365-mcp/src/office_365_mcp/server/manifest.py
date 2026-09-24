@@ -1,21 +1,3 @@
-"""What this deployment resolved to, written for the person who must act on it.
-
-**Nothing in this server can check the ask against the app registration.** The session token's `scp`
-carries only `access_as_user`, because Azure omits Graph scopes from it. A scope that the
-registration does not carry fails at the *authorize* hop. An unknown scope fails outright. A real
-but unconsented admin-consent permission stops at "Need admin approval". Neither failure appears in
-this server's logs.
-
-It prints **no consent URL**. `/.default` consents to whatever the registration happens to carry,
-not to what this deployment asks for. A scope-matched admin-consent URL also needs a `redirect_uri`
-that matches a registered one. The only Web redirect URI that office-365-mcp registers is FastMCP's
-OAuth callback, and that callback treats a *successful* consent as an error.
-
-The description scan only ever **warns**. If it required every mention instead, it drags
-`teams_search_messages`, together with `ChannelMessage.Read.All` and an administrator's signature,
-into a deployment that asked for nothing but `teams_list_chats`.
-"""
-
 import re
 import textwrap
 from collections.abc import Mapping, Sequence
@@ -26,32 +8,17 @@ from fastmcp.tools import Tool
 
 from office_365_mcp.tools import ALWAYS_ON, TOOL_NAMES, Selection
 
-# This table is not derived, and it cannot be derived. Whether a permission needs consent is
-# Microsoft's rule about that permission, and no tool file records it. The `False` entries make the
-# table checkable: one test asserts that it answers for every name in `REQUESTABLE_PERMISSIONS`. A
-# set that holds only the names that need consent cannot tell "no" from "nobody said".
-#
-# Unlike `REQUESTABLE_PERMISSIONS`, this table can name a permission before a tool declares it.
-# Nothing here reaches an authorize request.
 NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "User.Read": False,
     "Chat.Read": False,
     "Team.ReadBasic.All": False,
     "Channel.ReadBasic.All": False,
     "ChannelMessage.Read.All": True,
-    # Microsoft publishes AdminConsentRequired: No for both permissions below. This comes from the
-    # permissions reference, not copied from a neighboring row. `ChannelMessage.Read.All` above
-    # needs consent because it has the ".All" shape and reads every channel in the tenant. The two
-    # permissions below are narrower, delegated-only sends that touch only what the signed-in user
-    # can already post by hand.
     "ChatMessage.Send": False,
     "ChannelMessage.Send": False,
     "OnlineMeetings.Read": False,
     "OnlineMeetingTranscript.Read.All": True,
     "OnlineMeetingRecording.Read.All": True,
-    # Microsoft publishes AdminConsentRequired: No for every delegated Mail permission. That is
-    # Microsoft's rule about the permission, not a promise about a tenant. A tenant that runs a
-    # restricted user-consent policy still stops an unprivileged user at "Need admin approval".
     "Mail.Read": False,
     "People.Read": False,
     "MailboxSettings.Read": False,
@@ -59,8 +26,6 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Mail.Send": False,
     "Mail.ReadBasic": False,
     "MailboxSettings.ReadWrite": False,
-    # Microsoft publishes AdminConsentRequired: No for every delegated Calendars permission. This
-    # includes both `.Shared` permissions.
     "Calendars.Read": False,
     "Calendars.Read.Shared": False,
     "Calendars.ReadWrite": False,
@@ -76,7 +41,6 @@ _LINE_WIDTH = 96
 
 
 async def surface_manifest(server: FastMCP, selection: Selection, *, version: str) -> str:
-    """Built on demand, so the `/manifest` route and the startup log line are the same text."""
     consent = tuple(
         permission for permission in selection.permissions if _needs_admin_consent(permission)
     )
@@ -124,8 +88,6 @@ def _row(label: str, value: str) -> str:
 
 
 def _stale_promises(tools: Sequence[Tool], selection: Selection) -> list[str]:
-    """`ALWAYS_ON` can never appear here, because it is registered no matter what the selection is.
-    This lets the tools that send a model to it continue to name it in every deployment."""
     absent = tuple(name for name in TOOL_NAMES if name not in selection.tools)
     notes: list[str] = []
     for tool in tools:
@@ -140,15 +102,10 @@ def _stale_promises(tools: Sequence[Tool], selection: Selection) -> list[str]:
 
 
 def _mentions(prose: str, name: str) -> bool:
-    """This matches a whole word, not a substring. `teams_read_message` is not mentioned by prose
-    that says `read_messages`. Tool names use only `[a-z_]` characters, so a word boundary matches
-    how a person reads the name."""
     return re.search(rf"\b{re.escape(name)}\b", prose) is not None
 
 
 def _prose_of(tool: Tool) -> str:
-    """An argument's description is where a tool names the tool that mints its handle. A scan of
-    the tool description alone misses the references that matter most."""
     return " ".join(
         [
             tool.description or "",
