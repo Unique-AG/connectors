@@ -1,8 +1,17 @@
 data "azuread_application_published_app_ids" "well_known" {}
 
-resource "azuread_service_principal" "msgraph" {
-  client_id    = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
-  use_existing = true
+# A tenant-wide Microsoft-owned singleton, so read-only here: a `resource` with
+# `use_existing = true` would call the real delete API on tenant-wide state if this module were
+# ever removed from a caller's config.
+data "azuread_service_principal" "msgraph" {
+  client_id = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
+}
+
+removed {
+  from = azuread_service_principal.msgraph
+  lifecycle {
+    destroy = false
+  }
 }
 
 locals {
@@ -41,12 +50,12 @@ resource "azuread_application" "teams_mcp" {
   sign_in_audience = var.sign_in_audience
   notes            = var.notes
   required_resource_access {
-    resource_app_id = azuread_service_principal.msgraph.client_id
+    resource_app_id = data.azuread_service_principal.msgraph.client_id
 
     dynamic "resource_access" {
       for_each = local.graph_scopes
       content {
-        id   = azuread_service_principal.msgraph.oauth2_permission_scope_ids[resource_access.value]
+        id   = data.azuread_service_principal.msgraph.oauth2_permission_scope_ids[resource_access.value]
         type = "Scope"
       }
     }
@@ -102,7 +111,7 @@ resource "azuread_service_principal_delegated_permission_grant" "teams_mcp_graph
   count = var.service_principal_configuration != null ? 1 : 0
 
   service_principal_object_id          = azuread_service_principal.teams_mcp[0].object_id
-  resource_service_principal_object_id = azuread_service_principal.msgraph.object_id
+  resource_service_principal_object_id = data.azuread_service_principal.msgraph.object_id
   claim_values                         = local.graph_scopes
 
   depends_on = [time_sleep.wait_for_graph_propagation]
