@@ -71,6 +71,8 @@ from office_365_mcp.tools import (
     teams_read_message,
     teams_read_transcript,
     teams_search_messages,
+    teams_send_channel_message,
+    teams_send_chat_message,
 )
 
 # This is the whole of what this package promises. Importing `tools/get_me.py` directly names a
@@ -152,6 +154,8 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     teams_browse_channel,
     teams_search_messages,
     teams_read_message,
+    teams_send_chat_message,
+    teams_send_channel_message,
     teams_list_meeting_transcripts,
     teams_read_transcript,
     teams_list_meeting_recordings,
@@ -243,6 +247,22 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_list_meeting_transcripts",
         "teams_read_transcript",
         "teams_list_meeting_recordings",
+    ),
+    # A separate axis from every preset above, not a rung added to `teams`/`teams-messages`. Those
+    # stay read-only: `ChatMessage.Send`/`ChannelMessage.Send` never rides in on a deployment that
+    # asked only to browse or search. Unlike `outlook-send`, sending a Teams message needs no draft
+    # and no read of the target's existing content — `teams_send_chat_message` and
+    # `teams_send_channel_message` take a bare `chat_id` or `team_id`/`channel_id`, so this preset
+    # pairs them with exactly the tools that mint those ids (`teams_list_chats`,
+    # `teams_list_my_teams`, `teams_list_channels`) rather than pulling in
+    # `teams_browse_channel`/`teams_search_messages`/`teams_read_message`, which this axis has no
+    # use for.
+    "teams-write": (
+        "teams_list_chats",
+        "teams_list_my_teams",
+        "teams_list_channels",
+        "teams_send_chat_message",
+        "teams_send_channel_message",
     ),
     # Two axes, not one ladder. Mail content is read, then write, then send. Mailbox configuration
     # is read, then write. They are independent. Welding them into one chain is how

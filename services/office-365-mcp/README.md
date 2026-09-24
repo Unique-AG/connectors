@@ -2,12 +2,14 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes fifty-two
+Users sign in with their own Microsoft account and the server acts as them. It exposes fifty-four
 MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
 most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
 channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
 `teams_search_messages`, full-text search across every Teams message they can see; `teams_read_message`,
-one of those messages in full; `teams_list_meeting_transcripts`, whether a Teams meeting was
+one of those messages in full; `teams_send_chat_message`, which posts a plain-text message to an
+existing chat; `teams_send_channel_message`, which posts one to an existing channel;
+`teams_list_meeting_transcripts`, whether a Teams meeting was
 transcribed and a handle for each transcript; `teams_read_transcript`, what was said in one of those
 meetings as speaker-attributed, timestamped turns; and `teams_list_meeting_recordings`, whether a meeting
 was recorded, how long each recording runs and who may download it; and `outlook_search_mail`,
@@ -178,6 +180,8 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Team.ReadBasic.All` | Delegated | No | `teams_list_my_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `teams_list_channels` |
 | `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `teams_browse_channel`, `teams_search_messages`, `teams_read_message` (channels) |
+| `ChatMessage.Send` | Delegated | No | `teams_send_chat_message` |
+| `ChannelMessage.Send` | Delegated | No | `teams_send_channel_message` |
 | `OnlineMeetings.Read` | Delegated | No | `teams_list_meeting_transcripts`, `teams_list_meeting_recordings` (resolving a join URL to a meeting) |
 | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `teams_list_meeting_transcripts`, `teams_read_transcript` |
 | `OnlineMeetingRecording.Read.All` | Delegated | **Yes** | `teams_list_meeting_recordings` |
@@ -366,7 +370,8 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `teams-transcripts` | find a meeting and read what was said | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | 1 |
 | `teams-recordings` | say whether a meeting was recorded and who may get at it | `teams_list_chats`, `teams_list_meeting_recordings` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | 1 |
 | `teams-meetings` | both of the above for one meeting | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | + both meeting permissions | 2 |
-| `teams` | every Teams tool | the nine of them | all eight | 3 |
+| `teams-write` | find a chat or channel, then post a plain-text message to it | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message` | `User.Read`, `Chat.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChatMessage.Send`, `ChannelMessage.Send` | 0 |
+| `teams` | every read-only Teams tool | the nine of them | all eight | 3 |
 | `outlook-read` | find a message, read it in full, walk the folder tree, read a thread, list a folder in receipt order, and resolve a name to an address | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
 | `outlook-write` | the read surface, plus marking, filing and drafting | + `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | + `Mail.ReadWrite` | 0 |
 | `outlook-send` | the above, plus sending a draft the user can already read | + `outlook_send_draft` | + `Mail.Send`, `Mail.ReadBasic` | 0 |

@@ -299,6 +299,11 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
         "channel_id": ("teams_list_channels", "teams_search_messages"),
     },
     "teams_read_message": {"uri": ("teams_search_messages", "teams_browse_channel")},
+    "teams_send_chat_message": {"chat_id": ("teams_list_chats",)},
+    "teams_send_channel_message": {
+        "team_id": ("teams_list_my_teams",),
+        "channel_id": ("teams_list_channels", "teams_search_messages"),
+    },
     # Always satisfied, `get_me` being the floor; recorded so the guard below sees it as minted.
     "teams_search_messages": {"mentions": ("get_me",)},
     "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
@@ -397,6 +402,8 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
 # under a flat set the second would inherit the first's classification and the reachability check
 # below would never ask about it.
 _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
+    "teams_send_chat_message": frozenset({"message"}),
+    "teams_send_channel_message": frozenset({"message"}),
     "teams_search_messages": frozenset(
         {
             "query",
@@ -659,6 +666,19 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ),
         3,
         10,
+    ),
+    (
+        ToolsPreset.TEAMS_WRITE,
+        (
+            "User.Read",
+            "Chat.Read",
+            "Team.ReadBasic.All",
+            "Channel.ReadBasic.All",
+            "ChatMessage.Send",
+            "ChannelMessage.Send",
+        ),
+        0,
+        6,
     ),
     (ToolsPreset.OUTLOOK_READ, ("User.Read", "Mail.Read", "People.Read"), 0, 7),
     (ToolsPreset.OUTLOOK_MAILBOX, ("User.Read", "MailboxSettings.Read"), 0, 2),

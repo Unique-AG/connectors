@@ -23,6 +23,8 @@ mock_provider "azuread" {
         "Team.ReadBasic.All"               = "33333333-3333-3333-3333-333333333333"
         "Channel.ReadBasic.All"            = "44444444-4444-4444-4444-444444444444"
         "ChannelMessage.Read.All"          = "55555555-5555-5555-5555-555555555555"
+        "ChatMessage.Send"                 = "e1111111-1111-1111-1111-111111111111"
+        "ChannelMessage.Send"              = "e2222222-2222-2222-2222-222222222222"
         "OnlineMeetings.Read"              = "66666666-6666-6666-6666-666666666666"
         "OnlineMeetingTranscript.Read.All" = "77777777-7777-7777-7777-777777777777"
         "OnlineMeetingRecording.Read.All"  = "88888888-8888-8888-8888-888888888888"
@@ -178,6 +180,27 @@ run "preset_teams_meetings" {
   assert {
     condition     = join(",", local.permissions) == "User.Read,Chat.Read,OnlineMeetings.Read,OnlineMeetingTranscript.Read.All,OnlineMeetingRecording.Read.All"
     error_message = "teams-meetings composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_teams_write" {
+  variables {
+    tools_preset = "teams-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Team.ReadBasic.All,Channel.ReadBasic.All,ChatMessage.Send,ChannelMessage.Send"
+    error_message = "teams-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 6
+    error_message = "teams-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "teams-write should need no administrator, needs ${join(",", local.admin_consent)}"
   }
 }
 

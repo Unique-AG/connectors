@@ -38,6 +38,13 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Team.ReadBasic.All": False,
     "Channel.ReadBasic.All": False,
     "ChannelMessage.Read.All": True,
+    # Microsoft publishes AdminConsentRequired: No for both of these — confirmed against the
+    # permissions reference rather than copied from a neighboring row. `ChannelMessage.Read.All`
+    # above needs consent because it is the ".All" shape, reading every channel in the tenant; the
+    # two below are narrower, delegated-only sends that touch only what the signed-in user could
+    # already post to by hand.
+    "ChatMessage.Send": False,
+    "ChannelMessage.Send": False,
     "OnlineMeetings.Read": False,
     "OnlineMeetingTranscript.Read.All": True,
     "OnlineMeetingRecording.Read.All": True,
