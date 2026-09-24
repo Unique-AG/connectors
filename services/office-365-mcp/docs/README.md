@@ -1,10 +1,8 @@
 # office-365-mcp
 
-## Documentation Disclaimer
-
-> [!WARNING]
-> This feature is `EXPERIMENTAL` and under active development. It may change significantly, be
-> discontinued, or have breaking changes without notice.
+!!! danger "Documentation Disclaimer"
+    This feature is `EXPERIMENTAL` and under active development. It may change significantly, be
+    discontinued, or have breaking changes without notice.
 
 ## Overview
 
