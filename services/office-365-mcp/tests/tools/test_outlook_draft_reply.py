@@ -560,7 +560,7 @@ class TestHowItDeclaresItself:
     async def test_the_description_says_a_forward_brings_its_own_attachments_regardless(
         self, transport: httpx.AsyncClient
     ) -> None:
-        parameters, tool = await _registered(transport)
+        parameters, _tool = await _registered(transport)
 
         mode_description = cast("str", _properties(parameters)["mode"]["description"])
         assert "carries the original's own attachments" in mode_description.casefold()

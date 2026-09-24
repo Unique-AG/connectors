@@ -895,7 +895,7 @@ def _queries(panel: Mapping[str, object]) -> list[str]:
     return [
         expression
         for target in cast("list[object]", targets)
-        if isinstance(target, Mapping) and isinstance(expression := target.get("expr"), str)
+        if isinstance(target, Mapping) and isinstance(expression := target.get("expr"), str)  # pyright: ignore[reportUnknownMemberType]
     ]
 
 
