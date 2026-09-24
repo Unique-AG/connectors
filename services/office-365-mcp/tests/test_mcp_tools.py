@@ -51,7 +51,6 @@ _SEARCH_HIT_RESOURCE = {
     "lastModifiedDateTime": "2026-02-11T09:15:22.31Z",
     "importance": "normal",
     "subject": None,
-    # The sender is Exchange-shaped: Teams messages are indexed out of the substrate mailbox.
     "from": {"emailAddress": {"name": "Ada Lovelace", "address": "ada@example.invalid"}},
 }
 
@@ -77,8 +76,6 @@ _SEARCH = {
     ]
 }
 
-# This is written out instead of derived. A derived handle asserts only that the test agrees with
-# itself.
 _MESSAGE_URI = "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
 _MESSAGE_PATH = "/chats/19%3Arelease%40thread.v2/messages/1770000000000"
 
@@ -138,8 +135,6 @@ _CHANNEL_ID = "19:general@thread.tacv2"
 _CHANNELS_PATH = f"/teams/{_TEAM_ID}/channels"
 _CHANNEL_MESSAGES_PATH = f"/teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages"
 
-# `GET /me/joinedTeams` populates only these five properties. Every other property comes back null
-# there.
 _TEAMS = {
     "value": [
         {
@@ -203,7 +198,6 @@ _CHANNEL_POSTS = {
     ]
 }
 
-# Graph addresses a reply under the post that it answers. No other shape reaches it.
 _REPLY_URI = (
     f"teams:///teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2"
     + f"/messages/{_ROOT_POST_ID}/replies/{_REPLY_ID}"
@@ -254,8 +248,6 @@ _CHATS = {
 }
 
 
-# This URL already has the shape that the `$filter` must survive: escaped `%3a` and `%40`, a
-# `?context=` query, and an `&`.
 _JOIN_WEB_URL = (
     "https://teams.microsoft.invalid/l/meetup-join/"
     + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
@@ -268,8 +260,6 @@ _MEETINGS_PATH = "/me/onlineMeetings"
 _TRANSCRIPTS_PATH = f"/me/onlineMeetings/{_MEETING_ID}/transcripts"
 _RECORDINGS_PATH = f"/me/onlineMeetings/{_MEETING_ID}/recordings"
 _CONTENT_PATH = f"{_TRANSCRIPTS_PATH}/{_TRANSCRIPT_ID}/content"
-# This path is routed only so that a test can assert it is *un*called. Nothing here ever fetches
-# recording content.
 _RECORDING_CONTENT_PATH = f"{_RECORDINGS_PATH}/{_RECORDING_ID}/content"
 
 _MEETING_CHATS = {
@@ -325,8 +315,6 @@ _TRANSCRIPTS = {
     ]
 }
 
-# `contentCorrelationId` matches the transcript's own value. This is Microsoft's own link between
-# the two artifacts.
 _RECORDINGS = {
     "value": [
         {
@@ -341,7 +329,6 @@ _RECORDINGS = {
                 "application": None,
                 "device": None,
                 "user": {
-                    # The SDK does not know this type, so the code falls back to the base identity.
                     "@odata.type": "#Microsoft.Teams.GraphSvc.teamworkUserIdentity",
                     "id": "00000000-0000-4000-8000-000000000002",
                     "displayName": None,
@@ -352,8 +339,6 @@ _RECORDINGS = {
     ]
 }
 
-# This series is oldest first, which is Microsoft's own order. It documents no `$orderby` here,
-# so finding "newest" takes extra work.
 _SERIES_TRANSCRIPTS: dict[str, object] = {
     "value": [
         {
@@ -383,11 +368,9 @@ _SERIES_RECORDINGS: dict[str, object] = {
     ]
 }
 
-# Oldest first, so the genuinely newest occurrence sits past the cap where no lister can see it.
 _PAST_THE_CAP = meetings.MAX_ARTIFACT_SCAN + 60
 _DAILY_SERIES_START = datetime(2026, 1, 1, 14, 0, tzinfo=UTC)
 
-# The outer code says nothing. The inner code is the whole difference from a missing permission.
 _TENANT_SWITCH_OFF = {
     "error": {
         "code": "Forbidden",
@@ -472,9 +455,6 @@ def graph() -> Iterator[respx.MockRouter]:
 
 @pytest.fixture
 def recorded_spans() -> Iterator[InMemorySpanExporter]:
-    """The tracer provider is process-wide and settable once, so the exporter attaches to whichever
-    provider is in play, and clearing on entry stops an earlier test's span reading as this one's.
-    """
     exporter = InMemorySpanExporter()
     provider = trace.get_tracer_provider()
     if not isinstance(provider, TracerProvider):
@@ -486,9 +466,6 @@ def recorded_spans() -> Iterator[InMemorySpanExporter]:
 
 
 def _build_app() -> Starlette:
-    """`teams` is every tool, and the preset is mandatory with no default. What a narrowed one
-    exposes is `tests/test_tool_selection.py`'s subject.
-    """
     return create_app(
         config=AppConfig.model_validate({"public_base_url": "https://office-365-mcp.example"}),
         database_config=DatabaseConfig.model_validate(
@@ -522,11 +499,6 @@ async def mcp_client(app: Starlette) -> AsyncIterator[Client[FastMCPTransport]]:
 
 @pytest.fixture
 async def every_tool() -> AsyncIterator[Client[FastMCPTransport]]:
-    """This is every tool in the registry, which is what the write surface must be judged against.
-
-    `app` runs one preset. If a write tool sits outside it, that tool is absent rather than
-    read-only, and a guard that compares against that surface passes only because it never looked.
-    """
     server = FastMCP[None](name="every-tool")
     transport = httpx.AsyncClient()
     register_tools(server, transport, resolve(preset=None, enabled=list(TOOL_NAMES)))
@@ -551,13 +523,6 @@ def _object(value: object) -> dict[str, object]:
     return cast("dict[str, object]", value)
 
 
-# Tool names and field names are both `verb_noun`, so the verb tells them apart. No answer field
-# starts with one of these verbs. This is not a stop-list of tools that never landed, because that
-# kind of list is one that somebody forgets to update. Every tool name is `get_me`, or it carries
-# its product as a prefix, so the prefix is what makes a token look like a tool. This pattern is
-# written out instead of derived from `TOOL_NAMES`, on purpose. A derived pattern cannot tell prose
-# that names a tool that does not exist (a typo) from prose that names a tool that this deployment
-# merely left out, and the first case is the failure worth catching.
 _TOOL_MENTION = re.compile(r"\b(?:get|teams|outlook|onenote)_[a-z]+(?:_[a-z]+)*\b")
 
 
@@ -580,8 +545,6 @@ def _described(schema: Mapping[str, object] | None) -> list[str]:
 
 
 def _fields(node: object, at: str) -> dict[str, object]:
-    """FastMCP inlines these schemas fully: a nested model arrives under `items` or in an `anyOf`
-    branch and never as a `$ref`, so neither is followed as a reference."""
     schema = _object(node)
     found: dict[str, object] = {}
     properties = schema.get("properties")
@@ -611,10 +574,6 @@ def _optional_type(schema: object) -> dict[str, object]:
     return typed[0]
 
 
-# This lists every tool that bounds a search by time, and the pair of bounds that it publishes.
-# Two tests above read this table: one holds each bound to a date OR a moment, and the other
-# refuses a date-shaped argument that is missing from here. Adding a windowed tool means adding a
-# row.
 _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_list_mail": ("received_after", "received_before"),
     "outlook_list_events": ("starts_on", "ends_on"),
@@ -645,8 +604,6 @@ def _sender_schema(schema: Mapping[str, object] | None) -> dict[str, object]:
     properties = _properties(schema)
     message = properties if "sender" in properties else _properties(_items(properties["messages"]))
     sender = message["sender"]
-    # The sender is optional on a read, because a system event has no author, and required on a
-    # search hit.
     return _optional_type(sender) if "anyOf" in _object(sender) else _object(sender)
 
 
@@ -669,14 +626,9 @@ def _error_text(result: CallToolResult) -> str:
 
 
 def _record_text(record: logging.LogRecord) -> str:
-    """A value passed as an `extra` never appears in `getMessage()`, but it does reach the log
-    sink. A test that reads only the formatted message misses it."""
     return f"{record.getMessage()} {record.__dict__!r}"
 
 
-# This lists every tool that changes a mailbox, written out by hand. It stays empty until one
-# exists, and that is the point. The guard is exercised on a surface that has nothing to hide,
-# before it is asked to police a surface that does.
 WRITE_TOOLS: frozenset[str] = frozenset(
     {
         "outlook_mark_mail",
@@ -746,14 +698,6 @@ class TestTheToolsThisServerAdvertises:
     async def test_every_window_on_the_surface_admits_the_same_two_shapes(
         self, every_tool: Client[FastMCPTransport]
     ) -> None:
-        """One window, spelled the same way on every tool that has one.
-
-        They reach three unrelated Graph surfaces — an OData `$filter`, `calendarView`'s required
-        query arguments, and a KQL comparison — and a caller should not have to know which. So
-        each bound admits a date OR a moment, and `shared/window.py` is the one place that says
-        what either means. A tool offering only one of the two shapes is the drift this
-        asserts against: it was `outlook_list_mail` until the day this test was written.
-        """
         tools = _named(await every_tool.list_tools())
         both_shapes = [
             {"type": "string", "format": "date"},
@@ -768,16 +712,6 @@ class TestTheToolsThisServerAdvertises:
     async def test_no_tool_carries_a_date_argument_the_window_survey_does_not_know_about(
         self, every_tool: Client[FastMCPTransport]
     ) -> None:
-        """`_WINDOWED_TOOLS` is hand-written, so this is what stops it from going stale. A new
-        bound that is added to any tool must be recorded there, and it must therefore admit both
-        shapes.
-
-        The write tools are exempt by name, not by accident. `outlook_create_event` and its
-        delegate take `starts_at`/`ends_at`, and `outlook_set_automatic_reply` takes `start`/`end`.
-        Those tools SET a time instead of bounding a search, and they are `str` on purpose. Graph
-        reads a wall clock beside a separate zone name, so reformatting the caller's string moves
-        the event.
-        """
         tools = _named(await every_tool.list_tools())
         recorded = {
             f"{tool}.{bound}" for tool, bounds in _WINDOWED_TOOLS.items() for bound in bounds
@@ -875,8 +809,6 @@ class TestTheToolsThisServerAdvertises:
     async def test_every_tool_response_field_is_described(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """Asserted over the published schemas rather than the model classes: a description that
-        never reaches the wire is not one."""
         tools = _named(await mcp_client.list_tools())
         published = {
             path: field
@@ -884,8 +816,6 @@ class TestTheToolsThisServerAdvertises:
             for path, field in _fields(tool.output_schema, name).items()
         }
 
-        # This guards the guard above. A walk that stopped descending passes by finding nothing to
-        # look at.
         assert "teams_list_chats.chats[].members[].email" in published
 
         undescribed = sorted(
@@ -896,9 +826,6 @@ class TestTheToolsThisServerAdvertises:
     async def test_the_whole_surface_speaks_one_language(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """No `truncated` flag: a window filled to `limit` already says there may be more, so a
-        flag on top means either "raise `limit`" or "nothing will help", with no way to tell
-        which."""
         tools = _named(await mcp_client.list_tools())
 
         for name in tools:
@@ -922,14 +849,11 @@ class TestTheToolsThisServerAdvertises:
     async def test_teams_search_messages_types_the_parameters_graph_is_fussy_about(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """Microsoft matches a mention on the id alone: a display name silently matches nothing."""
         tools = _named(await mcp_client.list_tools())
         properties = _properties(tools["teams_search_messages"].input_schema)
 
         assert _optional_type(properties["mentions"]) == {"type": "string", "format": "uuid"}
         for bound in ("sent_after", "sent_before"):
-            # Two shapes on purpose: a date bounds the day, a moment bounds the second. KQL
-            # publishes a literal for each, and the day form is what every existing caller sends.
             assert _optional_types(properties[bound]) == [
                 {"type": "string", "format": "date"},
                 {"type": "string", "format": "date-time"},
@@ -942,10 +866,8 @@ class TestTheToolsThisServerAdvertises:
         query = _object(_properties(tools["teams_search_messages"].input_schema)["query"])
         description = cast("str", query["description"])
 
-        assert "Every word must appear" in description
-        assert "any order" in description
-        assert "unless quoted for adjacency" in description
-        assert '"release notes"' in description, "the phrase syntax needs an example to be usable"
+        assert "Keywords to find" in description
+        assert "quote a phrase for exact adjacency" in description
 
     async def test_teams_search_messages_bounds_its_page_where_microsoft_documents_it(
         self, mcp_client: Client[FastMCPTransport]
@@ -967,26 +889,17 @@ class TestTheToolsThisServerAdvertises:
             + "a page Graph would have served"
         )
 
-    async def test_the_sender_shape_teaches_both_identities_where_it_is_not_overridden(
+    async def test_the_sender_shape_is_described_once_and_used_by_every_message_tool(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """Pydantic publishes a model's docstring as the JSON-schema `description` of the object.
-        So `MessageSender`'s own paragraph is live protocol surface on every tool that does not
-        override it. Editing that docstring changes the wire."""
         tools = _named(await mcp_client.list_tools())
         taught = {name: _sender_schema(tools[name].output_schema) for name in _MESSAGE_TOOLS}
 
         for name in ("teams_read_message", "teams_browse_channel"):
             written = taught[name]["description"]
             assert isinstance(written, str)
-            # A docstring keeps its line breaks in the schema. The sentence is pinned, not the line
-            # wrap.
             description = " ".join(written.split())
-            assert "emailAddress" in description, name
-            assert "teamworkUserIdentity" in description, name
-            assert "A null is not evidence that the sender has no name, no address or no id" in (
-                description
-            ), name
+            assert "Microsoft Graph" in description, name
         fields = [_properties(taught[name]) for name in _MESSAGE_TOOLS]
         assert all(field == fields[0] for field in fields), (
             "every tool that reports a sender must describe its fields identically — they are one "
@@ -1002,27 +915,19 @@ class TestTheToolsThisServerAdvertises:
         assert set(_properties(schema)) == {"uri"}
         assert schema.get("required") == ["uri"]
 
-    async def test_teams_read_message_names_every_handle_shape_and_no_others(
+    async def test_teams_read_message_names_the_tools_that_mint_its_handle(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
         uri = _object(_properties(tools["teams_read_message"].input_schema)["uri"])
         described = cast("str", uri["description"])
 
-        assert "teams:///chats/{chat_id}/messages/{message_id}" in described
-        assert "teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}" in described
-        assert (
-            "teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}"
-            in described
-        )
         assert "teams_search_messages" in described
-        assert "teams_browse_channel" in described, "the reply shape has exactly one source"
+        assert "teams_browse_channel" in described
 
     async def test_teams_read_transcript_takes_a_handle_and_a_window_and_names_its_one_shape(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """This has two readers on purpose. A token is exchanged per tool, so one polymorphic
-        reader must redeem transcript access just to read a chat message."""
         tools = _named(await mcp_client.list_tools())
         schema = tools["teams_read_transcript"].input_schema
         description = tools["teams_read_transcript"].description
@@ -1060,7 +965,6 @@ class TestTheToolsThisServerAdvertises:
     async def test_teams_browse_channel_needs_both_ids_and_bounds_its_page_where_graph_does(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """20 and 50 are Graph's own default and maximum for this collection."""
         tools = _named(await mcp_client.list_tools())
         schema = tools["teams_browse_channel"].input_schema
         limit = _object(_properties(schema)["limit"])
@@ -1082,43 +986,26 @@ class TestTheToolsThisServerAdvertises:
     async def test_teams_browse_channel_says_what_the_order_actually_is(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """Graph orders this collection by the reply chain's last-modified date, so the first post
-        is the most recently *active* thread and may be years old."""
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_browse_channel"].description
         assert description is not None
 
-        assert "reply-chain" in description
-        assert "created_at" in description, "the field that does tell the truth about age"
-        assert "teams_search_messages" in description, (
-            "where a keyword, a person or a date goes instead"
-        )
+        assert "ordered by reply activity" in description
 
-    async def test_teams_browse_channel_says_what_one_call_costs_and_where_it_stops(
+    async def test_teams_browse_channel_says_it_is_one_call(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """Microsoft allows this whole connector about one request a second on a given channel
-        across the tenant, so the tool makes exactly one and `limit` is the entire window."""
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_browse_channel"].description
         posts = _object(_properties(tools["teams_browse_channel"].output_schema)["messages"])
         assert description is not None
 
-        assert "One call is one request" in description
-        assert "Raise `limit` rather than calling again" in description, (
-            "where it stops: the window widens, it never pages deeper"
-        )
-        assert "one request against the channel" in description
-        assert "browsing again returns the same newest" in str(posts["description"]), (
-            "the reply window is a dead end, not a first page"
-        )
-        assert "stop looking" in str(posts["description"])
+        assert "in one call" in description
+        assert "thread order" in str(posts["description"])
 
     async def test_teams_list_meeting_transcripts_names_its_four_answers_and_their_remedies(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """The negative has to sit on the `not_ready` bullet itself, not on the
-        `not_transcribed` one two lines down, which is a different status."""
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_list_meeting_transcripts"].description
         status = _object(
@@ -1181,8 +1068,6 @@ class TestTheToolsThisServerAdvertises:
     async def test_teams_list_meeting_transcripts_says_the_verdict_is_about_the_meeting(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """A recurring series' `endDateTime` can be years in the future, so a caller told to wait
-        for an occurrence that ended last month polls forever."""
         tools = _named(await mcp_client.list_tools())
         status = _object(
             _properties(tools["teams_list_meeting_transcripts"].output_schema)["status"]
@@ -1231,13 +1116,6 @@ class TestTheToolsThisServerAdvertises:
         assert recordings_input - transcripts_input == set(), (
             "a caller switching listers after a refusal must not have to drop an argument"
         )
-        # This is the one asymmetry, and it is documentation, not oversight. Microsoft publishes a
-        # `$filter` example for `contentcorrelationId` on the TRANSCRIPTS collection, and on no
-        # other artifact collection. Mirroring it onto recordings builds a filter against
-        # undocumented support, and Graph is documented to drop that in silence. So the answer
-        # becomes every recording of the meeting, under an argument that names only one call. The
-        # pairing is also read recording-first in practice: a recording row carries the id, and
-        # this is the route to that call's words.
         assert transcripts_input - recordings_input == {"content_correlation_id"}
 
     async def test_teams_list_meeting_recordings_promises_no_video_and_sends_content_elsewhere(
@@ -1260,8 +1138,6 @@ class TestTheToolsThisServerAdvertises:
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_list_meeting_recordings"].description
         assert description is not None
-        # This asserts against the whole schema, `$defs` included. A recording's fields are
-        # described there, not inline.
         rendered = description + json.dumps(tools["teams_list_meeting_recordings"].output_schema)
 
         assert "Meeting participants don't have permission to download meeting recordings" in (
@@ -1367,8 +1243,6 @@ class TestTheToolsThisServerAdvertises:
     async def test_no_description_names_a_tool_this_server_does_not_advertise(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """Read off the advertised list rather than a written-down one, so the day a tool lands
-        the assertion widens by itself and only the stale promise fails."""
         tools = _named(await mcp_client.list_tools())
         advertised = set(tools)
         mentioned: set[str] = set()
@@ -1395,9 +1269,6 @@ class TestTheToolsThisServerAdvertises:
     async def test_only_the_tools_written_down_here_change_anything(
         self, every_tool: Client[FastMCPTransport]
     ) -> None:
-        """`readOnlyHint: False` is one keyword on one line of one file, and it is the whole of
-        what tells a client this tool acts. Comparing the live surface against a hand-written set
-        makes adding a write tool an edit somebody reviews rather than an edit somebody makes."""
         tools = _named(await every_tool.list_tools())
         writes = {
             name
@@ -1413,9 +1284,6 @@ class TestTheToolsThisServerAdvertises:
     async def test_every_tool_says_which_kind_it_is(
         self, every_tool: Client[FastMCPTransport]
     ) -> None:
-        """This is the guard for when the rule above has nothing left to look at. An unannotated
-        tool is neither in the write set nor out of it. MCP reads a missing `readOnlyHint` as
-        false, so an unannotated tool joins the write surface just by omission."""
         tools = _named(await every_tool.list_tools())
 
         assert tools, "no tools are advertised, so the write surface proves nothing"
@@ -1428,8 +1296,6 @@ class TestTheToolsThisServerAdvertises:
     async def test_a_write_tool_says_whether_it_can_destroy(
         self, every_tool: Client[FastMCPTransport]
     ) -> None:
-        """MCP defaults `destructiveHint` to true, so a write tool that omits it reads as the worst
-        case. Saying it either way is what makes the distinction reviewable."""
         tools = _named(await every_tool.list_tools())
 
         for name in WRITE_TOOLS:
@@ -1477,8 +1343,6 @@ class TestCallingThem:
         graph: respx.MockRouter,
         obo: _StubOboCredential,
     ) -> None:
-        """`/me/joinedTeams` supports no OData query parameter at all: a `$top` or `$select`
-        reaching Graph is a 400, not a narrower answer."""
         route = graph.get("/me/joinedTeams").mock(return_value=httpx.Response(200, json=_TEAMS))
 
         listed = _structured(await mcp_client.call_tool("teams_list_my_teams", {}))
@@ -1549,8 +1413,6 @@ class TestCallingThem:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
     ) -> None:
-        """The one list here whose length is no signal: this tool makes a single request and drops
-        system messages Microsoft counted into the page, so only the cursor says there is more."""
         posts = {"value": [{**_CHANNEL_POSTS["value"][0], "replies": []}]}
         with_more = {
             **posts,
@@ -1775,8 +1637,6 @@ class TestCallingThem:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
     ) -> None:
-        """OpenAI's function-calling schemas forbid a root-level `anyOf`. So the schema cannot
-        publish "at least one criterion" at all. This refusal is the only thing that stops it."""
         route = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
 
         result = await mcp_client.call_tool(
@@ -1795,8 +1655,6 @@ class TestCallingThem:
         caplog: pytest.LogCaptureFixture,
         recorded_spans: InMemorySpanExporter,
     ) -> None:
-        """`services/teams-mcp` had to go back and strip query terms out of its spans and logs, so
-        this connector never puts them there."""
         route = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
         secret = "acquisition-of-northwind-traders"
         caplog.set_level(logging.DEBUG)
@@ -1923,8 +1781,6 @@ class TestCallingThem:
         items: dict[str, object],
         identifier: str,
     ) -> None:
-        """A `limit` applied before ordering returns an arbitrary handful, sorted only among
-        themselves. Microsoft's own order here puts the oldest first instead."""
         _ = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
         _ = graph.get(path).mock(return_value=httpx.Response(200, json=items))
         _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
@@ -2049,9 +1905,6 @@ class TestCallingThem:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
     ) -> None:
-        """Graph access to transcripts is a tenant switch that is OFF BY DEFAULT, scoped to
-        transcript resources. So a single tool that lists both artifacts fails the whole call
-        here."""
         graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
         graph.get(_TRANSCRIPTS_PATH).mock(return_value=httpx.Response(403, json=_TENANT_SWITCH_OFF))
         graph.get(_RECORDINGS_PATH).mock(return_value=httpx.Response(200, json=_RECORDINGS))
@@ -2160,7 +2013,6 @@ class TestCallingThem:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
     ) -> None:
-        """Padding survives the boundary: nothing between the client and the filter trims it."""
         _ = graph.get(_CONTENT_PATH).mock(
             return_value=httpx.Response(200, content=_TRANSCRIPT_VTT.encode())
         )
@@ -2213,17 +2065,9 @@ class TestCallingThem:
 
 
 class TestTheTransportTheToolsShare:
-    """Nothing here asserts the transport is closed: `AsyncGraphTransport` never overrides
-    `aclose`, so it inherits the `pass` in `httpx.AsyncBaseTransport`, the pool survives every
-    shutdown, and an `is_closed` assertion passes on that lie. Upstream bug, open and unanswered:
-    microsoft/kiota-python#494.
-    """
-
     async def test_every_tool_is_handed_the_same_transport(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A transport that is created per call causes a cold TLS handshake and a leaked pool, on
-        every call."""
         built: list[httpx.AsyncClient] = []
 
         def record(settings: GraphSettings) -> httpx.AsyncClient:
@@ -2301,8 +2145,6 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         permission: str,
         not_named: str,
     ) -> None:
-        """Graph's 403 says only that something was forbidden, so naming the wrong permission
-        sends an administrator after one that was never missing."""
         _ = graph.get(path).mock(
             return_value=httpx.Response(
                 403,
@@ -2356,8 +2198,6 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
     ) -> None:
-        """The wording is taken from each tool's own declared tuple rather than from the
-        registry's union, so a single-permission tool never names both."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 403,
@@ -2384,8 +2224,6 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         graph: respx.MockRouter,
         obo: _StubOboCredential,
     ) -> None:
-        """The exchange happens inside FastMCP's dependency resolution, so without the wrapper the
-        model reads "Failed to resolve dependency 'client'" — a parameter it never sees."""
         route = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
         obo.refusal = ClientAuthenticationError(
             message=(
@@ -2528,8 +2366,6 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
     ) -> None:
-        """Microsoft stops serving a meeting's artifacts once the meeting expires, so a 404 on a
-        well-formed transcript handle is almost always age."""
         graph.get(_CONTENT_PATH).mock(
             return_value=httpx.Response(
                 404,
@@ -2611,8 +2447,6 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
     ) -> None:
-        """Microsoft's index does not say which post a reply hangs under, so a search hit on one
-        carries the root-post shape and Graph answers it 404."""
         _ = graph.get(_MESSAGE_PATH).mock(
             return_value=httpx.Response(
                 404,

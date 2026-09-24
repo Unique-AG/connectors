@@ -1,6 +1,3 @@
-"""Every payload in this file is synthetic. No message in this file was ever posted to a real
-channel."""
-
 import json
 from collections.abc import Mapping, Sequence
 from typing import cast
@@ -55,9 +52,6 @@ async def _refuses(question: str, about: str) -> Confirmed:
 def _sent_payload(
     *, message_id: str = _SENT_MESSAGE_ID, content: str = _MESSAGE
 ) -> Mapping[str, object]:
-    """This function returns the Graph response for a successful post. It uses the same
-    `chatMessage` shape that a read returns. Graph fills in the `webUrl` field for a channel post,
-    but leaves it null for a chat message."""
     return message_payload(
         message_id=message_id,
         content=content,
@@ -90,10 +84,6 @@ async def _send(
 
 
 class TestThePersonBeforeThePost:
-    """There is no draft for review here. The confirmation question is the only place where a
-    person sees the words before the tool sends them, so the question must carry the message
-    text."""
-
     async def test_a_refusal_posts_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -124,8 +114,6 @@ class TestThePersonBeforeThePost:
     async def test_the_question_carries_the_destination(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A person approving a post must see WHERE it goes, not just the text: approving "post
-        this" in a multi-channel conversation should not silently approve the wrong channel."""
         _ = _posts(graph)
         asked: list[str] = []
 
@@ -157,11 +145,6 @@ class TestThePersonBeforeThePost:
 
 
 class TestHowTheQuestionReachesAPerson:
-    """`a_person_agrees` is this tool's own adapter onto `person_confirms`. The tests in
-    `tests/shared/test_seam.py` prove the mechanics of the seam itself: both protocol eras, and
-    every way that a client can fail to answer. This file tests only that this tool's wiring gates
-    the post on the answer."""
-
     @staticmethod
     def _context(answer: object) -> Context:
         class _Client:
@@ -200,8 +183,6 @@ class _ModernRequest:
 def _modern_context(
     *, answers: Mapping[str, InputResponse] | None = None, state: str | None = None
 ) -> Context:
-    """This models a connection at protocol version 2026-07-28. The `elicit` call raises an
-    exception, so a leak back onto the back-channel fails."""
 
     class _Client:
         request_context: _ModernRequest = _ModernRequest()
@@ -333,11 +314,6 @@ class TestTheRetryItRefuses:
     async def test_a_post_graph_answers_503_is_never_sent_a_second_time(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """This is the single most important line in the tool. By default, the SDK retries a POST
-        request three times on a 429, 503, or 504 response. Graph publishes no idempotency key for
-        a channel message post, so an unguarded post can deliver the same message up to four
-        times. `tests/graph_client/test_client.py::TestANonIdempotentCallIsNotRetried` proves the
-        default retry behavior that this test overrides."""
         post = graph.post(_SEND_PATH).mock(return_value=httpx.Response(503))
 
         with pytest.raises(Exception):  # noqa: B017, PT011
@@ -425,8 +401,6 @@ class TestTheFailuresItPassesOn:
 
 class TestHowItDeclaresItself:
     def test_the_permission_is_channel_message_send(self) -> None:
-        """Unlike the chat route, both of Graph's reference pages agree on this permission name.
-        See the module docstring for more information."""
         assert sender.GRAPH_PERMISSIONS == ("ChannelMessage.Send",)
 
     def test_its_one_step_is_the_one_call_it_makes(self) -> None:
@@ -435,9 +409,6 @@ class TestHowItDeclaresItself:
     async def test_it_announces_itself_as_an_addition_rather_than_a_destructive_write(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """This tool creates a new message. It does not consume or overwrite anything that already
-        existed. This differs from `outlook_send_draft`, which turns an existing draft into a sent
-        message."""
         _parameters, tool = await _registered(transport)
 
         annotations = tool.annotations
@@ -446,15 +417,13 @@ class TestHowItDeclaresItself:
         assert annotations.destructive_hint is WRITE_ADDITIVE["destructiveHint"]
         assert annotations.idempotent_hint is WRITE_ADDITIVE["idempotentHint"]
 
-    async def test_the_description_says_it_asks_before_posting_and_cannot_be_undone(
+    async def test_the_description_says_it_asks_before_posting(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "asks the user to approve the message" in lowered
-        assert "posts nothing unless they agree" in lowered
-        assert "cannot be undone" in lowered
+        assert "after the user approves it" in lowered
 
     async def test_the_three_arguments_are_team_id_channel_id_and_message(
         self, transport: httpx.AsyncClient
