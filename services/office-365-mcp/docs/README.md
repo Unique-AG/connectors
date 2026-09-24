@@ -149,17 +149,45 @@ description.
 (in another repository) writes the pod's active tool selection. Nothing compares the two on its
 own.
 
-## Permissions and consent
+## Permissions
 
 Each tool needs one or more Microsoft Graph permissions, and the Tools section names each one.
 [Microsoft's own reference](https://learn.microsoft.com/en-us/graph/permissions-reference) lists
 what each permission grants. A deployment asks for the union of every active tool's permissions,
 one time, at sign-in. It never asks again per call, and it never asks later for a permission that
-no tool requested at sign-in. Before any user can sign in, some permissions need a tenant
-administrator to grant them, and the Tools section marks these.
+no tool requested at sign-in. After sign-in, each call draws the one permission it needs from this
+already-granted set, for the signed-in user. It does not ask again.
+
+## Admin consent
+
+Some permissions need a tenant administrator to grant them, before any user in that tenant can
+sign in. The Tools section marks these.
 [Microsoft's own overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview)
-explains this step in more detail. After sign-in, each call draws the one permission it needs from
-this already-granted set, for the signed-in user. It does not ask again.
+explains this step in more detail.
+
+A deployment sets its `sign_in_audience` to one of two values:
+
+- `AzureADMyOrg`, the default. Only the deployment's own tenant can sign in.
+- `AzureADMultipleOrgs`. A user from any tenant can sign in, and each tenant consents on its own.
+
+**The deployment's own tenant:**
+
+- When the caller sets the `service_principal_configuration` input, Terraform grants the needed
+  consent itself, as part of `terraform apply`, through a tenant-wide delegated permission grant.
+- When that input is not set, a tenant administrator must grant it instead, through
+  [the Entra portal](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent),
+  or the module's own `admin_consent_url` output.
+- Either way, the module's own README asks the operator to make sure that the permissions show as
+  granted, in Entra under App registrations.
+
+**Any other tenant, under `AzureADMultipleOrgs`:**
+
+- Terraform's grant covers only the deployment's own tenant. A user from a different tenant can
+  still sign in, but that tenant's own consent is still needed first.
+- That tenant's own administrator must grant it, through the same `admin_consent_url`, which works
+  for any tenant.
+- The administrator sees the result as a new Enterprise Application in their own tenant. This is
+  separate from the App registration, which stays in the deployment's own tenant.
 
 ## Deployment
 
@@ -175,16 +203,8 @@ mcpConfig:
 
 The `preset` key names one of the 20 presets in the Presets table. The `enabled` key names an
 exact, comma-separated list of tool names instead. A deployment that needs a mix that no preset
-covers uses `enabled`, and names every wanted tool.
-
-Administrator consent is a separate step from setting the tool surface. It happens in Terraform.
-When the caller sets its `service_principal_configuration` input, the Terraform module can grant
-the needed consent itself. It does this as part of `terraform apply`, through a tenant-wide
-delegated permission grant. When that input is not set, the module grants no consent on its own.
-A tenant administrator must grant it instead, through
-[the Entra portal](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent),
-or the module's own `admin_consent_url` output. Either way, the module's own README asks the
-operator to make sure that the permissions show as granted, in Entra under App registrations.
+covers uses `enabled`, and names every wanted tool. Granting admin consent is a separate step,
+covered in Admin consent.
 
 Terraform writes the Entra application registration. Argo writes the deployed pod's tool
 selection, through the chart values in this section. No automatic step compares these two. A
