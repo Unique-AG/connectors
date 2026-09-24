@@ -332,6 +332,24 @@ class TestThePersonBetweenTheRequestAndTheChange:
         assert "Renamed" in asked[0]
         assert "cannot recall" in asked[0]
 
+    async def test_clearing_every_attendee_on_an_event_that_had_some_is_put_to_a_person(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """An empty `attendees=[]` still reaches everyone who was invited before: Graph mails
+        each dropped attendee that they were removed."""
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
+        _ = _updates(graph)
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _update(client, attendees=[], optional_attendees=[], confirm=counting)
+
+        assert len(asked) == 1
+
     async def test_a_new_location_on_an_event_with_nobody_on_it_is_still_put_to_a_person(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

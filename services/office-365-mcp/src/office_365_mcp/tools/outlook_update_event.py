@@ -379,11 +379,12 @@ def _patched(patch: EventPatch, *, before: Event) -> Event:
 
 def _reaches_an_attendee(body: Event, *, before: Event) -> bool:
     """Whether this PATCH, as built, notifies anybody who is not the signed-in user. A newly set
-    location can reach a bookable room's mailbox even with nobody invited."""
+    location can reach a bookable room's mailbox even with nobody invited. Clearing every attendee
+    still reaches them: Graph mails a removed attendee that they were dropped."""
     if body.location is not None:
         return True
     final_attendees = body.attendees if body.attendees is not None else before.attendees
-    return bool(final_attendees)
+    return bool(final_attendees) or bool(before.attendees)
 
 
 def _question(before: Event, patch: EventPatch) -> str:
