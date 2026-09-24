@@ -78,13 +78,15 @@ def _reads(graph: respx.MockRouter, payload: dict[str, object]) -> respx.Route:
     return graph.get(_DRAFT_PATH).mock(return_value=httpx.Response(200, json=payload))
 
 
-async def _agrees(draft: Message) -> Confirmed:
+async def _agrees(draft: Message, mailbox: str | None) -> Confirmed:
     assert draft is not None
+    assert mailbox is None or mailbox
     return None
 
 
-async def _refuses(draft: Message) -> Confirmed:
+async def _refuses(draft: Message, mailbox: str | None) -> Confirmed:
     assert draft is not None
+    assert mailbox is None or mailbox
     return "Nothing was sent."
 
 
@@ -127,8 +129,9 @@ class TestThePersonBetweenTheDraftAndTheSend:
         send = _ready(graph)
         calls_when_asked: list[int] = []
 
-        async def watching(draft: Message) -> None:
+        async def watching(draft: Message, mailbox: str | None) -> None:
             assert draft is not None
+            assert mailbox is None
             calls_when_asked.append(len(graph.calls))
 
         _ = await send_draft(client, confirm=watching, draft_ref=_DRAFT_REF)
@@ -142,7 +145,8 @@ class TestThePersonBetweenTheDraftAndTheSend:
         _ = _ready(graph)
         asked: list[Message] = []
 
-        async def capturing(draft: Message) -> None:
+        async def capturing(draft: Message, mailbox: str | None) -> None:
+            assert mailbox is None
             asked.append(draft)
 
         _ = await send_draft(client, confirm=capturing, draft_ref=_DRAFT_REF)
@@ -176,12 +180,12 @@ class TestHowTheQuestionReachesAPerson:
     async def test_agreeing_answers_with_no_refusal(self) -> None:
         confirm = a_person_agrees(self._context(AcceptedElicitation(data=sender.SEND)))
 
-        assert await confirm(Message(subject="Invoice 4471")) is None
+        assert await confirm(Message(subject="Invoice 4471"), None) is None
 
     async def test_declining_refuses_and_says_the_draft_survives(self) -> None:
         confirm = a_person_agrees(self._context(DeclinedElicitation()))
 
-        refusal = await confirm(Message(subject="Invoice 4471"))
+        refusal = await confirm(Message(subject="Invoice 4471"), None)
 
         assert isinstance(refusal, str)
         assert refusal.startswith(_NOTHING_SENT), refusal
@@ -189,17 +193,17 @@ class TestHowTheQuestionReachesAPerson:
     async def test_cancelling_refuses_too(self) -> None:
         confirm = a_person_agrees(self._context(CancelledElicitation()))
 
-        assert "did not agree" in _refusal_of(await confirm(Message(subject="Invoice 4471")))
+        assert "did not agree" in _refusal_of(await confirm(Message(subject="Invoice 4471"), None))
 
     async def test_answering_anything_but_send_refuses(self) -> None:
         confirm = a_person_agrees(self._context(AcceptedElicitation(data="do not send")))
 
-        assert "did not agree" in _refusal_of(await confirm(Message(subject="Invoice 4471")))
+        assert "did not agree" in _refusal_of(await confirm(Message(subject="Invoice 4471"), None))
 
     async def test_a_client_that_cannot_ask_sends_nothing(self) -> None:
         confirm = a_person_agrees(self._context(RuntimeError("elicitation not supported")))
 
-        answer = _refusal_of(await confirm(Message(subject="Invoice 4471")))
+        answer = _refusal_of(await confirm(Message(subject="Invoice 4471"), None))
 
         assert "does not support elicitation" in answer
         assert answer.startswith(_NOTHING_SENT), answer
@@ -218,9 +222,47 @@ class TestHowTheQuestionReachesAPerson:
     async def test_no_refusal_is_ever_raised(self, answer: object) -> None:
         confirm = a_person_agrees(self._context(answer))
 
-        refusal = await confirm(Message(subject="Invoice 4471"))
+        refusal = await confirm(Message(subject="Invoice 4471"), None)
 
         assert isinstance(refusal, str) and refusal
+
+    async def test_the_question_text_names_the_mailbox_when_one_is_given(self) -> None:
+        asked: list[str] = []
+
+        class _Client:
+            request_context: object = None
+
+            async def elicit(self, message: str, response_type: object = None) -> object:
+                asked.append(message)
+                assert response_type is not None
+                return AcceptedElicitation(data=sender.SEND)
+
+        confirm = a_person_agrees(cast("Context", cast("object", _Client())))
+
+        _ = await confirm(Message(subject="Invoice 4471"), "alex@example.invalid")
+
+        assert len(asked) == 1
+        assert "alex@example.invalid" in asked[0]
+
+    async def test_the_question_text_names_no_mailbox_when_sending_as_the_signed_in_user(
+        self,
+    ) -> None:
+        asked: list[str] = []
+
+        class _Client:
+            request_context: object = None
+
+            async def elicit(self, message: str, response_type: object = None) -> object:
+                asked.append(message)
+                assert response_type is not None
+                return AcceptedElicitation(data=sender.SEND)
+
+        confirm = a_person_agrees(cast("Context", cast("object", _Client())))
+
+        _ = await confirm(Message(subject="Invoice 4471"), None)
+
+        assert len(asked) == 1
+        assert "@" not in asked[0]
 
 
 class _ModernRequest:
@@ -758,6 +800,48 @@ class TestMailboxTargeting:
         assert read.called
         assert send.called
         assert sent.to
+
+    async def test_the_question_names_the_mailbox_a_send_goes_out_as(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """A person approving a send must see WHICH identity it goes out as: a signed-in user
+        with Send As on another mailbox must not approve a normal-looking question and have the
+        mail leave under a different name."""
+        _ = graph.get("/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-draft-0001%3D").mock(
+            return_value=httpx.Response(200, json=_draft())
+        )
+        _ = graph.post(
+            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-draft-0001%3D/send"
+        ).mock(return_value=httpx.Response(202))
+        asked: list[str] = []
+
+        async def capturing(draft: Message, mailbox: str | None) -> Confirmed:
+            assert draft is not None
+            assert mailbox == "alex@example.invalid"
+            asked.append(f"mailbox={mailbox}")
+            return None
+
+        _ = await send_draft(
+            client, confirm=capturing, draft_ref=_DRAFT_REF, mailbox="alex@example.invalid"
+        )
+
+        assert asked == ["mailbox=alex@example.invalid"]
+
+    async def test_the_question_names_no_mailbox_when_sending_as_the_signed_in_user(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _draft())
+        _ = _sends(graph)
+        asked: list[str | None] = []
+
+        async def capturing(draft: Message, mailbox: str | None) -> Confirmed:
+            assert draft is not None
+            asked.append(mailbox)
+            return None
+
+        _ = await send_draft(client, confirm=capturing, draft_ref=_DRAFT_REF)
+
+        assert asked == [None]
 
 
 class TestHowItDeclaresItself:

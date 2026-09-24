@@ -115,21 +115,22 @@ SEND = "send"
 _DO_NOT_SEND = "do not send"
 _NOTHING_SENT = "Nothing was sent, and the draft is untouched and still in Drafts."
 
-type _Confirm = Callable[[Message], Awaitable[Confirmed]]
+type _Confirm = Callable[[Message, str | None], Awaitable[Confirmed]]
 
 
 def a_person_agrees(ctx: Context) -> _Confirm:
     confirm = person_confirms(ctx, agree=SEND, decline=_DO_NOT_SEND, nothing_happened=_NOTHING_SENT)
 
-    async def asked(draft: Message) -> Confirmed:
+    async def asked(draft: Message, mailbox: str | None) -> Confirmed:
         everyone = [
             one.address or one.name or "an address Microsoft did not record"
             for one in MailAddress.each_of(draft.to_recipients)
             + MailAddress.each_of(draft.cc_recipients)
         ]
+        identity = f" as {mailbox}" if mailbox is not None else ""
         question = (
             f"Send the draft {draft.subject or '(no subject)'!r} to "
-            f"{', '.join(everyone) or 'nobody'}? Sending cannot be undone."
+            f"{', '.join(everyone) or 'nobody'}{identity}? Sending cannot be undone."
         )
         return await confirm(question, question)
 
@@ -151,7 +152,7 @@ async def send_draft(
         refused: str | None = _ALREADY_SENT
         if draft is not None and draft.is_draft is True:
             with not_graph():
-                answer = await confirm(draft)
+                answer = await confirm(draft, mailbox)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         sent_at = await _send(reached, handle) if refused is None and asked is None else None
