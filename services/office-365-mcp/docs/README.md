@@ -165,29 +165,40 @@ sign in. The Tools section marks these.
 [Microsoft's own overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview)
 explains this step in more detail.
 
-A deployment sets its `sign_in_audience` to one of two values:
+Three tenants matter here:
 
-- `AzureADMyOrg`, the default. Only the deployment's own tenant can sign in.
-- `AzureADMultipleOrgs`. A user from any tenant can sign in, and each tenant consents on its own.
+- **Tenant D, or Tenant U.** The tenant that owns the Entra App registration. Unique supports
+  both: a customer's own dedicated tenant (Tenant D), or Unique's own shared tenant (Tenant U).
+- **Tenant C.** The customer's own tenant. It is always external to Tenant D or Tenant U, and it
+  is where the customer's real users sign in.
 
-**The deployment's own tenant:**
+This deployment always sets `sign_in_audience` to `AzureADMultipleOrgs`. A user from any tenant
+can then sign in, not only the tenant that owns the App registration.
 
-- When the caller sets the `service_principal_configuration` input, Terraform grants the needed
-  consent itself, as part of `terraform apply`, through a tenant-wide delegated permission grant.
-- When that input is not set, a tenant administrator must grant it instead, through
+```mermaid
+flowchart LR
+  subgraph hosting["Hosting tenant — pick one"]
+    tenantD["Tenant D<br/>customer's own dedicated tenant"]
+    tenantU["Tenant U<br/>Unique's shared tenant"]
+  end
+  app["Entra App Registration<br/>one multi-tenant app"]
+  subgraph customer["Tenant C — the customer's own tenant"]
+    enterpriseApp["Enterprise Application"]
+  end
+  tenantD -->|owns| app
+  tenantU -->|owns| app
+  app -->|admin consent, always required| enterpriseApp
+```
+
+A customer's own administrator, in Tenant C, must always grant admin consent:
+
+- Terraform's own grant, through the `service_principal_configuration` input, only ever covers
+  the tenant that owns the App registration. It cannot reach Tenant C.
+- To grant it, Tenant C's own administrator uses
   [the Entra portal](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent),
-  or the module's own `admin_consent_url` output.
-- Either way, the module's own README asks the operator to make sure that the permissions show as
-  granted, in Entra under App registrations.
-
-**Any other tenant, under `AzureADMultipleOrgs`:**
-
-- Terraform's grant covers only the deployment's own tenant. A user from a different tenant can
-  still sign in, but that tenant's own consent is still needed first.
-- That tenant's own administrator must grant it, through the same `admin_consent_url`, which works
-  for any tenant.
-- The administrator sees the result as a new Enterprise Application in their own tenant. This is
-  separate from the App registration, which stays in the deployment's own tenant.
+  or the module's own `admin_consent_url` output, which works for any tenant.
+- The administrator sees the result as a new Enterprise Application in Tenant C. This is separate
+  from the App registration, which stays in Tenant D or Tenant U.
 
 ## Deployment
 
