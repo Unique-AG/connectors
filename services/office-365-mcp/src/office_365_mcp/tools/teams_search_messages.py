@@ -3,25 +3,27 @@
 `POST /search/query` with `entityTypes: ["chatMessage"]` is Graph's only full-text path over Teams
 messages, delegated context only
 (https://learn.microsoft.com/en-us/graph/search-concept-chat-messages). A hit is a projection with
-no `body`; `total` counts the page rather than the matches, so only `moreResultsAvailable` says
-whether to keep going; no custom sort is supported; and paging is stateless `from`/`size` integers
+no `body`. `total` counts the page rather than the matches, so only `moreResultsAvailable` says
+whether to keep going. No custom sort is supported. Paging is stateless `from`/`size` integers
 rather than an `@odata.nextLink`, so `collect_pages` has no part here.
 
-Graph throttles reads on a chat or channel to one request per second per app per tenant
-(https://learn.microsoft.com/en-us/graph/throttling), and that budget is the app's rather than the
-caller's, so one user's wide sweep degrades every other user in the tenant.
+Graph throttles reads on a chat or channel to one request per second, per app, per tenant
+(https://learn.microsoft.com/en-us/graph/throttling). That budget belongs to the app, not to the
+caller. As a result, one user's wide sweep degrades every other user in the tenant.
 
-`include_body` trades that budget for fewer round trips: each addressable hit gets its own
-`teams_read_message`-shaped GET — same endpoint, same permissions, same normalisation — capped at
-`_HYDRATION_CONCURRENCY` in flight so a page of `MAX_RESULTS` hits sharing one busy channel cannot
-burn through the app's whole one-a-second allowance on a single call. That still costs up to
-`size` extra requests and however long the slowest of them takes, against the "exactly one Graph
-request" this tool otherwise promises, so it defaults to off: a caller who only wants to know
-*whether* a message exists, or is happy with Microsoft's `summary`, should not pay Graph's latency
-for text nobody asked for. A hit Graph refuses to hydrate — deleted, not visible, or, for a hit on
-a channel reply, addressed under the wrong post (see `MessageHit.uri`) — keeps its `summary` and
-its handle; only `text` and `reactions` are left unset for that hit, exactly as if `include_body`
-had been off just for it.
+`include_body` trades that budget for fewer round trips. Each addressable hit gets its own
+`teams_read_message`-shaped GET request, with the same endpoint, the same permissions, and the
+same normalization. This is capped at `_HYDRATION_CONCURRENCY` requests in flight. As a result, a
+page of `MAX_RESULTS` hits that share one busy channel cannot burn through the app's whole
+one-a-second allowance on a single call. That still costs up to `size` extra requests, and however
+long the slowest of them takes. This goes against the "exactly one Graph request" that this tool
+otherwise promises. So `include_body` defaults to off. A caller that only wants to know *whether*
+a message exists does not need to pay Graph's latency for text that nobody asked for. Neither does
+a caller that is satisfied with Microsoft's `summary`. Graph can refuse a hit because the message
+was deleted, or because it is not visible. For a hit on a channel reply, Graph can also refuse it
+because the reply is addressed under the wrong post (see `MessageHit.uri`). A hit that Graph
+refuses to hydrate keeps its `summary` and its handle. For that hit, only `text` and `reactions`
+stay unset, exactly as if `include_body` was off just for it.
 """
 
 import asyncio
@@ -67,26 +69,28 @@ from office_365_mcp.shared.window import as_utc
 TOOL_NAME = "teams_search_messages"
 
 STEP_SEARCH = "search_query"
-# The same two names `teams_read_message` counts its own reads under: `include_body` makes exactly
-# that Graph call, on this tool's behalf, so "reading one chat message" stays one comparable series
-# whichever tool reached it, rather than forking into a second, tool-specific name for an identical
-# request shape. A hit never carries a reply's own handle (see `MessageHit.uri`), so hydration has
-# no third, `channel_reply` path to reuse.
+# `include_body` reuses the same two step names that `teams_read_message` counts its own reads
+# under. `include_body` makes exactly that Graph call, on this tool's behalf. As a result, "reading
+# one chat message" stays one comparable series, whichever tool reached it. This tool does not
+# fork a second, tool-specific name for an identical request shape. A hit never carries a reply's
+# own handle (see `MessageHit.uri`), so hydration has no third, `channel_reply` path to reuse.
 STEP_CHAT_MESSAGE = "chat_message"
 STEP_CHANNEL_MESSAGE = "channel_message"
 
-# TRAP: `/search/query` accepts `Chat.Read` alone and then silently covers chats only. Requesting
-# both refuses a tenant withholding the broad one at consent time rather than at query time.
+# TRAP: `/search/query` accepts `Chat.Read` alone and then silently covers chats only. This tool
+# requests both permissions. As a result, a tenant that withholds the broad one is refused at
+# consent time, not at query time.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "release"}
 
-# Graph publishes no `size` ceiling for `chatMessage` — 1000 generally, 25 for `message`/`event`.
+# Graph publishes no `size` ceiling for `chatMessage`. The usual ceiling is 1000, or 25 for
+# `message`/`event`.
 MAX_RESULTS = 50
 
-# Graph throttles a chat or channel to about one request per second per app per tenant (see the
-# module docstring), and that budget is shared with every other caller of this connector, so
-# hydration stays well under it even though `MAX_RESULTS` hits can share one busy channel.
+# Graph throttles a chat or channel to about one request per second, per app, per tenant (see the
+# module docstring). That budget is shared with every other caller of this connector. Hydration
+# stays well under that budget, even though `MAX_RESULTS` hits can share one busy channel.
 _HYDRATION_CONCURRENCY = 3
 
 _DESCRIPTION = """\
@@ -100,8 +104,8 @@ Notes:
 - At least one search criterion is required. Every given criterion is ANDed together.
 - It takes no chat or channel scope, and it searches every chat and channel the user can see. \
 Read `channel_id` or `chat_id` on each hit to see where it came from.
-- A hit carries only metadata and Microsoft's `summary` snippet, never the message body, unless \
-`include_body` is set. Pass a hit's `uri` to teams_read_message for the actual words either way.\
+- Unless `include_body` is set, a hit carries only metadata and Microsoft's `summary` snippet, \
+never the message body. Pass a hit's `uri` to teams_read_message for the actual words either way.\
 """
 
 
@@ -113,17 +117,18 @@ class MessageHit(BaseModel):
             "A handle for this exact message, for example "
             + "`teams:///chats/{chatId}/messages/{messageId}` or "
             + "`teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}`, with each id "
-            + "percent-encoded. Pass it verbatim to teams_read_message, the only route to the "
-            + "attachments and the mentions — and, unless `include_body` was set, to the full "
-            + "text too. This value is null when a hit carries neither a chat nor a channel "
-            + "identity, and that hit is then unaddressable, `include_body` included. When the "
-            + "hit is a reply, this handle addresses its parent post instead, and "
-            + "teams_read_message then reports that it cannot read the message — `include_body` "
-            + "hits the same wall and leaves `text` unset for it. Only teams_browse_channel emits "
-            + "a reply's own handle, and it reaches just the newest "
+            + "percent-encoded. Pass it verbatim to teams_read_message. This handle is the only "
+            + "route to the attachments and the mentions. Unless `include_body` was set, it is "
+            + "also the only route to the full text. When a hit carries neither a chat identity "
+            + "nor a channel identity, this value is null, and that hit is then unaddressable, "
+            + "`include_body` included. When the hit is a reply, this handle addresses its parent "
+            + "post instead, and teams_read_message then reports that it cannot read the "
+            + "message. `include_body` hits the same wall, and leaves `text` unset for it. Only "
+            + "teams_browse_channel emits a reply's own handle, and it reaches just the newest "
             + f"{MAX_REPLIES_PER_POST} replies of each post, with no further cursor. Outside "
-            + "that window, there is no route to the full text, and browsing again returns the "
-            + "same window. Report the `summary` with the sender and date. Then stop looking."
+            + "that window, there is no route to the full text. A second browse of that channel "
+            + "returns the same window. Report the `summary` with the sender and date. Then stop "
+            + "looking."
         )
     )
     message_id: str = Field(
@@ -179,21 +184,22 @@ class MessageHit(BaseModel):
     )
     text: str | None = Field(
         description=(
-            "The message as plain text, normalised the same way teams_read_message reports it — "
-            + "null unless `include_body` was set. Even then, null does not mean no text: it also "
-            + "covers a hit `include_body` could not hydrate (see `uri`) and a message that "
-            + "genuinely has none, for example a system event or an image-only post. Fall back to "
-            + "`summary`, or call teams_read_message with `uri`, rather than reading a null here "
-            + "as silence."
+            "The message as plain text, normalized the same way teams_read_message reports it — "
+            + "null unless `include_body` was set. Even then, null does not mean no text. It "
+            + "also covers a hit that `include_body` did not hydrate (see `uri`). It also covers "
+            + "a message that genuinely has none, for example a system event or an image-only "
+            + "post. Fall back to `summary`, or call teams_read_message with `uri`, rather than "
+            + "reading a null here as silence."
         )
     )
     reactions: list[MessageReaction] = Field(
         description=(
-            "Who reacted to this message, and with what — empty unless `include_body` was set "
-            + "and Graph answered. Search's own index carries no reactions at all, so this is "
-            + "populated from the same hydration that fills `text`, and an empty list here has "
-            + "the same three readings `text`'s null does: nobody reacted, `include_body` was "
-            + "not set, or hydration could not reach this hit."
+            "Unless `include_body` was set and Graph answered, this is empty. It shows who "
+            + "reacted to this message, and with what. Search's own index carries no reactions "
+            + "at all. As a result, this list is populated from the same hydration that fills "
+            + "`text`. An empty list here has the same three readings that `text`'s null value "
+            + "does: nobody reacted, `include_body` was not set, or hydration did not reach this "
+            + "hit."
         )
     )
 
@@ -204,8 +210,8 @@ class MessageHit(BaseModel):
             return None
         sender = MessageSender.from_identity(resource.from_)
         if sender is None:
-            # Graph nulls the identity on a deleted message or a system event, and the retrievable
-            # set holds neither `messageType` nor `eventDetail`, so this is the only signal.
+            # Graph nulls the identity on a deleted message or a system event. The retrievable set
+            # holds neither `messageType` nor `eventDetail`, so this is the only signal.
             return None
         channel = resource.channel_identity
         team_id = channel.team_id if channel is not None else None
@@ -247,10 +253,10 @@ class MessageSearchResults(BaseModel):
     )
     next_offset: int | None = Field(
         description=(
-            "The offset that reaches the next page, or null when it cannot advance further. "
-            + "Either no more results exist, or the page held no hits to advance past even "
-            + "though Graph said more remain. Do not reuse this offset either way. It counts "
-            + "Graph's hits, not the messages this tool returned."
+            "This is the offset that reaches the next page. When it cannot advance further, "
+            + "this is null instead. Either no more results exist, or the page held no hits to "
+            + "advance past even though Graph said more remain. Do not reuse this offset either "
+            + "way. It counts Graph's hits, not the messages this tool returned."
         )
     )
 
@@ -279,7 +285,7 @@ CRITERIA: tuple[str, ...] = tuple(field.name for field in fields(SearchCriteria)
 _NO_CRITERIA = (
     "teams_search_messages needs at least one of "
     + ", ".join(CRITERIA)
-    + ". Searching with none of them returns an arbitrary sample of every message the user "
+    + ". A search with none of them returns an arbitrary sample of every message the user "
     + "can see, not an answer. Add the keywords, person, or date range the question is about."
 )
 
@@ -287,7 +293,7 @@ _NO_CRITERIA = (
 def _query_string(criteria: SearchCriteria) -> str:
     """The `queryString` these criteria become. Empty exactly when nothing was asked for.
 
-    The term names and their odd casing are Microsoft's own for `chatMessage`; `sent` is a
+    The term names and their odd casing are Microsoft's own for `chatMessage`. `sent` is a
     comparison rather than a `term:value` pair. A query of nothing but punctuation contributes no
     term, which is why this string, not the arguments behind it, is what `is_empty` tests.
     """
@@ -319,10 +325,10 @@ def _query_string(criteria: SearchCriteria) -> str:
 def _kql_moment(bound: date | datetime) -> str:
     """One of KQL's documented datetime literal formats: a whole day, or a second.
 
-    KQL accepts no `+00:00` offset, so an aware moment is converted to UTC and written with a
-    literal `Z` — relabelling it would move the bound. `as_utc` only supplies the zone a naive
-    moment lacks. `datetime` must be checked first: it subclasses `date`, and the other order
-    silently discards the time.
+    KQL accepts no `+00:00` offset. So this function converts an aware moment to UTC, and writes
+    it with a literal `Z`. A relabel instead of a conversion moves the bound. `as_utc` only
+    supplies the zone a naive moment lacks. `datetime` must be checked first: it subclasses
+    `date`, and the other order silently discards the time.
     """
     if isinstance(bound, datetime):
         return f"{as_utc(bound).astimezone(UTC):%Y-%m-%dT%H:%M:%SZ}"
@@ -337,13 +343,13 @@ async def teams_search_messages(
     size: int,
     include_body: bool = False,
 ) -> MessageSearchResults:
-    """One page of matches for `criteria`. Exactly one Graph request, whatever the criteria — plus,
-    only when `include_body` is set, one more per addressable hit. See the module docstring for
-    what that second part costs and how a hit it cannot reach is handled.
+    """One page of matches for `criteria`. This is exactly one Graph request, whatever the
+    criteria. When `include_body` is set, it costs one more request per addressable hit. See the
+    module docstring for what that second part costs and how a hit it cannot reach is handled.
     """
     query = _query_string(criteria)
     assert query, (
-        "teams_search_messages needs at least one criterion; the tool refuses an empty set"
+        "teams_search_messages needs at least one criterion. The tool refuses an empty set."
     )
     assert 1 <= size <= MAX_RESULTS, f"size must be within 1..{MAX_RESULTS}, got {size}"
     assert offset >= 0, f"offset must not be negative, got {offset}"
@@ -375,20 +381,21 @@ async def teams_search_messages(
 
     return MessageSearchResults(
         messages=messages,
-        # `moreResultsAvailable` alone is not a next page: a hitless page would hand back the
-        # offset it was asked at, and a caller obeying `next_offset` re-requests it forever.
+        # `moreResultsAvailable` alone is not a safe signal for a next page. A hitless page still
+        # hands back the offset it was asked at. A caller that follows `next_offset` on that
+        # signal alone requests that same offset forever.
         next_offset=offset + len(hits) if more_to_come and hits else None,
     )
 
 
 async def _hydrated(client: GraphServiceClient, hits: list[MessageHit]) -> list[MessageHit]:
-    """`hits`, each carrying its own `text` and `reactions` where Graph would answer for it.
+    """This returns `hits`, each with its own `text` and `reactions` where Graph answers for it.
 
-    Concurrent, bounded to `_HYDRATION_CONCURRENCY`, and per-hit failures are absorbed here rather
-    than raised: one hit Graph refuses — deleted, not visible, or a reply addressed under the wrong
-    post — must not cost the whole page, the same principle `teams_browse_channel` applies to a
-    dropped system message. A failure this connector does not classify still raises, because that
-    is a bug to see rather than a hit to skip.
+    This work is concurrent, bounded to `_HYDRATION_CONCURRENCY`. Per-hit failures are absorbed
+    here rather than raised. Graph can refuse one hit — deleted, not visible, or a reply
+    addressed under the wrong post — and that must not cost the whole page. `teams_browse_channel`
+    applies the same principle to a dropped system message. A failure that this connector does
+    not classify still raises. This is because that is a bug to see rather than a hit to skip.
     """
     semaphore = asyncio.Semaphore(_HYDRATION_CONCURRENCY)
 
@@ -431,8 +438,8 @@ async def _fetch(client: GraphServiceClient, handle: MessageHandle) -> ChatMessa
 
 
 def _hits_container(response: QueryPostResponse) -> SearchHitsContainer | None:
-    """The one container this request produces: Graph accepts a single `searchRequest` at a time,
-    and this one names a single entity type, so the nesting holds one of each.
+    """The one container this request produces: Graph accepts a single `searchRequest` at a time.
+    This one names a single entity type, so the nesting holds one of each.
     """
     for search_response in response.value or []:
         for container in search_response.hits_containers or []:
@@ -565,8 +572,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Inline each hit's full text and reactions instead of leaving them for a "
                     + "separate teams_read_message call. This costs up to one more Graph request "
-                    + "per hit on this page, so leave it off for a quick scan of `summary` and "
-                    + "set it only when the words themselves are what this call is for."
+                    + "per hit on this page. Leave it off for a quick scan of `summary`. When the "
+                    + "words themselves are what this call is for, set it."
                 )
             ),
         ] = False,

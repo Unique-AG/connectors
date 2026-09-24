@@ -12,14 +12,14 @@ Graph's sender shapes all leave every field optional. There are three shapes:
 Microsoft documents the identity set as null for a deleted message and for one that the Teams
 internal system sent. Such a message's `body.content` is the literal `<systemEventMessage/>`, and
 the "Ada joined the chat" sentence is the Teams client's own
-(https://learn.microsoft.com/en-us/graph/system-messages). So a channel listing has to drop these
-on the client side, because Graph offers no server-side `messageType` filter on that collection.
+(https://learn.microsoft.com/en-us/graph/system-messages). So a channel listing must drop these on
+the client side, because Graph offers no server-side `messageType` filter on that collection.
 
 `reactions` is a plain property of `chatMessage`, the same as `mentions` and `attachments`, not a
 navigation property behind its own `$expand`
 (https://learn.microsoft.com/en-us/graph/api/resources/chatmessage). Every read this module backs
-already asks for the resource whole — no tool here sends `$select` — so a reaction sits in the
-response with nothing added to widen for it. The reactor's identity is the same
+already asks for the resource whole — no tool here sends `$select`. So a reaction already sits in
+the response, without any extra request to widen it. The reactor's identity is the same
 `teamworkUserIdentity` shape as a sender's, so it carries no email either.
 """
 
@@ -42,15 +42,15 @@ from pydantic import BaseModel, Field
 from office_365_mcp.shared.handles import MessageHandle
 
 # This constant sets how many of a post's replies a channel browse returns. That also sets how
-# far back a reply is reachable in this connector. `$expand=replies` brings back up to 200
+# far back a reply is reachable in this connector. `$expand=replies` returns up to 200
 # replies per post, and 50 posts of 200 replies is a response no caller has a budget for.
 #
-# This window is the end of the line rather than a first page. Graph expands up to 200 replies
-# before it pages them. So a thread that Graph paged comes back full to this window. Following
-# its cursor costs a request per post, against a channel that allows the whole app one request a
-# second. A reply older than this window has no route to its full text here. A search can find it
-# and report Microsoft's snippet instead. But Graph addresses a reply under the post that it
-# answers, and the search index does not name that post.
+# This window is a hard limit, not a first page that a caller can page through further. Graph
+# expands up to 200 replies before it pages them. So a thread that Graph paged comes back full to
+# this window. Following its cursor costs a request per post, against a channel that allows the
+# whole app one request a second. A reply older than this window has no route to its full text
+# here. A search can find it and report Microsoft's snippet instead. But Graph addresses a reply
+# under the post that it answers, and the search index does not name that post.
 MAX_REPLIES_PER_POST = 10
 
 
@@ -103,7 +103,7 @@ class MessageSender(BaseModel):
 
         This decision rests on the identity that Graph named, not on the fields above. Every one
         of those fields is optional, so an identity that carries an id or a name is a sender,
-        whatever else it left blank. The identity object being present says nothing on its own,
+        whatever else it left blank. An identity object can be present and still say nothing,
         because Graph sends empty ones.
         """
         if identity is None:
@@ -245,9 +245,9 @@ class TeamsMessage(BaseModel):
         description=(
             "The handle this message was read from, in the form that teams_read_message takes. "
             + "This is echoed so that messages can be quoted, cached, or re-read without "
-            + "reassembling them. For a reply in a channel thread, this is its only handle, "
-            + "because Microsoft addresses a reply under its parent post, and search cannot "
-            + "express that shape."
+            + "reassembling them. For a reply in a channel thread, this is its only handle. "
+            + "Microsoft addresses a reply under its parent post, and search cannot express that "
+            + "shape."
         )
     )
     message_id: str = Field(
@@ -266,17 +266,17 @@ class TeamsMessage(BaseModel):
             "Who wrote the message, in the same shape that teams_search_messages reports. This "
             + "is null only when nobody wrote it: Graph sends no author for system event "
             + "messages, and `event` then describes what happened instead. Reads identify senders "
-            + "by Entra id rather than by email, because the Teams identity has no email address "
-            + "at all, so `email` is normally null here."
+            + "by Entra id rather than by email. The Teams identity has no email address at all, "
+            + "so `email` is normally null here."
         )
     )
     text: str | None = Field(
         description=(
             "The message as plain text. This connector normalizes Teams HTML: mentions become "
-            + "`@Name`, list items become `- `, emoji become themselves, inline images become "
+            + "`@Name`, list items become `- `, and emoji become themselves. Inline images become "
             + "`[image]`, attachments become `[attachment: name]`, and cards become `[card]`. It "
             + "also removes all tags and decodes HTML entities. This is null when the message has "
-            + "no text of its own, for example system events, deleted messages, or posts that "
+            + "no text of its own. Examples are system events, deleted messages, and posts that "
             + "were only images or cards. This is the whole message, never abridged. Text that "
             + "looks like JSON or code is a person's words, and it is reported in full. `[card]` "
             + "appears only where `attachments` names a card."
@@ -472,7 +472,7 @@ _CARD = "[card]"
 # (https://learn.microsoft.com/en-us/graph/api/resources/chatmessageattachment,
 # https://learn.microsoft.com/en-us/microsoftteams/platform/task-modules-and-cards/cards/cards-reference).
 # This connector matches the two namespaces, instead of enumerating today's nine known values,
-# because Teams keeps adding card types to them.
+# because Teams regularly adds new card types to them.
 _CARD_CONTENT_TYPES = ("application/vnd.microsoft.card.", "application/vnd.microsoft.teams.card.")
 
 

@@ -48,8 +48,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
 }
 
-# A chat handle's refusal names only the chat permission. Naming the channel one too sends an
-# administrator after a permission that was never missing.
+# A chat handle's refusal names only the chat permission. If the refusal also names the channel
+# permission, it sends an administrator after a permission that was never missing.
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
 _DESCRIPTION = """\
@@ -74,27 +74,25 @@ _BAD_HANDLE = (
     + "identically."
 )
 
-# The default 404 advice, to check the id came from a tool response verbatim, is wrong here because
-# the handle did.
+# The default 404 advice tells the caller to make sure that the id came from a tool response,
+# unchanged. That advice is wrong here. The handle did come from one.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this message. The handle is well formed, so this is not a bad "
-    + "argument — and it is not evidence that the message does not exist: Graph answers 'deleted', "
-    + "'never existed' and 'the signed-in user cannot see it' with the same 404, and does not say "
-    + "which of them it meant. Report that this tool did not read the message, never that it was "
-    + "never "
-    + "written. Retrying will not help and this connector has no other route to the text. One "
-    + "well-formed handle always fails this way: a reply in a channel thread is addressed under "
-    + "the post it answers, and a search result does not identify that post — so a search hit that "
-    + "is a reply cannot be read from its own handle. teams_browse_channel is the only tool that "
-    + "emits a "
-    + "reply's own handle, and it reaches the newest "
-    + f"{MAX_REPLIES_PER_POST} replies of each post on the channel's first page and no "
-    + "further: it follows neither Microsoft's cursor into an older part of a thread nor the one "
-    + "into older posts, because a given channel allows this whole connector about one request a "
-    + "second across the tenant. So browse that channel once. If the reply is not in what comes "
-    + "back, there is no route to its full text, and a second browse returns the same window. "
-    + "Report the search snippet with its sender and date, say this tool did not retrieve the "
-    + "full text, and stop looking."
+    + "argument. It is also not evidence that the message does not exist. Graph answers "
+    + "'deleted', 'never existed', and 'the signed-in user cannot see it' with the same 404. "
+    + "Graph does not say which of these it meant. Report that this tool did not read the "
+    + "message, never that it was never written. Retrying will not help, and this connector has "
+    + "no other route to the text. One well-formed handle always fails this way: a reply in a "
+    + "channel thread is addressed under the post it answers. A search result does not identify "
+    + "that post, so a search hit that is a reply cannot be read from its own handle. "
+    + "teams_browse_channel is the only tool that emits a reply's own handle. It reaches the "
+    + f"newest {MAX_REPLIES_PER_POST} replies of each post on the channel's first page, and no "
+    + "further. It follows neither Microsoft's cursor into an older part of a thread, nor the "
+    + "one into older posts. This is because a given channel allows this whole connector about "
+    + "one request a second, across the whole tenant. Browse that channel once. If the reply is "
+    + "not in what comes back, there is no route to its full text, and a second browse returns "
+    + "the same window. Report the search snippet with its sender and date. Say that this tool "
+    + "did not retrieve the full text. Then stop looking."
 )
 
 # Without this header Graph answers `systemEventMessage` as `unknownFutureValue`. `chatEvent` and
@@ -157,7 +155,8 @@ async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage
 
 
 def _headers() -> HeadersCollection:
-    """Built per request. Adding to the shared default collection affects every Graph call."""
+    """This collection is built fresh for each request, not added to the shared default
+    collection. An addition to that shared collection affects every Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_UNKNOWN_ENUMS)
     return headers
@@ -184,12 +183,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}\n"
                     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}"
                     + "/replies/{reply_id}\n"
-                    + "teams_search_messages emits the first two. The third only "
-                    + "teams_browse_channel "
-                    + "emits: "
-                    + "Microsoft addresses a reply under the post it answers, and a search result "
-                    + "does not say which post that is. No other shape is readable. Chat topics, "
-                    + "person names and Teams web links cannot be turned into handles."
+                    + "teams_search_messages emits the first two. Only teams_browse_channel emits "
+                    + "the third. Microsoft addresses a reply under the post it answers. A search "
+                    + "result does not say which post that is. No other shape is readable. Chat "
+                    + "topics, person names, and Teams web links cannot be turned into handles."
                 ),
             ),
         ],

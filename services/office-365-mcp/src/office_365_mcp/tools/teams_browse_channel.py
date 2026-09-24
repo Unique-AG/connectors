@@ -1,18 +1,20 @@
 """`teams_browse_channel` — one Teams channel's posts with their newest replies.
 
 TRAP: Graph orders posts by reply-chain activity, not by post date. When someone replies to a
-two-year-old post, it moves to the first page. This tool keeps that order: if it sorts again, it
-invents an order Graph never gave. Read `created_at` to know when someone wrote a post.
+two-year-old post, that post moves to the first page. This tool keeps that order. If this tool
+sorts the posts again, it invents an order that Graph never gave. Read `created_at` to know when
+someone wrote a post.
 
-One request only: Graph rate-limits channel reads to one request per second for this app across
-the tenant. The collection accepts only `$top` and `$expand=replies`. Graph documents no
-`$orderby` and no date filter for it.
+One request only: Graph rate-limits channel reads to one request per second for this app, across
+the whole tenant. The collection accepts only the `$top` and `$expand=replies` parameters. Graph
+documents no `$orderby` parameter and no date filter for this collection.
 
-The reply handle minted here follows `shared/handles.py`'s grammar, so `teams_read_message`
-resolves it. The shape is `shared/messages.py`'s, so a browsed post and a read message are one
-type — reactions included: `reactions` is a plain property of `chatMessage`, not a navigation
-property behind `$expand`, so it arrives on every post and every reply here with nothing widened
-for it (https://learn.microsoft.com/en-us/graph/api/resources/chatmessage).
+The reply handle minted here follows the grammar of `shared/handles.py`, so `teams_read_message`
+can resolve it. The shape is the one defined in `shared/messages.py`, so a browsed post and a read
+message share one type. Reactions are included: `reactions` is a plain property of `chatMessage`,
+not a navigation property behind `$expand`. As a result, reactions arrive on every post and every
+reply here, with nothing to expand for them
+(https://learn.microsoft.com/en-us/graph/api/resources/chatmessage).
 """
 
 from collections.abc import Mapping
@@ -45,7 +47,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "channel_id": "19:general@thread.tacv2",
 }
 
-# Graph's documented ceiling on `$top` for a channel's messages, and the most one request holds.
+# This is Graph's documented ceiling on `$top` for a channel's messages. It is also the most that
+# one request holds.
 MAX_POSTS = 50
 
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
@@ -76,9 +79,9 @@ class ChannelPosts(BaseModel):
     )
     more_posts_in_channel: bool | None = Field(
         description=(
-            "This tool reports whether Microsoft's own cursor (`@odata.nextLink`) shows posts "
-            + "beyond this page, but only when `include_window_completeness` is set. Otherwise, "
-            + "this field is null. True means more posts exist. Raise `limit` (up to "
+            "When `include_window_completeness` is set, this tool reports whether Microsoft's "
+            + "own cursor (`@odata.nextLink`) shows posts beyond this page. Otherwise, this field "
+            + "is null. True means more posts exist. Raise `limit` (up to "
             + f"{MAX_POSTS}) or use teams_search_messages with `sent_before` to reach further "
             + "back. False means this window was the whole channel, subject to `limit` and the "
             + "per-post reply cap. A short page alone does not mean the channel ran out. Make "
@@ -87,10 +90,10 @@ class ChannelPosts(BaseModel):
     )
     posts_cut_to_limit: bool | None = Field(
         description=(
-            "True when Microsoft's page held more posts than `limit`, so this tool cut the "
-            + "answer to fit. This field is null when `include_window_completeness` is not set. "
-            + f"This is rarely true. Raise `limit` (up to {MAX_POSTS}) to get the cut posts in "
-            + "the next call."
+            "When Microsoft's page held more posts than `limit`, this tool cut the answer to "
+            + "fit, and this value is true. When `include_window_completeness` is not set, this "
+            + f"field is null. This is rarely true. Raise `limit` (up to {MAX_POSTS}) to get the "
+            + "cut posts in the next call."
         )
     )
 
@@ -105,9 +108,9 @@ async def teams_browse_channel(
 ) -> ChannelPosts:
     """Up to `limit` posts from a channel's first page, each with its newest replies.
 
-    One Graph request, always. This tool follows neither cursor: not `@odata.nextLink` on the
-    collection, not `replies@odata.nextLink` on a post. The reply window is deliberately not a
-    third reported fact — older replies are unreachable either way, so nothing can act on it. See
+    This is one Graph request, always. This tool follows neither cursor: not `@odata.nextLink` on
+    the collection, not `replies@odata.nextLink` on a post. The reply window is deliberately not a
+    third reported fact. Older replies are unreachable either way, so nothing can act on it. See
     `_replies`.
     """
     assert 1 <= limit <= MAX_POSTS, f"limit must be within 1..{MAX_POSTS}, got {limit}"
@@ -125,7 +128,7 @@ async def teams_browse_channel(
         )
         assert page is not None, "Graph answered a channel message listing with no collection"
 
-    # The window is this tool's promise, not Graph's: apply `limit` rather than trust `$top`.
+    # The window is this tool's promise, not Graph's. Apply `limit` here rather than trust `$top`.
     posts = [message for message in (page.value or []) if _is_a_post(message)]
     kept = posts[:limit]
 
@@ -159,11 +162,11 @@ def _is_a_post(message: ChatMessage) -> bool:
 
 
 def _replies(post: ChatMessage) -> list[ChatMessage]:
-    """Newest `MAX_REPLIES_PER_POST` replies to `post`, oldest first.
+    """This returns the newest `MAX_REPLIES_PER_POST` replies to `post`, oldest first.
 
-    Sorted here because Graph does not order replies: the collection documents `$top` only. Graph
-    expands up to 200 replies per post, so a thread that Graph paged is past this window either
-    way.
+    This function sorts the replies here because Graph does not order them itself. The collection
+    documents the `$top` parameter only. Graph expands up to 200 replies per post, so a thread
+    that Graph paged is past this window either way.
     """
     replies = sorted((reply for reply in post.replies or [] if _is_a_post(reply)), key=_sent_at)
     return replies[-MAX_REPLIES_PER_POST:]

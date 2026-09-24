@@ -2,10 +2,10 @@
 
 Posts one plain-text message to a channel that already exists
 (https://learn.microsoft.com/en-us/graph/api/channel-post-messages). This route cannot create a
-channel, and it cannot reply to an existing post — that is a different route
-(`.../messages/{message-id}/replies`) this connector does not call. `team_id` and `channel_id`
-have to be ones teams_list_my_teams and teams_list_channels already reported: there is no other
-route to either.
+channel, and it cannot reply to an existing post. A reply uses a different route
+(`.../messages/{message-id}/replies`) that this connector does not call. `team_id` and
+`channel_id` have to be ones teams_list_my_teams and teams_list_channels already reported: there
+is no other route to either.
 
 **`ChannelMessage.Send` is the permission this call needs.** The per-route reference this tool
 calls, `channel-post-messages`, names it least privileged for
@@ -13,16 +13,16 @@ calls, `channel-post-messages`, names it least privileged for
 higher-privileged alternative. The permissions reference
 (https://learn.microsoft.com/en-us/graph/permissions-reference) agrees: `ChannelMessage.Send` is
 "Send channel messages... on behalf of the signed-in user," delegated only,
-`AdminConsentRequired: No`. This is the one Teams route in this connector where the COMBINED
-"Send chatMessage in a channel or a chat" reference page (`chatmessage-post`) and the per-route
-page actually agree — see `teams_send_chat_message.py`'s module docstring for the route where they
-do not.
+`AdminConsentRequired: No`. This is the one Teams route in this connector where two Graph
+reference pages agree. Both the COMBINED "Send chatMessage in a channel or a chat" page
+(`chatmessage-post`) and the per-route page name the same permission here. See
+`teams_send_chat_message.py`'s module docstring for the route where they do not agree.
 
 **`no_retry()` is what stops one message becoming two, three, or four.** The SDK retries `POST`
-on 429, 503, and 504 up to three times by default (`GRAPH_MAX_RETRIES`), and Graph publishes no
+on 429, 503, and 504 up to three times by default (`GRAPH_MAX_RETRIES`). Graph publishes no
 idempotency key for a channel message send. An unguarded retry after a lost response posts the
-same words again, under the signed-in user's own name, to a channel that already saw them once —
-and a channel post is more durable than a chat message: it has its own `webUrl` and can be
+same words again, under the signed-in user's own name. That channel already saw the words once.
+A channel post is also more durable than a chat message. It has its own `webUrl`, and it can be
 searched, quoted, and replied to by anyone in the team.
 
 **`team_id` and `channel_id` are the opaque ids `teams_list_my_teams` and `teams_list_channels`
@@ -30,10 +30,10 @@ already report, never a `teams:///` handle.** Graph's send route reads them as t
 ids `teams_browse_channel.py` already takes bare. No handle family in `shared/handles.py`
 addresses a channel by itself — only a message inside one — so there is nothing to mint here.
 
-**A person confirms before anything goes out, every time.** There is no draft to review first:
+**A person approves before anything goes out, every time.** There is no draft to review first:
 the confirmation question IS the review. `person_confirms` (`shared/seam.py`) is the one seam
-this connector puts a question through, on either protocol era, and this tool asks nothing of
-Graph until that answer comes back `agree`.
+this connector puts a question through, on either protocol era. This tool asks nothing of Graph
+until that answer comes back `agree`.
 """
 
 from collections.abc import Mapping
@@ -93,10 +93,10 @@ them can be turned into one. A `channel_id` alone does not address a channel —
 with its `team_id`.
 - This tool asks the user to approve the message before it posts it, every time, and it posts \
 nothing unless they agree.
-- Posting cannot be undone. This connector has no way to edit, delete, or recall a message once \
-Microsoft has accepted it, and everyone in the channel can already read it.
-- The message goes out as plain text. Teams renders no markdown from it, and a URL in it is not \
-turned into a clickable link.\
+- A post cannot be undone. This connector has no way to edit, delete, or recall a message once \
+Microsoft accepts it. Everyone in the channel can already read it.
+- The message goes out as plain text. Teams renders no markdown from it, and it does not turn a \
+URL in it into a clickable link.\
 """
 
 
@@ -146,7 +146,7 @@ def _posted(message: str) -> ChatMessage:
 
 
 def _send_request() -> RequestConfiguration[QueryParameters]:
-    """`no_retry()` is what stops one message being posted up to four times: see the module
+    """`no_retry()` is what stops one message becoming two, three, or four posts. See the module
     docstring."""
     return RequestConfiguration[QueryParameters](options=no_retry())
 

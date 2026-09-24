@@ -217,7 +217,8 @@ type Confirmed = str | InputRequiredResult | None
 # being confirmed changes.
 type Confirm = Callable[[str, str], Awaitable[Confirmed]]
 
-# One question per call, so a fixed key is safe; a second question in one call would collide.
+# One question per call, so a fixed key is safe. A second question in the same call collides
+# with the first.
 _CONFIRMATION = "confirm"
 
 
@@ -257,7 +258,8 @@ def _another_request(nothing_happened: str) -> str:
 
 
 def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened: str) -> Confirm:
-    """Ask the caller's own client to put `question` to a person; only `agree` lets the call go on.
+    """Ask the caller's own client to put `question` to a person. Only `agree` lets the call
+    continue.
 
     A 2026-07-28 connection has no back-channel (SEP-2577): the question is returned and answered
     on a second call, bound to `about`.

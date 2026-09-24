@@ -12,30 +12,32 @@ names `ChatMessage.Send` as least privileged for `POST /chats/{chat-id}/messages
 reference (https://learn.microsoft.com/en-us/graph/permissions-reference) agrees: `ChatMessage.Send`
 is "Send user chat messages... on behalf of the signed-in user," delegated only,
 `AdminConsentRequired: No`. The COMBINED "Send chatMessage in a channel or a chat" page
-(`chatmessage-post`, not the page this tool cites) instead lists `ChannelMessage.Send` under its
-own "Permissions for chat" heading — the same table as its "Permissions for channel" heading,
-character for character. That is a copy-paste in Microsoft's docs, not a second valid answer:
-`teams_send_channel_message.py` needs `ChannelMessage.Send` for the channel route, and this tool's
-own route needs `ChatMessage.Send`, confirmed by both of the sources above.
+(`chatmessage-post`) is not the page this tool cites. That combined page instead lists
+`ChannelMessage.Send` under its own "Permissions for chat" heading. This heading is the same
+table as its "Permissions for channel" heading, character for character. That is a copy-paste in
+Microsoft's docs, not a second valid answer. `teams_send_channel_message.py` needs
+`ChannelMessage.Send` for the channel route. This tool's own route needs `ChatMessage.Send`
+instead, confirmed by both of the sources above.
 
 **`no_retry()` is what stops one message becoming two, three, or four.** The SDK retries `POST`
-on 429, 503, and 504 up to three times by default (`GRAPH_MAX_RETRIES`), and Graph publishes no
+on 429, 503, and 504 up to three times by default (`GRAPH_MAX_RETRIES`). Graph publishes no
 idempotency key for a chat message send. An unguarded retry after a lost response posts the same
-words again, under the signed-in user's own name, to people who already read them once.
+words again, under the signed-in user's own name. Those people already read the words once.
 `tests/graph_client/test_client.py::TestANonIdempotentCallIsNotRetried` proves the default this
 overrides.
 
 **`chat_id` is the opaque id `teams_list_chats` already reports, never a `teams:///` handle.**
 Graph's send route reads it as a raw chat id (`19:...@thread.v2`), the same string
 `teams_read_message.py` reads off a `MessageHandle.chat_id`. No handle family in
-`shared/handles.py` addresses a chat by itself — only a message, a meeting, or a transcript
-*inside* one — so there is nothing to mint here, and inventing a `teams:///chats/{id}` wrapper
-would be a second, competing spelling for an id every other Teams tool already takes bare.
+`shared/handles.py` addresses a chat by itself. Only a message, a meeting, or a transcript
+*inside* one has a handle. So there is nothing to mint here. An invented `teams:///chats/{id}`
+wrapper adds a second, competing spelling for an id that every other Teams tool already takes
+bare.
 
-**A person confirms before anything goes out, every time.** There is no draft to review first:
+**A person approves before anything goes out, every time.** There is no draft to review first:
 the confirmation question IS the review. `person_confirms` (`shared/seam.py`) is the one seam
-this connector puts a question through, on either protocol era, and this tool asks nothing of
-Graph until that answer comes back `agree`.
+this connector puts a question through, on either protocol era. This tool asks nothing of Graph
+until that answer comes back `agree`.
 """
 
 from collections.abc import Mapping
@@ -69,7 +71,7 @@ TOOL_NAME = "teams_send_chat_message"
 STEP_SEND = "send_chat_message"
 
 # See the module docstring: the combined "Send chatMessage in a channel or a chat" reference page
-# names `ChannelMessage.Send` here too, by copying its channel table into its chat section. The
+# names `ChannelMessage.Send` here too. It copies its channel table into its chat section. The
 # per-route page (`chat-post-messages`) and the permissions reference both name `ChatMessage.Send`
 # instead, and that is the one this tool declares.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMessage.Send",)
@@ -93,10 +95,10 @@ Notes:
 member's name, and a Teams web link are not this id, and none of them can be turned into one.
 - This tool asks the user to approve the message before it sends it, every time, and it sends \
 nothing unless they agree.
-- Sending cannot be undone. This connector has no way to edit, delete, or recall a message once \
-Microsoft has accepted it.
-- The message goes out as plain text. Teams renders no markdown from it, and a URL in it is not \
-turned into a clickable link.\
+- A send cannot be undone. This connector has no way to edit, delete, or recall a message once \
+Microsoft accepts it.
+- The message goes out as plain text. Teams renders no markdown from it, and it does not turn a \
+URL in it into a clickable link.\
 """
 
 
@@ -142,7 +144,7 @@ def _posted(message: str) -> ChatMessage:
 
 
 def _send_request() -> RequestConfiguration[QueryParameters]:
-    """`no_retry()` is what stops one message being posted up to four times: see the module
+    """`no_retry()` is what stops one message becoming two, three, or four posts. See the module
     docstring."""
     return RequestConfiguration[QueryParameters](options=no_retry())
 

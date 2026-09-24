@@ -1,13 +1,14 @@
-"""The registry of all tools, the selection an operator makes, and the permissions it implies.
+"""This is the registry of all tools, the selection that an operator makes, and the permissions
+that selection implies.
 
-TRAP: derive the scope list from the modules, never hand-write it. A permission not consented at
-sign-in cannot be obtained later — the On-Behalf-Of exchange fails with AADSTS65001 on every tool
-call, before the tool body runs. FastMCP's `enable` and `disable` transforms are no substitute for
-filtering here: they hide a registered tool and leave its scopes computed.
+TRAP: derive the scope list from the modules. Never hand-write it. A permission that was not
+consented to at sign-in cannot be obtained later. The On-Behalf-Of exchange fails with AADSTS65001
+on every tool call, before the tool body runs. FastMCP's `enable` and `disable` transforms are no
+substitute for filtering here. They hide a registered tool, but they leave its scopes computed.
 
-Order is the registry's, never the operator's, and it is stable via `dict.fromkeys` rather than
-`set`. `TOOLS_ENABLED=a,b` and `b,a` must yield one scope list, because the consent screen and
-every cached On-Behalf-Of token key are keyed by it.
+Order comes from the registry, never from the operator, and `dict.fromkeys` keeps it stable instead
+of a `set`. `TOOLS_ENABLED=a,b` and `b,a` must produce one scope list, because the consent screen
+and every cached On-Behalf-Of token key use it as the key.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -76,10 +77,10 @@ from office_365_mcp.tools import (
 )
 
 # This is the whole of what this package promises. Importing `tools/get_me.py` directly names a
-# tool module outside `_TOOL_MODULES`, the list that every selection is filtered over and that
-# every scope is derived from. `ToolModule` is absent on purpose — `tests/test_layering.py` rule
-# 4 forbids a tool file from importing `office_365_mcp.tools`, so no tool file can name it, even
-# to declare it.
+# tool module outside `_TOOL_MODULES`, the list that every selection filters over and that every
+# scope derives from. `ToolModule` is absent from `__all__` on purpose. `tests/test_layering.py`
+# rule 4 forbids a tool file from importing `office_365_mcp.tools`, so no tool file can name
+# `ToolModule`, even to declare that it satisfies it.
 __all__ = [
     "ALWAYS_ON",
     "PRESETS",
@@ -217,10 +218,10 @@ ALWAYS_ON: str = get_me.TOOL_NAME
 # asks for the identical three permissions, and it exposes a `teams_read_message` that nothing in
 # it can address.
 #
-# TRAP: `teams` is written out rather than derived from `TOOL_NAMES`. A derived preset takes in
+# TRAP: `teams` is written out rather than derived from `TOOL_NAMES`. A derived preset includes
 # every tool that joins the registry. So the first tool of another product puts its permission on
-# the consent screen of every `teams` deployment, without an edit that anybody reviewed. Widening
-# a live deployment costs every signed-in user a fresh sign-in.
+# the consent screen of every `teams` deployment, without an edit that anybody reviewed. A live
+# deployment that widens its tool set forces a fresh sign-in on every signed-in user.
 PRESETS: Mapping[str, tuple[str, ...]] = {
     "teams": (
         "teams_list_chats",
@@ -248,15 +249,15 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_read_transcript",
         "teams_list_meeting_recordings",
     ),
-    # A separate axis from every preset above, not a rung added to `teams`/`teams-messages`. Those
-    # stay read-only: `ChatMessage.Send`/`ChannelMessage.Send` never rides in on a deployment that
-    # asked only to browse or search. Unlike `outlook-send`, sending a Teams message needs no draft
-    # and no read of the target's existing content — `teams_send_chat_message` and
-    # `teams_send_channel_message` take a bare `chat_id` or `team_id`/`channel_id`, so this preset
-    # pairs them with exactly the tools that mint those ids (`teams_list_chats`,
-    # `teams_list_my_teams`, `teams_list_channels`) rather than pulling in
-    # `teams_browse_channel`/`teams_search_messages`/`teams_read_message`, which this axis has no
-    # use for.
+    # This is a separate axis from every preset above, not a rung added to `teams`/`teams-messages`.
+    # Those presets stay read-only. `ChatMessage.Send` and `ChannelMessage.Send` never enter a
+    # deployment that asked only to browse or search. Unlike `outlook-send`, sending a Teams message
+    # needs no draft and no read of the target's existing content. `teams_send_chat_message` and
+    # `teams_send_channel_message` take a bare `chat_id`, or a `team_id`/`channel_id` pair. So this
+    # preset pairs them with exactly the tools that mint those ids: `teams_list_chats`,
+    # `teams_list_my_teams`, and `teams_list_channels`. It does not include
+    # `teams_browse_channel`, `teams_search_messages`, or `teams_read_message`, which this axis
+    # does not use.
     "teams-write": (
         "teams_list_chats",
         "teams_list_my_teams",
@@ -264,11 +265,12 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_send_chat_message",
         "teams_send_channel_message",
     ),
-    # Two axes, not one ladder. Mail content is read, then write, then send. Mailbox configuration
-    # is read, then write. They are independent. Welding them into one chain is how
-    # `outlook-automate` came to require `Mail.Send` — an out-of-office reply has nothing to do
-    # with sending mail as the user, and a forwarding-rule audit has nothing to do with reading
-    # one. Each row below asks for exactly what its own tools declare.
+    # These are two axes, not one ladder. Mail content moves through three tiers: read, then write,
+    # then send. Mailbox configuration moves through two tiers: read, then write. The two axes are
+    # independent. A chain that welds them together is why `outlook-automate` once required
+    # `Mail.Send`. An out-of-office reply has nothing to do with sending mail as the user. A
+    # forwarding-rule audit has nothing to do with reading mail. Each row below asks for exactly
+    # what its own tools declare.
     "outlook-read": (
         "outlook_search_mail",
         "outlook_read_mail",
@@ -392,10 +394,10 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
 class Selection:
     """One deployment's tool surface: what is registered, and what sign-in therefore asks for.
 
-    `permissions` is Entra's own spelling, and `graph_scopes` is the authorize request's
-    spelling. Both are stored rather than derived on demand. The tuple handed to the auth
-    provider is checked by identity, not by equality, and a property that rebuilds it on each
-    call only looks equal.
+    `permissions` uses Entra's own spelling, and `graph_scopes` uses the authorize request's
+    spelling. Both are stored rather than derived on demand. The tuple handed to the auth provider
+    is checked by identity, not by equality. A property that rebuilds it on each call only looks
+    equal.
     """
 
     preset: str | None
@@ -405,14 +407,14 @@ class Selection:
 
 
 def resolve(*, preset: str | None, enabled: Sequence[str] | None) -> Selection:
-    """The surface that `preset` or `enabled` names, filtered over the registry in the registry's
-    order.
+    """This is the surface that `preset` or `enabled` names, filtered over the registry in the
+    registry's order.
 
-    Both routes in are checked against the registry. Without that check, a name this server has
-    no tool for is filtered out in silence. That leaves one tool fewer registered, and one
-    permission fewer on the consent screen, than whoever wrote it believes. `TOOLS_ENABLED`
-    raises because the mistake is the operator's. A preset asserts because the mistake is this
-    file's.
+    Both entry routes, `preset` and `enabled`, are checked against the registry. If that check is
+    skipped, a name that this server has no tool for is filtered out silently. That leaves one tool
+    fewer registered, and one permission fewer on the consent screen, than the operator believes.
+    `TOOLS_ENABLED` raises an error because the mistake is the operator's. A preset asserts because
+    the mistake belongs to this file.
     """
     assert (preset is None) != (enabled is None), (
         "exactly one of preset and enabled is a selection, which SurfaceConfig guarantees "
@@ -451,9 +453,9 @@ def _unknown(names: Iterable[str]) -> list[str]:
 
 
 def _every_name_known(enabled: Sequence[str]) -> tuple[str, ...]:
-    """`enabled` unchanged, once every name is known. A typo must never quietly cost a tool. If
-    nothing caught it, `TOOLS_ENABLED=read_transcripts` registers one tool fewer and asks for one
-    permission fewer than its operator believes.
+    """This returns `enabled` unchanged, once every name is known. A typo must never cost a tool
+    silently. If nothing catches it, `TOOLS_ENABLED=read_transcripts` registers one tool fewer and
+    asks for one permission fewer than the operator believes.
     """
     unknown = _unknown(enabled)
     if unknown:
@@ -465,11 +467,11 @@ def _every_name_known(enabled: Sequence[str]) -> tuple[str, ...]:
 
 
 def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
-    """What `GraphAdviceMiddleware` words each selected tool's refusals from.
+    """This is the source that `GraphAdviceMiddleware` uses to word each selected tool's refusals.
 
-    This dictionary is derived from the modules. Hand-writing it instead creates a second copy
-    of which permissions a tool calls under. A disagreement between the two copies causes a 403
-    that sends an administrator after a permission that was never missing.
+    This dictionary is derived from the modules. If this table is hand-written instead, it creates
+    a second copy of which permissions a tool calls under. A disagreement between the two copies
+    causes a 403 that sends an administrator after a permission that was never missing.
     """
     return {
         module.TOOL_NAME: ToolAdvice(
@@ -498,13 +500,13 @@ class GraphCallExample:
 
 
 def graph_call_examples(selection: Selection) -> Mapping[str, GraphCallExample]:
-    """One refusable call per selected tool, derived from the modules exactly as the table above
-    is.
+    """This is one refusable call per selected tool, derived from the modules in exactly the same
+    way as the table above.
 
-    This is exported, although nothing in `src/` calls it. It is the coverage contract for
-    `tests/test_error_mapping.py`, which refuses every registered tool one by one. Hand-written
-    there, the table was a second list of the tools, and a tool registered before its row existed
-    left the file one tool short — the very failure that file exists to prevent.
+    This function is exported, although nothing in `src/` calls it. It is the coverage contract for
+    `tests/test_error_mapping.py`, which refuses every registered tool one by one. That file once
+    hand-wrote this table as a second list of the tools. A tool registered before its row existed
+    left the file one tool short. This module exists to prevent exactly that failure.
     """
     return {
         module.TOOL_NAME: GraphCallExample(
