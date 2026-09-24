@@ -104,15 +104,22 @@ makes. It does not control access to the tool.
 
 ## Presets
 
-A deployment turns tools on in exactly one of two ways. The first way is a named preset. The
-second way is an exact list of tool names, set as the TOOLS_ENABLED configuration. A deployment
-must pick exactly one way. It must not set both, and it must not leave both unset. Three places
-enforce this rule: the Helm chart schema, the Terraform module, and the server's own startup
-check. This is not a preset plus an add-on. It is two ways to name one choice. The tool `get_me` is
-always on, in every configuration, so no preset or list needs to name it. A deployment cannot
-start from a preset and then add or remove one tool. For a mix of tools that no preset covers,
-name every wanted tool in the exact list instead. There are 20 presets. This table names what
-each preset turns on, besides `get_me`.
+A deployment turns tools on in one of two ways:
+
+- **A preset.** One of the 20 named bundles in the table below.
+- **An exact list.** The `TOOLS_ENABLED` configuration, which names every wanted tool.
+
+A deployment must pick exactly one way:
+
+- It must not set both, and it must not leave both unset.
+- Three places enforce this rule: the Helm chart schema, the Terraform module, and the server's
+  own startup check.
+- This is not a preset plus an add-on. It is two ways to name one choice.
+- The tool `get_me` is always on, in every configuration, so no preset or list needs to name it.
+- A deployment cannot start from a preset and then add or remove one tool. For a mix of tools
+  that no preset covers, name every wanted tool in the exact list instead.
+
+There are 20 presets. This table names what each preset turns on, besides `get_me`.
 
 | Preset | What it turns on |
 | --- | --- |
@@ -183,14 +190,21 @@ selection, through the chart values in this section. No automatic step compares 
 mismatch is possible, and it produces no warning. A registration narrower than the pod fails
 every sign-in at the authorize step, with nothing in the pod's own logs to explain why.
 
-The check is manual, and it is repeatable. Run `curl $PUBLIC_BASE_URL/manifest` against the
-deployed pod. It answers with the resolved tool selection and the exact permission list, in the
-tool registry's order. Then run `terraform output tool_surface` in the Terraform module. It
-answers with the same shape: the preset, the tools, the permissions, and which permissions need
-admin consent, in the same order. Compare the two permission lists, line for line. If the pod's
-list names a permission that the Terraform output does not, every sign-in fails at the authorize
-step. If the Terraform output names more permissions than the pod uses, the tenant carries
-standing access that no tool spends.
+The check is manual, and it is repeatable:
+
+1. Run `curl $PUBLIC_BASE_URL/manifest` against the deployed pod. It answers with the resolved
+   tool selection and the exact permission list, in the tool registry's order.
+2. Run `terraform output tool_surface` in the Terraform module. It answers with the same shape:
+   the preset, the tools, the permissions, and which permissions need admin consent, in the same
+   order.
+3. Compare the two permission lists, line for line.
+
+Two things can go wrong:
+
+- If the pod's list names a permission that the Terraform output does not, every sign-in fails at
+  the authorize step.
+- If the Terraform output names more permissions than the pod uses, the tenant carries standing
+  access that no tool spends.
 
 ## Limitations
 
