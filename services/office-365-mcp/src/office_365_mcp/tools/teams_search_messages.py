@@ -52,8 +52,6 @@ _DESCRIPTION = (
 
 
 class MessageHit(BaseModel):
-    """One matched Teams message from search."""
-
     uri: str | None = Field(
         description=(
             "A handle for this message; pass it to teams_read_message. Null when the hit "

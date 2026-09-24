@@ -895,11 +895,6 @@ class TestTheToolsThisServerAdvertises:
         tools = _named(await mcp_client.list_tools())
         taught = {name: _sender_schema(tools[name].output_schema) for name in _MESSAGE_TOOLS}
 
-        for name in ("teams_read_message", "teams_browse_channel"):
-            written = taught[name]["description"]
-            assert isinstance(written, str)
-            description = " ".join(written.split())
-            assert "Microsoft Graph" in description, name
         fields = [_properties(taught[name]) for name in _MESSAGE_TOOLS]
         assert all(field == fields[0] for field in fields), (
             "every tool that reports a sender must describe its fields identically — they are one "

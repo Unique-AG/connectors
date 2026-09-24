@@ -20,8 +20,6 @@ MAX_REPLIES_PER_POST = 10
 
 
 class MessageSender(BaseModel):
-    """Who sent a message, in whichever identity shape Microsoft Graph used."""
-
     display_name: str | None = Field(description="The sender's name as Teams shows it.")
     email: str | None = Field(
         description="The sender's email address, present only for search-hit results."
@@ -55,8 +53,6 @@ class MessageSender(BaseModel):
 
 
 class MessageMention(BaseModel):
-    """One resolved @-mention from the message body."""
-
     text: str | None = Field(description="The mention's display text, for example a name.")
     user_id: str | None = Field(
         description="The mentioned person's Microsoft Entra object id, if the mention names one."
@@ -70,8 +66,6 @@ class MessageMention(BaseModel):
 
 
 class MessageAttachment(BaseModel):
-    """One resolved attachment from the message body."""
-
     name: str | None = Field(description="The attachment's name, if it has one.")
     content_type: str | None = Field(
         description="Microsoft's content type for the attachment, such as a file or card type."
@@ -90,8 +84,6 @@ class MessageAttachment(BaseModel):
 
 
 class MessageReaction(BaseModel):
-    """One reaction to a message: what was used, who added it, and when."""
-
     reaction_type: str | None = Field(
         description="What was used to react: an emoji, `custom`, or a legacy reaction name."
     )
@@ -111,8 +103,6 @@ class MessageReaction(BaseModel):
 
 
 class TeamsMessage(BaseModel):
-    """One Teams message, as fully as Microsoft Graph will describe it."""
-
     uri: str = Field(description="The handle this message was read from.")
     message_id: str = Field(description="The message's Graph id.")
     chat_id: str | None = Field(description="The chat this message is in, or null for channels.")

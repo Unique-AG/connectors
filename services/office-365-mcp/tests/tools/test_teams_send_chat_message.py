@@ -118,10 +118,6 @@ class TestThePersonBeforeTheSend:
         assert _CHAT_ID in asked[0]
 
     def test_the_binding_differs_for_two_messages_with_the_same_120_char_preview(self) -> None:
-        """`about` is what a re-called accept is checked against. It must not be built from the
-        truncated, human-readable preview alone: two different full messages that share the same
-        first 120 characters would then bind identically, and an accept meant for one would also
-        cover the other."""
         common_prefix = "x" * 120
 
         first = sender._about(  # pyright: ignore[reportPrivateUsage]
@@ -302,9 +298,6 @@ class TestTheEraWithNoBackChannel:
     async def test_an_accept_for_one_message_cannot_send_a_longer_message_with_the_same_preview(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The exact scenario a truncated-preview binding would miss: message A and message B
-        share the same first 120 characters, so a client reading only the preview cannot tell
-        them apart. An accept given for A must not be replayable to send B."""
         post = _posts(graph)
         common_prefix = "x" * 120
         message_a = common_prefix + " short tail"
