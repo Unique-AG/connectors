@@ -1,18 +1,3 @@
-"""`outlook_cancel_event` — the organizer cancels one event, and Graph mails everyone that it
-was cancelled.
-
-- This tool uses one permission, and Microsoft offers no narrower one: `Calendars.ReadWrite`
-  (https://learn.microsoft.com/en-us/graph/api/event-cancel).
-- Only the organizer can call this tool. This tool reads the event first, and refuses in its
-  own words when `isOrganizer` already says no.
-- A cancel moves the event to Deleted Items. With any attendee on the event, a cancel also
-  sends a cancellation message that this connector cannot recall. An event with nobody on it
-  notifies nobody, so this tool skips the question for that case.
-- The response is `202 Accepted`, with an empty body. So everything that this tool answers with
-  is read before the cancel. This call carries `no_retry()`, because a retried cancel can mail
-  the cancellation message to attendees twice.
-"""
-
 from collections.abc import Mapping
 from typing import Annotated
 
@@ -63,21 +48,10 @@ _AGREE = "cancel"
 _DECLINE = "do not cancel"
 _NOTHING_HAPPENED = "Nothing was cancelled."
 
-_DESCRIPTION = """\
-Cancels one event that the signed-in user organizes, and moves it to Deleted Items. With any \
-attendee on the event, this sends them a cancellation message immediately, and nothing here \
-can recall it. This tool refuses an event that the signed-in user did not organize. \
-outlook_respond_to_invite is the tool for answering an invitation that somebody else organizes.
-
-Notes:
-- This tool asks the user to agree before it cancels an event that has any attendee, and \
-cancels nothing unless the user agrees. It cancels directly, with no question, only when the \
-event currently has nobody on it, because nobody is told either way.
-- `comment` is optional text that Microsoft includes in the cancellation message. It reaches \
-only attendees that this event already has. It changes nothing when there are none.
-- If a call times out, the cancellation and its message can already be out. Before you call \
-this tool again, make sure with outlook_list_events that the event is still there.
-"""
+_DESCRIPTION = (
+    "Cancels one event that the signed-in user organizes, moves it to Deleted Items, and mails "
+    + "any attendees a cancellation. Refuses an event the signed-in user did not organize."
+)
 
 _NOT_A_HANDLE = (
     "outlook_cancel_event takes the `uri` that outlook_list_events or outlook_read_event reported, "
@@ -97,46 +71,21 @@ _NOT_THE_ORGANIZER = (
 
 
 class CancelledEvent(BaseModel):
-    """This is what this event held just before it was cancelled — the only data that this call
-    has, because Microsoft's `202 Accepted` on a successful cancel carries no body."""
-
-    uri: str = Field(
-        description=(
-            "This is the handle that this call was given, echoed back for a reply about this "
-            + "event."
-        )
-    )
+    uri: str = Field(description="The handle this call was given, echoed back.")
     subject: str | None = Field(
-        description=(
-            "This is the subject, as it was read just before the cancel. This field is null "
-            + "when the event carried none."
-        )
+        description="The subject as read just before the cancel, or null if none."
     )
     organizer: MailAddress | None = Field(
-        description="This is the signed-in user, read off the event before the cancel."
+        description="The signed-in user, read off the event before the cancel."
     )
     attendees: list[EventAttendee] = Field(
-        description=(
-            "This is everyone that this event held just before the cancel, read from that "
-            + "pre-cancel state, and never invented. This is who Microsoft mailed the "
-            + "cancellation to — or, when this list is empty, the proof that nobody was told, "
-            + "because there was nobody to tell."
-        )
+        description="Everyone this event held just before the cancel."
     )
     comment: str | None = Field(
-        description=(
-            "This is the comment that this call asked Microsoft to include in the cancellation "
-            + "message. This field is null when none was given. Microsoft's 202 says nothing "
-            + "about delivery. This is what was requested, and not a receipt."
-        )
+        description="The comment sent with the cancellation, or null if none."
     )
     notified: bool = Field(
-        description=(
-            "This is this connector's own inference. It is true when `attendees` was not empty "
-            + "just before the cancel. `true` means a cancellation message already went out, "
-            + "and CANNOT BE RECALLED here. `false` means the event had nobody on it, so nobody "
-            + "was told."
-        )
+        description="Whether a cancellation message went out; true when `attendees` was not empty."
     )
 
 
@@ -147,8 +96,6 @@ async def cancel_event(
     comment: str | None = None,
     confirm: Confirm,
 ) -> CancelledEvent | InputRequiredResult:
-    """Read the event. Ask a person for confirmation when a cancel would notify anybody. Then
-    cancel the event."""
     handle = event_handle(uri)
     if handle is None:
         raise ToolError(_NOT_A_HANDLE)
@@ -230,10 +177,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                description=(
-                    "This is the event to cancel, as the `uri` field of an outlook_list_events "
-                    + "or outlook_read_event row, with no change."
-                ),
+                description="The event to cancel, as an outlook_list_events or outlook_read_event "
+                + "row's `uri`.",
             ),
         ],
         ctx: Context,
@@ -241,11 +186,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=1,
-                description=(
-                    "This is text that Microsoft includes in the cancellation message. It "
-                    + "reaches only attendees that this event already has. Omit this argument "
-                    + "for no comment."
-                ),
+                description="Text to include in the cancellation message. Omit for no comment.",
             ),
         ] = None,
         client: GraphServiceClient = graph,

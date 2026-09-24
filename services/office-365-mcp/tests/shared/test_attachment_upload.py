@@ -1,8 +1,3 @@
-"""Every payload in this file is synthetic data. No attachment in this file ever reaches a
-real message. `attachment-upload.invalid` is not a real Microsoft host. It replaces the
-pre-authenticated `uploadUrl` value that `createUploadSession` returns.
-"""
-
 from collections.abc import Sequence
 from typing import cast
 
@@ -80,12 +75,6 @@ async def _upload(
 
 
 class TestTheSmallPath:
-    """If the attachment size is less than `MAX_ATTACHMENT_BYTES`, only one Graph call happens:
-    the inline `POST .../attachments` request. This test class never registers a route for
-    `createUploadSession`. If the code calls `createUploadSession`, respx raises its own
-    unmatched-request error instead. No assertion in this file names that error directly.
-    """
-
     async def test_a_small_file_attaches_inline_with_no_upload_session(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
@@ -113,12 +102,6 @@ class TestTheSmallPath:
 
 
 class TestTheUploadSessionPath:
-    """If the attachment size is `MAX_ATTACHMENT_BYTES` or more, `createUploadSession` runs
-    first. Then the file goes to `uploadUrl` in `PUT` requests of `UPLOAD_CHUNK_BYTES` each.
-    Every `PUT` is full size, except the last one. The last `PUT` carries only the remaining
-    bytes.
-    """
-
     async def test_a_large_file_is_split_into_correctly_sized_chunks(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:

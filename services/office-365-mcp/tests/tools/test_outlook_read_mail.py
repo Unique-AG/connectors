@@ -1,5 +1,3 @@
-"""Every response body here is synthesised. None came from a real mailbox."""
-
 from collections.abc import Mapping, Sequence
 
 import httpx
@@ -19,7 +17,6 @@ from .conftest import ME
 _IMMUTABLE_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 _REST_ID = "AAMkAGI2SYNTHETIC-rest-0001="
 
-# The SDK re-encodes the id for the URL, so this is what the decoded handle comes back as.
 _PATH = "/me/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
 
 _HANDLE = MailMessageHandle(_IMMUTABLE_ID)
@@ -64,7 +61,6 @@ class TestWhatItAsksGraphFor:
     async def test_it_selects_both_bodies_beside_the_shared_summary_fields(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph returns neither `uniqueBody` nor `body` on a projection that does not name them."""
         route = _reads(graph, _payload(body=_body("hello")))
 
         _ = await read_mail(client, handle=_HANDLE)
@@ -79,7 +75,6 @@ class TestWhatItAsksGraphFor:
     async def test_it_never_selects_the_routing_headers(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The control is simple: the tool does not filter anything downstream of `$select`."""
         route = _reads(graph, _payload(body=_body("hello")))
 
         _ = await read_mail(client, handle=_HANDLE)
@@ -89,8 +84,6 @@ class TestWhatItAsksGraphFor:
     async def test_it_prefers_a_text_body_and_declares_the_immutable_id_space(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Without the id-space preference, Graph reads the path id as a `RestId` and returns a
-        404 for the immutable id the handle carries."""
         route = _reads(graph, _payload(body=_body("hello")))
 
         _ = await read_mail(client, handle=_HANDLE)
@@ -111,13 +104,6 @@ class TestWhatItAsksGraphFor:
     async def test_the_preferences_are_not_added_to_every_other_graph_request(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """kiota's `RequestConfiguration.headers` defaults to one `HeadersCollection` shared by
-        every configuration in the process, so a header added to the default leaks everywhere.
-
-        `shared/identity.py`'s `GET /me` is the witness, because it passes its own
-        `RequestConfiguration`. A call that passes no configuration of its own keeps the test
-        green even if the leak returns.
-        """
         _ = _reads(graph, _payload(body=_body("hello")))
         profile = graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
 
@@ -167,9 +153,6 @@ class TestWhichBodyItReturns:
     async def test_an_empty_unique_body_falls_back_rather_than_answering_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph returns an empty `uniqueBody` for a message that only forwards mail or only
-        quotes it. If the tool answers with that empty body, it hides every word that Outlook
-        shows the user."""
         _ = _reads(graph, _payload(body=_body(_QUOTED_THREAD), unique_body=_body("   ")))
 
         answer = await read_mail(client, handle=_HANDLE)
@@ -203,8 +186,6 @@ class TestWhetherGraphConvertedTheBody:
     async def test_a_body_graph_left_as_html_is_not_labelled_plain_text(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The documented preference and the documented behavior of this operation disagree, so
-        the response decides and the request never does."""
         _ = _reads(graph, _payload(body=_body("<p>Paid it.</p>", content_type="html")))
 
         answer = await read_mail(client, handle=_HANDLE)
@@ -214,8 +195,6 @@ class TestWhetherGraphConvertedTheBody:
     async def test_the_markup_reaches_the_caller_exactly_as_graph_sent_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """This tool has no HTML stripper, because a stripper can turn a script block into text
-        that reads like prose from the sender."""
         markup = '<div><script>alert("pay me")</script><p>Paid it.</p></div>'
         _ = _reads(graph, _payload(body=_body(markup, content_type="html")))
 
@@ -226,8 +205,6 @@ class TestWhetherGraphConvertedTheBody:
     async def test_the_body_that_was_used_is_the_one_whose_type_is_reported(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A converted `body` says nothing about an unconverted `uniqueBody`, and `uniqueBody` is
-        what the answer carries."""
         _ = _reads(
             graph,
             _payload(
@@ -348,8 +325,6 @@ class TestWhatItRefuses:
         ],
     )
     def test_a_uri_that_is_not_a_mail_message_handle_never_becomes_one(self, uri: str) -> None:
-        """The tool refuses this before it reaches Graph. A folder, a draft, and a rule are
-        addressable under the same scheme, and none of them is a message."""
         assert mail_message_handle(uri) is None
 
 
@@ -357,8 +332,6 @@ class TestMailboxTargeting:
     async def test_no_mailbox_reads_the_signed_in_users_own_one(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`_reads` mounts its mock at `/me/messages/{id}`. If this route never sees a call, no
-        request reached `/me` at all."""
         route = _reads(graph, _payload(body=_body("hello")))
 
         _ = await read_mail(client, handle=_HANDLE)
@@ -378,8 +351,6 @@ class TestMailboxTargeting:
         assert answer.body == "hello"
 
     def test_the_permission_is_the_one_microsoft_documents_for_a_shared_mailbox(self) -> None:
-        """`Mail.Read.Shared` is the permission that Microsoft's shared-folder walkthrough names
-        to read a message in a mailbox other than `/me`."""
         assert reader.GRAPH_PERMISSIONS == ("Mail.Read", "Mail.Read.Shared")
 
 
@@ -387,8 +358,6 @@ class TestTheFailuresItPassesOn:
     async def test_a_message_graph_will_not_return_is_a_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph gives the same answer for 'deleted', 'never existed', and 'not visible to the
-        caller'."""
         _ = graph.get(_PATH).mock(
             return_value=httpx.Response(
                 404, json={"error": {"code": "ErrorItemNotFound", "message": "Not Found"}}
@@ -415,9 +384,6 @@ class TestTheRoundTripFromASearchResult:
     async def test_a_hit_from_search_is_read_by_its_own_handle(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Whatever `outlook_search_mail` puts in `uri`, this reader resolves with no part of it
-        reassembled by hand. Which strings are handles at all is `shared/handles.py`'s question.
-        """
         _ = graph.get("/me/messages").mock(
             return_value=httpx.Response(
                 200,

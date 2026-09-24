@@ -20,8 +20,6 @@ from mcp.types import (
     InputRequiredResult,
     TextContent,
 )
-
-# The wire type a client carries an answer back in, which is not the fastmcp handler's own.
 from mcp.types import ElicitResult as CarriedAnswer
 from mcp.types.version import LATEST_HANDSHAKE_VERSION, LATEST_MODERN_VERSION
 from respx.models import Call
@@ -44,8 +42,6 @@ _CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 _CLIENT_TOKEN = "synthetic-fastmcp-session-token"
 _OBO_TOKEN = "synthetic-obo-graph-token"
 
-# GRAPH_CALL_EXAMPLE ids are percent-encoded. handles.py unquotes them inbound, and the SDK
-# re-encodes them outbound. So payloads below carry the plain id, and routes carry the encoded one.
 _CALENDAR_ID = "AAMkSYNTHETIC-cal-0001="
 _EVENT_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 
@@ -57,8 +53,6 @@ _ONE_EVENT = f"{_ONE_CALENDAR}/events/{_EVENT}"
 
 _ALLOWED = "get /me, get /me/calendar, get /me/calendars, one calendar view, two creates"
 
-# What `person_confirms` reads as agreement. Both create tools spell it the same way, and a value
-# that is not this one is a refusal rather than a create.
 _AGREES = "create"
 
 _ME = {
@@ -68,8 +62,6 @@ _ME = {
     "userPrincipalName": "ada@corp.example.invalid",
 }
 
-# `canEdit` is true because outlook_create_event_on_behalf refuses a calendar Graph reports as
-# read-only, and a refusal reaches no route at all.
 _CALENDAR_ROW: Mapping[str, object] = {
     "id": _CALENDAR_ID,
     "name": "Alex Wilber",
@@ -89,8 +81,6 @@ _EVENT_ROW: Mapping[str, object] = {
     "attendees": [],
 }
 
-# Microsoft's own verbs: an update is a PATCH and a removal a DELETE on the same path. So only
-# POST routes belong in this list. The two availability calls are POSTs of their own.
 _FORBIDDEN_POSTS = (
     f"{_ONE_EVENT}/cancel",
     f"{_ONE_EVENT}/accept",
@@ -110,8 +100,6 @@ class _StubOboCredential:
 
 @pytest.fixture
 def obo(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The exchange has to succeed. If it refuses, every call answers with the token advice
-    instead, and a tool that never ran reaches no route to assert about."""
     credential = _StubOboCredential()
 
     async def get_obo_credential(
@@ -129,8 +117,6 @@ def obo(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def graph() -> Iterator[respx.MockRouter]:
-    """respx matches routes in registration order, so the forbidden ones are registered first. An
-    unmocked route raises, instead of passing in silence, which keeps the assertion meaningful."""
     with respx.mock(base_url=GRAPH_V1, assert_all_called=False) as router:
         for path in _FORBIDDEN_POSTS:
             _ = router.post(path).mock(return_value=httpx.Response(202))
@@ -159,8 +145,6 @@ def graph() -> Iterator[respx.MockRouter]:
 
 
 def _made(router: respx.MockRouter) -> Sequence[Call]:
-    """respx types one call but leaves the list of them unknown. So this is where the cast lives,
-    instead of at every index."""
     return cast("Sequence[Call]", router.calls)
 
 
@@ -169,8 +153,6 @@ def _object(value: object) -> Mapping[str, object]:
 
 
 def _the_word_for_yes(asked: InputRequest) -> str:
-    """This reads the answer that means agreement off the question a call actually minted, instead
-    of writing it out here. So a second round cannot agree with the first by coincidence."""
     assert isinstance(asked, ElicitRequest), "the question is not one a person answers"
     params = asked.params
     assert isinstance(params, ElicitRequestFormParams), "the question is not one a client can fill"
@@ -193,16 +175,11 @@ async def _decline(
     _params: ElicitRequestParams,
     _context: object,
 ) -> ElicitResult[str]:
-    """This answers the way a client answers for a person who said no, instead of raising an
-    exception."""
     return ElicitResult(action="decline")
 
 
 @pytest.fixture
 def app() -> Starlette:
-    """This uses the outlook-calendar-delegate preset (the one an operator deploys) through
-    create_app. EntraOBOToken needs a real auth provider, or every call fails at its client
-    dependency."""
     return create_app(
         config=AppConfig.model_validate({"public_base_url": "https://office-365-mcp.example"}),
         database_config=DatabaseConfig.model_validate(
@@ -246,8 +223,6 @@ _CALENDAR_TOOLS: tuple[tuple[str, Mapping[str, object]], ...] = (
     ),
 )
 
-# One address, so an own-calendar create reaches the question at all: outlook_create_event asks
-# when the event names anybody or any place, and the example it publishes names neither.
 _ONE_ATTENDEE = "grace@example.invalid"
 
 _INVITING: Mapping[str, object] = {
@@ -265,8 +240,6 @@ _NEWER_CALENDAR_TOOLS: frozenset[str] = frozenset(
     }
 )
 
-# The two calls that reach a person. The delegated create asks whether it invites anybody or not,
-# because it writes into somebody else's day either way.
 _THE_TWO_CREATES: tuple[tuple[str, Mapping[str, object]], ...] = (
     (outlook_create_event.TOOL_NAME, _INVITING),
     (
@@ -281,10 +254,6 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
     async def test_the_whole_calendar_surface_is_registered_together(
         self, every_calendar_tool: Client[FastMCPTransport]
     ) -> None:
-        """This guards the guard. Against a server missing a tool, every assertion below holds by
-        not calling that tool. It lists `_NEWER_CALENDAR_TOOLS` by name on purpose, so that
-        widening the `outlook-calendar-delegate` preset again is an edit to this assertion that a
-        reviewer sees, the same way adding one of the original five already was."""
         listed = {tool.name for tool in await every_calendar_tool.list_tools()}
 
         assert listed == (
@@ -294,8 +263,6 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
     async def test_every_tool_answers_on_the_call_the_registry_publishes(
         self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter
     ) -> None:
-        """A refused tool reaches no forbidden route either, so this sweep only counts calls that
-        reached Graph. The two creates need an agreed confirmation before they post."""
         for name, arguments in _CALENDAR_TOOLS:
             result = await every_calendar_tool.call_tool(name, dict(arguments))
             answer = cast("dict[str, object] | None", result.structured_content)
@@ -316,8 +283,6 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
     async def test_a_person_who_says_no_leaves_both_calendars_untouched(
         self, a_declining_client: Client[FastMCPTransport], graph: respx.MockRouter
     ) -> None:
-        """A decline still reads, because the read is what makes the confirmation question
-        answerable. Neither create writes anything once the client answers no."""
         for name, arguments in _THE_TWO_CREATES:
             with pytest.raises(ToolError):
                 _ = await a_declining_client.call_tool(name, dict(arguments))
@@ -334,7 +299,6 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
     async def test_an_agreed_create_that_invites_somebody_posts_once_under_a_transaction_id(
         self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter
     ) -> None:
-        """The posted event carries the transactionId Microsoft Graph dedupes a retry on."""
         assert every_calendar_tool.protocol_version == LATEST_MODERN_VERSION, (
             "this file's whole point is a connection whose era has no back-channel"
         )
@@ -356,9 +320,6 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
     async def test_an_accept_that_omits_the_request_state_creates_nothing(
         self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter
     ) -> None:
-        """fastmcp makes sure that requestState matches only when a retry carries one. Dropping
-        requestState hits the binding check with nothing bound to it, and no earlier check
-        catches this."""
         first = await every_calendar_tool.session.call_tool(
             outlook_create_event.TOOL_NAME, dict(_INVITING), allow_input_required=True
         )
@@ -386,9 +347,6 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
     async def test_a_client_pinned_to_the_handshake_era_still_asks_and_writes(
         self, app: Starlette, graph: respx.MockRouter
     ) -> None:
-        """This is the one connection here pinned to the legacy era. mode="legacy" negotiates
-        2025-11-25, where ctx.elicit still has a back-channel and one call carries the whole
-        confirmation."""
         server = cast("FastMCP[None]", app.state.fastmcp_server)
 
         async with Client(
@@ -442,8 +400,6 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
     async def test_every_forbidden_route_is_one_this_mock_would_have_counted(
         self, graph: respx.MockRouter
     ) -> None:
-        """This is the last guard. If a path here is spelled wrong, respx never matches it, and the
-        two sweeps above pass over a rule that checks nothing."""
         async with httpx.AsyncClient() as caller:
             for path in _FORBIDDEN_POSTS:
                 answered = await caller.post(f"{GRAPH_V1}{path}")

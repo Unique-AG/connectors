@@ -1,18 +1,3 @@
-"""`outlook_respond_to_invite` — accept, decline, or tentatively accept an invitation you received.
-
-- One permission covers all three actions: `Calendars.ReadWrite`. Microsoft offers no narrower one
-  for any of them.
-- These are three DISTINCT actions, not one endpoint with a status field. `/accept`, `/decline`,
-  and `/tentativelyAccept` are separate Graph operations. This tool calls the one the caller
-  named.
-- `sendResponse` defaults to `true` and is what actually mails the organizer. This tool exposes
-  only `comment`, not `proposedNewTime`: a caller who wants to propose a new time asks the user to
-  do that in Outlook.
-- Every one of the three returns `202 Accepted` with no body, so nothing here is read back from
-  the write. This call carries `no_retry()`, because a retried response can mail the organizer
-  twice.
-"""
-
 from collections.abc import Mapping
 from typing import Annotated, Literal
 
@@ -66,7 +51,6 @@ GRAPH_NOT_FOUND = (
 
 type Response = Literal["accept", "decline", "tentative"]
 
-# Microsoft's own vocabulary for what got recorded, matching `EventAttendee.response` elsewhere.
 _RECORDED_AS: Mapping[Response, str] = {
     "accept": "accepted",
     "decline": "declined",
@@ -83,24 +67,10 @@ _AGREE = "respond"
 _DECLINE = "do not respond"
 _NOTHING_HAPPENED = "No response was sent."
 
-_DESCRIPTION = """\
-This tool answers one invitation the signed-in user received, by accepting it, declining it, or \
-tentatively accepting it. With `send_response` left at its default of true, this mails the \
-organizer immediately, and nothing here can recall it. This tool answers only an invitation \
-somebody else organizes. outlook_update_event and outlook_cancel_event are the tools for an \
-event the signed-in user organizes.
-
-Notes:
-- This tool asks the user to agree before it sends a response that reaches the organizer, and \
-sends nothing unless the user agrees. It skips that question only when `send_response` is set to \
-false, because then nobody is told either way.
-- `comment` is optional text Microsoft includes in the response Microsoft mails the organizer. It \
-changes nothing when `send_response` is false.
-- This tool cannot propose a different time. If the user wants to suggest one instead of \
-answering as asked, tell them to do that from Outlook directly.
-- If a call times out, the response can already be sent. Before calling this tool again for the \
-same invitation, ask the user whether they already answered it in Outlook.
-"""
+_DESCRIPTION = (
+    "Accept, decline, or tentatively accept a calendar invitation the signed-in user received, "
+    "by default notifying the organizer."
+)
 
 _NOT_A_HANDLE = (
     "outlook_respond_to_invite takes the `uri` that outlook_list_events or outlook_read_event "
@@ -112,41 +82,14 @@ _NOT_A_HANDLE = (
 
 
 class InvitationResponse(BaseModel):
-    """What this call asked Microsoft to record. Every one of the three actions answers `202
-    Accepted` with an empty body. Nothing here is confirmed by reading Microsoft's response. This
-    is what this call requested, read against the event as it stood just before this call."""
-
-    uri: str = Field(
-        description="The handle this call was given, echoed back for a reply about this event."
-    )
-    subject: str | None = Field(
-        description=(
-            "The subject as it was read just before this call. Null when the event carried "
-            + "none."
-        )
-    )
-    organizer: MailAddress | None = Field(
-        description=(
-            "Who organizes this event, read off the event before this call. This is who "
-            + "Microsoft mails the response to when `sent_response` is true."
-        )
-    )
+    uri: str = Field(description="The event handle this call was given.")
+    subject: str | None = Field(description="The event's subject, or null if it had none.")
+    organizer: MailAddress | None = Field(description="Who organizes this event.")
     response: str = Field(
-        description=(
-            "What this call asked Microsoft to record, in Microsoft's own spelling: "
-            + "`accepted`, `declined`, or `tentativelyAccepted`. This matches the vocabulary "
-            + "`outlook_read_event` reports for an attendee's own answer."
-        )
+        description="What was recorded: accepted, declined, or tentativelyAccepted."
     )
-    comment: str | None = Field(description="The comment this call sent. Null when none was given.")
-    sent_response: bool = Field(
-        description=(
-            "Whether this call asked Microsoft to mail the organizer, echoed from the "
-            + "`send_response` argument. True means that mail already went out and CANNOT BE "
-            + "RECALLED here. Microsoft's 202 confirms nothing further about delivery. This is "
-            + "what was requested, not a receipt."
-        )
-    )
+    comment: str | None = Field(description="The comment that was sent, or null if none.")
+    sent_response: bool = Field(description="Whether the organizer was notified.")
 
 
 async def respond_to_invite(
@@ -158,7 +101,6 @@ async def respond_to_invite(
     send_response: bool = True,
     confirm: Confirm,
 ) -> InvitationResponse | InputRequiredResult:
-    """Read the event, ask a person when this response reaches the organizer, then send it."""
     handle = event_handle(uri)
     if handle is None:
         raise ToolError(_NOT_A_HANDLE)
@@ -267,41 +209,24 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                description=(
-                    "The invitation to answer, as the `uri` field of an outlook_list_events or "
-                    + "outlook_read_event row, verbatim."
-                ),
+                description="The invitation's uri, from outlook_list_events or outlook_read_event.",
             ),
         ],
         response: Annotated[
             Response,
-            Field(
-                description=(
-                    "How to answer: `accept`, `decline`, or `tentative`. These are three "
-                    + "distinct Microsoft Graph actions, and this tool calls the one that "
-                    + "matches."
-                )
-            ),
+            Field(description="How to answer: accept, decline, or tentative."),
         ],
         ctx: Context,
         comment: Annotated[
             str | None,
             Field(
                 min_length=1,
-                description=(
-                    "Text Microsoft includes in the response mailed to the organizer. Reaches "
-                    + "nobody when `send_response` is false. Omit for no comment."
-                ),
+                description="Optional text included in the response mailed to the organizer.",
             ),
         ] = None,
         send_response: Annotated[
             bool,
-            Field(
-                description=(
-                    "Set this to false to record the answer without mailing the organizer. "
-                    + "Left at its default of true, this call mails the organizer immediately."
-                )
-            ),
+            Field(description="Whether to notify the organizer. Defaults to true."),
         ] = True,
         client: GraphServiceClient = graph,
     ) -> InvitationResponse | InputRequiredResult:

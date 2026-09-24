@@ -1,17 +1,3 @@
-"""`outlook_read_thread` — every message of one conversation that is in this mailbox.
-
-Microsoft publishes no thread endpoint for a personal mailbox. The only route from a message's
-`conversationId` to its thread is `$filter=conversationId eq '…'`, which appears in no Microsoft
-document. A Microsoft SDK maintainer reported that it works, in
-https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/757. That is the whole of the
-evidence. Graph ignores an unsupported `$filter` rather than refusing it, so every call selects
-`conversationId` back and refuses an answer carrying a foreign conversation. There is no
-`$orderby`: beside this `$filter` it answers `InefficientFilter`, so the sort happens here.
-
-**`mailbox` re-points both requests from `/me` to `/users/{id}`.** `searched_scope` below names
-the mailbox that was actually searched.
-"""
-
 from collections.abc import Mapping
 from typing import Annotated
 
@@ -52,8 +38,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 MAX_MESSAGES = 100
 
-# The id space every handle in this connector uses. Whether Graph also re-parses a path id in the
-# space a header names is undocumented.
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _ANCHOR_FIELDS: tuple[str, ...] = ("id", "conversationId")
@@ -63,17 +47,10 @@ _THREAD_FIELDS: tuple[str, ...] = (*SUMMARY_FIELDS, "conversationId", "sentDateT
 type _AnchorQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
 type _ThreadQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
-_DESCRIPTION = """\
-Reads every message of one conversation held in the signed-in user's mailbox, or, with \
-`mailbox`, a shared or delegated one, oldest first. It starts from any one message of the \
-conversation. This answers "what happened in this thread" or "did I ever reply". \
-outlook_read_mail is the sibling for one message alone. When the whole conversation matters, \
-use this tool.
-
-Notes:
-- Searches every folder that holds a copy of the conversation, not just the anchor message's \
-folder — Sent Items included.
-"""
+_DESCRIPTION = (
+    "Reads every message of one conversation held in the signed-in user's mailbox, or, with "
+    "`mailbox`, a shared or delegated one, oldest first."
+)
 
 _BAD_HANDLE = (
     "outlook_read_thread takes the `uri` of a message, which outlook_search_mail and "
@@ -101,8 +78,6 @@ _FILTER_IGNORED = (
 
 
 class MailThread(BaseModel):
-    """One conversation as this mailbox holds it, and what that excludes."""
-
     messages: list[MailSummary] = Field(
         description="Every message of the conversation found in this mailbox, oldest first."
     )
@@ -111,10 +86,8 @@ class MailThread(BaseModel):
     )
     complete: bool = Field(
         description=(
-            "False when more of the conversation remained in this mailbox after the tool "
-            + "reached the fixed cap. So the oldest part of the thread can be missing. True "
-            + "means every message this mailbox holds for the conversation is here — not "
-            + "necessarily every message of the conversation."
+            "False if more of the conversation remained in this mailbox after the tool "
+            "reached the fixed cap."
         )
     )
     searched_scope: str = Field(
@@ -140,7 +113,6 @@ async def read_thread(
             page = await reached.messages.get(request_configuration=_thread_request(conversation))
 
     found = list((page.value if page is not None else None) or [])
-    # A page can come back short of `$top` and still carry a next link, so the link is the signal.
     truncated = page is not None and page.odata_next_link is not None
     _make_sure_the_filter_was_applied(
         found, conversation=conversation, anchor=handle.message_id, truncated=truncated
@@ -151,12 +123,6 @@ async def read_thread(
 def _make_sure_the_filter_was_applied(
     found: list[Message], *, conversation: str, anchor: str, truncated: bool
 ) -> None:
-    """Refuse an answer Graph did not filter.
-
-    A foreign conversation proves that Graph dropped the filter, at any page size. An absent
-    anchor means the filter ran on the wrong value. This applies only on a whole page: with no
-    `$orderby`, a truncated page can honestly leave the anchor off.
-    """
     if not found:
         return
     foreign = [message for message in found if message.conversation_id != conversation]
@@ -179,7 +145,6 @@ def _answer(found: list[Message], *, complete: bool, mailbox: str | None) -> Mai
 
 
 def _searched_scope(mailbox: str | None) -> str:
-    """What `read_thread` searched, in words, for the answer's `searched_scope` field."""
     whose = "The signed-in user's own mailbox" if mailbox is None else f"The mailbox {mailbox!r}"
     return (
         f"{whose}, every folder of it — Sent Items, Deleted Items, and Junk Email included. Not "
@@ -191,7 +156,6 @@ def _searched_scope(mailbox: str | None) -> str:
 
 
 def _received_at(message: Message) -> str:
-    """Oldest first. A draft carries no received time, so it sorts first."""
     return "" if message.received_date_time is None else message.received_date_time.isoformat()
 
 
@@ -205,7 +169,6 @@ def _anchor_request() -> RequestConfiguration[_AnchorQuery]:
 
 
 def _thread_request(conversation: str) -> RequestConfiguration[_ThreadQuery]:
-    """No `$orderby`: beside this `$filter` Graph answers `InefficientFilter`."""
     return RequestConfiguration[_ThreadQuery](
         query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
             filter=f"conversationId eq '{odata_literal(conversation)}'",
@@ -217,8 +180,6 @@ def _thread_request(conversation: str) -> RequestConfiguration[_ThreadQuery]:
 
 
 def _immutable_ids() -> HeadersCollection:
-    """Built per call: kiota's `RequestConfiguration.headers` default is one collection shared
-    process-wide, so a preference added to it leaks onto every Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
     return headers
@@ -239,10 +200,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The `uri` of any one message of the thread, exactly as outlook_search_mail "
-                    + "or outlook_list_mail reported it. A subject line, an address, or an "
-                    + "Outlook web link is never one. Any message of the conversation reaches "
-                    + "the same thread, so the newest hit is as good as the oldest."
+                    "The `uri` of any one message of the thread, exactly as another tool "
+                    "reported it."
                 ),
             ),
         ],

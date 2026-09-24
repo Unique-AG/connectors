@@ -1,6 +1,3 @@
-"""Every payload in this file is synthetic data. This file never creates a draft in a real
-mailbox."""
-
 import base64
 import json
 from collections.abc import Mapping, Sequence
@@ -53,9 +50,6 @@ _UPLOAD_URL = "https://attachment-upload.invalid/session/mail?authtoken=syntheti
 
 
 def _session_route(graph: respx.MockRouter, *, draft_id: str = _DRAFT_ID) -> respx.Route:
-    """This route mocks `createUploadSession`, Graph's first call in the upload-session path.
-    `tests/shared/test_attachment_upload.py` mocks the same call, for the function that this
-    file calls."""
     return graph.post(f"{_MESSAGES}/{draft_id}/attachments/createUploadSession").mock(
         return_value=httpx.Response(
             201,
@@ -69,9 +63,6 @@ def _session_route(graph: respx.MockRouter, *, draft_id: str = _DRAFT_ID) -> res
 
 
 def _chunk_route(graph: respx.MockRouter, *, status: int = 201) -> respx.Route:
-    """This route mocks every chunk `PUT` to the pre-authenticated `uploadUrl` above, for any
-    number of chunks that `_LARGE_FILE` splits into. The split itself is the concern of
-    `shared/attachment_upload.py`. Its own test suite already covers the split."""
     return graph.route(method="PUT", host="attachment-upload.invalid").mock(
         return_value=httpx.Response(status)
     )
@@ -90,8 +81,6 @@ def _created(
     body: Mapping[str, object] | None = None,
     web_link: str | None = _WEB_LINK,
 ) -> dict[str, object]:
-    """Graph's `201` response is a whole message. `isDraft` is set, and there is no
-    `sentDateTime`."""
     return {
         "id": draft_id,
         "isDraft": True,
@@ -113,8 +102,6 @@ def _creates(graph: respx.MockRouter, payload: dict[str, object]) -> respx.Route
 async def _draft(
     client: GraphServiceClient, transport: httpx.AsyncClient, **overrides: object
 ) -> MailDraft:
-    """This function makes one valid call. A test about one thing then overrides only that
-    argument."""
     arguments: dict[str, object] = {"to": [_ADA], "subject": _SUBJECT, "body_html": _BODY}
     arguments.update(overrides)
     return await drafter.draft_mail(
@@ -141,8 +128,6 @@ def _addressed(sent: dict[str, object], field: str) -> list[str]:
 
 
 async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
-    """This returns the published schema and annotations. This is the surface that a client
-    actually reads."""
     mcp: FastMCP = FastMCP(name="schema-under-test")
     drafter.register(mcp, transport)
     tool = await mcp.get_tool(drafter.TOOL_NAME)
@@ -154,10 +139,6 @@ class TestWhatItSendsToGraph:
     async def test_it_declares_the_immutable_id_space_the_handle_is_minted_in(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """Every other handle that this connector creates carries an immutable id. If a draft
-        handle uses a different id space, it becomes the one exception to that rule.
-        `outlook_send_draft` reads this handle.
-        """
         route = _creates(graph, _created())
 
         _ = await _draft(client, transport)
@@ -192,8 +173,6 @@ class TestWhatItSendsToGraph:
         graph: respx.MockRouter,
         written: str,
     ) -> None:
-        """Microsoft decides what is safe in a body. This connector filters nothing. Whatever the
-        caller writes reaches Graph byte for byte. One example alone cannot prove that."""
         route = _creates(graph, _created())
 
         _ = await _draft(client, transport, body_html=written)
@@ -217,8 +196,6 @@ class TestWhatItSendsToGraph:
     async def test_nothing_it_sends_carries_an_attachment_or_a_blind_copy(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """There is no argument for either. So there is nothing to put in the request. This test
-        looks at the wire for that fact, not at the function signature."""
         route = _creates(graph, _created())
 
         _ = await _draft(client, transport)
@@ -230,9 +207,6 @@ class TestWhatItSendsToGraph:
     async def test_it_asks_graph_for_nothing_but_the_create(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """Sending mail is a second Graph call. This tool must never make that call. This test
-        counts every request. It does not look for one path by name. That count still catches a
-        new call under a path this test did not name."""
         route = _creates(graph, _created())
         send_mail = graph.post("/me/sendMail").mock(return_value=httpx.Response(202))
 
@@ -246,9 +220,6 @@ class TestWhatItSendsToGraph:
     async def test_a_create_graph_declines_is_never_sent_a_second_time(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """Graph publishes no idempotency key for this call. The SDK retries a `POST` request the
-        same way it retries a `GET` request. A `503` response that arrives after Graph already
-        accepted the create leaves the user with a duplicate draft."""
         route = graph.post(_MESSAGES).mock(return_value=httpx.Response(503))
 
         with pytest.raises(GraphUnavailable):
@@ -336,10 +307,6 @@ class TestTheSchemaItPublishes:
     async def test_no_argument_offers_a_blind_copy_a_fetch_or_markup(
         self, transport: httpx.AsyncClient, word: str
     ) -> None:
-        """This test looks for the absence of the argument. That absence is the real control. A
-        runtime refusal keeps the argument in the schema. A model reads a published argument as
-        an invitation to use it. `attachments` is the one deliberate exception. Its own tests,
-        below, cover `attachments`. It never appears in this list."""
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
@@ -348,9 +315,6 @@ class TestTheSchemaItPublishes:
     async def test_attachments_is_the_only_argument_naming_a_file(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """`attachments` is the one argument allowed to contain the word `file` or `attach`. This
-        test matches by name. It still catches a second argument that reaches the same
-        capability."""
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
@@ -380,9 +344,6 @@ class TestTheSchemaItPublishes:
     async def test_two_calls_do_not_share_one_cc_list(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """The default value comes from the `Field` declaration, not from the function signature.
-        A default of `[]` in the function signature becomes one shared list for the life of the
-        process."""
         route = _creates(graph, _created())
 
         _ = await _draft(client, transport, cc=["pam@example.invalid"])
@@ -393,8 +354,6 @@ class TestTheSchemaItPublishes:
 
 class TestHowItDeclaresItself:
     def test_the_permission_is_the_one_microsoft_documents_for_creating_a_message(self) -> None:
-        """Microsoft's walkthrough for shared folders names `Mail.ReadWrite.Shared` as the
-        permission for writing a message into a mailbox other than `/me`."""
         assert drafter.GRAPH_PERMISSIONS == ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
     async def test_it_announces_itself_as_a_write_that_destroys_nothing(
@@ -413,9 +372,6 @@ class TestHowItDeclaresItself:
     async def test_the_description_says_it_cannot_send_and_names_the_attachment_ceiling(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The tool description is the only place where the model reads these limits. It states
-        what it cannot do, and now what it can attach and how much. No other file re-reads the
-        tool file for the model."""
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""
@@ -463,8 +419,6 @@ class TestWhatItAnswers:
     async def test_the_recipients_are_read_off_graph_and_never_echoed_from_the_arguments(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """The record of a draft must show who the draft actually reaches, not who this call
-        asked for. This exposes a recipient that the user did not ask for."""
         _ = _creates(
             graph,
             _created(
@@ -515,9 +469,6 @@ class TestWhatItAnswers:
     async def test_the_handle_addresses_a_draft_and_cannot_be_read_as_a_message(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """Graph gives a draft the same id space as any other message. This connector keeps the
-        two handle families separate. That separation stops a message id a reader found from
-        being used as a draft id that a sender tool accepts."""
         _ = _creates(graph, _created())
 
         answer = await _draft(client, transport)
@@ -606,10 +557,6 @@ class TestAttachments:
     async def test_a_file_at_or_past_the_absolute_ceiling_is_refused_before_anything_reaches_graph(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """This test uses `MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION`, not `MAX_ATTACHMENT_BYTES`. A
-        file at the inline ceiling now attaches through the upload session. See
-        `TestLargeAttachments...` below. Only Microsoft's own absolute ceiling still refuses the
-        file outright."""
         route = _creates(graph, _created())
         oversized = base64.b64encode(b"x" * MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION).decode()
 
@@ -663,13 +610,6 @@ class TestAttachments:
 
 
 class TestLargeAttachmentsGoThroughAnUploadSessionAfterTheDraftExists:
-    """If the attachment size is at or past `MAX_ATTACHMENT_BYTES`, an attachment cannot travel
-    inside the create call. See the module docstring of the tool for the reason. So this file
-    always creates the draft first, then uploads each large attachment separately. Each upload
-    goes through `shared.attachment_upload.upload_attachment`, against the draft id that the
-    create call just returned.
-    """
-
     async def test_a_small_and_a_large_attachment_split_between_the_create_and_a_separate_upload(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
@@ -722,10 +662,6 @@ class TestLargeAttachmentsGoThroughAnUploadSessionAfterTheDraftExists:
     async def test_a_refused_upload_names_the_draft_that_already_exists_and_what_already_landed(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """By the time a large attachment's upload can fail, the create call has already
-        succeeded. So the draft is real. The module docstring promises that the exception states
-        this fact. Every other refusal in this file can still leave the caller to assume that
-        nothing happened, but this one cannot."""
         _ = _creates(graph, _created())
         session = _session_route(graph)
         _ = graph.route(method="PUT", host="attachment-upload.invalid").mock(
@@ -754,9 +690,6 @@ class TestLargeAttachmentsGoThroughAnUploadSessionAfterTheDraftExists:
     async def test_a_second_large_attachment_is_never_attempted_after_the_first_is_refused(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """This code stops at the first refusal. It does not try to upload the rest. Graph gives
-        no way to ask whether a later attachment landed. If the code skipped ahead, it could
-        silently under-report what is actually on the draft."""
         _ = _creates(graph, _created())
         session = _session_route(graph)
         _ = graph.route(method="PUT", host="attachment-upload.invalid").mock(
@@ -779,10 +712,6 @@ class TestLargeAttachmentsGoThroughAnUploadSessionAfterTheDraftExists:
     async def test_the_underlying_graph_failure_is_the_raised_exceptions_cause(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        """The code chains the error with `from`. So the original `GraphFailure` object, with its
-        status, code, and request id, stays available to anything that reads `__cause__`. The
-        message a caller sees is this file's own text, not the generic text that Microsoft
-        Graph's own error gives."""
         _ = _creates(graph, _created())
         _ = _session_route(graph)
         _ = graph.route(method="PUT", host="attachment-upload.invalid").mock(

@@ -1,6 +1,3 @@
-"""Every payload in this file is synthetic. No event in this file came from a real calendar.
-No address in this file resolves to anything real."""
-
 import json
 from collections.abc import Mapping, Sequence
 from typing import cast
@@ -226,8 +223,6 @@ class TestWhatItSendsToGraph:
     async def test_clearing_every_attendee_sends_an_explicit_empty_list(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`[]` and omitting the key are different instructions to Microsoft. Only `[]` clears
-        everyone who was already invited."""
         patch = _ready(graph)
 
         _ = await _update(client, attendees=[], optional_attendees=[])
@@ -238,8 +233,6 @@ class TestWhatItSendsToGraph:
     async def test_a_preexisting_resource_attendee_is_carried_forward_when_attendees_change(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft replaces the WHOLE attendee collection on any update to attendees. Without
-        this rule, a room that this connector never added silently loses its booking."""
         _ = _reads(graph, _event(attendees=[_attendee(_ADA), _attendee(_ROOM, kind="resource")]))
         patch = _updates(graph)
 
@@ -335,8 +328,6 @@ class TestThePersonBetweenTheRequestAndTheChange:
     async def test_clearing_every_attendee_on_an_event_that_had_some_is_put_to_a_person(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """An empty `attendees=[]` still reaches everyone who was invited before: Graph mails
-        each dropped attendee that they were removed."""
         _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
         _ = _updates(graph)
         asked: list[str] = []

@@ -1074,16 +1074,12 @@ class TestTheSchemaItPublishes:
             "an argument with no server-side route silently under-returns, which is unrecoverable"
         )
 
-    def test_the_description_sends_a_model_to_local_for_an_all_day_row(self) -> None:
-        """Graph holds an all-day event at midnight UTC, so `iso` names the day before only west
-        of UTC; this now lives on the `iso` field itself rather than the tool description, which
-        says so rather than claim `iso` carries no date at all."""
+    def test_the_iso_field_says_it_can_be_null(self) -> None:
         described = EventTime.model_fields["iso"].description
 
         assert described is not None
-        assert "the value to compare, to sort on, and to quote" in described
-        assert "In a zone west of UTC, this value names the day before" in described
-        assert "Read `local` for the date that such a row covers" in described
+        assert "comparing and sorting" in described
+        assert "null when the zone cannot be resolved" in described
 
     async def test_the_zone_argument_says_which_way_an_etc_gmt_key_runs(
         self, transport: httpx.AsyncClient

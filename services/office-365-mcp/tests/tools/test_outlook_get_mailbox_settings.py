@@ -528,7 +528,7 @@ class TestWhatItCannotSee:
         field = settings_tool.MailboxSettingsReport.model_fields["covers_mailbox_level_forwarding"]
 
         assert field.description is not None
-        assert "Set-Mailbox -ForwardingSmtpAddress" in field.description
+        assert "Exchange mailbox-level forwarding" in field.description
         assert "does not prove" in field.description
         assert "nobody forwards this mailbox's mail" in field.description
 

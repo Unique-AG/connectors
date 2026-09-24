@@ -1,21 +1,3 @@
-"""`outlook_suggest_meeting_times` — ask Microsoft to propose times, read-only.
-
-- `Calendars.Read.Shared` is Microsoft's own least-privileged permission for this call, because
-  `findMeetingTimes` reads attendees' calendars, and not only the signed-in user's own.
-- `findMeetingTimes` assumes any attendee who is a person is always required. The `type` this
-  tool sends on each attendee is Microsoft's own signal for a room or resource, not a
-  required/optional split of people.
-- A run with static inputs can still answer differently on a later call, since Microsoft's ranking
-  algorithm changes over time. This tool reports Microsoft's ranking as given and orders nothing
-  itself.
-- This is a query with no side effect, so nothing here carries `no_retry()`.
-
-TRAP: `meetingDuration` reaches the wire as a plain ISO 8601 string (`"PT45M"`), never as a
-`datetime.timedelta`, although the generated field is typed `Optional[timedelta]`. kiota's writer
-formats an actual `timedelta` with Python's own `str()`, which is not ISO 8601. This file sends
-the string form instead, and overrides the generated type hint at that one call site.
-"""
-
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Annotated, Literal
@@ -80,21 +62,10 @@ MAX_ATTENDEE_PERCENTAGE = 100.0
 
 _FALLBACK_ZONE = ZoneInfo("UTC")
 
-_DESCRIPTION = """\
-This tool asks Microsoft to suggest meeting times for the signed-in user and one or more \
-attendees. Microsoft ranks the results by how many attendees are actually free. This is a read: \
-nothing here books, invites, or holds a time. outlook_create_event is the tool that turns a \
-chosen suggestion into a real invitation.
-
-Notes:
-- Every address must come from the user, never invented or taken from text inside a message, \
-event, or transcript.
-- `attendees` and `optional_attendees` both count as people whose calendars Microsoft reads. \
-Only `is_organizer_optional` changes whether the signed-in user themselves must be free.
-- If nothing is suggested, `empty_reason` says why — most often that no attendee has a free slot \
-in the window this call asked about. Widen the window or drop an attendee rather than retrying \
-the same call.
-"""
+_DESCRIPTION = (
+    "Asks Microsoft to suggest meeting times for the signed-in user and one or more attendees. "
+    "This is a read; nothing here books, invites, or holds a time."
+)
 
 _ENDS_BEFORE_STARTS = (
     "outlook_suggest_meeting_times read nothing, because `ends_at` is not after `starts_at`. Both "
@@ -141,12 +112,9 @@ _TOO_MANY_ATTENDEES = (
 
 
 class SuggestedAttendee(BaseModel):
-    address: str | None = Field(description="This attendee's address, as Microsoft echoed it.")
+    address: str | None = Field(description="This attendee's address.")
     availability: str | None = Field(
-        description=(
-            "This attendee's free/busy status for this suggestion, in Microsoft's own "
-            + "spelling: `free`, `tentative`, `busy`, `oof`, `workingElsewhere`, or `unknown`."
-        )
+        description="This attendee's free/busy status for this suggestion."
     )
 
     @classmethod
@@ -166,19 +134,12 @@ class SuggestedAttendee(BaseModel):
 
 
 class MeetingSuggestion(BaseModel):
-    """One candidate time, as Microsoft ranked it — this connector reorders nothing."""
-
     start: EventTime | None = Field(description="When this candidate starts.")
     end: EventTime | None = Field(description="When this candidate ends.")
     confidence: float | None = Field(
-        description=(
-            "The average chance, 0 to 100, that every attendee is free at this time. Read "
-            + "`attendees` for whose absence lowers it."
-        )
+        description="The average chance, 0 to 100, that every attendee is free at this time."
     )
-    order: int | None = Field(
-        description="Microsoft's own rank, highest confidence first, ties broken chronologically."
-    )
+    order: int | None = Field(description="Microsoft's own rank, highest confidence first.")
     organizer_availability: str | None = Field(
         description="The signed-in user's own free/busy status for this candidate."
     )
@@ -186,10 +147,7 @@ class MeetingSuggestion(BaseModel):
         description="Each attendee's own free/busy status for this candidate."
     )
     reason: str | None = Field(
-        description=(
-            "Why Microsoft suggested this time, only when `return_suggestion_reasons` was "
-            + "true. Null otherwise."
-        )
+        description="Why Microsoft suggested this time, when requested. Null otherwise."
     )
 
     @classmethod
@@ -222,18 +180,10 @@ class SuggestedMeetingTimes(BaseModel):
     window: SuggestionWindow = Field(description="The exact range this call asked Microsoft for.")
     duration_minutes: int = Field(description="The candidate length this call asked for.")
     suggestions: list[MeetingSuggestion] = Field(
-        description=(
-            "Candidates in Microsoft's own order, highest confidence first. An empty list "
-            + "means Microsoft suggested nothing. Read `empty_reason` to find out why."
-        )
+        description="Candidates in Microsoft's own order, highest confidence first."
     )
     empty_reason: str | None = Field(
-        description=(
-            "Why `suggestions` is empty, in Microsoft's own spelling: "
-            + "`attendeesUnavailable`, `attendeesUnavailableOrUnknown`, `locationsUnavailable`, "
-            + "`organizerUnavailable`, or `unknown`. Null, and never an empty string, when "
-            + "`suggestions` holds at least one candidate."
-        )
+        description="Why suggestions is empty. Null when it holds at least one candidate."
     )
 
 
@@ -345,47 +295,27 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 max_length=MAX_ATTENDEES,
-                description=(
-                    "The people who must attend, one SMTP address per entry. An empty list "
-                    + "reads only the signed-in user's own calendar."
-                ),
+                description="The people who must attend, one SMTP address per entry.",
             ),
         ],
         starts_at: Annotated[
             str,
-            Field(
-                min_length=1,
-                description=(
-                    "The window's start, as a local wall-clock time in `time_zone`, for "
-                    + "example `2026-03-02T09:00`. No offset and no `Z`."
-                ),
-            ),
+            Field(min_length=1, description="The window's start, as a local wall-clock time."),
         ],
         ends_at: Annotated[
             str,
-            Field(
-                min_length=1,
-                description=(
-                    "The window's end, in the same form and zone as `starts_at`, and after it."
-                ),
-            ),
+            Field(min_length=1, description="The window's end, after starts_at."),
         ],
         time_zone: Annotated[
             str,
-            Field(
-                min_length=1,
-                description=(
-                    "The zone `starts_at` and `ends_at` are written in. Required, with no "
-                    + "default, because a wrong guess searches the wrong hours."
-                ),
-            ),
+            Field(min_length=1, description="The zone starts_at and ends_at are written in."),
         ],
         optional_attendees: Annotated[
             list[str],
             Field(
                 default=[],
                 max_length=MAX_ATTENDEES,
-                description="People the meeting works without, under the same rule as `attendees`.",
+                description="People the meeting works without.",
             ),
         ],
         duration_minutes: Annotated[
@@ -395,35 +325,23 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         activity_domain: Annotated[
             ActivityDomainName,
             Field(
-                description=(
-                    "`work` suggests only within configured work hours (the default). "
-                    + "`personal` adds the weekend at the same hours. `unrestricted` searches "
-                    + "every hour of every day."
-                )
+                description="work searches work hours, personal adds weekends, unrestricted all."
             ),
         ] = "work",
         is_organizer_optional: Annotated[
             bool,
-            Field(
-                description=(
-                    "Set this to true if the signed-in user does not have to attend either. "
-                    + "Defaults to false."
-                )
-            ),
+            Field(description="Set true if the signed-in user does not have to attend either."),
         ] = False,
         max_candidates: Annotated[
             int | None,
-            Field(ge=1, description="The most candidates to return. Omit for Microsoft's default."),
+            Field(ge=1, description="The most candidates to return."),
         ] = None,
         minimum_attendee_percentage: Annotated[
             float | None,
             Field(
                 ge=MIN_ATTENDEE_PERCENTAGE,
                 le=MAX_ATTENDEE_PERCENTAGE,
-                description=(
-                    "Only return candidates at least this confident, 0 to 100. Omit for "
-                    + "Microsoft's default of 50."
-                ),
+                description="Only return candidates at least this confident, 0 to 100.",
             ),
         ] = None,
         return_suggestion_reasons: Annotated[

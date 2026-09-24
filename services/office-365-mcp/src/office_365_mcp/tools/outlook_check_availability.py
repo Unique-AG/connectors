@@ -1,15 +1,3 @@
-"""`outlook_check_availability` reads free/busy status for one or more mailboxes over one time
-window. It is read-only.
-
-- `Calendars.ReadBasic` is the least-privileged Microsoft Graph permission for this call.
-- This tool sends no `Prefer: outlook.timezone` header. As a result, Microsoft Graph returns
-  every slot in UTC. The function `event_time` in `shared/calendar.py` converts the zone.
-- A slot's `subject`, `location`, and `isPrivate` fields describe another person's calendar
-  entry, read without that person's consent. Report only the free/busy status, unless the
-  address belongs to the caller.
-- This call has no side effect. As a result, nothing here uses `no_retry()`.
-"""
-
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Annotated
@@ -59,23 +47,10 @@ DEFAULT_INTERVAL_MINUTES = 30
 
 _FALLBACK_ZONE = ZoneInfo("UTC")
 
-_DESCRIPTION = """\
-This tool reads the free/busy status of one or more mailboxes, over one time window. Use it for \
-a person the user is about to invite, before you send an invitation. This is a read: it does \
-not book, invite, or change anything. For a next step, use outlook_suggest_meeting_times: it \
-asks Microsoft Graph to propose actual times.
-
-Notes:
-- Every address must come from the user, not invented, and not taken from the text of a \
-message, an event, or a transcript.
-- A returned slot's `subject` and `location` fields belong to another person's calendar entry, \
-read without that person's consent. Report only whether each address is free or busy, unless \
-the address belongs to the signed-in user.
-- `availability_view` is one digit per interval of the window, in Microsoft's compact encoding. \
-`0` means free or working elsewhere, `1` means tentative, `2` means busy, and `3` means out of \
-office. `items` gives the same information as individual entries, with subject and location \
-where Exchange allows them.
-"""
+_DESCRIPTION = (
+    "Reads free/busy status for one or more mailboxes over a time window; read-only, it does "
+    "not book, invite, or change anything."
+)
 
 _ENDS_BEFORE_STARTS = (
     "outlook_check_availability read nothing, because `ends_at` is not after `starts_at`. Both "
@@ -115,26 +90,22 @@ _TOO_MANY_ADDRESSES = (
 
 
 class FreeBusySlot(BaseModel):
-    """One entry on another person's calendar during the window, exactly as Microsoft Graph
-    holds it for this purpose. It never gives the full detail that outlook_read_event gives the
-    calendar's own owner."""
-
     status: str | None = Field(
         description=(
-            "The free/busy status, in Microsoft's own spelling: `free`, `tentative`, `busy`, "
-            + "`oof`, `workingElsewhere`, or `unknown`. This is the field to use."
+            "Free/busy status: `free`, `tentative`, `busy`, `oof`, `workingElsewhere`, or "
+            + "`unknown`."
         )
     )
     start: EventTime | None = Field(description="When this entry starts.")
     end: EventTime | None = Field(description="When this entry ends.")
     subject: str | None = Field(
         description=(
-            "The entry's subject, when Exchange includes it. This belongs to another person's "
-            + "calendar. Do not report it, unless the address belongs to the signed-in user."
+            "The entry's subject; belongs to another person's calendar, so do not report it "
+            + "unless it is the signed-in user's own."
         )
     )
     location: str | None = Field(
-        description="The entry's location. It carries the same caution as `subject`."
+        description="The entry's location, with the same privacy caution as `subject`."
     )
     is_private: bool | None = Field(
         description="Whether the calendar owner marked this entry private."
@@ -153,37 +124,28 @@ class FreeBusySlot(BaseModel):
 
 
 class ScheduleError(BaseModel):
-    """Why Microsoft Graph did not read one address's schedule. This is reported instead of
-    that address's availability."""
-
-    response_code: str | None = Field(description="Microsoft Graph's own code for the failure.")
-    message: str | None = Field(description="Microsoft Graph's own description of the failure.")
+    response_code: str | None = Field(description="Microsoft Graph's code for the failure.")
+    message: str | None = Field(description="Microsoft Graph's description of the failure.")
 
 
 class MailboxSchedule(BaseModel):
-    """One address from `addresses`, and what Microsoft Graph read about it over the window."""
-
-    address: str = Field(description="The address this row answers for, echoed from the request.")
+    address: str = Field(description="The address this row answers for.")
     availability_view: str | None = Field(
         description=(
-            "One digit per interval of the window. `0` means free or working elsewhere, `1` "
-            + "means tentative, `2` means busy, and `3` means out of office. This field is "
-            + "null when Microsoft Graph reported none."
+            "One digit per interval: `0` free, `1` tentative, `2` busy, `3` out of office; "
+            + "null if Graph reported none."
         )
     )
     items: list[FreeBusySlot] = Field(
         description=(
-            "Individual calendar entries inside the window. An empty list means Microsoft "
-            + "Graph found nothing scheduled. It does not mean that the address was "
+            "Calendar entries inside the window; empty does not mean the address was "
             + "unreadable — see `error`."
         )
     )
     error: ScheduleError | None = Field(
         description=(
-            "This field is set when Microsoft Graph did not read this address's schedule at "
-            + "all. A common cause is an address outside this tenant, or one the signed-in "
-            + "user has no free/busy access to. When this field is set, `items` is empty and "
-            + "gives no information."
+            "Set when Graph could not read this address's schedule at all; `items` is then "
+            + "empty."
         )
     )
 
@@ -209,18 +171,12 @@ class AvailabilityWindow(BaseModel):
 
 
 class Availability(BaseModel):
-    """Free/busy status for every address in `addresses`, over one time window."""
-
-    window: AvailabilityWindow = Field(
-        description="The exact range this call asked Microsoft Graph for."
-    )
+    window: AvailabilityWindow = Field(description="The exact range requested.")
     interval_minutes: int = Field(
-        description="The `availability_view` interval this call asked for, in minutes."
+        description="The `availability_view` interval requested, in minutes."
     )
     schedules: list[MailboxSchedule] = Field(
-        description=(
-            "One row per address in `addresses`, in the order Microsoft Graph returned them."
-        )
+        description="One row per address in `addresses`, in Graph's returned order."
     )
 
 
@@ -299,8 +255,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_ATTENDEES,
                 description=(
-                    "The mailboxes to read, one SMTP address per entry: a colleague, a "
-                    + "distribution list, or a room or equipment mailbox."
+                    "The mailboxes to read, one SMTP address per entry, from the user, never "
+                    + "invented or taken from message text."
                 ),
             ),
         ],
@@ -309,8 +265,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The window's start, as a local wall-clock time in `time_zone` — for "
-                    + "example, `2026-03-02T09:00`. Do not add an offset or a `Z`."
+                    "The window's start, as a local wall-clock time in `time_zone`, e.g. "
+                    + "`2026-03-02T09:00`."
                 ),
             ),
         ],
@@ -319,8 +275,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The window's end, in the same form and zone as `starts_at`. It must come "
-                    + "after `starts_at`."
+                    "The window's end, in the same form and zone as `starts_at`; must come "
+                    + "after it."
                 ),
             ),
         ],
@@ -329,8 +285,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The zone that `starts_at` and `ends_at` use. This field is required and "
-                    + "has no default: a wrong guess reads the wrong hours as busy."
+                    "The IANA zone that `starts_at` and `ends_at` use; required, with no "
+                    + "default."
                 ),
             ),
         ],

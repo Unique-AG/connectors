@@ -1,6 +1,3 @@
-"""Every payload in this file is synthetic. No event in this file came from a real calendar.
-No address in this file resolves to anything real."""
-
 import json
 from collections.abc import Mapping
 from typing import cast

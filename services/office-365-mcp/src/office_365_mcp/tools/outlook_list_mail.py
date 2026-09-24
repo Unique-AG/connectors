@@ -1,19 +1,3 @@
-"""`outlook_list_mail` — the newest messages of one folder, in receipt order.
-
-Every property in `$orderby` must also appear in `$filter`, in the same order, and before any
-unordered one. If it does not, Graph answers 400 `InefficientFilter`
-(https://learn.microsoft.com/en-us/graph/api/user-list-messages). So the `receivedDateTime` bounds
-open the `$filter`, and `isRead` and `from` only ever follow one. An unsupported combination can
-also fail *silently* (https://learn.microsoft.com/en-us/graph/query-parameters). So `_keeps` makes
-sure that both conditions are true for every returned row. This tool also sends
-`Prefer: IdType="ImmutableId"`, because the ids listed here become handles, and a `RestId` one
-404s once Outlook files the message. `$skip` inside an `@odata.nextLink` counts items that the
-service enumerated, rather than items returned. So this tool follows the link whole, and never
-parses it.
-
-**`mailbox` re-points every request from `/me` to `/users/{id}`.**
-"""
-
 from collections.abc import Callable, Mapping
 from datetime import date, datetime, timedelta
 from typing import Annotated
@@ -82,19 +66,10 @@ _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 _FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQueryParameters
 _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
-_DESCRIPTION = """\
-Lists the newest messages of one mail folder, newest received first — the signed-in user's own \
-mailbox, or, with `mailbox`, a shared or delegated one. This suits a folder's recent, unread, or \
-date-windowed mail, in filing order. outlook_search_mail is the sibling for relevance-ranked \
-search across mailbox content — not receipt order — and its index does not reach unsent drafts.
-
-Notes:
-- Pass exactly one of `folder` or `folder_ref`, never both.
-- Lists only mail filed directly in the folder, not its subfolders.
-- To bound a past window, set both `received_after` and `received_before`. Rows come back \
-newest first. So `received_after` alone spends `limit` on newer mail before it reaches an \
-older window.
-"""
+_DESCRIPTION = (
+    "Lists the newest messages of one mail folder, newest received first, in the signed-in "
+    "user's own mailbox or, with `mailbox`, a shared or delegated one."
+)
 
 _BOTH_FOLDERS = (
     "outlook_list_mail lists one folder, so `folder` and `folder_ref` are alternatives, not a "
@@ -129,43 +104,26 @@ _NOT_A_FOLDER_HANDLE = (
 
 
 class FolderMessages(BaseModel):
-    """One folder's newest mail, and the folder's own counts to read the answer's length against."""
-
     folder_name: str | None = Field(
-        description=(
-            "The folder's display name as Outlook shows it, in the mailbox's own language. Null "
-            + "when Graph did not report one."
-        )
+        description="The folder's display name, or null if Graph did not report one."
     )
     total_items: int | None = Field(
         description=(
-            "How many items of every kind the folder holds — an upper bound on its messages, "
-            + "not a count of them. Null when Graph did not report it."
+            "How many items of every kind the folder holds, or null if Graph did not report it."
         )
     )
     unread_items: int | None = Field(
-        description=(
-            "How many of `total_items` are unread, on the same terms: an upper bound, not an "
-            + "exact message count. Null when Graph did not report it."
-        )
+        description="How many of `total_items` are unread, or null if Graph did not report it."
     )
     messages: list[MailSummary] = Field(
         description=(
-            "The rows for this call, one per message. Pass a row's `uri` to outlook_read_mail "
-            + "for the full message. The `uri` continues to work after the message is later "
-            + "moved, renamed, or refiled."
+            "The rows for this call, one per message; pass a row's `uri` to outlook_read_mail "
+            "for the full message."
         )
     )
     capped: bool = Field(
         description=(
-            "True means more of the folder remains beyond what this call returned. It can also "
-            + "mean more of the window that `received_after` and `received_before` opened "
-            + "remains. Either the call reached `limit`, or `unread_only` or `from_address` "
-            + "discarded enough non-matching mail to stop the search early. To reach further "
-            + "into a capped window, narrow `received_before`. A higher `received_after` only "
-            + "drops rows this call never reached. False means every match already came back. "
-            + "Compare against "
-            + "`total_items` and `unread_items` to see how much of the folder this call reached."
+            "True if more of the folder or date window remains beyond what this call returned."
         )
     )
 
@@ -182,7 +140,6 @@ async def list_mail(
     limit: int,
     mailbox: str | None = None,
 ) -> FolderMessages:
-    """The newest `limit` messages of one folder, and that folder's own counts."""
     assert 1 <= limit <= MAX_RESULTS, f"limit must be within 1..{MAX_RESULTS}, got {limit}"
     _refuse_a_backwards_window(received_after, received_before)
     sender = _one_address(from_address)
@@ -231,14 +188,6 @@ async def list_mail(
 
 
 def _folder_address(folder: WellKnownFolder, folder_ref: str | None) -> str:
-    """This is the single path segment that addresses the folder: a well-known name, or a
-    handle's id.
-
-    FastMCP fills in the `folder` default before the body runs. So an explicit `folder="inbox"`
-    beside a `folder_ref` looks the same as an omitted `folder`, and this treats it as
-    `folder_ref` alone. Only a `folder` that names some other folder alongside `folder_ref` is
-    rejected below.
-    """
     if folder_ref is None:
         return folder
     if folder != DEFAULT_FOLDER:
@@ -252,9 +201,6 @@ def _folder_address(folder: WellKnownFolder, folder_ref: str | None) -> str:
 def _refuse_a_backwards_window(
     received_after: date | datetime | None, received_before: date | datetime | None
 ) -> None:
-    """Refuse a backwards window here: Graph answers one with an empty page, indistinguishable
-    from "no mail in that window". `runs_backwards` compares the bounds as instants, because
-    Python refuses to compare a `date` with a `datetime`."""
     if runs_backwards(received_after, received_before):
         raise ToolError(_WINDOW_RUNS_BACKWARDS)
 
@@ -266,13 +212,6 @@ def _query_filter(
     unread_only: bool,
     sender: str | None,
 ) -> str | None:
-    """The `$filter` this tool sends, or None when it sends none.
-
-    The `receivedDateTime` bounds are ordered and must come first. `isRead` and
-    `from/emailAddress/address` are unordered, and go on only when a date term did. Alone, beside
-    `$orderby=receivedDateTime`, they are an `InefficientFilter` 400. Reordering these lines
-    composes that 400 out of arguments that are individually fine.
-    """
     dated = _received_within(received_after, received_before)
     if dated is None:
         return None
@@ -287,12 +226,6 @@ def _query_filter(
 def _received_within(
     received_after: date | datetime | None, received_before: date | datetime | None
 ) -> str | None:
-    """The ordered half of the `$filter`, or None when the caller bounded neither end.
-
-    Microsoft publishes this two-sided `receivedDateTime` range against this collection and rules
-    that a DateTimeOffset literal is not quoted
-    (https://learn.microsoft.com/en-us/graph/filter-query-parameter).
-    """
     terms: list[str] = []
     if received_after is not None:
         terms.append(f"receivedDateTime ge {_wire(opens_at(received_after))}")
@@ -304,31 +237,18 @@ def _received_within(
 
 
 def _closing_term(received_before: date | datetime) -> str:
-    """Either spelling covers the whole of the value the caller named."""
     if isinstance(received_before, datetime):
         return f"le {_wire(closes_at(received_before))}"
     return f"lt {_wire(opens_at(received_before + timedelta(days=1)))}"
 
 
 def _wire(instant: datetime) -> str:
-    """An instant as the ISO-8601 UTC literal that Graph documents. The result keeps whatever
-    precision the instant has.
-
-    A value truncated to whole seconds moves the bound silently in both directions. A row lost at
-    the boundary then leaves a well-formed answer, with `capped` false and no sign that the row
-    was dropped.
-    """
     if instant.microsecond:
         return f"{instant:%Y-%m-%dT%H:%M:%S.%f}Z"
     return f"{instant:%Y-%m-%dT%H:%M:%SZ}"
 
 
 def _keeps(*, unread_only: bool, sender: str | None) -> Callable[[Message], bool] | None:
-    """What every returned row must satisfy, or None when the caller asked for no narrowing.
-
-    This runs whether or not `_query_filter` sent the matching term, because Graph can drop an
-    unsupported one silently. Both properties are in `SUMMARY_FIELDS`, so it costs nothing.
-    """
     checks: list[Callable[[Message], bool]] = []
     if unread_only:
         checks.append(_is_unread)
@@ -340,13 +260,10 @@ def _keeps(*, unread_only: bool, sender: str | None) -> Callable[[Message], bool
 
 
 def _is_unread(message: Message) -> bool:
-    """`isRead` false, and not merely absent: a message Graph said nothing about is not unread."""
     return message.is_read is False
 
 
 def _sent_by(sender: str) -> Callable[[Message], bool]:
-    """Whether the message came from this address, compared case-insensitively as SMTP is: the
-    casing on a message is the sender's server's, not the caller's."""
     wanted = sender.casefold()
 
     def sent_by(message: Message) -> bool:
@@ -357,8 +274,6 @@ def _sent_by(sender: str) -> Callable[[Message], bool]:
 
 
 def _one_address(from_address: str | None) -> str | None:
-    """The argument as one SMTP address, or a refusal. A display name reaches Graph as an address
-    that matches nothing. So `eq` answers that with an empty page rather than an error."""
     if from_address is None:
         return None
     candidate = from_address.strip()
@@ -373,8 +288,6 @@ def _summary(message: Message) -> MailSummary:
 
 
 def _headers() -> HeadersCollection:
-    """Built per request: kiota's `RequestConfiguration.headers` defaults to one collection shared
-    process-wide, and `collect_pages`' `PageIterator` otherwise starts from an empty one."""
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
     return headers
@@ -394,10 +307,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             WellKnownFolder,
             Field(
                 description=(
-                    "Which well-known folder to list, by Microsoft's locale-independent name: "
-                    + "`inbox`, `sentitems`, `drafts`, `archive`, `deleteditems`, `junkemail`, "
-                    + "or `clutter`. Alternative to `folder_ref`, which is required for any "
-                    + "other folder, even one that the user made."
+                    "Which well-known folder to list (`inbox`, `sentitems`, `drafts`, "
+                    "`archive`, `deleteditems`, `junkemail`, or `clutter`); alternative to "
+                    "`folder_ref`."
                 )
             ),
         ] = DEFAULT_FOLDER,
@@ -406,44 +318,24 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The folder to list, as the opaque handle an outlook_browse_folders result "
-                    + "reported in its `uri`: `outlook:///folders/{id}`. A folder's display "
-                    + "name, a well-known folder name, and a message's own handle are not valid "
-                    + "here. Alternative to `folder`."
+                    "The folder to list, as the `uri` handle from an outlook_browse_folders "
+                    "result; alternative to `folder`."
                 ),
             ),
         ] = None,
         unread_only: Annotated[
             bool,
-            Field(
-                description=(
-                    "Keeps only messages Graph reports as unread. This tool makes sure that "
-                    + "every returned row is unread. It does not merely ask Graph for unread "
-                    + "mail. Without a date bound, this can reach `capped` before it finds much "
-                    + "unread mail in a busy folder. Pair `unread_only` with a date bound to "
-                    + "avoid that."
-                )
-            ),
+            Field(description="Keeps only messages that are unread."),
         ] = False,
         received_after: Annotated[
             date | datetime | None,
-            Field(
-                description=(
-                    "Only messages received at or after this point. A date (`2026-03-04`) opens "
-                    + "at the first instant of that whole UTC day. A moment "
-                    + "(`2026-03-04T09:00:00Z`) opens at the exact second named, and a moment "
-                    + "with no time zone is read as UTC."
-                )
-            ),
+            Field(description="Only messages received at or after this date or moment (UTC)."),
         ] = None,
         received_before: Annotated[
             date | datetime | None,
             Field(
                 description=(
-                    "Only messages received at or before this point, inclusive, in the same two "
-                    + "shapes as `received_after`. A date closes at the end of that whole UTC "
-                    + "day, so the same date in both bounds spans exactly that one day. A moment "
-                    + "closes at the second named."
+                    "Only messages received at or before this date or moment (UTC), inclusive."
                 )
             ),
         ] = None,
@@ -452,13 +344,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only messages from this sender, as one SMTP address — never a display name "
-                    + "and never a list. A display name (`Bob Vance`) matches nothing and comes "
-                    + "back as an empty page, not an error. Resolve one with "
-                    + "outlook_find_recipient first. Without a date bound, a rare sender in a "
-                    + "busy folder can reach `capped` before it finds enough matches. For a "
-                    + "sender's display name, or mail that only mentions them, use "
-                    + "outlook_search_mail."
+                    "Only messages from this sender, as one SMTP address, never a display name."
                 ),
             ),
         ] = None,
@@ -467,12 +353,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 ge=1,
                 le=MAX_RESULTS,
-                description=(
-                    f"How many messages to return, at most {MAX_RESULTS}. The result is already "
-                    + "the whole answer for this call, not a first page. Calling again with the "
-                    + "same arguments returns the same rows, not more. Raise `limit`, or narrow "
-                    + "the date window, to get more."
-                ),
+                description=f"How many messages to return, at most {MAX_RESULTS}.",
             ),
         ] = 25,
         mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,

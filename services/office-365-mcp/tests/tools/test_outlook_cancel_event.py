@@ -1,6 +1,3 @@
-"""Every payload in this file is synthetic data. This file never creates an event in a
-real calendar. No address in this file resolves anywhere."""
-
 import json
 from collections.abc import Mapping, Sequence
 from typing import cast
@@ -242,8 +239,6 @@ class TestWhatItRefuses:
     async def test_an_unknown_organizer_flag_does_not_refuse_up_front(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`isOrganizer` missing is not the same fact as `isOrganizer: false`. If `isOrganizer`
-        is missing, only Graph's own response to the cancel call must decide a refusal."""
         _ = _reads(graph, _event(attendees=[], is_organizer=None))
         cancel = _cancels(graph)
 

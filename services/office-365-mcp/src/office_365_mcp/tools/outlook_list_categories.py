@@ -1,17 +1,3 @@
-"""`outlook_list_categories` — the master category list this mailbox tags mail, events and
-contacts with: every name Outlook offers, paired with the color shown beside it.
-
-- `name` is what a caller writes back to assign a category. This tool does not report an id.
-  Microsoft documents `displayName` itself as the unique, unchangeable key.
-- TRAP: `color` deserializes to `CategoryColor`, an enum that kiota mixes `str` into without
-  making it a `StrEnum`. Its inherited `__str__` answers `CategoryColor.Preset3`, not `preset3`.
-  `str.__str__(color)` reads the value that Microsoft actually sent.
-
-**This tool takes no `mailbox` argument.** Microsoft publishes no `.Shared` variant of
-`MailboxSettings.Read`. `outlook_get_mailbox_settings` takes no `mailbox` argument either, for
-the same reason.
-"""
-
 from collections.abc import Mapping
 from typing import Self
 
@@ -42,43 +28,23 @@ _CATEGORY_FIELDS: tuple[str, ...] = ("displayName", "color")
 
 _CategoriesQuery = MasterCategoriesRequestBuilder.MasterCategoriesRequestBuilderGetQueryParameters
 
-_DESCRIPTION = """\
-Lists every category the signed-in user's mailbox can tag mail, events and contacts with — each \
-one's name and the color Outlook shows beside it. outlook_get_mailbox_settings also reports \
-category names, as one line of a wider mailbox report. This tool is the dedicated listing, with \
-color included.
-
-Notes:
-- A message's, event's or contact's own `categories` field holds these categories by name — \
-write and match on `name`, verbatim, never on an id.
-- `color` is one of Microsoft's fixed presets (`preset0` through `preset24`, or the literal \
-string `none`), the same palette Outlook itself offers when a category is created. It is never \
-a hex code.
-"""
+_DESCRIPTION = (
+    "Lists every category this mailbox can tag mail, events, and contacts with, each one's "
+    "name and color."
+)
 
 
 class Category(BaseModel):
-    """One category this mailbox has defined, as Outlook itself shows it: a name and the color
-    beside it. Microsoft documents the name as unique per mailbox and unchangeable once created.
-    So the name is the identifying value, and nothing else here addresses a category more
-    precisely."""
-
     name: str = Field(
         description=(
-            "The category's name, chosen by whoever created it. This is the exact string that a "
-            + "message, an event, or a contact holds in its own `categories` list. Write and "
-            + "match on this string, never on an id. This tool does not report an id, because no "
-            + "other part of this connector reads one."
+            "The category's name, exactly as it appears in a message's, event's, or contact's "
+            "own `categories` list."
         )
     )
     color: str | None = Field(
         description=(
-            "This is the preset color that Outlook shows beside the category, in Microsoft's own "
-            + "spelling. Values run from `preset0` through `preset24`. The literal string `none` "
-            + "marks a category that has no assigned color. This is a fixed palette id, never a "
-            + "hex code. This field is null only when Graph reported no color property at all. "
-            + "That is a different, and rarer, case than the explicit `none` value described "
-            + "above."
+            "The preset color Outlook shows beside the category (`preset0` through `preset24`, "
+            "or `none`); null when Graph reported no color."
         )
     )
 
@@ -95,20 +61,14 @@ class Category(BaseModel):
 
 
 class Categories(BaseModel):
-    """Every category this mailbox has defined, in the order Graph returned them."""
-
     categories: list[Category] = Field(
         description=(
-            "The mailbox's categories, in the order that Graph returned them, not alphabetical "
-            + "and not grouped by color. Empty means the mailbox has defined none. This is the "
-            + "state of a mailbox where nobody in Outlook has created or renamed a category yet."
+            "The mailbox's categories, in the order Graph returned them; empty if none are defined."
         )
     )
     capped: bool = Field(
         description=(
-            f"True means the listing stopped at {MAX_CATEGORIES} categories, with more still on "
-            + "offer, so `categories` is missing some. False means this tool read every category "
-            + "the mailbox holds, however few or many that is."
+            f"True if the listing stopped at {MAX_CATEGORIES} categories with more remaining."
         )
     )
 

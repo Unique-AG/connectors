@@ -1,9 +1,3 @@
-"""This file tests `outlook_browse_folders`: the level it asks Graph for, the level it returns,
-and what it refuses.
-
-Every response body in this file is synthetic data. None of it came from a real mailbox.
-"""
-
 import httpx
 import pytest
 import respx
@@ -86,8 +80,6 @@ class TestTheLevelItAsksFor:
     async def test_it_asks_for_the_counts_graph_gives_away_on_the_folder(
         self, client: GraphServiceClient, top_level: respx.Route
     ) -> None:
-        """Microsoft recommends these two counts. It warns that a count with `$count` and
-        `$filter` can cause high latency."""
         top_level.mock(return_value=_page(_folder_payload(_INBOX_ID)))
 
         _ = await browser.browse_folders(client, limit=25)
@@ -107,9 +99,6 @@ class TestTheLevelItAsksFor:
     async def test_it_never_expands_a_second_level_out_of_one_request(
         self, client: GraphServiceClient, top_level: respx.Route
     ) -> None:
-        """If this tool uses `$expand=childFolders`, the query fetches one more level, then
-        stops again. That only moves the boundary of this tool. It does not remove the
-        boundary. Then `child_folder_count` has two different meanings, one from each level."""
         top_level.mock(return_value=_page(_folder_payload(_INBOX_ID)))
 
         _ = await browser.browse_folders(client, limit=25)
@@ -128,8 +117,6 @@ class TestTheLevelItAsksFor:
     async def test_asking_for_hidden_folders_sends_graphs_own_spelling_of_true(
         self, client: GraphServiceClient, top_level: respx.Route
     ) -> None:
-        """The SDK defines this query parameter as a string type. If the code sends a bool
-        value, Graph receives the Python word `True` instead of the lowercase `true`."""
         top_level.mock(return_value=_page(_folder_payload(_INBOX_ID)))
 
         _ = await browser.browse_folders(client, include_hidden=True, limit=25)
@@ -184,9 +171,6 @@ class TestTheLevelItAnswers:
     async def test_a_handle_it_minted_browses_the_level_below_that_folder(
         self, client: GraphServiceClient, top_level: respx.Route, inbox_children: respx.Route
     ) -> None:
-        """This test proves the round-trip promise of the tool. The test takes the `uri` of a
-        folder that has children. It resubmits that `uri` as `parent`. The tool then returns
-        only the children of that folder, and nothing else."""
         top_level.mock(return_value=_page(_folder_payload(_INBOX_ID, child_folder_count=1)))
         inbox_children.mock(
             return_value=_page(_folder_payload(_PROJECTS_ID, display_name="Projects"))
@@ -223,8 +207,6 @@ class TestTheLevelItAnswers:
     async def test_a_folder_graph_reported_no_counts_for_is_still_listed(
         self, client: GraphServiceClient, top_level: respx.Route
     ) -> None:
-        """`child_folder_count` is a number, or nothing. This tool never invents a zero. A folder
-        with zero children and a folder that Graph gave no count for are different states."""
         top_level.mock(
             return_value=_page(
                 _folder_payload(
@@ -248,8 +230,6 @@ class TestTheLevelItAnswers:
     async def test_a_hidden_folder_is_reported_as_hidden(
         self, client: GraphServiceClient, top_level: respx.Route
     ) -> None:
-        """A hidden folder in Outlook can still hold mail. For this reason, this tool reports the
-        `is_hidden` flag. It does not remove hidden folders from the list."""
         top_level.mock(
             return_value=_page(
                 _folder_payload(_INBOX_ID),
@@ -269,15 +249,6 @@ class TestTheLevelItAnswers:
     async def test_the_pages_of_one_level_are_followed_rather_than_read_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph chooses its own page size for this collection. If a folder level is wider than
-        one page, Graph returns it in pieces. A test that reads only the first page misses
-        folders silently.
-
-        This test registers the cursor routes before the bare route. respx matches routes in
-        the order of registration. The bare path also matches a request that carries
-        `$skiptoken`. A bare route registered first answers every page, including the ones with
-        a cursor.
-        """
         graph.get(_TOP_LEVEL, params={"$skiptoken": "second"}).mock(
             return_value=_page(_folder_payload(_ARCHIVE_ID, display_name="Archive"))
         )
@@ -296,8 +267,6 @@ class TestTheLevelItAnswers:
     async def test_an_empty_page_in_the_middle_does_not_end_the_level(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph sometimes sends an empty page that still carries an `@odata.nextLink` value.
-        The SDK's own page walker treats an empty page as the end of the collection."""
         graph.get(_TOP_LEVEL, params={"$skiptoken": "third"}).mock(
             return_value=_page(_folder_payload(_ARCHIVE_ID, display_name="Archive"))
         )
@@ -332,9 +301,6 @@ class TestTheLevelItAnswers:
     async def test_a_window_filled_exactly_by_the_end_of_the_level_is_not_capped(
         self, client: GraphServiceClient, top_level: respx.Route
     ) -> None:
-        """`capped` means the limit stopped the walk while more folders were still available. It
-        does not mean the result was short. A level that runs out on its own reports `capped`
-        as False, no matter how small the limit was."""
         top_level.mock(
             return_value=_page(
                 _folder_payload(_INBOX_ID), _folder_payload(_ARCHIVE_ID, display_name="Archive")
@@ -373,9 +339,6 @@ class TestWhatItRefuses:
     async def test_a_parent_that_is_not_a_folder_handle_never_reaches_graph(
         self, client: GraphServiceClient, top_level: respx.Route, parent: str
     ) -> None:
-        """A plain name, a well-known name, a bare id, and a handle from another family are all
-        not a folder handle. Graph accepts some of these values, but for the wrong resource.
-        Graph then returns a listing of the wrong thing."""
         with pytest.raises(ToolError, match="folder handle"):
             _ = await browser.browse_folders(client, parent=parent, limit=25)
 
@@ -425,13 +388,7 @@ class TestGraphFailures:
             _ = await browser.browse_folders(client, limit=25)
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
-        """Microsoft's walkthrough for shared folders names `Mail.Read.Shared` as the permission
-        for reading a folder in a mailbox other than `/me`."""
         assert browser.GRAPH_PERMISSIONS == ("Mail.Read", "Mail.Read.Shared")
 
     def test_a_stale_folder_handle_is_answered_with_the_recovery_that_works(self) -> None:
-        """A 404 error here does not call for the usual advice about a mistyped id. This
-        connector generated the id itself. Microsoft's own documentation disagrees on whether a
-        folder id stays valid after a move.
-        """
         assert "outlook_browse_folders" in browser.GRAPH_NOT_FOUND

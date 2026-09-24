@@ -1,6 +1,3 @@
-"""Every payload in this file is synthetic data. This file never creates a calendar entry for a
-real mailbox. No address in this file resolves anywhere."""
-
 import json
 from collections.abc import Mapping, Sequence
 from typing import cast

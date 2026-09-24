@@ -1,9 +1,3 @@
-# `terraform validate` skips validations on defaulted variables, so it passes a configuration
-# with no tool selection at all. These credential-free runs are the only gate on that.
-
-# The mocks compensate for provider behavior. A mocked map is EMPTY, so `result["MicrosoftGraph"]`
-# fails with `Invalid index`. `azuread_application.id` must be the `/applications/<uuid>` form, or
-# `azuread_application_identifier_uri` cannot parse it.
 mock_provider "azuread" {
   override_data {
     target = data.azuread_application_published_app_ids.well_known
@@ -483,8 +477,6 @@ run "a_trailing_slash_does_not_produce_a_double_slash" {
 
 run "a_customer_tenant_can_own_its_own_consent" {
   variables {
-    # `teams-chat` is on purpose. `terraform test` escalates a failed `check` assertion to a test
-    # FAILURE, where plan and apply only warn. So this run's selection must need no administrator.
     tools_preset                    = "teams-chat"
     service_principal_configuration = null
   }
