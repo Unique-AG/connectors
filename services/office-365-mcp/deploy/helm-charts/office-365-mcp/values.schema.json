@@ -55,7 +55,7 @@
         },
         "digest": {
           "type": "string",
-          "description": "Container image digest (sha256). Stamped by helm-chart-publish at release time. When useDigest is true, the kubelet pulls by this digest. The tag is kept only for human readability. Never reference this from a label.",
+          "description": "Container image digest (sha256). Stamped by helm-chart-publish at release time. When useDigest is true the kubelet pulls by this digest; the tag is kept only for human readability. Never reference this from a label.",
           "pattern": "^sha256:[a-f0-9]{64}$",
           "examples": [
             "sha256:6d8b1bbd9bca5e0000000000000000000000000000000000000000000000000a"
@@ -63,7 +63,7 @@
         },
         "useDigest": {
           "type": "boolean",
-          "description": "When true, render container image as repository:tag@sha256:digest (kubelet pulls by digest). When false, render as repository:tag (digest field is ignored even if present). Default in source values.yaml is false. helm-chart-publish flips it to true at release time, alongside stamping image.digest. Customers can opt out of digest enforcement by overriding this back to false in their cluster overlay.",
+          "description": "When true, render container image as repository:tag@sha256:digest (kubelet pulls by digest). When false, render as repository:tag (digest field is ignored even if present). Default in source values.yaml is false; helm-chart-publish flips it to true at release time alongside stamping image.digest. Customers can opt out of digest enforcement by overriding this back to false in their cluster overlay.",
           "default": false
         },
         "pullPolicy": {
@@ -92,7 +92,7 @@
     },
     "env": {
       "type": "object",
-      "description": "Environment variables rendered into a ConfigMap and mounted into the container. Each value is a plain string (tpl-evaluated), a number or boolean (converted to a string as-is), or an object with 'value' (a tpl expression to emit) and an optional 'if' (a tpl expression). The key is omitted when the result is '' or 'false'. Prefer quoting numeric values in YAML to keep types explicit.",
+      "description": "Environment variables rendered into a ConfigMap and mounted into the container. Each value is a plain string (tpl-evaluated), a number/boolean (converted to string as-is), or an object with 'value' (tpl expression to emit) and optional 'if' (tpl expression; key is omitted when result is '' or 'false'). Prefer quoting numeric values in YAML to keep types explicit.",
       "additionalProperties": {
         "oneOf": [
           {
@@ -117,7 +117,7 @@
               },
               "if": {
                 "type": "string",
-                "description": "A tpl expression that controls whether this key is emitted. The key is omitted when the result is '' or 'false'."
+                "description": "tpl expression controlling emission. Key is omitted when result is '' or 'false'."
               }
             }
           }
@@ -130,7 +130,7 @@
     },
     "envVars": {
       "type": "array",
-      "description": "Additional environment variables in native Kubernetes syntax (for example, valueFrom secretKeyRef).",
+      "description": "Additional environment variables in native Kubernetes syntax (e.g. valueFrom secretKeyRef).",
       "items": {
         "type": "object"
       }
@@ -247,7 +247,7 @@
         },
         "timeout": {
           "type": "string",
-          "description": "Request timeout for all routes, for example 60s",
+          "description": "Request timeout for all routes, e.g. 60s",
           "examples": [
             "60s"
           ]
@@ -316,7 +316,7 @@
     },
     "prometheus": {
       "type": "object",
-      "description": "Prometheus monitoring configuration. All resources render by default when the monitoring.coreos.com/v1 CRD is available. Set prometheus.enabled to false to opt out.",
+      "description": "Prometheus monitoring configuration. All resources render by default when the monitoring.coreos.com/v1 CRD is available; opt out via prometheus.enabled: false.",
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -348,7 +348,7 @@
               "properties": {
                 "enabled": {
                   "type": "boolean",
-                  "description": "Defaults to true. Set false to opt out of this alert group."
+                  "description": "Defaults to true; set false to opt out of this alert group."
                 },
                 "applicationName": {
                   "type": "string"
@@ -361,7 +361,7 @@
                 },
                 "additionalLabels": {
                   "type": "object",
-                  "description": "Routing labels applied to argocd alert rules. This overrides defaultAlerts.additionalLabels"
+                  "description": "Routing labels applied to argocd alert rules; overrides defaultAlerts.additionalLabels"
                 }
               }
             },
@@ -371,7 +371,7 @@
               "properties": {
                 "enabled": {
                   "type": "boolean",
-                  "description": "Defaults to true. Set false to opt out of this alert group."
+                  "description": "Defaults to true; set false to opt out of this alert group."
                 },
                 "for": {
                   "type": "string"
@@ -384,7 +384,7 @@
                 },
                 "additionalLabels": {
                   "type": "object",
-                  "description": "Routing labels applied to kubernetesApplication alert rules. This overrides defaultAlerts.additionalLabels"
+                  "description": "Routing labels applied to kubernetesApplication alert rules; overrides defaultAlerts.additionalLabels"
                 }
               }
             },
@@ -394,7 +394,7 @@
               "properties": {
                 "enabled": {
                   "type": "boolean",
-                  "description": "Defaults to true. Set false to opt out of this alert group."
+                  "description": "Defaults to true; set false to opt out of this alert group."
                 },
                 "for": {
                   "type": "string"
@@ -407,13 +407,13 @@
                 },
                 "additionalLabels": {
                   "type": "object",
-                  "description": "Routing labels applied to kubernetesResources alert rules. This overrides defaultAlerts.additionalLabels"
+                  "description": "Routing labels applied to kubernetesResources alert rules; overrides defaultAlerts.additionalLabels"
                 }
               }
             },
             "additionalLabels": {
               "type": "object",
-              "description": "Extra labels applied to all default alert rules, for example team routing labels"
+              "description": "Extra labels applied to all default alert rules, e.g. team routing labels"
             }
           }
         },
@@ -423,7 +423,7 @@
           "properties": {
             "additionalLabels": {
               "type": "object",
-              "description": "Routing labels applied to all custom alert rules. This overrides defaultAlerts.additionalLabels"
+              "description": "Routing labels applied to all custom alert rules; overrides defaultAlerts.additionalLabels"
             }
           },
           "additionalProperties": {
@@ -961,7 +961,7 @@
     },
     "hooks": {
       "type": "object",
-      "description": "Pre-install and post-install Helm hook jobs, keyed by hook name (for example, migration, seed). The chart also supports top-level boolean and object properties (for example, enabled, image, resources) as shared defaults applied to all hook jobs.",
+      "description": "Pre/post-install Helm hook jobs, keyed by hook name (e.g. migration, seed). Top-level boolean and object properties (e.g. enabled, image, resources) are also supported as shared defaults applied to all hook jobs.",
       "additionalProperties": {
         "oneOf": [
           {
@@ -1448,7 +1448,7 @@
             },
             "egress": {
               "type": "object",
-              "description": "Named baked-in egress rules. Each key is a rule name. Set enabled: false to disable it individually.",
+              "description": "Named baked-in egress rules. Each key is a rule name; set enabled: false to disable it individually.",
               "additionalProperties": {
                 "type": "object",
                 "properties": {
@@ -1462,7 +1462,7 @@
             },
             "ingress": {
               "type": "object",
-              "description": "Named baked-in ingress rules. Each key is a rule name. Set enabled: false to disable it individually.",
+              "description": "Named baked-in ingress rules. Each key is a rule name; set enabled: false to disable it individually.",
               "additionalProperties": {
                 "type": "object",
                 "properties": {
@@ -1480,7 +1480,7 @@
     },
     "internalServices": {
       "type": "object",
-      "description": "Symmetric in-cluster service-to-service traffic declarations. Each chart declares both the services it calls (dependencies) and the services that call it (dependents). Map keys are arbitrary logical names. Values are per-entry descriptors.",
+      "description": "Symmetric in-cluster service-to-service traffic declarations. Each chart declares both the services it calls (dependencies) and the services that call it (dependents). Map keys are arbitrary logical names; values are per-entry descriptors.",
       "additionalProperties": false,
       "properties": {
         "dependencies": {
@@ -1585,7 +1585,7 @@
     },
     "extraObjects": {
       "type": "array",
-      "description": "Additional raw Kubernetes manifests to include once at the chart root, alongside the chart's own templates. Each item is a full manifest (apiVersion/kind/metadata/spec). Each item is tpl-rendered.",
+      "description": "Additional raw Kubernetes manifests to include once at the chart root, alongside the chart's own templates. Each item is a full manifest (apiVersion/kind/metadata/spec); tpl-rendered.",
       "items": {
         "type": "object"
       }
@@ -1606,7 +1606,7 @@
             },
             "replacements": {
               "type": "object",
-              "description": "Map of placeholder to resolved datasource UID. Dashboard JSON files must use %%PLACEHOLDER%% markers (for example, %%PROMETHEUS_UID%%) instead of hardcoded UIDs. Each entry replaces a marker with the actual UID before the ConfigMap is rendered. The dedicated chart sets defaults. Customer overlays override these per tenant.",
+              "description": "Map of placeholder to resolved datasource UID. Dashboard JSON files should use %%PLACEHOLDER%% markers (e.g. %%PROMETHEUS_UID%%) instead of hardcoded UIDs. Each entry replaces a marker with the actual UID before the ConfigMap is rendered. The dedicated chart sets defaults; customer overlays override per tenant.",
               "additionalProperties": {
                 "type": "string"
               },
@@ -1664,7 +1664,7 @@
         },
         "networkPolicyEgressManaged": {
           "type": "boolean",
-          "description": "Set to true when connection.url or an opaque host is used and networkPolicy is enabled. This suppresses the render-time failure. You must define the egress rule in networkPolicy.egress[] yourself."
+          "description": "Set to true when connection.url or an opaque host is used and networkPolicy is enabled. Suppresses the render-time fail; you must define the egress rule in networkPolicy.egress[] yourself."
         },
         "connection": {
           "type": "object",
@@ -1694,7 +1694,7 @@
             },
             "url": {
               "$ref": "#/$defs/valueSourceSensitive",
-              "description": "Sensitive full DSN. When set, DATABASE_URL is injected directly. Individual POSTGRESQL_* fields are still emitted for convenience."
+              "description": "Sensitive full DSN. When set, DATABASE_URL is injected directly; individual POSTGRESQL_* fields are still emitted for convenience."
             },
             "envVarNames": {
               "type": "object",
@@ -1756,7 +1756,7 @@
         },
         "networkPolicyEgressManaged": {
           "type": "boolean",
-          "description": "Set to true when an opaque host is used and networkPolicy is enabled. This suppresses the render-time failure. You must define the egress rule in networkPolicy.egress[] yourself."
+          "description": "Set to true when an opaque host is used and networkPolicy is enabled. Suppresses the render-time fail; you must define the egress rule in networkPolicy.egress[] yourself."
         },
         "connection": {
           "type": "object",
@@ -1858,7 +1858,7 @@
         },
         "networkPolicyEgressManaged": {
           "type": "boolean",
-          "description": "Set to true when connection.url or an opaque host is used and networkPolicy is enabled. This suppresses the render-time failure. You must define the egress rule in networkPolicy.egress[] yourself."
+          "description": "Set to true when connection.url or an opaque host is used and networkPolicy is enabled. Suppresses the render-time fail; you must define the egress rule in networkPolicy.egress[] yourself."
         },
         "connection": {
           "type": "object",
@@ -1944,7 +1944,7 @@
         },
         "networkPolicyEgressManaged": {
           "type": "boolean",
-          "description": "Set to true when connection.url or an opaque host is used and networkPolicy is enabled. This suppresses the render-time failure. You must define the egress rule in networkPolicy.egress[] yourself."
+          "description": "Set to true when connection.url or an opaque host is used and networkPolicy is enabled. Suppresses the render-time fail; you must define the egress rule in networkPolicy.egress[] yourself."
         },
         "connection": {
           "type": "object",
@@ -2133,7 +2133,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Kubernetes Service name. Used as the default app.kubernetes.io/name pod selector label value when podSelectorLabels is omitted."
+          "description": "Kubernetes Service name; used as the default app.kubernetes.io/name pod selector label value when podSelectorLabels is omitted."
         },
         "namespace": {
           "type": "string",
@@ -2165,7 +2165,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Pod selector labels for Cilium egress rules to this dependency. When networkPolicy.flavor is cilium, keys must use the k8s: source prefix (for example, k8s:app.kubernetes.io/name). Defaults to { app.kubernetes.io/name: <name> }."
+          "description": "Pod selector labels for Cilium egress rules to this dependency. When networkPolicy.flavor is cilium, keys must use the k8s: source prefix (e.g. k8s:app.kubernetes.io/name). Defaults to { app.kubernetes.io/name: <name> }."
         },
         "enabled": {
           "type": "boolean",
@@ -2192,7 +2192,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Kubernetes Service name of the calling service. Used as the default app.kubernetes.io/name pod selector label value when podSelectorLabels is omitted."
+          "description": "Kubernetes Service name of the calling service; used as the default app.kubernetes.io/name pod selector label value when podSelectorLabels is omitted."
         },
         "namespace": {
           "type": "string",
@@ -2302,7 +2302,7 @@
         "namespace",
         "podPort"
       ],
-      "description": "In-cluster Kubernetes Service descriptor. The helper resolves the host literal to <name>.<namespace>.svc.cluster.local AND feeds CNP pod-selector egress. Set connection.port for the dial port. The CIDR-fallback hack for evicted-pod identity loss is NOT part of this shape. Charts that need it declare an explicit networkPolicy.egress[] entry.",
+      "description": "In-cluster Kubernetes Service descriptor. The helper resolves the host literal to <name>.<namespace>.svc.cluster.local AND feeds CNP pod-selector egress. Set connection.port for the dial port. The CIDR-fallback hack for evicted-pod identity loss is NOT part of this shape; charts that need it declare an explicit networkPolicy.egress[] entry.",
       "properties": {
         "name": {
           "type": "string"
@@ -2323,7 +2323,7 @@
         },
         "skipClusterDomain": {
           "type": "boolean",
-          "description": "When true, resolves the host to <name>.<namespace>.svc instead of the full .svc.cluster.local FQDN. Set this only when the target service's TLS certificate does not include the cluster.local suffix in its SANs (for example, ECK auto-generated Elasticsearch HTTP certificates)."
+          "description": "When true, resolves the host to <name>.<namespace>.svc instead of the full .svc.cluster.local FQDN. Set this only when the target service's TLS certificate does not include the cluster.local suffix in its SANs (e.g. ECK auto-generated Elasticsearch HTTP certificates)."
         }
       }
     },
@@ -2508,7 +2508,7 @@
         },
         "reloadOnChange": {
           "type": "boolean",
-          "description": "Defaults to true when caBundle.fromSecret is used. This emits a secret.reloader.stakater.com/reload annotation on the Deployment, so Stakater Reloader rolls the workload when the CA Secret changes (for example, ECK certificate rotation). Set to false to opt out. This requires the Reloader controller in the cluster. Otherwise, the annotation is an inert no-op."
+          "description": "Defaults to true when caBundle.fromSecret is used: emits a secret.reloader.stakater.com/reload annotation on the Deployment so Stakater Reloader rolls the workload when the CA Secret changes (e.g. ECK certificate rotation). Set to false to opt out. Requires the Reloader controller in the cluster; otherwise the annotation is an inert no-op."
         },
         "fromSecret": {
           "$ref": "#/$defs/_fromSecretRef"
