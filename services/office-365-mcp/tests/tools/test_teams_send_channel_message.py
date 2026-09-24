@@ -117,7 +117,7 @@ class TestThePersonBeforeThePost:
         _ = _posts(graph)
         asked: list[str] = []
 
-        async def capturing(question: str, about: str) -> Confirmed:
+        async def capturing(question: str, _about: str) -> Confirmed:
             asked.append(question)
             return None
 
