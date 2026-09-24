@@ -804,9 +804,6 @@ class TestMailboxTargeting:
     async def test_the_question_names_the_mailbox_a_send_goes_out_as(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A person approving a send must see WHICH identity it goes out as: a signed-in user
-        with Send As on another mailbox must not approve a normal-looking question and have the
-        mail leave under a different name."""
         _ = graph.get("/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-draft-0001%3D").mock(
             return_value=httpx.Response(200, json=_draft())
         )

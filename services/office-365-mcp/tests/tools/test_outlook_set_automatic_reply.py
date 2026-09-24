@@ -1,12 +1,3 @@
-"""`outlook_set_automatic_reply`: what it refuses, what whole object it sends, and whose answer it
-reports.
-
-Every response body here is synthesised. No mailbox was written to. The converted window in
-`TestItAnswersWithWhatMicrosoftStored` is Microsoft's own worked example — a start sent as
-`18:00:00` in UTC and returned as `02:00:00` in UTC — because a tool that echoed its arguments
-would pass every other test in this file.
-"""
-
 import json
 from collections.abc import Mapping
 from typing import cast
@@ -33,8 +24,6 @@ from office_365_mcp.tools.outlook_set_automatic_reply import (
 
 _SETTINGS = "/me/mailboxSettings"
 
-# What the mailbox already holds in most of these tests: an audience and two messages nobody in the
-# call under test names, which is exactly what a merge could lose.
 _STORED_INTERNAL = "<p>Back on the 14th.</p>"
 _STORED_EXTERNAL = "<p>Away until the 14th. Reach Grace at grace@example.invalid.</p>"
 
@@ -66,7 +55,6 @@ def _setting(
 
 
 def _settings_response(reply: dict[str, object] | None) -> httpx.Response:
-    """`reply=None` is a mailbox Microsoft answered with no `automaticRepliesSetting` on it."""
     body: dict[str, object] = {} if reply is None else {"automaticRepliesSetting": reply}
     return httpx.Response(200, json=body)
 
@@ -82,14 +70,11 @@ def writes(graph: respx.MockRouter) -> respx.Route:
 
 
 def _sent(route: respx.Route) -> Mapping[str, object]:
-    """The `automaticRepliesSetting` this tool actually put on the wire."""
     body = cast("dict[str, object]", json.loads(route.calls.last.request.content))
     return cast("Mapping[str, object]", body["automaticRepliesSetting"])
 
 
 def _status_values(tool: Tool) -> list[str]:
-    """The values a client may send as `status`, followed through the `$ref` pydantic emits for a
-    named Literal alias."""
     schemas = cast("Mapping[str, Mapping[str, object]]", tool.parameters["$defs"])
     named = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])["status"]
     definition = cast("str", named["$ref"]).removeprefix("#/$defs/")
@@ -141,8 +126,6 @@ class TestTheReplyItWillNotSet:
         start: str | None,
         end: str | None,
     ) -> None:
-        """An open-ended reply is what this refusal is really about, so it has to happen before the
-        mailbox is touched rather than after the read."""
         with pytest.raises(ToolError):
             _ = await _scheduled(client, start=start, end=end)
 
@@ -162,8 +145,6 @@ class TestTheReplyItWillNotSet:
     async def test_the_schema_offers_no_status_that_never_ends(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The argument is the control. A caller cannot ask for an unbounded reply here at all,
-        which is a stronger promise than refusing one at runtime."""
         tool = await _registered(transport)
 
         assert _status_values(tool) == ["scheduled", "disabled"]
@@ -194,9 +175,6 @@ class TestItSendsTheWholeSetting:
         property_name: str,
         stored: str,
     ) -> None:
-        """Microsoft's two PATCH pages demonstrate opposite merge semantics for a nested object —
-        `user-update-mailboxsettings` keeps what was left out, `messagerule-update` drops it — so
-        every property goes on the wire and the question never has to be answered."""
         _ = await _scheduled(client)
 
         assert _sent(writes)[property_name] == stored
@@ -217,8 +195,6 @@ class TestItSendsTheWholeSetting:
     async def test_an_audience_neither_the_call_nor_the_mailbox_names_discloses_the_least(
         self, client: GraphServiceClient, graph: respx.MockRouter, writes: respx.Route
     ) -> None:
-        """`none` answers colleagues only. Inventing `all` here would publish the reply text to
-        every stranger who writes, on the strength of an argument nobody passed."""
         _ = graph.get(_SETTINGS).mock(
             return_value=_settings_response(_setting(external_audience=None))
         )
@@ -263,8 +239,6 @@ class TestItSendsTheWholeSetting:
     async def test_a_window_the_call_omits_is_sent_as_the_mailbox_had_it(
         self, client: GraphServiceClient, writes: respx.Route
     ) -> None:
-        """Switching the reply off leaves the dates behind rather than dropping them, so a mailbox
-        that is turned off and on again keeps the window its owner set."""
         _ = await set_automatic_reply(client, change=ReplyChange(status="disabled"))
 
         sent = _sent(writes)
@@ -276,8 +250,6 @@ class TestItSendsTheWholeSetting:
     async def test_a_mailbox_with_no_setting_at_all_is_written_without_inventing_one(
         self, client: GraphServiceClient, graph: respx.MockRouter, writes: respx.Route
     ) -> None:
-        """kiota drops a property whose value is None, so there is nothing to send for a property
-        Microsoft never reported and no null is put on the wire in its place."""
         _ = graph.get(_SETTINGS).mock(return_value=_settings_response(None))
 
         _ = await _scheduled(client)
@@ -293,9 +265,6 @@ class TestItAnswersWithWhatMicrosoftStored:
     async def test_the_window_reported_is_the_one_microsoft_converted_it_to(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft's own example sends an 18:00 UTC start and answers with a 02:00 UTC one. A
-        tool reporting its arguments would tell the user they are away at hours the mailbox does
-        not have."""
         _ = graph.patch(_SETTINGS).mock(
             return_value=_settings_response(
                 _setting(status="scheduled", start="2026-03-20T02:00:00.0000000")
@@ -336,8 +305,6 @@ class TestItAnswersWithWhatMicrosoftStored:
     async def test_text_the_call_never_sent_is_reported_rather_than_answered_as_none(
         self, client: GraphServiceClient
     ) -> None:
-        """The failure this exists to prevent: an omitted `external_message` re-broadcasting the
-        mailbox's old text while the answer says there is none."""
         answer = await _scheduled(client)
 
         assert answer.external_message == _STORED_EXTERNAL
@@ -363,8 +330,6 @@ class TestItAnswersWithWhatMicrosoftStored:
     async def test_a_mailbox_microsoft_reports_nothing_for_answers_null_and_not_off(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Null is "Microsoft told us nothing", which is a different claim from "the reply is
-        disabled" — and the second one would be a reassurance nobody checked."""
         _ = graph.get(_SETTINGS).mock(return_value=_settings_response(None))
         _ = graph.patch(_SETTINGS).mock(return_value=_settings_response(None))
 
@@ -381,8 +346,6 @@ class TestTheWriteIsNotRetried:
     async def test_a_patch_microsoft_answered_503_to_is_sent_exactly_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Without `no_retry` the SDK sends this `GraphSettings().max_retries` more times, and the
-        answer would describe whichever response came back last rather than the one applied."""
         _ = graph.get(_SETTINGS).mock(return_value=_settings_response(_setting()))
         route = graph.patch(_SETTINGS).mock(return_value=httpx.Response(503))
 
