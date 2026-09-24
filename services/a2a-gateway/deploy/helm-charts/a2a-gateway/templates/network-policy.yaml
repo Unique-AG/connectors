@@ -1,0 +1,21 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "a2a-gateway.fullname" . }}
+  labels:
+    {{- include "a2a-gateway.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "a2a-gateway.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {{ toYaml .Values.networkPolicy.ingressNamespaceSelector | nindent 12 }}
+          podSelector: {{ toYaml .Values.networkPolicy.ingressPodSelector | nindent 12 }}
+      ports:
+        - protocol: TCP
+          port: http
+{{- end }}

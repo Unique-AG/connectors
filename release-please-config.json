@@ -23,6 +23,24 @@
     { "type": "ci", "section": "Continuous Integration", "hidden": true }
   ],
   "packages": {
+    "services/a2a-gateway": {
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/a2a-gateway/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/a2a-gateway/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/a2a-gateway/values.yaml"
+        }
+      ]
+    },
     "services/sharepoint-connector": {
       "extra-files": [
         {

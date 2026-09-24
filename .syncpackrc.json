@@ -10,6 +10,21 @@
   ],
   "versionGroups": [
     {
+      "label": "A2A gateway uses NestJS 12",
+      "packages": ["@unique-ag/a2a-gateway"],
+      "dependencies": [
+        "@nestjs/cli",
+        "@nestjs/common",
+        "@nestjs/core",
+        "@nestjs/platform-express",
+        "@nestjs/schematics",
+        "@nestjs/terminus",
+        "@nestjs/testing",
+        "typescript"
+      ],
+      "isIgnored": true
+    },
+    {
       "label": "Peer Dependencies - Allow range patterns",
       "packages": ["**"],
       "dependencyTypes": ["peer"],

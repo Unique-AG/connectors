@@ -1,0 +1,59 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/unique-ag/connectors/services/a2a-gateway
+  tag: 0.0.0 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+service:
+  port: 9560
+
+config:
+  authMode: kong
+  publicBaseUrl: ""
+  zitadelIssuer: ""
+  uniqueChatUrl: ""
+  uniqueScopeManagementUrl: ""
+  uniqueIngestionUrl: ""
+  corsAllowedOrigins: []
+  workerEnabled: true
+  workerConcurrency: 4
+
+secretRef: a2a-gateway
+
+kong:
+  enabled: false
+  projectId: ""
+  parentRefs: []
+  hostnames: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+networkPolicy:
+  enabled: true
+  ingressNamespaceSelector: {}
+  ingressPodSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [kong, node-chat]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,62 @@
+{
+  "name": "@unique-ag/a2a-gateway",
+  "description": "Optional bidirectional A2A gateway for Unique",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Unique License v1",
+  "type": "module",
+  "files": [
+    "dist",
+    "deploy"
+  ],
+  "scripts": {
+    "build": "nest build",
+    "predev": "pnpm --filter @unique-ag/aes-gcm-encryption build",
+    "dev": "nest start --watch",
+    "debug": "nest start --debug --watch",
+    "codegen": "echo \"No codegen for this server\"",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:check": "drizzle-kit check",
+    "db:absurd:init": "uvx absurdctl init -d \"$DATABASE_URL\" && uvx absurdctl create-queue -d \"$DATABASE_URL\" a2a-gateway",
+    "style": "biome check .",
+    "style:fix": "biome check . --write",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest watch"
+  },
+  "dependencies": {
+    "@a2a-js/sdk": "1.2.0",
+    "@golevelup/nestjs-rabbitmq": "catalog:",
+    "@nestjs/common": "12.0.4",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "12.0.4",
+    "@nestjs/platform-express": "12.0.4",
+    "@nestjs/terminus": "12.1.0",
+    "@unique-ag/aes-gcm-encryption": "workspace:*",
+    "absurd-sdk": "0.5.0",
+    "drizzle-orm": "catalog:",
+    "express": "5.2.1",
+    "oauth4webapi": "3.8.8",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typeid-js": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "12.0.5",
+    "@nestjs/schematics": "12.0.4",
+    "@nestjs/testing": "12.0.4",
+    "@swc/cli": "catalog:",
+    "@swc/core": "catalog:",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "drizzle-kit": "catalog:",
+    "typescript": "6.0.2",
+    "unplugin-swc": "catalog:",
+    "vitest": "catalog:"
+  },
+  "packageManager": "pnpm@10.34.5"
+}
