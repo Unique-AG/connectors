@@ -24,83 +24,83 @@ makes. It does not control access to the tool.
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `get_me` | Read | User.Read | No | The answer is the signed-in user's own Microsoft 365 profile: id, display name, email address, sign-in name, and job title. |
+| `get_me` | Read | `User.Read` | No | The answer is the signed-in user's own Microsoft 365 profile: id, display name, email address, sign-in name, and job title. |
 
 ### Microsoft Teams
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `teams_list_chats` | Read | Chat.Read | No | The signed-in user's Teams chats (1:1, group, meeting), newest last message first. |
-| `teams_list_my_teams` | Read | Team.ReadBasic.All | No | The teams that the signed-in user is a member of. |
-| `teams_list_channels` | Read | Channel.ReadBasic.All | No | The channels of one team that the signed-in user can access. |
-| `teams_browse_channel` | Read | ChannelMessage.Read.All | Yes | One Teams channel's posts, with their newest replies. |
-| `teams_search_messages` | Read | Chat.Read, ChannelMessage.Read.All | Yes | A full-text search across every Teams message, in chats and channels, that the signed-in user can see. |
-| `teams_read_message` | Read | Chat.Read, ChannelMessage.Read.All | Yes | One Microsoft Teams message in full, from a handle that another tool minted. |
-| `teams_list_meeting_transcripts` | Read | OnlineMeetings.Read, OnlineMeetingTranscript.Read.All | Yes | Whether a Teams meeting has a transcript, and a handle for each one. |
-| `teams_read_transcript` | Read | OnlineMeetingTranscript.Read.All | Yes | One page of a Teams meeting transcript, as timestamped turns with the speaker named, not the whole file at once. |
-| `teams_list_meeting_recordings` | Read | User.Read, OnlineMeetings.Read, OnlineMeetingRecording.Read.All | Yes | Whether a meeting recording exists, how long it runs, and who can download it. The answer is metadata only, never the video itself. |
+| `teams_list_chats` | Read | `Chat.Read` | No | The signed-in user's Teams chats (1:1, group, meeting), newest last message first. |
+| `teams_list_my_teams` | Read | `Team.ReadBasic.All` | No | The teams that the signed-in user is a member of. |
+| `teams_list_channels` | Read | `Channel.ReadBasic.All` | No | The channels of one team that the signed-in user can access. |
+| `teams_browse_channel` | Read | `ChannelMessage.Read.All` | Yes | One Teams channel's posts, with their newest replies. |
+| `teams_search_messages` | Read | `Chat.Read`, `ChannelMessage.Read.All` | Yes | A full-text search across every Teams message, in chats and channels, that the signed-in user can see. |
+| `teams_read_message` | Read | `Chat.Read`, `ChannelMessage.Read.All` | Yes | One Microsoft Teams message in full, from a handle that another tool minted. |
+| `teams_list_meeting_transcripts` | Read | `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | Yes | Whether a Teams meeting has a transcript, and a handle for each one. |
+| `teams_read_transcript` | Read | `OnlineMeetingTranscript.Read.All` | Yes | One page of a Teams meeting transcript, as timestamped turns with the speaker named, not the whole file at once. |
+| `teams_list_meeting_recordings` | Read | `User.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | Yes | Whether a meeting recording exists, how long it runs, and who can download it. The answer is metadata only, never the video itself. |
 
 ### Outlook mail
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `outlook_search_mail` | Read | Mail.Read, User.Read | No | Finds a message anywhere in the signed-in user's mailbox. |
-| `outlook_read_mail` | Read | Mail.Read | No | One message's full text, from a handle that another tool minted. |
-| `outlook_browse_folders` | Read | Mail.Read | No | One level of the mail folder tree, and a handle for each folder. |
-| `outlook_find_recipient` | Read | Mail.Read, People.Read, User.Read | No | The email address behind a display name. A draft therefore goes to the real address, not a guess. |
-| `outlook_read_thread` | Read | Mail.Read | No | Every message of one conversation that is in this mailbox. |
-| `outlook_list_mail` | Read | Mail.Read | No | The newest messages of one folder, in receipt order. |
-| `outlook_get_mailbox_settings` | Read | MailboxSettings.Read | No | What acts quietly on this mailbox — the rules, the automatic reply, and the categories — and what this tool cannot show. |
-| `outlook_mark_mail` | Write, changes or removes | Mail.ReadWrite | No | The read status, the follow-up flag, and the importance, on up to twenty messages. |
-| `outlook_move_mail` | Write, changes or removes | Mail.ReadWrite | No | Moves messages into another folder. This connector erases mail only by moving it to Deleted Items. |
-| `outlook_draft_mail` | Write, adds | Mail.ReadWrite | No | A new message, composed into Drafts. The tool cannot send it. |
-| `outlook_draft_reply` | Write, adds | Mail.ReadWrite | No | A reply or a forward, composed into Drafts and left there. |
-| `outlook_send_draft` | Write, changes or removes | Mail.Send, Mail.ReadBasic | No | The only tool in this connector that puts mail on the wire. It sends a draft that this connector composed. |
-| `outlook_set_automatic_reply` | Write, safe to repeat | MailboxSettings.ReadWrite | No | Turns the out-of-office reply on for a fixed period, or off. The reply never runs with no end date. |
-| `outlook_disable_mail_rule` | Write, safe to repeat | MailboxSettings.ReadWrite | No | Turns one existing inbox rule off, and nothing else. |
+| `outlook_search_mail` | Read | `Mail.Read`, `User.Read` | No | Finds a message anywhere in the signed-in user's mailbox. |
+| `outlook_read_mail` | Read | `Mail.Read` | No | One message's full text, from a handle that another tool minted. |
+| `outlook_browse_folders` | Read | `Mail.Read` | No | One level of the mail folder tree, and a handle for each folder. |
+| `outlook_find_recipient` | Read | `Mail.Read`, `People.Read`, `User.Read` | No | The email address behind a display name. A draft therefore goes to the real address, not a guess. |
+| `outlook_read_thread` | Read | `Mail.Read` | No | Every message of one conversation that is in this mailbox. |
+| `outlook_list_mail` | Read | `Mail.Read` | No | The newest messages of one folder, in receipt order. |
+| `outlook_get_mailbox_settings` | Read | `MailboxSettings.Read` | No | What acts quietly on this mailbox — the rules, the automatic reply, and the categories — and what this tool cannot show. |
+| `outlook_mark_mail` | Write, changes or removes | `Mail.ReadWrite` | No | The read status, the follow-up flag, and the importance, on up to twenty messages. |
+| `outlook_move_mail` | Write, changes or removes | `Mail.ReadWrite` | No | Moves messages into another folder. This connector erases mail only by moving it to Deleted Items. |
+| `outlook_draft_mail` | Write, adds | `Mail.ReadWrite` | No | A new message, composed into Drafts. The tool cannot send it. |
+| `outlook_draft_reply` | Write, adds | `Mail.ReadWrite` | No | A reply or a forward, composed into Drafts and left there. |
+| `outlook_send_draft` | Write, changes or removes | `Mail.Send`, `Mail.ReadBasic` | No | The only tool in this connector that puts mail on the wire. It sends a draft that this connector composed. |
+| `outlook_set_automatic_reply` | Write, safe to repeat | `MailboxSettings.ReadWrite` | No | Turns the out-of-office reply on for a fixed period, or off. The reply never runs with no end date. |
+| `outlook_disable_mail_rule` | Write, safe to repeat | `MailboxSettings.ReadWrite` | No | Turns one existing inbox rule off, and nothing else. |
 
 ### Outlook calendar
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `outlook_list_calendars` | Read | Calendars.Read, Calendars.Read.Shared, User.Read | No | Every calendar that this mailbox reaches — the user's own and each one delegated — and a handle for each one. |
-| `outlook_list_events` | Read | Calendars.Read, Calendars.Read.Shared | No | One calendar's occurrences over a window, never a recurrence rule. |
-| `outlook_read_event` | Read | Calendars.Read, Calendars.Read.Shared | No | One event in full, from a handle that another tool minted, with every attendee and each one's reply. |
-| `outlook_create_event` | Write, adds | Calendars.ReadWrite | No | One new event on the user's own calendar. The tool creates it and sends invitations in one call. |
-| `outlook_create_event_on_behalf` | Write, adds | Calendars.ReadWrite.Shared, Calendars.Read, Calendars.Read.Shared | No | One event on a calendar delegated by another person, sent under that person's own name. |
+| `outlook_list_calendars` | Read | `Calendars.Read`, `Calendars.Read.Shared`, `User.Read` | No | Every calendar that this mailbox reaches — the user's own and each one delegated — and a handle for each one. |
+| `outlook_list_events` | Read | `Calendars.Read`, `Calendars.Read.Shared` | No | One calendar's occurrences over a window, never a recurrence rule. |
+| `outlook_read_event` | Read | `Calendars.Read`, `Calendars.Read.Shared` | No | One event in full, from a handle that another tool minted, with every attendee and each one's reply. |
+| `outlook_create_event` | Write, adds | `Calendars.ReadWrite` | No | One new event on the user's own calendar. The tool creates it and sends invitations in one call. |
+| `outlook_create_event_on_behalf` | Write, adds | `Calendars.ReadWrite.Shared`, `Calendars.Read`, `Calendars.Read.Shared` | No | One event on a calendar delegated by another person, sent under that person's own name. |
 
 ### SharePoint and OneDrive
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `sharepoint_search_files` | Read | Files.Read.All | Yes | Searches the files and folders that the signed-in user can see, across OneDrive and SharePoint. |
-| `sharepoint_browse_folder` | Read | Files.Read.All | Yes | Lists every item directly inside one folder, in OneDrive or SharePoint, one level only. |
-| `sharepoint_read_file` | Read | Files.Read.All | Yes | The answer is the content of one file, in its original format, or converted to PDF. |
+| `sharepoint_search_files` | Read | `Files.Read.All` | Yes | Searches the files and folders that the signed-in user can see, across OneDrive and SharePoint. |
+| `sharepoint_browse_folder` | Read | `Files.Read.All` | Yes | Lists every item directly inside one folder, in OneDrive or SharePoint, one level only. |
+| `sharepoint_read_file` | Read | `Files.Read.All` | Yes | The answer is the content of one file, in its original format, or converted to PDF. |
 
 ### OneNote
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `onenote_list_notebooks` | Read | Notes.Read | No | Every notebook that the user owns, or that is shared with the user, with each notebook's sections. |
-| `onenote_list_pages` | Read | Notes.Read | No | Finds pages by title, across notebooks or in one section. Microsoft Graph has no full-text search for OneNote. |
-| `onenote_read_page` | Read | Notes.Read | No | Reads the HTML of one page, exactly as Microsoft stores it. |
-| `onenote_create_page` | Write, adds | Notes.Create | No | Writes a new page into the signed-in user's OneNote. No attachments or images. |
-| `onenote_append_to_page` | Write, adds | Notes.ReadWrite | No | Adds HTML to the end of one page. It cannot insert, edit, or erase existing content. |
-| `onenote_preview_page` | Read | Notes.Read | No | A short snippet, up to 300 characters, of one page, plus a preview image address. |
-| `onenote_read_resource` | Read | Notes.Read | No | Fetches the bytes of one image or file that is embedded in a page, with its real media type. |
-| `onenote_find_notebook_from_url` | Read | Notes.Read | No | Resolves a OneNote web address into a notebook handle. |
-| `onenote_list_recent_notebooks` | Read | Notes.Read | No | Notebooks that the signed-in user opened recently, per Microsoft's own record. |
-| `onenote_list_sections` | Read | Notes.Read | No | Sections and section groups directly under one notebook or section group, one level at a time. |
-| `onenote_create_notebook` | Write, adds | Notes.Create | No | Creates a new, empty notebook for the signed-in user. |
-| `onenote_create_section` | Write, adds | Notes.Create | No | Creates a new, empty section directly under a notebook or section group. |
-| `onenote_create_section_group` | Write, adds | Notes.Create | No | Creates a new, empty section group directly under a notebook or another section group. |
-| `onenote_edit_page` | Write, changes or removes | Notes.ReadWrite | No | Adds content next to an element on one page, or replaces one, through 1 to 20 batched commands. |
-| `onenote_rename_page` | Write, changes or removes, safe to repeat | Notes.ReadWrite | No | Changes the title of one page, and nothing else. |
-| `onenote_copy_page` | Write, adds | Notes.Read, Notes.Create | No | Starts a copy of one page into another section, on Microsoft's own systems. The answer is a handle for the operation. |
-| `onenote_copy_section` | Write, adds | Notes.Create | No | Starts a copy of one section into another notebook or section group. The answer is a handle for the operation. |
-| `onenote_copy_notebook` | Write, adds | Notes.Create | No | Starts a copy of a whole notebook into the user's own OneDrive, on Microsoft's own systems. The answer is a handle for the operation. |
-| `onenote_get_operation` | Read | Notes.Read | No | Polls a copy operation, started by `onenote_copy_page`, `onenote_copy_section`, or `onenote_copy_notebook`, for its result. |
-| `onenote_delete_page` | Write, changes or removes, safe to repeat | Notes.ReadWrite | No | Erases one page outright. The tool always asks the user to approve this first, because Microsoft Graph keeps no recycle bin for OneNote. |
+| `onenote_list_notebooks` | Read | `Notes.Read` | No | Every notebook that the user owns, or that is shared with the user, with each notebook's sections. |
+| `onenote_list_pages` | Read | `Notes.Read` | No | Finds pages by title, across notebooks or in one section. Microsoft Graph has no full-text search for OneNote. |
+| `onenote_read_page` | Read | `Notes.Read` | No | Reads the HTML of one page, exactly as Microsoft stores it. |
+| `onenote_create_page` | Write, adds | `Notes.Create` | No | Writes a new page into the signed-in user's OneNote. No attachments or images. |
+| `onenote_append_to_page` | Write, adds | `Notes.ReadWrite` | No | Adds HTML to the end of one page. It cannot insert, edit, or erase existing content. |
+| `onenote_preview_page` | Read | `Notes.Read` | No | A short snippet, up to 300 characters, of one page, plus a preview image address. |
+| `onenote_read_resource` | Read | `Notes.Read` | No | Fetches the bytes of one image or file that is embedded in a page, with its real media type. |
+| `onenote_find_notebook_from_url` | Read | `Notes.Read` | No | Resolves a OneNote web address into a notebook handle. |
+| `onenote_list_recent_notebooks` | Read | `Notes.Read` | No | Notebooks that the signed-in user opened recently, per Microsoft's own record. |
+| `onenote_list_sections` | Read | `Notes.Read` | No | Sections and section groups directly under one notebook or section group, one level at a time. |
+| `onenote_create_notebook` | Write, adds | `Notes.Create` | No | Creates a new, empty notebook for the signed-in user. |
+| `onenote_create_section` | Write, adds | `Notes.Create` | No | Creates a new, empty section directly under a notebook or section group. |
+| `onenote_create_section_group` | Write, adds | `Notes.Create` | No | Creates a new, empty section group directly under a notebook or another section group. |
+| `onenote_edit_page` | Write, changes or removes | `Notes.ReadWrite` | No | Adds content next to an element on one page, or replaces one, through 1 to 20 batched commands. |
+| `onenote_rename_page` | Write, changes or removes, safe to repeat | `Notes.ReadWrite` | No | Changes the title of one page, and nothing else. |
+| `onenote_copy_page` | Write, adds | `Notes.Read`, `Notes.Create` | No | Starts a copy of one page into another section, on Microsoft's own systems. The answer is a handle for the operation. |
+| `onenote_copy_section` | Write, adds | `Notes.Create` | No | Starts a copy of one section into another notebook or section group. The answer is a handle for the operation. |
+| `onenote_copy_notebook` | Write, adds | `Notes.Create` | No | Starts a copy of a whole notebook into the user's own OneDrive, on Microsoft's own systems. The answer is a handle for the operation. |
+| `onenote_get_operation` | Read | `Notes.Read` | No | Polls a copy operation, started by `onenote_copy_page`, `onenote_copy_section`, or `onenote_copy_notebook`, for its result. |
+| `onenote_delete_page` | Write, changes or removes, safe to repeat | `Notes.ReadWrite` | No | Erases one page outright. The tool always asks the user to approve this first, because Microsoft Graph keeps no recycle bin for OneNote. |
 
 ## Presets
 
@@ -119,30 +119,31 @@ A deployment must pick exactly one way:
 - A deployment cannot start from a preset and then add or remove one tool. For a mix of tools
   that no preset covers, name every wanted tool in the exact list instead.
 
-There are 20 presets. This table names what each preset turns on, besides `get_me`.
+There are 20 presets. This table names each preset's tools, besides `get_me`, and gives a short
+description.
 
-| Preset | What it turns on |
-| --- | --- |
-| teams | Every Teams tool this server has: chats, teams, channels, channel posts, message search, one message in full, transcripts, and recordings. |
-| teams-chat | The list of the signed-in user's Teams chats, and nothing else. It cannot read a chat message. |
-| teams-messages | Finds a message anywhere, and reads it in full (`teams_list_chats`, `teams_search_messages`, `teams_read_message`). |
-| teams-channels | Walks a team's channels, and reads the posts in one channel (`teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel`). |
-| teams-transcripts | Finds a meeting, and reads the transcript of it (`teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`). |
-| teams-recordings | Says whether a meeting was recorded, and who can get the recording (`teams_list_chats`, `teams_list_meeting_recordings`). |
-| teams-meetings | Both transcripts and recordings, for one meeting (`teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings`). |
-| outlook-read | Finds a message, reads it in full, walks the folder tree, reads a thread, lists a folder, and resolves a name to an address. |
-| outlook-write | Everything in outlook-read, plus marking, filing, and drafting mail (`outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply`). |
-| outlook-send | Everything in outlook-write, plus sending a draft that this connector composed (`outlook_send_draft`). |
-| outlook-mailbox | Shows what quietly acts on the mailbox: the rules, the automatic reply, and the categories (`outlook_get_mailbox_settings`). |
-| outlook-automate | Everything in outlook-mailbox, plus setting the automatic reply and turning an inbox rule off (`outlook_set_automatic_reply`, `outlook_disable_mail_rule`). |
-| outlook-calendar | Names every calendar that the mailbox reaches, and reads what sits on one (`outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`). |
-| outlook-calendar-write | Everything in outlook-calendar, plus creating one event on the user's own calendar (`outlook_create_event`). |
-| outlook-calendar-delegate | Everything in outlook-calendar-write, plus creating an event on a calendar delegated by another person (`outlook_create_event_on_behalf`). |
-| sharepoint-search | Finds a file in OneDrive or on a SharePoint site, and lists one level of a folder (`sharepoint_search_files`, `sharepoint_browse_folder`). |
-| sharepoint-read | Everything in sharepoint-search, plus reading one file itself, or its PDF form (`sharepoint_read_file`). |
-| onenote-read | Lists notebooks, sections, and pages, and reads or previews a page (eight tools, from `onenote_list_notebooks` to `onenote_list_sections`). |
-| onenote-write | Everything in onenote-read, plus creating, editing, and copying notebooks, sections, and pages (eleven more tools). |
-| onenote-delete | Everything in onenote-write, plus erasing one page outright (`onenote_delete_page`). |
+| Preset | Tools | Description |
+| --- | --- | --- |
+| `teams` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel`, `teams_search_messages`, `teams_read_message`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | Every Teams tool this server has. |
+| `teams-chat` | `teams_list_chats` | The list of the signed-in user's Teams chats. It cannot read a chat message. |
+| `teams-messages` | `teams_list_chats`, `teams_search_messages`, `teams_read_message` | Finds a message anywhere, and reads it in full. |
+| `teams-channels` | `teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel` | Walks a team's channels, and reads the posts in one channel. |
+| `teams-transcripts` | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript` | Finds a meeting, and reads the transcript of it. |
+| `teams-recordings` | `teams_list_chats`, `teams_list_meeting_recordings` | Says whether a meeting was recorded, and who can get the recording. |
+| `teams-meetings` | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | Both transcripts and recordings, for one meeting. |
+| `outlook-read` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | Finds a message, reads it in full, walks the folder tree, reads a thread, lists a folder, and resolves a name to an address. |
+| `outlook-write` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | Everything in `outlook-read`, plus marking, filing, and drafting mail. |
+| `outlook-send` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_send_draft` | Everything in `outlook-write`, plus sending a draft that this connector composed. |
+| `outlook-mailbox` | `outlook_get_mailbox_settings` | Shows what quietly acts on the mailbox: the rules, the automatic reply, and the categories. |
+| `outlook-automate` | `outlook_get_mailbox_settings`, `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | Everything in `outlook-mailbox`, plus setting the automatic reply and turning an inbox rule off. |
+| `outlook-calendar` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` | Names every calendar that the mailbox reaches, and reads what sits on one. |
+| `outlook-calendar-write` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event` | Everything in `outlook-calendar`, plus creating one event on the user's own calendar. |
+| `outlook-calendar-delegate` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event`, `outlook_create_event_on_behalf` | Everything in `outlook-calendar-write`, plus creating an event on a calendar delegated by another person. |
+| `sharepoint-search` | `sharepoint_search_files`, `sharepoint_browse_folder` | Finds a file in OneDrive or on a SharePoint site, and lists one level of a folder. |
+| `sharepoint-read` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_read_file` | Everything in `sharepoint-search`, plus reading one file itself, or its PDF form. |
+| `onenote-read` | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections` | Lists notebooks, sections, and pages, and reads or previews a page. |
+| `onenote-write` | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections`, `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`, `onenote_get_operation` | Everything in `onenote-read`, plus creating, editing, and copying notebooks, sections, and pages. |
+| `onenote-delete` | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections`, `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`, `onenote_get_operation`, `onenote_delete_page` | Everything in `onenote-write`, plus erasing one page outright. |
 
 **Note:** Terraform (in another repository) writes the Entra application registration, and Argo
 (in another repository) writes the pod's active tool selection. Nothing compares the two on its
