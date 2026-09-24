@@ -584,12 +584,12 @@ class TestWhatItRefuses:
 
         assert searched.call_count == 0
 
-    async def test_the_refusal_names_every_criterion_the_schema_publishes(
+    async def test_the_refusal_names_every_criterion_search_criteria_defines(
         self, client: GraphServiceClient
     ) -> None:
-        """A criterion added to `SearchCriteria` reaches the schema's `anyOf` list automatically, so
-        the same criterion must also reach the refusal message. Otherwise, a client is turned away
-        by a rule whose list of valid criteria is missing the one it wanted."""
+        """A criterion added to `SearchCriteria` reaches `CRITERIA` automatically, and through
+        `CRITERIA` it reaches this refusal too. Otherwise a client is turned away by a rule whose
+        list of ways out is missing the one it wanted."""
         with pytest.raises(ToolError) as refusal:
             await search_mail(client, SearchCriteria(), limit=25)
 
@@ -600,11 +600,10 @@ class TestWhatItRefuses:
     async def test_a_date_window_on_its_own_is_no_criterion(
         self, client: GraphServiceClient, searched: respx.Route
     ) -> None:
-        """A window with no search criterion is a question for the `outlook_list_mail` tool
-        instead. `outlook_list_mail` orders results by receipt date and reaches drafts that this
-        search index does not. For this reason, the date bounds are outside `SearchCriteria`, the
-        type that both the `anyOf` list and this refusal derive from. So a date bound alone cannot
-        satisfy "at least one criterion"."""
+        """A window with nothing to search for is a question for `outlook_list_mail` instead. That
+        tool orders results by receipt date, and it reaches the drafts that this index does not.
+        So the date bounds sit outside `SearchCriteria`, the type that both `CRITERIA` and this
+        refusal derive from. A date bound alone cannot satisfy "at least one criterion"."""
         with pytest.raises(ToolError, match="at least one of"):
             await search_mail(
                 client,

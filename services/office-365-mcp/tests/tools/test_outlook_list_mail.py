@@ -965,19 +965,6 @@ class TestWhatItRefuses:
 
 
 class TestTheSchemaItPublishes:
-    async def test_the_two_ways_in_are_published_as_alternatives(
-        self, transport: httpx.AsyncClient
-    ) -> None:
-        """FastMCP validates arguments against the signature. So the schema must also state the
-        constraint that the runtime refusal enforces, or no client can see it."""
-        mcp: FastMCP = FastMCP(name="schema-under-test")
-        lister.register(mcp, transport)
-
-        tool = await mcp.get_tool(lister.TOOL_NAME)
-
-        assert tool is not None, "register left the tool off the server"
-        assert tool.parameters["not"] == {"required": ["folder", "folder_ref"]}
-
     async def test_neither_way_in_is_required_on_its_own(
         self, transport: httpx.AsyncClient
     ) -> None:

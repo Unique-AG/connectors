@@ -48,14 +48,12 @@ every row becomes a 404. `outlook_read_mail` sends the same header, for the same
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from typing import Annotated, Literal
 
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from fastmcp.tools import Tool
-from fastmcp.tools import tool as tool_metadata
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.headers_collection import HeadersCollection
@@ -226,11 +224,6 @@ class MarkChange:
         return self.is_read is None and self.flagged is None and self.importance is None
 
 
-# Derived from the dataclass fields, so the schema constraint below and the fields cannot drift
-# apart. Without this, a new field does not join the "at least one" rule by itself.
-CHANGES: tuple[str, ...] = tuple(field.name for field in fields(MarkChange))
-
-
 async def mark_mail(
     client: GraphServiceClient,
     *,
@@ -363,7 +356,7 @@ def _why(failure: GraphFailure) -> str:
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
-    @tool_metadata(
+    @mcp.tool(
         name=TOOL_NAME,
         title="Mark Mail Messages",
         description=_DESCRIPTION,
@@ -425,14 +418,3 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             change=MarkChange(is_read=is_read, flagged=flagged, importance=importance),
             mailbox=mailbox,
         )
-
-    _require_a_change(mcp.add_tool(outlook_mark_mail))
-
-
-def _require_a_change(tool: Tool) -> None:
-    """Say "at least one of these" in the schema. A Python signature cannot say that.
-
-    The runtime refusal stays. FastMCP validates arguments against the signature, not against
-    this schema, so a client that ignores `anyOf` still needs to be told.
-    """
-    tool.parameters["anyOf"] = [{"required": [name]} for name in CHANGES]

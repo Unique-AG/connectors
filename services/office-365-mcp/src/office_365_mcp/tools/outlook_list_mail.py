@@ -21,8 +21,6 @@ from typing import Annotated
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from fastmcp.tools import Tool
-from fastmcp.tools import tool as tool_metadata
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.message import Message
@@ -74,9 +72,6 @@ GRAPH_NOT_FOUND = (
 MAX_RESULTS = 50
 
 DEFAULT_FOLDER: WellKnownFolder = "inbox"
-
-# The schema constraint and the `_BOTH_FOLDERS` refusal must name the same pair.
-FOLDER_ARGUMENTS: tuple[str, str] = ("folder", "folder_ref")
 
 _FOLDER_FIELDS: tuple[str, ...] = ("displayName", "totalItemCount", "unreadItemCount")
 
@@ -236,10 +231,13 @@ async def list_mail(
 
 
 def _folder_address(folder: WellKnownFolder, folder_ref: str | None) -> str:
-    """The single path segment that addresses the folder: a well-known name, or a handle's id.
+    """This is the single path segment that addresses the folder: a well-known name, or a
+    handle's id.
 
-    FastMCP fills the `folder` default in before the body runs. So an explicit `folder="inbox"`
-    beside a `folder_ref` is caught by the schema constraint, rather than here.
+    FastMCP fills in the `folder` default before the body runs. So an explicit `folder="inbox"`
+    beside a `folder_ref` looks the same as an omitted `folder`, and this treats it as
+    `folder_ref` alone. Only a `folder` that names some other folder alongside `folder_ref` is
+    rejected below.
     """
     if folder_ref is None:
         return folder
@@ -385,7 +383,7 @@ def _headers() -> HeadersCollection:
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
-    @tool_metadata(
+    @mcp.tool(
         name=TOOL_NAME,
         title="List Mail in a Folder",
         description=_DESCRIPTION,
@@ -491,14 +489,3 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             limit=limit,
             mailbox=mailbox,
         )
-
-    _one_folder_at_a_time(mcp.add_tool(outlook_list_mail))
-
-
-def _one_folder_at_a_time(tool: Tool) -> None:
-    """Say "one of these two, not both" in the schema, which a Python signature cannot express.
-
-    FastMCP validates arguments against the signature rather than this schema, so the runtime
-    refusal stays.
-    """
-    tool.parameters["not"] = {"required": list(FOLDER_ARGUMENTS)}

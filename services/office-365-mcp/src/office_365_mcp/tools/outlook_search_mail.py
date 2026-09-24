@@ -29,8 +29,6 @@ from typing import Annotated
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from fastmcp.tools import Tool
-from fastmcp.tools import tool as tool_metadata
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.exchange_id_format import ExchangeIdFormat
 from msgraph.generated.models.message import Message
@@ -264,7 +262,7 @@ def _wire(instant: datetime) -> str:
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
-    @tool_metadata(
+    @mcp.tool(
         name=TOOL_NAME,
         title="Search Mail",
         description=_DESCRIPTION,
@@ -396,14 +394,3 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             limit=limit,
             mailbox=mailbox,
         )
-
-    _require_a_criterion(mcp.add_tool(outlook_search_mail))
-
-
-def _require_a_criterion(tool: Tool) -> None:
-    """Say "at least one of these" in the schema, which a Python signature cannot express.
-
-    FastMCP validates arguments against the signature rather than this schema, so the runtime
-    refusal stays.
-    """
-    tool.parameters["anyOf"] = [{"required": [name]} for name in CRITERIA]
