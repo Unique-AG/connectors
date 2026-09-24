@@ -32,8 +32,9 @@ def client(transport: httpx.AsyncClient) -> GraphServiceClient:
     return graph_client_for(transport, CALLER_TOKEN)
 
 
-# Already percent-escaped `%3a` and `%40`, a `?context=` value holding `%7b` and `%22`, and an `&`
-# after it. A `$filter` encoded too little, too much or not at all answers `200 OK` and no results.
+# This URL is already percent-escaped: `%3a` and `%40` appear encoded, a `?context=` value holds
+# `%7b` and `%22`, and an `&` follows it. A `$filter` encoded too little, too much or not at all
+# answers `200 OK` and no results.
 JOIN_WEB_URL = (
     "https://teams.microsoft.invalid/l/meetup-join/"
     + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
@@ -112,7 +113,8 @@ def recording_payload(
         else {
             "@odata.type": organizer_odata_type,
             "id": organizer_user_id,
-            # Null in every documented sample: an organiser can only be reported as an id.
+            # Null in every documented sample: this connector can report an organizer only as an
+            # id.
             "displayName": None,
             "userIdentityType": "aadUser",
             "tenantId": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
@@ -156,8 +158,8 @@ def reaction_payload(
     display_name: str | None = "Grace Hopper",
     created_at: str = "2026-02-11T09:20:00Z",
 ) -> dict[str, object]:
-    """One `chatMessageReaction`. The nested `user.user` shape is Graph's own — the same
-    `teamworkUserIdentity` wrapping every other identity this connector reads."""
+    """One `chatMessageReaction`. The nested `user.user` shape is Graph's own. It is the same
+    `teamworkUserIdentity` that wraps every other identity this connector reads."""
     user = (
         None
         if user_id is None and display_name is None
@@ -182,7 +184,8 @@ def chat_hit(
     summary: str | None = "...cut the <c0>release</c0> on Friday...",
     sender: Mapping[str, object] | None = MAILBOX_SENDER,
 ) -> dict[str, object]:
-    """`sender=None` is a system event message: the projection has no `messageType` naming it."""
+    """`sender=None` is a system event message: the projection has no `messageType` that names
+    it."""
     resource = _chat_message(message_id=message_id, sender=sender)
     if chat_id is not None:
         resource["chatId"] = chat_id

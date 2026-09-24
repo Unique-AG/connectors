@@ -1,10 +1,11 @@
-"""The Graph metrics, asserted on a scrape of the registry `/metrics` actually serves.
+"""These are the Graph metrics, asserted on a scrape of the registry that `/metrics` actually
+serves.
 
-Trap: `configure_metrics` aims its Prometheus reader at `unique_toolkit.monitoring.REGISTRY`, not
-`prometheus_client`'s default. An empty registry answers 200, so a test that read the default
-registry would pass with every instrument unbound.
+TRAP: `configure_metrics` aims its Prometheus reader at `unique_toolkit.monitoring.REGISTRY`, not
+at `prometheus_client`'s default. An empty registry answers 200, so a test that reads the default
+registry instead passes with every instrument unbound.
 
-Every assertion is a delta: the registry is process-wide and cumulative, and the rest of the suite
+Every assertion is a delta. The registry is process-wide and cumulative, and the rest of the suite
 drives the same operation names.
 """
 
@@ -174,21 +175,21 @@ class TestAGraphCallIsCountedAndTimed:
     ) -> None:
         """The buckets are the whole of what these histograms can say about a throttled call.
 
-        Both time the SDK's `Retry-After` waits along with the call: `GraphSettings` documents four
-        attempts at its 30 s request timeout, and each wait between them is capped at kiota's
-        `RetryHandlerOption.MAX_DELAY` of 180 s. At `prometheus_client`'s default ceiling of 10 s
-        every one of those lands in `+Inf` and a throttled call cannot be told apart from a slow one
-        — which is the distinction the panel exists to draw. The same layout `app.py` hands
-        `setup_ops` for the inbound histogram, so the three can be read against each other without
-        correcting for the boundaries.
+        Both histograms time the SDK's `Retry-After` waits along with the call. `GraphSettings`
+        documents four attempts at its 30 s request timeout, and kiota caps each wait between them
+        at `RetryHandlerOption.MAX_DELAY`, which is 180 s. At `prometheus_client`'s default ceiling
+        of 10 s, every one of those waits lands in `+Inf`, and a throttled call cannot be told apart
+        from a slow one. That is the distinction that this panel exists to draw. `app.py` hands the
+        same layout to `setup_ops` for the inbound histogram, so a reader can compare all three
+        without correcting for the boundaries.
 
-        Both instruments, because they share one bucket tuple in `metrics.py` on purpose — an
-        operation and the steps inside it are only comparable on one scale, and a view added for one
-        of them without the other is how that stops being true.
+        Both instruments share one bucket tuple in `metrics.py` on purpose. An operation and the
+        steps inside it are comparable only on one scale. A view added for one of them, without the
+        other, is how that comparison stops being true.
 
-        Asserted on the scrape rather than on `_VIEWS`, for the reason the inbound twin in
-        `test_app.py` gives: a histogram's layout is registered once per process, so the argument
-        is only correct if it arrived first, and only the scrape says whether it did.
+        This is asserted on the scrape, not on `_VIEWS`, for the same reason that the inbound twin
+        in `test_app.py` gives. A histogram's layout registers once per process, so the argument is
+        correct only if it arrived first. Only the scrape can say whether it did.
         """
         _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
@@ -296,8 +297,8 @@ class TestAGraphCallIsCountedAndTimed:
     async def test_a_client_that_cannot_ask_is_not_counted_as_a_graph_error(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Driven through the real adapter rather than a stub, because this path is deterministic
-        for a client with no elicitation: every send it attempts would raise the failure rate.
+        """This runs through the real adapter, not a stub, because this path is deterministic for a
+        client with no elicitation. Every send that it attempts raises the failure rate.
         """
 
         class _CannotAsk:
@@ -377,9 +378,9 @@ class TestAGraphCallIsCountedAndTimed:
 
 
 class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
-    """A second pair of instruments rather than a `step` label on the first: adding one to
-    `graph_operations_total` would silently turn every dashboard's operation rate into a Graph-call
-    rate under an unchanged expression.
+    """This is a second pair of instruments, not a `step` label on the first. Adding one to
+    `graph_operations_total` silently turns every dashboard's operation rate into a Graph-call
+    rate, under an unchanged expression.
     """
 
     async def test_a_step_is_counted_and_timed_under_the_operation_that_reached_it(
@@ -668,18 +669,19 @@ class TestEveryToolNamesItselfWhenItCallsGraph:
 
 
 def _names_the_tool(argument: ast.expr) -> bool:
-    """Whether this argument is the module's own `TOOL_NAME`, and not a literal spelled again."""
+    """This reports whether this argument is the module's own `TOOL_NAME`, and not a literal
+    spelled again."""
     return isinstance(argument, ast.Name) and argument.id == "TOOL_NAME"
 
 
 class TestNoOperationNameIsTakenFromData:
-    """Only a tool can be held to naming itself — `shared/identity.py` names nothing on purpose —
-    but any module under `src/` can pass *data* as the name, which is why this is a second rule and
-    not a wider glob on the one above.
+    """Only a tool can be held to naming itself. `shared/identity.py` names nothing on purpose, but
+    any module under `src/` can pass *data* as the name. That is why this is a second rule, not a
+    wider glob on the one above.
 
-    The argument's shape is what is checked: a string literal, or a name this module binds to one at
-    module level. Stronger than any test of the recorded samples, because the label only leaks on
-    the day a caller passes a live id and no test drives that day.
+    This looks only at the argument's shape: a string literal, or a name that this module binds to
+    one at module level. This is stronger than any test of the recorded samples, because the label
+    leaks only on the day that a caller passes a live id, and no test drives that day.
     """
 
     def test_the_rule_reaches_past_the_tools_directory(self) -> None:
@@ -726,16 +728,16 @@ def _operation_named(call: ast.Call) -> ast.expr | None:
         if keyword.arg == "operation":
             return keyword.value
         if keyword.arg is None:
-            # `graph_errors(**named)`: reported as the mapping rather than as nothing, so the
+            # `graph_errors(**named)` reports the argument as the mapping, not as nothing, so the
             # message names the expression.
             return keyword.value
     return None
 
 
 def _module_level_strings(module: ast.Module) -> dict[str, str]:
-    """Top level only and a literal only: a local or a parameter of the same name could hold
-    anything a caller passed. The values come back too, because the step vocabulary below reads
-    them.
+    """This reads top-level names only, and literal values only. A local variable or a parameter of
+    the same name can hold anything that a caller passed. The values come back too, because the
+    step vocabulary below reads them.
     """
     return {
         target.id: value
@@ -774,9 +776,10 @@ def _is_chosen_in_code(named: ast.expr, chosen: frozenset[str]) -> bool:
     return isinstance(named, ast.Name) and named.id in chosen
 
 
-# Every step name this service is signed off to emit; an exact set rather than a ceiling, which
-# would absorb growth silently. The budget: `graph_steps_total` is (operation, step) pairs x
-# statuses and `graph_step_duration_seconds` is those pairs x buckets.
+# This is every step name that this service is signed off to emit. It is an exact set, not a
+# ceiling, because a ceiling absorbs growth silently. The budget is this: `graph_steps_total` is
+# (operation, step) pairs times statuses, and `graph_step_duration_seconds` is those pairs times
+# buckets.
 GRAPH_STEPS = frozenset(
     {
         "signed_in_user",
@@ -858,18 +861,20 @@ GRAPH_STEPS = frozenset(
     }
 )
 
-# `STEP` for a module with one, `STEP_<NAME>` for a module that names several.
+# Use `STEP` for a module with one step, and `STEP_<NAME>` for a module that names several.
 _STEP_CONSTANT = re.compile(r"^STEP(_[A-Z0-9_]+)?$")
 
-# A bound on shape, not on cardinality (`GRAPH_STEPS` is that), so a step cannot arrive spelled like
-# a URL or an id and pass the set assertion by being added to it without anyone noticing what it is.
+# This is a bound on shape, not on cardinality (`GRAPH_STEPS` covers that). So a step cannot arrive
+# spelled like a URL or an id and pass the set assertion just by being added to it, without anyone
+# noticing what it is.
 _STEP_VALUE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 def _declared_steps() -> dict[str, str]:
-    """Read from the call sites, not collected by matching constant names: a constant called
-    anything but `STEP` or `STEP_*` is still a name this file can read, so matching on the name
-    would let it pass the shape rule and stay invisible to the budget below.
+    """This reads from the call sites. It does not collect values by matching constant names. A
+    constant called anything other than `STEP` or `STEP_*` is still a name that this file can read.
+    Matching on the name instead lets it pass the shape rule and stay invisible to the budget
+    below.
     """
     found: dict[str, str] = {}
     for source in _source_modules():
@@ -887,10 +892,10 @@ def _declared_steps() -> dict[str, str]:
 
 
 class TestNoStepNameIsTakenFromData:
-    """`step` multiplies against `operation`, so a step read off an argument is one time series per
-    chat on both step instruments at once. The shape rule below bounds nothing globally — a module
-    can declare five hundred module-level constants and pass them all — so the vocabulary is pinned
-    to an exact set as well.
+    """`step` multiplies against `operation`, so a step that is read off an argument becomes one
+    time series per chat, on both step instruments at once. The shape rule below bounds nothing
+    globally. A module can declare five hundred module-level constants and pass them all. So the
+    vocabulary is also pinned to an exact set.
     """
 
     def test_there_are_steps_to_read(self) -> None:
@@ -1031,12 +1036,12 @@ def _metric_names(query: str) -> list[str]:
 
 class TestTheDashboardAsksForMetricsThisServiceEmits:
     """`graph_requests_total` became `graph_operations_total` here. A Prometheus query for a metric
-    nobody exports is an empty result and not a failure, so every panel naming the old series would
-    have gone on rendering empty, and a blank panel looks like an idle service.
+    that nobody exports gives an empty result, not a failure. So every panel that names the old
+    series keeps rendering empty, and a blank panel looks like an idle service.
     """
 
     def test_the_dashboard_is_readable_json(self) -> None:
-        """An unreadable or moved file would make the rules below vacuous."""
+        """If the file is unreadable or moved, the rules below become vacuous."""
         assert _DASHBOARD.exists(), f"no dashboard at {_DASHBOARD}"
         assert len(_panels()) > 1, "a dashboard with no panels asserts nothing below"
         assert _queried_graph_metrics(), "no panel queries a graph_* series at all"
@@ -1082,12 +1087,12 @@ def _instrument(sample: str) -> str:
     return sample
 
 
-# A panel titled "Graph calls/min" over `graph_operations_total` was counting tool calls and calling
-# them Graph calls, which is the reading the `graph_requests_total` rename was meant to end.
+# A panel titled "Graph calls/min" over `graph_operations_total` counted tool calls and called them
+# Graph calls. The `graph_requests_total` rename exists to end that misreading.
 _A_CALL_IN_A_TITLE = re.compile(r"\bcalls?\b", re.IGNORECASE)
 
-# The two series that count a Graph call; everything else `graph_*` counts an operation, a page or
-# a 429.
+# These are the two series that count a Graph call. Everything else under `graph_*` counts an
+# operation, a page, or a 429.
 _STEP_LEVEL = frozenset({GRAPH_STEPS_TOTAL, GRAPH_STEP_DURATION_SECONDS})
 
 
@@ -1133,7 +1138,8 @@ class TestNoPanelPromisesGraphCallsAndPlotsOperations:
         )
 
 
-# How a dashboard query says "count this as a failure": everything except the statuses it names.
+# This is how a dashboard query says "count this as a failure": everything except the statuses
+# that it names.
 _EXCLUDED_STATUSES = re.compile(r'status!~\\?"([a-z_|]+)\\?"')
 
 

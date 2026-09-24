@@ -77,7 +77,8 @@ _SEARCH = {
     ]
 }
 
-# Written out rather than derived: a derived handle asserts only that the test agrees with itself.
+# This is written out instead of derived. A derived handle asserts only that the test agrees with
+# itself.
 _MESSAGE_URI = "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
 _MESSAGE_PATH = "/chats/19%3Arelease%40thread.v2/messages/1770000000000"
 
@@ -137,7 +138,8 @@ _CHANNEL_ID = "19:general@thread.tacv2"
 _CHANNELS_PATH = f"/teams/{_TEAM_ID}/channels"
 _CHANNEL_MESSAGES_PATH = f"/teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages"
 
-# The only five properties `GET /me/joinedTeams` populates; every other comes back null there.
+# `GET /me/joinedTeams` populates only these five properties. Every other property comes back null
+# there.
 _TEAMS = {
     "value": [
         {
@@ -201,7 +203,7 @@ _CHANNEL_POSTS = {
     ]
 }
 
-# Graph addresses a reply under the post it answers; no other shape reaches it.
+# Graph addresses a reply under the post that it answers. No other shape reaches it.
 _REPLY_URI = (
     f"teams:///teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2"
     + f"/messages/{_ROOT_POST_ID}/replies/{_REPLY_ID}"
@@ -252,7 +254,8 @@ _CHATS = {
 }
 
 
-# Already-escaped `%3a` and `%40`, a `?context=` query, an `&`: the shape the `$filter` survives.
+# This URL already has the shape that the `$filter` must survive: escaped `%3a` and `%40`, a
+# `?context=` query, and an `&`.
 _JOIN_WEB_URL = (
     "https://teams.microsoft.invalid/l/meetup-join/"
     + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
@@ -265,7 +268,8 @@ _MEETINGS_PATH = "/me/onlineMeetings"
 _TRANSCRIPTS_PATH = f"/me/onlineMeetings/{_MEETING_ID}/transcripts"
 _RECORDINGS_PATH = f"/me/onlineMeetings/{_MEETING_ID}/recordings"
 _CONTENT_PATH = f"{_TRANSCRIPTS_PATH}/{_TRANSCRIPT_ID}/content"
-# Routed only to be asserted *un*called: nothing here ever fetches recording content.
+# This path is routed only so that a test can assert it is *un*called. Nothing here ever fetches
+# recording content.
 _RECORDING_CONTENT_PATH = f"{_RECORDINGS_PATH}/{_RECORDING_ID}/content"
 
 _MEETING_CHATS = {
@@ -321,7 +325,8 @@ _TRANSCRIPTS = {
     ]
 }
 
-# `contentCorrelationId` matches the transcript's: Microsoft's own link between the two artifacts.
+# `contentCorrelationId` matches the transcript's own value. This is Microsoft's own link between
+# the two artifacts.
 _RECORDINGS = {
     "value": [
         {
@@ -347,7 +352,8 @@ _RECORDINGS = {
     ]
 }
 
-# Oldest first, Microsoft's own order — it documents no `$orderby` here — so "newest" is work.
+# This series is oldest first, which is Microsoft's own order. It documents no `$orderby` here,
+# so finding "newest" takes extra work.
 _SERIES_TRANSCRIPTS: dict[str, object] = {
     "value": [
         {
@@ -381,7 +387,7 @@ _SERIES_RECORDINGS: dict[str, object] = {
 _PAST_THE_CAP = meetings.MAX_ARTIFACT_SCAN + 60
 _DAILY_SERIES_START = datetime(2026, 1, 1, 14, 0, tzinfo=UTC)
 
-# The outer code says nothing; the inner code is the whole difference from a missing permission.
+# The outer code says nothing. The inner code is the whole difference from a missing permission.
 _TENANT_SWITCH_OFF = {
     "error": {
         "code": "Forbidden",
@@ -516,10 +522,10 @@ async def mcp_client(app: Starlette) -> AsyncIterator[Client[FastMCPTransport]]:
 
 @pytest.fixture
 async def every_tool() -> AsyncIterator[Client[FastMCPTransport]]:
-    """Every tool in the registry, which is what the write surface has to be judged against.
+    """This is every tool in the registry, which is what the write surface must be judged against.
 
-    `app` runs one preset, so a write tool outside it would be absent rather than read-only, and a
-    guard comparing against that surface would pass by not looking.
+    `app` runs one preset. If a write tool sits outside it, that tool is absent rather than
+    read-only, and a guard that compares against that surface passes only because it never looked.
     """
     server = FastMCP[None](name="every-tool")
     transport = httpx.AsyncClient()
@@ -545,12 +551,13 @@ def _object(value: object) -> dict[str, object]:
     return cast("dict[str, object]", value)
 
 
-# Tool names and field names are both `verb_noun`, so the verb discriminates: no answer field
-# starts with one of these. Not a stop-list of unlanded tools — that is one somebody forgets.
-# Every tool name is `get_me` or carries its product as a prefix, so the prefix is what makes a
-# token tool-shaped. Written out rather than derived from TOOL_NAMES on purpose: a derived
-# pattern could not tell prose naming a tool that does not exist — a typo — from prose naming
-# one this deployment merely left out, and the first is the failure worth catching.
+# Tool names and field names are both `verb_noun`, so the verb tells them apart. No answer field
+# starts with one of these verbs. This is not a stop-list of tools that never landed, because that
+# kind of list is one that somebody forgets to update. Every tool name is `get_me`, or it carries
+# its product as a prefix, so the prefix is what makes a token look like a tool. This pattern is
+# written out instead of derived from `TOOL_NAMES`, on purpose. A derived pattern cannot tell prose
+# that names a tool that does not exist (a typo) from prose that names a tool that this deployment
+# merely left out, and the first case is the failure worth catching.
 _TOOL_MENTION = re.compile(r"\b(?:get|teams|outlook|onenote)_[a-z]+(?:_[a-z]+)*\b")
 
 
@@ -604,9 +611,10 @@ def _optional_type(schema: object) -> dict[str, object]:
     return typed[0]
 
 
-# Every tool that bounds a search by time, and the pair of bounds it publishes. Two tests above
-# read this: one holds each bound to a date OR a moment, the other refuses a date-shaped argument
-# that is missing from here. Adding a windowed tool means adding a row.
+# This lists every tool that bounds a search by time, and the pair of bounds that it publishes.
+# Two tests above read this table: one holds each bound to a date OR a moment, and the other
+# refuses a date-shaped argument that is missing from here. Adding a windowed tool means adding a
+# row.
 _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_list_mail": ("received_after", "received_before"),
     "outlook_list_events": ("starts_on", "ends_on"),
@@ -637,7 +645,8 @@ def _sender_schema(schema: Mapping[str, object] | None) -> dict[str, object]:
     properties = _properties(schema)
     message = properties if "sender" in properties else _properties(_items(properties["messages"]))
     sender = message["sender"]
-    # Optional on a read (a system event has no author) and required on a search hit.
+    # The sender is optional on a read, because a system event has no author, and required on a
+    # search hit.
     return _optional_type(sender) if "anyOf" in _object(sender) else _object(sender)
 
 
@@ -660,14 +669,14 @@ def _error_text(result: CallToolResult) -> str:
 
 
 def _record_text(record: logging.LogRecord) -> str:
-    """A value passed as an `extra` never appears in `getMessage()` but does reach the log sink, so
-    checking the formatted message alone would miss it."""
+    """A value passed as an `extra` never appears in `getMessage()`, but it does reach the log
+    sink. A test that reads only the formatted message misses it."""
     return f"{record.getMessage()} {record.__dict__!r}"
 
 
-# Every tool that changes a mailbox, written out by hand. Empty until one exists, which is the
-# point: the guard is exercised on a surface that has nothing to hide before it is asked to police
-# a surface that does.
+# This lists every tool that changes a mailbox, written out by hand. It stays empty until one
+# exists, and that is the point. The guard is exercised on a surface that has nothing to hide,
+# before it is asked to police a surface that does.
 WRITE_TOOLS: frozenset[str] = frozenset(
     {
         "outlook_mark_mail",
@@ -759,14 +768,15 @@ class TestTheToolsThisServerAdvertises:
     async def test_no_tool_carries_a_date_argument_the_window_survey_does_not_know_about(
         self, every_tool: Client[FastMCPTransport]
     ) -> None:
-        """`_WINDOWED_TOOLS` is hand-written, so this is what stops it going stale: a new bound
-        added to any tool has to be recorded there and therefore has to admit both shapes.
+        """`_WINDOWED_TOOLS` is hand-written, so this is what stops it from going stale. A new
+        bound that is added to any tool must be recorded there, and it must therefore admit both
+        shapes.
 
-        The write tools are exempt by name and not by accident. `outlook_create_event` and its
-        delegate take `starts_at`/`ends_at`, and `outlook_set_automatic_reply` takes `start`/`end`
-        — those SET a time rather than bounding a search, and they are `str` on purpose, because
-        Graph reads a wall clock beside a separate zone name and reformatting the caller's string
-        would move the event.
+        The write tools are exempt by name, not by accident. `outlook_create_event` and its
+        delegate take `starts_at`/`ends_at`, and `outlook_set_automatic_reply` takes `start`/`end`.
+        Those tools SET a time instead of bounding a search, and they are `str` on purpose. Graph
+        reads a wall clock beside a separate zone name, so reformatting the caller's string moves
+        the event.
         """
         tools = _named(await every_tool.list_tools())
         recorded = {
@@ -874,7 +884,8 @@ class TestTheToolsThisServerAdvertises:
             for path, field in _fields(tool.output_schema, name).items()
         }
 
-        # Guards the guard: a walk that stopped descending would pass by finding nothing to check.
+        # This guards the guard above. A walk that stopped descending passes by finding nothing to
+        # look at.
         assert "teams_list_chats.chats[].members[].email" in published
 
         undescribed = sorted(
@@ -983,16 +994,17 @@ class TestTheToolsThisServerAdvertises:
     async def test_the_sender_shape_teaches_both_identities_where_it_is_not_overridden(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """Pydantic publishes a model's docstring as the JSON-schema `description` of the object,
-        so `MessageSender`'s own paragraph is live protocol surface on every tool that does not
-        override it, and editing that docstring changes the wire."""
+        """Pydantic publishes a model's docstring as the JSON-schema `description` of the object.
+        So `MessageSender`'s own paragraph is live protocol surface on every tool that does not
+        override it. Editing that docstring changes the wire."""
         tools = _named(await mcp_client.list_tools())
         taught = {name: _sender_schema(tools[name].output_schema) for name in _MESSAGE_TOOLS}
 
         for name in ("teams_read_message", "teams_browse_channel"):
             written = taught[name]["description"]
             assert isinstance(written, str)
-            # A docstring keeps its line breaks in the schema; the sentence is pinned, not the wrap.
+            # A docstring keeps its line breaks in the schema. The sentence is pinned, not the line
+            # wrap.
             description = " ".join(written.split())
             assert "emailAddress" in description, name
             assert "teamworkUserIdentity" in description, name
@@ -1033,8 +1045,8 @@ class TestTheToolsThisServerAdvertises:
     async def test_teams_read_transcript_takes_a_handle_and_a_window_and_names_its_one_shape(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """Two readers deliberately: a token is exchanged per tool, so one polymorphic reader
-        would have to redeem transcript access to read a chat message."""
+        """This has two readers on purpose. A token is exchanged per tool, so one polymorphic
+        reader must redeem transcript access just to read a chat message."""
         tools = _named(await mcp_client.list_tools())
         schema = tools["teams_read_transcript"].input_schema
         description = tools["teams_read_transcript"].description
@@ -1243,11 +1255,11 @@ class TestTheToolsThisServerAdvertises:
         assert recordings_input - transcripts_input == set(), (
             "a caller switching listers after a refusal must not have to drop an argument"
         )
-        # The one asymmetry, and it is documentation and not oversight: Microsoft publishes a
-        # `$filter` example for `contentcorrelationId` on the TRANSCRIPTS collection and on no
-        # other artifact collection. Mirroring it onto recordings would be a filter composed
-        # against undocumented support, which Graph is documented to drop in silence — so the
-        # answer would be every recording of the meeting under an argument naming one call. The
+        # This is the one asymmetry, and it is documentation, not oversight. Microsoft publishes a
+        # `$filter` example for `contentcorrelationId` on the TRANSCRIPTS collection, and on no
+        # other artifact collection. Mirroring it onto recordings builds a filter against
+        # undocumented support, and Graph is documented to drop that in silence. So the answer
+        # becomes every recording of the meeting, under an argument that names only one call. The
         # pairing is also read recording-first in practice: a recording row carries the id, and
         # this is the route to that call's words.
         assert transcripts_input - recordings_input == {"content_correlation_id"}
@@ -1272,7 +1284,8 @@ class TestTheToolsThisServerAdvertises:
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_list_meeting_recordings"].description
         assert description is not None
-        # The whole schema, `$defs` included: a recording's fields are described there, not inline.
+        # This asserts against the whole schema, `$defs` included. A recording's fields are
+        # described there, not inline.
         rendered = description + json.dumps(tools["teams_list_meeting_recordings"].output_schema)
 
         assert "Meeting participants don't have permission to download meeting recordings" in (
@@ -1424,9 +1437,9 @@ class TestTheToolsThisServerAdvertises:
     async def test_every_tool_says_which_kind_it_is(
         self, every_tool: Client[FastMCPTransport]
     ) -> None:
-        """The guard that fails once the rule above has nothing to check. An unannotated tool is
-        neither in the write set nor out of it: MCP reads a missing `readOnlyHint` as false, so it
-        would join the write surface by omission."""
+        """This is the guard for when the rule above has nothing left to look at. An unannotated
+        tool is neither in the write set nor out of it. MCP reads a missing `readOnlyHint` as
+        false, so an unannotated tool joins the write surface just by omission."""
         tools = _named(await every_tool.list_tools())
 
         assert tools, "no tools are advertised, so the write surface proves nothing"
@@ -1786,8 +1799,8 @@ class TestCallingThem:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
     ) -> None:
-        """FastMCP validates arguments against the signature, not the advertised schema, so the
-        `anyOf` alone would not stop this."""
+        """FastMCP validates arguments against the signature, not against the advertised schema. So
+        the `anyOf` alone does not stop this."""
         route = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
 
         result = await mcp_client.call_tool(
@@ -1934,8 +1947,8 @@ class TestCallingThem:
         items: dict[str, object],
         identifier: str,
     ) -> None:
-        """A `limit` applied before ordering would return an arbitrary handful sorted among
-        themselves, and Microsoft's own order here puts the oldest first."""
+        """A `limit` applied before ordering returns an arbitrary handful, sorted only among
+        themselves. Microsoft's own order here puts the oldest first instead."""
         _ = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
         _ = graph.get(path).mock(return_value=httpx.Response(200, json=items))
         _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
@@ -2060,8 +2073,9 @@ class TestCallingThem:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
     ) -> None:
-        """Graph access to transcripts is a tenant switch that is OFF BY DEFAULT and scoped to
-        transcript resources, so one tool listing both artifacts would fail the whole call here."""
+        """Graph access to transcripts is a tenant switch that is OFF BY DEFAULT, scoped to
+        transcript resources. So a single tool that lists both artifacts fails the whole call
+        here."""
         graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
         graph.get(_TRANSCRIPTS_PATH).mock(return_value=httpx.Response(403, json=_TENANT_SWITCH_OFF))
         graph.get(_RECORDINGS_PATH).mock(return_value=httpx.Response(200, json=_RECORDINGS))
@@ -2232,7 +2246,8 @@ class TestTheTransportTheToolsShare:
     async def test_every_tool_is_handed_the_same_transport(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A transport per call would mean a cold TLS handshake and a leaked pool per call."""
+        """A transport that is created per call causes a cold TLS handshake and a leaked pool, on
+        every call."""
         built: list[httpx.AsyncClient] = []
 
         def record(settings: GraphSettings) -> httpx.AsyncClient:

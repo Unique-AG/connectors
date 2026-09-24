@@ -1,4 +1,5 @@
-"""Every payload here is synthesised. No message in this file was ever posted to a real chat."""
+"""Every payload in this file is synthetic. No message in this file was ever posted to a real
+chat."""
 
 import json
 from collections.abc import Mapping, Sequence
@@ -51,7 +52,8 @@ async def _refuses(question: str, about: str) -> Confirmed:
 def _sent_payload(
     *, message_id: str = _SENT_MESSAGE_ID, content: str = _MESSAGE
 ) -> Mapping[str, object]:
-    """Graph's answer to a successful post: the same chatMessage shape a read returns."""
+    """This function returns the Graph response for a successful post. It uses the same
+    `chatMessage` shape that a read returns."""
     return message_payload(
         message_id=message_id,
         content=content,
@@ -76,8 +78,9 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
 
 
 class TestThePersonBeforeTheSend:
-    """There is no draft to review here: the confirmation question is the only place a human
-    sees the words before they leave, so it has to carry them."""
+    """There is no draft for review here. The confirmation question is the only place where a
+    person sees the words before the tool sends them, so the question must carry the message
+    text."""
 
     async def test_a_refusal_sends_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -126,10 +129,10 @@ class TestThePersonBeforeTheSend:
 
 
 class TestHowTheQuestionReachesAPerson:
-    """`a_person_agrees` is this tool's own adapter onto `person_confirms`. The seam's own
-    mechanics — both protocol eras, every way a client can fail to answer — are proved once in
-    tests/shared/test_seam.py; what belongs here is that this tool's wiring actually gates the
-    send on the answer."""
+    """`a_person_agrees` is this tool's own adapter onto `person_confirms`. The tests in
+    `tests/shared/test_seam.py` prove the mechanics of the seam itself: both protocol eras, and
+    every way that a client can fail to answer. This file tests only that this tool's wiring gates
+    the send on the answer."""
 
     @staticmethod
     def _context(answer: object) -> Context:
@@ -169,7 +172,8 @@ class _ModernRequest:
 def _modern_context(
     *, answers: Mapping[str, InputResponse] | None = None, state: str | None = None
 ) -> Context:
-    """A 2026-07-28 connection: `elicit` raises, so a leak back onto the back-channel fails."""
+    """This models a connection at protocol version 2026-07-28. The `elicit` call raises an
+    exception, so a leak back onto the back-channel fails."""
 
     class _Client:
         request_context: _ModernRequest = _ModernRequest()
@@ -316,11 +320,11 @@ class TestTheRetryItRefuses:
     async def test_a_post_graph_answers_503_is_never_sent_a_second_time(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The single most important line in the tool. The SDK retries POST on 429, 503 and 504
-        three times by default and Graph publishes no idempotency key for a chat message post, so
-        an unguarded send delivers the same message up to four times.
+        """This is the single most important line in the tool. By default, the SDK retries a POST
+        request three times on a 429, 503, or 504 response. Graph publishes no idempotency key for
+        a chat message post, so an unguarded send can deliver the same message up to four times.
         `tests/graph_client/test_client.py::TestANonIdempotentCallIsNotRetried` proves the default
-        this overrides."""
+        retry behavior that this test overrides."""
         post = graph.post(_SEND_PATH).mock(return_value=httpx.Response(503))
 
         with pytest.raises(Exception):  # noqa: B017, PT011
@@ -398,9 +402,10 @@ class TestTheFailuresItPassesOn:
 
 class TestHowItDeclaresItself:
     def test_the_permission_is_chat_message_send_and_not_channel_message_send(self) -> None:
-        """Graph's own combined reference page names `ChannelMessage.Send` for this route too —
-        see the module docstring for why that is a documentation copy-paste and not a second valid
-        answer. The per-route page and the permissions reference both name this one instead."""
+        """The combined Graph reference page also names `ChannelMessage.Send` for this route. See
+        the module docstring for the reason: that entry is a copy-paste error in the
+        documentation, not a second valid answer. The per-route reference page and the permissions
+        reference page both name `ChatMessage.Send` instead."""
         assert sender.GRAPH_PERMISSIONS == ("ChatMessage.Send",)
 
     def test_its_one_step_is_the_one_call_it_makes(self) -> None:
@@ -409,8 +414,9 @@ class TestHowItDeclaresItself:
     async def test_it_announces_itself_as_an_addition_rather_than_a_destructive_write(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """It creates a new message; it does not consume or overwrite anything that already
-        existed, unlike outlook_send_draft, which turns an existing draft into a sent message."""
+        """This tool creates a new message. It does not consume or overwrite anything that already
+        existed. This differs from `outlook_send_draft`, which turns an existing draft into a sent
+        message."""
         _parameters, tool = await _registered(transport)
 
         annotations = tool.annotations

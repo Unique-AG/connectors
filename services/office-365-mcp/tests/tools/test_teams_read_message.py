@@ -1,4 +1,5 @@
-"""`teams_read_message`: what a read asks Graph for, and what a Teams body really holds."""
+"""Tests for `teams_read_message`: what a read asks Graph for, and what a Teams message body
+really holds."""
 
 import httpx
 import pytest
@@ -20,7 +21,7 @@ _CHANNEL_ID = "19:general@thread.tacv2"
 
 _CHAT_URI = f"teams:///chats/19%3Arelease%40thread.v2/messages/{_MESSAGE_ID}"
 
-# The SDK re-encodes the ids for the URL, so this is what a percent-decoded handle comes back as.
+# The SDK re-encodes the ids for the URL. This is what a percent-decoded handle looks like.
 _CHAT_PATH = f"/chats/19%3Arelease%40thread.v2/messages/{_MESSAGE_ID}"
 _CHANNEL_PATH = f"/teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages/{_MESSAGE_ID}"
 
@@ -29,8 +30,8 @@ _REPLY_PATH = f"{_CHANNEL_PATH}/replies/{_REPLY_ID}"
 
 _CHAT_HANDLE = MessageHandle(message_id=_MESSAGE_ID, chat_id=_CHAT_ID)
 _CHANNEL_HANDLE = MessageHandle(message_id=_MESSAGE_ID, team_id=_TEAM_ID, channel_id=_CHANNEL_ID)
-# A reply is addressed under the post it answers: `reply_to_id` is the parent's id, and
-# `message_id` is the reply's own.
+# A reply is addressed under the post that the reply answers. `reply_to_id` is the id of the
+# parent, and `message_id` is the id of the reply itself.
 _REPLY_HANDLE = MessageHandle(
     message_id=_REPLY_ID, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, reply_to_id=_MESSAGE_ID
 )
@@ -64,8 +65,8 @@ class TestTheRequestItMakes:
     async def test_a_reply_handle_reads_it_under_the_post_it_answers(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A reply's own id beside its siblings is a 404, which is what a search hit on a reply
-        produces."""
+        """The id of a reply, read beside its siblings, gives a 404 error. This is what a search
+        hit on a reply produces."""
         route = graph.get(_REPLY_PATH).mock(
             return_value=httpx.Response(
                 200, json=message_payload(message_id=_REPLY_ID, reply_to_id=_MESSAGE_ID)
@@ -82,8 +83,8 @@ class TestTheRequestItMakes:
     async def test_a_reply_graph_named_no_parent_for_is_still_placed_in_its_thread(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`replyToId` is the message's own property; without the handle's fallback a reply with
-        none would read as a root post."""
+        """`replyToId` is a property of the message itself. Without the fallback in the handle, a
+        reply with no `replyToId` value reads as a root post."""
         _ = graph.get(_REPLY_PATH).mock(
             return_value=httpx.Response(200, json=message_payload(message_id=_REPLY_ID))
         )
@@ -95,9 +96,10 @@ class TestTheRequestItMakes:
     async def test_it_makes_one_request_and_narrows_it_with_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`chatmessage-get` "doesn't support the OData query parameters", so nothing narrows or
-        widens the read. Every other test here mocks by path alone and would keep passing with a
-        query string on the wire and a second request behind it."""
+        """Graph documents `chatmessage-get` as a method that "doesn't support the OData query
+        parameters." So nothing narrows or widens this read. Every other test in this file mocks
+        by path alone. Each one would still pass with a query string on the wire and a second
+        request behind it."""
         route = graph.get(_CHAT_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -120,7 +122,7 @@ class TestTheRequestItMakes:
     async def test_it_asks_for_the_message_type_graph_hides_by_default(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Without this header Graph reports `systemEventMessage` as `unknownFutureValue`."""
+        """Without this header, Graph reports `systemEventMessage` as `unknownFutureValue`."""
         route = graph.get(_CHAT_PATH).mock(return_value=httpx.Response(200, json=message_payload()))
 
         _ = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
@@ -131,10 +133,12 @@ class TestTheRequestItMakes:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """kiota's `RequestConfiguration.headers` defaults to one `HeadersCollection` shared by
-        every configuration in the process, so a header added to the default leaks everywhere.
+        every configuration in the process. A header added to the default leaks into every other
+        request.
 
-        `shared/identity.py`'s `GET /me` is the witness because it passes a `RequestConfiguration`
-        of its own; a call passing none would keep passing while the leak came back.
+        The `GET /me` call in `shared/identity.py` acts as the witness for this test, because it
+        passes its own `RequestConfiguration`. A call that passes none would keep passing even if
+        the leak returned.
         """
         _reads(graph, message_payload())
         profile = graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
@@ -160,7 +164,8 @@ class TestWhatItReportsAboutTheMessage:
     async def test_the_sender_is_the_teams_identity_shape_with_no_email(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`teamworkUserIdentity` has no email property at all, so `user_id` carries the sender."""
+        """`teamworkUserIdentity` has no email property. The `user_id` field identifies the sender
+        instead."""
         _reads(graph, message_payload())
 
         message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
@@ -173,7 +178,7 @@ class TestWhatItReportsAboutTheMessage:
     async def test_a_sender_graph_gave_no_name_is_still_identified(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`displayName` is documented Optional and genuinely absent for federated and external
+        """Microsoft documents `displayName` as optional. It is absent for federated and external
         users."""
         _reads(
             graph,
@@ -198,8 +203,8 @@ class TestWhatItReportsAboutTheMessage:
     async def test_a_bot_is_named_by_its_application(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A bot's id is never `user_id`, which the `mentions` parameter takes and only a person
-        has."""
+        """The id of a bot is never `user_id`. Only a person has a `user_id` value, and the
+        `mentions` argument takes that value."""
         _reads(
             graph,
             message_payload(
@@ -222,7 +227,7 @@ class TestWhatItReportsAboutTheMessage:
     async def test_edits_and_reactions_are_not_confused_for_each_other(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`lastModifiedDateTime` moves when somebody adds a reaction."""
+        """The `lastModifiedDateTime` field changes when a person adds a reaction."""
         _reads(
             graph,
             message_payload(
@@ -268,8 +273,8 @@ class TestReactions:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """`reactions` is a plain property of `chatMessage`, not a navigation property behind its
-        own `$expand`, so it arrives with the same query-less request every other test here
-        makes."""
+        own `$expand`. It arrives with the same query-less request that every other test in this
+        file makes."""
         route = graph.get(_CHAT_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -422,7 +427,7 @@ class TestTheBodyItNormalises:
     async def test_a_mention_with_no_text_of_its_own_is_resolved_from_the_mentions_list(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft documents the `<at>` element's `id` as corresponding to `mentions[].id`."""
+        """Microsoft documents that the `id` of the `<at>` element matches `mentions[].id`."""
         _reads(
             graph,
             message_payload(
@@ -570,11 +575,12 @@ _CARD_ATTACHMENT: dict[str, object] = {
 
 
 class TestWhatCountsAsACard:
-    """A card is attachment metadata, never the shape of the body text.
+    """A card is attachment metadata. It is never the shape of the body text.
 
-    Microsoft marks one in `attachments[].contentType` — `application/vnd.microsoft.card.adaptive`
-    and its siblings — and puts the payload in `attachment.content`. Going by the body text instead
-    reports a developer's pasted JSON as a card and throws their message away.
+    Microsoft marks a card in `attachments[].contentType`, as
+    `application/vnd.microsoft.card.adaptive` or one of its siblings, and puts the payload in
+    `attachment.content`. Do not identify a card by the body text instead. That method reports a
+    developer's pasted JSON as a card, and it discards the message.
     https://learn.microsoft.com/en-us/graph/api/resources/chatmessageattachment
     https://learn.microsoft.com/en-us/microsoftteams/platform/task-modules-and-cards/cards/cards-reference
     """
@@ -607,8 +613,8 @@ class TestWhatCountsAsACard:
     async def test_a_card_attachment_reads_as_a_card_where_its_placeholder_sat(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Teams gives a card no `name`, so only its `contentType` keeps it from reading as an
-        anonymous `[attachment]`."""
+        """Teams gives a card no `name`. Only the `contentType` field keeps the card from reading
+        as an anonymous `[attachment]`."""
         _reads(
             graph,
             message_payload(
@@ -639,10 +645,10 @@ class TestWhatCountsAsACard:
             ("application/vnd.microsoft.card.announcement", "[card]"),
             ("application/vnd.microsoft.teams.card.list", "[card]"),
             ("application/vnd.microsoft.teams.card.o365connector", "[card]"),
-            # The card type Microsoft publishes next: the namespace is the documented shape, so
-            # matching it covers what a table of today's nine values would call `[attachment]`.
+            # This test also covers the next card type that Microsoft publishes. Matching by
+            # namespace does not depend on a fixed list of today's nine values.
             ("application/vnd.microsoft.card.somethingNew", "[card]"),
-            # Not cards.
+            # The following content types are not cards.
             ("reference", "[attachment]"),
             ("forwardedMessageReference", "[attachment]"),
         ],
@@ -720,8 +726,8 @@ class TestWhatCountsAsACard:
     async def test_a_payload_carrying_a_non_breaking_space_is_still_the_card_it_came_from(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The normalisation rewrites Teams' non-breaking spaces, which a card's own layout text
-        carries too, so the body is compared in more than one form."""
+        """The normalization step rewrites the non-breaking spaces from Teams. A card's own layout
+        text can carry these spaces too, so the test compares the body in more than one form."""
         payload = (
             '{"type":"AdaptiveCard","version":"1.4",'
             + '"body":[{"type":"TextBlock","text":"Deploy\xa0build #7?"}]}'
@@ -758,7 +764,7 @@ class TestWhatCountsAsACard:
     async def test_a_payload_graph_escaped_on_its_way_into_the_body_is_still_that_card(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph HTML-escapes a body and never escapes `attachment.content`."""
+        """Graph HTML-escapes the body but never escapes `attachment.content`."""
         payload = (
             '{"type":"AdaptiveCard","version":"1.4",'
             + '"body":[{"type":"TextBlock","text":"Ship & tell <b>everyone</b>"}]}'
@@ -861,8 +867,9 @@ class TestTheMessagesThatHaveNoText:
     async def test_a_system_event_says_what_happened_instead_of_the_literal_tag(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The sentence Teams shows is written by the Teams client and never sent, so
-        `eventDetail`'s type is the only thing naming the event."""
+        """The Teams client writes the sentence that Teams shows, and the client never sends that
+        sentence to the server. So the type of `eventDetail` is the only field that names the
+        event."""
         _reads(
             graph,
             message_payload(
@@ -894,8 +901,9 @@ class TestTheMessagesThatHaveNoText:
                 "#microsoft.graph.conversationMemberRoleUpdatedEventMessageDetail",
                 "conversation member role updated",
             ),
-            # The subtype Microsoft adds next: a table of the 31 that exist today answers
-            # "unknown" to it, and reading the type covers it.
+            # This test also covers the next event subtype that Microsoft adds. A table of the 31
+            # subtypes that exist today has no entry for a new type and answers "unknown" instead.
+            # Reading the `@odata.type` value covers the new subtype.
             ("#microsoft.graph.somethingNewEventMessageDetail", "something new"),
         ],
     )
@@ -945,8 +953,8 @@ class TestTheMessagesThatHaveNoText:
     async def test_a_message_with_no_sender_always_says_what_happened_instead(
         self, client: GraphServiceClient, graph: respx.MockRouter, sender: dict[str, object] | None
     ) -> None:
-        """Graph names no author both with a null `from` and with an identity set holding
-        nobody."""
+        """Graph names no author in two ways: with a null `from` field, and with an identity set
+        that names nobody."""
         _reads(graph, message_payload(sender=sender, content=""))
 
         message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
@@ -968,7 +976,8 @@ class TestTheFailuresItPassesOn:
     async def test_a_message_graph_will_not_return_is_a_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph answers 'deleted', 'never existed' and 'you may not see it' identically."""
+        """Graph gives the same answer for a deleted message, a message that never existed, and a
+        message that the caller cannot see."""
         _ = graph.get(_CHAT_PATH).mock(
             return_value=httpx.Response(
                 404, json={"error": {"code": "NotFound", "message": "Not Found"}}
@@ -995,10 +1004,10 @@ class TestTheRoundTripFromASearchResult:
     async def test_a_hit_from_search_is_read_by_its_own_handle(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Whatever `teams_search_messages` puts in `uri`, `teams_read_message` resolves with no
-        part of it
-        reassembled by hand. Which strings are handles at all is `shared/handles.py`'s question,
-        covered by `TestTheMessageHandleGrammar` in `tests/shared/test_handles.py`.
+        """`teams_read_message` resolves whatever `teams_search_messages` puts in `uri`. No part
+        of the URI is reassembled by hand. The question of which strings count as handles belongs
+        to `shared/handles.py`, and `TestTheMessageHandleGrammar` in `tests/shared/test_handles.py`
+        covers it.
         """
         _ = graph.post("/search/query").mock(
             return_value=httpx.Response(
