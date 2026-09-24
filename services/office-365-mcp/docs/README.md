@@ -1,5 +1,10 @@
 # office-365-mcp
 
+## Documentation Disclaimer
+
+This feature is `EXPERIMENTAL` and under active development. It may change significantly, be
+discontinued, or have breaking changes without notice.
+
 ## Overview
 
 office-365-mcp is a Python MCP server, built on FastMCP, that connects Microsoft 365 to MCP
