@@ -102,7 +102,7 @@ class TestThePersonBeforeThePost:
 
         async def capturing(question: str, about: str) -> Confirmed:
             asked.append(question)
-            assert about == question
+            assert about
             return None
 
         _ = await _send(client, confirm=capturing)
@@ -126,6 +126,27 @@ class TestThePersonBeforeThePost:
         assert len(asked) == 1
         assert _TEAM_ID in asked[0]
         assert _CHANNEL_ID in asked[0]
+
+    def test_the_binding_differs_for_two_messages_with_the_same_120_char_preview(self) -> None:
+        common_prefix = "x" * 120
+
+        first = sender._about(  # pyright: ignore[reportPrivateUsage]
+            common_prefix + " short tail", _TEAM_ID, _CHANNEL_ID
+        )
+        second = sender._about(  # pyright: ignore[reportPrivateUsage]
+            common_prefix + " a very different, much longer tail", _TEAM_ID, _CHANNEL_ID
+        )
+
+        assert first != second
+
+    def test_the_binding_differs_for_the_same_message_to_a_different_channel(self) -> None:
+        first = sender._about(  # pyright: ignore[reportPrivateUsage]
+            _MESSAGE, _TEAM_ID, _CHANNEL_ID
+        )
+        second = sender._about(  # pyright: ignore[reportPrivateUsage]
+            _MESSAGE, _TEAM_ID, "19:other@thread.tacv2"
+        )
+        assert first != second
 
     async def test_the_confirmation_happens_before_the_post(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -211,11 +232,8 @@ def _the_question(answer: object) -> tuple[str, str, str]:
     schema = cast("Mapping[str, object]", params.requested_schema)
     properties = cast("Mapping[str, object]", schema["properties"])
     choices = cast("Sequence[str]", cast("Mapping[str, object]", properties["value"])["enum"])
-    assert answer.request_state == params.message, (
-        "the answer is bound to the question, so an edited message cannot be posted on a stale "
-        + "accept"
-    )
-    return key, params.message, choices[0]
+    assert answer.request_state
+    return key, answer.request_state, choices[0]
 
 
 class TestTheEraWithNoBackChannel:
@@ -272,6 +290,33 @@ class TestTheEraWithNoBackChannel:
             )
 
         assert post.call_count == 0, "a message went out under an answer nobody gave for it"
+
+    async def test_an_accept_for_one_message_cannot_post_a_longer_message_with_the_same_preview(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+        common_prefix = "x" * 120
+        message_a = common_prefix + " short tail"
+        message_b = common_prefix + " a very different, much longer tail than the first one"
+        key, state, agrees_with = _the_question(
+            await _send(client, message=message_a, confirm=a_person_agrees(_modern_context()))
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _send(
+                client,
+                message=message_b,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+            )
+
+        assert post.call_count == 0, "message B went out on an accept given for message A"
 
 
 class TestWhatItAsksGraphFor:

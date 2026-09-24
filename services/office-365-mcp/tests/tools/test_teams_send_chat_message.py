@@ -93,7 +93,7 @@ class TestThePersonBeforeTheSend:
 
         async def capturing(question: str, about: str) -> Confirmed:
             asked.append(question)
-            assert about == question
+            assert about
             return None
 
         _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing)
@@ -116,6 +116,29 @@ class TestThePersonBeforeTheSend:
 
         assert len(asked) == 1
         assert _CHAT_ID in asked[0]
+
+    def test_the_binding_differs_for_two_messages_with_the_same_120_char_preview(self) -> None:
+        """`about` is what a re-called accept is checked against. It must not be built from the
+        truncated, human-readable preview alone: two different full messages that share the same
+        first 120 characters would then bind identically, and an accept meant for one would also
+        cover the other."""
+        common_prefix = "x" * 120
+
+        first = sender._about(  # pyright: ignore[reportPrivateUsage]
+            common_prefix + " short tail", _CHAT_ID
+        )
+        second = sender._about(  # pyright: ignore[reportPrivateUsage]
+            common_prefix + " a very different, much longer tail", _CHAT_ID
+        )
+
+        assert first != second
+
+    def test_the_binding_differs_for_the_same_message_to_a_different_chat(self) -> None:
+        first = sender._about(_MESSAGE, _CHAT_ID)  # pyright: ignore[reportPrivateUsage]
+        second = sender._about(  # pyright: ignore[reportPrivateUsage]
+            _MESSAGE, "19:other@thread.v2"
+        )
+        assert first != second
 
     async def test_the_confirmation_happens_before_the_post(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -201,10 +224,8 @@ def _the_question(answer: object) -> tuple[str, str, str]:
     schema = cast("Mapping[str, object]", params.requested_schema)
     properties = cast("Mapping[str, object]", schema["properties"])
     choices = cast("Sequence[str]", cast("Mapping[str, object]", properties["value"])["enum"])
-    assert answer.request_state == params.message, (
-        "the answer is bound to the question, so an edited message cannot be sent on a stale accept"
-    )
-    return key, params.message, choices[0]
+    assert answer.request_state
+    return key, answer.request_state, choices[0]
 
 
 class TestTheEraWithNoBackChannel:
@@ -277,6 +298,42 @@ class TestTheEraWithNoBackChannel:
             )
 
         assert post.call_count == 0, "a message went out under an answer nobody gave for it"
+
+    async def test_an_accept_for_one_message_cannot_send_a_longer_message_with_the_same_preview(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The exact scenario a truncated-preview binding would miss: message A and message B
+        share the same first 120 characters, so a client reading only the preview cannot tell
+        them apart. An accept given for A must not be replayable to send B."""
+        post = _posts(graph)
+        common_prefix = "x" * 120
+        message_a = common_prefix + " short tail"
+        message_b = common_prefix + " a very different, much longer tail than the first one"
+        key, state, agrees_with = _the_question(
+            await send_chat_message(
+                client,
+                chat_id=_CHAT_ID,
+                message=message_a,
+                confirm=a_person_agrees(_modern_context()),
+            )
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await send_chat_message(
+                client,
+                chat_id=_CHAT_ID,
+                message=message_b,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+            )
+
+        assert post.call_count == 0, "message B went out on an accept given for message A"
 
 
 class TestWhatItAsksGraphFor:

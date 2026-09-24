@@ -1,3 +1,4 @@
+import hashlib
 from collections.abc import Mapping
 from typing import Annotated
 
@@ -50,11 +51,12 @@ async def send_channel_message(
     client: GraphServiceClient, *, team_id: str, channel_id: str, message: str, confirm: Confirm
 ) -> TeamsMessage | InputRequiredResult:
     question = _question(message, team_id, channel_id)
+    about = _about(message, team_id, channel_id)
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME, step=STEP_SEND):
         with not_graph():
-            answer = await confirm(question, question)
+            answer = await confirm(question, about)
         asked = answer if isinstance(answer, InputRequiredResult) else None
         refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
@@ -80,6 +82,10 @@ def _question(message: str, team_id: str, channel_id: str) -> str:
         f"Post {cut_for_a_question(message)!r} to channel {channel_id!r} in team {team_id!r} "
         f"now? {_CANNOT_BE_RECALLED}"
     )
+
+
+def _about(message: str, team_id: str, channel_id: str) -> str:
+    return f"{team_id}:{channel_id}:{hashlib.sha256(message.encode()).hexdigest()}"
 
 
 def _posted(message: str) -> ChatMessage:
