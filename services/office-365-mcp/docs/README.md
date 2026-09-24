@@ -2,8 +2,9 @@
 
 ## Documentation Disclaimer
 
-This feature is `EXPERIMENTAL` and under active development. It may change significantly, be
-discontinued, or have breaking changes without notice.
+> [!WARNING]
+> This feature is `EXPERIMENTAL` and under active development. It may change significantly, be
+> discontinued, or have breaking changes without notice.
 
 ## Overview
 
