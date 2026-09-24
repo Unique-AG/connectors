@@ -609,18 +609,6 @@ class TestTheSchemaItPublishes:
         assert tool is not None, "register left the tool off the server"
         return tool.parameters
 
-    async def test_exactly_one_destination_is_published_as_a_constraint(
-        self, transport: httpx.AsyncClient
-    ) -> None:
-        """FastMCP validates arguments against the signature, so a rule the runtime enforces has to
-        be said in the schema as well or no client can see it."""
-        parameters = await self._tool_schema(transport)
-
-        assert parameters["oneOf"] == [
-            {"required": ["destination"], "not": {"required": ["folder_ref"]}},
-            {"required": ["folder_ref"], "not": {"required": ["destination"]}},
-        ]
-
     async def test_the_bulk_cap_is_published_on_the_batch_itself(
         self, transport: httpx.AsyncClient
     ) -> None:
@@ -634,8 +622,10 @@ class TestTheSchemaItPublishes:
     async def test_only_the_batch_is_required_of_a_client(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The two destinations are alternatives, so neither can be required on its own — the
-        constraint above is what makes one of them compulsory."""
+        """The two destinations are alternatives, so neither can be required on its own — a
+        runtime refusal, not the schema, is what makes one of them compulsory. OpenAI's function
+        schemas forbid a root-level `oneOf`/`anyOf`/`not`, so this constraint cannot be published
+        at all."""
         parameters = await self._tool_schema(transport)
 
         assert parameters["required"] == ["message_refs"]

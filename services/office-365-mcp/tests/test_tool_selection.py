@@ -441,9 +441,8 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
 
 
 def _required_arguments(schema: Mapping[str, object]) -> set[str]:
-    """Not just the top-level `required`: a tool that requires "at least one of these" says it with
-    a `required` inside each branch of an `anyOf`, and reading only the top level would report
-    `teams_search_messages` as requiring nothing at all."""
+    """Not just the top-level `required`: a polymorphic argument can name a field as required only
+    inside one branch of its own nested `anyOf`, and reading only the top level would miss it."""
     found: set[str] = set()
     pending: list[object] = [schema]
     while pending:

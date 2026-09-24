@@ -21,8 +21,6 @@ from uuid import UUID
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from fastmcp.tools import Tool
-from fastmcp.tools import tool as tool_metadata
 from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.generated.models.entity_type import EntityType
 from msgraph.generated.models.search_hit import SearchHit
@@ -330,9 +328,7 @@ def _hit_uri(
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
-    # Two steps rather than `@mcp.tool`, which hands back the function: only `add_tool` returns the
-    # registered tool, whose schema `_require_a_criterion` adds to.
-    @tool_metadata(
+    @mcp.tool(
         name=TOOL_NAME,
         title="Search Teams Messages",
         description=_DESCRIPTION,
@@ -457,14 +453,3 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             offset=offset,
             size=size,
         )
-
-    _require_a_criterion(mcp.add_tool(search_teams_messages))
-
-
-def _require_a_criterion(tool: Tool) -> None:
-    """Put "at least one criterion" in the tool's schema, where a client can enforce it.
-
-    FastMCP validates arguments against the signature rather than against this schema, so the
-    runtime check in the tool stays.
-    """
-    tool.parameters["anyOf"] = [{"required": [name]} for name in CRITERIA]
