@@ -27,7 +27,6 @@ from office_365_mcp.shared.seam import WRITE_ADDITIVE
 from office_365_mcp.tools import outlook_draft_reply as replier
 from office_365_mcp.tools.outlook_draft_reply import MailReplyDraft, MailReplyMode
 
-# A one-pixel GIF, so `content_bytes` decodes into real, if pointless, bytes.
 _TINY_FILE = base64.b64encode(bytes.fromhex("47494638396101000100")).decode()
 
 
@@ -147,9 +146,6 @@ def _attaches(graph: respx.MockRouter, *payloads: dict[str, object]) -> respx.Ro
     return graph.post(f"{_FILL}/attachments").mock(side_effect=responses)
 
 
-# Not a Microsoft host: it stands in for the pre-authenticated `uploadUrl` a real
-# `createUploadSession` would hand back, the same convention
-# `tests/shared/test_attachment_upload.py` uses for its own upload-session tests.
 _UPLOAD_URL = "https://attachment-upload.invalid/session/reply?authtoken=synthetic"
 
 
@@ -176,10 +172,6 @@ def _chunk_route(graph: respx.MockRouter, *, status: int = 201) -> respx.Route:
     )
 
 
-# One byte past `MAX_ATTACHMENT_BYTES`, so a test that wants a genuinely large attachment gets the
-# smallest one that still takes the upload-session path, and stays inside a single chunk
-# (`UPLOAD_CHUNK_BYTES` in `shared/attachment_upload.py` is bigger still) — the chunking mechanics
-# themselves are `tests/shared/test_attachment_upload.py`'s job, not this file's.
 def _large_content() -> bytes:
     return b"a" * (MAX_ATTACHMENT_BYTES + 1)
 
@@ -944,7 +936,6 @@ class TestNewAttachments:
 
         assert [one.name for one in answer.attachments] == ["one.pdf"]
         assert answer.attachment_failure is not None
-        # The draft and its text are unaffected by an attachment that did not land.
         assert answer.body_written is True
 
     async def test_a_refused_attachment_stops_rather_than_trying_the_rest(
@@ -1134,7 +1125,6 @@ class TestLargeAttachmentsGoThroughTheUploadSession:
         assert chunk.call_count == 1, "the failed chunk is never retried"
         assert [one.name for one in answer.attachments] == ["budget.pdf"]
         assert answer.attachment_failure is not None
-        # The draft and its text are unaffected by the attachment that never finished.
         assert answer.body_written is True
 
     async def test_a_second_large_attachment_is_never_attempted_after_the_first_fails(

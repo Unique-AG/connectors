@@ -8,11 +8,8 @@ evidence. Graph ignores an unsupported `$filter` rather than refusing it, so eve
 `conversationId` back and refuses an answer carrying a foreign conversation. There is no
 `$orderby`: beside this `$filter` it answers `InefficientFilter`, so the sort happens here.
 
-**`mailbox` re-points both requests from `/me` to `/users/{id}`.** `Mail.Read.Shared` is
-Microsoft's own permission for reading messages in a shared or delegated mailbox
-(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders); `searched_scope` below
-still names the mailbox that was actually searched, own or delegated, so the caveat about what a
-"complete" thread means stays true of whichever one it is.
+**`mailbox` re-points both requests from `/me` to `/users/{id}`.** `searched_scope` below names
+the mailbox that was actually searched.
 """
 
 from collections.abc import Mapping
@@ -181,8 +178,7 @@ def _answer(found: list[Message], *, complete: bool, mailbox: str | None) -> Mai
 
 
 def _searched_scope(mailbox: str | None) -> str:
-    """`mailbox` is echoed here rather than left implicit: the caller named it, so the one place
-    this answer says what was searched is where a wrong or stale mailbox becomes visible."""
+    """What `read_thread` searched, in words, for the answer's `searched_scope` field."""
     whose = "The signed-in user's own mailbox" if mailbox is None else f"The mailbox {mailbox!r}"
     return (
         f"{whose}, every folder of it including Sent Items, Deleted Items and Junk Email. Not "

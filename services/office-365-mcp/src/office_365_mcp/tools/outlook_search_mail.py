@@ -14,33 +14,11 @@ not reach drafts in Deleted Items, so a window here under-returns where `outlook
 not.
 
 **`mailbox` re-points every request from `/me` to `/users/{id}`, `translateExchangeIds` included.**
-Microsoft's shared-folder walkthrough names `Mail.Read.Shared` as what authorizes the search itself
-(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders). The id exchange needs no
-second permission: Microsoft lists `User.Read` as valid, if not least-privileged, for
-`POST /users/{id}/translateExchangeIds` too, and this file already holds it for the `/me` route.
 
 **`attachment_name` is the only route to an attachment here, and it is a route to its NAME.**
-Investigated: does `$search` on `/me/messages` reach an attachment's own text, the way it reaches
-`from`, `subject` and `body`? No, checked against Microsoft's own reference rather than assumed.
-The searchable-email-property table names `attachment` as "Names of files attached to an email
-message" and nothing else (https://learn.microsoft.com/en-us/graph/search-query-parameter); the
-Exchange KQL property table this file's own `attachment:` clause cites lists the identical
-wording and no second, content-bearing property alongside it
-(https://learn.microsoft.com/en-us/Exchange/policy-and-compliance/ediscovery/message-properties-and-search-operators).
-Unscoped `query` fares no better: the same reference states plainly that a search naming no
-property "targets these default properties: from, subject, and body" — attachment content is not
-among them either way a term reaches this endpoint. The one Graph surface that does read inside an
-attachment is `POST /search/query`, the Microsoft Search API
-(https://learn.microsoft.com/en-us/graph/search-concept-messages: "applies to the body and
-attachments of messages") — which is the same endpoint the top of this file already rules out,
-and for the same reason stated there, now sharper: its own documented "known limitations" say
-"you can access only the signed-in user's own mailbox. Searching delegated mailboxes is not
-supported", and `mailbox` above exists precisely to reach one. Switching this tool to it would
-trade every delegated-mailbox search away for attachment content in the caller's own mailbox
-alone — a different tool's trade, not an extension of this one. So there is no Graph capability
-this tool can reach that indexes attachment content without this connector running its own
-ingestion, which is out of scope; `attachment_name` remains a file-name match and nothing else,
-and `query` never sees inside a file no matter how it is phrased.
+Neither `$search` nor the Microsoft Search API can index attachment content for a delegated
+mailbox from this connector. `attachment_name` matches a file name only. It never searches inside
+a file.
 """
 
 from collections.abc import Mapping
@@ -81,8 +59,6 @@ STEP_SEARCH = "mail_search"
 STEP_IDS = "mail_ids"
 
 # `User.Read` covers the id exchange, which is the only call that 403s without it.
-# `Mail.Read.Shared` is what Microsoft's shared-folder walkthrough names for `mailbox`; see the
-# module docstring for why the id exchange needs no `.Shared` permission of its own.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "User.Read", "Mail.Read.Shared")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
@@ -300,8 +276,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Words to find in the subject or the body — NOT an attachment's text, which "
-                    + "this tool cannot reach; use `attachment_name` for a file's name instead. "
+                    "Words to find in the subject or the body — NOT an attachment's text. This "
+                    + "tool cannot reach that. Use `attachment_name` for a file's name instead. "
                     + "Every word must appear, in any order. Quote a run to require adjacency. "
                     + '`"purchase order"` matches only side by side. `purchase order` matches '
                     + "both words anywhere. This tool reads search operators in this text "

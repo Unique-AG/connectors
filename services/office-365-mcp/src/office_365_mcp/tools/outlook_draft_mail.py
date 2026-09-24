@@ -6,37 +6,16 @@ everything this tool produces stops in the user's Drafts folder, and waits for t
 it, edit it and press Send in Outlook. This is not a policy layered over a sending tool. It is
 the only Graph operation this file makes.
 
-**`attachments` takes bytes already in the call, never a fetch.** Still not a URL, not a file
-path, not a driveItem id: none of those is a shape this file accepts, because each one would have
-this pod reach out and retrieve content nobody here reviewed — an `https://` source fetched from
-inside the cluster, or a store id read against a connector this file otherwise never touches. What
-`attachments` takes instead is `content_bytes`, Graph's own `contentBytes` wire shape: base64 text
-that has to already be sitting in the call, because the caller supplied it or the model
-transcribed it from something already in context. That is strictly less reach than a fetch would
-be — nothing this argument names pulls content in from outside the conversation — but it is not
-nothing: a caller can still hand this base64 that decodes into something harmful, with the user's
-own address on the From line. What still stands between that and a delivered message is the rest
-of this file: there is still no `/send` call under any argument, the attachment lands in a
-*draft* a human opens before anything leaves, and `outlook_send_draft` cannot touch an attachment
-— or any other part of the message — at all. `shared.mail.MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION`
-bounds each file at 150 MB decoded, Microsoft's own ceiling for a single attachment on any Outlook
-item at all (https://learn.microsoft.com/en-us/graph/outlook-large-attachments); a larger file is
-refused before anything reaches Graph.
+**`attachments` takes bytes already in the call, never a fetch.** No URL, file path, or drive id:
+this tool cannot pull content in from outside the conversation. `outlook_send_draft` still cannot
+touch an attachment, or any other part of the message, so a draft always waits for a human to
+press Send.
 
-**A file under `shared.mail.MAX_ATTACHMENT_BYTES` (3 MB decoded) travels inside the create call
-that makes the draft. One at or past it cannot: Microsoft's inline `POST .../attachments` route
-refuses anything that size, and its replacement for a larger file
-(`shared.attachment_upload.upload_attachment`, an upload session) needs a message id to attach
-to — one that does not exist until the create already answered.** So this tool always creates the
-draft first, with only the small attachments if any, and only then, one at a time and in the
-order given, uploads each large attachment against the draft id Graph just returned. TRAP: this
-makes the call non-atomic in a way the single-request path before it never was. If a large
-attachment's upload session, or one of its chunk `PUT`s, is refused, the draft the exception names
-already exists — in the user's Drafts folder, with whichever attachments landed before that
-refusal — and nothing here rolls it back, because there is no Graph call that undoes a create once
-it has answered 201. The exception this file raises for that case says so explicitly: it names the
-draft and says what did and did not attach, rather than leaving the caller to assume nothing
-happened, which every other refusal in this file still correctly promises.
+**A file under `shared.mail.MAX_ATTACHMENT_BYTES` travels inside the create call. A larger one
+uploads in its own call, against the draft id the create already returned.** TRAP: this makes the
+call non-atomic. A refused upload leaves the draft behind, in the user's Drafts folder, with
+whichever attachments landed before it. Nothing here rolls the draft back. The exception this
+file raises for that case names the draft and says what did and did not attach.
 
 **There is no `bcc` argument either.** The draft is reviewed by a human before it leaves, and a
 blind copy is precisely the recipient that review cannot see. Cc is offered because Outlook shows
@@ -64,11 +43,8 @@ The draft is addressed by `outlook:///drafts/{id}`, a handle family of its own. 
 draft the same id space as any other message, so a single family lets a message a reader *found*
 be spelled as a draft, and handed to whatever tool later sends one. See `shared/handles.py`.
 
-**`mailbox` re-points the one write this tool makes from `/me` to `/users/{id}`.**
-`Mail.ReadWrite.Shared` is Microsoft's permission for writing messages in a shared or delegated
-mailbox (https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders). The draft lands
-in that mailbox's own Drafts folder, for a human with access to it to review and send from there
-— this connector still has no `sendMail` call for anyone to reach through this tool.
+**`mailbox` re-points the one write this tool makes from `/me` to `/users/{id}`.** The draft lands
+in that mailbox's own Drafts folder.
 """
 
 from collections.abc import Mapping, Sequence
@@ -224,9 +200,7 @@ class MailDraft(BaseModel):
 @dataclass(frozen=True, slots=True)
 class _HeldBack:
     """One attachment already decoded and bounded, too large for the create call, waiting for
-    `upload_attachment` once the draft it will attach to exists. Keeping the decoded bytes here
-    rather than re-decoding later is what lets `_prepare_attachments` be the only place this file
-    calls `decode_attachment` at all."""
+    `upload_attachment` once the draft it will attach to exists."""
 
     name: str
     content_type: str
@@ -245,16 +219,12 @@ async def draft_mail(
     mailbox: str | None = None,
 ) -> MailDraft:
     """Create one draft with its small attachments, then attach any large ones against the draft
-    id the create returned. See the module docstring for why a large attachment cannot travel
-    inside the create call, and what an upload refused partway through leaves behind."""
+    id the create returned."""
     assert 1 <= len(to) <= MAX_RECIPIENTS, f"the To list is bounded by the schema, got {len(to)}"
     assert len(cc) <= MAX_RECIPIENTS, f"the Cc list is bounded by the schema, got {len(cc)}"
     recipients = _recipients(to, argument="to")
     copies = _recipients(cc, argument="cc")
     inline, held_back = _prepare_attachments(attachments)
-    # `Message.attachments` is typed `list[Attachment] | None`, and `list` is invariant, so
-    # `list[FileAttachment]` is not assignable to it directly. `list[Attachment](inline)` copies
-    # into a freshly, correctly typed list rather than asserting the mismatch away.
     graph_attachments: list[Attachment] = list[Attachment](inline)
     reached = graph_mailbox(client, mailbox)
 
@@ -295,15 +265,8 @@ async def _attach_held_back(
     small: int,
     held_back: Sequence[_HeldBack],
 ) -> list[_HeldBack]:
-    """Each large attachment, in order, against the draft `draft_id` already names.
-
-    Stops and raises at the first refusal rather than skipping ahead to the next file: Graph gives
-    no route to ask "did the rest still land", so continuing past one refusal would turn a
-    transient failure into a silently incomplete attachment list nobody asked for. The draft
-    already exists by the time any of this runs — see the module docstring — so the exception
-    raised here says so, rather than leaving the caller to read a bare Graph failure and assume
-    nothing happened, the way every other refusal in this file still correctly can.
-    """
+    """Each large attachment, in order, against the draft `draft_id` already names. Stops and
+    raises at the first refusal, rather than skipping ahead to the next file."""
     uploaded: list[_HeldBack] = []
     for index, held in enumerate(held_back):
         try:
@@ -366,7 +329,7 @@ def _recipients(addresses: Sequence[str], *, argument: str) -> list[Recipient]:
 
 def _bad_attachment_base64(name: str) -> str:
     return (
-        f"outlook_draft_mail could not attach {name!r}: `content_bytes` was not valid base64, "
+        f"outlook_draft_mail did not attach {name!r}: `content_bytes` was not valid base64, "
         + "so there is no file inside it to attach. No draft was created. Base64-encode the "
         + "file's own bytes and call again."
     )
@@ -376,7 +339,7 @@ def _attachment_too_large(name: str, size: int) -> str:
     mb = size / (1024 * 1024)
     ceiling = MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION // (1024 * 1024)
     return (
-        f"outlook_draft_mail could not attach {name!r}: decoded, it is {mb:.1f} MB, at or past "
+        f"outlook_draft_mail did not attach {name!r}: decoded, it is {mb:.1f} MB, at or past "
         + f"the {ceiling} MB ceiling Microsoft publishes for a single attachment on any Outlook "
         + "item at all, inline or not "
         + "(https://learn.microsoft.com/en-us/graph/outlook-large-attachments). No draft was "
@@ -388,17 +351,8 @@ def _prepare_attachments(
     attachments: Sequence[MailAttachmentInput],
 ) -> tuple[list[FileAttachment], list[_HeldBack]]:
     """Every attachment, decoded and bounded, split into what the create call embeds directly and
-    what waits for `upload_attachment` once the draft exists — the same `MAX_ATTACHMENT_BYTES`
-    line `upload_attachment` itself splits on, so nothing calling it ever takes the inline branch
-    it also offers.
-
-    Raises `ToolError` rather than asserting on a bad entry: `content_bytes` is a `str` in the
-    schema, so a model can pass text that is not valid base64, or bytes past Graph's own ceiling,
-    and neither is a mistake the schema catches on its own — unlike the list's own length, which
-    `assert` below states as already guaranteed. Every entry is decoded and bounded before either
-    Graph call runs, so a bad entry anywhere in the list is refused with no draft created, small or
-    large alike.
-    """
+    what waits for `upload_attachment` once the draft exists. Raises `ToolError` on a bad entry,
+    rather than asserting: a caller can pass text that is not valid base64."""
     assert len(attachments) <= MAX_ATTACHMENTS, (
         f"attachments is bounded by the schema, got {len(attachments)}"
     )
@@ -428,11 +382,8 @@ def _prepare_attachments(
 
 
 def _answer(draft: Message, inline: list[FileAttachment], uploaded: list[_HeldBack]) -> MailDraft:
-    """Everything but `attachments` comes off `draft`, Graph's 201 body, and nothing off the
-    request. `attachments` is the one exception, and the class docstring says why. `uploaded`
-    comes off what this file already knows it sent, the same way `inline` does — `upload_attachment`
-    returns nothing to read back, because Graph's own attachment shape for a session-uploaded file
-    carries nothing this file did not already have before making the call."""
+    """Everything but `attachments` comes off `draft`, Graph's 201 body. `attachments` comes off
+    what this file already knows it sent, since `upload_attachment` returns nothing to read back."""
     assert draft.id is not None, "Graph created a draft it gave no id, which cannot be addressed"
     return MailDraft(
         uri=MailDraftHandle(draft.id).uri,
@@ -535,7 +486,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        # Same reasoning as `cc`'s default: declared on the `Field`, not the signature.
         attachments: Annotated[
             list[MailAttachmentInput],
             Field(default=[], max_length=MAX_ATTACHMENTS, description=ATTACHMENTS_FIELD),

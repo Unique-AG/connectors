@@ -49,30 +49,17 @@ PREVIEW_CHARACTERS = 255
 ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
 # Shared by outlook_draft_mail and outlook_draft_reply, the only two tools that attach a file.
-# `outlook_send_draft` needs neither: it cannot touch an attachment at all, by the same absent-
-# argument control it applies to everything else about the message.
 MAX_ATTACHMENTS = 10
 
-# Microsoft's own ceiling for a `fileAttachment` added through a single `POST .../attachments`
-# call, the cheapest of the two ways this connector attaches a file: "This operation limits the
-# size of the attachment you can add to under 3 MB"
-# (https://learn.microsoft.com/en-us/graph/outlook-large-attachments). Measured against the
-# DECODED bytes, which is what that ceiling counts; a caller's base64 text runs a third longer. A
-# file at or over this line still attaches — see `MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION` — just
-# not through this single call.
+# Microsoft's ceiling for a `fileAttachment` added through a single `POST .../attachments` call.
+# Measured against the decoded bytes.
 MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024
 
-# Microsoft's own ceiling for a single attachment on a message at all, inline or not: "you can
-# attach files up to 150 MB to an Outlook message or event item"
-# (https://learn.microsoft.com/en-us/graph/outlook-large-attachments). A file from
-# `MAX_ATTACHMENT_BYTES` up to this line attaches through an upload session instead of the single
-# inline call — `shared.attachment_upload.upload_attachment` is what carries either path out, and
-# the split is invisible above that function. Measured against the same DECODED bytes as
-# `MAX_ATTACHMENT_BYTES`.
+# Microsoft's ceiling for a single attachment on a message, inline or not. A file from
+# `MAX_ATTACHMENT_BYTES` up to this line attaches through an upload session instead.
 MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION = 150 * 1024 * 1024
 
-# Reused verbatim by both attaching tools, for the reason `MAILBOX_FIELD` in `shared/seam.py` is:
-# one text every caller agrees with, not one chance per tool to drift from the other.
+# Reused verbatim by both attaching tools, so the text stays in sync between them.
 ATTACHMENTS_FIELD: str = (
     f"Files to attach, at most {MAX_ATTACHMENTS}. Each entry is Graph's own small-attachment "
     + "shape: `name` (the file name shown to the recipient), `content_type` (a MIME type, for "
@@ -138,20 +125,10 @@ class MailAttachmentSummary(BaseModel):
 
 
 def decode_attachment(content_bytes: str) -> bytes | None:
-    """`content_bytes` as the raw bytes Graph's `fileAttachment.contentBytes` wants, or `None`
-    when it is not valid base64.
-
-    `validate=True` refuses a string with non-alphabet characters rather than silently discarding
-    them, which is what plain `base64.b64decode` does: a caller's corrupted or truncated base64
-    would otherwise decode into fewer, wrong bytes instead of failing here, at the one point that
-    can still refuse before anything reaches Graph.
-    """
+    """The raw bytes `content_bytes` decodes to, or `None` when it is not valid base64."""
     try:
         return base64.b64decode(content_bytes, validate=True)
     except ValueError:
-        # `binascii.Error` is a `ValueError` subclass, which is what `validate=True` raises for
-        # non-alphabet characters; a bare string with no valid characters at all raises the plain
-        # base `ValueError` instead, so both are caught here rather than the narrower type alone.
         return None
 
 

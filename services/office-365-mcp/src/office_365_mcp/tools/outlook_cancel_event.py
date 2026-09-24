@@ -2,19 +2,14 @@
 
 - One permission, and no narrower one Microsoft offers: `Calendars.ReadWrite`
   (https://learn.microsoft.com/en-us/graph/api/event-cancel).
-- Only the organizer may call this: "An attendee calling this action gets an error (HTTP 400 Bad
-  Request)... 'You need to be an organizer to cancel a meeting.'" (event-cancel). This tool reads
-  the event first and refuses in its own words when `isOrganizer` already says no, rather than
-  spending a call to relay Microsoft's.
-- Cancel "moves the event to the Deleted Items folder" and, with any attendee on it, "allows the
-  organizer to send a custom message to the attendees about the cancellation" (event-cancel) — a
-  message this connector cannot recall once it is sent. An event with nobody on it notifies
-  nobody, and this tool skips the question for exactly that case, the same rule
-  `outlook_create_event` uses for when to ask.
-- The response is `202 Accepted` with an empty body (event-cancel), so everything this tool answers
-  with is read BEFORE the cancel, not after it. The SDK retries `POST` three times on 429, 503 and
-  504 by default; a retried cancel of an event that already went can mail attendees the
-  cancellation message twice, so this call carries `no_retry()`.
+- Only the organizer can call this. This tool reads the event first and refuses in its own words
+  when `isOrganizer` already says no.
+- Cancel moves the event to Deleted Items and, with any attendee on it, sends a cancellation
+  message this connector cannot recall. An event with nobody on it notifies nobody, so this tool
+  skips the question for that case.
+- The response is `202 Accepted` with an empty body, so everything this tool answers with is read
+  before the cancel. This call carries `no_retry()`, because a retried cancel can mail attendees
+  the cancellation message twice.
 """
 
 from collections.abc import Mapping
@@ -147,11 +142,7 @@ async def cancel_event(
     comment: str | None = None,
     confirm: Confirm,
 ) -> CancelledEvent | InputRequiredResult:
-    """Read the event, ask a person when cancelling it would notify anybody, then cancel it.
-
-    A connection with no server-to-client channel cannot answer inside the call: `confirm` hands the
-    question back and this returns it, for the client to put to a person and call again with.
-    """
+    """Read the event, ask a person when cancelling it notifies anybody, then cancel it."""
     handle = event_handle(uri)
     if handle is None:
         raise ToolError(_NOT_A_HANDLE)
@@ -179,8 +170,6 @@ async def cancel_event(
                     )
                 )
 
-    # Raised outside the block on purpose: `graph_errors` records an escaping `ToolError` as a Graph
-    # operation that failed for a reason it cannot describe, and a refusal is not one.
     if asked is not None:
         return asked
     if refused is not None:

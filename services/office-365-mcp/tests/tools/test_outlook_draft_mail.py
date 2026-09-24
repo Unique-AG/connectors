@@ -25,11 +25,8 @@ from office_365_mcp.shared.seam import WRITE_ADDITIVE
 from office_365_mcp.tools import outlook_draft_mail as drafter
 from office_365_mcp.tools.outlook_draft_mail import MailDraft
 
-# A one-pixel GIF, so `content_bytes` decodes into real, if pointless, bytes.
 _TINY_FILE = base64.b64encode(bytes.fromhex("47494638396101000100")).decode()
 
-# At `MAX_ATTACHMENT_BYTES` exactly, which `_prepare_attachments` holds back rather than embeds —
-# see its own boundary, `< MAX_ATTACHMENT_BYTES` for the inline path.
 _LARGE_FILE = base64.b64encode(b"x" * MAX_ATTACHMENT_BYTES).decode()
 
 

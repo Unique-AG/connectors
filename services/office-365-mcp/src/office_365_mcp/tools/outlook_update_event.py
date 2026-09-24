@@ -1,21 +1,15 @@
 """`outlook_update_event` — PATCH one field or several on an event the signed-in user organizes.
 
-- One permission covers the whole surface: Microsoft names `Calendars.ReadWrite` for every property
-  this PATCH can touch, with no narrower one (https://learn.microsoft.com/en-us/graph/api/event-update).
-- "In the request body, supply *only* the values for properties to update. Existing properties
-  that aren't included in the request body maintain their previous values" (event-update). So a
-  parameter left out of this call must reach Graph as an absent key and never as an explicit null,
-  which is the same None-is-omitted mechanic `shared/calendar.py::event_patch_body` documents.
+- One permission covers the whole surface: `Calendars.ReadWrite`, with no narrower one.
+- A property this PATCH omits keeps its previous value, on the same None-is-omitted mechanic
+  `shared/calendar.py::event_patch_body` documents.
 - `attendees` is the one property where that mechanic is not enough on its own: Microsoft replaces
   the WHOLE collection with whatever this call sends, so `attendees` and `optional_attendees` are
-  accepted only together, as the caller's complete desired list — never as an edit to one entry.
-  Sending it at all also drops any `resource` attendee (a room) that this connector never added,
-  unless this tool carries the room forward itself; `event_patch_body` cannot know about it, so this
-  file reads it off the event first and reattaches it.
-- The SDK retries `PATCH` three times on 429, 503 and 504 exactly as it retries `POST`, and
-  Microsoft documents no transactionId for update — there is nothing to deduplicate against — so
-  a retried timeout can hand attendees a second "this meeting changed" email for a PATCH that
-  already landed. Hence `no_retry()`, the same defense `outlook_create_event` uses.
+  accepted only together, as the caller's complete desired list. Sending it also drops any
+  `resource` attendee (a room), unless this tool carries it forward itself.
+- The SDK retries `PATCH` three times on 429, 503 and 504, and Microsoft documents no
+  transactionId for update, so a retried timeout can hand attendees a second "this meeting
+  changed" email. Hence `no_retry()`.
 """
 
 from collections.abc import Mapping, Sequence
@@ -140,8 +134,8 @@ _TIME_TRIO_INCOMPLETE = (
 _ATTENDEE_LISTS_INCOMPLETE = (
     "outlook_update_event was given `attendees` or `optional_attendees` without the other. "
     + "NOTHING WAS CHANGED. Microsoft replaces the WHOLE attendee collection with whatever this "
-    + "call sends, so a partial list here would silently drop whoever is only in the list you "
-    + "left out. Pass both lists together as the full desired set — call outlook_read_event "
+    + "call sends, so a partial list here silently drops whoever is only in the list you left "
+    + "out. Pass both lists together as the full desired set — call outlook_read_event "
     + "first and copy its `attendees` if you only mean to change one of them — or omit both to "
     + "leave attendees untouched."
 )
@@ -163,7 +157,7 @@ _BACKWARD_TIMES = (
 )
 
 _TOO_LONG = (
-    f"outlook_update_event refused this because it would run longer than {MAX_TIMED_EVENT_HOURS} "
+    f"outlook_update_event refused this because it runs longer than {MAX_TIMED_EVENT_HOURS} "
     + "hours, which is almost always a wrong argument. NOTHING WAS CHANGED. Read the two times "
     + "back to the user and ask which one is wrong."
 )
@@ -225,11 +219,7 @@ async def update_event(
     optional_attendees: Sequence[str] | None = None,
     confirm: Confirm,
 ) -> UpdatedEvent | InputRequiredResult:
-    """Read the event, ask a person when the change reaches anybody, then PATCH only what changed.
-
-    A connection with no server-to-client channel cannot answer inside the call: `confirm` hands the
-    question back and this returns it, for the client to put to a person and call again with.
-    """
+    """Read the event, ask when the change reaches anybody, then PATCH only what changed."""
     handle = event_handle(uri)
     if handle is None:
         raise ToolError(_NOT_A_HANDLE)
@@ -303,8 +293,6 @@ async def update_event(
                     )
                 )
 
-    # Raised outside the block on purpose: `graph_errors` records an escaping `ToolError` as a Graph
-    # operation that failed for a reason it cannot describe, and a refusal is not one.
     if asked is not None:
         return asked
     if refused is not None:
@@ -343,11 +331,9 @@ def _moment(argument: str, value: str) -> datetime:
 
 
 def _place(location: str | None) -> str | None:
-    """`None` means "leave the location untouched" all the way down to `event_patch_body`, which
-    omits the wire key for it — the same None-is-omitted rule `EventPatch` uses everywhere else.
-    A location of only whitespace is refused rather than read as "clear it", because that would
-    need this tool to send an explicit null Microsoft's PATCH contract never promises clears the
-    property, rather than merely leaving it unset — unverified behavior this tool does not ship."""
+    """`None` means "leave the location untouched". A location of only whitespace is refused
+    rather than read as "clear it": Microsoft's PATCH contract never promises that an explicit
+    null clears the property, and this tool does not ship that unverified behavior."""
     if location is None:
         return None
     stripped = location.strip()
@@ -378,9 +364,7 @@ def _invited_once(required: tuple[str, ...], optional: tuple[str, ...]) -> None:
 
 def _patched(patch: EventPatch, *, before: Event) -> Event:
     """`event_patch_body` builds the wire body from what the caller named. A room this connector
-    never added is not one of those names, so it is carried forward here, after that body exists,
-    rather than being folded into `event_patch_body` itself — the shared builder has no way to know
-    about an event it was never handed."""
+    never added is not one of those names, so it is carried forward here instead."""
     body = event_patch_body(patch)
     if patch.attendees is not None:
         rooms = resource_addresses(before)
@@ -394,10 +378,8 @@ def _patched(patch: EventPatch, *, before: Event) -> Event:
 
 
 def _reaches_an_attendee(body: Event, *, before: Event) -> bool:
-    """Whether this PATCH, as built, notifies anybody who is not the signed-in user: a location
-    newly set can reach a bookable room's mailbox even with nobody invited, exactly as it can on a
-    create, and any attendee this event has — before this call or because of it — is mailed about
-    whatever else this call changes."""
+    """Whether this PATCH, as built, notifies anybody who is not the signed-in user. A newly set
+    location can reach a bookable room's mailbox even with nobody invited."""
     if body.location is not None:
         return True
     final_attendees = body.attendees if body.attendees is not None else before.attendees
@@ -537,7 +519,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 max_length=MAX_ATTENDEES,
                 description=(
-                    "The FULL required-attendee list this event should now have, one SMTP "
+                    "The FULL required-attendee list this event must now have, one SMTP "
                     + "address per entry. Required together with `optional_attendees`; omit "
                     + "both to leave attendees untouched."
                 ),
@@ -548,7 +530,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 max_length=MAX_ATTENDEES,
                 description=(
-                    "The FULL optional-attendee list this event should now have, under the "
+                    "The FULL optional-attendee list this event must now have, under the "
                     + "same rule as `attendees`."
                 ),
             ),

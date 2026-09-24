@@ -60,17 +60,9 @@ means nothing in particular.
 **No blind copy is read or reported**, which matches the draft this sends: `outlook_draft_mail`
 declares no `bcc` argument at all, so a draft that reaches here has none to report.
 
-**`mailbox` re-points both requests from `/me` to `/users/{id}`, and the pre-read is why this file
-declares `Mail.Read.Shared` rather than a `.Shared` twin of `Mail.ReadBasic`.** Microsoft never
-published `Mail.ReadBasic.Shared`
-(https://learn.microsoft.com/en-us/graph/permissions-reference) — `Mail.ReadBasic` has no `.Shared`
-counterpart at all — so the least-privileged permission this file can hold for the pre-read of a
-message in another mailbox is `Mail.Read`'s own shared variant, one step up from what it costs to
-read the signed-in user's own draft. The send itself is `Mail.Send.Shared`
-(https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user), and Exchange still
-requires Full Access on `mailbox` together with Send As or Send on Behalf, which this connector
-cannot see. `draft_ref` must name a draft in `mailbox` — a handle `outlook_draft_mail` or
-`outlook_draft_reply` minted for a different mailbox 404s here, the same as any other stale handle.
+**`mailbox` re-points both requests from `/me` to `/users/{id}`.** Microsoft publishes no
+`Mail.ReadBasic.Shared`, so the pre-read of another mailbox's draft asks for `Mail.Read.Shared`
+instead. `draft_ref` must name a draft already in `mailbox`.
 """
 
 from collections.abc import Awaitable, Callable, Mapping
@@ -109,8 +101,6 @@ TOOL_NAME = "outlook_send_draft"
 STEP_READ_DRAFT = "read_draft"
 STEP_SEND_DRAFT = "send_draft"
 
-# `Mail.Read.Shared`, not a `.Shared` twin of `Mail.ReadBasic`: Microsoft publishes no
-# `Mail.ReadBasic.Shared`. See the module docstring.
 GRAPH_PERMISSIONS: tuple[str, ...] = (
     "Mail.Send",
     "Mail.ReadBasic",

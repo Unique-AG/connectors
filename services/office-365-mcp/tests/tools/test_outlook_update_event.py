@@ -174,8 +174,6 @@ class TestWhatItSendsToGraph:
 
         _ = await _update(client, subject="Renamed")
 
-        # `Event` always writes its own `@odata.type` discriminator alongside whatever this tool
-        # actually asked to change.
         sent = _sent(patch)
         assert sent == {"subject": "Renamed", "@odata.type": "#microsoft.graph.event"}
 

@@ -294,9 +294,6 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_draft_reply",
         "outlook_send_draft",
     ),
-    # `outlook_list_categories` asks for `MailboxSettings.Read` alone, the identical permission
-    # `outlook_get_mailbox_settings` already asks for — a category list is mailbox configuration,
-    # not mail content, so it belongs on this row rather than widening `outlook-read`'s ask.
     "outlook-mailbox": ("outlook_get_mailbox_settings", "outlook_list_categories"),
     "outlook-automate": (
         "outlook_get_mailbox_settings",

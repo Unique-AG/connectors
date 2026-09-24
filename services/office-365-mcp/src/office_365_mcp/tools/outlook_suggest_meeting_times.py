@@ -1,26 +1,19 @@
 """`outlook_suggest_meeting_times` — ask Microsoft to propose times, read-only.
 
-- `Calendars.Read.Shared` is Microsoft's own least-privileged permission for this call
-  (https://learn.microsoft.com/en-us/graph/api/user-findmeetingtimes) — ABOVE plain `Calendars.Read`
-  in Microsoft's own least-to-most-privileged ordering, unlike every other read tool this connector
-  has, because `findMeetingTimes` checks attendees' calendars and not only the signed-in user's own.
-- `findMeetingTimes` "assumes that any attendee who is a person is always required" (same page): the
-  `type` this tool sends on each attendee is Microsoft's own signal for a room or resource, not a
-  finer-grained required/optional split of people the way an event invitation has one.
-- A run with static inputs against static calendar data can still answer differently on a later
-  call: "the algorithm... undergoes fine-tuning from time to time" (same page). This tool reports
-  Microsoft's ranking as Microsoft gave it and orders nothing itself.
-- This is a query with no side effect: retrying it costs another Graph call and nothing else, so
-  unlike every write tool in this file, nothing here carries `no_retry()`.
+- `Calendars.Read.Shared` is Microsoft's own least-privileged permission for this call, because
+  `findMeetingTimes` checks attendees' calendars and not only the signed-in user's own.
+- `findMeetingTimes` assumes any attendee who is a person is always required: the `type` this
+  tool sends on each attendee is Microsoft's own signal for a room or resource, not a
+  required/optional split of people.
+- A run with static inputs can still answer differently on a later call, since Microsoft's ranking
+  algorithm changes over time. This tool reports Microsoft's ranking as given and orders nothing
+  itself.
+- This is a query with no side effect, so nothing here carries `no_retry()`.
 
 TRAP: `meetingDuration` reaches the wire as a plain ISO 8601 string (`"PT45M"`), never as a
-`datetime.timedelta`, although the generated `meeting_duration` field is typed
-`Optional[timedelta]`. kiota's writer formats an actual `timedelta` with Python's own `str()` —
-45 minutes becomes `"0:45:00"` — which is not the ISO 8601 duration Microsoft's `Edm.Duration` and
-which Microsoft's own Python sample sends (`meeting_duration = "PT1H"`,
-https://learn.microsoft.com/en-us/graph/api/user-findmeetingtimes). The writer's other branch
-accepts and validates a string instead, so this file sends that form and the generated type hint is
-overridden at the one call site that needs it, rather than trusted.
+`datetime.timedelta`, although the generated field is typed `Optional[timedelta]`. kiota's writer
+formats an actual `timedelta` with Python's own `str()`, which is not ISO 8601. This file sends
+the string form instead, and overrides the generated type hint at that one call site.
 """
 
 from collections.abc import Mapping, Sequence
@@ -290,7 +283,6 @@ async def suggest_meeting_times(
                         )
                     ],
                 ),
-                # str, not timedelta: see the TRAP in this module's docstring.
                 meeting_duration=f"PT{duration_minutes}M",  # pyright: ignore[reportArgumentType]
                 is_organizer_optional=is_organizer_optional,
                 max_candidates=max_candidates,
@@ -387,8 +379,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        # The default lives in the `Field` rather than in the signature: a `[]` parameter default is
-        # one list shared for the life of the process, and pydantic copies this one per call.
         optional_attendees: Annotated[
             list[str],
             Field(

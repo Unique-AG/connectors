@@ -1,20 +1,12 @@
 """`outlook_check_availability` — free/busy for one or more mailboxes over one window, read-only.
 
-- `Calendars.ReadBasic` is Microsoft's own least-privileged permission for this call, ABOVE
-  `Calendars.Read` and `Calendars.ReadWrite` in privilege but sufficient on its own
-  (https://learn.microsoft.com/en-us/graph/api/calendar-getschedule) — the one delegated
-  permission this connector had not already declared for another calendar tool, so it is new to
-  `shared/seam.py::REQUESTABLE_PERMISSIONS` in this change.
-- No `Prefer: outlook.timezone` header is sent, so every slot Microsoft answers with is in UTC
-  regardless of the zone this call asked its window in — the same choice `outlook_list_events`
-  makes, for the same reason: the zone conversion lives in `shared/calendar.py::event_time`, not in
-  a header Exchange might or might not honor.
+- `Calendars.ReadBasic` is Microsoft's own least-privileged permission for this call.
+- No `Prefer: outlook.timezone` header is sent, so every slot Microsoft answers with is in UTC.
+  The zone conversion lives in `shared/calendar.py::event_time` instead.
 - A slot's `subject`, `location` and `isPrivate` describe somebody ELSE's calendar entry, read
   without that person's own consent screen. Report only the free/busy status unless the caller is
-  checking their own address, the same caution `outlook_list_events` documents for a shared
-  calendar's private items.
-- This is a query with no side effect: retrying it costs nothing beyond another Graph call, so
-  unlike every write tool in this file, nothing here carries `no_retry()`.
+  checking their own address.
+- This is a query with no side effect, so nothing here carries `no_retry()`.
 """
 
 from collections.abc import Mapping, Sequence
@@ -158,7 +150,7 @@ class FreeBusySlot(BaseModel):
 
 
 class ScheduleError(BaseModel):
-    """Why Microsoft could not read one address's schedule, reported instead of that address's
+    """Why Microsoft did not read one address's schedule, reported instead of that address's
     availability."""
 
     response_code: str | None = Field(description="Microsoft's own code for the failure.")
@@ -166,7 +158,7 @@ class ScheduleError(BaseModel):
 
 
 class MailboxSchedule(BaseModel):
-    """One address from `addresses`, and what Microsoft could read about it over the window."""
+    """One address from `addresses`, and what Microsoft read about it over the window."""
 
     address: str = Field(description="The address this row answers for, echoed from the request.")
     availability_view: str | None = Field(
@@ -178,12 +170,12 @@ class MailboxSchedule(BaseModel):
     items: list[FreeBusySlot] = Field(
         description=(
             "Individual calendar entries inside the window. An empty list means Microsoft "
-            + "found nothing scheduled, not that the address could not be read — check `error`."
+            + "found nothing scheduled, not that the address was unreadable — check `error`."
         )
     )
     error: ScheduleError | None = Field(
         description=(
-            "Set when Microsoft could not read this address's schedule at all — commonly an "
+            "Set when Microsoft did not read this address's schedule at all — commonly an "
             + "address outside this tenant, or one the signed-in user has no free/busy access "
             + "to. `items` is empty and uninformative when this is set."
         )

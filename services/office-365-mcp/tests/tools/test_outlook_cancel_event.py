@@ -137,9 +137,6 @@ class TestWhatItSendsToGraph:
 
         _ = await _cancel(client, comment="Cancelling for this week")
 
-        # `CancelPostRequestBody.serialize` writes the key "Comment", capitalized, matching
-        # Microsoft's own HTTP example on this one action (event-cancel) though not on the other
-        # three this connector calls.
         assert _sent(cancel)["Comment"] == "Cancelling for this week"
 
     async def test_no_comment_is_omitted_rather_than_sent_as_null(

@@ -1,33 +1,14 @@
 """`outlook_list_categories` — the master category list this mailbox tags mail, events and
 contacts with: every name Outlook offers, paired with the color shown beside it.
 
-- `GET /me/outlook/masterCategories` returns the categories the signed-in user has defined, each
-  an `outlookCategory` of `displayName` and `color`
-  (https://learn.microsoft.com/en-us/graph/api/outlookuser-list-mastercategories). Microsoft
-  documents `displayName` itself as "a unique name that identifies a category in the user's
-  mailbox" — the name is the key, not a label beside one.
-- `categories` on a message, event or contact — the `outlookItem` base type all three inherit — is
-  a plain string collection (https://learn.microsoft.com/en-us/graph/api/resources/outlookitem),
-  and Outlook populates it with that same `displayName`, never with `masterCategories`' own `id`.
-  So `name` below is what a caller writes back to assign a category; this tool does not report the
-  id, which identifies nothing else in this connector.
-- TRAP: `color` deserializes to `CategoryColor`, an enum kiota mixes `str` into without making it a
-  `StrEnum`. Its inherited `__str__` answers `CategoryColor.Preset3`, not `preset3` — the same trap
-  `shared/calendar.py`'s `spelled` exists for, on a different enum family. `str.__str__(color)` is
-  what reads the value Microsoft actually sent, confirmed against a live import of this SDK.
+- `name` is what a caller writes back to assign a category. This tool does not report an id;
+  Microsoft documents `displayName` itself as the unique, unchangeable key.
+- TRAP: `color` deserializes to `CategoryColor`, an enum kiota mixes `str` into without making it
+  a `StrEnum`. Its inherited `__str__` answers `CategoryColor.Preset3`, not `preset3`.
+  `str.__str__(color)` reads the value Microsoft actually sent.
 
-**This tool takes no `mailbox` argument.** `GET /users/{id}/outlook/masterCategories` is a
-documented URL, but Microsoft's own permissions table for this exact call lists only
-`MailboxSettings.Read`, delegated, with every higher-privileged alternative "Not available"
-(https://learn.microsoft.com/en-us/graph/api/outlookuser-list-mastercategories) — there is no
-`.Shared` sibling of `MailboxSettings.Read` to ask a tenant to consent to, on this permission or on
-`MailboxSettings.ReadWrite`. `outlook_get_mailbox_settings`, which reads this identical endpoint
-for a different purpose, documents the practical consequence in its own module docstring:
-delegated `MailboxSettings.Read` against another user's `{id}` answers 403 regardless of Full
-Access, application permissions being the only documented route to someone else's categories, and
-this connector's On-Behalf-Of design never holds one. A `mailbox` argument here would be silently
-unreachable, for the same reason `outlook_get_mailbox_settings`, `outlook_set_automatic_reply` and
-`outlook_disable_mail_rule` take none.
+**This tool takes no `mailbox` argument.** Microsoft publishes no `.Shared` variant of
+`MailboxSettings.Read`, for the same reason `outlook_get_mailbox_settings` takes none.
 """
 
 from collections.abc import Mapping
@@ -50,20 +31,14 @@ TOOL_NAME = "outlook_list_categories"
 
 STEP = "categories"
 
-# The one delegated permission Microsoft documents for this call — see the module docstring for
-# why no `.Shared` variant exists to add beside it.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.Read",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
-# Far above what a mailbox holds in practice: categories are a hand-made list, and
-# `outlook_get_mailbox_settings` uses this same bound for the identical collection.
 MAX_CATEGORIES = 500
 
 _CATEGORY_FIELDS: tuple[str, ...] = ("displayName", "color")
 
-# Bound rather than aliased with `type`. This name serves as the query parameters' constructor and
-# also as `RequestConfiguration`'s type argument, and a `TypeAliasType` is not callable.
 _CategoriesQuery = MasterCategoriesRequestBuilder.MasterCategoriesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\

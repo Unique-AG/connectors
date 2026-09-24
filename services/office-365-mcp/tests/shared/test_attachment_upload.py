@@ -120,9 +120,6 @@ class TestTheUploadSessionPath:
     async def test_a_large_file_is_split_into_correctly_sized_chunks(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        # One full chunk plus a short remainder: not a multiple of UPLOAD_CHUNK_BYTES, and still
-        # well past MAX_ATTACHMENT_BYTES, so this exercises the session path with a genuinely
-        # uneven final chunk.
         total = UPLOAD_CHUNK_BYTES + 1_000
         content = _bytes(total)
         _session_route(graph)
@@ -140,8 +137,6 @@ class TestTheUploadSessionPath:
         assert second.headers["Content-Length"] == "1000"
         assert second.headers["Content-Range"] == f"bytes {UPLOAD_CHUNK_BYTES}-{total - 1}/{total}"
         assert second.content == content[UPLOAD_CHUNK_BYTES:]
-        # Forced on every chunk regardless of the file's own MIME type — Microsoft's documented
-        # requirement for this endpoint, not something either caller's `content_type` overrides.
         assert first.headers["Content-Type"] == "application/octet-stream"
         assert second.headers["Content-Type"] == "application/octet-stream"
 
@@ -170,6 +165,4 @@ class TestTheUploadSessionPath:
         with pytest.raises(GraphFailure):
             await _upload(client, transport, content=_bytes(total))
 
-        # Stopped at the first refusal rather than sending the second chunk over a session Graph
-        # already rejected.
         assert chunks.call_count == 1

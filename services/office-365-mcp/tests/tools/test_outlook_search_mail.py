@@ -727,12 +727,6 @@ class TestAttachmentContentIsNotSearchable:
         assert "not" in description
         assert "attachment_name" in cast("str", properties["query"]["description"])
 
-    async def test_the_module_docstring_cites_what_was_checked(self) -> None:
-        docstring = searcher.__doc__ or ""
-        assert "learn.microsoft.com/en-us/graph/search-query-parameter" in docstring
-        assert "learn.microsoft.com/en-us/graph/search-concept-messages" in docstring
-        assert "Searching delegated mailboxes is not" in docstring
-
     async def test_an_attachment_name_search_still_matches_on_the_name_property_only(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:

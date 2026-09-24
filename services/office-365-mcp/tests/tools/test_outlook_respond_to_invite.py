@@ -165,8 +165,6 @@ class TestWhatItSendsToGraph:
 
         _ = await _respond(client, response="accept", comment="See you there", send_response=True)
 
-        # `AcceptPostRequestBody.serialize` writes "Comment" and "SendResponse", capitalized —
-        # unlike Microsoft's own lowercase HTTP example on this action (event-accept).
         sent = _sent(accept)
         assert sent["Comment"] == "See you there"
         assert sent["SendResponse"] is True

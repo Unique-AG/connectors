@@ -124,9 +124,6 @@ _DefaultCalendarQuery = CalendarRequestBuilder.CalendarRequestBuilderGetQueryPar
 _NamedCalendarQuery = CalendarItemRequestBuilder.CalendarItemRequestBuilderGetQueryParameters
 _EventItemQuery = EventItemRequestBuilder.EventItemRequestBuilderGetQueryParameters
 
-# Every write tool that starts from a handle asks for this id space, so the id it reports (or
-# reuses from the argument) never turns into a `RestId` that changes the next time Outlook moves
-# the item (https://learn.microsoft.com/en-us/graph/outlook-immutable-id).
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 # Never change this: a new namespace makes every id already sent unrecognizable to Graph.
@@ -607,13 +604,8 @@ def providers_without_teams(calendar: Calendar) -> list[str] | None:
 
 
 def resource_addresses(event: Event) -> tuple[str, ...]:
-    """The rooms and equipment Microsoft already attached to `event` as `resource` attendees.
-
-    No tool here adds one of these: Microsoft books a room only as a `resource` attendee, and a
-    caller here only ever writes `location` text. A write that resends `attendees` at all replaces
-    Microsoft's whole collection, so a tool that merges in a caller's required and optional lists
-    without also carrying these forward silently un-books whatever room this event already held.
-    """
+    """The rooms and equipment already attached to `event` as `resource` attendees. A write that
+    resends `attendees` must carry these forward, or Microsoft un-books the room."""
     return tuple(
         attendee.email_address.address
         for attendee in event.attendees or []
@@ -633,20 +625,15 @@ def repeated_address(addresses: Sequence[str]) -> str | None:
 
 
 def immutable_id_headers() -> HeadersCollection:
-    """Built fresh per call: kiota's `RequestConfiguration.headers` default is one collection
-    shared by every configuration in the process, so a preference added to it leaks onto every
-    Graph call that reuses the default instead of building its own."""
+    """Built fresh per call: a shared default collection would leak onto every other Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
     return headers
 
 
 async def event_of(client: GraphServiceClient, *, calendar_id: str, event_id: str) -> Event:
-    """One event, addressed beside the calendar it lives on: an id from another mailbox "would
-    return an error" (outlook-get-shared-events-calendars), and Graph puts no calendar id on an
-    event row. Every write tool that starts from an `EventHandle` reads through this same route
-    before it writes, both to word its confirmation from real data and to answer a 202 that
-    carries nothing back in its own body."""
+    """One event, addressed beside the calendar it lives on. Every write tool that starts from an
+    `EventHandle` reads through this route first, to word its confirmation from real data."""
     with graph_step(STEP_EVENT):
         found = (
             await client.me.calendars.by_calendar_id(calendar_id)
@@ -754,9 +741,8 @@ def event_body(draft: EventDraft, *, transaction_id: str) -> Event:
 
 @dataclass(frozen=True, slots=True)
 class EventPatch:
-    """A partial write to one existing event: `None` on any field leaves Microsoft's stored value
-    alone, which is a different instruction from setting it to empty. `attendees` and
-    `optional_attendees` are set or left `None` together — see `event_patch_body`."""
+    """A partial write to one existing event. `None` on any field leaves the stored value alone.
+    `attendees` and `optional_attendees` are set or left `None` together."""
 
     subject: str | None
     starts_at: str | None
@@ -768,16 +754,11 @@ class EventPatch:
 
 
 def event_patch_body(patch: EventPatch) -> Event:
-    """Only the fields `patch` carries reach the wire, because PATCH's own contract is that a
-    property this body omits "maintain[s] previous values" (event-update) — the same
-    None-is-omitted mechanic `event_body` uses to mean "no value" here means "no change".
+    """Only the fields `patch` carries reach the wire; a `None` field leaves Microsoft's stored
+    value untouched instead of clearing it.
 
-    TRAP: `attendees` is the one field where `None` and `()` must stay distinguishable that far
-    down. kiota's `write_collection_of_object_values` skips a field only when it is not a list at
-    all (`isinstance(values, list)`), so `None` omits the key — Microsoft leaves the whole
-    collection alone — and `()` sends `"attendees": []` — Microsoft clears it. Collapsing an empty
-    desired list into `None`, the way `event_body` does for a create, would silently cancel a
-    caller's "remove everyone" here.
+    TRAP: `attendees` must stay `None` (omit, keep) or `()` (send `[]`, clear) — never collapsed
+    to `None` for an empty desired list the way `event_body` does for a create.
     """
     assert (patch.attendees is None) == (patch.optional_attendees is None), (
         "attendees and optional_attendees are resolved to a full replacement list together, "
@@ -805,12 +786,8 @@ def event_patch_body(patch: EventPatch) -> Event:
 
 
 def confirmation_id_for(target: str, *fields: str) -> str:
-    """A stable id that binds one elicitation round-trip to the request it was asked about: the
-    2026-07-28 protocol era carries no back-channel, so the round that answers the question has to
-    recompose the same id from the same arguments as the round that asked it
-    (`shared/seam.py::person_confirms`). Shares `transaction_id_for`'s canonicalization and
-    namespace, because both answer the same underlying question — is a second call the same
-    request as the first — for whichever fields the caller's write is actually made of."""
+    """A stable id that binds one elicitation round-trip to the request it was asked about, built
+    from the same canonicalization and namespace as `transaction_id_for`."""
     return str(uuid.uuid5(_TRANSACTION_NAMESPACE, _canonical(target, *fields)))
 
 
@@ -867,9 +844,8 @@ def invited_attendee(address: str, kind: AttendeeType) -> Attendee:
 
 
 def invited_attendees(required: Sequence[str], optional: Sequence[str]) -> list[Attendee]:
-    """Every attendee a create or an update names, required first — resources (rooms) are never
-    among them, because no tool here adds one; a caller that resends this list on a PATCH must
-    carry any existing resource attendee forward itself, or Microsoft un-books it."""
+    """Every attendee a create or an update names, required first. Never includes a resource
+    (room); see `resource_addresses` for carrying one forward on a PATCH."""
     return [invited_attendee(address, AttendeeType.Required) for address in required] + [
         invited_attendee(address, AttendeeType.Optional) for address in optional
     ]

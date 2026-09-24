@@ -1,22 +1,16 @@
 """`outlook_respond_to_invite` — accept, decline, or tentatively accept an invitation you received.
 
-- One permission covers all three actions, and Microsoft offers no narrower one for any of them:
-  `Calendars.ReadWrite` (https://learn.microsoft.com/en-us/graph/api/event-accept,
-  https://learn.microsoft.com/en-us/graph/api/event-decline,
-  https://learn.microsoft.com/en-us/graph/api/event-tentativelyaccept).
+- One permission covers all three actions: `Calendars.ReadWrite`. Microsoft offers no narrower one
+  for any of them.
 - These are three DISTINCT actions, not one endpoint with a status field: `/accept`, `/decline`,
-  and `/tentativelyAccept` are separate Graph operations, each with its own request-body type, and
-  this tool dispatches to the one the caller named rather than PATCHing `responseStatus` (Microsoft
-  does not document that PATCH as a way to record a response at all).
-- `sendResponse` defaults to `true` and is what actually mails the organizer; `comment` and
-  `proposedNewTime` are the other parameters Microsoft documents, and this tool exposes only
-  `comment` — a caller who wants to propose a new time asks the user to do that in Outlook, since a
-  wrong proposal is a meeting time changed by an app that misread which slot the user meant. This
-  tool asks a person to confirm exactly when `sendResponse` is true, the same rule
-  `outlook_create_event` uses for when a call reaches somebody else's inbox.
-- Every one of the three returns `202 Accepted` with no body, so nothing here is read back from the
-  write; the SDK retries `POST` three times on 429, 503 and 504, and a retried response can mail the
-  organizer twice, hence `no_retry()`.
+  and `/tentativelyAccept` are separate Graph operations, and this tool dispatches to the one the
+  caller named.
+- `sendResponse` defaults to `true` and is what actually mails the organizer. This tool exposes
+  only `comment`, not `proposedNewTime`: a caller who wants to propose a new time asks the user to
+  do that in Outlook.
+- Every one of the three returns `202 Accepted` with no body, so nothing here is read back from
+  the write. This call carries `no_retry()`, because a retried response can mail the organizer
+  twice.
 """
 
 from collections.abc import Mapping
@@ -72,8 +66,7 @@ GRAPH_NOT_FOUND = (
 
 type Response = Literal["accept", "decline", "tentative"]
 
-# Microsoft's own vocabulary for what got recorded, matching `EventAttendee.response` elsewhere in
-# this connector, kept apart from the tool's own words so this tool reads naturally to call.
+# Microsoft's own vocabulary for what got recorded, matching `EventAttendee.response` elsewhere.
 _RECORDED_AS: Mapping[Response, str] = {
     "accept": "accepted",
     "decline": "declined",
@@ -165,11 +158,7 @@ async def respond_to_invite(
     send_response: bool = True,
     confirm: Confirm,
 ) -> InvitationResponse | InputRequiredResult:
-    """Read the event, ask a person when this response would reach the organizer, then send it.
-
-    A connection with no server-to-client channel cannot answer inside the call: `confirm` hands the
-    question back and this returns it, for the client to put to a person and call again with.
-    """
+    """Read the event, ask a person when this response reaches the organizer, then send it."""
     handle = event_handle(uri)
     if handle is None:
         raise ToolError(_NOT_A_HANDLE)
@@ -194,8 +183,6 @@ async def respond_to_invite(
                     send_response=send_response,
                 )
 
-    # Raised outside the block on purpose: `graph_errors` records an escaping `ToolError` as a Graph
-    # operation that failed for a reason it cannot describe, and a refusal is not one.
     if asked is not None:
         return asked
     if refused is not None:

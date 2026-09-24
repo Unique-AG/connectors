@@ -44,11 +44,7 @@ check also falls back to the properties only a search folder declares, which the
 `additional_data` when it did not recognise them.
 
 **`mailbox` re-points every request — the destination read included — from `/me` to
-`/users/{id}`.** `Mail.ReadWrite.Shared` is Microsoft's permission for writing messages in a
-shared or delegated mailbox
-(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders). One `mailbox` covers
-the whole call: the destination and every message in `message_refs` are read and moved within
-that one mailbox, never split across two.
+`/users/{id}`.** One `mailbox` covers the whole call, never split across two.
 """
 
 from collections.abc import Mapping, Sequence

@@ -10,10 +10,7 @@ become handles, and a `RestId` one 404s once Outlook files the message. `$skip` 
 `@odata.nextLink` counts items the service enumerated rather than items returned, so the link is
 followed whole and never parsed.
 
-**`mailbox` re-points every request from `/me` to `/users/{id}`.** Microsoft's own example for
-this scenario lists exactly this collection —
-`GET /users/{Garth-userId}/mailfolders('Inbox')/messages` — under `Mail.Read.Shared`
-(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders).
+**`mailbox` re-points every request from `/me` to `/users/{id}`.**
 """
 
 from collections.abc import Callable, Mapping

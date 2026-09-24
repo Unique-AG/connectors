@@ -253,12 +253,6 @@ _INVITING: Mapping[str, object] = {
     "attendees": [_ONE_ATTENDEE],
 }
 
-# The five tools this file's own sweeps deliberately do not call: each already has its own
-# dedicated `tests/tools/test_outlook_*.py` file asserting its Graph mechanics in full. Naming
-# them here, rather than folding them into `_CALENDAR_TOOLS`, keeps the sweeps below testing
-# exactly what they tested before this preset grew — that the original five never cascade into a
-# cancel, a response, or an availability lookup — while still making the preset's wider surface an
-# assertion a reviewer sees, not a silent drift.
 _NEWER_CALENDAR_TOOLS: frozenset[str] = frozenset(
     {
         "outlook_check_availability",

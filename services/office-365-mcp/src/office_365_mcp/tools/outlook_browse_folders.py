@@ -26,10 +26,7 @@ immutable-id page says container ids "were already constant"
 contradiction, so nothing here promises a handle survives: `uri` names re-browsing as the recovery,
 which is what works under either reading.
 
-**`mailbox` re-points both request builders from `/me` to `/users/{id}`.** Microsoft's own example
-for this scenario reads exactly this collection —
-`GET /users/{Garth-userId}/mailfolders('Inbox')` — under `Mail.Read.Shared`
-(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders).
+**`mailbox` re-points both request builders from `/me` to `/users/{id}`.**
 """
 
 from collections.abc import Mapping

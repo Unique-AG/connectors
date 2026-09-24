@@ -121,9 +121,6 @@ class TestWhatItSendsToGraph:
             interval_minutes=60,
         )
 
-        # `GetSchedulePostRequestBody.serialize` writes capitalized keys ("Schedules",
-        # "StartTime", "EndTime", "AvailabilityViewInterval"), unlike the lowercase keys
-        # Microsoft's own HTTP example for this action uses.
         sent = _sent(schedule)
         assert sent["Schedules"] == [_ADA, _GRACE]
         assert sent["StartTime"] == {"dateTime": "2026-03-02T09:00", "timeZone": "Europe/Zurich"}

@@ -42,11 +42,8 @@ that `outlook_search_mail` and `outlook_list_mail` mint. Graph reads a path id i
 space the request declares. Without this header, Graph reads the immutable id as a `RestId`, and
 every row becomes a 404. `outlook_read_mail` sends the same header, for the same reason.
 
-**`mailbox`, given once, re-points every PATCH in the batch from `/me` to `/users/{id}`.**
-`Mail.ReadWrite.Shared` is Microsoft's own permission for writing messages in a shared or
-delegated mailbox (https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders). One
-`mailbox` argument marks every message of one call, never a mix — a batch that names messages
-across two mailboxes in one call is not a shape this tool accepts.
+**`mailbox`, given once, re-points every PATCH in the batch from `/me` to `/users/{id}`.** One
+`mailbox` argument marks every message of one call, never a mix.
 """
 
 from collections.abc import Mapping, Sequence

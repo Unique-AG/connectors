@@ -31,10 +31,7 @@ of its own. A hand-rolled stripper can turn a `<script>` block or a conditional 
 that reads as prose from the sender. This tool never sends `Prefer: outlook.allow-unsafe-html`,
 which asks Graph to stop sanitising at all.
 
-**`mailbox` re-points the one request this tool makes from `/me` to `/users/{id}`.** Microsoft's
-shared-folder walkthrough names `Mail.Read.Shared` as what authorizes reading a message this way
-(https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders); nothing else in this
-file changes, because `graph_mailbox` is the whole of the branch.
+**`mailbox` re-points the one request this tool makes from `/me` to `/users/{id}`.**
 
 **Three things this deliberately does not ask for.** `internetMessageHeaders` is not selected,
 and that omission is the whole of the control. The routing headers are a message's most forgeable

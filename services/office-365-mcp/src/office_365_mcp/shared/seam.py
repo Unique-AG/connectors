@@ -210,33 +210,17 @@ def graph_mailbox(client: GraphServiceClient, mailbox: str | None) -> UserItemRe
     """The mailbox a call reaches: the signed-in user's own when `mailbox` is None, or the
     mailbox `mailbox` names — its user principal name or its Entra object id — when given.
 
-    TRAP: `client.me` and `client.users.by_user_id(...)` answer with the SAME generated type,
-    `UserItemRequestBuilder`. `client.me` is a property that fixes that type's id path parameter
-    to a sentinel, `"me-token-to-replace"`, which this SDK's own request adapter rewrites to `/me`
-    on the wire (`msgraph/graph_service_client.py`); `by_user_id` fixes the identical parameter to
-    whatever `mailbox` names instead (`msgraph/generated/users/users_request_builder.py`). So this
-    function has nothing to branch on beyond which id to fix, and every reader and writer that
-    calls it reaches `.messages`, `.mailFolders`, `.translateExchangeIds` and the rest through the
-    object this returns, with no copy of the `None` check and nothing to keep in sync when Graph
-    adds another one of those collections.
-
-    A `.Shared` permission is what lets the token this call carries name a mailbox other than
-    `/me` at all; it is not what lets `mailbox` resolve to a mailbox that answers. Exchange also
-    requires the signed-in user to hold real access to it — a folder shared with them, a full
-    delegation, or, to send, Full Access together with Send As or Send on Behalf
-    (https://learn.microsoft.com/en-us/graph/outlook-share-messages-folders). This connector
-    cannot see or check that mailbox-level grant. Graph answers a caller who holds the Graph
-    permission but not the Exchange one with the same 403 as a caller who holds neither, and
-    `graph_tool_errors` words both identically, because Graph does not say which is missing.
+    A `.Shared` permission lets the token name a mailbox other than `/me`. Exchange also must
+    grant the signed-in user real access to it, which this connector cannot see or check; a
+    missing Exchange grant and a missing Graph permission both come back as the same 403.
     """
     if mailbox is None:
         return client.me
     return client.users.by_user_id(mailbox)
 
 
-# Reused verbatim by every tool whose Pydantic model threads a mailbox through to `graph_mailbox`,
-# so that what "omit it" means and what actually authorizes reaching another mailbox is one text
-# every one of them agrees with, not one chance per tool to drift from the others.
+# Reused verbatim by every tool that threads a mailbox through to `graph_mailbox`, so the text
+# stays in sync between them.
 MAILBOX_FIELD: str = (
     "A shared or delegated mailbox to act on instead of the signed-in user's own, as its user "
     + "principal name or its Entra object id. Omit it for the signed-in user's own mailbox. This "
