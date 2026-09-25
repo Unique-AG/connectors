@@ -52,7 +52,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/office-365-mcp
-  tag: 0.2.3 # x-release-please-version
+  tag: 0.2.4 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:

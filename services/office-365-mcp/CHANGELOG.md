@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.4](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.3...office-365-mcp@0.2.4) (2026-09-25)
+
+
+### Features
+
+* **office-365-mcp:** add Outlook mailbox, categories, attachments and calendar parity tools ([#1093](https://github.com/Unique-AG/connectors/issues/1093)) ([5e32c50](https://github.com/Unique-AG/connectors/commit/5e32c5098c7eb9147a14c982024a726ecf64cc9a))
+* **office-365-mcp:** Teams send tools and teams-write preset ([#1096](https://github.com/Unique-AG/connectors/issues/1096)) ([41a4d31](https://github.com/Unique-AG/connectors/commit/41a4d318a238c3600c1102f2ada61d4eda753fa9))
+
+
+### Bug Fixes
+
+* **office-365-mcp:** stop publishing a root-level anyOf/oneOf/not in five tool schemas ([#1092](https://github.com/Unique-AG/connectors/issues/1092)) ([142b461](https://github.com/Unique-AG/connectors/commit/142b46181fcfbb155958e7a4f10ad939c8cccb23))
+* **sharepoint-connector,office-365-mcp,outlook-semantic-mcp,teams-mcp:** stop managing shared Microsoft service principals as destroyable resources ([#1097](https://github.com/Unique-AG/connectors/issues/1097)) ([e8cdadd](https://github.com/Unique-AG/connectors/commit/e8cdaddc16dfd1352797c8b450e8cd244abb0445))
+
 ## [Unreleased]
 
 ### Features
