@@ -60,7 +60,11 @@ flowchart TD
 | Dockerfile scan | our own Dockerfiles | no |
 | CodeQL | our source code: our workflow files, our JavaScript and TypeScript, and our Python | no |
 
-Every check runs on a stacked pull request. No check carries a branch filter. GitHub Actions runs every check in this document. GitHub Actions is the platform, not a check.
+Every check runs on a stacked pull request. No check carries a branch filter.
+
+The Dockerfile scan runs twice: on your pull request, and again on every push to `main`. A merge is also a push, so the scan repeats right after your change lands.
+
+GitHub Actions runs every check in this document. GitHub Actions is the platform, not a check.
 
 #### Why the checks do not overlap
 
@@ -74,7 +78,7 @@ An image holds software that no lockfile lists. Examples are a base operating sy
 
 **A threshold decides which finding can stop a pull request, or open an alert.** It applies to every check in this document except CodeQL. Two conditions apply: the severity must be CRITICAL or HIGH, and a fix must already exist.
 
-Trivy looks only for CRITICAL and HIGH findings. This applies to every Trivy-based check in this document: the image vulnerability check, the Dockerfile scan, the registry scan, and the release image scan. No Trivy-based check looks for a MEDIUM or LOW finding.
+Trivy looks only for CRITICAL and HIGH findings. This applies to every Trivy-based check in this document: the image vulnerability check, the Dockerfile scan, the registry scan, and the release image scan. No Trivy-based check looks for a MEDIUM or LOW finding. No part of this document tracks either one.
 
 The dependency review uses the same threshold, through a different setting: `fail-on-severity: high`. This setting also stops the pull request at HIGH and at CRITICAL, and lets a LOW or MEDIUM advisory through.
 
@@ -126,7 +130,7 @@ The release image scan runs after the image reaches the registry. It stops nothi
 
 An image does not change after we publish it. New vulnerabilities appear against it while nobody pushes a commit. The registry image scan finds them every Wednesday, at 06:00 UTC.
 
-A second scan of the same image only adds findings. It never removes them. **To clear a finding in a published image, release the service again.** A fix in the tree does not change the image that we already published.
+A second scan of the same image only adds findings. It never removes them. **To clear a finding in a published image, release the service again.** A fix in the tree does not change the image that we already published. This includes a finding you waived with `security-exception` before merge. See [Labels](#labels).
 
 ```mermaid
 flowchart LR
@@ -246,7 +250,7 @@ Signing proves what we shipped. It does not keep that image free of new findings
 
 ## Labels
 
-Two labels waive a check. A label that waives a check is named `<what>-exception`.
+Two labels waive a check. A label that waives a check is named `<what>-exception`. Adding either one needs write access to this repository, and no separate approval.
 
 | Label | It waives |
 |---|---|
@@ -255,7 +259,9 @@ Two labels waive a check. A label that waives a check is named `<what>-exception
 
 `security-exception` waives two controls, not one. Use it only when you accept both.
 
-`title-exception` is not a security waiver. It waives a naming check, unrelated to this document.
+**`security-exception` only changes what happens on your pull request.** It does not reach the release image scan or the registry image scan. Once you merge and release, the same finding can open a fresh alert in the Security tab, with no link back to this label.
+
+`title-exception` is not a security waiver. It waives the pull request title and scope check in `.github/workflows/gatekeeper.yaml`. This document does not cover that check.
 
 ## Files
 
