@@ -1126,8 +1126,8 @@ importers:
   services/sharepoint-connector:
     dependencies:
       '@azure/msal-node':
-        specifier: 6.0.0
-        version: 6.0.0
+        specifier: 6.0.1
+        version: 6.0.1
       '@microsoft/microsoft-graph-client':
         specifier: 'catalog:'
         version: 3.0.7
@@ -1612,12 +1612,12 @@ packages:
     resolution: {integrity: sha512-/PZmyAlb2NGWPikRRuiWLdfHQd8Wrx6lX4HqvTcaDhlU43M3T0ud4PH2T3QDp7BzHYY92xtD8iPxX2asg67G1A==}
     engines: {node: ^18.19.1 || ^20.11.1 || >=22.0.0, npm: ^6.11.0 || ^7.5.6 || >=8.0.0, yarn: '>= 1.13.0'}
 
-  '@azure/msal-common@16.14.0':
-    resolution: {integrity: sha512-A4rb55hI86Q9tBl/+jBj7TMz7iX2RFgQs/nExFzcAtoI/BFRVdaH5SL/MivrYD7qvweMpN8AgVvVMHV8UBYxew==}
+  '@azure/msal-common@16.14.1':
+    resolution: {integrity: sha512-Or6xhPNyi4zHW25158yxBoyxuCqNSPa5YBVqfF1J5Ks4MJWBo/USXdp05DQIPu1Zli00YZu6t0+h6KvHJealxQ==}
     engines: {node: '>=0.8.0'}
 
-  '@azure/msal-node@6.0.0':
-    resolution: {integrity: sha512-PU0l3CsEZVm2K8vZNFxvgmM5d0Yx/sVL/axWW0hJBoeyiB6Q/uv7hXORb7EdzlNxvehsWEF82/o+/sXlIo+UIw==}
+  '@azure/msal-node@6.0.1':
+    resolution: {integrity: sha512-ixSO1Y/kCVRthRs+hSx/5qkwaunX1/RAePhlMN0wIpIQ4WEZ6AREGGnGd1AP0qspHVsAwzWQKGubpjh50JyJIQ==}
     engines: {node: '>=20'}
 
   '@babel/code-frame@7.29.7':
@@ -1674,6 +1674,11 @@ packages:
 
   '@babel/parser@7.29.8':
     resolution: {integrity: sha512-E8lTAYNB1KW+FH+VGJuZM1ioAx2E6oVlvQFRrf5P8ZZmsiJXYAD9vTFV7yyEURNzgh1dFqMZuO6tUwcARbqFCA==}
+    engines: {node: '>=6.0.0'}
+    hasBin: true
+
+  '@babel/parser@7.29.9':
+    resolution: {integrity: sha512-CjXrNHTnvqBVqHgdBysY3vk2T8tpJHb5/RMeHJBTyVa9xgugCB0CJTx/3oO8RV2QRQP391RWpB7D6hLjm8V9uA==}
     engines: {node: '>=6.0.0'}
     hasBin: true
 
@@ -5549,6 +5554,7 @@ packages:
 
   serialize-error-cjs@0.2.0:
     resolution: {integrity: sha512-Phvx+w3MTgexuKnaIOkehfKCg1uF/DWfCRqg6F6haFz0qnyn1Fboo5MRedcgZitgi/chw+lM5hxZhw4OSA0gqQ==}
+    deprecated: Rolling release, please update to 0.3.0
 
   serve-static@2.2.1:
     resolution: {integrity: sha512-xRXBn0pPqQTVQiC8wyQrKs2MOlX24zQ0POGaj0kultvoOCstBQM5yvOhAVSUwOMjQtTvsPWoNCHfPGwaaQJhTw==}
@@ -6279,11 +6285,11 @@ snapshots:
     transitivePeerDependencies:
       - chokidar
 
-  '@azure/msal-common@16.14.0': {}
+  '@azure/msal-common@16.14.1': {}
 
-  '@azure/msal-node@6.0.0':
+  '@azure/msal-node@6.0.1':
     dependencies:
-      '@azure/msal-common': 16.14.0
+      '@azure/msal-common': 16.14.1
       jsonwebtoken: 9.0.3
 
   '@babel/code-frame@7.29.7':
@@ -6355,6 +6361,11 @@ snapshots:
   '@babel/parser@7.29.8':
     dependencies:
       '@babel/types': 7.29.8
+
+  '@babel/parser@7.29.9':
+    dependencies:
+      '@babel/types': 7.29.8
+    optional: true
 
   '@babel/parser@8.0.4':
     dependencies:
@@ -9592,7 +9603,7 @@ snapshots:
 
   magicast@0.3.5:
     dependencies:
-      '@babel/parser': 7.29.8
+      '@babel/parser': 7.29.9
       '@babel/types': 7.29.8
       source-map-js: 1.2.1
     optional: true
