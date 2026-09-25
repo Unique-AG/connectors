@@ -79,6 +79,15 @@ _NOT_A_HANDLE = (
     + "than assembling one. Retrying this value will fail identically."
 )
 
+_NOT_THE_ORGANIZER = (
+    "Microsoft 365 records the signed-in user as an attendee of this event, not its organizer. "
+    + "NOTHING WAS CHANGED. Graph documents no defined outcome for a non-organizer changing an "
+    + "event's subject, time, location, or attendee list, and this connector's own confirmation "
+    + "promises Microsoft mails every current attendee — a promise only the organizer's own edit "
+    + "can keep. outlook_respond_to_invite can accept, decline, or tentatively accept this invite "
+    + "instead. Retrying will fail identically."
+)
+
 _NOTHING_TO_CHANGE = (
     "outlook_update_event was given no argument that changes anything: `subject`, the time "
     + "arguments, `location`, and the two attendee lists were all left out. NOTHING WAS CHANGED. "
@@ -223,6 +232,7 @@ async def update_event(
     )
     with graph_errors(TOOL_NAME):
         event = await event_of(client, calendar_id=handle.calendar_id, event_id=handle.event_id)
+        refused: str | None = _NOT_THE_ORGANIZER if event.is_organizer is False else None
         patch = EventPatch(
             subject=subject,
             starts_at=starts_at,
@@ -233,13 +243,11 @@ async def update_event(
             optional_attendees=optional,
         )
         body = _patched(patch, before=event)
-        if _reaches_an_attendee(body, before=event):
+        if refused is None and _reaches_an_attendee(body, before=event):
             with not_graph():
                 answer = await confirm(_question(event, patch), about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
-        else:
-            refused = None
         if refused is None and asked is None:
             with graph_step(STEP_UPDATE):
                 updated = (

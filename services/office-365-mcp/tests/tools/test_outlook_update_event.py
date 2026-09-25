@@ -480,6 +480,27 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
+    async def test_an_attendee_of_the_meeting_cannot_update_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)], is_organizer=False))
+        patch = _updates(graph)
+
+        with pytest.raises(ToolError, match="not its organizer"):
+            _ = await _update(client, subject="Renamed")
+
+        assert patch.call_count == 0
+
+    async def test_an_unknown_organizer_flag_does_not_refuse_up_front(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[], is_organizer=None))
+        patch = _updates(graph)
+
+        _ = await _update(client, subject="Renamed")
+
+        assert patch.call_count == 1
+
     @pytest.mark.parametrize(
         ("starts_at", "ends_at", "time_zone"),
         [
