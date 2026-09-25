@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+* **office-365-mcp:** add Teams chat and channel send tools
+* **office-365-mcp:** add Teams message reactions and search include_body
+* **office-365-mcp:** register Teams send tools and add a teams-write preset
+
 ## [0.2.3](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.2...office-365-mcp@0.2.3) (2026-09-23)
 
 

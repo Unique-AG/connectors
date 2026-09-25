@@ -30,15 +30,26 @@ locals {
   sharepoint_roles = toset(local.sync_mode_extra_roles[var.sync_mode_role_preset].sharepoint_roles)
 }
 
-# Service principals for Microsoft services
-resource "azuread_service_principal" "msgraph" {
-  client_id    = local.graph_app_id
-  use_existing = true
+data "azuread_service_principal" "msgraph" {
+  client_id = local.graph_app_id
 }
 
-resource "azuread_service_principal" "sharepoint" {
-  client_id    = local.sharepoint_app_id
-  use_existing = true
+data "azuread_service_principal" "sharepoint" {
+  client_id = local.sharepoint_app_id
+}
+
+removed {
+  from = azuread_service_principal.msgraph
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = azuread_service_principal.sharepoint
+  lifecycle {
+    destroy = false
+  }
 }
 
 # Azure AD application for SharePoint Connector
@@ -61,7 +72,7 @@ resource "azuread_application" "sharepoint_connector" {
     dynamic "resource_access" {
       for_each = local.graph_roles
       content {
-        id   = azuread_service_principal.msgraph.app_role_ids[resource_access.value]
+        id   = data.azuread_service_principal.msgraph.app_role_ids[resource_access.value]
         type = "Role"
       }
     }
@@ -76,7 +87,7 @@ resource "azuread_application" "sharepoint_connector" {
       dynamic "resource_access" {
         for_each = local.sharepoint_roles
         content {
-          id   = azuread_service_principal.sharepoint.app_role_ids[resource_access.value]
+          id   = data.azuread_service_principal.sharepoint.app_role_ids[resource_access.value]
           type = "Role"
         }
       }
@@ -104,9 +115,9 @@ resource "time_sleep" "wait_for_graph_propagation" {
 # Grant admin consent for Microsoft Graph permissions
 resource "azuread_app_role_assignment" "grant_graph_admin_consent" {
   for_each            = var.service_principal_configuration != null ? local.graph_roles : []
-  app_role_id         = azuread_service_principal.msgraph.app_role_ids[each.value]
+  app_role_id         = data.azuread_service_principal.msgraph.app_role_ids[each.value]
   principal_object_id = azuread_service_principal.sharepoint_connector[0].object_id
-  resource_object_id  = azuread_service_principal.msgraph.object_id
+  resource_object_id  = data.azuread_service_principal.msgraph.object_id
 
   depends_on = [time_sleep.wait_for_graph_propagation]
 }
@@ -114,9 +125,9 @@ resource "azuread_app_role_assignment" "grant_graph_admin_consent" {
 # Grant admin consent for SharePoint permissions
 resource "azuread_app_role_assignment" "grant_sharepoint_admin_consent" {
   for_each            = var.service_principal_configuration != null ? local.sharepoint_roles : []
-  app_role_id         = azuread_service_principal.sharepoint.app_role_ids[each.value]
+  app_role_id         = data.azuread_service_principal.sharepoint.app_role_ids[each.value]
   principal_object_id = azuread_service_principal.sharepoint_connector[0].object_id
-  resource_object_id  = azuread_service_principal.sharepoint.object_id
+  resource_object_id  = data.azuread_service_principal.sharepoint.object_id
 
   depends_on = [time_sleep.wait_for_graph_propagation]
 }

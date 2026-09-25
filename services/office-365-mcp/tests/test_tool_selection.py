@@ -254,6 +254,11 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
         "channel_id": ("teams_list_channels", "teams_search_messages"),
     },
     "teams_read_message": {"uri": ("teams_search_messages", "teams_browse_channel")},
+    "teams_send_chat_message": {"chat_id": ("teams_list_chats",)},
+    "teams_send_channel_message": {
+        "team_id": ("teams_list_my_teams",),
+        "channel_id": ("teams_list_channels", "teams_search_messages"),
+    },
     "teams_search_messages": {"mentions": ("get_me",)},
     "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
@@ -347,6 +352,8 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
 
 
 _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
+    "teams_send_chat_message": frozenset({"message"}),
+    "teams_send_channel_message": frozenset({"message"}),
     "teams_search_messages": frozenset(
         {
             "query",
@@ -576,6 +583,19 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ),
         3,
         10,
+    ),
+    (
+        ToolsPreset.TEAMS_WRITE,
+        (
+            "User.Read",
+            "Chat.Read",
+            "Team.ReadBasic.All",
+            "Channel.ReadBasic.All",
+            "ChatMessage.Send",
+            "ChannelMessage.Send",
+        ),
+        0,
+        6,
     ),
     (
         ToolsPreset.OUTLOOK_READ,

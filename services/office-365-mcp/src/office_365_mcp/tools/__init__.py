@@ -65,6 +65,8 @@ from office_365_mcp.tools import (
     teams_read_message,
     teams_read_transcript,
     teams_search_messages,
+    teams_send_channel_message,
+    teams_send_chat_message,
 )
 
 __all__ = [
@@ -113,6 +115,8 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     teams_browse_channel,
     teams_search_messages,
     teams_read_message,
+    teams_send_chat_message,
+    teams_send_channel_message,
     teams_list_meeting_transcripts,
     teams_read_transcript,
     teams_list_meeting_recordings,
@@ -196,6 +200,13 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_list_meeting_transcripts",
         "teams_read_transcript",
         "teams_list_meeting_recordings",
+    ),
+    "teams-write": (
+        "teams_list_chats",
+        "teams_list_my_teams",
+        "teams_list_channels",
+        "teams_send_chat_message",
+        "teams_send_channel_message",
     ),
     "outlook-read": (
         "outlook_search_mail",

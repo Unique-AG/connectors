@@ -1,6 +1,3 @@
-"""`teams_browse_channel`: the one request it spends, the order it must not correct, and
-the traps."""
-
 from collections.abc import Mapping, Sequence
 
 import httpx
@@ -13,7 +10,7 @@ from office_365_mcp.shared.handles import message_handle
 from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST
 from office_365_mcp.tools import teams_browse_channel as browser
 
-from .conftest import GRAPH_V1
+from .conftest import GRAPH_V1, reaction_payload
 
 _TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
 _CHANNEL_ID = "19:general@thread.tacv2"
@@ -34,6 +31,7 @@ def _message_payload(
     message_id: str,
     content: str,
     content_type: str = "html",
+    reactions: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
     return {
         "@odata.type": "#microsoft.graph.chatMessage",
@@ -53,7 +51,7 @@ def _message_payload(
         "body": {"contentType": content_type, "content": content},
         "mentions": [],
         "attachments": [],
-        "reactions": [],
+        "reactions": [dict(reaction) for reaction in reactions],
         "eventDetail": None,
     }
 
@@ -65,8 +63,9 @@ def _post_payload(
     created_at: str = "2026-02-11T09:15:22.31Z",
     replies: Sequence[Mapping[str, object]] = (),
     more_replies: bool = False,
+    reactions: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
-    payload = _message_payload(message_id=message_id, content=content)
+    payload = _message_payload(message_id=message_id, content=content, reactions=reactions)
     payload["createdDateTime"] = created_at
     payload["replies"] = [dict(reply) for reply in replies]
     if more_replies:
@@ -75,9 +74,16 @@ def _post_payload(
 
 
 def _reply_payload(
-    message_id: str, *, root_id: str, created_at: str, content: str = "a synthetic reply"
+    message_id: str,
+    *,
+    root_id: str,
+    created_at: str,
+    content: str = "a synthetic reply",
+    reactions: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
-    payload = _message_payload(message_id=message_id, content=content, content_type="text")
+    payload = _message_payload(
+        message_id=message_id, content=content, content_type="text", reactions=reactions
+    )
     payload["createdDateTime"] = created_at
     payload["replyToId"] = root_id
     return payload
@@ -86,8 +92,6 @@ def _reply_payload(
 _SYSTEM_MESSAGE: dict[str, object] = {
     "@odata.type": "#microsoft.graph.chatMessage",
     "id": "1770000009999",
-    # Without the `Prefer` header Graph types this `unknownFutureValue`, which is why the
-    # authorless `from` and the populated `eventDetail` are the signals filtered on.
     "messageType": "unknownFutureValue",
     "createdDateTime": "2026-02-11T10:00:00Z",
     "from": None,
@@ -104,7 +108,6 @@ class TestTheQueryItSends:
     async def test_browsing_a_channel_asks_for_replies_and_a_page_size(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`$top` and `$expand` are the only two parameters this collection takes."""
         route = graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000000")]})
         )
@@ -168,11 +171,97 @@ class TestBrowsingOneChannel:
         assert post.chat_id is None
         assert post.reply_to_id is None, "a root post answers nothing"
 
+    async def test_reactions_arrive_on_a_post_with_no_widening_of_the_request(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get(_MESSAGES_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _post_payload(
+                            "1770000000000",
+                            reactions=[
+                                reaction_payload(
+                                    reaction_type="\U0001f44d", display_name="Grace Hopper"
+                                )
+                            ],
+                        )
+                    ]
+                },
+            )
+        )
+
+        browsed = await browser.teams_browse_channel(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
+        )
+
+        assert route.calls.last.request.url.params["$expand"] == "replies", (
+            "reactions needed no widening on top of it"
+        )
+        post = browsed.messages[0]
+        assert len(post.reactions) == 1
+        assert post.reactions[0].reaction_type == "\U0001f44d"
+
+    async def test_a_reply_carries_its_own_reactions_too(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get(_MESSAGES_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _post_payload(
+                            "1770000000000",
+                            replies=[
+                                _reply_payload(
+                                    "1770000000001",
+                                    root_id="1770000000000",
+                                    created_at="2026-02-11T10:00:00Z",
+                                    reactions=[reaction_payload(reaction_type="❤️")],
+                                )
+                            ],
+                        )
+                    ]
+                },
+            )
+        )
+
+        browsed = await browser.teams_browse_channel(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
+        )
+
+        reply = browsed.messages[1]
+        assert [reaction.reaction_type for reaction in reply.reactions] == ["❤️"]
+
+    async def test_a_post_nobody_reacted_to_has_an_empty_list(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get(_MESSAGES_PATH).mock(
+            return_value=httpx.Response(200, json={"value": [_post_payload("1770000000000")]})
+        )
+
+        browsed = await browser.teams_browse_channel(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
+        )
+
+        assert browsed.messages[0].reactions == []
+
     async def test_one_browse_is_one_graph_request_whatever_the_channel_holds(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph allows this whole connector about one request a second on a given channel *for
-        the tenant*, so following `@odata.nextLink` spends a budget that is not this call's."""
         second_page = graph.get(_MESSAGES_PATH, params={"$skiptoken": "synthetic"}).mock(
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000002")]})
         )
@@ -201,8 +290,6 @@ class TestBrowsingOneChannel:
     async def test_the_order_is_graphs_reply_chain_order_and_the_dates_say_so(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph sorts a channel's messages by the last modified date of the *entire reply
-        chain*, so `created_at` and not the position is what tells the truth about age."""
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -246,8 +333,6 @@ class TestBrowsingOneChannel:
     async def test_a_reply_carries_a_handle_teams_read_message_can_actually_resolve(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph addresses a reply under the post it answers, so the root-post handle shape cannot
-        name one and a search hit on a reply 404s. Browsing knows each reply's parent."""
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -293,7 +378,6 @@ class TestBrowsingOneChannel:
     async def test_replies_are_sorted_and_the_newest_of_a_long_thread_are_kept(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph publishes no order for replies, so they are sorted here."""
         replies = [
             _reply_payload(
                 f"177000000{index:04d}",
@@ -328,9 +412,6 @@ class TestBrowsingOneChannel:
     async def test_a_thread_graph_itself_paged_is_not_chased(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Following the per-post replies cursor would be a request per post against the same
-        one-a-second channel. The cursor needs no reporting either: Graph expands up to 200 replies
-        before it pages them, so a thread it paged overflows this window regardless."""
         replies = graph.get(f"{_MESSAGES_PATH}/1770000000000/replies").mock(
             return_value=httpx.Response(200, json={"value": []})
         )
@@ -370,8 +451,6 @@ class TestBrowsingOneChannel:
     async def test_system_messages_are_dropped_wherever_they_appear(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph offers no `messageType` filter here, so a page can hold fewer posts than asked
-        for, which is not evidence of a quiet channel."""
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -411,8 +490,6 @@ class TestBrowsingOneChannel:
     async def test_microsofts_own_cursor_is_what_says_the_channel_holds_more(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """System messages are dropped out of the page after Graph counted them into it, so this
-        answer's own length says nothing about completeness. Graph's cursor does."""
         second_page = graph.get(_MESSAGES_PATH, params={"$skiptoken": "synthetic"}).mock(
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000002")]})
         )
@@ -442,7 +519,6 @@ class TestBrowsingOneChannel:
     async def test_the_same_page_without_a_cursor_says_that_was_the_channel(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The page above with its cursor taken off, and nothing else changed."""
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000000")]})
         )
@@ -461,8 +537,6 @@ class TestBrowsingOneChannel:
     async def test_a_page_holding_more_posts_than_the_window_is_the_other_fact(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Two fields because the remedies are opposite: raising `limit` returns what this window
-        closed over, and nothing returns what is behind Microsoft's cursor."""
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(
                 200,

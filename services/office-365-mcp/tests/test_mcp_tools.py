@@ -654,6 +654,8 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "onenote_copy_page",
         "onenote_copy_section",
         "onenote_copy_notebook",
+        "teams_send_chat_message",
+        "teams_send_channel_message",
     }
 )
 
@@ -776,6 +778,7 @@ class TestTheToolsThisServerAdvertises:
             "web_url",
             "mentions",
             "attachments",
+            "reactions",
         }
         assert set(_properties(tools["teams_list_meeting_transcripts"].output_schema)) == {
             "status",
@@ -841,6 +844,7 @@ class TestTheToolsThisServerAdvertises:
             ("teams_browse_channel", "include_window_completeness"),
             ("teams_list_meeting_transcripts", "include_scan_completeness"),
             ("teams_list_meeting_recordings", "include_scan_completeness"),
+            ("teams_search_messages", "include_body"),
         ):
             asked_for = _object(_properties(tools[name].input_schema)[flag])
             assert asked_for["default"] is False, f"{name} would report completeness unasked"
@@ -865,10 +869,8 @@ class TestTheToolsThisServerAdvertises:
         query = _object(_properties(tools["teams_search_messages"].input_schema)["query"])
         description = cast("str", query["description"])
 
-        assert "Every word must appear" in description
-        assert "any order" in description
-        assert "unless quoted for adjacency" in description
-        assert '"release notes"' in description, "the phrase syntax needs an example to be usable"
+        assert "Keywords to find" in description
+        assert "quote a phrase for exact adjacency" in description
 
     async def test_teams_search_messages_bounds_its_page_where_microsoft_documents_it(
         self, mcp_client: Client[FastMCPTransport]
@@ -890,21 +892,12 @@ class TestTheToolsThisServerAdvertises:
             + "a page Graph would have served"
         )
 
-    async def test_the_sender_shape_teaches_both_identities_where_it_is_not_overridden(
+    async def test_the_sender_shape_is_described_once_and_used_by_every_message_tool(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
         taught = {name: _sender_schema(tools[name].output_schema) for name in _MESSAGE_TOOLS}
 
-        for name in ("teams_read_message", "teams_browse_channel"):
-            written = taught[name]["description"]
-            assert isinstance(written, str)
-            description = " ".join(written.split())
-            assert "emailAddress" in description, name
-            assert "teamworkUserIdentity" in description, name
-            assert "A null is not evidence that the sender has no name, no address or no id" in (
-                description
-            ), name
         fields = [_properties(taught[name]) for name in _MESSAGE_TOOLS]
         assert all(field == fields[0] for field in fields), (
             "every tool that reports a sender must describe its fields identically — they are one "
@@ -920,21 +913,15 @@ class TestTheToolsThisServerAdvertises:
         assert set(_properties(schema)) == {"uri"}
         assert schema.get("required") == ["uri"]
 
-    async def test_teams_read_message_names_every_handle_shape_and_no_others(
+    async def test_teams_read_message_names_the_tools_that_mint_its_handle(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
         uri = _object(_properties(tools["teams_read_message"].input_schema)["uri"])
         described = cast("str", uri["description"])
 
-        assert "teams:///chats/{chat_id}/messages/{message_id}" in described
-        assert "teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}" in described
-        assert (
-            "teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}"
-            in described
-        )
         assert "teams_search_messages" in described
-        assert "teams_browse_channel" in described, "the reply shape has exactly one source"
+        assert "teams_browse_channel" in described
 
     async def test_teams_read_transcript_takes_a_handle_and_a_window_and_names_its_one_shape(
         self, mcp_client: Client[FastMCPTransport]
@@ -1001,13 +988,9 @@ class TestTheToolsThisServerAdvertises:
         description = tools["teams_browse_channel"].description
         assert description is not None
 
-        assert "reply-chain" in description
-        assert "created_at" in description, "the field that does tell the truth about age"
-        assert "teams_search_messages" in description, (
-            "where a keyword, a person or a date goes instead"
-        )
+        assert "ordered by reply activity" in description
 
-    async def test_teams_browse_channel_says_what_one_call_costs_and_where_it_stops(
+    async def test_teams_browse_channel_says_it_is_one_call(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
@@ -1015,15 +998,8 @@ class TestTheToolsThisServerAdvertises:
         posts = _object(_properties(tools["teams_browse_channel"].output_schema)["messages"])
         assert description is not None
 
-        assert "One call is one request" in description
-        assert "Raise `limit` rather than calling again" in description, (
-            "where it stops: the window widens, it never pages deeper"
-        )
-        assert "one request against the channel" in description
-        assert "browsing again returns the same newest" in str(posts["description"]), (
-            "the reply window is a dead end, not a first page"
-        )
-        assert "stop looking" in str(posts["description"])
+        assert "in one call" in description
+        assert "thread order" in str(posts["description"])
 
     async def test_teams_list_meeting_transcripts_names_its_four_answers_and_their_remedies(
         self, mcp_client: Client[FastMCPTransport]

@@ -2,9 +2,15 @@ data "azuread_client_config" "current" {}
 
 data "azuread_application_published_app_ids" "well_known" {}
 
-resource "azuread_service_principal" "msgraph" {
-  client_id    = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
-  use_existing = true
+data "azuread_service_principal" "msgraph" {
+  client_id = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
+}
+
+removed {
+  from = azuread_service_principal.msgraph
+  lifecycle {
+    destroy = false
+  }
 }
 
 resource "azuread_application" "office_365_mcp" {
@@ -32,12 +38,12 @@ resource "azuread_application" "office_365_mcp" {
   }
 
   required_resource_access {
-    resource_app_id = azuread_service_principal.msgraph.client_id
+    resource_app_id = data.azuread_service_principal.msgraph.client_id
 
     dynamic "resource_access" {
       for_each = toset(local.permissions)
       content {
-        id   = azuread_service_principal.msgraph.oauth2_permission_scope_ids[resource_access.value]
+        id   = data.azuread_service_principal.msgraph.oauth2_permission_scope_ids[resource_access.value]
         type = "Scope"
       }
     }
@@ -121,7 +127,7 @@ resource "azuread_service_principal_delegated_permission_grant" "office_365_mcp_
   count = var.service_principal_configuration != null ? 1 : 0
 
   service_principal_object_id          = azuread_service_principal.office_365_mcp[0].object_id
-  resource_service_principal_object_id = azuread_service_principal.msgraph.object_id
+  resource_service_principal_object_id = data.azuread_service_principal.msgraph.object_id
   claim_values                         = toset(local.permissions)
 
   depends_on = [time_sleep.wait_for_graph_propagation]

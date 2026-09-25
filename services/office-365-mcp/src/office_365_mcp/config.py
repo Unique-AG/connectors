@@ -18,19 +18,12 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 PKG_VERSION = pkg_version("office-365-mcp")
 
-# libpq `sslmode` values asyncpg accepts. `verify` is rewritten because asyncpg rejects the short
-# spelling. Trap: `verify-ca` is a genuinely weaker mode. Never widen it to `verify-full` — the
-# wider mode silently changes what the connection checks.
 _ASYNCPG_SSLMODES = frozenset({"disable", "allow", "prefer", "require", "verify-ca", "verify-full"})
 
-# Trap: asyncpg forwards unknown params as server settings, so `channel_binding` fails startup.
 _UNSUPPORTED_PARAMS = frozenset({"channel_binding"})
 
 
 def asyncpg_dsn(url: str) -> str:
-    """Trap: `urlsplit` keeps `netloc` intact, so a percent-encoded password, a bracketed IPv6 host
-    and a missing port all survive. A library that decodes and reassembles the parts corrupts them.
-    """
     parts = urlsplit(url)
     scheme = parts.scheme
     if scheme in ("postgres", "postgresql+asyncpg"):
@@ -62,7 +55,6 @@ class AppEnv(StrEnum):
     TEST = "test"
 
 
-# Bracketed spellings are listed too, because pydantic's `HttpUrl.host` keeps the brackets.
 _NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0", "[::]"})
 
 
@@ -75,13 +67,6 @@ class LogLevel(StrEnum):
 
 
 class ToolsPreset(StrEnum):
-    """The named tool surfaces an operator can deploy. `tools/__init__.py` maps each to its tools.
-
-    Trap: unlike `AppEnv` and `LogLevel`, an uppercase spelling is not accepted, because the Helm
-    chart's schema carries these same values as a JSON Schema `enum`, which has no
-    case-insensitive form.
-    """
-
     TEAMS = "teams"
     TEAMS_CHAT = "teams-chat"
     TEAMS_MESSAGES = "teams-messages"
@@ -89,6 +74,7 @@ class ToolsPreset(StrEnum):
     TEAMS_TRANSCRIPTS = "teams-transcripts"
     TEAMS_RECORDINGS = "teams-recordings"
     TEAMS_MEETINGS = "teams-meetings"
+    TEAMS_WRITE = "teams-write"
     OUTLOOK_READ = "outlook-read"
     OUTLOOK_MAILBOX = "outlook-mailbox"
     OUTLOOK_WRITE = "outlook-write"
@@ -114,37 +100,17 @@ class AppConfig(BaseSettings):
 
     public_base_url: HttpUrl = HttpUrl("http://localhost:9544")
 
-    # Worst case of one tool call: the request timeout times `graph_max_retries + 1` attempts,
-    # before any Retry-After wait, per Graph call, and a paged walk makes several.
-    #
-    # Zero timeouts are refused: httpx reads a timeout as a deadline, not as "unbounded", so a zero
-    # deadline times every Graph call out before it leaves the process.
-    #
-    # TRAP: the retry ceiling is the SDK's. `RetryHandlerOption.__init__` raises `ValueError:
-    # MaxLimitExceeded. MaxRetries should not be more than $10` above `MAX_MAX_RETRIES = 10`
-    # (kiota_http/middleware/options/retry_handler_option.py:12,38-41), from inside
-    # `create_graph_transport` and so inside `create_app`. Bounded here so that
-    # `GRAPH_MAX_RETRIES=11` is a startup error naming the setting.
     graph_request_timeout_seconds: float = Field(default=30.0, gt=0)
     graph_connect_timeout_seconds: float = Field(default=10.0, gt=0)
     graph_max_retries: int = Field(default=3, ge=0, le=RetryHandlerOption.MAX_MAX_RETRIES)
 
-    # Named fields rather than a model validator over the whole dict: pydantic resolves the names
-    # at class-definition time, so renaming a field here becomes an import error instead of a
-    # validator that silently stops firing.
     @field_validator("log_level", "app_env", mode="before")
     @classmethod
     def _lowercase(cls, value: object) -> object:
-        """Accept uppercase `LOG_LEVEL=INFO` and `APP_ENV=PRODUCTION` from operators.
-
-        Trap: pydantic's `StrEnum` coercion is case-sensitive, so without this step an uppercase
-        value aborts startup instead.
-        """
         return value.lower() if isinstance(value, str) else value
 
     @model_validator(mode="after")
     def _reject_local_base_url_in_production(self) -> Self:
-        """Trap: without this check, the server logs nothing, and clients fail to connect."""
         if self.app_env != AppEnv.PRODUCTION:
             return self
         host = self.public_base_url.host
@@ -159,8 +125,6 @@ class AppConfig(BaseSettings):
 
     @model_validator(mode="after")
     def _reject_cleartext_base_url_in_production(self) -> Self:
-        """Trap: nothing downstream fails closed — the auth provider logs a warning for http and
-        then drops `Secure` from its OAuth consent cookies."""
         if self.app_env != AppEnv.PRODUCTION:
             return self
         if self.public_base_url.scheme != "https":
@@ -173,25 +137,10 @@ class AppConfig(BaseSettings):
 
     @property
     def issuer(self) -> str:
-        """Trap: `HttpUrl` renders with a trailing slash, so joining a path onto it gives
-        `https://host//authorize`."""
         return str(self.public_base_url).rstrip("/")
 
 
 class SurfaceConfig(BaseSettings):
-    """Which tools this deployment runs, and so what every user is asked to consent to at sign-in.
-
-    Exactly one of the two is a selection. Both set is an error naming which to remove, rather than
-    a precedence rule nobody remembers. Neither set is an error too, because **there is no
-    default**: a default of "every tool" makes the widest consent screen the thing an operator gets
-    by not choosing, which is the whole of what this knob exists to stop. `TOOLS_PRESET=teams`
-    keeps "everything" a one-word but chosen value.
-
-    Narrowing a live deployment costs nothing. Widening one adds a permission to the authorize
-    request, so every signed-in user meets AADSTS65001 on the new tool until they sign in again —
-    the same footnote the README carries for rotating the client secret.
-    """
-
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict()
 
     tools_preset: ToolsPreset | None = None
@@ -200,18 +149,12 @@ class SurfaceConfig(BaseSettings):
     @field_validator("tools_enabled", mode="before")
     @classmethod
     def _split_the_list_an_operator_writes(cls, value: object) -> object:
-        """Trap: pydantic-settings JSON-decodes an env var whose field is a collection, before any
-        validator here runs. `NoDecode` turns that off. The `| None` is load-bearing too: at the
-        pinned version the decode failure is tolerated only because the field is a union.
-        """
         if not isinstance(value, str):
             return value
         return tuple(name.strip() for name in value.split(",") if name.strip())
 
     @model_validator(mode="after")
     def _require_exactly_one_selection(self) -> Self:
-        """None of the three is fixable after the fact: a permission not requested at sign-in
-        cannot be redeemed later, and neither failure shows up in this server's logs."""
         if self.tools_preset is not None and self.tools_enabled is not None:
             raise ValueError(
                 "TOOLS_PRESET and TOOLS_ENABLED are alternatives and both are set: remove one. "
@@ -233,7 +176,6 @@ class SurfaceConfig(BaseSettings):
         return self
 
 
-# Entra's authority literal for a multi-tenant (`AzureADMultipleOrgs`) registration.
 ORGANIZATIONS = "organizations"
 
 _PERSONAL_ACCOUNT_AUTHORITIES = frozenset({"common", "consumers"})
@@ -242,9 +184,6 @@ _NAMED_AUTHORITIES = _PERSONAL_ACCOUNT_AUTHORITIES | {ORGANIZATIONS}
 
 
 class EntraConfig(BaseSettings):
-    """Microsoft Entra app registration. `client_secret` is optional to AzureProvider but required
-    here: the On-Behalf-Of exchange that calls Graph as the user needs one."""
-
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="ENTRA_")
 
     tenant_id: str = Field(min_length=1)
@@ -274,12 +213,6 @@ class EntraConfig(BaseSettings):
 
 
 class DatabaseConfig(BaseSettings):
-    """PostgreSQL connection settings. Accept DB_URL or discrete fields.
-
-    Expose driver_dsn only. Trap: no second engine-shaped rendering. Two shapes negotiate TLS
-    differently.
-    """
-
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="DB_")
 
     url: PostgresDsn | None = None
@@ -293,13 +226,6 @@ class DatabaseConfig(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def accept_database_url(cls, data: object) -> object:
-        """Accept DATABASE_URL (the base Helm chart's alias) as a last resort.
-
-        Any source that sets `url`, or any one of `host`/`name`/`user`/`password`, suppresses the
-        fallback entirely — the env var is read only when nothing else names a database. Trap:
-        without that guard, an explicit `DatabaseConfig(host=...)` call silently loses its
-        arguments to the ambient environment instead.
-        """
         if not isinstance(data, dict):
             return data
         values = cast("dict[str, object]", data)
@@ -335,11 +261,8 @@ class DatabaseConfig(BaseSettings):
             "the missing-field check above must leave every discrete part set"
         )
 
-        # An unescaped delimiter reparses the DSN, and `quote`'s default leaves `/` alone, so
-        # `safe=""` is what forces full escaping.
         userinfo = f"{quote(self.user, safe='')}:{quote(self.password, safe='')}"
         database = quote(self.name, safe="")
-        # The host is written as given, so a bracketed IPv6 literal keeps its brackets.
         self._driver_dsn = f"postgresql://{userinfo}@{self.host}:{self.port}/{database}"
         return self
 
