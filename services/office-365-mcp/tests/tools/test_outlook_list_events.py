@@ -1,8 +1,3 @@
-"""Microsoft interprets `startDateTime` and `endDateTime` by the offset written into the value
-itself and by nothing else, so a bound rendered without an offset, or in the wrong zone, answers
-a different week correctly.
-"""
-
 from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import cast
@@ -22,8 +17,6 @@ from office_365_mcp.tools import outlook_list_events as lister
 
 from .conftest import GRAPH_V1
 
-# No `=` in a calendar id: this half of the pair travels in the URL path, and an assertion on a
-# path respx never matched proves nothing about the route the tool addressed.
 _MY_CALENDAR_ID = "AAMkADAwSYNTHETIC-calendar-default"
 _SHARED_CALENDAR_ID = "AAMkADAwSYNTHETIC-calendar-shared"
 
@@ -36,7 +29,6 @@ _FIRST_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 _SECOND_ID = "AAMkAGI2SYNTHETIC-immutable-0002="
 _THIRD_ID = "AAMkAGI2SYNTHETIC-immutable-0003="
 
-# July in Zurich is UTC+2, so the offset in a rendered bound is visible rather than assumed.
 _SUMMER_MONDAY = date(2026, 7, 6)
 _SUMMER_SUNDAY = date(2026, 7, 12)
 _ZURICH = "Europe/Zurich"
@@ -85,8 +77,6 @@ def _event_payload(
     series_master_id: str | None = "AAMkAGI2SYNTHETIC-series-0001=",
     owner_response: str | None = "organizer",
 ) -> dict[str, object]:
-    """`timeZone` is `UTC` because this tool sends no `Prefer: outlook.timezone`, and Microsoft
-    documents UTC as what a calendar view answers in without it."""
     return {
         "id": event_id,
         "subject": subject,
@@ -122,8 +112,6 @@ def _page(*events: dict[str, object], next_link: str | None = None) -> httpx.Res
 
 
 def _fields(node: object, at: str, *, root: Mapping[str, object]) -> dict[str, object]:
-    """Pydantic publishes a nested model as a `$ref` into the schema's own `$defs` rather than
-    inline, so a walk that skips it checks only the top level and calls that the whole answer."""
     schema = _resolved(node, root=root)
     found: dict[str, object] = {}
     properties = schema.get("properties")
@@ -207,8 +195,6 @@ class TestTheQueryItComposes:
     async def test_it_asks_for_the_shared_summary_fields_and_nothing_else(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """Microsoft warns that a large page with no `$select` risks a gateway timeout, and
-        `createdDateTime` and `lastModifiedDateTime` do not support `$select` at all."""
         _ = await lister.list_events(
             client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=25
         )
@@ -220,8 +206,6 @@ class TestTheQueryItComposes:
     async def test_the_callers_limit_is_the_page_size_it_asks_microsoft_for(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """Microsoft documents a calendar view's `$top` as a minimum of 1 and a maximum of 1000,
-        and this tool's own cap is far inside that."""
         _ = await lister.list_events(
             client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=7
         )
@@ -242,8 +226,6 @@ class TestTheQueryItComposes:
     async def test_a_call_that_narrows_nothing_sends_no_filter_at_all(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """The plain window is what almost every call asks for, and an empty `$filter=` is not the
-        same request as no `$filter`."""
         _ = await lister.list_events(
             client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=25
         )
@@ -260,8 +242,6 @@ class TestTheQueryItComposes:
     async def test_cancelled_is_narrowed_by_microsoft_rather_than_over_the_rows(
         self, client: GraphServiceClient, my_view: respx.Route, cancelled: bool, expected: str
     ) -> None:
-        """Against a live tenant `eq false` answered a whole 23-row window and `eq true` answered
-        none of it, which partitions the window and so proves Graph evaluated the term."""
         _ = await lister.list_events(
             client,
             starts_on=_MARCH_MONDAY,
@@ -284,11 +264,6 @@ class TestTheQueryItComposes:
         my_view: respx.Route,
         owner_response: lister.OwnerResponse,
     ) -> None:
-        """`responseStatus/response` IS filterable on `calendarView` on its own, which is the trap:
-        a live probe on 2026-09-10 found a nested path returns 500 as soon as it is conjoined with
-        any other property, in both orders and parenthesised. So the one argument that could be
-        pushed down alone is the one that must never be, because `cancelled=false` beside
-        `owner_response="accepted"` is the combination a caller most wants and would crash."""
         _ = await lister.list_events(
             client,
             starts_on=_MARCH_MONDAY,
@@ -319,8 +294,6 @@ class TestTheQueryItComposes:
     async def test_an_apostrophe_in_a_subject_fragment_cannot_end_the_odata_literal(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """A quote left as it came closes the literal early and leaves the rest of the caller's own
-        text standing as predicate syntax, which Graph answers instead of the question asked."""
         _ = await lister.list_events(
             client,
             starts_on=_MARCH_MONDAY,
@@ -337,9 +310,6 @@ class TestTheQueryItComposes:
     async def test_the_owner_response_it_cannot_send_it_applies_to_the_rows_instead(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """The argument contributes nothing to the wire, so this is the only thing that makes it
-        mean anything. Without this the tool would accept `owner_response` and silently ignore it.
-        """
         _ = my_view.mock(
             return_value=_page(
                 _event_payload("AAMkAGI2accepted==", owner_response="accepted"),
@@ -364,8 +334,6 @@ class TestTheQueryItComposes:
     async def test_a_row_graph_recorded_no_answer_on_is_not_a_notresponded(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """`notResponded` is an answer Microsoft states. A missing `responseStatus` is the absence
-        of one, and reading it as `notResponded` would invent an invitation nobody was sent."""
         _ = my_view.mock(
             return_value=_page(_event_payload("AAMkAGI2nothing==", owner_response=None))
         )
@@ -404,10 +372,6 @@ class TestTheQueryItComposes:
         subject_contains: str | None,
         expected: str,
     ) -> None:
-        """A live tenant honoured the two flat conjuncts joined this way, and a term this tool
-        composed but Graph ignored would widen the answer without widening what the tool reports.
-        `owner_response` is passed in every case here and contributes to none of them: it is the
-        nested path that 500s the moment it is conjoined."""
         _ = await lister.list_events(
             client,
             starts_on=_MARCH_MONDAY,
@@ -424,8 +388,6 @@ class TestTheQueryItComposes:
     async def test_a_filter_does_not_displace_the_order_the_rows_are_promised_in(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """`$filter` beside `$orderby=start/dateTime` returned the full row set against a live
-        tenant, so neither parameter has to give way to the other."""
         _ = await lister.list_events(
             client,
             starts_on=_MARCH_MONDAY,
@@ -443,8 +405,6 @@ class TestTheQueryItComposes:
     async def test_the_listing_asks_for_ids_that_outlive_the_event_being_filed(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """The same preference outlook_read_event sends on the way in: without it these handles
-        would be `RestId`s, which die the moment Outlook moves the event."""
         _ = await lister.list_events(
             client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=25
         )
@@ -455,8 +415,6 @@ class TestTheQueryItComposes:
     async def test_the_preference_is_supplied_again_for_every_page(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`PageIterator` starts from an empty header collection, so a page fetched without it
-        would answer in the other id space and mint handles that 404."""
         cursor = graph.get(_MY_VIEW, params={"$skiptoken": "second"}).mock(
             return_value=_page(_event_payload(_SECOND_ID))
         )
@@ -477,8 +435,6 @@ class TestTheQueryItComposes:
     async def test_no_request_asks_exchange_to_render_the_times(
         self, client: GraphServiceClient, my_calendar: respx.Route, my_view: respx.Route
     ) -> None:
-        """`Prefer: outlook.timezone` would move the conversion into Exchange, where a zone name it
-        rejects fails the whole request instead of costing one field."""
         _ = await lister.list_events(
             client,
             starts_on=_SUMMER_MONDAY,
@@ -494,8 +450,6 @@ class TestTheQueryItComposes:
     async def test_the_preference_does_not_leak_onto_the_calendar_read(
         self, client: GraphServiceClient, my_calendar: respx.Route
     ) -> None:
-        """Kiota's `RequestConfiguration.headers` default is one collection shared process-wide, so
-        a preference added to it would reach the calendar read of every later call."""
         _ = await lister.list_events(
             client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=25
         )
@@ -512,8 +466,6 @@ class TestTheCalendarItAddresses:
     async def test_no_calendar_ref_reads_the_mailboxs_own_primary_calendar(
         self, client: GraphServiceClient, graph: respx.MockRouter, my_view: respx.Route
     ) -> None:
-        """`GET /me/calendar` is the primary calendar, and `GET /me/calendars/{id}` needs an id
-        nobody supplied."""
         shared = graph.get(_SHARED_CALENDAR)
 
         _ = await lister.list_events(
@@ -559,8 +511,6 @@ class TestTheCalendarItAddresses:
     async def test_the_view_is_addressed_by_the_id_the_calendar_read_returned(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph puts no calendar id on a calendar view row, so the id the pre-read reported is the
-        only one that can address the view or complete a handle."""
         elsewhere = graph.get("/me/calendar/calendarView")
 
         _ = await lister.list_events(
@@ -660,8 +610,6 @@ class TestWhatItAnswers:
     async def test_the_calendar_envelope_says_whose_it_is_and_leaves_is_mine_unknown(
         self, client: GraphServiceClient
     ) -> None:
-        """This tool reads no `/me`, so `is_mine` is null rather than a guess. Null means unknown
-        and never false."""
         answer = await lister.list_events(
             client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=25
         )
@@ -696,8 +644,6 @@ class TestWhatItAnswers:
     async def test_a_canceled_row_is_flagged_rather_than_dropped(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """A canceled event stays in a calendar until somebody removes it, so hiding it here would
-        report a slot as free while Outlook still shows it."""
         my_view.mock(return_value=_page(_event_payload(_FIRST_ID, is_cancelled=True)))
 
         answer = await lister.list_events(
@@ -731,8 +677,6 @@ class TestWhatItAnswers:
     async def test_omitting_cancelled_lists_the_called_off_rows_as_well(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """A cancelled event stays in the calendar until somebody removes it, so hiding it by
-        default would answer "nothing is on" for a day that had a meeting until this morning."""
         my_view.mock(
             return_value=_page(
                 _event_payload(_FIRST_ID, is_cancelled=True),
@@ -753,8 +697,6 @@ class TestWhatItAnswers:
     async def test_the_pages_of_a_window_are_followed_rather_than_read_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The cursor route is registered before the bare one, which respx matches in registration
-        order: the bare path matches a `$skiptoken` request too and would answer every page."""
         graph.get(_MY_VIEW, params={"$skiptoken": "second"}).mock(
             return_value=_page(_event_payload(_SECOND_ID))
         )
@@ -794,8 +736,6 @@ class TestWhatItAnswers:
     async def test_a_window_filled_exactly_by_its_own_end_is_not_capped(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """`capped` means a cap stopped the walk with more still on offer, never that the answer
-        was short."""
         my_view.mock(return_value=_page(_event_payload(_FIRST_ID), _event_payload(_SECOND_ID)))
 
         answer = await lister.list_events(
@@ -809,8 +749,6 @@ class TestWhatItAnswers:
     async def test_a_narrowed_window_microsoft_answered_with_nothing_is_not_capped(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """This is the difference between "nobody has such a meeting" and "this call did not reach
-        it", and a model widens the window only for the second."""
         my_view.mock(return_value=_page())
 
         answer = await lister.list_events(
@@ -828,8 +766,6 @@ class TestWhatItAnswers:
     async def test_a_narrowed_call_that_filled_the_limit_still_says_capped(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """Narrowing runs inside the query, so every row that arrives already matched: `limit` is
-        the only thing left that can stop the walk short."""
         my_view.mock(
             return_value=_page(
                 _event_payload(_FIRST_ID),
@@ -877,10 +813,6 @@ class TestWhatItRefuses:
     async def test_a_window_of_any_width_reaches_graph(
         self, client: GraphServiceClient, my_calendar: respx.Route, my_view: respx.Route
     ) -> None:
-        """This tool used to refuse a window wider than a quarter. The refusal protected nothing:
-        `$top` and `limit` bound the rows fetched, not the width, so a year costs exactly what a
-        week costs. What a wide window really does is answer with the START of the range, because
-        the rows arrive earliest first — and `capped` already reports that."""
         _ = await lister.list_events(
             client, starts_on=date(2026, 1, 1), ends_on=date(2026, 12, 31), limit=25
         )
@@ -892,8 +824,6 @@ class TestWhatItRefuses:
     async def test_a_wide_window_asks_for_no_more_rows_than_a_narrow_one(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
-        """The whole case for removing the cap: width does not buy rows. If a refactor ever let the
-        window reach `$top`, this is what catches it."""
         for ends_on in (date(2026, 1, 8), date(2027, 1, 1)):
             _ = await lister.list_events(
                 client, starts_on=date(2026, 1, 1), ends_on=ends_on, limit=25
@@ -916,8 +846,6 @@ class TestWhatItRefuses:
     async def test_a_zone_zoneinfo_cannot_resolve_never_reaches_graph(
         self, client: GraphServiceClient, my_calendar: respx.Route, time_zone: str
     ) -> None:
-        """Graph accepts a Windows zone name in an event's own `timeZone`, so a model that read one
-        off a previous answer arrives here with it. This argument is IANA only."""
         with pytest.raises(ToolError, match="IANA"):
             _ = await lister.list_events(
                 client,
@@ -944,8 +872,6 @@ class TestWhatItRefuses:
     async def test_the_zone_refusal_warns_that_an_etc_gmt_key_reverses_its_sign(
         self, client: GraphServiceClient
     ) -> None:
-        """`Etc/GMT+2` is a key the database holds, at two hours behind UTC. The refusal turns
-        down `+02:00`, so it names that key as well and says which way the sign runs."""
         with pytest.raises(ToolError, match="Etc/GMT") as refused:
             _ = await lister.list_events(
                 client,
@@ -1045,8 +971,6 @@ class TestTheSchemaItPublishes:
     async def test_a_fragment_too_short_to_filter_anything_is_refused_by_the_schema(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """An optional string publishes as an `anyOf` of the constrained string and null, so the
-        bound sits on the first branch rather than on the property."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -1061,9 +985,6 @@ class TestTheSchemaItPublishes:
     async def test_no_argument_is_published_that_microsoft_cannot_narrow_on(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Every spelling of `attendees/any(...)` is a 400 on a calendar view, and an
-        `organizer/emailAddress/address` term answers 200 with no rows for an organizer that
-        demonstrably has them — so this tool offers no way to ask for one person's meetings."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -1074,22 +995,16 @@ class TestTheSchemaItPublishes:
             "an argument with no server-side route silently under-returns, which is unrecoverable"
         )
 
-    def test_the_description_sends_a_model_to_local_for_an_all_day_row(self) -> None:
-        """Graph holds an all-day event at midnight UTC, so `iso` names the day before only west
-        of UTC; this now lives on the `iso` field itself rather than the tool description, which
-        says so rather than claim `iso` carries no date at all."""
+    def test_the_iso_field_says_it_can_be_null(self) -> None:
         described = EventTime.model_fields["iso"].description
 
         assert described is not None
-        assert "the value to compare, to sort on, and to quote" in described
-        assert "In a zone west of UTC, this value names the day before" in described
-        assert "Read `local` for the date that such a row covers" in described
+        assert "comparing and sorting" in described
+        assert "null when the zone cannot be resolved" in described
 
     async def test_the_zone_argument_says_which_way_an_etc_gmt_key_runs(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """`Etc/GMT+2` resolves, at two hours behind UTC, so this argument accepts it and answers
-        the right meetings at the wrong hours. Nothing fails, so the argument says so."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
 
@@ -1114,7 +1029,6 @@ class TestTheSchemaItPublishes:
         assert tool is not None, "register left the tool off the server"
         answer = cast("Mapping[str, object]", tool.output_schema)
         published = _fields(answer, lister.TOOL_NAME, root=answer)
-        # Guards the guard: a walk that stopped descending passes by finding nothing to check.
         assert f"{lister.TOOL_NAME}.window.starts_at" in published
         assert f"{lister.TOOL_NAME}.events[].start.iso" in published
         assert f"{lister.TOOL_NAME}.calendar.owner.address" in published
@@ -1155,8 +1069,6 @@ class TestGraphFailures:
             )
 
     def test_the_permissions_are_the_ones_microsoft_documents(self) -> None:
-        """`Calendars.Read` reads the user's own calendars, and `Calendars.Read.Shared` is what
-        makes a delegated calendar legible at all."""
         assert lister.GRAPH_PERMISSIONS == ("Calendars.Read", "Calendars.Read.Shared")
 
     def test_a_calendar_that_will_not_resolve_is_answered_with_the_recovery_that_fits(self) -> None:

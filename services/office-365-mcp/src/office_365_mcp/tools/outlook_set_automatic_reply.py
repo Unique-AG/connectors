@@ -1,48 +1,3 @@
-"""`outlook_set_automatic_reply` — the out-of-office, on for a bounded window or off, never open.
-
-**`alwaysEnabled` is deliberately not offered. That absence is the shape of this tool.** It is
-Graph's third status, and it sets a reply with no end date. Every future sender is answered, the
-user's colleagues and strangers alike, until a human notices and turns it off in Outlook. That
-outlives the conversation that asked for it, including for whoever asked: they get the reply
-back the next time they write. So `scheduled` requires both `start` and `end`, and is refused
-without them. The only other status here is `disabled`.
-
-**This tool reads the whole `automaticRepliesSetting` first, then sends it back whole. It never
-sends only the properties that changed.** Microsoft's two PATCH documents show OPPOSITE merge
-behavior for a nested complex type. `user-update-mailboxsettings` Example 1
-(https://learn.microsoft.com/en-us/graph/api/user-update-mailboxsettings) sends
-`automaticRepliesSetting` carrying `status` and the two dates alone. Its 200 response still
-carries `externalAudience: all` and both reply messages: what was left out survived.
-`messagerule-update` (https://learn.microsoft.com/en-us/graph/api/messagerule-update) sends
-`actions` carrying `markImportance` alone, at a rule whose action was `forwardTo`. The response's
-`actions` is `markImportance` alone: what was left out is gone. Neither page says which of the
-two behaviors this endpoint's nested object follows. Sending every property, each taken from the
-argument that named it or from the mailbox's current value, makes the two behaviors produce the
-same object. So this tool never has to answer that question. Without this, an `external_message`
-of None either re-broadcasts whatever text was last in the mailbox, or silently erases it, and
-this tool cannot tell which one happened.
-
-**An omitted message keeps the text the mailbox already holds. There is no way to clear one.**
-That is the honest reading of the paragraph above, and it is also the only one the SDK can
-express. Kiota's JSON writer drops a property whose value is None, instead of writing an
-explicit null (`kiota_serialization_json/json_serialization_writer.py`). So "send nothing there"
-and "send null there" are the same bytes. `disabled` is how an automatic reply stops. The text
-left behind in the mailbox is inert while the status says so, and this tool reports it either
-way, instead of answering that there is none.
-
-**The answer is read off Graph's own response to the write, never off the arguments.**
-Microsoft's Example 1 sends `scheduledStartDateTime` as `2016-03-20T18:00:00.0000000` in UTC,
-and the response returns `2016-03-20T02:00:00.0000000` in UTC. Exchange stored a different
-moment from the one the request named. A tool that echoes its arguments reports a window the
-mailbox does not have. The user is then away at the wrong hours, with a transcript that says
-otherwise.
-
-**`no_retry()` on the PATCH.** The SDK retries every verb on 429, 503 and 504, and
-`GRAPH_MAX_RETRIES` defaults to 3. This write is idempotent, so the risk is not double
-application. The risk is that a retried PATCH is answered by a different response from the one
-that was applied. This tool's whole promise is that its answer is what the mailbox now holds.
-"""
-
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Annotated, Literal, Self
@@ -73,23 +28,14 @@ STEP_WRITE = "write_automatic_reply"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.ReadWrite",)
 
-# Switching the reply off, which is the one call that needs no other argument and still reaches
-# Graph. A `scheduled` example without both dates is refused before any request.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"status": "disabled"}
 
-# Microsoft's own spellings, so a value here matches the documentation, the admin center and
-# what outlook_get_mailbox_settings reports, instead of a vocabulary invented in this file.
 type SettableStatus = Literal["scheduled", "disabled"]
 type ReplyStatus = Literal["disabled", "alwaysEnabled", "scheduled"]
 type ExternalAudience = Literal["none", "contactsOnly", "all"]
 
-# The one property of the nine this tool reads and writes. Microsoft documents `mailboxSettings`
-# as requiring `$select`. Asking for the rest drags in a working-hours block that nothing here
-# reports, and that nothing here can overwrite.
 _SETTINGS_FIELDS: tuple[str, ...] = ("automaticRepliesSetting",)
 
-# Bound rather than aliased with `type`: this is spelled as the query parameters' constructor as
-# well as `RequestConfiguration`'s argument, and a `TypeAliasType` is not callable.
 _SettingsQuery = MailboxSettingsRequestBuilder.MailboxSettingsRequestBuilderGetQueryParameters
 
 _STATUS_TO_WRITE: Mapping[SettableStatus, AutomaticRepliesStatus] = {
@@ -103,20 +49,9 @@ _AUDIENCE_TO_WRITE: Mapping[ExternalAudience, ExternalAudienceScope] = {
     "all": ExternalAudienceScope.All,
 }
 
-_DESCRIPTION = """\
-This tool turns the automatic reply (out of office) of the signed-in user on for a fixed \
-window, or off, to set or clear an out-of-office message.
-
-Notes:
-- `status: "scheduled"` requires both `start` and `end`. This tool does not offer a reply \
-with no end date at all, because it answers every future sender long after anyone remembers \
-this call.
-- If you omit `internal_message` or `external_message`, this tool keeps the text already in \
-the mailbox and resends it. Read the answer rather than assuming an omitted message means none.
-- While the reply is on, everyone who emails this user gets a reply back automatically, \
-disclosed to whoever writes, including strangers and spam senders. Treat dates away, a \
-deputy's address, or a phone number in the text as public.
-"""
+_DESCRIPTION = (
+    "Turns the signed-in user's automatic reply (out of office) on for a fixed window, or off."
+)
 
 _NO_WINDOW = (
     "outlook_set_automatic_reply refused to schedule an automatic reply without both `start` and "
@@ -129,22 +64,8 @@ _NO_WINDOW = (
 
 
 class ReplyMoment(BaseModel):
-    """One end of the window, as the date and the zone Microsoft 365 reports it in."""
-
-    date_time: str | None = Field(
-        description=(
-            "The moment, in Graph's combined `{date}T{time}` format with no offset. Read it "
-            + "against `time_zone`. Null when Microsoft recorded none. This is what Microsoft "
-            + "stored, which does not always match what the request sent. Exchange can "
-            + "convert it, and the converted value is the one that the mailbox acts on."
-        )
-    )
-    time_zone: str | None = Field(
-        description=(
-            "The zone that `date_time` is expressed in, usually `UTC`. Never assume it. A "
-            + "window read in the wrong zone is off by hours."
-        )
-    )
+    date_time: str | None = Field(description="The moment, in Graph's combined date-time format.")
+    time_zone: str | None = Field(description="The zone that date_time is expressed in.")
 
     @classmethod
     def from_moment(cls, moment: DateTimeTimeZone | None) -> Self | None:
@@ -154,67 +75,21 @@ class ReplyMoment(BaseModel):
 
 
 class AutomaticReplyReport(BaseModel):
-    """The automatic reply as Microsoft 365 now holds it, read off its answer to this write.
-
-    Not one field of this is built from the arguments. A tool that echoes them reports a
-    success in exactly the case worth catching: the one where Exchange accepted the request and
-    stored something other than what it was asked for.
-    """
-
-    status: ReplyStatus | None = Field(
-        description=(
-            "`disabled`: nothing is sent. `scheduled`: senders are answered between "
-            + "`scheduled_start` and `scheduled_end`. `alwaysEnabled`: every sender is "
-            + "answered with no end date. This tool cannot set that value, so it here means "
-            + "that the mailbox already held it. Null when Microsoft reported no status. "
-            + "Anything other than `disabled` means that the messages below go out to people."
-        )
-    )
+    status: ReplyStatus | None = Field(description="disabled, scheduled, or alwaysEnabled.")
     external_audience: ExternalAudience | None = Field(
-        description=(
-            "Who outside this organization receives `external_message`. `none`: nobody, so "
-            + "only colleagues are answered. `contactsOnly`: only senders already in the "
-            + "user's contacts. `all`: every outside sender, strangers and spam included. "
-            + "Null when Microsoft did not say."
-        )
+        description="Who outside the organization receives external_message."
     )
-    scheduled_start: ReplyMoment | None = Field(
-        description=(
-            "When the reply starts, read back from Microsoft's response rather than from the "
-            + "`start` argument. Exchange can convert to a different moment, and this is the "
-            + "one that the mailbox acts on. Null when Microsoft reported none. This field is "
-            + "meaningless unless `status` is `scheduled`. A date on a `disabled` reply is "
-            + "leftover, not evidence."
-        )
-    )
-    scheduled_end: ReplyMoment | None = Field(
-        description=(
-            "When the reply stops, on the same terms as `scheduled_start`. This is the whole "
-            + "of what stops an automatic reply on its own. Nothing else expires it."
-        )
-    )
+    scheduled_start: ReplyMoment | None = Field(description="When the reply starts.")
+    scheduled_end: ReplyMoment | None = Field(description="When the reply stops.")
     internal_message: str | None = Field(
-        description=(
-            "The reply now sent to senders inside this organization, as Microsoft stored it: "
-            + "usually HTML, not the plain text that the request sent. Null when the mailbox "
-            + "holds none. A value here that nobody passed in this call is text that the "
-            + "mailbox already held, sent again automatically. Say so, instead of presenting "
-            + "it as new."
-        )
+        description="The reply sent to senders inside the organization, or null."
     )
     external_message: str | None = Field(
-        description=(
-            "The reply now sent to senders outside this organization, subject to "
-            + "`external_audience`. Null when the mailbox holds none. Read it for what it "
-            + "discloses to strangers, not only for whether a reply is on. Examples include "
-            + "dates away from home, a deputy's address, and a phone number."
-        )
+        description="The reply sent to senders outside the organization, or null."
     )
 
     @classmethod
     def from_setting(cls, setting: AutomaticRepliesSetting | None) -> Self:
-        """Every field null for a mailbox Microsoft answered with no setting at all, which says
-        "Microsoft told us nothing" and never "the reply is off"."""
         if setting is None:
             return cls(
                 status=None,
@@ -236,8 +111,6 @@ class AutomaticReplyReport(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class ReplyChange:
-    """What to write, separately from how it reaches Graph. A None here keeps the mailbox's own."""
-
     status: SettableStatus
     start: str | None = None
     end: str | None = None
@@ -254,15 +127,12 @@ class ReplyChange:
 async def set_automatic_reply(
     client: GraphServiceClient, *, change: ReplyChange
 ) -> AutomaticReplyReport:
-    """`change` written onto the whole `automaticRepliesSetting`, reported as Microsoft kept it."""
     if change.status == "scheduled" and change.has_no_window:
         raise ToolError(_NO_WINDOW)
 
     with graph_errors(TOOL_NAME):
         current = await _read_setting(client)
         written = await _write_setting(client, _whole_setting(current, change))
-        # A PATCH Microsoft answered with no setting on it leaves the promise above unkept, so the
-        # setting is read again rather than the arguments reported in its place.
         stored = written if written is not None else await _read_setting(client)
 
     return AutomaticReplyReport.from_setting(stored)
@@ -292,11 +162,6 @@ async def _write_setting(
 def _whole_setting(
     current: AutomaticRepliesSetting | None, change: ReplyChange
 ) -> AutomaticRepliesSetting:
-    """Every property of the setting, from the argument that named it or from the mailbox.
-
-    A fresh object rather than the one that was read: `current` is the caller's, and the merge
-    behavior this defends against is exactly the kind of thing an in-place edit hides.
-    """
     stored = current if current is not None else AutomaticRepliesSetting()
     return AutomaticRepliesSetting(
         status=_STATUS_TO_WRITE[change.status],
@@ -315,8 +180,6 @@ def _whole_setting(
 def _audience(
     asked: ExternalAudience | None, stored: ExternalAudienceScope | None
 ) -> ExternalAudienceScope:
-    """`none` when neither the caller nor the mailbox says, because it discloses the least: the
-    reply then reaches colleagues only, and nobody outside the organization."""
     if asked is not None:
         return _AUDIENCE_TO_WRITE[asked]
     return stored if stored is not None else ExternalAudienceScope.None_
@@ -370,77 +233,31 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     async def outlook_set_automatic_reply(
         status: Annotated[
             SettableStatus,
-            Field(
-                description=(
-                    "`scheduled` switches the automatic reply on between `start` and `end`, "
-                    + "both of which are then required. `disabled` switches it off, and is the "
-                    + "only way to stop one through this connector. This tool does not offer "
-                    + "Microsoft's `alwaysEnabled`, an automatic reply with no end date."
-                )
-            ),
+            Field(description="scheduled turns the reply on between start and end; disabled off."),
         ],
         start: Annotated[
             str | None,
-            Field(
-                description=(
-                    "When the reply starts, as an ISO-8601 date-time without an offset, for "
-                    + "example `2026-09-01T08:00:00`. Read against `time_zone`. Required with "
-                    + "`scheduled`. Microsoft accepts a future range only. Omitting it keeps "
-                    + "whatever dates the mailbox already had."
-                )
-            ),
+            Field(description="When the reply starts, ISO-8601. Required with scheduled."),
         ] = None,
         end: Annotated[
             str | None,
-            Field(
-                description=(
-                    "When the reply stops, on the same terms as `start`, and required with "
-                    + "`scheduled`. Ask the user for a real date rather than a distant one "
-                    + "standing in for 'until I say otherwise'."
-                )
-            ),
+            Field(description="When the reply stops, same form as start. Required with scheduled."),
         ] = None,
         time_zone: Annotated[
             str,
-            Field(
-                description=(
-                    "The zone that `start` and `end` are expressed in: a Windows or IANA name "
-                    + "such as `UTC`, `W. Europe Standard Time`, or `Europe/Zurich`. Defaults "
-                    + "to `UTC`. Without this argument, this tool treats a local time as a UTC "
-                    + "time, and the user is away at the wrong hours."
-                )
-            ),
+            Field(description="The zone start and end are expressed in. Defaults to UTC."),
         ] = "UTC",
         internal_message: Annotated[
             str | None,
-            Field(
-                description=(
-                    "The text sent automatically to senders inside the organization. Plain "
-                    + "text or HTML. Outlook stores and shows it as HTML. Omit this argument "
-                    + "to keep the text that the mailbox already holds, which this tool then "
-                    + "resends to everyone who writes."
-                )
-            ),
+            Field(description="The text sent to senders inside the organization."),
         ] = None,
         external_message: Annotated[
             str | None,
-            Field(
-                description=(
-                    "The text sent automatically to senders outside the organization, as far "
-                    + "as `external_audience` allows. Omit this argument to keep the text "
-                    + "already in the mailbox."
-                )
-            ),
+            Field(description="The text sent to senders outside the organization."),
         ] = None,
         external_audience: Annotated[
             ExternalAudience | None,
-            Field(
-                description=(
-                    "Who outside the organization is answered at all: `none`, `contactsOnly`, "
-                    + "or `all`. Omit this argument to keep what the mailbox is already set "
-                    + "to, which can well be `all`."
-                )
-            ),
+            Field(description="Who outside the organization is answered at all."),
         ] = None,
         client: GraphServiceClient = graph,
     ) -> AutomaticReplyReport:

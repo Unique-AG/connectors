@@ -1,12 +1,3 @@
-"""`outlook_disable_mail_rule`: what it cannot express, what it reads before it writes, and whose
-answer it reports.
-
-Every response body here is synthesised. No mailbox was written to. The forwarding rule the tests
-disable is shaped like Microsoft's own worked example on the create endpoint — `forwardTo` an
-outside address plus `stopProcessingRules` — because that is the rule this tool exists to turn off
-and the one it must never be able to turn back on.
-"""
-
 import json
 from collections.abc import Mapping
 from typing import cast
@@ -31,16 +22,13 @@ from office_365_mcp.tools.outlook_disable_mail_rule import (
 
 _RULE_ID = "AQAAAJ5dZqSYNTHETIC="
 
-# Spelled by the one module allowed to spell them, so a change to the grammar reaches this file.
 _RULE_REF = MailRuleHandle(_RULE_ID).uri
 
-# The SDK re-encodes the id for the URL, so this is what the decoded handle comes back as.
 _RULE_PATH = "/me/mailFolders/inbox/messageRules/AQAAAJ5dZqSYNTHETIC%3D"
 
 _OUTSIDE = "collector@elsewhere.invalid"
 _ARCHIVE_FOLDER_ID = "AQMkADAwSYNTHETIC-archive"
 
-# Rule properties nothing in this tool can name, so nothing downstream has to filter them out.
 _UNWRITABLE: tuple[str, ...] = ("actions", "conditions", "exceptions", "displayName", "sequence")
 
 
@@ -62,7 +50,6 @@ def _rule(
     is_read_only: bool | None = False,
     actions: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    """`actions=None` is a rule Microsoft reported no actions object for at all."""
     payload: dict[str, object] = {
         "id": _RULE_ID,
         "displayName": display_name,
@@ -91,7 +78,6 @@ def writes(graph: respx.MockRouter) -> respx.Route:
 
 
 def _sent(route: respx.Route) -> Mapping[str, object]:
-    """The JSON this tool actually put on the wire for the last write on `route`."""
     return cast("dict[str, object]", json.loads(route.calls.last.request.content))
 
 
@@ -111,8 +97,6 @@ class TestWhatCannotBeAskedForAtAll:
     async def test_the_schema_admits_no_way_to_switch_a_rule_on(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Re-arming an existing forwarding rule needs no permission this deployment lacks, so
-        `enabled` is typed to the single value false rather than checked in the body."""
         tool = await _registered(transport)
 
         assert _arguments(tool)["enabled"]["const"] is False
@@ -121,8 +105,6 @@ class TestWhatCannotBeAskedForAtAll:
     async def test_nothing_a_rule_does_can_be_named_in_a_call(
         self, transport: httpx.AsyncClient, unwritable: str
     ) -> None:
-        """Creating a rule is absent for the same reason as enabling one: Microsoft's own worked
-        example for the create endpoint is a `forwardTo` rule."""
         tool = await _registered(transport)
 
         assert unwritable not in _arguments(tool)
@@ -131,8 +113,6 @@ class TestWhatCannotBeAskedForAtAll:
     async def test_the_only_property_on_the_wire_is_the_one_being_turned_off(
         self, client: GraphServiceClient, writes: respx.Route
     ) -> None:
-        """kiota omits a property that was never set, so a rule's actions, conditions and name
-        cannot be rewritten through this PATCH even by accident."""
         _ = await disable_mail_rule(client, rule_ref=_RULE_REF)
 
         assert _sent(writes) == {"isEnabled": False}
@@ -151,8 +131,6 @@ class TestItRecordsWhatItTurnedOff:
     async def test_the_answer_names_the_outside_address_the_rule_was_forwarding_to(
         self, client: GraphServiceClient
     ) -> None:
-        """A rule's display name is a label its author chose — this one is called `Newsletters` —
-        so what it did has to be in the answer as its own field."""
         answer = await disable_mail_rule(client, rule_ref=_RULE_REF)
 
         assert answer.forwarded_to == [_OUTSIDE]
@@ -188,7 +166,6 @@ class TestItRecordsWhatItTurnedOff:
     async def test_a_recipient_microsoft_recorded_no_address_for_is_named_rather_than_dropped(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A destination left out of the answer is a destination the user does not know about."""
         _ = graph.get(_RULE_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -217,8 +194,6 @@ class TestItRecordsWhatItTurnedOff:
     async def test_a_rule_that_was_already_off_says_so(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Reporting a change that did not happen is how a user comes away believing something was
-        just switched off that had been off for months."""
         _ = graph.get(_RULE_PATH).mock(
             return_value=httpx.Response(
                 200, json=_rule(is_enabled=False, actions=_forwarding_actions())
@@ -245,8 +220,6 @@ class TestItAnswersWithMicrosoftsOwnWord:
     async def test_a_rule_microsoft_still_reports_as_running_is_the_answer(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A tool echoing its argument would report every write as a success, including the one
-        case worth catching."""
         _ = graph.patch(_RULE_PATH).mock(
             return_value=httpx.Response(200, json=_rule(is_enabled=True))
         )
@@ -271,8 +244,6 @@ class TestWhatItRefusesBeforeWritingAnything:
     async def test_a_read_only_rule_is_refused_and_never_written_to(
         self, client: GraphServiceClient, graph: respx.MockRouter, writes: respx.Route
     ) -> None:
-        """Microsoft documents the flag as a rule the rules API cannot modify, so the PATCH would
-        fail; saying which rule and why is better than handing back an error about an id."""
         _ = graph.get(_RULE_PATH).mock(
             return_value=httpx.Response(
                 200, json=_rule(is_read_only=True, actions=_forwarding_actions())
@@ -339,8 +310,6 @@ class TestHowItDeclaresItself:
     async def test_it_says_it_writes_and_that_writing_the_same_thing_twice_is_safe(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Disabling a rule that is already off changes nothing, and nothing it writes destroys
-        state it did not read: the rule's actions, conditions and name all survive."""
         tool = await _registered(transport)
 
         assert tool.annotations is not None
@@ -366,4 +335,4 @@ class TestHowItDeclaresItself:
 
         described = tool.description or ""
         assert "cannot enable a rule" in described
-        assert "one click in Outlook" in described
+        assert "clicks once in Outlook" in described

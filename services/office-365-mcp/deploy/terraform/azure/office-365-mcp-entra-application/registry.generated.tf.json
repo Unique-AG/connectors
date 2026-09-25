@@ -47,6 +47,18 @@
           ]
         },
         {
+          "name": "teams_send_chat_message",
+          "permissions": [
+            "ChatMessage.Send"
+          ]
+        },
+        {
+          "name": "teams_send_channel_message",
+          "permissions": [
+            "ChannelMessage.Send"
+          ]
+        },
+        {
           "name": "teams_list_meeting_transcripts",
           "permissions": [
             "OnlineMeetings.Read",
@@ -71,19 +83,22 @@
           "name": "outlook_search_mail",
           "permissions": [
             "Mail.Read",
-            "User.Read"
+            "User.Read",
+            "Mail.Read.Shared"
           ]
         },
         {
           "name": "outlook_read_mail",
           "permissions": [
-            "Mail.Read"
+            "Mail.Read",
+            "Mail.Read.Shared"
           ]
         },
         {
           "name": "outlook_browse_folders",
           "permissions": [
-            "Mail.Read"
+            "Mail.Read",
+            "Mail.Read.Shared"
           ]
         },
         {
@@ -97,13 +112,15 @@
         {
           "name": "outlook_read_thread",
           "permissions": [
-            "Mail.Read"
+            "Mail.Read",
+            "Mail.Read.Shared"
           ]
         },
         {
           "name": "outlook_list_mail",
           "permissions": [
-            "Mail.Read"
+            "Mail.Read",
+            "Mail.Read.Shared"
           ]
         },
         {
@@ -115,32 +132,38 @@
         {
           "name": "outlook_mark_mail",
           "permissions": [
-            "Mail.ReadWrite"
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
           ]
         },
         {
           "name": "outlook_move_mail",
           "permissions": [
-            "Mail.ReadWrite"
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
           ]
         },
         {
           "name": "outlook_draft_mail",
           "permissions": [
-            "Mail.ReadWrite"
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
           ]
         },
         {
           "name": "outlook_draft_reply",
           "permissions": [
-            "Mail.ReadWrite"
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
           ]
         },
         {
           "name": "outlook_send_draft",
           "permissions": [
             "Mail.Send",
-            "Mail.ReadBasic"
+            "Mail.ReadBasic",
+            "Mail.Send.Shared",
+            "Mail.Read.Shared"
           ]
         },
         {
@@ -153,6 +176,12 @@
           "name": "outlook_disable_mail_rule",
           "permissions": [
             "MailboxSettings.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_list_categories",
+          "permissions": [
+            "MailboxSettings.Read"
           ]
         },
         {
@@ -178,6 +207,18 @@
           ]
         },
         {
+          "name": "outlook_check_availability",
+          "permissions": [
+            "Calendars.ReadBasic"
+          ]
+        },
+        {
+          "name": "outlook_suggest_meeting_times",
+          "permissions": [
+            "Calendars.Read.Shared"
+          ]
+        },
+        {
           "name": "outlook_create_event",
           "permissions": [
             "Calendars.ReadWrite"
@@ -189,6 +230,24 @@
             "Calendars.Read",
             "Calendars.Read.Shared",
             "Calendars.ReadWrite.Shared"
+          ]
+        },
+        {
+          "name": "outlook_update_event",
+          "permissions": [
+            "Calendars.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_cancel_event",
+          "permissions": [
+            "Calendars.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_respond_to_invite",
+          "permissions": [
+            "Calendars.ReadWrite"
           ]
         },
         {
@@ -339,6 +398,8 @@
         "teams_browse_channel",
         "teams_search_messages",
         "teams_read_message",
+        "teams_send_chat_message",
+        "teams_send_channel_message",
         "teams_list_meeting_transcripts",
         "teams_read_transcript",
         "teams_list_meeting_recordings",
@@ -356,11 +417,17 @@
         "outlook_send_draft",
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",
+        "outlook_list_categories",
         "outlook_list_calendars",
         "outlook_list_events",
         "outlook_read_event",
+        "outlook_check_availability",
+        "outlook_suggest_meeting_times",
         "outlook_create_event",
         "outlook_create_event_on_behalf",
+        "outlook_update_event",
+        "outlook_cancel_event",
+        "outlook_respond_to_invite",
         "sharepoint_search_files",
         "sharepoint_browse_folder",
         "sharepoint_read_file",
@@ -426,6 +493,13 @@
           "teams_read_transcript",
           "teams_list_meeting_recordings"
         ],
+        "teams-write": [
+          "teams_list_chats",
+          "teams_list_my_teams",
+          "teams_list_channels",
+          "teams_send_chat_message",
+          "teams_send_channel_message"
+        ],
         "outlook-read": [
           "outlook_search_mail",
           "outlook_read_mail",
@@ -460,7 +534,8 @@
           "outlook_send_draft"
         ],
         "outlook-mailbox": [
-          "outlook_get_mailbox_settings"
+          "outlook_get_mailbox_settings",
+          "outlook_list_categories"
         ],
         "outlook-automate": [
           "outlook_get_mailbox_settings",
@@ -470,19 +545,31 @@
         "outlook-calendar": [
           "outlook_list_calendars",
           "outlook_list_events",
-          "outlook_read_event"
+          "outlook_read_event",
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times"
         ],
         "outlook-calendar-write": [
           "outlook_list_calendars",
           "outlook_list_events",
           "outlook_read_event",
-          "outlook_create_event"
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times",
+          "outlook_create_event",
+          "outlook_update_event",
+          "outlook_cancel_event",
+          "outlook_respond_to_invite"
         ],
         "outlook-calendar-delegate": [
           "outlook_list_calendars",
           "outlook_list_events",
           "outlook_read_event",
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times",
           "outlook_create_event",
+          "outlook_update_event",
+          "outlook_cancel_event",
+          "outlook_respond_to_invite",
           "outlook_create_event_on_behalf"
         ],
         "sharepoint-search": [
@@ -554,18 +641,24 @@
         "Team.ReadBasic.All",
         "Channel.ReadBasic.All",
         "ChannelMessage.Read.All",
+        "ChatMessage.Send",
+        "ChannelMessage.Send",
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
         "OnlineMeetingRecording.Read.All",
         "Mail.Read",
+        "Mail.Read.Shared",
         "People.Read",
         "MailboxSettings.Read",
         "Mail.ReadWrite",
+        "Mail.ReadWrite.Shared",
         "Mail.Send",
         "Mail.ReadBasic",
+        "Mail.Send.Shared",
         "MailboxSettings.ReadWrite",
         "Calendars.Read",
         "Calendars.Read.Shared",
+        "Calendars.ReadBasic",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
         "Files.Read.All",
@@ -579,18 +672,24 @@
         "Team.ReadBasic.All": false,
         "Channel.ReadBasic.All": false,
         "ChannelMessage.Read.All": true,
+        "ChatMessage.Send": false,
+        "ChannelMessage.Send": false,
         "OnlineMeetings.Read": false,
         "OnlineMeetingTranscript.Read.All": true,
         "OnlineMeetingRecording.Read.All": true,
         "Mail.Read": false,
+        "Mail.Read.Shared": false,
         "People.Read": false,
         "MailboxSettings.Read": false,
         "Mail.ReadWrite": false,
+        "Mail.ReadWrite.Shared": false,
         "Mail.Send": false,
+        "Mail.Send.Shared": false,
         "Mail.ReadBasic": false,
         "MailboxSettings.ReadWrite": false,
         "Calendars.Read": false,
         "Calendars.Read.Shared": false,
+        "Calendars.ReadBasic": false,
         "Calendars.ReadWrite": false,
         "Calendars.ReadWrite.Shared": false,
         "Files.Read.All": true,

@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.6.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.1...outlook-semantic-mcp@3.6.2) (2026-09-25)
+
+
+### Bug Fixes
+
+* **sharepoint-connector,office-365-mcp,outlook-semantic-mcp,teams-mcp:** stop managing shared Microsoft service principals as destroyable resources ([#1097](https://github.com/Unique-AG/connectors/issues/1097)) ([e8cdadd](https://github.com/Unique-AG/connectors/commit/e8cdaddc16dfd1352797c8b450e8cd244abb0445))
+
+
+### Dependencies
+
+* bump markdown-it in / ([#1064](https://github.com/Unique-AG/connectors/issues/1064)) ([1f4e266](https://github.com/Unique-AG/connectors/commit/1f4e2666448d551ce4fbc6c76d354351eac2569b))
+* bump node in /services/*/deploy ([#1061](https://github.com/Unique-AG/connectors/issues/1061)) ([900cf1d](https://github.com/Unique-AG/connectors/commit/900cf1da2c09c5ccf86724b16472405d7c4e8c11))
+* bump node in /services/confluence-connector/deploy ([#996](https://github.com/Unique-AG/connectors/issues/996)) ([0b051f4](https://github.com/Unique-AG/connectors/commit/0b051f4a54096b2b91e9e5f2bea8e41d52444855))
+* bump temporal-polyfill in / ([#1065](https://github.com/Unique-AG/connectors/issues/1065)) ([15fc44e](https://github.com/Unique-AG/connectors/commit/15fc44e3cfc2c946b39e9326c908acfb086ec3f3))
+* **outlook-semantic-mcp,teams-mcp:** run migrations without pnpm ([#1034](https://github.com/Unique-AG/connectors/issues/1034)) ([5c95c51](https://github.com/Unique-AG/connectors/commit/5c95c515336437d4e7da95cdb4a1fe927f6e499e))
+* remove pnpm from the Node runtime images ([#1035](https://github.com/Unique-AG/connectors/issues/1035)) ([5ad580a](https://github.com/Unique-AG/connectors/commit/5ad580abb79f72f60d4e68a461c301c816692fcd))
+
 ## [3.6.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.0...outlook-semantic-mcp@3.6.1) (2026-09-15)
 
 

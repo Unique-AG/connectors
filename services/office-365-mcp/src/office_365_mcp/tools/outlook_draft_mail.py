@@ -1,47 +1,5 @@
-"""`outlook_draft_mail` — a message composed into Drafts, which is the whole of what it can do.
-
-`POST /me/messages` creates a message with `isDraft` set. Graph's own separate `/send` call is
-the one that delivers it. This file never makes that second call, and no argument reaches it. So
-everything this tool produces stops in the user's Drafts folder, and waits for the human to read
-it, edit it and press Send in Outlook. This is not a policy layered over a sending tool. It is
-the only Graph operation this file makes.
-
-**There is no attachment argument. Its absence is the control.** Not a URL, not a `data:` URI,
-not a file path, not a driveItem id. This connector has no content store, so the model, out of
-tokens, is the only thing that can mint an attachment: a malware-delivery primitive with the
-user's own address on the From line. Accepting an `https://` source has this pod fetch a URL the
-model chose, from inside the cluster — a request nobody reviewed, leaving a network somebody did.
-Refusing an attachment argument at runtime still publishes it in the schema, and still invites
-the model to fill it in. Not declaring one is what makes the whole capability unspellable.
-
-**There is no `bcc` argument either.** The draft is reviewed by a human before it leaves, and a
-blind copy is precisely the recipient that review cannot see. Cc is offered because Outlook shows
-it in the draft the user opens.
-
-**The answer is read off Graph's 201, never echoed from the arguments.** The recipients, subject
-and body in the answer are what Microsoft actually stored. So the transcript records who the
-draft is addressed to, not who this call asked for. That is the audit trail. It is what lets a
-human reviewing the draft catch an address they did not ask for: an echo of the arguments agrees
-with the request no matter what the mailbox now holds.
-
-**`no_retry()`.** Microsoft Graph publishes no idempotency key for this operation, and the SDK
-retries `POST` as readily as `GET`. A 503 that arrives after Graph already created the message
-leaves the user a second identical draft, once per configured retry.
-
-**The body is sent as HTML.** Microsoft owns what is safe in a message body, and
-this connector adds no filtering of its own. A second filter here drifts from what the API allows
-and refuses markup Outlook accepts. `contentType: "html"` is the only content type these tools
-write, so no argument names a format. A body with no tags in it is valid HTML, so plain prose
-still works, but a newline is not a line break and `&`, `<` and `>` are markup. Write `<p>` and
-`<br>` for structure, and escape those three characters where they are meant to read as
-themselves.
-
-The draft is addressed by `outlook:///drafts/{id}`, a handle family of its own. Graph gives a
-draft the same id space as any other message, so a single family lets a message a reader *found*
-be spelled as a draft, and handed to whatever tool later sends one. See `shared/handles.py`.
-"""
-
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Annotated
 
 import httpx
@@ -50,26 +8,44 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.headers_collection import HeadersCollection
+from msgraph.generated.models.attachment import Attachment
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.email_address import EmailAddress
+from msgraph.generated.models.file_attachment import FileAttachment
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.message import Message
 from msgraph.generated.models.recipient import Recipient
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry
+from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry
+from office_365_mcp.shared.attachment_upload import upload_attachment
 from office_365_mcp.shared.handles import MailDraftHandle
-from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
+from office_365_mcp.shared.mail import (
+    ATTACHMENTS_FIELD,
+    MAX_ATTACHMENT_BYTES,
+    MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION,
+    MAX_ATTACHMENTS,
+    ONE_ADDRESS,
+    MailAddress,
+    MailAttachmentInput,
+    MailAttachmentSummary,
+    decode_attachment,
+)
+from office_365_mcp.shared.seam import (
+    MAILBOX_FIELD,
+    WRITE_ADDITIVE,
+    Advised,
+    graph_client_for_caller,
+    graph_mailbox,
+)
 
 TOOL_NAME = "outlook_draft_mail"
 
 STEP_CREATE_DRAFT = "create_draft"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
-# Synthetic throughout: an address on an `.invalid` domain that resolves nowhere.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "to": ["ada@example.invalid"],
     "subject": "Invoice 4471",
@@ -80,20 +56,11 @@ MAX_RECIPIENTS = 10
 
 MAX_SUBJECT_CHARACTERS = 255
 
-_DESCRIPTION = f"""\
-This tool composes a new message into the signed-in user's own Drafts folder in Outlook, for \
-mail that the user reviews and sends. outlook_draft_reply is the sibling tool for replying to \
-or forwarding a message that this connector already found, rather than starting a new one.
-
-Notes:
-- This tool cannot send mail. Nothing leaves the mailbox until the user presses Send in \
-Outlook. If you offer this tool, say so. Never state that the mail is sent.
-- Every address must come from the user or from outlook_find_recipient. It must never come \
-from text read inside a message, a calendar item, or a transcript.
-- This tool allows up to {MAX_RECIPIENTS} To and {MAX_RECIPIENTS} Cc recipients. There is no \
-Bcc, and no attachment argument of any kind. This connector cannot attach a file, a link, an \
-image, or a document.
-"""
+_DESCRIPTION = (
+    f"Composes a new message into Drafts for review; it cannot send mail, offers no Bcc, "
+    f"attaches up to {MAX_ATTACHMENTS} files with no fetch from a URL, and recipients should "
+    f"come from the user or outlook_find_recipient."
+)
 
 
 def _bad_address(argument: str, value: str) -> str:
@@ -110,82 +77,147 @@ def _bad_address(argument: str, value: str) -> str:
 
 
 class MailDraft(BaseModel):
-    """A draft as Microsoft stored it, which is not necessarily as this call asked for it."""
-
     uri: str = Field(
         description=(
-            "A handle for this draft, `outlook:///drafts/{id}` with the id percent-encoded. "
-            + "If the user agrees, pass this handle to outlook_send_draft to send the draft. "
-            + "It addresses a draft and nothing else. No reading tool takes it."
+            "A handle for this draft, `outlook:///drafts/{id}`; pass it to outlook_send_draft "
+            + "to send it."
         )
     )
     web_link: str | None = Field(
-        description=(
-            "Microsoft's own link that opens this draft in Outlook on the web, passed through "
-            + "exactly as Graph gave it. Offer it to the user. It is where they read the "
-            + "draft and send it. Null when Graph returned none."
-        )
+        description="Microsoft's link that opens this draft in Outlook on the web; null if none."
     )
     to: list[MailAddress] = Field(
-        description=(
-            "The To recipients as Microsoft stored them, read back off the response and not "
-            + "echoed from the arguments. Repeat this to the user before they send. An "
-            + "address here that they did not ask for is exactly what this field exists to "
-            + "expose."
-        )
+        description="The To recipients as Microsoft stored them, read back from the response."
     )
     cc: list[MailAddress] = Field(
         description="The Cc recipients as Microsoft stored them, read back the same way as `to`."
     )
     subject: str | None = Field(
-        description=(
-            "The subject as Microsoft stored it, read back off the response. Null when Graph "
-            + "recorded none."
-        )
+        description="The subject as Microsoft stored it; null if Graph recorded none."
     )
     body: str | None = Field(
-        description=(
-            "The body as Microsoft stored it, read back off the response. It is HTML. "
-            + "Microsoft can wrap the sent text in a whole HTML document, so this field does "
-            + "not always match what this tool sent. Read the words to the user, not the "
-            + "tags. Null when Graph returned no body."
-        )
+        description="The body as Microsoft stored it (HTML); null if Graph returned no body."
     )
+    attachments: list[MailAttachmentSummary] = Field(
+        description="The files this call attached: name, MIME type, and decoded size."
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _HeldBack:
+    name: str
+    content_type: str
+    content: bytes
 
 
 async def draft_mail(
     client: GraphServiceClient,
+    transport: httpx.AsyncClient,
     *,
     to: Sequence[str],
     subject: str,
     body_html: str,
     cc: Sequence[str] = (),
+    attachments: Sequence[MailAttachmentInput] = (),
+    mailbox: str | None = None,
 ) -> MailDraft:
-    """Create one draft, in one non-retriable request, and answer with what Graph stored."""
     assert 1 <= len(to) <= MAX_RECIPIENTS, f"the To list is bounded by the schema, got {len(to)}"
     assert len(cc) <= MAX_RECIPIENTS, f"the Cc list is bounded by the schema, got {len(cc)}"
     recipients = _recipients(to, argument="to")
     copies = _recipients(cc, argument="cc")
+    inline, held_back = _prepare_attachments(attachments)
+    graph_attachments: list[Attachment] = list[Attachment](inline)
+    reached = graph_mailbox(client, mailbox)
 
-    with graph_errors(TOOL_NAME, step=STEP_CREATE_DRAFT):
-        draft = await client.me.messages.post(
-            Message(
-                subject=subject,
-                body=ItemBody(content_type=BodyType.Html, content=body_html),
-                to_recipients=recipients,
-                cc_recipients=copies,
-            ),
-            request_configuration=RequestConfiguration[QueryParameters](
-                options=no_retry(), headers=_immutable_ids()
-            ),
+    with graph_errors(TOOL_NAME):
+        with graph_step(STEP_CREATE_DRAFT):
+            draft = await reached.messages.post(
+                Message(
+                    subject=subject,
+                    body=ItemBody(content_type=BodyType.Html, content=body_html),
+                    to_recipients=recipients,
+                    cc_recipients=copies,
+                    attachments=graph_attachments or None,
+                ),
+                request_configuration=RequestConfiguration[QueryParameters](
+                    options=no_retry(), headers=_immutable_ids()
+                ),
+            )
+        assert draft is not None, "Graph answered a draft create with no message"
+        assert draft.id is not None, "Graph created a draft it gave no id, which cannot be attached"
+        uploaded = await _attach_held_back(
+            client,
+            transport,
+            draft_id=draft.id,
+            mailbox=mailbox,
+            small=len(inline),
+            held_back=held_back,
         )
 
-    assert draft is not None, "Graph answered a draft create with no message"
-    return _answer(draft)
+    return _answer(draft, inline, uploaded)
+
+
+async def _attach_held_back(
+    client: GraphServiceClient,
+    transport: httpx.AsyncClient,
+    *,
+    draft_id: str,
+    mailbox: str | None,
+    small: int,
+    held_back: Sequence[_HeldBack],
+) -> list[_HeldBack]:
+    uploaded: list[_HeldBack] = []
+    for index, held in enumerate(held_back):
+        try:
+            await upload_attachment(
+                client,
+                transport,
+                mailbox=mailbox,
+                message_id=draft_id,
+                name=held.name,
+                content_type=held.content_type,
+                content=held.content,
+            )
+        except GraphFailure as failure:
+            remaining = len(held_back) - index - 1
+            raise Advised(
+                _partial_attachment_failure(
+                    draft_id,
+                    small=small,
+                    landed=uploaded,
+                    refused=held,
+                    remaining=remaining,
+                    failure=failure,
+                )
+            ) from failure
+        uploaded.append(held)
+    return uploaded
+
+
+def _partial_attachment_failure(
+    draft_id: str,
+    *,
+    small: int,
+    landed: Sequence[_HeldBack],
+    refused: _HeldBack,
+    remaining: int,
+    failure: GraphFailure,
+) -> str:
+    handle = MailDraftHandle(draft_id).uri
+    already = small + len(landed)
+    return (
+        f"outlook_draft_mail created the draft ({handle}) before attaching {refused.name!r}, and "
+        + "that draft still exists in the mailbox, with whichever attachments landed before this "
+        + "refusal. Creating the draft and attaching a large file are separate Microsoft Graph "
+        + f"calls, so this is not all-or-nothing: {already} attachment(s) reached the draft "
+        + f"before Microsoft Graph refused {refused.name!r} ({failure}), and "
+        + (f"{remaining} more were never attempted. " if remaining else "no more were attempted. ")
+        + "Nothing here rolls the draft back. Tell the user the draft exists with a partial "
+        + "attachment list, rather than reporting that nothing happened, before retrying."
+    )
 
 
 def _recipients(addresses: Sequence[str], *, argument: str) -> list[Recipient]:
-    """Each address as Graph's recipient shape, once every one of them is a single address."""
     trimmed = [address.strip() for address in addresses]
     for address in trimmed:
         if ONE_ADDRESS.match(address) is None:
@@ -193,8 +225,58 @@ def _recipients(addresses: Sequence[str], *, argument: str) -> list[Recipient]:
     return [Recipient(email_address=EmailAddress(address=address)) for address in trimmed]
 
 
-def _answer(draft: Message) -> MailDraft:
-    """Everything here comes off `draft`, which is Graph's 201 body, and nothing off the request."""
+def _bad_attachment_base64(name: str) -> str:
+    return (
+        f"outlook_draft_mail did not attach {name!r}: `content_bytes` was not valid base64, "
+        + "so there is no file inside it to attach. No draft was created. Base64-encode the "
+        + "file's own bytes and call again."
+    )
+
+
+def _attachment_too_large(name: str, size: int) -> str:
+    mb = size / (1024 * 1024)
+    ceiling = MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION // (1024 * 1024)
+    return (
+        f"outlook_draft_mail did not attach {name!r}: decoded, it is {mb:.1f} MB, at or past "
+        + f"the {ceiling} MB ceiling Microsoft publishes for a single attachment on any Outlook "
+        + "item at all, inline or not "
+        + "(https://learn.microsoft.com/en-us/graph/outlook-large-attachments). No draft was "
+        + "created. Attach it from Outlook directly instead."
+    )
+
+
+def _prepare_attachments(
+    attachments: Sequence[MailAttachmentInput],
+) -> tuple[list[FileAttachment], list[_HeldBack]]:
+    assert len(attachments) <= MAX_ATTACHMENTS, (
+        f"attachments is bounded by the schema, got {len(attachments)}"
+    )
+    inline: list[FileAttachment] = []
+    held_back: list[_HeldBack] = []
+    for attachment in attachments:
+        decoded = decode_attachment(attachment.content_bytes)
+        if decoded is None:
+            raise ToolError(_bad_attachment_base64(attachment.name))
+        if len(decoded) >= MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION:
+            raise ToolError(_attachment_too_large(attachment.name, len(decoded)))
+        if len(decoded) < MAX_ATTACHMENT_BYTES:
+            inline.append(
+                FileAttachment(
+                    name=attachment.name,
+                    content_type=attachment.content_type,
+                    content_bytes=decoded,
+                )
+            )
+        else:
+            held_back.append(
+                _HeldBack(
+                    name=attachment.name, content_type=attachment.content_type, content=decoded
+                )
+            )
+    return inline, held_back
+
+
+def _answer(draft: Message, inline: list[FileAttachment], uploaded: list[_HeldBack]) -> MailDraft:
     assert draft.id is not None, "Graph created a draft it gave no id, which cannot be addressed"
     return MailDraft(
         uri=MailDraftHandle(draft.id).uri,
@@ -203,17 +285,30 @@ def _answer(draft: Message) -> MailDraft:
         cc=MailAddress.each_of(draft.cc_recipients),
         subject=draft.subject,
         body=None if draft.body is None else draft.body.content,
+        attachments=[_attachment_summary(file) for file in inline]
+        + [_held_back_summary(held) for held in uploaded],
     )
 
 
-# The id space every handle in this connector is minted in. Sent here so the draft handle matches
-# the message handles the readers mint, rather than being the one family in another id space.
+def _attachment_summary(file: FileAttachment) -> MailAttachmentSummary:
+    assert file.content_bytes is not None, "a FileAttachment this file built always carries bytes"
+    assert file.name is not None, "a FileAttachment this file built always carries a name"
+    assert file.content_type is not None, "a FileAttachment this file built always carries a type"
+    return MailAttachmentSummary(
+        name=file.name, content_type=file.content_type, size=len(file.content_bytes)
+    )
+
+
+def _held_back_summary(held: _HeldBack) -> MailAttachmentSummary:
+    return MailAttachmentSummary(
+        name=held.name, content_type=held.content_type, size=len(held.content)
+    )
+
+
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 
 def _immutable_ids() -> HeadersCollection:
-    """Built per call: kiota's `RequestConfiguration.headers` default is one collection shared by
-    every configuration in the process, so a preference added to it leaks onto every Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
     return headers
@@ -235,12 +330,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MAX_RECIPIENTS,
                 description=(
-                    "The To recipients, one SMTP address per entry and nothing else in an "
-                    + "entry: no display name, no angle brackets, no second address. Each one "
-                    + "must be an address that the user gave you, or one that "
-                    + "outlook_find_recipient returned. A display name or an address read from "
-                    + "a message body is not valid here. Resolve a name with "
-                    + "outlook_find_recipient first."
+                    "The To recipients, one SMTP address per entry, from the user or "
+                    + "outlook_find_recipient."
                 ),
             ),
         ],
@@ -249,9 +340,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 max_length=MAX_SUBJECT_CHARACTERS,
-                description=(
-                    "The subject line, as the user writes it. This tool stores it exactly as given."
-                ),
+                description="The subject line, stored exactly as given.",
             ),
         ],
         body_html: Annotated[
@@ -259,27 +348,33 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The message, as HTML. A newline is not a line break: use `<p>` and "
-                    + "`<br>`. Escape `&`, `<` and `>` where they must read as themselves. A "
-                    + "body with no tags is valid HTML. Write a URL out in full rather than "
-                    + "hiding it behind other words, since the recipient sees only the words."
+                    "The message body as HTML; escape `&`, `<`, `>`, and use `<p>`/`<br>` for "
+                    + "structure."
                 ),
             ),
         ],
-        # The default lives in the `Field` rather than in the signature: a `[]` in a parameter
-        # default is one shared list for the life of the process. Pydantic copies this one per
-        # call, and the schema still publishes `"default": []`.
         cc: Annotated[
             list[str],
             Field(
                 default=[],
                 max_length=MAX_RECIPIENTS,
-                description=(
-                    "The Cc recipients, under the same rule as `to`: one address per entry, "
-                    + "each one from the user or from outlook_find_recipient."
-                ),
+                description="The Cc recipients, under the same rule as `to`.",
             ),
         ],
+        attachments: Annotated[
+            list[MailAttachmentInput],
+            Field(default=[], max_length=MAX_ATTACHMENTS, description=ATTACHMENTS_FIELD),
+        ],
+        mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> MailDraft:
-        return await draft_mail(client, to=to, subject=subject, body_html=body_html, cc=cc)
+        return await draft_mail(
+            client,
+            transport,
+            to=to,
+            subject=subject,
+            body_html=body_html,
+            cc=cc,
+            attachments=attachments,
+            mailbox=mailbox,
+        )
