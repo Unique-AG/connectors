@@ -61,7 +61,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/kb-mcp
-  tag: 0.1.5 # x-release-please-version
+  tag: 0.1.6 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
