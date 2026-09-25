@@ -34,7 +34,7 @@ This document covers the three parts of that picture in turn.
 
 ## 1. Vulnerability management
 
-**Vulnerability management looks for known problems.** A published advisory names a package, a version range, and a severity. Four checks do this search.
+A published advisory names a package, a version range, and a severity. Four checks search for a match against these advisories.
 
 ### What runs on your pull request
 
@@ -76,7 +76,7 @@ An image holds software that no lockfile lists. Examples are a base operating sy
 
 ### The severity threshold
 
-**A threshold decides which finding can stop a pull request, or open an alert.** It applies to every check in this document except CodeQL. Two conditions apply: the severity must be CRITICAL or HIGH, and a fix must already exist.
+A threshold applies to every check in this document except CodeQL. Two conditions decide whether a finding can stop a pull request, or open an alert. The severity must be CRITICAL or HIGH. A fix must already exist.
 
 Trivy looks only for CRITICAL and HIGH findings. This applies to every Trivy-based check in this document: the image vulnerability check, the Dockerfile scan, the registry scan, and the release image scan. No Trivy-based check looks for a MEDIUM or LOW finding. No part of this document tracks either one.
 
@@ -86,7 +86,7 @@ One check sets a wider threshold. The license scan also looks for UNKNOWN, becau
 
 A CRITICAL or HIGH finding with no fix does not stop the pull request. It becomes a warning instead. See [The image vulnerability check stopped it](#the-image-vulnerability-check-stopped-it).
 
-**The goal is to stop a pull request only for a finding worth acting on, with a fix ready today.** A LOW finding is not that. Neither is a HIGH finding with no fix. Both let the pull request merge.
+A LOW finding lets the pull request merge. So does a HIGH finding with no fix.
 
 ### What to do when a check stops your pull request
 
@@ -155,7 +155,7 @@ flowchart LR
 
 ## 2. Dependency management
 
-**Dependency management looks for newer versions.** It does not ask whether a version is safe. The checks in [Vulnerability management](#1-vulnerability-management) ask that question, on the pull request Dependabot opens.
+Dependency management does not ask whether a version is safe. The checks in [Vulnerability management](#1-vulnerability-management) ask that question, on the pull request Dependabot opens.
 
 ### Dependabot raises versions
 
@@ -194,7 +194,7 @@ Apart from opening pull requests, Dependabot also reads the lockfiles already on
 
 ## 3. Image and build management
 
-**Image and build management covers how we build an image, and how we prove it is the exact image we shipped.** No vulnerability scan and no version check answers either question.
+No vulnerability scan and no version check covers how an image is built, or whether it is the image this repository shipped.
 
 ### How an image is built
 
@@ -234,7 +234,7 @@ The build step attaches two records to the image itself:
 
 After the push, the pipeline signs the image with [Cosign](https://github.com/sigstore/cosign). It uses a keyless GitHub Actions identity, not a stored key. The same job then makes sure that the new signature is valid, against that identity and against `main`.
 
-Signing does not stop a deploy on its own. It gives anyone who deploys this image a way to make sure that it came from this repository. They run the same `cosign verify` command, with the same identity.
+Signing does not stop a deploy on its own. Anyone who deploys this image can run the same `cosign verify` command, with the same identity, to make sure that it came from this repository.
 
 The pull request build, described in [What runs on your pull request](#what-runs-on-your-pull-request), skips signing. A pull request never pushes an image, so there is nothing yet to sign.
 
@@ -246,7 +246,7 @@ It uses a wider threshold than the other scans: UNKNOWN, HIGH, and CRITICAL. See
 
 ### A published image is fixed
 
-Signing proves what we shipped. It does not keep that image free of new findings. Once a version ships, its image does not change again. See [After a release](#after-a-release) for how this repository finds, and clears, a finding in an image already shipped.
+Signing proves where an image came from, not that the image stays free of new findings. Once a version ships, its image does not change again. See [After a release](#after-a-release) for how this repository finds, and clears, a finding in an image already shipped.
 
 ## Labels
 
