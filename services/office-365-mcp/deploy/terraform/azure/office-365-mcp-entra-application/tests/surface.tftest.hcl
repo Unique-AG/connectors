@@ -6,8 +6,8 @@ mock_provider "azuread" {
     }
   }
 
-  override_resource {
-    target = azuread_service_principal.msgraph
+  override_data {
+    target = data.azuread_service_principal.msgraph
     values = {
       client_id = "00000003-0000-0000-c000-000000000000"
       object_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
@@ -206,9 +206,9 @@ run "the_mock_covers_every_requestable_permission" {
   assert {
     condition = length(setsubtract(
       toset(local.requestable_permissions),
-      toset(keys(azuread_service_principal.msgraph.oauth2_permission_scope_ids)),
+      toset(keys(data.azuread_service_principal.msgraph.oauth2_permission_scope_ids)),
     )) == 0
-    error_message = "the azuread mock has no scope id for ${join(", ", sort(setsubtract(toset(local.requestable_permissions), toset(keys(azuread_service_principal.msgraph.oauth2_permission_scope_ids)))))} — every other run that names one fails with a bare `Invalid index` on main.tf, which does not say the mock is what is short."
+    error_message = "the azuread mock has no scope id for ${join(", ", sort(setsubtract(toset(local.requestable_permissions), toset(keys(data.azuread_service_principal.msgraph.oauth2_permission_scope_ids)))))} — every other run that names one fails with a bare `Invalid index` on main.tf, which does not say the mock is what is short."
   }
 }
 
