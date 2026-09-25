@@ -43,7 +43,7 @@ Four checks run on every pull request. Two of them can stop it.
 ```mermaid
 flowchart TD
   pr[A pull request opens or changes] --> deps[Dependency review]
-  pr --> gate[Image vulnerability gate]
+  pr --> gate[Image vulnerability check]
   pr --> docker[Dockerfile scan]
   pr --> codeql[CodeQL]
 
@@ -56,11 +56,11 @@ flowchart TD
 | Check | It reads | It stops the merge |
 |---|---|---|
 | Dependency review | the dependencies your pull request adds or changes, for npm and for Python | yes, at HIGH severity |
-| Image vulnerability gate | the container image your pull request builds, before any push | yes, when a finding has a fix |
+| Image vulnerability check | the container image your pull request builds, before any push | yes, when a finding has a fix |
 | Dockerfile scan | our own Dockerfiles | no |
-| CodeQL | our source code, in three languages: GitHub Actions, JavaScript and TypeScript, and Python | no |
+| CodeQL | our source code: our workflow files, our JavaScript and TypeScript, and our Python | no |
 
-Every check runs on a stacked pull request. No check carries a branch filter.
+Every check runs on a stacked pull request. No check carries a branch filter. GitHub Actions runs every check in this document. GitHub Actions is the platform, not a check.
 
 #### Why the checks do not overlap
 
@@ -70,15 +70,29 @@ A Dockerfile is a build input. It never appears inside the image it builds. No i
 
 An image holds software that no lockfile lists. Examples are a base operating system package, and a file that a build step adds by hand. No lockfile scan can find these.
 
+### The severity threshold
+
+**A threshold decides which finding can stop a pull request, or open an alert.** It applies to every check in this document except CodeQL. Two conditions apply: the severity must be CRITICAL or HIGH, and a fix must already exist.
+
+Trivy looks only for CRITICAL and HIGH findings. This applies to every Trivy-based check in this document: the image vulnerability check, the Dockerfile scan, the registry scan, and the release image scan. No Trivy-based check looks for a MEDIUM or LOW finding.
+
+The dependency review uses the same threshold, through a different setting: `fail-on-severity: high`. This setting also stops the pull request at HIGH and at CRITICAL, and lets a LOW or MEDIUM advisory through.
+
+One check sets a wider threshold. The license scan also looks for UNKNOWN, because an unclassified license is itself the finding. See [License scanning](#license-scanning).
+
+A CRITICAL or HIGH finding with no fix does not stop the pull request. It becomes a warning instead. See [The image vulnerability check stopped it](#the-image-vulnerability-check-stopped-it).
+
+**The goal is to stop a pull request only for a finding worth acting on, with a fix ready today.** A LOW finding is not that. Neither is a HIGH finding with no fix. Both let the pull request merge.
+
 ### What to do when a check stops your pull request
 
-#### The image vulnerability gate stopped it
+#### The image vulnerability check stopped it
 
-The gate stops only on a finding that has a fix. Each finding gets one annotation. The annotation names the package, the version you have, and the version with the fix.
+The image vulnerability check stops only on a finding that has a fix. Each finding gets one annotation. The annotation names the package, the version you have, and the version with the fix.
 
 ```mermaid
 flowchart TD
-  caught[The image gate stopped the pull request] --> read[Read the annotation. It names the package and the fixed version.]
+  caught[The image vulnerability check stopped the pull request] --> read[Read the annotation. It names the package and the fixed version.]
   read --> decide{Can you take the fix now}
   decide -->|yes| raise[Raise the version, or add an override for a pinned parent]
   decide -->|no| waive[Add the security-exception label]
@@ -128,7 +142,7 @@ flowchart LR
 | Result | Where to look |
 |---|---|
 | Dependency review | a check on the pull request, and a comment when it fails |
-| Image vulnerability gate | a check on the pull request, with one annotation for each finding |
+| Image vulnerability check | a check on the pull request, with one annotation for each finding |
 | Dockerfile scan | Security tab, code scanning, category `trivy-config` |
 | CodeQL | Security tab, code scanning, one category for each language |
 | Release image scan | Security tab, code scanning, category `trivy-image/<service>` |
@@ -224,6 +238,8 @@ The pull request build, described in [What runs on your pull request](#what-runs
 
 A release also scans the finished image for its open-source licenses. This scan fails nothing, and it writes no alert to the Security tab. Read its output in the log of the `security-trivy-license-scan` job, on the release workflow run.
 
+It uses a wider threshold than the other scans: UNKNOWN, HIGH, and CRITICAL. See [The severity threshold](#the-severity-threshold).
+
 ### A published image is fixed
 
 Signing proves what we shipped. It does not keep that image free of new findings. Once a version ships, its image does not change again. See [After a release](#after-a-release) for how this repository finds, and clears, a finding in an image already shipped.
@@ -234,7 +250,7 @@ Two labels waive a check. A label that waives a check is named `<what>-exception
 
 | Label | It waives |
 |---|---|
-| `security-exception` | the dependency review, and it reports image gate findings as warnings |
+| `security-exception` | the dependency review, and it reports image vulnerability check findings as warnings |
 | `title-exception` | the pull request title check and the scope check |
 
 `security-exception` waives two controls, not one. Use it only when you accept both.
@@ -246,9 +262,9 @@ Two labels waive a check. A label that waives a check is named `<what>-exception
 | File | What it holds |
 |---|---|
 | `.github/dependabot.yaml` | the ecosystems, the schedule, and the labels for dependency updates |
-| `.github/workflows/dependency-review.yaml` | the dependency gate |
-| `.github/workflows/_template-containerize.yaml` | the pull request image build, and the call to the gate |
-| `.github/actions/container-image-vuln-gate/action.yml` | the gate itself |
+| `.github/workflows/dependency-review.yaml` | the dependency review |
+| `.github/workflows/_template-containerize.yaml` | the pull request image build, and the call to the image vulnerability check |
+| `.github/actions/container-image-vuln-gate/action.yml` | the image vulnerability check itself |
 | `.github/workflows/security-trivy-repo.yaml` | the Dockerfile scan |
 | `.github/workflows/security-trivy-registry.yaml` | the Wednesday scan of published images |
 | `.github/workflows/_template-cd.yaml` | the release build: push, sign, attest, the release image scan, and the license scan |
