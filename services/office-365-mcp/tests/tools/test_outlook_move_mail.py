@@ -1,20 +1,3 @@
-"""`outlook_move_mail`: the requests it makes, the handles it hands back, what it refuses.
-
-The handles are the subject of most of this file. A move is Microsoft creating a new copy of the
-message in the destination and removing the original, so every handle the caller held for a moved
-message is stale the instant the move succeeds — and the answer is the only place a model can learn
-the replacement. So the assertions below pin that the new `uri` is read off Graph's own response
-rather than carried over from the request, that a row still names the dead handle it came in with,
-and that the field a model reads says so in words.
-
-The rest is what makes a batch honest: one request per message so a partial failure is visible per
-message, `no_retry` on each of them because the first attempt is what removes the original, and a
-destination read in this same call so a hidden or search folder cannot be filed into on the
-strength of a flag the model is remembering from an earlier turn.
-
-Every response body here is synthesised. None came from a real mailbox.
-"""
-
 import json
 from collections.abc import Mapping
 from typing import cast
@@ -40,7 +23,6 @@ _FIRST_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 _SECOND_ID = "AAMkAGI2SYNTHETIC-immutable-0002="
 _THIRD_ID = "AAMkAGI2SYNTHETIC-immutable-0003="
 
-# What Graph answers a move with: the copy it made in the destination, under an id of its own.
 _FIRST_MOVED_ID = "AAMkAGI2SYNTHETIC-immutable-0001-moved="
 _SECOND_MOVED_ID = "AAMkAGI2SYNTHETIC-immutable-0002-moved="
 
@@ -50,9 +32,6 @@ _ARCHIVE_REF = MailFolderHandle(_ARCHIVE_ID).uri
 
 _WELL_KNOWN = "/me/mailFolders/archive"
 
-# The folders `shared/mail.py` leaves out of `WellKnownFolder` on purpose: the purge bin Outlook
-# does not display, the two folder parents, the folder a message occupies for the seconds before it
-# is sent, iOS's own, and Outlook's sync diagnostics.
 _NEVER_A_DESTINATION: tuple[str, ...] = (
     "recoverableitemsdeletions",
     "msgfolderroot",
@@ -71,7 +50,6 @@ def _move_path(message_id: str) -> str:
 
 
 def _moved(new_id: str) -> httpx.Response:
-    """Graph answers a move with the whole new message; only its id is read."""
     return httpx.Response(
         201,
         json={
@@ -102,8 +80,6 @@ def _folder_payload(
     return payload
 
 
-# What Graph answers for a search folder, minus the annotation. Microsoft can leave `@odata.type`
-# out, and then the SDK has no discriminator and builds a plain `MailFolder`.
 _SEARCH_FOLDER_PROPERTIES: Mapping[str, object] = {
     "filterQuery": "flagStatus eq 'flagged'",
     "sourceFolderIds": ["AQMkADAwSYNTHETIC-inbox"],
@@ -113,12 +89,6 @@ _SEARCH_FOLDER_PROPERTIES: Mapping[str, object] = {
 
 
 def _sent_body(route: respx.Route) -> Mapping[str, object]:
-    """The move's request body.
-
-    TRAP: the key is `DestinationId`, not the `destinationId` Microsoft's own page shows. The
-    generated SDK writes the CSDL's spelling of the action parameter and Graph accepts either, so
-    this asserts what actually goes on the wire rather than what the documentation prints.
-    """
     return cast("Mapping[str, object]", json.loads(route.calls.last.request.content))
 
 
@@ -142,8 +112,6 @@ class TestTheRequestsItMakes:
     async def test_a_well_known_name_is_the_destination_and_no_folder_is_read(
         self, client: GraphServiceClient, graph: respx.MockRouter, first_move: respx.Route
     ) -> None:
-        """Microsoft accepts a well-known name as `destinationId` directly, and the vocabulary is
-        closed, so there is nothing to look up and nothing to check."""
         named = graph.get(_WELL_KNOWN)
 
         _ = await mover.move_mail(
@@ -170,8 +138,6 @@ class TestTheRequestsItMakes:
         first_move: respx.Route,
         second_move: respx.Route,
     ) -> None:
-        """Graph publishes no batch form of this route, which is why a partial failure is the
-        ordinary shape of a bad batch and every row is reported separately."""
         third = graph.post(_move_path(_THIRD_ID)).mock(return_value=_moved("NEW-0003="))
 
         _ = await mover.move_mail(
@@ -189,8 +155,6 @@ class TestTheRequestsItMakes:
     async def test_every_move_declares_the_immutable_id_space(
         self, client: GraphServiceClient, first_move: respx.Route, second_move: respx.Route
     ) -> None:
-        """Without it the id Graph answers with is a `RestId`, and the replacement handle would
-        die the moment an inbox rule files the message somewhere else."""
         _ = await mover.move_mail(
             client,
             message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
@@ -204,8 +168,6 @@ class TestTheRequestsItMakes:
     async def test_the_preference_does_not_leak_onto_the_folder_read(
         self, client: GraphServiceClient, archive: respx.Route
     ) -> None:
-        """Kiota's `RequestConfiguration.headers` default is one collection shared process-wide, so
-        a preference added to it would reach every other Graph call this process makes."""
         _ = await mover.move_mail(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
         )
@@ -219,9 +181,6 @@ class TestAMoveIsNeverRetried:
     async def test_a_move_that_answers_503_is_sent_exactly_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A move is not idempotent: the first attempt removes the original, so a retry after a
-        lost response addresses an id that no longer exists. The SDK retries `POST` on 503 as
-        readily as `GET`, which is what makes the count below mean something."""
         assert GraphSettings().max_retries > 0, "the transport retries nothing, so this proves none"
         route = graph.post(_move_path(_FIRST_ID)).mock(return_value=httpx.Response(503))
 
@@ -253,8 +212,6 @@ class TestTheHandlesItHandsBack:
     async def test_the_new_handle_is_read_off_graphs_answer(
         self, client: GraphServiceClient
     ) -> None:
-        """The single most important thing about this tool: a move mints a new id, so the handle
-        that reaches the caller has to come out of the response and never out of the request."""
         answer = await mover.move_mail(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], destination="archive"
         )
@@ -265,8 +222,6 @@ class TestTheHandlesItHandsBack:
     async def test_the_new_handle_is_not_the_one_that_was_passed_in(
         self, client: GraphServiceClient
     ) -> None:
-        """Guards the guard above: an answer that echoed its argument would satisfy any assertion
-        written against the handle alone."""
         answer = await mover.move_mail(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], destination="archive"
         )
@@ -279,7 +234,6 @@ class TestTheHandlesItHandsBack:
     async def test_every_row_names_the_handle_it_came_in_with(
         self, client: GraphServiceClient
     ) -> None:
-        """The dead handle is what lets a model match a row to the message it was asking about."""
         answer = await mover.move_mail(
             client,
             message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
@@ -313,13 +267,11 @@ class TestTheHandlesItHandsBack:
         assert failed.uri == MailMessageHandle(_SECOND_ID).uri
 
     def test_the_replacement_handle_says_the_old_one_is_dead(self) -> None:
-        """A model reads the field description, not this module. The one thing it must learn here
-        is that every handle it already holds for the message has stopped addressing anything."""
         described = mover.MovedMessage.model_fields["new_uri"].description
 
         assert described is not None
-        assert "the only one for the message from now on" in described
-        assert "are now dead" in described
+        assert "the only valid handle from now on" in described
+        assert "is now dead" in described
         assert (
             "every earlier handle for it, from a search, a listing, or a thread read" in described
         )
@@ -329,7 +281,6 @@ class TestWhenPartOfTheBatchFails:
     async def test_a_failure_after_a_move_is_reported_rather_than_raised(
         self, client: GraphServiceClient, graph: respx.MockRouter, first_move: respx.Route
     ) -> None:
-        """Raising would discard the only record of which handles the first move just killed."""
         _ = first_move
         _ = graph.post(_move_path(_SECOND_ID)).mock(return_value=_refused(404))
 
@@ -345,7 +296,6 @@ class TestWhenPartOfTheBatchFails:
     async def test_a_failure_before_a_move_is_reported_the_same_way(
         self, client: GraphServiceClient, graph: respx.MockRouter, second_move: respx.Route
     ) -> None:
-        """Order does not decide it: what decides it is whether anything moved at all."""
         _ = second_move
         _ = graph.post(_move_path(_FIRST_ID)).mock(return_value=_refused(404))
 
@@ -380,8 +330,6 @@ class TestWhenPartOfTheBatchFails:
     async def test_a_batch_where_nothing_moved_raises_instead_of_answering(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Nothing has changed, so nothing is lost by raising — and the advice middleware gets to
-        word a refusal a model can act on rather than burying it in a row."""
         _ = graph.post(_move_path(_FIRST_ID)).mock(return_value=_refused(404))
         _ = graph.post(_move_path(_SECOND_ID)).mock(return_value=_refused(404))
 
@@ -412,8 +360,6 @@ class TestTheDestinationItRefuses:
     async def test_a_hidden_folder_is_refused_and_nothing_moves(
         self, client: GraphServiceClient, graph: respx.MockRouter, first_move: respx.Route
     ) -> None:
-        """Mail filed into a folder Outlook does not display disappears from the user's view
-        without having been deleted, which is the one outcome this tool must not produce quietly."""
         _ = graph.get(_ARCHIVE).mock(
             return_value=httpx.Response(200, json=_folder_payload(is_hidden=True))
         )
@@ -429,8 +375,6 @@ class TestTheDestinationItRefuses:
     async def test_a_search_folder_is_refused_and_nothing_moves(
         self, client: GraphServiceClient, graph: respx.MockRouter, first_move: respx.Route
     ) -> None:
-        """`mailSearchFolder` is a distinct `@odata.type` rather than a flag, so what is checked is
-        the type Graph's own discriminator produced."""
         _ = graph.get(_ARCHIVE).mock(
             return_value=httpx.Response(
                 200,
@@ -452,10 +396,6 @@ class TestTheDestinationItRefuses:
     async def test_a_search_folder_is_refused_even_with_no_odata_type(
         self, client: GraphServiceClient, graph: respx.MockRouter, first_move: respx.Route
     ) -> None:
-        """The annotation is the clean signal, not the only one. Graph can answer without it, and
-        the SDK then builds a plain `MailFolder`, so the type check alone lets the folder through.
-        A search folder still names itself through the properties only it declares.
-        """
         _ = graph.get(_ARCHIVE).mock(
             return_value=httpx.Response(
                 200,
@@ -474,8 +414,6 @@ class TestTheDestinationItRefuses:
     async def test_the_destination_read_narrows_nothing(
         self, client: GraphServiceClient, archive: respx.Route
     ) -> None:
-        """`$select` is what hides a search folder: a narrowed answer can carry neither the
-        annotation nor the properties the check falls back on."""
         _ = await mover.move_mail(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
         )
@@ -486,8 +424,6 @@ class TestTheDestinationItRefuses:
     async def test_the_folder_is_read_again_on_every_call(
         self, client: GraphServiceClient, archive: respx.Route
     ) -> None:
-        """A flag read from an earlier turn's answer is a snapshot the model is holding, not a fact
-        about the mailbox: a folder hidden between the two calls has to be caught by the second."""
         refs = [MailMessageHandle(_FIRST_ID).uri]
 
         _ = await mover.move_mail(client, message_refs=refs, folder_ref=_ARCHIVE_REF)
@@ -511,8 +447,6 @@ class TestWhatItRefusesBeforeReachingGraph:
     async def test_both_destinations_together_move_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """One call files mail into one folder, and picking one of the two silently would file it
-        somewhere nobody asked for."""
         move = graph.post(_move_path(_FIRST_ID))
 
         with pytest.raises(ToolError, match="alternatives"):
@@ -580,8 +514,6 @@ class TestWhatItRefusesBeforeReachingGraph:
     async def test_one_bad_handle_stops_the_whole_batch_before_any_of_it_moves(
         self, client: GraphServiceClient, first_move: respx.Route
     ) -> None:
-        """Every handle is parsed before the first request, so a typo leaves the mailbox alone
-        rather than half filed."""
         with pytest.raises(ToolError, match="message handles"):
             _ = await mover.move_mail(
                 client,
@@ -622,10 +554,6 @@ class TestTheSchemaItPublishes:
     async def test_only_the_batch_is_required_of_a_client(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The two destinations are alternatives, so neither can be required on its own — a
-        runtime refusal, not the schema, is what makes one of them compulsory. OpenAI's function
-        schemas forbid a root-level `oneOf`/`anyOf`/`not`, so this constraint cannot be published
-        at all."""
         parameters = await self._tool_schema(transport)
 
         assert parameters["required"] == ["message_refs"]
@@ -633,8 +561,6 @@ class TestTheSchemaItPublishes:
     async def test_the_destination_vocabulary_is_the_closed_one(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """`destination` is an enum rather than a string: a free-form folder name matched against a
-        user's own folders by string is how mail is filed into the wrong place."""
         parameters = await self._tool_schema(transport)
         defined = cast("Mapping[str, Mapping[str, object]]", parameters["$defs"])
 
@@ -651,8 +577,6 @@ class TestTheSchemaItPublishes:
     async def test_the_folders_microsoft_publishes_and_this_excludes_stay_excluded(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The purge bin, the two folder parents, the Outbox, iOS's own and the sync diagnostics.
-        Each is a well-known name Graph accepts and none of them is a place mail belongs."""
         parameters = await self._tool_schema(transport)
         defined = cast("Mapping[str, Mapping[str, object]]", parameters["$defs"])
         offered = cast("list[str]", defined["WellKnownFolder"]["enum"])
@@ -662,8 +586,6 @@ class TestTheSchemaItPublishes:
     async def test_it_declares_itself_a_write_that_can_destroy(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """MCP defaults `destructiveHint` to true and `idempotentHint` to false, so every hint is
-        written out: an omitted one says nothing at all about a tool that acts."""
         mcp: FastMCP = FastMCP(name="schema-under-test")
         mover.register(mcp, transport)
 
@@ -676,13 +598,44 @@ class TestTheSchemaItPublishes:
         assert tool.annotations.idempotent_hint is False
 
 
+class TestMailboxTargeting:
+    async def test_no_mailbox_moves_mail_in_the_signed_in_users_own_mailbox(
+        self, client: GraphServiceClient, archive: respx.Route, first_move: respx.Route
+    ) -> None:
+        _ = await mover.move_mail(
+            client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
+        )
+
+        assert archive.called
+        assert first_move.called
+
+    async def test_a_mailbox_moves_mail_in_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        folder = graph.get(f"/users/alex@example.invalid/mailFolders/{_ARCHIVE_ID}").mock(
+            return_value=httpx.Response(200, json=_folder_payload())
+        )
+        move = graph.post(
+            f"/users/alex@example.invalid/messages/{quote(_FIRST_ID, safe='')}/move"
+        ).mock(return_value=_moved(_FIRST_MOVED_ID))
+
+        moved = await mover.move_mail(
+            client,
+            message_refs=[MailMessageHandle(_FIRST_ID).uri],
+            folder_ref=_ARCHIVE_REF,
+            mailbox="alex@example.invalid",
+        )
+
+        assert folder.called
+        assert move.called
+        assert moved.messages[0].moved is True
+
+
 class TestWhatItSaysAboutItself:
     def test_the_permission_is_the_write_one_microsoft_documents(self) -> None:
-        assert mover.GRAPH_PERMISSIONS == ("Mail.ReadWrite",)
+        assert mover.GRAPH_PERMISSIONS == ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
     def test_the_description_teaches_that_this_is_how_a_message_is_deleted(self) -> None:
-        """There is no delete tool. A model that does not read it here will either refuse to remove
-        a message or report one as destroyed."""
         described = mover._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
 
         assert "deleteditems" in described
@@ -691,30 +644,21 @@ class TestWhatItSaysAboutItself:
         assert "no permanent-erase operation" in described
 
     def test_the_description_warns_that_the_handles_passed_in_die(self) -> None:
-        """The old top-level warning that a moved message kills every handle for it now lives on
-        the two result fields it actually describes: `uri` says the passed-in handle stops
-        addressing anything and must not be reused, `new_uri` says every earlier handle for the
-        message is dead too."""
         uri_described = mover.MovedMessage.model_fields["uri"].description
         new_uri_described = mover.MovedMessage.model_fields["new_uri"].description
 
         assert uri_described is not None
         assert "it addresses nothing" in uri_described
-        assert "Never pass it to another tool" in uri_described
+        assert "never pass it to another tool" in uri_described
 
         assert new_uri_described is not None
-        assert "are now dead" in new_uri_described
+        assert "is now dead" in new_uri_described
 
     def test_a_stale_handle_is_answered_with_both_recoveries(self) -> None:
-        """A 404 here is not the default "check you copied the id" advice: both arguments that can
-        produce one carry handles this connector minted."""
         assert "outlook_browse_folders" in mover.GRAPH_NOT_FOUND
         assert "outlook_search_mail" in mover.GRAPH_NOT_FOUND
 
     def test_the_example_call_reaches_graph_without_a_folder_read(self) -> None:
-        """`tools/__init__.py` hands this to the error-mapping suite, which needs a call that gets
-        as far as a Graph request; a destination it had to look up would be refused at the lookup.
-        """
         assert mover.GRAPH_CALL_EXAMPLE["destination"] == "archive"
         refs = cast("list[str]", mover.GRAPH_CALL_EXAMPLE["message_refs"])
         assert all(ref.startswith("outlook:///messages/") for ref in refs)

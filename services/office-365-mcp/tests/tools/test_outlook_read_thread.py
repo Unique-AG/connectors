@@ -1,5 +1,3 @@
-"""Every response body here is synthesised. None came from a real mailbox."""
-
 import httpx
 import pytest
 import respx
@@ -8,6 +6,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
+from office_365_mcp.tools import outlook_read_thread as reader
 from office_365_mcp.tools.outlook_read_thread import MAX_MESSAGES, read_thread
 
 _ANCHOR_ID = "AAMkAGI2SYNTHETIC-anchor-0001="
@@ -84,8 +83,6 @@ class TestWhatItAsksGraphFor:
     async def test_it_sends_no_order_because_graph_refuses_one_beside_that_filter(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
-        """Every property in `$orderby` must also be in `$filter`, so an order on receipt time
-        beside a filter on conversation answers `InefficientFilter`."""
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
         thread.mock(return_value=httpx.Response(200, json={"value": [_message(_ANCHOR_ID)]}))
 
@@ -96,8 +93,6 @@ class TestWhatItAsksGraphFor:
     async def test_both_requests_declare_the_immutable_id_space(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
-        """The handle carries an immutable id, and Graph reads a path id in whichever space the
-        request declares."""
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
         thread.mock(return_value=httpx.Response(200, json={"value": [_message(_ANCHOR_ID)]}))
 
@@ -125,9 +120,6 @@ class TestWhatItAsksGraphFor:
 
 
 class TestItChecksThatGraphAppliedTheFilter:
-    """`$filter=conversationId` is in no Microsoft document, and Graph ignores an unsupported
-    filter rather than refusing it. So the answer is checked instead of trusted."""
-
     async def test_a_foreign_conversation_in_the_answer_is_refused(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
@@ -150,8 +142,6 @@ class TestItChecksThatGraphAppliedTheFilter:
     async def test_an_answer_without_the_anchor_is_refused_even_when_it_all_matches(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
-        """What a filter applied to the wrong value looks like: every row agrees with every other
-        row, and none of them is the message the caller named."""
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
         thread.mock(return_value=httpx.Response(200, json={"value": [_message(_OLDER_ID)]}))
 
@@ -161,8 +151,6 @@ class TestItChecksThatGraphAppliedTheFilter:
     async def test_an_empty_answer_is_not_treated_as_a_failed_filter(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
-        """A mailbox that kept no copy of the thread is a real answer, and an empty page carries no
-        evidence either way."""
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
         thread.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -199,7 +187,6 @@ class TestWhatItAnswers:
     async def test_a_message_with_no_received_time_does_not_break_the_order(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
-        """A draft in the thread was never received."""
         draft = _message(_OLDER_ID)
         del draft["receivedDateTime"]
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
@@ -223,8 +210,6 @@ class TestWhatItAnswers:
     async def test_a_thread_graph_had_more_of_says_it_is_incomplete(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
-        """Graph's own next link, not a full window: a page can come back short of `$top` and
-        still carry one, because `$skip` counts every item the service walked."""
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
         thread.mock(return_value=httpx.Response(200, json=_page([_message(_ANCHOR_ID)], more=True)))
 
@@ -235,9 +220,6 @@ class TestWhatItAnswers:
     async def test_a_thread_longer_than_one_page_answers_without_the_anchor_on_it(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
-        """The anchor check cannot run on a truncated page. There is no `$orderby` to say which
-        messages the page holds, so a long thread can leave the anchor off it honestly — and
-        refusing there would blame Graph for a filter it did apply."""
         crowd = [_message(f"{_OLDER_ID}{index}") for index in range(MAX_MESSAGES)]
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
         thread.mock(return_value=httpx.Response(200, json=_page(crowd, more=True)))
@@ -250,8 +232,6 @@ class TestWhatItAnswers:
     async def test_a_foreign_conversation_is_refused_even_on_a_truncated_page(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
-        """The half of the check that survives truncation. A row from another conversation proves
-        the filter was dropped whatever the page size."""
         crowd = [_message(f"{_OLDER_ID}{index}") for index in range(MAX_MESSAGES - 1)]
         crowd.append(_message(_OLDER_ID, conversation=_OTHER_CONVERSATION))
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
@@ -263,13 +243,44 @@ class TestWhatItAnswers:
     async def test_an_anchor_with_no_conversation_answers_nothing_rather_than_everything(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
-        """A filter built from a null conversation would have matched the whole mailbox."""
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body(None)))
 
         result = await read_thread(client, handle=_HANDLE)
 
         assert result.messages == []
         assert thread.call_count == 0
+
+
+class TestMailboxTargeting:
+    async def test_no_mailbox_reads_the_signed_in_users_own_one(
+        self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
+    ) -> None:
+        anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
+        thread.mock(return_value=httpx.Response(200, json={"value": [_message(_ANCHOR_ID)]}))
+
+        result = await read_thread(client, handle=_HANDLE)
+
+        assert anchor.called
+        assert "signed-in user's own mailbox" in result.searched_scope
+
+    async def test_a_mailbox_reads_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        anchor = graph.get(f"/users/alex@example.invalid/messages/{_ANCHOR_ID}").mock(
+            return_value=httpx.Response(200, json=_anchor_body())
+        )
+        thread = graph.get("/users/alex@example.invalid/messages").mock(
+            return_value=httpx.Response(200, json={"value": [_message(_ANCHOR_ID)]})
+        )
+
+        result = await read_thread(client, handle=_HANDLE, mailbox="alex@example.invalid")
+
+        assert anchor.called
+        assert thread.called
+        assert "alex@example.invalid" in result.searched_scope
+
+    def test_the_permission_is_the_one_microsoft_documents_for_a_shared_mailbox(self) -> None:
+        assert reader.GRAPH_PERMISSIONS == ("Mail.Read", "Mail.Read.Shared")
 
 
 class TestWhatItRefuses:

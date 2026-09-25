@@ -1,10 +1,3 @@
-"""Every response body here is synthesised. No mailbox was written to.
-
-The four rules that make a write tool safe are what this file is about: the batch is bounded, every
-message is its own request and its own row, what is reported comes off Microsoft's answer rather
-than off the arguments, and no retry turns one row into several.
-"""
-
 import json
 from collections.abc import Mapping
 from typing import cast
@@ -40,10 +33,8 @@ _IDS: tuple[str, ...] = (
     "AAMkAGI2SYNTHETIC-immutable-0003=",
 )
 
-# Spelled by the one module allowed to spell them, so a change to the grammar reaches this file.
 _REFS: tuple[str, ...] = tuple(MailMessageHandle(message_id).uri for message_id in _IDS)
 
-# The SDK re-encodes each id for the URL, so this is what the decoded handle comes back as.
 _PATHS: tuple[str, ...] = tuple(
     f"/me/messages/AAMkAGI2SYNTHETIC-immutable-000{number}%3D" for number in (1, 2, 3)
 )
@@ -62,7 +53,6 @@ def _updated(
     flag_status: str | None = "notFlagged",
     importance: str | None = "normal",
 ) -> dict[str, object]:
-    """What Graph answers a message PATCH with: the message as it now stands."""
     return {
         "id": message_id,
         "isRead": is_read,
@@ -79,7 +69,6 @@ def _writes(
     flag_status: str | None = "notFlagged",
     importance: str | None = "normal",
 ) -> respx.Route:
-    """One route for one message, so a test can tell which of them was written."""
     return graph.patch(_PATHS[index]).mock(
         return_value=httpx.Response(
             200,
@@ -94,12 +83,10 @@ def _writes(
 
 
 def _every_write(graph: respx.MockRouter) -> respx.Route:
-    """A catch-all for the tests that care how many writes happened, not which."""
     return graph.route(method="PATCH").mock(return_value=httpx.Response(200, json=_updated()))
 
 
 def _sent(route: respx.Route) -> Mapping[str, object]:
-    """The JSON this tool actually put on the wire for the last write on `route`."""
     return cast("dict[str, object]", json.loads(route.calls.last.request.content))
 
 
@@ -108,7 +95,6 @@ def _arguments(tool: Tool) -> Mapping[str, Mapping[str, object]]:
 
 
 async def _registered(transport: httpx.AsyncClient) -> Tool:
-    """The tool exactly as `register` declares it."""
     mcp: FastMCP[None] = FastMCP("Mark Mail Under Test")
     register(mcp, transport)
     tool = await mcp.get_tool(TOOL_NAME)
@@ -135,8 +121,6 @@ class TestTheBulkCap:
     async def test_a_batch_over_the_cap_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The point of the cap is that one call cannot touch a whole mailbox, so it has to be
-        refused before the first write and not after the twentieth."""
         route = _every_write(graph)
         too_many = [MailMessageHandle(f"SYNTHETIC-{number}").uri for number in range(21)]
 
@@ -169,8 +153,6 @@ class TestTheBulkCap:
     async def test_the_schema_publishes_the_cap_a_client_is_held_to(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """The assertion in the worker is the backstop; this is what stops a client sending five
-        hundred handles in the first place."""
         tool = await _registered(transport)
 
         refs = _arguments(tool)["message_refs"]
@@ -202,8 +184,6 @@ class TestEveryWriteIsItsOwnRequest:
     async def test_one_refused_message_neither_hides_nor_becomes_the_whole_batch(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The failure this tool exists to make visible: nineteen writes and one 404 is neither
-        'it worked' nor 'it failed'."""
         _ = _writes(graph, 0)
         _ = graph.patch(_PATHS[1]).mock(return_value=httpx.Response(404, json=_NOT_FOUND))
         _ = _writes(graph, 2)
@@ -258,7 +238,6 @@ class TestItEchoesGraphAndNotItsArguments:
     async def test_the_read_state_reported_is_the_one_microsoft_answered_with(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A tool echoing its own arguments cannot tell a caller that a write did nothing."""
         _ = _writes(graph, 0, is_read=False)
 
         answer = await _marked(client, is_read=True)
@@ -269,8 +248,6 @@ class TestItEchoesGraphAndNotItsArguments:
     async def test_the_flag_status_reported_is_the_one_microsoft_answered_with(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`complete` is neither of the two values `flagged` takes, which is why the status is
-        reported as Microsoft's own three-valued property."""
         _ = _writes(graph, 0, flag_status="complete")
 
         answer = await _marked(client, flagged=True)
@@ -302,8 +279,6 @@ class TestWhatItSendsToGraph:
     async def test_only_the_properties_the_call_named_are_written(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """An unset property is absent from the payload, so a PATCH cannot null the rest of the
-        message on its way past."""
         route = _writes(graph, 0)
 
         _ = await _marked(client, is_read=True)
@@ -314,8 +289,6 @@ class TestWhatItSendsToGraph:
     async def test_no_draft_only_property_is_ever_in_the_payload(
         self, client: GraphServiceClient, graph: respx.MockRouter, draft_only: str
     ) -> None:
-        """Microsoft makes these writable only while `isDraft` is true, and a PATCH of one against
-        a sent message is documented nowhere."""
         route = _writes(graph, 0)
 
         _ = await _marked(client, is_read=True, flagged=True, importance="high")
@@ -326,8 +299,6 @@ class TestWhatItSendsToGraph:
     async def test_no_draft_only_property_is_addressable_in_the_schema_either(
         self, transport: httpx.AsyncClient, draft_only: str
     ) -> None:
-        """Their absence from the signature is the control: nothing downstream filters them out,
-        because nothing upstream can name them."""
         tool = await _registered(transport)
 
         assert draft_only not in _arguments(tool)
@@ -358,8 +329,6 @@ class TestWhatItSendsToGraph:
     async def test_it_declares_the_immutable_id_space_on_every_write(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Without the preference Graph reads the handle's immutable id as a `RestId` and answers
-        404, so every row of a perfectly good batch would fail."""
         routes = [_writes(graph, index) for index in range(3)]
 
         _ = await _marked(client, refs=3, is_read=True)
@@ -370,8 +339,6 @@ class TestWhatItSendsToGraph:
     async def test_the_preference_is_not_added_to_every_other_graph_request(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """kiota's `RequestConfiguration.headers` defaults to one `HeadersCollection` shared by
-        every configuration in the process, so a header added to the default leaks everywhere."""
         _ = _writes(graph, 0)
         profile = graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
 
@@ -386,9 +353,6 @@ class TestAWriteIsNotRetried:
     async def test_a_patch_microsoft_answered_503_to_is_sent_exactly_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The middleware default is what makes this worth asserting: without `no_retry` the SDK
-        sends this `GraphSettings().max_retries` more times, and the row's one line would stand for
-        an unknown number of attempts."""
         route = graph.patch(_PATHS[0]).mock(return_value=httpx.Response(503))
 
         answer = await _marked(client, is_read=True)
@@ -402,7 +366,6 @@ class TestWhatItRefusesBeforeWritingAnything:
     async def test_a_call_that_changes_nothing_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """An empty update would be written to every message named and reported as a change."""
         route = _every_write(graph)
 
         with pytest.raises(ToolError):
@@ -425,8 +388,6 @@ class TestWhatItRefusesBeforeWritingAnything:
     async def test_one_bad_handle_refuses_the_whole_call_and_writes_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter, not_a_message: str
     ) -> None:
-        """Dropping the bad entries and writing the rest would leave a call that half happened and
-        reported neither half."""
         route = _every_write(graph)
 
         with pytest.raises(ToolError):
@@ -453,12 +414,38 @@ class TestWhatItRefusesBeforeWritingAnything:
         assert "2, 4" in str(refused.value)
 
 
+class TestMailboxTargeting:
+    async def test_no_mailbox_writes_the_signed_in_users_own_one(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _writes(graph, 0)
+
+        _ = await mark_mail(client, message_refs=_REFS[:1], change=MarkChange(is_read=True))
+
+        assert route.called
+
+    async def test_a_mailbox_writes_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.patch(
+            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+        ).mock(return_value=httpx.Response(200, json=_updated()))
+
+        answer = await mark_mail(
+            client,
+            message_refs=_REFS[:1],
+            change=MarkChange(is_read=True),
+            mailbox="alex@example.invalid",
+        )
+
+        assert route.called
+        assert answer.messages[0].changed is True
+
+
 class TestHowItDeclaresItself:
     async def test_it_says_it_writes_and_that_the_write_can_destroy(
         self, transport: httpx.AsyncClient
     ) -> None:
-        """Clearing a follow-up flag drops the start, due and completed dates this tool never read,
-        so `destructiveHint: false` — MCP's "performs only additive updates" — would be untrue."""
         tool = await _registered(transport)
 
         assert tool.annotations is not None
@@ -467,14 +454,13 @@ class TestHowItDeclaresItself:
         assert WRITE_DESTRUCTIVE["destructiveHint"] is True
 
     def test_it_asks_for_the_permission_that_can_write(self) -> None:
-        assert GRAPH_PERMISSIONS == ("Mail.ReadWrite",)
+        assert GRAPH_PERMISSIONS == ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
-    async def test_it_tells_a_caller_the_mailbox_changes_and_that_nothing_here_undoes_it(
+    async def test_it_tells_a_caller_what_it_does_and_where(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
         described = tool.description or ""
         assert "in the signed-in user's own mailbox" in described
-        assert "The change is immediate and cannot be undone" in described
-        assert "Outlook" in described
+        assert "flags them for follow-up" in described

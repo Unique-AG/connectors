@@ -237,8 +237,9 @@ class TestAGraphCallIsCountedAndTimed:
 
         answered = _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="ok")
 
-        async def declines(draft: Message) -> str | None:
+        async def declines(draft: Message, mailbox: str | None) -> str | None:
             assert draft is not None
+            assert mailbox is None
             return "Nothing was sent."
 
         with pytest.raises(ToolError):
@@ -300,8 +301,9 @@ class TestAGraphCallIsCountedAndTimed:
         waited = 0.5
         before = _value(f"{GRAPH_OPERATION_DURATION_SECONDS}_sum", operation="outlook_send_draft")
 
-        async def thinks_about_it(draft: Message) -> str | None:
+        async def thinks_about_it(draft: Message, mailbox: str | None) -> str | None:
             assert draft is not None
+            assert mailbox is None
             await asyncio.sleep(waited)
             return None
 
@@ -711,12 +713,16 @@ GRAPH_STEPS = frozenset(
         "mailbox_settings",
         "mail_rules",
         "mail_categories",
+        "categories",
         "mark_message",
         "move_message",
         "destination_folder",
         "create_draft",
         "create_reply",
         "fill_reply",
+        "attach_inline",
+        "create_upload_session",
+        "upload_session_chunks",
         "read_draft",
         "send_draft",
         "read_mailbox_settings",
@@ -730,6 +736,11 @@ GRAPH_STEPS = frozenset(
         "calendar_events",
         "calendar_event",
         "create_event",
+        "update_event",
+        "cancel_event",
+        "respond_to_invite",
+        "get_schedule",
+        "find_meeting_times",
         "notebook",
         "notebooks",
         "section",

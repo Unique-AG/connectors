@@ -1,15 +1,18 @@
-"""Every response body here is synthesised. None came from a real mailbox."""
-
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta, timezone
+from typing import cast
 
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphThrottled
 from office_365_mcp.shared.handles import MailMessageHandle
+from office_365_mcp.tools import outlook_search_mail as searcher
 from office_365_mcp.tools.outlook_search_mail import (
     CRITERIA,
     MAX_RESULTS,
@@ -69,10 +72,6 @@ class TestWhatItAsksGraphFor:
     async def test_a_multi_word_value_does_not_close_the_search_string_early(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """`$search` takes a double-quoted string and KQL quotes a phrase inside it, so a naive
-        wrap emits `$search="from:"Bob Vance""` — a string that ends at the third quote and leaves
-        the rest as syntax. Every mail example Microsoft publishes is a single word, which hides it.
-        """
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -94,9 +93,6 @@ class TestWhatItAsksGraphFor:
     async def test_the_to_line_and_the_wider_participants_are_different_terms(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """`participants` is from, to, cc and bcc together, so on the user's own mailbox it matches
-        nearly every message. `to` is the To line alone, which is what "addressed to me" means.
-        Both spellings are Microsoft's own for a message collection."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -112,9 +108,6 @@ class TestWhatItAsksGraphFor:
     async def test_an_attachment_name_is_sent_as_microsofts_own_property(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """`attachment`, singular, is the spelling in the searchable-email-property table and in
-        its own example. Attachment file names are on none of the properties a bare `query`
-        reaches."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -125,8 +118,6 @@ class TestWhatItAsksGraphFor:
     async def test_a_file_name_with_a_space_stays_one_phrase(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """Unquoted, `Q3 report.xlsx` would be two ANDed terms, one of them a bare word matching
-        every message that says "Q3"."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -139,8 +130,6 @@ class TestWhatItAsksGraphFor:
     async def test_a_wildcard_in_a_file_name_is_sent_as_text_and_not_as_syntax(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """KQL reads `*` as a prefix wildcard, so an unescaped one turns a named file into a
-        pattern. The description promises a whole name, and this keeps that promise."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -151,8 +140,6 @@ class TestWhatItAsksGraphFor:
     async def test_every_criterion_is_anded_into_the_one_search_string(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """Six criteria, one `$search`, no `$filter` — which is what keeps an unrecognised term a
-        narrowing failure rather than a widening one."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -191,8 +178,6 @@ class TestWhatItAsksGraphFor:
     async def test_it_never_sends_an_order_or_a_filter_beside_the_search(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """Graph fails an unsupported combination silently, so an ignored `$orderby` would return
-        its own order under a label promising another."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -205,8 +190,6 @@ class TestWhatItAsksGraphFor:
     async def test_it_does_not_ask_for_immutable_ids_on_the_search_itself(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """The header is not honoured under `$search` and Graph answers `Preference-Applied`
-        regardless, so sending it would buy a false confirmation and nothing else."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -216,19 +199,6 @@ class TestWhatItAsksGraphFor:
 
 
 class TestTheWindowItSends:
-    """Both bounds are KQL comparisons inside the one `$search`, and a live probe against a real
-    tenant on 2026-09-10 is why: `received` with a full ISO instant answered row for row with the
-    equivalent `receivedDateTime` `$filter`, while that `$filter` beside a `$search` is refused
-    outright with `SearchWithFilter`. Every value here is machine-rendered from a parsed date, so
-    it is emitted bare: `kql.quoted` would phrase-quote it for its colons into a form no probe
-    verified.
-
-    The explicit `AND` is the load-bearing part of every expectation below. The same probe found
-    two SPACE-separated `received` comparisons are both DROPPED — the answer came back as the
-    criterion's own unbounded matches, 46 rows where the true answer was 0, every one of them
-    outside the window — while `AND` matched the `$filter` reference exactly. A space here is not
-    a formatting choice, it is a silently unbounded search."""
-
     async def test_a_lower_bound_reaches_graph_as_a_comparison_beside_the_criteria(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
@@ -247,10 +217,6 @@ class TestTheWindowItSends:
     async def test_a_bare_date_upper_bound_closes_at_the_start_of_the_following_day(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """The day a caller names is inside the window, so the half-open bound falls on the NEXT
-        day's first instant. Closing at the named day's own midnight would bracket a day that ends
-        before it begins, and every message of the day asked about would be missing from a
-        well-formed answer."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -266,8 +232,6 @@ class TestTheWindowItSends:
     async def test_a_moment_upper_bound_closes_at_the_second_it_names(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """A named second is exact already, so it closes with `<=` at itself rather than with `<`
-        at the following day. Both spellings keep the one promise `shared/window.py` makes."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -286,8 +250,6 @@ class TestTheWindowItSends:
     async def test_a_two_sided_window_sends_both_comparisons_and_still_no_filter(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """The probed pair, verbatim in its verified shape: a criterion and the two bounds in one
-        `$search`. A `$filter` here is the 400 the whole construction exists to avoid."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -308,8 +270,6 @@ class TestTheWindowItSends:
     async def test_one_date_in_both_bounds_searches_that_single_day(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """Both bounds cover the day they name whole, so "the invoice mail from Tuesday" is that
-        date twice. Two first instants would bracket nothing at all."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -328,7 +288,6 @@ class TestTheWindowItSends:
     async def test_a_date_and_a_moment_can_bound_the_same_window(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """The two shapes mix, and each end keeps its own spelling."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -347,8 +306,6 @@ class TestTheWindowItSends:
     async def test_a_moment_with_no_zone_is_read_as_utc_and_not_as_the_servers_own(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """Otherwise the bound lands in whichever zone the pod runs in — one no caller chose and no
-        answer names."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -367,9 +324,6 @@ class TestTheWindowItSends:
     async def test_a_moment_east_of_utc_is_converted_rather_than_relabelled(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """14:00+02:00 is 12:00 UTC, and the probe checked that offset against the `$filter`
-        reference. Stamping `Z` on the wall clock would move the bound two hours, which is the trap
-        `shared/window.py` documents against `as_utc` alone."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -388,10 +342,6 @@ class TestTheWindowItSends:
     async def test_a_sub_second_bound_keeps_its_precision_on_the_wire(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """Truncating to whole seconds moves both bounds earlier and is silent both times: the
-        lower one lets in mail the caller excluded, the upper one shuts out mail the caller
-        included, and nothing in the answer says a row was dropped. The probe confirmed the index
-        parses a fraction."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -430,9 +380,6 @@ class TestTheWindowItSends:
         criteria: SearchCriteria,
         term: str,
     ) -> None:
-        """Each criterion first, then the bounds, all ANDed — which in KQL is what a space between
-        two terms already means. So every criterion narrows to the same window rather than any one
-        of them displacing it."""
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
         translated.mock(return_value=httpx.Response(200, json={"value": []}))
 
@@ -483,8 +430,6 @@ class TestTheHandlesItMints:
     async def test_a_hit_the_exchange_could_not_translate_is_dropped(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
-        """A handle that resolves now and 404s once Outlook files the message is the failure the
-        exchange exists to prevent, and a model reads that 404 as "deleted"."""
         searched.mock(
             return_value=httpx.Response(
                 200, json={"value": [_message(_REST_ID), _message(_SECOND_REST_ID)]}
@@ -559,8 +504,6 @@ class TestWhatItRefuses:
     async def test_a_query_of_nothing_but_punctuation_is_no_criterion(
         self, client: GraphServiceClient, searched: respx.Route
     ) -> None:
-        """The KQL, not the arguments, is the honest test: a query that contributes no term would
-        otherwise reach Graph as a criteria-free search."""
         with pytest.raises(ToolError, match="at least one of"):
             await search_mail(client, SearchCriteria(query="   "), limit=25)
 
@@ -569,9 +512,6 @@ class TestWhatItRefuses:
     async def test_the_refusal_names_every_criterion_search_criteria_defines(
         self, client: GraphServiceClient
     ) -> None:
-        """A criterion added to `SearchCriteria` reaches `CRITERIA`, and through it this refusal,
-        automatically. Otherwise a client is turned away by a rule whose list of ways out is
-        missing the one it wanted."""
         with pytest.raises(ToolError) as refusal:
             await search_mail(client, SearchCriteria(), limit=25)
 
@@ -582,10 +522,6 @@ class TestWhatItRefuses:
     async def test_a_date_window_on_its_own_is_no_criterion(
         self, client: GraphServiceClient, searched: respx.Route
     ) -> None:
-        """A window with nothing to search for is outlook_list_mail's question: it orders by
-        receipt and reaches the drafts this index does not. So the bounds are outside
-        `SearchCriteria`, which is what `CRITERIA` and this refusal are both derived from, and a
-        date cannot satisfy "at least one criterion"."""
         with pytest.raises(ToolError, match="at least one of"):
             await search_mail(
                 client,
@@ -600,8 +536,6 @@ class TestWhatItRefuses:
     async def test_a_window_that_runs_backwards_never_reaches_graph(
         self, client: GraphServiceClient, searched: respx.Route
     ) -> None:
-        """Graph answers a backwards window with an empty page, which is the same answer as "the
-        index matched nothing". Only one of the two is worth reporting."""
         with pytest.raises(ToolError, match="backwards"):
             await search_mail(
                 client,
@@ -616,9 +550,6 @@ class TestWhatItRefuses:
     async def test_the_backwards_refusal_names_both_bounds_and_which_takes_the_earlier_one(
         self, client: GraphServiceClient
     ) -> None:
-        """A date against a moment, because Python refuses to order those two: the bounds are
-        compared as instants, and a direct comparison raises `TypeError` here instead of
-        refusing."""
         with pytest.raises(ToolError) as refusal:
             await search_mail(
                 client,
@@ -641,6 +572,39 @@ class TestWhatItRefuses:
             await search_mail(client, SearchCriteria(query="invoice"), limit=limit)
 
 
+class TestMailboxTargeting:
+    async def test_no_mailbox_searches_the_signed_in_users_own_one(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(client, SearchCriteria(query="invoice"), limit=25)
+
+        assert searched.called
+
+    async def test_a_mailbox_searches_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        searched = graph.get("/users/alex@example.invalid/messages").mock(
+            return_value=httpx.Response(200, json={"value": [_message(_REST_ID)]})
+        )
+        translated = graph.post("/users/alex@example.invalid/translateExchangeIds").mock(
+            return_value=httpx.Response(200, json=_translation({_REST_ID: _STABLE_ID}))
+        )
+
+        found = await search_mail(
+            client, SearchCriteria(query="invoice"), limit=25, mailbox="alex@example.invalid"
+        )
+
+        assert searched.called
+        assert translated.called
+        assert found.messages[0].uri == MailMessageHandle(_STABLE_ID).uri
+
+    def test_the_permission_is_the_one_microsoft_documents_for_a_shared_mailbox(self) -> None:
+        assert searcher.GRAPH_PERMISSIONS == ("Mail.Read", "User.Read", "Mail.Read.Shared")
+
+
 class TestWhatAGraphFailureBecomes:
     async def test_a_refused_search_is_a_forbidden(
         self, client: GraphServiceClient, searched: respx.Route
@@ -659,3 +623,33 @@ class TestWhatAGraphFailureBecomes:
 
         with pytest.raises(GraphThrottled):
             await search_mail(client, SearchCriteria(query="invoice"), limit=25)
+
+
+async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
+    mcp: FastMCP = FastMCP(name="schema-under-test")
+    searcher.register(mcp, transport)
+    tool = await mcp.get_tool(searcher.TOOL_NAME)
+    assert tool is not None, "register left the tool off the server"
+    return cast("Mapping[str, object]", tool.parameters), tool
+
+
+class TestAttachmentContentIsNotSearchable:
+    async def test_the_query_field_does_not_claim_to_reach_attachment_text(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        description = cast("str", properties["query"]["description"]).casefold()
+        assert "attachment" in description
+        assert "not" in description
+
+    async def test_an_attachment_name_search_still_matches_on_the_name_property_only(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(client, SearchCriteria(attachment_name="budget.pdf"), limit=25)
+
+        assert searched.calls.last.request.url.params["$search"] == '"attachment:budget.pdf"'

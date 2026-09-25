@@ -26,6 +26,7 @@ from mcp.types import (
     InputRequiredResult,
 )
 from mcp.types.version import MODERN_PROTOCOL_VERSIONS
+from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import (
@@ -81,14 +82,18 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "OnlineMeetingTranscript.Read.All",
         "OnlineMeetingRecording.Read.All",
         "Mail.Read",
+        "Mail.Read.Shared",
         "People.Read",
         "MailboxSettings.Read",
         "Mail.ReadWrite",
+        "Mail.ReadWrite.Shared",
         "Mail.Send",
+        "Mail.Send.Shared",
         "Mail.ReadBasic",
         "MailboxSettings.ReadWrite",
         "Calendars.Read",
         "Calendars.Read.Shared",
+        "Calendars.ReadBasic",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
         "Files.Read.All",
@@ -148,6 +153,18 @@ def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> 
         return graph_client_for(transport, access_token)
 
     return Depends(client_for_this_call)
+
+
+def graph_mailbox(client: GraphServiceClient, mailbox: str | None) -> UserItemRequestBuilder:
+    if mailbox is None:
+        return client.me
+    return client.users.by_user_id(mailbox)
+
+
+MAILBOX_FIELD: str = (
+    "A shared or delegated mailbox to act on, as its user principal name or Entra object id, "
+    + "instead of the signed-in user's own mailbox. Omit for the signed-in user's own mailbox."
+)
 
 
 _ASK_AGAIN = (

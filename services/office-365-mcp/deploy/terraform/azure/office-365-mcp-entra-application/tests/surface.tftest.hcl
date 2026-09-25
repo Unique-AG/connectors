@@ -23,14 +23,18 @@ mock_provider "azuread" {
         "OnlineMeetingTranscript.Read.All" = "77777777-7777-7777-7777-777777777777"
         "OnlineMeetingRecording.Read.All"  = "88888888-8888-8888-8888-888888888888"
         "Mail.Read"                        = "a1111111-1111-1111-1111-111111111111"
+        "Mail.Read.Shared"                 = "a1111111-2222-2222-2222-222222222222"
         "People.Read"                      = "a2222222-2222-2222-2222-222222222222"
         "MailboxSettings.Read"             = "a3333333-3333-3333-3333-333333333333"
         "Mail.ReadWrite"                   = "a4444444-4444-4444-4444-444444444444"
+        "Mail.ReadWrite.Shared"            = "a4444444-5555-5555-5555-555555555555"
         "Mail.Send"                        = "a5555555-5555-5555-5555-555555555555"
+        "Mail.Send.Shared"                 = "a5555555-6666-6666-6666-666666666666"
         "Mail.ReadBasic"                   = "a6666666-6666-6666-6666-666666666666"
         "MailboxSettings.ReadWrite"        = "a7777777-7777-7777-7777-777777777777"
         "Calendars.Read"                   = "b1111111-1111-1111-1111-111111111111"
         "Calendars.Read.Shared"            = "b2222222-2222-2222-2222-222222222222"
+        "Calendars.ReadBasic"              = "b2222222-3333-3333-3333-333333333333"
         "Calendars.ReadWrite"              = "b3333333-3333-3333-3333-333333333333"
         "Calendars.ReadWrite.Shared"       = "b4444444-4444-4444-4444-444444444444"
         "Files.Read.All"                   = "c1111111-1111-1111-1111-111111111111"
@@ -218,7 +222,7 @@ run "preset_outlook_read" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read"
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,Mail.Read.Shared,People.Read"
     error_message = "outlook-read composed ${join(",", local.permissions)}"
   }
 }
@@ -232,6 +236,11 @@ run "preset_outlook_mailbox" {
     condition     = join(",", local.permissions) == "User.Read,MailboxSettings.Read"
     error_message = "outlook-mailbox composed ${join(",", local.permissions)}"
   }
+
+  assert {
+    condition     = length(local.tools) == 3
+    error_message = "outlook-mailbox resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
 }
 
 run "preset_outlook_write" {
@@ -240,7 +249,7 @@ run "preset_outlook_write" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,Mail.ReadWrite"
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,Mail.Read.Shared,People.Read,Mail.ReadWrite,Mail.ReadWrite.Shared"
     error_message = "outlook-write composed ${join(",", local.permissions)}"
   }
 }
@@ -251,7 +260,7 @@ run "preset_outlook_send" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,Mail.ReadWrite,Mail.Send,Mail.ReadBasic"
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,Mail.Read.Shared,People.Read,Mail.ReadWrite,Mail.ReadWrite.Shared,Mail.Send,Mail.ReadBasic,Mail.Send.Shared"
     error_message = "outlook-send composed ${join(",", local.permissions)}"
   }
 }
@@ -273,8 +282,13 @@ run "preset_outlook_calendar" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared"
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadBasic"
     error_message = "outlook-calendar composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 6
+    error_message = "outlook-calendar resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
 
@@ -284,8 +298,13 @@ run "preset_outlook_calendar_write" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadWrite"
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadBasic,Calendars.ReadWrite"
     error_message = "outlook-calendar-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 10
+    error_message = "outlook-calendar-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
 
@@ -295,8 +314,13 @@ run "preset_outlook_calendar_delegate" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadWrite,Calendars.ReadWrite.Shared"
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadBasic,Calendars.ReadWrite,Calendars.ReadWrite.Shared"
     error_message = "outlook-calendar-delegate composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 11
+    error_message = "outlook-calendar-delegate resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 
   assert {
