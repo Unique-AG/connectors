@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.11](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.10...teams-mcp@0.4.11) (2026-09-25)
+
+
+### Bug Fixes
+
+* **sharepoint-connector,office-365-mcp,outlook-semantic-mcp,teams-mcp:** stop managing shared Microsoft service principals as destroyable resources ([#1097](https://github.com/Unique-AG/connectors/issues/1097)) ([e8cdadd](https://github.com/Unique-AG/connectors/commit/e8cdaddc16dfd1352797c8b450e8cd244abb0445))
+
 ## [0.4.10](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.9...teams-mcp@0.4.10) (2026-09-21)
 
 
