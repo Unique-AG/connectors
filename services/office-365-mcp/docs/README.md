@@ -8,14 +8,14 @@
 
 office-365-mcp is a Python MCP server, built on FastMCP, that connects Microsoft 365 to MCP
 clients through the Microsoft Graph API. It reaches Outlook mail and calendar, Microsoft Teams,
-SharePoint and OneDrive, OneNote, and user identity. The server has 52 tools in total. A
-deployment turns on a fixed subset of these 52 tools (never all of them, unless a preset or a
+SharePoint and OneDrive, OneNote, and user identity. The server has 60 tools in total. A
+deployment turns on a fixed subset of these 60 tools (never all of them, unless a preset or a
 list names every one). This document explains what each tool does, how a deployment picks its
 tools, and how sign-in and consent work.
 
 ## Tools
 
-office-365-mcp has 52 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
+office-365-mcp has 60 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
 calendar, SharePoint and OneDrive, and OneNote. One tool, `get_me`, is always on, in every
 configuration. The Kind column is a hint to the calling client about the kind of change a tool
 makes. It does not control access to the tool.
@@ -39,6 +39,8 @@ makes. It does not control access to the tool.
 | `teams_list_meeting_transcripts` | Read | `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | Yes | Whether a Teams meeting has a transcript, and a handle for each one. |
 | `teams_read_transcript` | Read | `OnlineMeetingTranscript.Read.All` | Yes | One page of a Teams meeting transcript, as timestamped turns with the speaker named, not the whole file at once. |
 | `teams_list_meeting_recordings` | Read | `User.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | Yes | Whether a meeting recording exists, how long it runs, and who can download it. The answer is metadata only, never the video itself. |
+| `teams_send_chat_message` | Write, adds | `ChatMessage.Send` | No | Posts one plain-text message to an existing Teams chat, after the user approves it. |
+| `teams_send_channel_message` | Write, adds | `ChannelMessage.Send` | No | Posts one plain-text message to an existing Teams channel, after the user approves it. |
 
 ### Outlook mail
 
@@ -51,6 +53,7 @@ makes. It does not control access to the tool.
 | `outlook_read_thread` | Read | `Mail.Read` | No | Every message of one conversation that is in this mailbox. |
 | `outlook_list_mail` | Read | `Mail.Read` | No | The newest messages of one folder, in receipt order. |
 | `outlook_get_mailbox_settings` | Read | `MailboxSettings.Read` | No | What acts quietly on this mailbox — the rules, the automatic reply, and the categories — and what this tool cannot show. |
+| `outlook_list_categories` | Read | `MailboxSettings.Read` | No | Every category that this mailbox can use to tag mail, events, and contacts, with each category's name and color. |
 | `outlook_mark_mail` | Write, changes or removes | `Mail.ReadWrite` | No | The read status, the follow-up flag, and the importance, on up to twenty messages. |
 | `outlook_move_mail` | Write, changes or removes | `Mail.ReadWrite` | No | Moves messages into another folder. This connector erases mail only by moving it to Deleted Items. |
 | `outlook_draft_mail` | Write, adds | `Mail.ReadWrite` | No | A new message, composed into Drafts. The tool cannot send it. |
@@ -66,7 +69,12 @@ makes. It does not control access to the tool.
 | `outlook_list_calendars` | Read | `Calendars.Read`, `Calendars.Read.Shared`, `User.Read` | No | Every calendar that this mailbox reaches — the user's own and each one delegated — and a handle for each one. |
 | `outlook_list_events` | Read | `Calendars.Read`, `Calendars.Read.Shared` | No | One calendar's occurrences over a window, never a recurrence rule. |
 | `outlook_read_event` | Read | `Calendars.Read`, `Calendars.Read.Shared` | No | One event in full, from a handle that another tool minted, with every attendee and each one's reply. |
+| `outlook_check_availability` | Read | `Calendars.ReadBasic` | No | Reads free/busy status for one or more mailboxes over a time window. It does not book, invite, or change anything. |
+| `outlook_suggest_meeting_times` | Read | `Calendars.Read.Shared` | No | Asks Microsoft to suggest meeting times for the signed-in user and one or more attendees. It does not book, invite, or hold a time. |
 | `outlook_create_event` | Write, adds | `Calendars.ReadWrite` | No | One new event on the user's own calendar. The tool creates it and sends invitations in one call. |
+| `outlook_update_event` | Write, adds | `Calendars.ReadWrite` | No | Changes the subject, time, location, or attendee list of one event that the signed-in user organizes. A change that reaches an attendee mails the attendee a notice that the meeting changed. |
+| `outlook_cancel_event` | Write, changes or removes | `Calendars.ReadWrite` | No | Cancels one event that the signed-in user organizes, moves the event to Deleted Items, and mails any attendees a cancellation. Refuses an event that the signed-in user did not organize. |
+| `outlook_respond_to_invite` | Write, adds | `Calendars.ReadWrite` | No | Accepts, declines, or tentatively accepts a calendar invitation that the signed-in user received. By default, it notifies the organizer. |
 | `outlook_create_event_on_behalf` | Write, adds | `Calendars.ReadWrite.Shared`, `Calendars.Read`, `Calendars.Read.Shared` | No | One event on a calendar delegated by another person, sent under that person's own name. |
 
 ### SharePoint and OneDrive
@@ -106,7 +114,7 @@ makes. It does not control access to the tool.
 
 A deployment turns tools on in one of two ways:
 
-- **A preset.** One of the 20 named bundles in the table below.
+- **A preset.** One of the 21 named bundles in the table below.
 - **An exact list.** The `TOOLS_ENABLED` configuration, which names every wanted tool.
 
 A deployment must pick exactly one way:
@@ -119,7 +127,7 @@ A deployment must pick exactly one way:
 - A deployment cannot start from a preset and then add or remove one tool. For a mix of tools
   that no preset covers, name every wanted tool in the exact list instead.
 
-There are 20 presets. This table names each preset's tools, besides `get_me`, and gives a short
+There are 21 presets. This table names each preset's tools, besides `get_me`, and gives a short
 description.
 
 | Preset | Tools | Description |
@@ -131,14 +139,15 @@ description.
 | `teams-transcripts` | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript` | Finds a meeting, and reads the transcript of it. |
 | `teams-recordings` | `teams_list_chats`, `teams_list_meeting_recordings` | Says whether a meeting was recorded, and who can get the recording. |
 | `teams-meetings` | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | Both transcripts and recordings, for one meeting. |
+| `teams-write` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message` | Finds a chat or a channel, and posts a new message to either. |
 | `outlook-read` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | Finds a message, reads it in full, walks the folder tree, reads a thread, lists a folder, and resolves a name to an address. |
 | `outlook-write` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | Everything in `outlook-read`, plus marking, filing, and drafting mail. |
 | `outlook-send` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_send_draft` | Everything in `outlook-write`, plus sending a draft that this connector composed. |
-| `outlook-mailbox` | `outlook_get_mailbox_settings` | Shows what quietly acts on the mailbox: the rules, the automatic reply, and the categories. |
+| `outlook-mailbox` | `outlook_get_mailbox_settings`, `outlook_list_categories` | Shows what quietly acts on the mailbox — the rules and the automatic reply — and lists every category with its name and color. |
 | `outlook-automate` | `outlook_get_mailbox_settings`, `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | Everything in `outlook-mailbox`, plus setting the automatic reply and turning an inbox rule off. |
-| `outlook-calendar` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` | Names every calendar that the mailbox reaches, and reads what sits on one. |
-| `outlook-calendar-write` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event` | Everything in `outlook-calendar`, plus creating one event on the user's own calendar. |
-| `outlook-calendar-delegate` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event`, `outlook_create_event_on_behalf` | Everything in `outlook-calendar-write`, plus creating an event on a calendar delegated by another person. |
+| `outlook-calendar` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times` | Names every calendar that the mailbox reaches, reads what sits on one, and checks or suggests free time. |
+| `outlook-calendar-write` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times`, `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite` | Everything in `outlook-calendar`, plus creating, changing, and canceling an event, and responding to an invitation. |
+| `outlook-calendar-delegate` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times`, `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite`, `outlook_create_event_on_behalf` | Everything in `outlook-calendar-write`, plus creating an event on a calendar delegated by another person. |
 | `sharepoint-search` | `sharepoint_search_files`, `sharepoint_browse_folder` | Finds a file in OneDrive or on a SharePoint site, and lists one level of a folder. |
 | `sharepoint-read` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_read_file` | Everything in `sharepoint-search`, plus reading one file itself, or its PDF form. |
 | `onenote-read` | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections` | Lists notebooks, sections, and pages, and reads or previews a page. |
@@ -212,7 +221,7 @@ mcpConfig:
     preset: teams        # or: enabled: get_me,teams_list_chats
 ```
 
-The `preset` key names one of the 20 presets in the Presets table. The `enabled` key names an
+The `preset` key names one of the 21 presets in the Presets table. The `enabled` key names an
 exact, comma-separated list of tool names instead. A deployment that needs a mix that no preset
 covers uses `enabled`, and names every wanted tool. Granting admin consent is a separate step,
 covered in Admin consent.
@@ -252,9 +261,6 @@ the same resource.
 
 | Capability | office-365-mcp | teams-mcp |
 | --- | --- | --- |
-| Send or reply to a Teams message | No | Yes |
-| Message reactions in a tool's answer | No | Yes |
-| Full message body in one search call | No, a second call is needed | Yes |
 | Capture a transcript into Unique's knowledge base | No | Yes, opt-in, needs a database |
 | Read the replies inside a channel thread | Yes | No, root posts only |
 | Read a transcript, or a recording's metadata, live, with no configuration | Yes | No, ingest only |
@@ -264,10 +270,10 @@ the same resource.
 
 | Capability | office-365-mcp | outlook-semantic-mcp |
 | --- | --- | --- |
-| Read a shared or delegated mailbox | No, own mailbox only | Yes |
+| Read a shared or delegated mailbox | Yes, one mailbox per call | Yes, own and delegated in one search |
 | Search the words inside an attachment | No, file name only | Yes |
-| Change or cancel an event, or answer an invitation | No, create only | Yes |
-| Add an attachment to a draft | No | Yes |
+| Change an event's agenda or add a Teams meeting | No | Yes |
+| Add an attachment from Unique's knowledge base to a draft | No | Yes |
 | Send a message outright | Yes | No, draft only |
 | Mark a message read or unread, set its flag or importance, or move it | Yes | No |
 | Read a whole conversation across folders, in one call | Yes | No, one message at a time |
