@@ -30,9 +30,6 @@ locals {
   sharepoint_roles = toset(local.sync_mode_extra_roles[var.sync_mode_role_preset].sharepoint_roles)
 }
 
-# Service principals for Microsoft services. These are tenant-wide singletons owned by
-# Microsoft, so they are read-only here: a `resource` with `use_existing = true` would call the
-# real delete API on tenant-wide state if this module were ever removed from a caller's config.
 data "azuread_service_principal" "msgraph" {
   client_id = local.graph_app_id
 }

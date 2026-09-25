@@ -1,8 +1,5 @@
 data "azuread_application_published_app_ids" "well_known" {}
 
-# A tenant-wide Microsoft-owned singleton, so read-only here: a `resource` with
-# `use_existing = true` would call the real delete API on tenant-wide state if this module were
-# ever removed from a caller's config.
 data "azuread_service_principal" "msgraph" {
   client_id = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
 }
