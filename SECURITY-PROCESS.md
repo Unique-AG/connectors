@@ -250,18 +250,15 @@ Signing proves where an image came from, not that the image stays free of new fi
 
 ## Labels
 
-Two labels waive a check. A label that waives a check is named `<what>-exception`. Adding either one needs write access to this repository, and no separate approval.
+One label waives a check: `security-exception`. Adding it needs write access to this repository, and no separate approval.
 
 | Label | It waives |
 |---|---|
 | `security-exception` | the dependency review, and it reports image vulnerability check findings as warnings |
-| `title-exception` | the pull request title check and the scope check |
 
 `security-exception` waives two controls, not one. Use it only when you accept both.
 
 **`security-exception` only changes what happens on your pull request.** It does not reach the release image scan or the registry image scan. Once you merge and release, the same finding can open a fresh alert in the Security tab, with no link back to this label.
-
-`title-exception` is not a security waiver. It waives the pull request title and scope check in `.github/workflows/gatekeeper.yaml`. This document does not cover that check.
 
 ## Files
 
