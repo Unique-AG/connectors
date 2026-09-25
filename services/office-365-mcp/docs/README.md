@@ -1,3 +1,6 @@
+<!-- confluence-page-id: 2760507523 -->
+<!-- confluence-space-key: PUBDOC -->
+
 # office-365-mcp
 
 !!! danger "Documentation Disclaimer"
