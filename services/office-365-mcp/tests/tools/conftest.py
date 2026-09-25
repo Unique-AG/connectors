@@ -1,5 +1,3 @@
-"""A mocked graph.microsoft.com, a Graph client that calls it, and the payloads two tools share."""
-
 from collections.abc import AsyncGenerator, Iterator, Mapping, Sequence
 
 import httpx
@@ -32,8 +30,6 @@ def client(transport: httpx.AsyncClient) -> GraphServiceClient:
     return graph_client_for(transport, CALLER_TOKEN)
 
 
-# Already percent-escaped `%3a` and `%40`, a `?context=` value holding `%7b` and `%22`, and an `&`
-# after it. A `$filter` encoded too little, too much or not at all answers `200 OK` and no results.
 JOIN_WEB_URL = (
     "https://teams.microsoft.invalid/l/meetup-join/"
     + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
@@ -80,7 +76,6 @@ def transcript_payload(
     ended_at: str | None = "2026-02-10T14:58:02.117Z",
     content_correlation_id: str | None = "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3",
 ) -> dict[str, object]:
-    """Metadata only: the words come from `/content`."""
     return {
         "id": transcript_id,
         "meetingId": meeting_id,
@@ -101,18 +96,12 @@ def recording_payload(
     organizer_user_id: str | None = OTHER_USER_ID,
     organizer_odata_type: str = "#microsoft.graph.teamworkUserIdentity",
 ) -> dict[str, object]:
-    """Metadata only, and no duration, size or media-type property exists on `callRecording`.
-
-    `organizer_odata_type` is a parameter because Microsoft's own list-recordings sample sends
-    `#Microsoft.Teams.GraphSvc.teamworkUserIdentity`, a discriminator the SDK does not know.
-    """
     user = (
         None
         if organizer_user_id is None
         else {
             "@odata.type": organizer_odata_type,
             "id": organizer_user_id,
-            # Null in every documented sample: an organiser can only be reported as an id.
             "displayName": None,
             "userIdentityType": "aadUser",
             "tenantId": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
@@ -132,13 +121,10 @@ def recording_payload(
     }
 
 
-# Teams messages are indexed out of the substrate mailbox, so a search hit's `from` is an Exchange
-# `emailAddress` rather than a Teams identity.
 MAILBOX_SENDER: dict[str, object] = {
     "emailAddress": {"name": "Ada Lovelace", "address": "ada@example.invalid"}
 }
 
-# What every Teams *read* API answers with instead: no email property exists on this shape.
 TEAMS_SENDER: dict[str, object] = {
     "user": {
         "@odata.type": "#microsoft.graph.teamworkUserIdentity",
@@ -149,6 +135,30 @@ TEAMS_SENDER: dict[str, object] = {
 }
 
 
+def reaction_payload(
+    *,
+    reaction_type: str = "\U0001f44d",
+    user_id: str | None = "00000000-0000-4000-8000-000000000002",
+    display_name: str | None = "Grace Hopper",
+    created_at: str = "2026-02-11T09:20:00Z",
+) -> dict[str, object]:
+    user = (
+        None
+        if user_id is None and display_name is None
+        else {
+            "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+            "id": user_id,
+            "displayName": display_name,
+        }
+    )
+    return {
+        "reactionType": reaction_type,
+        "displayName": None,
+        "createdDateTime": created_at,
+        "user": {"application": None, "device": None, "user": user},
+    }
+
+
 def chat_hit(
     *,
     chat_id: str | None = "19:release@thread.v2",
@@ -156,7 +166,6 @@ def chat_hit(
     summary: str | None = "...cut the <c0>release</c0> on Friday...",
     sender: Mapping[str, object] | None = MAILBOX_SENDER,
 ) -> dict[str, object]:
-    """`sender=None` is a system event message: the projection has no `messageType` naming it."""
     resource = _chat_message(message_id=message_id, sender=sender)
     if chat_id is not None:
         resource["chatId"] = chat_id
@@ -171,7 +180,6 @@ def channel_hit(
 ) -> dict[str, object]:
     resource = _chat_message(message_id=message_id, sender=MAILBOX_SENDER)
     resource["channelIdentity"] = {"teamId": team_id, "channelId": channel_id}
-    # Graph populates `webUrl` for channel messages and leaves it null for chat messages.
     resource["webUrl"] = f"https://teams.microsoft.invalid/l/message/{channel_id}/{message_id}"
     return {"hitId": message_id, "rank": 1, "summary": "synthetic snippet", "resource": resource}
 
@@ -203,6 +211,7 @@ def message_payload(
     web_url: str | None = None,
     mentions: Sequence[Mapping[str, object]] = (),
     attachments: Sequence[Mapping[str, object]] = (),
+    reactions: Sequence[Mapping[str, object]] = (),
     event_detail: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     return {
@@ -223,7 +232,7 @@ def message_payload(
         "body": {"contentType": content_type, "content": content},
         "mentions": [dict(mention) for mention in mentions],
         "attachments": [dict(attachment) for attachment in attachments],
-        "reactions": [],
+        "reactions": [dict(reaction) for reaction in reactions],
         "eventDetail": dict(event_detail) if event_detail is not None else None,
     }
 
@@ -234,7 +243,6 @@ def search_response(
     total: int | None = None,
     more_results_available: bool = False,
 ) -> dict[str, object]:
-    """Graph nests one response per request and one container per type: only ever one of each."""
     container: dict[str, object] = {"moreResultsAvailable": more_results_available}
     if hits is not None:
         container["hits"] = list(hits)

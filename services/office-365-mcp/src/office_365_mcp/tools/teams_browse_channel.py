@@ -1,18 +1,3 @@
-"""`teams_browse_channel` — one Teams channel's posts with their newest replies.
-
-TRAP: Graph orders posts by reply-chain activity, not by post date. When someone replies to a
-two-year-old post, it moves to the first page. This tool keeps that order: if it sorts again, it
-invents an order Graph never gave. Read `created_at` to know when someone wrote a post.
-
-One request only: Graph rate-limits channel reads to one request per second for this app across
-the tenant. The collection accepts only `$top` and `$expand=replies`. Graph documents no
-`$orderby` and no date filter for it.
-
-The reply handle minted here follows `shared/handles.py`'s grammar, so `teams_read_message`
-resolves it. The shape is `shared/messages.py`'s, so a browsed post and a read message are one
-type.
-"""
-
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Annotated
@@ -43,52 +28,30 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "channel_id": "19:general@thread.tacv2",
 }
 
-# Graph's documented ceiling on `$top` for a channel's messages, and the most one request holds.
 MAX_POSTS = 50
 
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
-_DESCRIPTION = """\
-This tool reads one Teams channel's posts in full, each with its newest replies, ordered by \
-reply-chain activity rather than post date. Read each post's `created_at` before you trust the \
-order. This tool shows what is in a channel. It has no date filter and no keyword search. Use \
-teams_search_messages for a keyword, a person, or any date bound.
-
-Notes:
-- One call is one request against the channel. Raise `limit` rather than calling again.\
-"""
+_DESCRIPTION = (
+    "Reads a Teams channel's posts and their newest replies in one call, ordered by reply "
+    "activity rather than post date."
+)
 
 
 class ChannelPosts(BaseModel):
     messages: list[TeamsMessage] = Field(
-        description=(
-            "Posts and their replies, in thread order: each root post's replies follow it "
-            + "directly, oldest first, and carry `reply_to_id` for their parent. Each message is "
-            + "complete: it has the same shape and text that `teams_read_message` returns, so "
-            + f"this tool needs no second read. Only the newest {MAX_REPLIES_PER_POST} replies "
-            + "per post come back. Older replies are unreachable here, and browsing again "
-            + "returns the same newest window. For a reply outside that window, report the "
-            + "`teams_search_messages` snippet with its sender and date. Then stop looking. This "
-            + "connector has no route to the full text."
-        )
+        description="The channel's posts and their newest replies, in thread order."
     )
     more_posts_in_channel: bool | None = Field(
         description=(
-            "This tool reports whether Microsoft's own cursor (`@odata.nextLink`) shows posts "
-            + "beyond this page, but only when `include_window_completeness` is set. Otherwise, "
-            + "this field is null. True means more posts exist. Raise `limit` (up to "
-            + f"{MAX_POSTS}) or use teams_search_messages with `sent_before` to reach further "
-            + "back. False means this window was the whole channel, subject to `limit` and the "
-            + "per-post reply cap. A short page alone does not mean the channel ran out. Make "
-            + "sure that you rely on this field, not on page length, for the answer."
+            "Whether more posts exist beyond this page; null unless "
+            "`include_window_completeness` is set."
         )
     )
     posts_cut_to_limit: bool | None = Field(
         description=(
-            "True when Microsoft's page held more posts than `limit`, so this tool cut the "
-            + "answer to fit. This field is null when `include_window_completeness` is not set. "
-            + f"This is rarely true. Raise `limit` (up to {MAX_POSTS}) to get the cut posts in "
-            + "the next call."
+            "Whether the page held more posts than `limit`; null unless "
+            "`include_window_completeness` is set."
         )
     )
 
@@ -101,13 +64,6 @@ async def teams_browse_channel(
     limit: int,
     include_window_completeness: bool,
 ) -> ChannelPosts:
-    """Up to `limit` posts from a channel's first page, each with its newest replies.
-
-    One Graph request, always. This tool follows neither cursor: not `@odata.nextLink` on the
-    collection, not `replies@odata.nextLink` on a post. The reply window is deliberately not a
-    third reported fact — older replies are unreachable either way, so nothing can act on it. See
-    `_replies`.
-    """
     assert 1 <= limit <= MAX_POSTS, f"limit must be within 1..{MAX_POSTS}, got {limit}"
 
     configuration = RequestConfiguration[_MessagesQuery](
@@ -123,7 +79,6 @@ async def teams_browse_channel(
         )
         assert page is not None, "Graph answered a channel message listing with no collection"
 
-    # The window is this tool's promise, not Graph's: apply `limit` rather than trust `$top`.
     posts = [message for message in (page.value or []) if _is_a_post(message)]
     kept = posts[:limit]
 
@@ -157,12 +112,6 @@ def _is_a_post(message: ChatMessage) -> bool:
 
 
 def _replies(post: ChatMessage) -> list[ChatMessage]:
-    """Newest `MAX_REPLIES_PER_POST` replies to `post`, oldest first.
-
-    Sorted here because Graph does not order replies: the collection documents `$top` only. Graph
-    expands up to 200 replies per post, so a thread that Graph paged is past this window either
-    way.
-    """
     replies = sorted((reply for reply in post.replies or [] if _is_a_post(reply)), key=_sent_at)
     return replies[-MAX_REPLIES_PER_POST:]
 
@@ -190,7 +139,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                description="The team the channel is in, exactly as teams_list_my_teams reported.",
+                description="The team the channel is in, as reported by teams_list_my_teams.",
             ),
         ],
         channel_id: Annotated[
@@ -198,10 +147,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The channel to read, exactly as teams_list_channels or "
-                    + "teams_search_messages reported it. This id is opaque. Copy it. Do not "
-                    + "build it from a channel name. A channel id alone does not address a "
-                    + "channel. Always pass it with `team_id`."
+                    "The channel to read, as reported by teams_list_channels or "
+                    "teams_search_messages; always pass it with `team_id`."
                 ),
             ),
         ],
@@ -211,8 +158,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_POSTS,
                 description=(
-                    "How many posts to return, each with its replies, at most "
-                    + f"{MAX_POSTS} (Graph's own ceiling for this collection)."
+                    f"How many posts to return, each with its replies, at most {MAX_POSTS}."
                 ),
             ),
         ] = 20,
@@ -220,9 +166,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool,
             Field(
                 description=(
-                    "This populates `more_posts_in_channel` and `posts_cut_to_limit`. Otherwise, "
-                    + "both fields are null. When a short answer can mean either the whole "
-                    + "channel or a page cut short, set it."
+                    "Whether to populate `more_posts_in_channel` and `posts_cut_to_limit`."
                 )
             ),
         ] = False,

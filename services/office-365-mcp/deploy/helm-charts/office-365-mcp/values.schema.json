@@ -2033,7 +2033,7 @@
           "properties": {
             "publicBaseUrl": {
               "type": "string",
-              "description": "The externally-reachable OAuth issuer URL clients are redirected to. Must be https. Example: https://office-365.mcp.unique.app"
+              "description": "The externally-reachable OAuth issuer URL that clients are redirected to. Must be https. Example: https://office-365.mcp.unique.app"
             }
           },
           "required": [
@@ -2042,19 +2042,19 @@
         },
         "entra": {
           "type": "object",
-          "description": "Entra app registration users sign in through",
+          "description": "The Entra app registration that users sign in through",
           "properties": {
             "tenantId": {
               "type": "string",
-              "description": "One tenant's ID, or 'organizations' for a multi-tenant (AzureADMultipleOrgs) registration: then any Entra tenant's users can sign in, every access token is validated against its own tenant's issuer, and Graph is called in that tenant. 'common' and 'consumers' are rejected at startup: personal Microsoft accounts have no Microsoft 365 mailbox or Teams."
+              "description": "One tenant's ID, or 'organizations' for a multi-tenant registration."
             },
             "clientId": {
               "type": "string",
-              "description": "The client ID of the Entra app registration users sign in through."
+              "description": "The client ID of the Entra app registration that users sign in through."
             },
             "clientSecret": {
               "$ref": "#/$defs/valueSourceSensitive",
-              "description": "The app registration's client secret, from the office-365-mcp-entra-application Terraform module's client_secrets[key].key_vault_secret_name output. Also the key material for the OAuth state rows, so rotating it costs every signed-in user one re-login. fromSecretProvider is auto-collected into the chart's SecretProviderClass — no separate secretProvider.vaults entry needed."
+              "description": "The app registration's client secret, used for the On-Behalf-Of token exchange."
             }
           },
           "required": [
@@ -2065,7 +2065,7 @@
         },
         "tools": {
           "type": "object",
-          "description": "The tool surface this deployment runs. Set exactly one of preset or enabled — the tools enabled decide which delegated Microsoft Graph permissions every user is asked to consent to at sign-in, so there is deliberately no default: 'every tool' has to be a choice rather than what a deployment gets by not making one.",
+          "description": "The tool surface this deployment runs; set exactly one of preset or enabled.",
           "properties": {
             "preset": {
               "type": "string",
@@ -2077,6 +2077,7 @@
                 "teams-transcripts",
                 "teams-recordings",
                 "teams-meetings",
+                "teams-write",
                 "outlook-read",
                 "outlook-mailbox",
                 "outlook-write",
@@ -2091,12 +2092,12 @@
                 "onenote-write",
                 "onenote-delete"
               ],
-              "description": "Which tools this deployment runs, as a named surface. 'teams' is every Teams tool; each other name is one use case, and README's preset table says what each costs a tenant in permissions and admin consents. Set this or enabled, never both. Narrowing a live deployment is free; widening it makes every signed-in user sign in again."
+              "description": "Which tools this deployment runs, as a named surface such as 'teams'."
             },
             "enabled": {
               "type": "string",
               "minLength": 1,
-              "description": "Which tools this deployment runs, as a comma-separated list of tool names, for a surface no preset covers. get_me is always on and need not be listed, so no deployment asks for less than User.Read. Set this or preset, never both. Must name at least one tool: an empty value is a selection that says nothing, which the server refuses to start on, and catching it here is the difference between a failed helm install and a crash-looping pod. GET /manifest and the startup log print the resolved tools, the exact delegated permissions and which of them need admin consent — that list is what an Entra administrator has to grant."
+              "description": "Which tools this deployment runs, as a comma-separated list of tool names."
             }
           },
           "oneOf": [

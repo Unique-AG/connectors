@@ -1,9 +1,3 @@
-# `terraform validate` skips validations on defaulted variables, so it passes a configuration with
-# no tool selection at all; these credential-free runs are the only gate on that.
-
-# The mocks compensate for provider behaviour: a mocked map is EMPTY, so `result["MicrosoftGraph"]`
-# fails with `Invalid index`, and `azuread_application.id` must be the `/applications/<uuid>` form
-# or `azuread_application_identifier_uri` cannot parse it.
 mock_provider "azuread" {
   override_data {
     target = data.azuread_application_published_app_ids.well_known
@@ -23,6 +17,8 @@ mock_provider "azuread" {
         "Team.ReadBasic.All"               = "33333333-3333-3333-3333-333333333333"
         "Channel.ReadBasic.All"            = "44444444-4444-4444-4444-444444444444"
         "ChannelMessage.Read.All"          = "55555555-5555-5555-5555-555555555555"
+        "ChatMessage.Send"                 = "e1111111-1111-1111-1111-111111111111"
+        "ChannelMessage.Send"              = "e2222222-2222-2222-2222-222222222222"
         "OnlineMeetings.Read"              = "66666666-6666-6666-6666-666666666666"
         "OnlineMeetingTranscript.Read.All" = "77777777-7777-7777-7777-777777777777"
         "OnlineMeetingRecording.Read.All"  = "88888888-8888-8888-8888-888888888888"
@@ -178,6 +174,27 @@ run "preset_teams_meetings" {
   assert {
     condition     = join(",", local.permissions) == "User.Read,Chat.Read,OnlineMeetings.Read,OnlineMeetingTranscript.Read.All,OnlineMeetingRecording.Read.All"
     error_message = "teams-meetings composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_teams_write" {
+  variables {
+    tools_preset = "teams-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Team.ReadBasic.All,Channel.ReadBasic.All,ChatMessage.Send,ChannelMessage.Send"
+    error_message = "teams-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 6
+    error_message = "teams-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "teams-write should need no administrator, needs ${join(",", local.admin_consent)}"
   }
 }
 
@@ -459,8 +476,6 @@ run "a_trailing_slash_does_not_produce_a_double_slash" {
 
 run "a_customer_tenant_can_own_its_own_consent" {
   variables {
-    # `teams-chat` on purpose: `terraform test` escalates a failed `check` assertion to a test
-    # FAILURE where plan and apply only warn, so this run's selection must need no administrator.
     tools_preset                    = "teams-chat"
     service_principal_configuration = null
   }

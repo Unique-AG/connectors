@@ -1,5 +1,3 @@
-"""`teams_search_messages`: the query Graph is sent, and the traps in what comes back."""
-
 import json
 from datetime import UTC, date, datetime, timedelta, timezone
 from typing import cast
@@ -11,11 +9,10 @@ import respx
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
-from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST
 from office_365_mcp.tools import teams_search_messages
 from office_365_mcp.tools.teams_search_messages import SearchCriteria
 
-from .conftest import channel_hit, chat_hit, search_response
+from .conftest import channel_hit, chat_hit, message_payload, reaction_payload, search_response
 
 _MENTIONED = UUID("497b7a2a-9e1a-48d7-80e8-2965d2fc3a81")
 
@@ -35,8 +32,6 @@ def _query_string(route: respx.Route) -> str:
 
 
 def _unquoted_words(query: str) -> list[str]:
-    """Splitting on `"` and keeping the even-numbered pieces, which is only the words outside any
-    quoted phrase while the quotes are balanced. Every test using this asserts balance first."""
     return [
         word
         for index, part in enumerate(query.split('"'))
@@ -49,8 +44,6 @@ class TestTheQueryItSends:
     async def test_it_asks_only_for_chat_messages_and_pages_by_offset(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph refuses to mix entity types, and message search pages by `from`/`size` integers
-        rather than by a cursor, which is what lets a stateless tool resume one."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([chat_hit()]))
         )
@@ -88,9 +81,6 @@ class TestTheQueryItSends:
         graph: respx.MockRouter,
         criteria: SearchCriteria,
     ) -> None:
-        """Graph's read budget is "one request per second per app per tenant … on a given channel
-        or chat". It is *per app*, so a per-chat scan by one user degrades every other user of the
-        app registration, and nothing but a call count would say a fan-out had been added."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200, json=search_response([chat_hit(), channel_hit()], more_results_available=True)
@@ -107,8 +97,6 @@ class TestTheQueryItSends:
     async def test_every_criterion_becomes_its_documented_scope_term(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The spellings are Microsoft's, inconsistent casing and all, and `sent` is a comparison
-        rather than a `term:value` pair."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -138,7 +126,6 @@ class TestTheQueryItSends:
     async def test_the_mentioned_user_id_loses_its_hyphens(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft's `mentions` example is a user id "without '-'"."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -152,7 +139,6 @@ class TestTheQueryItSends:
     async def test_date_bounds_include_the_days_they_name(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`sent>2026-01-01` silently drops everything sent on the 1st."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -169,9 +155,6 @@ class TestTheQueryItSends:
     async def test_a_moment_bounds_the_second_rather_than_the_day(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """KQL publishes `YYYY-MM-DDThh:mm:ssZ` as a literal for a DateTime comparison. An
-        `isoformat()` of an aware moment writes `+00:00`, which is none of the four shapes it
-        publishes."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -191,8 +174,6 @@ class TestTheQueryItSends:
     async def test_a_moment_with_no_zone_is_read_as_utc_and_not_as_the_servers_own(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The zone a naive moment picks up would otherwise be whichever one the pod runs in — a
-        zone no caller chose and no answer names."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -209,8 +190,6 @@ class TestTheQueryItSends:
     async def test_a_moment_east_of_utc_is_converted_rather_than_relabelled(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """An offset the caller wrote is honoured, not dropped: 09:30+02:00 is 07:30 UTC, and
-        stamping `Z` on the wall clock would move the bound two hours."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -229,9 +208,6 @@ class TestTheQueryItSends:
     async def test_a_date_renders_exactly_as_it_always_has(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`datetime` subclasses `date`, so a check in the wrong order renders every moment as the
-        day it falls on. This pins the other half: widening the type left the date form as it was.
-        """
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -248,9 +224,6 @@ class TestTheQueryItSends:
     async def test_a_multi_word_query_reaches_graph_as_words_and_not_as_a_phrase(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Quoting the whole query — the guard a *filter value* needs — makes it an exact-adjacency
-        phrase, so "cut the release" would drop "the release was cut". Bare terms are what Graph
-        ANDs."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -292,10 +265,6 @@ class TestTheQueryItSends:
     async def test_a_caller_cannot_smuggle_kql_through_the_free_text(
         self, client: GraphServiceClient, graph: respx.MockRouter, injection: str
     ) -> None:
-        """Free text reaches Microsoft as Keyword Query Language and can widen the search past
-        every filter the tool applied. The guard works a word at a time, so the assertion is about
-        the query string's *structure*: nothing outside the quoted spans reads as anything but a
-        keyword, and a bare keyword expresses no restriction, negation or boolean."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -358,11 +327,6 @@ class TestTheQueryItSends:
         sender: str,
         expected: str,
     ) -> None:
-        """KQL reads `<property>:*` as a match on every item having a value for that property, so
-        `from:*` asks for every message with a sender and no emptiness check trips on it. A leading
-        `-` is quoted because a NOT read into a filter value would answer the opposite question.
-        The last case must not change: quoting an ordinary address into a phrase would alter every
-        search this tool already serves."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -378,7 +342,6 @@ class TestTheQueryItSends:
     async def test_an_ordinary_value_is_left_as_a_keyword(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Quoting everything would turn every search into a phrase search and lose stemming."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -395,7 +358,6 @@ class TestCriteriaThatAskForNothing:
         assert SearchCriteria().is_empty is True
 
     def test_free_text_with_no_word_in_it_asks_for_nothing(self) -> None:
-        """`is_empty` is measured on the query string, not on which arguments were passed."""
         assert SearchCriteria(query='" "').is_empty is True
 
     @pytest.mark.parametrize(
@@ -413,7 +375,6 @@ class TestCriteriaThatAskForNothing:
         ],
     )
     def test_any_single_criterion_is_enough(self, criteria: SearchCriteria) -> None:
-        """`false` is a criterion: only an unset value counts as absent."""
         assert criteria.is_empty is False
 
     async def test_searching_for_nothing_is_a_programming_error(
@@ -438,50 +399,22 @@ class TestCriteriaThatAskForNothing:
 
 class TestTheHandleItMints:
     def test_the_handle_names_the_reader_that_now_takes_it(self) -> None:
-        """The absences matter as much as the mention: a model told the snippet is all there is
-        stops looking, and every other assertion about this tool passes either way."""
         described = teams_search_messages.MessageHit.model_fields["uri"].description
         assert described is not None
 
         assert "teams_read_message" in described
-        assert "only route to the full text, the attachments, and the mentions" in described
-        assert "no tool on this server takes it as an argument" not in described
-        assert "no route from here to the message body" not in described
 
-    def test_the_summary_warns_against_inference_from_truncation(self) -> None:
+    def test_the_summary_is_distinguished_from_the_full_message(self) -> None:
         described = teams_search_messages.MessageHit.model_fields["summary"].description
         assert described is not None
 
-        assert "Do not infer anything from its absence" in described
-
-    def test_the_advice_for_a_reply_hit_stops_rather_than_pointing_back_at_browsing(self) -> None:
-        """A hit on a channel reply carries the root-post shape, which Graph 404s.
-        `teams_browse_channel`
-        mints a reply's own handle but reaches only the newest replies of each post and follows no
-        cursor past them, so "browse instead" is a route for a recent reply and a loop for an older
-        one."""
-        described = teams_search_messages.MessageHit.model_fields["uri"].description
-        assert described is not None
-
-        assert "teams_browse_channel" in described, (
-            "the one tool that can, when the reply is recent"
-        )
-        assert f"just the newest {MAX_REPLIES_PER_POST} replies" in described, (
-            "and where it stops, in the number the browser actually applies rather than in prose "
-            + "of its own"
-        )
-        assert "no route to the full text" in described
-        assert "browsing again returns the same window" in described
-        assert "stop looking" in described
+        assert "not the full message" in described
 
 
 class TestWhatTheCallerIsTold:
     async def test_a_chat_hit_carries_a_chat_handle_and_a_channel_hit_a_channel_one(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The ids are percent-encoded because a Teams id is full of `:` and `@`. Which strings are
-        handles at all is `shared/handles.py`'s question, covered by `TestTheMessageHandleGrammar`
-        in `tests/shared/test_handles.py`."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -507,8 +440,6 @@ class TestWhatTheCallerIsTold:
             "teams:///teams/8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
             + "/channels/19%3Ageneral%40thread.tacv2/messages/1770000000002",
         ]
-        # The raw ids are returned alongside, unencoded, so a hit can be lined up with the
-        # `chat_id` teams_list_chats reports without anyone unpicking the handle to get one back.
         assert found.messages[0].chat_id == "19:release@thread.v2"
         assert (found.messages[1].team_id, found.messages[1].channel_id) == (
             "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
@@ -518,7 +449,6 @@ class TestWhatTheCallerIsTold:
     async def test_a_hit_with_neither_identity_is_kept_without_a_handle(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph does occasionally return a hit with no chatId and no channelIdentity."""
         hit = chat_hit(chat_id=None)
         graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([hit]))
@@ -557,8 +487,6 @@ class TestWhatTheCallerIsTold:
     async def test_a_search_hits_mailbox_shaped_sender_is_understood(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Teams messages are indexed out of the substrate mailbox, so a hit's `from` is an
-        Exchange `emailAddress`: a shape the Graph SDK has no field for."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -660,8 +588,6 @@ class TestWhatTheCallerIsTold:
         graph: respx.MockRouter,
         application: dict[str, object],
     ) -> None:
-        """Microsoft documents an application identity's `displayName` as optional and its `id` as
-        not, so a bot Graph did not name is still a bot Graph identified."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200, json=search_response([chat_hit(sender={"application": application})])
@@ -691,8 +617,6 @@ class TestWhatTheCallerIsTold:
     async def test_an_identity_set_that_names_nobody_is_dropped(
         self, client: GraphServiceClient, graph: respx.MockRouter, sender: dict[str, object]
     ) -> None:
-        """Graph sends an empty identity object, so the object's presence says nothing and what is
-        inside it decides."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -711,8 +635,6 @@ class TestWhatTheCallerIsTold:
     async def test_system_event_messages_are_dropped(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph sends a null `from` and a body of the literal `<systemEventMessage/>` for these,
-        and the search projection does not return the `eventDetail` that names them."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -736,8 +658,6 @@ class TestPagingAndItsHonesty:
     async def test_the_next_offset_drives_paging_and_total_is_ignored(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft documents `total` as the count of results on the page for Teams messages, not
-        the number of matches."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -765,8 +685,6 @@ class TestPagingAndItsHonesty:
     async def test_the_next_offset_counts_graphs_hits_not_the_messages_kept(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Advancing by the number of messages returned would re-read the filtered-out hits for
-        ever, because the filtering happens on our side of the offset."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -806,7 +724,6 @@ class TestPagingAndItsHonesty:
     async def test_a_search_that_matched_nothing_is_an_empty_page_not_a_failure(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph answers a no-match search with a container holding no `hits` key at all."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response(None))
         )
@@ -821,9 +738,6 @@ class TestPagingAndItsHonesty:
     async def test_a_page_of_no_hits_never_offers_the_offset_it_was_asked_at(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`next_offset` advances past the hits Graph returned, so a page with no hits and
-        `moreResultsAvailable` still set would hand back the offset just asked at. Both directions
-        are asserted, because either alone would pass while the other rotted."""
         empty = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([], more_results_available=True))
         )
@@ -866,3 +780,164 @@ class TestGraphFailures:
             )
 
         assert raised.value.status == 403
+
+
+_CHAT_MESSAGE_PATH = "/chats/19%3Arelease%40thread.v2/messages/1770000000000"
+_CHANNEL_MESSAGE_PATH = (
+    "/teams/8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81/channels/19%3Ageneral%40thread.tacv2"
+    + "/messages/1770000000000"
+)
+
+
+class TestIncludeBody:
+    async def test_left_off_by_default_costs_the_one_request_this_tool_promises(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([chat_hit()]))
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25
+        )
+
+        assert len(graph.calls) == 1, "no hydration request without being asked for one"
+        assert found.messages[0].text is None
+        assert found.messages[0].reactions == []
+
+    async def test_a_chat_hit_is_hydrated_from_the_same_endpoint_teams_read_message_uses(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([chat_hit()]))
+        )
+        read = graph.get(_CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=message_payload(
+                    content="cut the release on Friday",
+                    content_type="text",
+                    reactions=[reaction_payload(reaction_type="\U0001f44d")],
+                ),
+            )
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25, include_body=True
+        )
+
+        assert read.called
+        message = found.messages[0]
+        assert message.text == "cut the release on Friday"
+        assert [reaction.reaction_type for reaction in message.reactions] == ["\U0001f44d"]
+
+    async def test_a_channel_hit_is_hydrated_too(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([channel_hit()]))
+        )
+        read = graph.get(_CHANNEL_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                200, json=message_payload(content="the plan for Friday", content_type="text")
+            )
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25, include_body=True
+        )
+
+        assert read.called
+        assert found.messages[0].text == "the plan for Friday"
+
+    async def test_an_unaddressable_hit_is_never_fetched(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([chat_hit(chat_id=None)]))
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25, include_body=True
+        )
+
+        assert len(graph.calls) == 1, "a hit with no handle has nothing to hydrate from"
+        assert found.messages[0].text is None
+
+    async def test_a_hit_graph_refuses_to_hydrate_keeps_its_summary_and_the_rest_of_the_page(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(
+                200,
+                json=search_response(
+                    [
+                        channel_hit(message_id="1770000000001"),
+                        channel_hit(message_id="1770000000002"),
+                    ]
+                ),
+            )
+        )
+        refused_path = (
+            "/teams/8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81/channels/19%3Ageneral%40thread.tacv2"
+            + "/messages/1770000000001"
+        )
+        answered_path = (
+            "/teams/8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81/channels/19%3Ageneral%40thread.tacv2"
+            + "/messages/1770000000002"
+        )
+        graph.get(refused_path).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "NotFound", "message": "Not Found"}}
+            )
+        )
+        graph.get(answered_path).mock(
+            return_value=httpx.Response(200, json=message_payload(message_id="1770000000002"))
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25, include_body=True
+        )
+
+        refused, answered = found.messages
+        assert refused.text is None and refused.reactions == []
+        assert refused.summary is not None, "the snippet survives a hydration that could not"
+        assert refused.uri is not None, "the handle survives too"
+        assert answered.text is not None
+
+    async def test_every_addressable_hit_on_the_page_is_hydrated(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        hit_count = teams_search_messages._HYDRATION_CONCURRENCY + 2  # pyright: ignore[reportPrivateUsage]
+        hits = [chat_hit(message_id=f"177000000{index:04d}") for index in range(hit_count)]
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response(hits))
+        )
+        read = graph.route(method="GET").mock(
+            return_value=httpx.Response(200, json=message_payload())
+        )
+
+        found = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25, include_body=True
+        )
+
+        assert read.call_count == hit_count
+        assert all(message.text is not None for message in found.messages)
+
+    async def test_a_refused_search_is_not_softened_by_include_body(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await teams_search_messages.teams_search_messages(
+                client,
+                criteria=SearchCriteria(query="release"),
+                offset=0,
+                size=25,
+                include_body=True,
+            )
