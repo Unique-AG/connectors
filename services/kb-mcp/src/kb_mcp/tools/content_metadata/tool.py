@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import json
 import logging
 from collections import Counter, defaultdict
 from collections.abc import Sequence
@@ -105,6 +106,13 @@ def _notices(
 def _value_limit(limit: int | None, ceiling: int) -> int:
     requested = _DEFAULT_VALUE_LIMIT if limit is None else limit
     return min(requested, ceiling)
+
+
+def _most_common_stable(counter: Counter[Any], limit: int | None = None) -> list[Any]:
+    # Walk arrival order changes between cache builds, so ties break on the label.
+    ranked = sorted(counter.items(), key=lambda item: (-item[1], str(item[0])))
+    chosen = ranked if limit is None else ranked[:limit]
+    return [value for value, _count in chosen]
 
 
 async def _unreadable_folder_ids(
@@ -479,9 +487,7 @@ async def content_metadata(
                 for value in values:
                     field_value_counts[meta_field][value] += 1
 
-        ranked_fields = [
-            meta_field for meta_field, _file_count in field_file_counts.most_common()
-        ]
+        ranked_fields = _most_common_stable(field_file_counts)
         # Missing names and withheld counts wait until the scan finishes.
         missing = (
             [f for f in dict.fromkeys(fields or []) if f not in field_file_counts]
@@ -505,7 +511,7 @@ async def content_metadata(
             truncation: list[str] = []
             for meta_field in ranked_fields:
                 counter = field_value_counts[meta_field]
-                shown = [value for value, _count in counter.most_common(value_limit)]
+                shown = _most_common_stable(counter, value_limit)
                 metadata.append({meta_field: shown})
                 if len(shown) < len(counter):
                     truncation.append(
@@ -525,9 +531,9 @@ async def content_metadata(
             cid,
             field_count,
         )
-        payload = output.model_dump()
+        payload = output.model_dump(mode="json")
         return ToolResult(
-            content=[TextContent(type="text", text=output.model_dump_json())],
+            content=[TextContent(type="text", text=json.dumps(payload))],
             structured_content=payload,
         )
     except Exception as exc:

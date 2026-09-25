@@ -156,7 +156,7 @@ def test_output_schema_publishes_the_catalog_fields():
 
 
 @pytest.mark.asyncio
-async def test_returns_json_list_of_single_key_field_to_values_objects():
+async def test_returns_a_complete_metadata_catalog():
     mock_tree = _make_mock_tree(
         snapshot=FakeSnapshot(
             files=_files({"department": "Legal"}, {"department": "Finance"})
@@ -169,10 +169,11 @@ async def test_returns_json_list_of_single_key_field_to_values_objects():
 
     assert isinstance(result, ToolResult)
     body = _body(result)
+    assert result.structured_content == body
     assert body["complete"] is True
     assert "notice" not in body
     assert "metadata_counts" not in body
-    assert body["metadata"] == [{"department": ["Legal", "Finance"]}]
+    assert body["metadata"] == [{"department": ["Finance", "Legal"]}]
 
 
 @pytest.mark.asyncio
@@ -193,6 +194,65 @@ async def test_values_within_a_field_are_ordered_most_common_first():
 
     payload = _payload(result)
     assert payload == [{"status": ["approved", "draft"]}]
+
+
+@pytest.mark.asyncio
+async def test_tied_ranking_stays_the_same_when_file_order_changes():
+    rows = (
+        {"zeta": "mid", "author": "ada", "mood": "calm", "region": "eu"},
+        {"zeta": "mid", "mood": "glad", "author": "ada"},
+        {"zeta": "mid", "author": "bea", "mood": "sad", "region": "us"},
+        {"zeta": "alpha", "mood": "mad", "author": "bea"},
+        {"zeta": "alpha"},
+        {"zeta": "bravo"},
+        {"zeta": "bravo"},
+        {"zeta": "delta"},
+        {"zeta": "delta"},
+        {"zeta": "echo"},
+        {"zeta": "echo"},
+        {"zeta": "zoo"},
+        {"zeta": "ant"},
+        {"zeta": "moon"},
+    )
+    # Same files, opposite walk order and opposite key order inside each file.
+    orders = (
+        rows,
+        tuple(dict(reversed(row.items())) for row in reversed(rows)),
+    )
+    value_bodies = []
+    count_bodies = []
+    for order in orders:
+        mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=_files(*order)))
+        with patch(
+            "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+        ):
+            values = await content_metadata(limit=3, config=ContentMetadataToolConfig())
+            counts = await content_metadata(
+                counts_only=True, limit=1, config=ContentMetadataToolConfig()
+            )
+        value_bodies.append(_body(values))
+        count_bodies.append(_body(counts))
+
+    assert value_bodies[0] == value_bodies[1]
+    assert value_bodies[0]["metadata"] == [
+        {"zeta": ["mid", "alpha", "bravo"]},
+        {"author": ["ada", "bea"]},
+        {"mood": ["calm", "glad", "mad"]},
+        {"region": ["eu", "us"]},
+    ]
+    assert value_bodies[0]["notice"] == [
+        "zeta: showing 3 of 8 values.",
+        "mood: showing 3 of 4 values.",
+    ]
+    assert count_bodies[0] == count_bodies[1]
+    assert count_bodies[0]["metadata_counts"] == [
+        {"zeta": 8},
+        {"author": 2},
+        {"mood": 4},
+        {"region": 2},
+    ]
+    assert "notice" not in count_bodies[0]
+    assert "metadata" not in count_bodies[0]
 
 
 @pytest.mark.asyncio
@@ -794,7 +854,7 @@ async def test_fields_limits_the_catalog_to_the_requested_fields():
             fields=["status", "region"], config=ContentMetadataToolConfig()
         )
 
-    assert _payload(result) == [{"status": ["draft", "approved"]}, {"region": ["EU"]}]
+    assert _payload(result) == [{"status": ["approved", "draft"]}, {"region": ["EU"]}]
 
 
 @pytest.mark.asyncio
@@ -870,7 +930,7 @@ async def test_requested_fields_with_no_values_are_named_in_a_notice():
         )
 
     body = _body(result)
-    assert body["metadata"] == [{"status": ["draft", "approved"]}]
+    assert body["metadata"] == [{"status": ["approved", "draft"]}]
     assert len(body["notice"]) == 1
     assert "['Department']" in body["notice"][0]
     assert "counts_only=true" in body["notice"][0]
