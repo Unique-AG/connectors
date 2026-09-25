@@ -1,22 +1,7 @@
-"""Knowledge Base content-metadata tool — discover metadata fields/values
-that exist on visible content, so a caller can build a metadata filter.
+"""Knowledge Base content-metadata tool — discover metadata fields and values for a search filter.
 
-- CONFIG (admin, per company): ContentMetadataToolConfig
-- ENV (process-wide): KB_MCP_TREE_CACHE_TTL_SECONDS / _MAX_ENTRIES and
-  KB_MCP_WALK_TIMEOUT_SECONDS / KB_MCP_WALK_MAX_TIMEOUT_SECONDS
-- STATE (LLM, per call): folder_ids/folder_paths/include_subfolders scope
-  which content counts; fields narrows the catalog to named fields and
-  counts_only swaps the values for their distinct count, so a caller can
-  survey what exists before asking for a potentially huge value list
-
-Mirrors content_tree's structure and shares its ContentTree cache, keyed by
-company+user+folder scope, since both tools are just different views over the
-same visible-file snapshot. Scoping roots the walk at the requested folders
-rather than filtering afterwards; the admin filter is never bypassed.
-
-Exhaustive for now: every known field (or every requested one) and every
-distinct value it has, with no caps — pagination will be added once scale
-requires it.
+- CONFIG (admin): ContentMetadataToolConfig
+- STATE (LLM): folder_ids or folder_paths scope the walk; fields, counts_only, and limit shape the catalog
 """
 
 import asyncio
@@ -24,13 +9,19 @@ import json
 import logging
 from collections import Counter, defaultdict
 from collections.abc import Sequence
-from typing import Annotated, Any
+from typing import Annotated, Any, Self
 
 import unique_sdk
 from fastmcp.dependencies import Depends
 from fastmcp.tools import ToolResult, tool
 from mcp.types import TextContent, ToolAnnotations
-from pydantic import Field
+from pydantic import (
+    BaseModel,
+    Field,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+    model_validator,
+)
 from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
@@ -67,6 +58,61 @@ def _missing_fields_notice(missing: Sequence[str]) -> str:
         "are case-sensitive; call content_metadata with counts_only=true to "
         "see which fields exist."
     )
+
+
+_DEFAULT_VALUE_LIMIT = 50
+
+Scalar = str | int | float | bool | None
+
+
+class ContentMetadataOutput(BaseModel):
+    complete: bool
+    notice: list[str] | None = None
+    metadata: list[dict[str, list[Scalar]]] | None = None
+    metadata_counts: list[dict[str, int]] | None = None
+
+    @model_validator(mode="after")
+    def one_catalog(self) -> Self:
+        assert (self.metadata is None) != (self.metadata_counts is None)
+        return self
+
+    @model_validator(mode="after")
+    def incomplete_requires_notice(self) -> Self:
+        if not self.complete:
+            assert self.notice
+        return self
+
+    @model_serializer(mode="wrap")
+    def _omit_none(self, serializer: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        dumped = serializer(self)
+        assert isinstance(dumped, dict)
+        return {key: value for key, value in dumped.items() if value is not None}
+
+
+def _notices(
+    *,
+    complete: bool,
+    truncation: Sequence[str],
+    missing: Sequence[str],
+) -> list[str] | None:
+    if not complete:
+        return [_INCOMPLETE_NOTICE]
+    lines = [*truncation]
+    if missing:
+        lines.append(_missing_fields_notice(missing))
+    return lines or None
+
+
+def _value_limit(limit: int | None, ceiling: int) -> int:
+    requested = _DEFAULT_VALUE_LIMIT if limit is None else limit
+    return min(requested, ceiling)
+
+
+def _most_common_stable(counter: Counter[Any], limit: int | None = None) -> list[Any]:
+    # Walk arrival order changes between cache builds, so ties break on the label.
+    ranked = sorted(counter.items(), key=lambda item: (-item[1], str(item[0])))
+    chosen = ranked if limit is None else ranked[:limit]
+    return [value for value, _count in chosen]
 
 
 async def _unreadable_folder_ids(
@@ -170,12 +216,14 @@ _META = merge_tool_meta(
             "metadata filter for search — not for searching content "
             "itself. On a large knowledge base, call counts_only=true "
             "first to see field sizes, then fields to fetch only the "
-            "ones you need. Optionally scope it to one or more folders "
-            "with folder_ids (same as search's), or to one or more "
-            "folders by exact path with folder_paths if you don't have "
-            "scope_xxx ids in hand. If the result says the scan is "
-            "incomplete, call this tool again; do not tell the user "
-            "missing fields/values do not exist."
+            "ones you need. A notice entry 'field: showing N of M "
+            "values' means the rest were withheld; calling again with "
+            "the same limit returns the same values. Optionally scope it "
+            "to one or more folders with folder_ids (same as search's), "
+            "or to one or more folders by exact path with folder_paths "
+            "if you don't have scope_xxx ids in hand. If the result says "
+            "the scan is incomplete, call this tool again; do not tell "
+            "the user missing fields/values do not exist."
         ),
     },
     ContextRequirements(
@@ -187,6 +235,7 @@ _META = merge_tool_meta(
 
 @tool(
     name="content_metadata",
+    output_schema=ContentMetadataOutput.model_json_schema(),
     meta=_META,
     annotations=ToolAnnotations(
         read_only_hint=True,
@@ -245,14 +294,26 @@ async def content_metadata(
         bool,
         Field(
             description=(
-                "If true, return each field name with its number of "
-                "distinct values instead of the values themselves — e.g. "
-                '[{"department": 12}], most widely used field first. Use it '
-                "to see what fields exist, and how big each value list is, "
-                "before requesting values for a few of them with fields."
+                "If true, return each field's distinct-value count instead "
+                "of its values, under metadata_counts — e.g. "
+                '{"complete": true, "metadata_counts": [{"department": 12}]}, '
+                "most widely used field first. Use it to see what fields "
+                "exist, and how big each value list is, before requesting "
+                "values for a few of them with fields. Ignores limit."
             )
         ),
     ] = False,
+    limit: Annotated[
+        int | None,
+        Field(
+            ge=1,
+            description=(
+                "Maximum distinct values to return per field, most common "
+                "first. Omit for 50. Clamped to the admin ceiling "
+                "max_values_per_field. Ignored when counts_only is true."
+            ),
+        ),
+    ] = None,
     refresh: Annotated[
         bool,
         Field(
@@ -280,15 +341,15 @@ async def content_metadata(
 ) -> ToolResult:
     """Discover metadata fields and values on the knowledge base's visible
     content (optionally scoped to folder_ids), so a caller can build a
-    metadata filter for search. Returns JSON: a list of single-key objects
-    mapping a field name to every distinct value found, e.g.
-    [{"department": ["Legal", "Finance"]}] — one entry per known field, or
-    per requested field when fields is set. With counts_only, returns each
-    field's distinct-value count instead, e.g. [{"department": 12}].
-    Exhaustive: every field and value the scope has, not a sample. Values
-    here describe what filtering is *possible*, not a guarantee today's
-    search tool accepts an arbitrary metadata filter — check with the
-    user's actual search tool before promising a filter will work.
+    metadata filter for search. Returns one JSON object with complete, an
+    optional notice list, and exactly one catalog: metadata (field name to
+    its values) or, with counts_only, metadata_counts (field name to its
+    distinct-value count). e.g. {"complete": true, "metadata":
+    [{"department": ["Legal", "Finance"]}]}. Once the scan is complete,
+    notice names each field whose value list was shortened. Values here
+    describe what filtering is *possible*, not a guarantee today's search
+    tool accepts an arbitrary metadata filter — check with the user's
+    actual search tool before promising a filter will work.
     """
     kb_settings = get_settings()
     cid: str | None = None
@@ -426,49 +487,55 @@ async def content_metadata(
                 for value in values:
                     field_value_counts[meta_field][value] += 1
 
-        ranked_fields = [
-            meta_field for meta_field, _file_count in field_file_counts.most_common()
-        ]
-        payload: list[dict[str, Any]] = (
-            [
-                {meta_field: len(field_value_counts[meta_field])}
-                for meta_field in ranked_fields
-            ]
-            if counts_only
-            else [
-                {
-                    meta_field: [
-                        value
-                        for value, _count in field_value_counts[
-                            meta_field
-                        ].most_common()
-                    ]
-                }
-                for meta_field in ranked_fields
-            ]
-        )
-
-        # Leads so the caller sees "incomplete" before the data.
-        content: list[TextContent] = (
-            []
+        ranked_fields = _most_common_stable(field_file_counts)
+        # Missing names and withheld counts wait until the scan finishes.
+        missing = (
+            [f for f in dict.fromkeys(fields or []) if f not in field_file_counts]
             if snapshot.complete
-            else [TextContent(type="text", text=_INCOMPLETE_NOTICE)]
+            else []
         )
-        content.append(TextContent(type="text", text=json.dumps(payload)))
-        # Only report missing fields once the scan is complete — a partial one
-        # just hasn't reached them yet.
-        missing = [f for f in dict.fromkeys(fields or []) if f not in field_file_counts]
-        if missing and snapshot.complete:
-            content.append(
-                TextContent(type="text", text=_missing_fields_notice(missing))
+        value_limit = _value_limit(limit, config.max_values_per_field)
+        if counts_only:
+            output = ContentMetadataOutput(
+                complete=snapshot.complete,
+                notice=_notices(
+                    complete=snapshot.complete, truncation=[], missing=missing
+                ),
+                metadata_counts=[
+                    {meta_field: len(field_value_counts[meta_field])}
+                    for meta_field in ranked_fields
+                ],
+            )
+        else:
+            metadata: list[dict[str, list[Scalar]]] = []
+            truncation: list[str] = []
+            for meta_field in ranked_fields:
+                counter = field_value_counts[meta_field]
+                shown = _most_common_stable(counter, value_limit)
+                metadata.append({meta_field: shown})
+                if len(shown) < len(counter):
+                    truncation.append(
+                        f"{meta_field}: showing {len(shown)} of {len(counter)} values."
+                    )
+            output = ContentMetadataOutput(
+                complete=snapshot.complete,
+                notice=_notices(
+                    complete=snapshot.complete, truncation=truncation, missing=missing
+                ),
+                metadata=metadata,
             )
 
+        field_count = len(output.metadata_counts or output.metadata or [])
         _LOGGER.info(
             "content_metadata complete correlation_id=%s field_count=%d",
             cid,
-            len(payload),
+            field_count,
         )
-        return ToolResult(content=content)
+        payload = output.model_dump(mode="json")
+        return ToolResult(
+            content=[TextContent(type="text", text=json.dumps(payload))],
+            structured_content=payload,
+        )
     except Exception as exc:
         _LOGGER.exception(
             "content_metadata error correlation_id=%s error_type=%s",

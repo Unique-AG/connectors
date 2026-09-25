@@ -47,4 +47,12 @@ class ContentMetadataToolConfig(BaseModel):
     excluded_fields: list[str] = Field(
         default_factory=lambda: list(_DEFAULT_EXCLUDED_FIELDS)
     )
+    max_values_per_field: int = Field(
+        default=1000,
+        ge=1,
+        description=(
+            "Ceiling on distinct values returned per field. A caller's "
+            "limit is clamped to this."
+        ),
+    )
     max_concurrent_scope_lookups: int = 25
