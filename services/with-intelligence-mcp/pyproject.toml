@@ -4,7 +4,7 @@ version = "0.0.1"
 description = "With Intelligence FastMCP server with OAuth credential bridging"
 requires-python = ">=3.14"
 dependencies = [
-    "fastmcp==4.0.3",
+    "fastmcp==4.0.5",
     "uvicorn[standard]==0.53.0",
     "pydantic[email]==2.13.5",
     "pydantic-settings==2.15.0",
@@ -84,7 +84,7 @@ reportUnusedFunction = false
 reportCallInDefaultInitializer = false
 
 [tool.uv]
-override-dependencies = ["fastmcp==4.0.3"]
+override-dependencies = ["fastmcp==4.0.5"]
 
 [tool.uv.sources]
 mcp-credential-auth = { path = "../../packages/mcp-credential-auth" }
