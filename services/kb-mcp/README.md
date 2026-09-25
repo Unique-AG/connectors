@@ -34,8 +34,10 @@ stored in Postgres. For local development, set
 `ALLOW_EPHEMERAL_OAUTH_STORAGE=true` instead of configuring Postgres.
 
 Set `UNIQUE_API_BASE_URL` to the internal Unique API service in Kubernetes.
-Local development and Kong/public-gateway deployments also need
-`UNIQUE_APP_ID` and `UNIQUE_APP_KEY`.
+`UNIQUE_APP_ID` and `UNIQUE_APP_KEY` are needed for every deployment except one calling
+`node-chat` directly in-cluster: local development, and any deployment (Azure, GCP, AWS, or
+elsewhere) that reaches the Unique API through the Kong gateway rather than an internal
+cluster IP.
 
 The optional `KB_MCP_*` variables in `.env.example` tune advertised tools,
 search concurrency, content-tree cache and timeout behavior, and the outbound
