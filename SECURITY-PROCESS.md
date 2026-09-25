@@ -70,19 +70,28 @@ GitHub Actions runs every check in this document. GitHub Actions is the platform
 
 Two facts keep the four checks apart.
 
-A Dockerfile is a build input. It never appears inside the image it builds. No image scan can read a Dockerfile.
-
-An image holds software that no lockfile lists. Examples are a base operating system package, and a file that a build step adds by hand. No lockfile scan can find these.
+- **A Dockerfile is a build input.** It never appears inside the image it builds. No image scan can read a Dockerfile.
+- **An image holds software that no lockfile lists.** Examples are a base operating system package, and a file that a build step adds by hand. No lockfile scan can find these.
 
 ### The severity threshold
 
-A threshold applies to every check in this document except CodeQL. Two conditions decide whether a finding can stop a pull request, or open an alert. The severity must be CRITICAL or HIGH. A fix must already exist.
+A threshold applies to every check in this document except CodeQL. Two conditions decide whether a finding can stop a pull request, or open an alert:
 
-Trivy looks only for CRITICAL and HIGH findings. This applies to every Trivy-based check in this document: the image vulnerability check, the Dockerfile scan, the registry scan, and the release image scan. No Trivy-based check looks for a MEDIUM or LOW finding. No part of this document tracks either one.
+- The severity must be CRITICAL or HIGH.
+- A fix must already exist.
 
-The dependency review uses the same threshold, through a different setting: `fail-on-severity: high`. This setting also stops the pull request at HIGH and at CRITICAL, and lets a LOW or MEDIUM advisory through.
+| Check | Severity threshold |
+|---|---|
+| Image vulnerability check | CRITICAL, HIGH |
+| Dockerfile scan | CRITICAL, HIGH |
+| Registry scan | CRITICAL, HIGH |
+| Release image scan | CRITICAL, HIGH |
+| Dependency review | HIGH and above, set by `fail-on-severity: high` |
+| License scan | UNKNOWN, HIGH, CRITICAL |
 
-One check sets a wider threshold. The license scan also looks for UNKNOWN, because an unclassified license is itself the finding. See [License scanning](#license-scanning).
+Trivy is the tool behind the image vulnerability check, the Dockerfile scan, the registry scan, and the release image scan. No part of this document tracks a MEDIUM or LOW finding.
+
+The license scan sets a wider threshold because an unclassified license is itself the finding. See [License scanning](#license-scanning).
 
 A CRITICAL or HIGH finding with no fix does not stop the pull request. It becomes a warning instead. See [The image vulnerability check stopped it](#the-image-vulnerability-check-stopped-it).
 
@@ -182,7 +191,10 @@ Three settings shape what Dependabot does with what it finds:
 - **A limit of 5 open pull requests, for each ecosystem.** Once 5 are open, Dependabot waits for one to close before it opens another.
 - **One dependency for each pull request.** Dependabot does not combine unrelated packages into one change.
 
-Dependabot does not rebase a pull request on its own. If `main` moves past it, update the branch yourself. You can also close the pull request, and wait for Dependabot to open it again.
+Dependabot does not rebase a pull request on its own. If `main` moves past it, do one of the following:
+
+- Update the branch yourself.
+- Close the pull request, and wait for Dependabot to open it again.
 
 ### When your pull request changes a dependency
 
@@ -256,7 +268,12 @@ One label waives a check: `security-exception`. Adding it needs write access to 
 |---|---|
 | `security-exception` | the dependency review, and it reports image vulnerability check findings as warnings |
 
-`security-exception` waives two controls, not one. Use it only when you accept both.
+`security-exception` waives two controls:
+
+- The dependency review does not run.
+- The image vulnerability check reports a finding as a warning, instead of stopping the merge.
+
+Use it only when you accept both.
 
 **`security-exception` only changes what happens on your pull request.** It does not reach the release image scan or the registry image scan. Once you merge and release, the same finding can open a fresh alert in the Security tab, with no link back to this label.
 
