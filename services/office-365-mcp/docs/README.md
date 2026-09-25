@@ -46,19 +46,19 @@ makes. It does not control access to the tool.
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `outlook_search_mail` | Read | `Mail.Read`, `User.Read` | No | Finds a message anywhere in the signed-in user's mailbox. |
-| `outlook_read_mail` | Read | `Mail.Read` | No | One message's full text, from a handle that another tool minted. |
-| `outlook_browse_folders` | Read | `Mail.Read` | No | One level of the mail folder tree, and a handle for each folder. |
+| `outlook_search_mail` | Read | `Mail.Read`, `Mail.Read.Shared`, `User.Read` | No | Finds a message anywhere in the signed-in user's own mailbox, or, with `mailbox`, a shared or delegated one. |
+| `outlook_read_mail` | Read | `Mail.Read`, `Mail.Read.Shared` | No | One message's full text, from a handle that another tool minted, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
+| `outlook_browse_folders` | Read | `Mail.Read`, `Mail.Read.Shared` | No | One level of the mail folder tree, and a handle for each folder, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
 | `outlook_find_recipient` | Read | `Mail.Read`, `People.Read`, `User.Read` | No | The email address behind a display name. A draft therefore goes to the real address, not a guess. |
-| `outlook_read_thread` | Read | `Mail.Read` | No | Every message of one conversation that is in this mailbox. |
-| `outlook_list_mail` | Read | `Mail.Read` | No | The newest messages of one folder, in receipt order. |
+| `outlook_read_thread` | Read | `Mail.Read`, `Mail.Read.Shared` | No | Every message of one conversation, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
+| `outlook_list_mail` | Read | `Mail.Read`, `Mail.Read.Shared` | No | The newest messages of one folder, in receipt order, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
 | `outlook_get_mailbox_settings` | Read | `MailboxSettings.Read` | No | What acts quietly on this mailbox — the rules, the automatic reply, and the categories — and what this tool cannot show. |
 | `outlook_list_categories` | Read | `MailboxSettings.Read` | No | Every category that this mailbox can use to tag mail, events, and contacts, with each category's name and color. |
-| `outlook_mark_mail` | Write, changes or removes | `Mail.ReadWrite` | No | The read status, the follow-up flag, and the importance, on up to twenty messages. |
-| `outlook_move_mail` | Write, changes or removes | `Mail.ReadWrite` | No | Moves messages into another folder. This connector erases mail only by moving it to Deleted Items. |
-| `outlook_draft_mail` | Write, adds | `Mail.ReadWrite` | No | A new message, composed into Drafts. The tool cannot send it. |
-| `outlook_draft_reply` | Write, adds | `Mail.ReadWrite` | No | A reply or a forward, composed into Drafts and left there. |
-| `outlook_send_draft` | Write, changes or removes | `Mail.Send`, `Mail.ReadBasic` | No | The only tool in this connector that puts mail on the wire. It sends a draft that this connector composed. |
+| `outlook_mark_mail` | Write, changes or removes | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | The read status, the follow-up flag, and the importance, on up to twenty messages, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
+| `outlook_move_mail` | Write, changes or removes | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | Moves messages into another folder, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. This connector erases mail only by moving it to Deleted Items. |
+| `outlook_draft_mail` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A new message, composed into Drafts, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The tool cannot send it. |
+| `outlook_draft_reply` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A reply or a forward, composed into Drafts and left there, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
+| `outlook_send_draft` | Write, changes or removes | `Mail.Send`, `Mail.ReadBasic`, `Mail.Send.Shared`, `Mail.Read.Shared` | No | The only tool in this connector that puts mail on the wire. It sends a draft that this connector composed, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
 | `outlook_set_automatic_reply` | Write, safe to repeat | `MailboxSettings.ReadWrite` | No | Turns the out-of-office reply on for a fixed period, or off. The reply never runs with no end date. |
 | `outlook_disable_mail_rule` | Write, safe to repeat | `MailboxSettings.ReadWrite` | No | Turns one existing inbox rule off, and nothing else. |
 
