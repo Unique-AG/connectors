@@ -1,8 +1,13 @@
-from collections.abc import Generator
+from collections.abc import AsyncIterator, Generator
 
+import httpx
 import pytest
+from fastmcp import Client, FastMCP
+from fastmcp.client.transports import FastMCPTransport
 from kiota_http.middleware import retry_handler
 from testcontainers.community.postgres import PostgresContainer
+
+from office_365_mcp.tools import TOOL_NAMES, register_tools, resolve
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -43,3 +48,13 @@ def retry_sleeps(monkeypatch: pytest.MonkeyPatch) -> RecordedSleeps:
     recorded = RecordedSleeps()
     monkeypatch.setattr(retry_handler, "asyncio", recorded)
     return recorded
+
+
+@pytest.fixture
+async def every_tool() -> AsyncIterator[Client[FastMCPTransport]]:
+    server = FastMCP[None](name="every-tool")
+    transport = httpx.AsyncClient()
+    register_tools(server, transport, resolve(preset=None, enabled=list(TOOL_NAMES)))
+    async with Client(FastMCPTransport(server)) as client:
+        yield client
+    await transport.aclose()

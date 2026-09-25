@@ -28,7 +28,6 @@ from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, Surfac
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
 from office_365_mcp.shared import meetings
 from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST
-from office_365_mcp.tools import TOOL_NAMES, register_tools, resolve
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -495,16 +494,6 @@ def _server_of(app: Starlette) -> FastMCP[None]:
 async def mcp_client(app: Starlette) -> AsyncIterator[Client[FastMCPTransport]]:
     async with Client(FastMCPTransport(_server_of(app))) as client:
         yield client
-
-
-@pytest.fixture
-async def every_tool() -> AsyncIterator[Client[FastMCPTransport]]:
-    server = FastMCP[None](name="every-tool")
-    transport = httpx.AsyncClient()
-    register_tools(server, transport, resolve(preset=None, enabled=list(TOOL_NAMES)))
-    async with Client(FastMCPTransport(server)) as client:
-        yield client
-    await transport.aclose()
 
 
 def _named(tools: Sequence[Tool]) -> dict[str, Tool]:
