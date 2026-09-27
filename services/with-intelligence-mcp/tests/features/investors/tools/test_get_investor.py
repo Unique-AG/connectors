@@ -6,6 +6,7 @@ import respx
 from tests.helpers import BASE_URL, build_client, page_body, sent_query
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
+    InvestorNotEntitledResponse,
     InvestorNotFoundResponse,
     InvestorProfileResponse,
 )
@@ -24,7 +25,12 @@ async def get_investor(
     client: WithIntelligenceClient,
     name: str | None = None,
     investor_id: int | None = None,
-) -> InvestorProfileResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse:
+) -> (
+    InvestorProfileResponse
+    | InvestorAmbiguousResponse
+    | InvestorNotEntitledResponse
+    | InvestorNotFoundResponse
+):
     return await call_get_investor(
         name=name,
         investor_id=investor_id,
@@ -160,7 +166,8 @@ class TestEntitlements:
         respx.get(f"{BASE_URL}/v3/investors").mock(return_value=httpx.Response(403))
         client, _ = build_client()
         result = await get_investor(name="Virginia Retirement System", client=client)
-        assert isinstance(result, InvestorNotFoundResponse)
+        assert isinstance(result, InvestorNotEntitledResponse)
+        assert result.status == "not_entitled"
         assert result.hint is not None
         assert "licensed" in result.hint
 
@@ -169,7 +176,8 @@ class TestEntitlements:
         respx.get(f"{BASE_URL}/v3/investors/2504").mock(return_value=httpx.Response(403))
         client, _ = build_client()
         result = await get_investor(investor_id=2504, client=client)
-        assert isinstance(result, InvestorNotFoundResponse)
+        assert isinstance(result, InvestorNotEntitledResponse)
+        assert result.status == "not_entitled"
         assert result.hint is not None
         assert "licensed" in result.hint
 
@@ -195,6 +203,17 @@ class TestEntitlements:
         result = await get_investor(investor_id=2504, client=client)
         assert isinstance(result, InvestorProfileResponse)
         assert result.preferences_available is True
+
+    @respx.mock
+    async def test_empty_present_preferences_are_available(self) -> None:
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json={**VIRGINIA, "preferences": {}})
+        )
+        client, _ = build_client()
+        result = await get_investor(investor_id=2504, client=client)
+        assert isinstance(result, InvestorProfileResponse)
+        assert result.preferences_available is True
+        assert result.preferences == {}
 
 
 class TestProjection:

@@ -5,6 +5,7 @@ from with_intelligence_mcp.features.investors.queries.resolve_investor_record_qu
 )
 from with_intelligence_mcp.features.investors.responses import (
     InvestorAmbiguousResponse,
+    InvestorNotEntitledResponse,
     InvestorNotFoundResponse,
     InvestorProfileResponse,
 )
@@ -18,7 +19,12 @@ class GetInvestorQuery:
 
     async def run(
         self, *, name: str | None, investor_id: int | None
-    ) -> InvestorProfileResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse:
+    ) -> (
+        InvestorProfileResponse
+        | InvestorAmbiguousResponse
+        | InvestorNotEntitledResponse
+        | InvestorNotFoundResponse
+    ):
         record = await self._resolve_investor_record_query.run(name=name, investor_id=investor_id)
         if not isinstance(record, InvestorExtendedAttributes):
             return record

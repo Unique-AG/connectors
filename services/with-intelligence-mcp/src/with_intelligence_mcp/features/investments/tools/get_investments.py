@@ -13,6 +13,7 @@ from with_intelligence_mcp.features.investments.queries import GetInvestmentsQue
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
     InvestorExtendedAttributes,
+    InvestorNotEntitledResponse,
     InvestorNotFoundResponse,
 )
 from with_intelligence_mcp.features.investors.dependencies import (
@@ -23,7 +24,10 @@ from with_intelligence_mcp.models import published_output_schema
 from with_intelligence_mcp.with_intelligence_client import NotEntitled
 
 type GetInvestmentsResult = (
-    InvestorPositionsResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse
+    InvestorPositionsResponse
+    | InvestorAmbiguousResponse
+    | InvestorNotEntitledResponse
+    | InvestorNotFoundResponse
 )
 
 
@@ -80,7 +84,7 @@ async def get_investments(
             updated_since=updated_since,
         )
     except NotEntitled as error:
-        return InvestorNotFoundResponse(
+        return InvestorNotEntitledResponse(
             searched_for=name or str(investor.id),
             hint=f"With Intelligence refused {error.path} for this account.",
         )

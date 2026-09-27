@@ -22,9 +22,9 @@ class PositionResponse(OmitNoneModel):
         default=None, description="Use with manager_id filters to find their other investors."
     )
     amount: PositionAmountResponse | None = None
-    asset_classes: list[str] = Field(default_factory=list)
-    strategies: list[str] = Field(default_factory=list)
-    structures: list[str] = Field(default_factory=list)
+    asset_classes: list[str] | None = None
+    strategies: list[str] | None = None
+    structures: list[str] | None = None
     as_of: str | None = Field(default=None, description="When With Intelligence last confirmed it.")
     is_current: bool | None = Field(
         default=None, description="False once the position carries an exit date."

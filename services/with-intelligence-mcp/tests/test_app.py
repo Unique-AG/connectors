@@ -109,7 +109,7 @@ class TestMcpEndpoint:
             assert isinstance(alternatives, list)
             assert all(
                 isinstance(alternative, dict) and "properties" in alternative
-                for alternative in alternatives
+                for alternative in cast("list[object]", alternatives)
             )
             assert registered.annotations is not None
             assert registered.annotations.destructive_hint is False

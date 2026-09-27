@@ -1,6 +1,7 @@
 from with_intelligence_mcp.features.investors.responses import (
     InvestorAmbiguousResponse,
     InvestorCandidateResponse,
+    InvestorNotEntitledResponse,
     InvestorNotFoundResponse,
 )
 from with_intelligence_mcp.features.investors.search_investors_by_name import (
@@ -11,7 +12,7 @@ from with_intelligence_mcp.with_intelligence_client import NotEntitled, WithInte
 
 async def resolve_investor(
     client: WithIntelligenceClient, name: str, *, limit: int = 10
-) -> int | InvestorAmbiguousResponse | InvestorNotFoundResponse:
+) -> int | InvestorAmbiguousResponse | InvestorNotEntitledResponse | InvestorNotFoundResponse:
     """A name to one investor id, or a list to choose between.
 
     Name matching is partial — "Virginia" matches 20 investors — so several matches are the
@@ -21,7 +22,7 @@ async def resolve_investor(
     try:
         matches, total = await search_investors_by_name(client, name, limit=limit)
     except NotEntitled as error:
-        return InvestorNotFoundResponse(
+        return InvestorNotEntitledResponse(
             searched_for=name,
             hint=(
                 "With Intelligence refused the investor search for this account "

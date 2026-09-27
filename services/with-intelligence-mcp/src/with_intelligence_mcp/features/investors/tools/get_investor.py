@@ -7,6 +7,7 @@ from pydantic import Field
 
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
+    InvestorNotEntitledResponse,
     InvestorNotFoundResponse,
     InvestorProfileResponse,
 )
@@ -15,7 +16,10 @@ from with_intelligence_mcp.features.investors.queries import GetInvestorQuery
 from with_intelligence_mcp.models import published_output_schema
 
 type GetInvestorResult = (
-    InvestorProfileResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse
+    InvestorProfileResponse
+    | InvestorAmbiguousResponse
+    | InvestorNotEntitledResponse
+    | InvestorNotFoundResponse
 )
 
 

@@ -24,6 +24,7 @@ from with_intelligence_mcp.features.investors.responses import (
     ConsultantResponse,
     InvestorAmbiguousResponse,
     InvestorCandidateResponse,
+    InvestorNotEntitledResponse,
     InvestorNotFoundResponse,
     InvestorProfileResponse,
 )
@@ -40,6 +41,7 @@ __all__ = [
     "InvestorCandidateResponse",
     "InvestorExtendedAttributes",
     "InvestorListItemAttributes",
+    "InvestorNotEntitledResponse",
     "InvestorNotFoundResponse",
     "InvestorProfileResponse",
     "InvestorRecordResolution",

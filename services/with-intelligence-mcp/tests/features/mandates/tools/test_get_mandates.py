@@ -6,6 +6,7 @@ import respx
 from tests.helpers import BASE_URL, build_client, page_body, sent_query
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
+    InvestorNotEntitledResponse,
     InvestorNotFoundResponse,
 )
 from with_intelligence_mcp.features.investors.queries import ResolveInvestorRecordQuery
@@ -24,7 +25,12 @@ async def get_mandates(
     investor_id: int | None = None,
     limit: int = 25,
     updated_since: str | None = None,
-) -> InvestorMandatesResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse:
+) -> (
+    InvestorMandatesResponse
+    | InvestorAmbiguousResponse
+    | InvestorNotEntitledResponse
+    | InvestorNotFoundResponse
+):
     return await call_get_mandates(
         name=name,
         investor_id=investor_id,
@@ -114,6 +120,27 @@ class TestStatus:
 
 
 class TestWhatTheyAreLookingFor:
+    @respx.mock
+    async def test_an_unavailable_detail_keeps_unknown_collections_unknown(self) -> None:
+        respx.get(f"{BASE_URL}/v3/mandates").mock(
+            return_value=httpx.Response(
+                200,
+                json=page_body([{"id": 21, "updated_at": "2026-08-01"}], total=1),
+            )
+        )
+        respx.get(f"{BASE_URL}/v3/mandates/21").mock(return_value=httpx.Response(403))
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=INVESTOR)
+        )
+        client, _ = build_client()
+        result = await get_mandates(investor_id=2504, client=client)
+        assert isinstance(result, InvestorMandatesResponse)
+        mandate = result.mandates[0]
+        assert mandate.asset_classes is None
+        assert mandate.strategies is None
+        assert mandate.structures is None
+        assert mandate.market_focuses is None
+
     @respx.mock
     async def test_strategies_structures_and_focus_come_through(self) -> None:
         _mock([OPEN_SEARCH])

@@ -11,6 +11,7 @@ from with_intelligence_mcp.features.investments.tools.get_investments import (
 )
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
+    InvestorNotEntitledResponse,
     InvestorNotFoundResponse,
 )
 from with_intelligence_mcp.features.investors.queries import ResolveInvestorRecordQuery
@@ -24,7 +25,12 @@ async def get_investments(
     investor_id: int | None = None,
     limit: int = 25,
     updated_since: str | None = None,
-) -> InvestorPositionsResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse:
+) -> (
+    InvestorPositionsResponse
+    | InvestorAmbiguousResponse
+    | InvestorNotEntitledResponse
+    | InvestorNotFoundResponse
+):
     return await call_get_investments(
         name=name,
         investor_id=investor_id,
@@ -143,6 +149,9 @@ class TestExits:
         result = await get_investments(investor_id=2504, client=client)
         assert isinstance(result, InvestorPositionsResponse)
         assert result.positions[0].is_current is None
+        assert result.positions[0].asset_classes is None
+        assert result.positions[0].strategies is None
+        assert result.positions[0].structures is None
 
     @respx.mock
     async def test_an_exited_position_is_flagged_not_dropped(self) -> None:
@@ -170,6 +179,17 @@ class TestUnidentifiedFund:
 
 
 class TestScoping:
+    @respx.mock
+    async def test_an_unlicensed_listing_is_not_reported_as_not_found(self) -> None:
+        respx.get(f"{BASE_URL}/v3/investments").mock(return_value=httpx.Response(403))
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=INVESTOR)
+        )
+        client, _ = build_client()
+        result = await get_investments(investor_id=2504, client=client)
+        assert isinstance(result, InvestorNotEntitledResponse)
+        assert result.status == "not_entitled"
+
     @respx.mock
     async def test_scopes_by_investor_and_package(self) -> None:
         route = respx.get(f"{BASE_URL}/v3/investments").mock(

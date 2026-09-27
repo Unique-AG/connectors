@@ -1,6 +1,8 @@
 """What the tool returns to the model: trimmed, renamed where With Intelligence's naming misleads,
 and documented for the model that reads it."""
 
+from typing import Literal
+
 from pydantic import Field
 
 from with_intelligence_mcp.models import OmitNoneModel
@@ -119,7 +121,7 @@ class InvestorCandidateResponse(OmitNoneModel):
 class InvestorAmbiguousResponse(OmitNoneModel):
     """Several investors matched the name. Ask which one, then call again with `investor_id`."""
 
-    status: str = "ambiguous"
+    status: Literal["ambiguous"] = "ambiguous"
     searched_for: str
     candidates: list[InvestorCandidateResponse] = Field(default_factory=list)
     total_matches: int = 0
@@ -128,6 +130,12 @@ class InvestorAmbiguousResponse(OmitNoneModel):
 class InvestorNotFoundResponse(OmitNoneModel):
     """Nothing matched. The name filter may need to be closer to the investor's registered name."""
 
-    status: str = "not_found"
+    status: Literal["not_found"] = "not_found"
+    searched_for: str
+    hint: str | None = None
+
+
+class InvestorNotEntitledResponse(OmitNoneModel):
+    status: Literal["not_entitled"] = "not_entitled"
     searched_for: str
     hint: str | None = None

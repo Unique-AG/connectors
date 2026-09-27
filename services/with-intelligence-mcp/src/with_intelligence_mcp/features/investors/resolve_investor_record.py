@@ -3,12 +3,16 @@ from with_intelligence_mcp.features.investors.fetch_investor import fetch_invest
 from with_intelligence_mcp.features.investors.resolve_investor import resolve_investor
 from with_intelligence_mcp.features.investors.responses import (
     InvestorAmbiguousResponse,
+    InvestorNotEntitledResponse,
     InvestorNotFoundResponse,
 )
 from with_intelligence_mcp.with_intelligence_client import NotEntitled, WithIntelligenceClient
 
 type InvestorRecordResolution = (
-    InvestorExtendedAttributes | InvestorAmbiguousResponse | InvestorNotFoundResponse
+    InvestorExtendedAttributes
+    | InvestorAmbiguousResponse
+    | InvestorNotEntitledResponse
+    | InvestorNotFoundResponse
 )
 
 
@@ -30,7 +34,7 @@ async def resolve_investor_record(
     try:
         record = await fetch_investor(client, investor_id)
     except NotEntitled as error:
-        return InvestorNotFoundResponse(
+        return InvestorNotEntitledResponse(
             searched_for=name or str(investor_id),
             hint=(
                 f"With Intelligence refused {error.path} for this account — "

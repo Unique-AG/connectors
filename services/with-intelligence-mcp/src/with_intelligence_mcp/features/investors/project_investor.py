@@ -41,8 +41,8 @@ def project_investor(record: InvestorExtendedAttributes) -> InvestorProfileRespo
         consultants=[_consultant(entry) for entry in record.consultants],
         contacts_total=record.contacts_total,
         contact_ids=_ids(record.contacts),
-        preferences_available=bool(record.preferences),
-        preferences=record.preferences or None,
+        preferences_available="preferences" in record.model_fields_set,
+        preferences=record.preferences,
     )
 
 

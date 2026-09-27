@@ -22,10 +22,10 @@ class MandateResponse(OmitNoneModel):
         default=None, description="What kind of mandate it is, e.g. a manager search."
     )
     amount: MandateAmountResponse | None = None
-    asset_classes: list[str] = Field(default_factory=list)
-    strategies: list[str] = Field(default_factory=list)
-    structures: list[str] = Field(default_factory=list)
-    market_focuses: list[str] = Field(default_factory=list)
+    asset_classes: list[str] | None = None
+    strategies: list[str] | None = None
+    structures: list[str] | None = None
+    market_focuses: list[str] | None = None
     awarded_to: str | None = Field(default=None, description="The fund that won it, once one has.")
     consultant: str | None = None
     consultant_firm: str | None = None

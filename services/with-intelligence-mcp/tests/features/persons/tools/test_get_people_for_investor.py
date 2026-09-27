@@ -6,6 +6,7 @@ import respx
 from tests.helpers import BASE_URL, build_client, page_body, sent_query
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
+    InvestorNotEntitledResponse,
     InvestorNotFoundResponse,
 )
 from with_intelligence_mcp.features.investors.queries import ResolveInvestorRecordQuery
@@ -23,7 +24,12 @@ async def get_people_for_investor(
     name: str | None = None,
     investor_id: int | None = None,
     limit: int = 25,
-) -> PeopleForInvestorResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse:
+) -> (
+    PeopleForInvestorResponse
+    | InvestorAmbiguousResponse
+    | InvestorNotEntitledResponse
+    | InvestorNotFoundResponse
+):
     return await call_get_people_for_investor(
         name=name,
         investor_id=investor_id,
@@ -175,6 +181,7 @@ class TestContactDetails:
         assert isinstance(result, PeopleForInvestorResponse)
         assert [person.name for person in result.people] == ["Available", "Restricted"]
         assert result.people[1].is_current is None
+        assert result.people[1].specialisms is None
 
     @respx.mock
     async def test_surfaces_title_seniority_email_and_main_contact_flag(self) -> None:

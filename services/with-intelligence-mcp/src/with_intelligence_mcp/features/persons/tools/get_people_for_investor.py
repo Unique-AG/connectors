@@ -8,6 +8,7 @@ from pydantic import Field
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
     InvestorExtendedAttributes,
+    InvestorNotEntitledResponse,
     InvestorNotFoundResponse,
 )
 from with_intelligence_mcp.features.investors.dependencies import (
@@ -23,7 +24,10 @@ from with_intelligence_mcp.models import published_output_schema
 from with_intelligence_mcp.with_intelligence_client import NotEntitled
 
 type GetPeopleResult = (
-    PeopleForInvestorResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse
+    PeopleForInvestorResponse
+    | InvestorAmbiguousResponse
+    | InvestorNotEntitledResponse
+    | InvestorNotFoundResponse
 )
 
 
@@ -73,7 +77,7 @@ async def get_people_for_investor(
     try:
         return await get_people_for_investor_query.run(investor=investor, limit=limit)
     except NotEntitled as error:
-        return InvestorNotFoundResponse(
+        return InvestorNotEntitledResponse(
             searched_for=name or str(investor.id),
             hint=f"With Intelligence refused {error.path} for this account.",
         )
