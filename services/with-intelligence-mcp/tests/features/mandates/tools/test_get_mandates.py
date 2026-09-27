@@ -4,9 +4,36 @@ import httpx
 import respx
 
 from tests.helpers import BASE_URL, build_client, page_body, sent_query
-from with_intelligence_mcp.features.investors import InvestorAmbiguousResponse
+from with_intelligence_mcp.features.investors import (
+    InvestorAmbiguousResponse,
+    InvestorNotFoundResponse,
+)
+from with_intelligence_mcp.features.investors.queries import ResolveInvestorRecordQuery
 from with_intelligence_mcp.features.mandates import InvestorMandatesResponse
-from with_intelligence_mcp.features.mandates.tools.get_mandates import get_mandates
+from with_intelligence_mcp.features.mandates.queries import GetMandatesQuery
+from with_intelligence_mcp.features.mandates.tools.get_mandates import (
+    get_mandates as call_get_mandates,
+)
+from with_intelligence_mcp.with_intelligence_client import WithIntelligenceClient
+
+
+async def get_mandates(
+    *,
+    client: WithIntelligenceClient,
+    name: str | None = None,
+    investor_id: int | None = None,
+    limit: int = 25,
+    updated_since: str | None = None,
+) -> InvestorMandatesResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse:
+    return await call_get_mandates(
+        name=name,
+        investor_id=investor_id,
+        limit=limit,
+        updated_since=updated_since,
+        resolve_investor_record_query=ResolveInvestorRecordQuery(client),
+        get_mandates_query=GetMandatesQuery(client),
+    )
+
 
 INVESTOR: dict[str, object] = {"id": 2504, "name": "Example Retirement System (ERS)"}
 

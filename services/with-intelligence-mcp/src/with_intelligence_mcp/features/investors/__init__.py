@@ -1,7 +1,20 @@
 """Institutional investors: resolving one by name, and the record behind it."""
 
+from with_intelligence_mcp.features.investors.api_responses import (
+    ClassificationAttributes,
+    InvestorExtendedAttributes,
+    InvestorListItemAttributes,
+)
+from with_intelligence_mcp.features.investors.dependencies import (
+    get_investor_query_factory,
+    get_resolve_investor_record_query_factory,
+)
 from with_intelligence_mcp.features.investors.fetch_investor import INVESTORS_PATH, fetch_investor
 from with_intelligence_mcp.features.investors.project_investor import project_investor
+from with_intelligence_mcp.features.investors.queries import (
+    GetInvestorQuery,
+    ResolveInvestorRecordQuery,
+)
 from with_intelligence_mcp.features.investors.resolve_investor import resolve_investor
 from with_intelligence_mcp.features.investors.resolve_investor_record import (
     InvestorRecordResolution,
@@ -17,16 +30,12 @@ from with_intelligence_mcp.features.investors.responses import (
 from with_intelligence_mcp.features.investors.search_investors_by_name import (
     search_investors_by_name,
 )
-from with_intelligence_mcp.features.investors.wi_responses import (
-    ClassificationAttributes,
-    InvestorExtendedAttributes,
-    InvestorListItemAttributes,
-)
 
 __all__ = [
     "INVESTORS_PATH",
     "ClassificationAttributes",
     "ConsultantResponse",
+    "GetInvestorQuery",
     "InvestorAmbiguousResponse",
     "InvestorCandidateResponse",
     "InvestorExtendedAttributes",
@@ -34,7 +43,10 @@ __all__ = [
     "InvestorNotFoundResponse",
     "InvestorProfileResponse",
     "InvestorRecordResolution",
+    "ResolveInvestorRecordQuery",
     "fetch_investor",
+    "get_investor_query_factory",
+    "get_resolve_investor_record_query_factory",
     "project_investor",
     "resolve_investor",
     "resolve_investor_record",

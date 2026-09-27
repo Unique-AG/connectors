@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from with_intelligence_mcp.response_model import OmitNoneModel
+from with_intelligence_mcp.models import OmitNoneModel
 
 
 class MandateAmountResponse(OmitNoneModel):

@@ -9,7 +9,28 @@ from with_intelligence_mcp.features.investors import (
     InvestorNotFoundResponse,
     InvestorProfileResponse,
 )
-from with_intelligence_mcp.features.investors.tools.get_investor import get_investor
+from with_intelligence_mcp.features.investors.queries import (
+    GetInvestorQuery,
+    ResolveInvestorRecordQuery,
+)
+from with_intelligence_mcp.features.investors.tools.get_investor import (
+    get_investor as call_get_investor,
+)
+from with_intelligence_mcp.with_intelligence_client import WithIntelligenceClient
+
+
+async def get_investor(
+    *,
+    client: WithIntelligenceClient,
+    name: str | None = None,
+    investor_id: int | None = None,
+) -> InvestorProfileResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse:
+    return await call_get_investor(
+        name=name,
+        investor_id=investor_id,
+        get_investor_query=GetInvestorQuery(ResolveInvestorRecordQuery(client)),
+    )
+
 
 # Shaped from the v3 OpenAPI schemas, not invented: `country`/`state` are objects,
 # `latest_aum` dates itself with `as_of` and carries no currency, `currency` is `short_name`,

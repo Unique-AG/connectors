@@ -5,11 +5,35 @@ import respx
 
 from tests.helpers import BASE_URL, build_client, page_body, sent_query
 from with_intelligence_mcp.features.investments import InvestorPositionsResponse
-from with_intelligence_mcp.features.investments.tools.get_investments import get_investments
+from with_intelligence_mcp.features.investments.queries import GetInvestmentsQuery
+from with_intelligence_mcp.features.investments.tools.get_investments import (
+    get_investments as call_get_investments,
+)
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
     InvestorNotFoundResponse,
 )
+from with_intelligence_mcp.features.investors.queries import ResolveInvestorRecordQuery
+from with_intelligence_mcp.with_intelligence_client import WithIntelligenceClient
+
+
+async def get_investments(
+    *,
+    client: WithIntelligenceClient,
+    name: str | None = None,
+    investor_id: int | None = None,
+    limit: int = 25,
+    updated_since: str | None = None,
+) -> InvestorPositionsResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse:
+    return await call_get_investments(
+        name=name,
+        investor_id=investor_id,
+        limit=limit,
+        updated_since=updated_since,
+        resolve_investor_record_query=ResolveInvestorRecordQuery(client),
+        get_investments_query=GetInvestmentsQuery(client),
+    )
+
 
 INVESTOR: dict[str, object] = {"id": 2504, "name": "Example Retirement System (ERS)"}
 
@@ -104,6 +128,23 @@ class TestAmounts:
 
 class TestExits:
     @respx.mock
+    async def test_an_unavailable_detail_does_not_claim_the_position_is_current(self) -> None:
+        respx.get(f"{BASE_URL}/v3/investments").mock(
+            return_value=httpx.Response(
+                200,
+                json=page_body([{"id": 11, "updated_at": "2026-08-01"}], total=1),
+            )
+        )
+        respx.get(f"{BASE_URL}/v3/investments/11").mock(return_value=httpx.Response(403))
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=INVESTOR)
+        )
+        client, _ = build_client()
+        result = await get_investments(investor_id=2504, client=client)
+        assert isinstance(result, InvestorPositionsResponse)
+        assert result.positions[0].is_current is None
+
+    @respx.mock
     async def test_an_exited_position_is_flagged_not_dropped(self) -> None:
         """A redemption is the answer to "what changed" — hiding it loses the finding."""
         _mock([HELD, EXITED])
@@ -142,6 +183,7 @@ class TestScoping:
         query = sent_query(route)
         assert "investor_id=2504" in query
         assert "asset_class_group=hfm" in query
+        assert "sort%5Bupdated_at%5D=desc" in query
 
     @respx.mock
     async def test_updated_since_becomes_a_change_log_window(self) -> None:

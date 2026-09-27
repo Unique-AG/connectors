@@ -23,10 +23,10 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     f"{_PACKAGE}.with_intelligence_client",
 )
 
-_MODEL_LAYERS: tuple[str, ...] = ("wi_responses", "internal_dto", "responses")
+_MODEL_LAYERS: tuple[str, ...] = ("api_responses", "internal_dto", "responses")
 _MODEL_LAYER_RANK = {name: index for index, name in enumerate(_MODEL_LAYERS)}
 _CLASS_SUFFIX_LAYER = {
-    "Attributes": "wi_responses",
+    "Attributes": "api_responses",
     "Dto": "internal_dto",
     "Response": "responses",
 }
@@ -231,7 +231,7 @@ class TestRule5FeatureModelLayersFlowDownward:
                 if _MODEL_LAYER_RANK[imported] >= _MODEL_LAYER_RANK[layer]:
                     found.append(
                         f"{source.relative_to(_SRC)}:{line} {layer} imports {imported} "
-                        + "(layers flow responses -> internal_dto -> wi_responses)"
+                        + "(layers flow responses -> internal_dto -> api_responses)"
                     )
         assert found == [], "; ".join(found)
 
@@ -326,11 +326,11 @@ class TestTheDetectionItself:
     def test_recognises_the_model_layers(self) -> None:
         assert _layer_of("responses") == "responses"
         assert _layer_of("internal_dto") == "internal_dto"
-        assert _layer_of("wi_responses_investor") == "wi_responses"
+        assert _layer_of("api_responses_investor") == "api_responses"
         assert _layer_of("fetch_investor") is None
 
     def test_ranks_the_layers_downward(self) -> None:
-        assert _MODEL_LAYER_RANK["wi_responses"] < _MODEL_LAYER_RANK["internal_dto"]
+        assert _MODEL_LAYER_RANK["api_responses"] < _MODEL_LAYER_RANK["internal_dto"]
         assert _MODEL_LAYER_RANK["internal_dto"] < _MODEL_LAYER_RANK["responses"]
 
     def test_pascal_cases_a_module_stem(self) -> None:

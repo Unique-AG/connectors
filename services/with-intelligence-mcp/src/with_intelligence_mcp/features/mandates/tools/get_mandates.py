@@ -1,4 +1,3 @@
-import asyncio
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
@@ -10,24 +9,31 @@ from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
     InvestorExtendedAttributes,
     InvestorNotFoundResponse,
-    resolve_investor_record,
 )
-from with_intelligence_mcp.features.mandates import (
-    InvestorMandatesResponse,
-    MandateResponse,
-    fetch_mandate,
-    fetch_mandates_for_investor,
-    project_mandate,
+from with_intelligence_mcp.features.investors.dependencies import (
+    get_resolve_investor_record_query_factory,
 )
-from with_intelligence_mcp.features.wi_session import get_with_intelligence_client
-from with_intelligence_mcp.with_intelligence_client import NotEntitled, WithIntelligenceClient
+from with_intelligence_mcp.features.investors.queries import ResolveInvestorRecordQuery
+from with_intelligence_mcp.features.mandates import InvestorMandatesResponse
+from with_intelligence_mcp.features.mandates.dependencies import get_mandates_query_factory
+from with_intelligence_mcp.features.mandates.queries import GetMandatesQuery
+from with_intelligence_mcp.models import published_output_schema
+from with_intelligence_mcp.with_intelligence_client import NotEntitled
 
 type GetMandatesResult = (
     InvestorMandatesResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse
 )
 
 
-@tool(annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True))
+@tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+    output_schema=published_output_schema(GetMandatesResult),
+)
 async def get_mandates(
     name: Annotated[
         str | None,
@@ -46,7 +52,10 @@ async def get_mandates(
         str | None,
         Field(description="ISO date. Only mandates With Intelligence changed since then."),
     ] = None,
-    client: WithIntelligenceClient = Depends(get_with_intelligence_client),
+    resolve_investor_record_query: ResolveInvestorRecordQuery = Depends(
+        get_resolve_investor_record_query_factory
+    ),
+    get_mandates_query: GetMandatesQuery = Depends(get_mandates_query_factory),
 ) -> GetMandatesResult:
     """An investor's allocation searches: what they are looking to allocate to, at what size,
     how far along each is, and which consultant is running it.
@@ -55,31 +64,18 @@ async def get_mandates(
     assuming a mandate is live. `last_reviewed` is when they last confirmed it, so an old date
     means a stale mandate even where the status still reads open. Amounts are in MILLIONS.
     """
-    investor = await resolve_investor_record(client, name, investor_id)
+    investor = await resolve_investor_record_query.run(name=name, investor_id=investor_id)
     if not isinstance(investor, InvestorExtendedAttributes):
         return investor
-    resolved = investor.id
 
     try:
-        listed, total = await fetch_mandates_for_investor(
-            client, resolved, limit=limit, updated_since=updated_since
+        return await get_mandates_query.run(
+            investor=investor,
+            limit=limit,
+            updated_since=updated_since,
         )
     except NotEntitled as error:
         return InvestorNotFoundResponse(
-            searched_for=name or str(resolved),
+            searched_for=name or str(investor.id),
             hint=f"With Intelligence refused {error.path} for this account.",
         )
-
-    details = await asyncio.gather(*(fetch_mandate(client, entry.id) for entry in listed))
-    mandates = [
-        project_mandate(detail) if detail else MandateResponse(id=listed[index].id)
-        for index, detail in enumerate(details)
-    ]
-
-    return InvestorMandatesResponse(
-        investor_id=resolved,
-        investor_name=investor.name,
-        mandates=mandates,
-        total=total,
-        returned=len(mandates),
-    )

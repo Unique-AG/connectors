@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from with_intelligence_mcp.response_model import OmitNoneModel
+from with_intelligence_mcp.models import OmitNoneModel
 
 
 class PositionAmountResponse(OmitNoneModel):
@@ -26,8 +26,8 @@ class PositionResponse(OmitNoneModel):
     strategies: list[str] = Field(default_factory=list)
     structures: list[str] = Field(default_factory=list)
     as_of: str | None = Field(default=None, description="When With Intelligence last confirmed it.")
-    is_current: bool = Field(
-        default=True, description="False once the position carries an exit date."
+    is_current: bool | None = Field(
+        default=None, description="False once the position carries an exit date."
     )
     exited_on: str | None = None
     fund_unidentified: bool | None = Field(

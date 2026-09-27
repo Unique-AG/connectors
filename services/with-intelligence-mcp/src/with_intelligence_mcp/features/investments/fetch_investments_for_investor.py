@@ -1,6 +1,6 @@
 from pydantic import TypeAdapter
 
-from with_intelligence_mcp.features.investments.wi_responses import (
+from with_intelligence_mcp.features.investments.api_responses import (
     InvestmentListItemAttributes,
 )
 from with_intelligence_mcp.with_intelligence_client import Page, QueryValue, WithIntelligenceClient
@@ -17,7 +17,10 @@ async def fetch_investments_for_investor(
     updated_since: str | None = None,
 ) -> tuple[list[InvestmentListItemAttributes], int]:
     """Position ids for one investor. The listing carries no detail, so ids are all it gives."""
-    params: dict[str, QueryValue] = {"investor_id": [investor_id]}
+    params: dict[str, QueryValue] = {
+        "investor_id": [investor_id],
+        "sort[updated_at]": "desc",
+    }
     if client.asset_class_groups:
         params["asset_class_group"] = list(client.asset_class_groups)
     if updated_since is not None:

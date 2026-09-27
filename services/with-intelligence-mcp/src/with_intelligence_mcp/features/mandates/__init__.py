@@ -1,26 +1,29 @@
 """An investor's allocation searches: what they are looking to allocate to, and how far along."""
 
-from with_intelligence_mcp.features.mandates.fetch_mandate import fetch_mandate
-from with_intelligence_mcp.features.mandates.fetch_mandates_for_investor import (
-    MANDATES_PATH,
-    fetch_mandates_for_investor,
-)
-from with_intelligence_mcp.features.mandates.project_mandate import project_mandate
-from with_intelligence_mcp.features.mandates.responses import (
-    InvestorMandatesResponse,
-    MandateAmountResponse,
-    MandateResponse,
-)
-from with_intelligence_mcp.features.mandates.wi_responses import (
+from with_intelligence_mcp.features.mandates.api_responses import (
     MandateExtendedAttributes,
     MandateInvestorAttributes,
     MandateListItemAttributes,
     MandateNoteAttributes,
     MandateStatusAttributes,
 )
+from with_intelligence_mcp.features.mandates.dependencies import get_mandates_query_factory
+from with_intelligence_mcp.features.mandates.fetch_mandate import fetch_mandate
+from with_intelligence_mcp.features.mandates.fetch_mandates_for_investor import (
+    MANDATES_PATH,
+    fetch_mandates_for_investor,
+)
+from with_intelligence_mcp.features.mandates.project_mandate import project_mandate
+from with_intelligence_mcp.features.mandates.queries import GetMandatesQuery
+from with_intelligence_mcp.features.mandates.responses import (
+    InvestorMandatesResponse,
+    MandateAmountResponse,
+    MandateResponse,
+)
 
 __all__ = [
     "MANDATES_PATH",
+    "GetMandatesQuery",
     "InvestorMandatesResponse",
     "MandateAmountResponse",
     "MandateExtendedAttributes",
@@ -31,5 +34,6 @@ __all__ = [
     "MandateStatusAttributes",
     "fetch_mandate",
     "fetch_mandates_for_investor",
+    "get_mandates_query_factory",
     "project_mandate",
 ]

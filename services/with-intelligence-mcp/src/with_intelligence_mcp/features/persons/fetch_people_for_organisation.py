@@ -1,6 +1,6 @@
 from pydantic import TypeAdapter
 
-from with_intelligence_mcp.features.persons.wi_responses import PersonListItemAttributes
+from with_intelligence_mcp.features.persons.api_responses import PersonListItemAttributes
 from with_intelligence_mcp.with_intelligence_client import Page, QueryValue, WithIntelligenceClient
 
 PERSONS_PATH = "/v3/persons"

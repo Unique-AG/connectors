@@ -4,11 +4,34 @@ import httpx
 import respx
 
 from tests.helpers import BASE_URL, build_client, page_body, sent_query
-from with_intelligence_mcp.features.investors import InvestorAmbiguousResponse
-from with_intelligence_mcp.features.persons import PeopleForInvestorResponse
-from with_intelligence_mcp.features.persons.tools.get_people_for_investor import (
-    get_people_for_investor,
+from with_intelligence_mcp.features.investors import (
+    InvestorAmbiguousResponse,
+    InvestorNotFoundResponse,
 )
+from with_intelligence_mcp.features.investors.queries import ResolveInvestorRecordQuery
+from with_intelligence_mcp.features.persons import PeopleForInvestorResponse
+from with_intelligence_mcp.features.persons.queries import GetPeopleForInvestorQuery
+from with_intelligence_mcp.features.persons.tools.get_people_for_investor import (
+    get_people_for_investor as call_get_people_for_investor,
+)
+from with_intelligence_mcp.with_intelligence_client import WithIntelligenceClient
+
+
+async def get_people_for_investor(
+    *,
+    client: WithIntelligenceClient,
+    name: str | None = None,
+    investor_id: int | None = None,
+    limit: int = 25,
+) -> PeopleForInvestorResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse:
+    return await call_get_people_for_investor(
+        name=name,
+        investor_id=investor_id,
+        limit=limit,
+        resolve_investor_record_query=ResolveInvestorRecordQuery(client),
+        get_people_for_investor_query=GetPeopleForInvestorQuery(client),
+    )
+
 
 INVESTOR = {"id": 2504, "name": "Example Retirement System (ERS)", "contacts_total": 64}
 
@@ -101,6 +124,7 @@ class TestRoleSelection:
         assert isinstance(result, PeopleForInvestorResponse)
         assert result.people[0].name == "D. Allocator"
         assert result.people[0].job_title is None
+        assert result.people[0].is_current is None
 
 
 class TestDepartures:
@@ -125,6 +149,33 @@ class TestDepartures:
 
 
 class TestContactDetails:
+    @respx.mock
+    async def test_keeps_the_roster_when_one_detail_is_not_licensed(self) -> None:
+        respx.get(f"{BASE_URL}/v3/persons").mock(
+            return_value=httpx.Response(
+                200,
+                json=page_body(
+                    [{"id": 1, "name": "Available"}, {"id": 2, "name": "Restricted"}],
+                    total=2,
+                ),
+            )
+        )
+        respx.get(f"{BASE_URL}/v3/persons/1").mock(
+            return_value=httpx.Response(
+                200,
+                json=_person(1, "Available", [_role(2504, job_title="CIO")]),
+            )
+        )
+        respx.get(f"{BASE_URL}/v3/persons/2").mock(return_value=httpx.Response(403))
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=INVESTOR)
+        )
+        client, _ = build_client()
+        result = await get_people_for_investor(investor_id=2504, client=client)
+        assert isinstance(result, PeopleForInvestorResponse)
+        assert [person.name for person in result.people] == ["Available", "Restricted"]
+        assert result.people[1].is_current is None
+
     @respx.mock
     async def test_surfaces_title_seniority_email_and_main_contact_flag(self) -> None:
         _mock_roster(

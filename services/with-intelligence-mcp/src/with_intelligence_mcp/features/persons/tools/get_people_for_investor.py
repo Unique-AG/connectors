@@ -1,4 +1,3 @@
-import asyncio
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
@@ -10,24 +9,33 @@ from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
     InvestorExtendedAttributes,
     InvestorNotFoundResponse,
-    resolve_investor_record,
 )
-from with_intelligence_mcp.features.persons import (
-    PeopleForInvestorResponse,
-    PersonResponse,
-    fetch_people_for_organisation,
-    fetch_person,
-    project_person,
+from with_intelligence_mcp.features.investors.dependencies import (
+    get_resolve_investor_record_query_factory,
 )
-from with_intelligence_mcp.features.wi_session import get_with_intelligence_client
-from with_intelligence_mcp.with_intelligence_client import NotEntitled, WithIntelligenceClient
+from with_intelligence_mcp.features.investors.queries import ResolveInvestorRecordQuery
+from with_intelligence_mcp.features.persons import PeopleForInvestorResponse
+from with_intelligence_mcp.features.persons.dependencies import (
+    get_people_for_investor_query_factory,
+)
+from with_intelligence_mcp.features.persons.queries import GetPeopleForInvestorQuery
+from with_intelligence_mcp.models import published_output_schema
+from with_intelligence_mcp.with_intelligence_client import NotEntitled
 
 type GetPeopleResult = (
     PeopleForInvestorResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse
 )
 
 
-@tool(annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True))
+@tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+    output_schema=published_output_schema(GetPeopleResult),
+)
 async def get_people_for_investor(
     name: Annotated[
         str | None,
@@ -42,7 +50,12 @@ async def get_people_for_investor(
     limit: Annotated[
         int, Field(ge=1, le=50, description="How many people to return, most recent first.")
     ] = 25,
-    client: WithIntelligenceClient = Depends(get_with_intelligence_client),
+    resolve_investor_record_query: ResolveInvestorRecordQuery = Depends(
+        get_resolve_investor_record_query_factory
+    ),
+    get_people_for_investor_query: GetPeopleForInvestorQuery = Depends(
+        get_people_for_investor_query_factory
+    ),
 ) -> GetPeopleResult:
     """Contacts at one institutional investor, with the role each holds there: job title,
     seniority, email and phone where recorded, and whether they have left.
@@ -53,34 +66,14 @@ async def get_people_for_investor(
     The two counts this returns disagree: the person search and the investor record hold
     different numbers of contacts, and which is authoritative is undocumented.
     """
-    investor = await resolve_investor_record(client, name, investor_id)
+    investor = await resolve_investor_record_query.run(name=name, investor_id=investor_id)
     if not isinstance(investor, InvestorExtendedAttributes):
         return investor
-    resolved = investor.id
 
     try:
-        listed, total = await fetch_people_for_organisation(client, resolved, limit=limit)
+        return await get_people_for_investor_query.run(investor=investor, limit=limit)
     except NotEntitled as error:
         return InvestorNotFoundResponse(
-            searched_for=name or str(resolved),
+            searched_for=name or str(investor.id),
             hint=f"With Intelligence refused {error.path} for this account.",
         )
-
-    details = await asyncio.gather(
-        *(fetch_person(client, person.id) for person in listed), return_exceptions=False
-    )
-    people = [
-        project_person(detail, resolved)
-        if detail
-        else PersonResponse(id=listed[index].id, name=listed[index].name)
-        for index, detail in enumerate(details)
-    ]
-
-    return PeopleForInvestorResponse(
-        investor_id=resolved,
-        investor_name=investor.name,
-        people=people,
-        total_at_organisation=total,
-        contacts_on_investor_record=investor.contacts_total,
-        returned=len(people),
-    )

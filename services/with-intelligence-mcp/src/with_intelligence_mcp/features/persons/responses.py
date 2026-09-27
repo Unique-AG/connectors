@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from with_intelligence_mcp.response_model import OmitNoneModel
+from with_intelligence_mcp.models import OmitNoneModel
 
 
 class PersonResponse(OmitNoneModel):
@@ -25,8 +25,8 @@ class PersonResponse(OmitNoneModel):
     is_main_contact: bool | None = Field(
         default=None, description="Flagged by With Intelligence as the main contact here."
     )
-    is_current: bool = Field(
-        default=True,
+    is_current: bool | None = Field(
+        default=None,
         description=(
             "False when the role has an end date — they have left. Do not write to a former "
             "contact without saying so."

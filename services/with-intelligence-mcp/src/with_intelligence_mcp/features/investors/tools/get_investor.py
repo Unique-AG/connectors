@@ -7,14 +7,12 @@ from pydantic import Field
 
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
-    InvestorExtendedAttributes,
     InvestorNotFoundResponse,
     InvestorProfileResponse,
-    project_investor,
-    resolve_investor_record,
 )
-from with_intelligence_mcp.features.wi_session import get_with_intelligence_client
-from with_intelligence_mcp.with_intelligence_client import WithIntelligenceClient
+from with_intelligence_mcp.features.investors.dependencies import get_investor_query_factory
+from with_intelligence_mcp.features.investors.queries import GetInvestorQuery
+from with_intelligence_mcp.models import published_output_schema
 
 type GetInvestorResult = (
     InvestorProfileResponse | InvestorAmbiguousResponse | InvestorNotFoundResponse
@@ -22,7 +20,13 @@ type GetInvestorResult = (
 
 
 @tool(
-    annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+    output_schema=published_output_schema(GetInvestorResult),
 )
 async def get_investor(
     name: Annotated[
@@ -38,7 +42,7 @@ async def get_investor(
         int | None,
         Field(description="With Intelligence investor id, when it is already known."),
     ] = None,
-    client: WithIntelligenceClient = Depends(get_with_intelligence_client),
+    get_investor_query: GetInvestorQuery = Depends(get_investor_query_factory),
 ) -> GetInvestorResult:
     """Profile one institutional investor: type, AUM, location, the strategies and structures
     they allocate to, who they currently invest with, their consultants, and key contacts.
@@ -48,7 +52,4 @@ async def get_investor(
     `preferences_available: false` means this subscription lacks the Intentions & Preferences
     add-on — not that the investor has stated no preferences.
     """
-    record = await resolve_investor_record(client, name, investor_id)
-    if not isinstance(record, InvestorExtendedAttributes):
-        return record
-    return project_investor(record)
+    return await get_investor_query.run(name=name, investor_id=investor_id)

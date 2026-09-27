@@ -1,10 +1,10 @@
+from with_intelligence_mcp.features.investors.api_responses import InvestorExtendedAttributes
 from with_intelligence_mcp.features.investors.fetch_investor import fetch_investor
 from with_intelligence_mcp.features.investors.resolve_investor import resolve_investor
 from with_intelligence_mcp.features.investors.responses import (
     InvestorAmbiguousResponse,
     InvestorNotFoundResponse,
 )
-from with_intelligence_mcp.features.investors.wi_responses import InvestorExtendedAttributes
 from with_intelligence_mcp.with_intelligence_client import NotEntitled, WithIntelligenceClient
 
 type InvestorRecordResolution = (

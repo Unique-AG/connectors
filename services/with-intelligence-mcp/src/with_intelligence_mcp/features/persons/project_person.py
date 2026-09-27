@@ -1,8 +1,8 @@
-from with_intelligence_mcp.features.persons.responses import PersonResponse
-from with_intelligence_mcp.features.persons.wi_responses import (
+from with_intelligence_mcp.features.persons.api_responses import (
     PersonExtendedAttributes,
     PersonRoleAttributes,
 )
+from with_intelligence_mcp.features.persons.responses import PersonResponse
 
 
 def project_person(record: PersonExtendedAttributes, organisation_id: int) -> PersonResponse:
@@ -23,7 +23,7 @@ def project_person(record: PersonExtendedAttributes, organisation_id: int) -> Pe
         linkedin=record.linked_in_url,
         biography=record.biography,
         is_main_contact=role.main_for_organisation if role else None,
-        is_current=not (role.end_date) if role else True,
+        is_current=not role.end_date if role else None,
         role_started=role.start_date if role else None,
         role_ended=role.end_date if role else None,
     )

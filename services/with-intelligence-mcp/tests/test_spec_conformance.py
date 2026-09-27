@@ -20,14 +20,14 @@ from typing import get_args, get_origin
 import pytest
 from pydantic import BaseModel
 
-from with_intelligence_mcp.features.investments.wi_responses import (
+from with_intelligence_mcp.features.investments.api_responses import (
     CurrencyAmountAttributes,
     InvestmentAmountAttributes,
     InvestmentExtendedAttributes,
     InvestmentFundAttributes,
     InvestmentListItemAttributes,
 )
-from with_intelligence_mcp.features.investors.wi_responses import (
+from with_intelligence_mcp.features.investors.api_responses import (
     AddressAttributes,
     AumRangeAttributes,
     ClassificationAttributes,
@@ -40,7 +40,7 @@ from with_intelligence_mcp.features.investors.wi_responses import (
     StateAttributes,
     StrategyGroupAttributes,
 )
-from with_intelligence_mcp.features.mandates.wi_responses import (
+from with_intelligence_mcp.features.mandates.api_responses import (
     MandateAmountAttributes,
     MandateExtendedAttributes,
     MandateInvestorAttributes,
@@ -50,7 +50,7 @@ from with_intelligence_mcp.features.mandates.wi_responses import (
     MandateServiceAttributes,
     MandateStatusAttributes,
 )
-from with_intelligence_mcp.features.persons.wi_responses import (
+from with_intelligence_mcp.features.persons.api_responses import (
     PersonExtendedAttributes,
     PersonListItemAttributes,
     PersonRoleAttributes,

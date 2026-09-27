@@ -1,12 +1,13 @@
 from pydantic import TypeAdapter
 
+from with_intelligence_mcp.features.investments.api_responses import (
+    InvestmentExtendedAttributes,
+)
 from with_intelligence_mcp.features.investments.fetch_investments_for_investor import (
     INVESTMENTS_PATH,
 )
-from with_intelligence_mcp.features.investments.wi_responses import (
-    InvestmentExtendedAttributes,
-)
 from with_intelligence_mcp.with_intelligence_client import (
+    NotEntitled,
     NotFound,
     WithIntelligenceClient,
 )
@@ -19,5 +20,5 @@ async def fetch_investment(
 ) -> InvestmentExtendedAttributes | None:
     try:
         return await client.get_json(f"{INVESTMENTS_PATH}/{investment_id}", _INVESTMENT_RESPONSE)
-    except NotFound:
+    except NotEntitled, NotFound:
         return None
