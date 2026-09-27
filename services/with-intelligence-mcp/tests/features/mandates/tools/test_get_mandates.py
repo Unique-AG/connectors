@@ -12,6 +12,7 @@ from with_intelligence_mcp.features.investors import (
 from with_intelligence_mcp.features.investors.queries import ResolveInvestorRecordQuery
 from with_intelligence_mcp.features.mandates import InvestorMandatesResponse
 from with_intelligence_mcp.features.mandates.queries import GetMandatesQuery
+from with_intelligence_mcp.features.mandates.resource_utils import MapMandateToResponseUtil
 from with_intelligence_mcp.features.mandates.tools.get_mandates import (
     get_mandates as call_get_mandates,
 )
@@ -37,7 +38,10 @@ async def get_mandates(
         limit=limit,
         updated_since=updated_since,
         resolve_investor_record_query=ResolveInvestorRecordQuery(client),
-        get_mandates_query=GetMandatesQuery(client),
+        get_mandates_query=GetMandatesQuery(
+            client=client,
+            map_mandate_to_response_util=MapMandateToResponseUtil(),
+        ),
     )
 
 

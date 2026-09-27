@@ -7,14 +7,17 @@ from with_intelligence_mcp.features.mandates.api_responses import (
     MandateNoteAttributes,
     MandateStatusAttributes,
 )
-from with_intelligence_mcp.features.mandates.dependencies import get_mandates_query_factory
+from with_intelligence_mcp.features.mandates.dependencies import (
+    get_mandates_query_factory,
+    get_map_mandate_to_response_util_factory,
+)
 from with_intelligence_mcp.features.mandates.fetch_mandate import fetch_mandate
 from with_intelligence_mcp.features.mandates.fetch_mandates_for_investor import (
     MANDATES_PATH,
     fetch_mandates_for_investor,
 )
-from with_intelligence_mcp.features.mandates.project_mandate import project_mandate
 from with_intelligence_mcp.features.mandates.queries import GetMandatesQuery
+from with_intelligence_mcp.features.mandates.resource_utils import MapMandateToResponseUtil
 from with_intelligence_mcp.features.mandates.responses import (
     InvestorMandatesResponse,
     MandateAmountResponse,
@@ -25,6 +28,7 @@ __all__ = [
     "MANDATES_PATH",
     "GetMandatesQuery",
     "InvestorMandatesResponse",
+    "MapMandateToResponseUtil",
     "MandateAmountResponse",
     "MandateExtendedAttributes",
     "MandateInvestorAttributes",
@@ -35,5 +39,5 @@ __all__ = [
     "fetch_mandate",
     "fetch_mandates_for_investor",
     "get_mandates_query_factory",
-    "project_mandate",
+    "get_map_mandate_to_response_util_factory",
 ]

@@ -14,6 +14,7 @@ from with_intelligence_mcp.features.investors.queries import (
     GetInvestorQuery,
     ResolveInvestorRecordQuery,
 )
+from with_intelligence_mcp.features.investors.resource_utils import MapInvestorToResponseUtil
 from with_intelligence_mcp.features.investors.tools.get_investor import (
     get_investor as call_get_investor,
 )
@@ -34,7 +35,10 @@ async def get_investor(
     return await call_get_investor(
         name=name,
         investor_id=investor_id,
-        get_investor_query=GetInvestorQuery(ResolveInvestorRecordQuery(client)),
+        get_investor_query=GetInvestorQuery(
+            resolve_investor_record_query=ResolveInvestorRecordQuery(client),
+            map_investor_to_response_util=MapInvestorToResponseUtil(),
+        ),
     )
 
 

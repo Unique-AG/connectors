@@ -7,10 +7,10 @@ from with_intelligence_mcp.features.investors.api_responses import (
 )
 from with_intelligence_mcp.features.investors.dependencies import (
     get_investor_query_factory,
+    get_map_investor_to_response_util_factory,
     get_resolve_investor_record_query_factory,
 )
 from with_intelligence_mcp.features.investors.fetch_investor import INVESTORS_PATH, fetch_investor
-from with_intelligence_mcp.features.investors.project_investor import project_investor
 from with_intelligence_mcp.features.investors.queries import (
     GetInvestorQuery,
     ResolveInvestorRecordQuery,
@@ -20,6 +20,7 @@ from with_intelligence_mcp.features.investors.resolve_investor_record import (
     InvestorRecordResolution,
     resolve_investor_record,
 )
+from with_intelligence_mcp.features.investors.resource_utils import MapInvestorToResponseUtil
 from with_intelligence_mcp.features.investors.responses import (
     ConsultantResponse,
     InvestorAmbiguousResponse,
@@ -45,11 +46,12 @@ __all__ = [
     "InvestorNotFoundResponse",
     "InvestorProfileResponse",
     "InvestorRecordResolution",
+    "MapInvestorToResponseUtil",
     "ResolveInvestorRecordQuery",
     "fetch_investor",
     "get_investor_query_factory",
+    "get_map_investor_to_response_util_factory",
     "get_resolve_investor_record_query_factory",
-    "project_investor",
     "resolve_investor",
     "resolve_investor_record",
     "search_investors_by_name",
