@@ -134,6 +134,18 @@ class TestAmounts:
 
 class TestExits:
     @respx.mock
+    async def test_sparse_detail_keeps_status_and_collections_unknown(self) -> None:
+        _mock([{"id": 11}])
+        client, _ = build_client()
+        result = await get_investments(investor_id=2504, client=client)
+        assert isinstance(result, InvestorPositionsResponse)
+        position = result.positions[0]
+        assert position.is_current is None
+        assert position.asset_classes is None
+        assert position.strategies is None
+        assert position.structures is None
+
+    @respx.mock
     async def test_an_unavailable_detail_does_not_claim_the_position_is_current(self) -> None:
         respx.get(f"{BASE_URL}/v3/investments").mock(
             return_value=httpx.Response(

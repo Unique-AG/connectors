@@ -40,4 +40,4 @@ def _role_at(record: PersonExtendedAttributes, organisation_id: int) -> PersonRo
     if not matching:
         return None
     current = [role for role in matching if not role.end_date]
-    return current[0] if current else matching[0]
+    return current[0] if current else max(matching, key=lambda role: role.end_date or "")

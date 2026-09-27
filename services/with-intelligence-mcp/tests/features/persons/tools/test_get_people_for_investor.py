@@ -123,6 +123,27 @@ class TestRoleSelection:
         assert result.people[0].is_current is True
 
     @respx.mock
+    async def test_prefers_the_latest_role_when_all_roles_have_ended(self) -> None:
+        _mock_roster(
+            [
+                _person(
+                    1,
+                    "C. Allocator",
+                    [
+                        _role(2504, job_title="Analyst", end_date="2020-01-01"),
+                        _role(2504, job_title="CIO", end_date="2025-01-01"),
+                    ],
+                )
+            ],
+            total=1,
+        )
+        client, _ = build_client()
+        result = await get_people_for_investor(investor_id=2504, client=client)
+        assert isinstance(result, PeopleForInvestorResponse)
+        assert result.people[0].job_title == "CIO"
+        assert result.people[0].role_ended == "2025-01-01"
+
+    @respx.mock
     async def test_a_person_with_no_role_here_still_returns_their_name(self) -> None:
         _mock_roster([_person(1, "D. Allocator", [_role(999, job_title="Elsewhere")])], total=1)
         client, _ = build_client()

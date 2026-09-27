@@ -218,6 +218,20 @@ class TestEntitlements:
 
 class TestProjection:
     @respx.mock
+    async def test_sparse_detail_keeps_omitted_collections_unknown(self) -> None:
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json={"id": 2504})
+        )
+        client, _ = build_client()
+        result = await get_investor(investor_id=2504, client=client)
+        assert isinstance(result, InvestorProfileResponse)
+        assert result.asset_classes is None
+        assert result.strategies is None
+        assert result.managers is None
+        assert result.consultants is None
+        assert result.contact_ids is None
+
+    @respx.mock
     async def test_parses_the_nested_address_and_currency_objects(self) -> None:
         """`country` and `state` arrive as objects; declaring them as strings raised here."""
         respx.get(f"{BASE_URL}/v3/investors/2504").mock(
@@ -238,6 +252,7 @@ class TestProjection:
         client, _ = build_client()
         result = await get_investor(investor_id=2504, client=client)
         assert isinstance(result, InvestorProfileResponse)
+        assert result.consultants is not None
         assert result.consultants[0].name == "Mercer"
         assert result.consultants[0].is_lead is True
         assert result.consultants[0].role == "General consultant"
@@ -299,6 +314,7 @@ class TestProjection:
         client, _ = build_client()
         result = await get_investor(investor_id=2504, client=client)
         assert isinstance(result, InvestorProfileResponse)
+        assert result.primary_strategies is not None
         assert result.primary_strategies[0].id == 3
         assert result.primary_strategies[0].name == "Equity Long/Short"
 
@@ -313,9 +329,9 @@ class TestProjection:
         assert isinstance(result, InvestorProfileResponse)
         assert result.id == 7
         assert result.aum is None
-        assert result.managers == []
-        assert result.contact_ids == []
+        assert result.managers is None
+        assert result.contact_ids is None
         payload = result.model_dump()
         assert "aum" not in payload
         assert "website" not in payload
-        assert payload["managers"] == []
+        assert "managers" not in payload

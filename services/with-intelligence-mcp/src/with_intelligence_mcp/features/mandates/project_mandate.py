@@ -11,6 +11,9 @@ from with_intelligence_mcp.features.mandates.responses import (
 
 def project_mandate(record: MandateExtendedAttributes) -> MandateResponse:
     latest = _latest_note(record)
+    strategy_available = bool(
+        {"primary_strategies", "secondary_strategies"} & record.model_fields_set
+    )
     return MandateResponse(
         id=record.id,
         status=record.status.name if record.status else None,
@@ -19,10 +22,20 @@ def project_mandate(record: MandateExtendedAttributes) -> MandateResponse:
         ),
         service=record.service.name if record.service else None,
         amount=_amount(record),
-        asset_classes=_names(record.asset_class),
-        strategies=_names(record.primary_strategies) + _names(record.secondary_strategies),
-        structures=_names(record.fund_structures),
-        market_focuses=_names(record.market_focuses),
+        asset_classes=(
+            _names(record.asset_class) if "asset_class" in record.model_fields_set else None
+        ),
+        strategies=(
+            _names(record.primary_strategies) + _names(record.secondary_strategies)
+            if strategy_available
+            else None
+        ),
+        structures=(
+            _names(record.fund_structures) if "fund_structures" in record.model_fields_set else None
+        ),
+        market_focuses=(
+            _names(record.market_focuses) if "market_focuses" in record.model_fields_set else None
+        ),
         awarded_to=record.fund.name if record.fund else None,
         consultant=record.consultant,
         consultant_firm=(

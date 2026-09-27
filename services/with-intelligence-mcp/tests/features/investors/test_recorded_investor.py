@@ -63,10 +63,12 @@ class TestWhatTheToolPublishes:
     def test_strategies_are_grouped_under_their_primary(
         self, projected: InvestorProfileResponse
     ) -> None:
+        assert projected.strategies is not None
         grouped = {group.primary: group.secondary for group in projected.strategies}
         assert grouped == {"Equity": ["Long/Short Equity"], "Multi-Strategy": []}
 
     def test_the_lead_consultant_is_identifiable(self, projected: InvestorProfileResponse) -> None:
+        assert projected.consultants is not None
         leads = [c.name for c in projected.consultants if c.is_lead]
         assert leads == ["Consultant One"]
 
@@ -85,6 +87,7 @@ class TestWhatTheToolPublishes:
         self, projected: InvestorProfileResponse
     ) -> None:
         """Manager ids are signed in the live data; treating them as unsigned would drop rows."""
+        assert projected.managers is not None
         assert [m.id for m in projected.managers] == [2145858758, -179975042]
 
     def test_preferences_are_reported_unavailable_on_this_subscription(

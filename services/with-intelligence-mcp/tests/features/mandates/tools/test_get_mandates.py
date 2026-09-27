@@ -121,6 +121,18 @@ class TestStatus:
 
 class TestWhatTheyAreLookingFor:
     @respx.mock
+    async def test_sparse_detail_keeps_omitted_collections_unknown(self) -> None:
+        _mock([{"id": 21}])
+        client, _ = build_client()
+        result = await get_mandates(investor_id=2504, client=client)
+        assert isinstance(result, InvestorMandatesResponse)
+        mandate = result.mandates[0]
+        assert mandate.asset_classes is None
+        assert mandate.strategies is None
+        assert mandate.structures is None
+        assert mandate.market_focuses is None
+
+    @respx.mock
     async def test_an_unavailable_detail_keeps_unknown_collections_unknown(self) -> None:
         respx.get(f"{BASE_URL}/v3/mandates").mock(
             return_value=httpx.Response(

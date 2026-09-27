@@ -9,6 +9,10 @@ from with_intelligence_mcp.features.investors import ClassificationAttributes
 
 
 def project_position(record: InvestmentExtendedAttributes) -> PositionResponse:
+    detail_available = bool(record.model_fields_set - {"id"})
+    strategy_available = bool(
+        {"fund_primary_strategies", "fund_secondary_strategies"} & record.model_fields_set
+    )
     return PositionResponse(
         id=record.id,
         fund=record.fund.name if record.fund else None,
@@ -16,12 +20,19 @@ def project_position(record: InvestmentExtendedAttributes) -> PositionResponse:
         manager=record.manager_firm.name if record.manager_firm else None,
         manager_id=record.manager_firm.id if record.manager_firm else None,
         amount=_amount(record),
-        asset_classes=_names(record.asset_classes),
-        strategies=_names(record.fund_primary_strategies)
-        + _names(record.fund_secondary_strategies),
-        structures=_names(record.fund_structures),
+        asset_classes=(
+            _names(record.asset_classes) if "asset_classes" in record.model_fields_set else None
+        ),
+        strategies=(
+            _names(record.fund_primary_strategies) + _names(record.fund_secondary_strategies)
+            if strategy_available
+            else None
+        ),
+        structures=(
+            _names(record.fund_structures) if "fund_structures" in record.model_fields_set else None
+        ),
         as_of=record.latest_as_of,
-        is_current=not record.deleted_at,
+        is_current=not record.deleted_at if detail_available else None,
         exited_on=record.deleted_at,
         fund_unidentified=record.fund.unknown if record.fund else None,
     )

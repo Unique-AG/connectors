@@ -28,22 +28,50 @@ def project_investor(record: InvestorExtendedAttributes) -> InvestorProfileRespo
         location=_location(record),
         aum=_aum(record),
         updated_at=record.updated_at,
-        asset_classes=_named(record.asset_classes),
-        strategies=[_strategy_group(group) for group in record.investment_strategies],
-        primary_strategies=_named(record.primary_strategies),
-        secondary_strategies=_named(record.secondary_strategies),
-        investment_regions=_named(record.investment_regions),
-        investment_countries=_named(record.investment_countries),
-        fund_structures=_named(record.investment_fund_structures),
-        instruments=_named(record.investment_instruments),
-        capital_structure_ids=_ids(record.investment_capital_structures),
-        managers=_named(record.managers),
-        consultants=[_consultant(entry) for entry in record.consultants],
+        asset_classes=_when_present(record, "asset_classes", _named(record.asset_classes)),
+        strategies=_when_present(
+            record,
+            "investment_strategies",
+            [_strategy_group(group) for group in record.investment_strategies],
+        ),
+        primary_strategies=_when_present(
+            record, "primary_strategies", _named(record.primary_strategies)
+        ),
+        secondary_strategies=_when_present(
+            record, "secondary_strategies", _named(record.secondary_strategies)
+        ),
+        investment_regions=_when_present(
+            record, "investment_regions", _named(record.investment_regions)
+        ),
+        investment_countries=_when_present(
+            record, "investment_countries", _named(record.investment_countries)
+        ),
+        fund_structures=_when_present(
+            record,
+            "investment_fund_structures",
+            _named(record.investment_fund_structures),
+        ),
+        instruments=_when_present(
+            record, "investment_instruments", _named(record.investment_instruments)
+        ),
+        capital_structure_ids=_when_present(
+            record,
+            "investment_capital_structures",
+            _ids(record.investment_capital_structures),
+        ),
+        managers=_when_present(record, "managers", _named(record.managers)),
+        consultants=_when_present(
+            record, "consultants", [_consultant(entry) for entry in record.consultants]
+        ),
         contacts_total=record.contacts_total,
-        contact_ids=_ids(record.contacts),
+        contact_ids=_when_present(record, "contacts", _ids(record.contacts)),
         preferences_available="preferences" in record.model_fields_set,
         preferences=record.preferences,
     )
+
+
+def _when_present[T](record: InvestorExtendedAttributes, field: str, value: T) -> T | None:
+    return value if field in record.model_fields_set else None
 
 
 def _strategy_group(group: StrategyGroupAttributes) -> StrategyGroupResponse:

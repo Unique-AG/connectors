@@ -67,34 +67,34 @@ class InvestorProfileResponse(OmitNoneModel):
     aum: AumResponse | None = None
     updated_at: str | None = None
 
-    asset_classes: list[NamedValueResponse] = Field(default_factory=list)
-    strategies: list[StrategyGroupResponse] = Field(
-        default_factory=list,
+    asset_classes: list[NamedValueResponse] | None = None
+    strategies: list[StrategyGroupResponse] | None = Field(
+        default=None,
         description=(
             "What they allocate to, grouped: each primary strategy with the secondaries "
             "recorded under it. Prefer this over the flat lists below, which mix every asset "
             "class's strategies together."
         ),
     )
-    primary_strategies: list[NamedValueResponse] = Field(default_factory=list)
-    secondary_strategies: list[NamedValueResponse] = Field(default_factory=list)
-    investment_regions: list[NamedValueResponse] = Field(default_factory=list)
-    investment_countries: list[NamedValueResponse] = Field(default_factory=list)
-    fund_structures: list[NamedValueResponse] = Field(default_factory=list)
-    instruments: list[NamedValueResponse] = Field(default_factory=list)
-    capital_structure_ids: list[int] = Field(
-        default_factory=list,
+    primary_strategies: list[NamedValueResponse] | None = None
+    secondary_strategies: list[NamedValueResponse] | None = None
+    investment_regions: list[NamedValueResponse] | None = None
+    investment_countries: list[NamedValueResponse] | None = None
+    fund_structures: list[NamedValueResponse] | None = None
+    instruments: list[NamedValueResponse] | None = None
+    capital_structure_ids: list[int] | None = Field(
+        default=None,
         description="Ids only — the API returns no names for capital structures here.",
     )
 
-    managers: list[NamedValueResponse] = Field(default_factory=list)
-    consultants: list[ConsultantResponse] = Field(default_factory=list)
+    managers: list[NamedValueResponse] | None = None
+    consultants: list[ConsultantResponse] | None = None
 
     contacts_total: int | None = Field(
         default=None, description="How many contacts With Intelligence holds for this investor."
     )
-    contact_ids: list[int] = Field(
-        default_factory=list,
+    contact_ids: list[int] | None = Field(
+        default=None,
         description=(
             "Every contact the investor record lists, as ids — the API returns no names here, "
             "so names, titles and seniority require a separate person lookup."
