@@ -51,3 +51,5 @@ class InvestorMandatesResponse(OmitNoneModel):
     mandates: list[MandateResponse] = Field(default_factory=list)
     total: int = Field(default=0, description="How many mandates With Intelligence holds in total.")
     returned: int = 0
+    page: int = 1
+    has_more: bool = False

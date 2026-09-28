@@ -30,12 +30,14 @@ class GetMandatesQuery:
         self,
         *,
         investor: InvestorExtendedAttributes,
+        page: int,
         limit: int,
         updated_since: str | None,
     ) -> InvestorMandatesResponse:
         listed, total = await fetch_mandates_for_investor(
             self._client,
             investor.id,
+            page=page,
             limit=limit,
             updated_since=updated_since,
         )
@@ -52,6 +54,8 @@ class GetMandatesQuery:
             mandates=mandates,
             total=total,
             returned=len(mandates),
+            page=page,
+            has_more=(page - 1) * limit + len(mandates) < total,
         )
         logger.info(
             "mandates.investor.fetched",

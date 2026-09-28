@@ -24,6 +24,7 @@ async def get_mandates(
     client: WithIntelligenceClient,
     name: str | None = None,
     investor_id: int | None = None,
+    page: int = 1,
     limit: int = 25,
     updated_since: str | None = None,
 ) -> (
@@ -35,6 +36,7 @@ async def get_mandates(
     return await call_get_mandates(
         name=name,
         investor_id=investor_id,
+        page=page,
         limit=limit,
         updated_since=updated_since,
         resolve_investor_record_query=ResolveInvestorRecordQuery(client),
@@ -224,6 +226,23 @@ class TestScoping:
         query = sent_query(route)
         assert "investor_id=2504" in query
         assert "sort%5Bupdated_at%5D=desc" in query
+
+    @respx.mock
+    async def test_requests_the_selected_page(self) -> None:
+        route = respx.get(f"{BASE_URL}/v3/mandates").mock(
+            return_value=httpx.Response(200, json=page_body([], total=75, page=3, size=10))
+        )
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=INVESTOR)
+        )
+        client, _ = build_client()
+        result = await get_mandates(investor_id=2504, page=3, limit=10, client=client)
+        assert isinstance(result, InvestorMandatesResponse)
+        assert result.page == 3
+        assert result.has_more is True
+        query = sent_query(route)
+        assert "page=3" in query
+        assert "page_size=10" in query
 
     @respx.mock
     async def test_an_ambiguous_name_asks_before_fetching(self) -> None:

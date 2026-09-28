@@ -11,6 +11,7 @@ async def fetch_mandates_for_investor(
     client: WithIntelligenceClient,
     investor_id: int,
     *,
+    page: int,
     limit: int,
     updated_since: str | None = None,
 ) -> tuple[list[MandateListItemAttributes], int]:
@@ -21,5 +22,7 @@ async def fetch_mandates_for_investor(
     if updated_since is not None:
         params["updated_at[from]"] = updated_since
 
-    page = await client.get_page(MANDATES_PATH, _MANDATES_PAGE, params, page=1, page_size=limit)
-    return page.results, page.pagination.total
+    response = await client.get_page(
+        MANDATES_PATH, _MANDATES_PAGE, params, page=page, page_size=limit
+    )
+    return response.results, response.pagination.total

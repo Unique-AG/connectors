@@ -49,6 +49,7 @@ async def get_mandates(
         ),
     ] = None,
     investor_id: Annotated[int | None, Field(description="Investor id, when known.")] = None,
+    page: Annotated[int, Field(ge=1, description="Page number to return.")] = 1,
     limit: Annotated[
         int, Field(ge=1, le=50, description="How many mandates to return, newest first.")
     ] = 25,
@@ -75,6 +76,7 @@ async def get_mandates(
     try:
         return await get_mandates_query.run(
             investor=investor,
+            page=page,
             limit=limit,
             updated_since=updated_since,
         )
