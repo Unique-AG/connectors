@@ -4,10 +4,9 @@ import logging
 from pydantic import TypeAdapter
 
 from with_intelligence_mcp.features.investors.api_responses import InvestorExtendedAttributes
-from with_intelligence_mcp.features.mandates.api_responses import MandateExtendedAttributes
-from with_intelligence_mcp.features.mandates.fetch_mandates_for_investor import (
-    MANDATES_PATH,
-    fetch_mandates_for_investor,
+from with_intelligence_mcp.features.mandates.api_responses import (
+    MandateExtendedAttributes,
+    MandateListItemAttributes,
 )
 from with_intelligence_mcp.features.mandates.responses import (
     InvestorMandatesResponse,
@@ -16,11 +15,14 @@ from with_intelligence_mcp.features.mandates.responses import (
 from with_intelligence_mcp.with_intelligence_client import (
     NotEntitled,
     NotFound,
+    Page,
+    QueryValue,
     WithIntelligenceClient,
 )
 
 logger = logging.getLogger(__name__)
 _MANDATE_RESPONSE = TypeAdapter(MandateExtendedAttributes)
+_MANDATES_PAGE = TypeAdapter(Page[MandateListItemAttributes])
 
 
 class GetMandatesQuery:
@@ -35,7 +37,7 @@ class GetMandatesQuery:
         limit: int,
         updated_since: str | None,
     ) -> InvestorMandatesResponse:
-        listed, total = await fetch_mandates_for_investor(
+        listed, total = await _fetch_mandates_for_investor(
             self._client,
             investor.id,
             page=page,
@@ -71,6 +73,29 @@ async def _fetch_mandate(
     client: WithIntelligenceClient, mandate_id: int
 ) -> MandateExtendedAttributes | None:
     try:
-        return await client.get_json(f"{MANDATES_PATH}/{mandate_id}", _MANDATE_RESPONSE)
+        return await client.get_json(f"/v3/mandates/{mandate_id}", _MANDATE_RESPONSE)
     except NotEntitled, NotFound:
         return None
+
+
+async def _fetch_mandates_for_investor(
+    client: WithIntelligenceClient,
+    investor_id: int,
+    *,
+    page: int,
+    limit: int,
+    updated_since: str | None,
+) -> tuple[list[MandateListItemAttributes], int]:
+    params: dict[str, QueryValue] = {
+        "investor_id": [investor_id],
+        "sort[updated_at]": "desc",
+    }
+    if client.asset_class_groups:
+        params["asset_class_group"] = list(client.asset_class_groups)
+    if updated_since is not None:
+        params["updated_at[from]"] = updated_since
+
+    response = await client.get_page(
+        "/v3/mandates", _MANDATES_PAGE, params, page=page, page_size=limit
+    )
+    return response.results, response.pagination.total
