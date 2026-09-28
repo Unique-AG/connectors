@@ -40,8 +40,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 MAX_RESULTS = 50
 
 _DESCRIPTION = (
-    "Searches the signed-in user's own mailbox by keyword, sender, recipient, subject, or "
-    "attachment file name."
+    "Searches the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one, by "
+    "keyword, sender, recipient, subject, or attachment file name."
 )
 
 

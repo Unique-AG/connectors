@@ -359,6 +359,14 @@ class TestWhatARuleSays:
         assert answer.rules == []
         assert answer.rules_capped is False
 
+    def test_a_rule_handle_names_the_tool_that_turns_the_rule_off(self) -> None:
+        described = settings_tool.InboxRule.model_fields["uri"].description
+
+        assert described is not None
+        assert "outlook_disable_mail_rule" in described
+        assert "no tool here can change" not in described
+        assert "No tool here can delete a rule." in described
+
 
 class TestTheAutomaticReply:
     @pytest.mark.usefixtures("mailbox")

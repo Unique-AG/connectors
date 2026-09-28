@@ -446,6 +446,16 @@ class TestHowItDeclaresItself:
     def test_the_permission_is_the_one_microsoft_documents_for_these_writes(self) -> None:
         assert replier.GRAPH_PERMISSIONS == ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
+    def test_a_missing_message_is_never_blamed_on_a_folder_move(self) -> None:
+        assert "A moved message gets a new id" not in replier.GRAPH_NOT_FOUND
+        assert "does not mean that the message moved" not in replier.GRAPH_NOT_FOUND
+        assert "If a message moves to another folder of this mailbox, its handle does not" in (
+            replier.GRAPH_NOT_FOUND
+        )
+        assert "If somebody deletes the message permanently, or moves it to an archive" in (
+            replier.GRAPH_NOT_FOUND
+        )
+
     def test_the_two_writes_this_file_makes_directly_are_named_as_their_own_steps(self) -> None:
         assert replier.STEP_CREATE_REPLY == "create_reply"
         assert replier.STEP_FILL_REPLY == "fill_reply"

@@ -43,10 +43,9 @@ class DriveItemSummary(BaseModel):
     )
     is_folder: bool = Field(
         description=(
-            "True for a folder, false for a file. Graph uses one type for both and tells them "
-            + "apart by which facet it returns, so this is the only reliable test. A folder has "
-            + "no content to read; browse it instead. A search never returns a folder, so every "
-            + "search result has this false; a folder listing returns both."
+            "This field is true for a folder and false for a file. Graph uses one type for both, "
+            + "and only the facet in its answer shows which one an item is. So this field is the "
+            + "only reliable test. A folder has no content to read. Browse it instead."
         )
     )
     size: int | None = Field(
@@ -114,10 +113,9 @@ class DriveItemSummary(BaseModel):
 
     parent_uri: str | None = Field(
         description=(
-            "The handle of the folder that holds this item. Pass it to sharepoint_browse_folder to "
-            + "see everything else in the same folder. This is the way to reach a SharePoint "
-            + "folder: a search finds files, and this field turns a file into the folder around "
-            + "it. Null only when Graph reported no parent, which happens for the root of a drive."
+            "This is the handle of the folder that holds this item. Pass it to "
+            + "sharepoint_browse_folder to see everything else in the same folder. This field is "
+            + "null only when Graph reported no parent. That happens for the root of a drive."
         )
     )
 

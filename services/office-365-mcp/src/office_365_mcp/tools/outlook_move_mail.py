@@ -47,13 +47,18 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 GRAPH_NOT_FOUND = (
-    "Microsoft 365 did not return the item this move addressed, and nothing moved. If "
-    + "`folder_ref` was used, the destination is the likelier cause: the handle is well formed. "
-    + "So the folder was most likely deleted, moved, or copied, and given a new id. Call "
-    + "outlook_browse_folders again, and take the `uri` it reports now. Otherwise, a message "
-    + "handle is stale. That is exactly what a stale handle looks like for a message that "
-    + "already moved. Find the message again with outlook_search_mail, and move the `uri` that "
-    + "search returns. Retrying with these arguments will fail identically."
+    "Microsoft 365 did not return an item that this call needed, and nothing moved. If you "
+    + "passed `folder_ref`, the destination is the more probable cause, because the handle is "
+    + "well formed. The probable cause is that somebody deleted, moved, or copied the folder. "
+    + "Microsoft 365 can give a moved or copied folder a new id. Call outlook_browse_folders "
+    + "again. Then use the `uri` that it reports now.\n\n"
+    + "If you did not pass `folder_ref`, a message handle is stale. If a message moves to "
+    + "another folder of this mailbox, its handle does not change. If somebody deletes the "
+    + "message permanently, or moves it to an archive mailbox, Microsoft 365 gives this answer. "
+    + "Find the message again with outlook_search_mail. Then move the `uri` that the search "
+    + "returns. If the search does not find the message, tell the user that the message is not "
+    + "in this mailbox now.\n\n"
+    + "If you call this tool again with the same arguments, the call will fail the same way."
 )
 
 MAX_MESSAGES = 20
@@ -131,15 +136,16 @@ _SEARCH_FOLDER_DESTINATION = (
 class MovedMessage(BaseModel):
     uri: str = Field(
         description=(
-            "The handle the request gave for this message; once `moved` is true it addresses "
-            "nothing, so never pass it to another tool."
+            "This is the handle that the request gave for this message. This connector asks "
+            "Microsoft 365 for immutable ids. An immutable id does not change when the message "
+            "moves to another folder of the same mailbox. So this handle still addresses the "
+            "message."
         )
     )
     new_uri: str | None = Field(
         description=(
-            "The message's handle in its new folder, read from Microsoft's response, or null "
-            "if the move failed; once set, it is the only valid handle from now on, and every "
-            "earlier handle for it, from a search, a listing, or a thread read, is now dead."
+            "This is the handle of this message, as Microsoft 365 gave it after it moved the "
+            "message. This field is null when Microsoft 365 did not move the message."
         )
     )
     moved: bool = Field(
