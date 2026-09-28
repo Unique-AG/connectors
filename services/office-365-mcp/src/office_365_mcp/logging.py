@@ -464,6 +464,13 @@ def _reclaim(name: str) -> None:
     reclaimed.propagate = True
 
 
+_REQUEST_URL_LOGGERS: tuple[str, ...] = (
+    "azure.core.pipeline.policies.http_logging_policy",
+    "httpx",
+    "httpx2",
+)
+
+
 _FILTERS: tuple[type[logging.Filter], ...] = (
     ColorMessageFilter,
     CorrelationFilter,
@@ -485,6 +492,8 @@ def configure_logging(config: AppConfig) -> None:
     logging.captureWarnings(True)
     for name in _RECLAIMED_LOGGERS:
         _reclaim(name)
+    for name in _REQUEST_URL_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
     # Every root handler: a second handler is a second way out, and partial redaction does not hold.
     for handler in logging.getLogger().handlers:
         _install_filters(handler)

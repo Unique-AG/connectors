@@ -14,14 +14,20 @@ import socket
 import subprocess
 import sys
 import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import TracebackType
 from typing import IO, Protocol, cast, override
+from urllib.parse import urlsplit
 
 import httpx
+import httpx2
 import pytest
-from azure.core.exceptions import ClientAuthenticationError
+import respx
+from azure.core.exceptions import ClientAuthenticationError, ServiceRequestError
+from azure.core.pipeline.transport import AsyncHttpTransport, HttpRequest
+from azure.core.rest import AsyncHttpResponse
+from azure.identity.aio import OnBehalfOfCredential
 from fastmcp.server.auth.providers.azure import AzureProvider
 from fastmcp.server.dependencies import AccessToken
 from opentelemetry import trace
@@ -31,7 +37,15 @@ from starlette.testclient import TestClient
 from unique_mcp.logging import _PinoJson  # pyright: ignore[reportPrivateUsage]
 
 from office_365_mcp.app import create_app
-from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
+from office_365_mcp.config import (
+    AppConfig,
+    DatabaseConfig,
+    EntraConfig,
+    LogLevel,
+    SurfaceConfig,
+    ToolsPreset,
+)
+from office_365_mcp.graph_client import GraphSettings, create_graph_transport, graph_client_for
 from office_365_mcp.logging import (
     CENSORED,
     TRUNCATED,
@@ -106,6 +120,7 @@ def sink() -> Iterator[_Sink]:
     level = root.level
     configure_logging(AppConfig.model_validate({"public_base_url": _PUBLIC_BASE_URL}))
     handler = _pino_handler()
+    handler_level = handler.level
     stream_handler = cast("logging.StreamHandler[IO[str]]", handler)
     stream = io.StringIO()
     previous = stream_handler.setStream(stream)
@@ -115,6 +130,7 @@ def sink() -> Iterator[_Sink]:
         if previous is not None:
             _ = stream_handler.setStream(previous)
         root.setLevel(level)
+        handler.setLevel(handler_level)
 
 
 def _log(message: str, *args: object, **extra: object) -> None:
@@ -406,6 +422,84 @@ class TestNoLineLeavesByAnotherDoor:
         line = sink.one()
         assert line["context"] == "fastmcp.server.auth"
         assert line["msg"] == f"using Bearer {CENSORED}"
+
+
+async def _a_graph_search() -> str:
+    url = "https://graph.microsoft.com/v1.0/users/alice%40contoso.example/messages?$search=%22severance%22"
+    client = graph_client_for(create_graph_transport(GraphSettings()), "synthetic")
+    with respx.mock() as router:
+        route = router.get(host="graph.microsoft.com").respond(json={"value": []})
+        _ = await client.me.messages.with_url(url).get()
+    assert route.called
+    return url
+
+
+async def _a_fastmcp_upstream_call() -> str:
+    url = f"https://login.microsoftonline.com/{_TENANT_ID}/discovery/v2.0/keys?appid={_CLIENT_ID}"
+    transport = httpx2.MockTransport(lambda _request: httpx2.Response(200, json={"keys": []}))
+    async with httpx2.AsyncClient(transport=transport) as client:
+        response = await client.get(url)
+    assert response.status_code == 200
+    return url
+
+
+class _UnreachableTransport(AsyncHttpTransport[HttpRequest, AsyncHttpResponse]):
+    def __init__(self) -> None:
+        self.sent: list[str] = []
+
+    @override
+    async def send(self, request: HttpRequest, **kwargs: object) -> AsyncHttpResponse:
+        self.sent = [*self.sent, request.url]
+        raise ServiceRequestError("unreachable")
+
+    @override
+    async def open(self) -> None:
+        pass
+
+    @override
+    async def close(self) -> None:
+        pass
+
+    @override
+    async def __aexit__(self, *args: object) -> None:
+        pass
+
+
+async def _an_on_behalf_of_exchange() -> str:
+    transport = _UnreachableTransport()
+    credential = OnBehalfOfCredential(
+        tenant_id=_TENANT_ID,
+        client_id=_CLIENT_ID,
+        client_secret="synthetic",
+        user_assertion=_JWT,
+        transport=transport,
+        retry_total=0,
+    )
+    async with credential:
+        with pytest.raises(ServiceRequestError):
+            _ = await credential.get_token("https://graph.microsoft.com/.default")
+    assert transport.sent
+    return transport.sent[0]
+
+
+class TestNoOutboundRequestUrlReachesTheLog:
+    @pytest.mark.parametrize("level", [LogLevel.INFO, LogLevel.DEBUG])
+    @pytest.mark.parametrize(
+        "send", [_a_graph_search, _a_fastmcp_upstream_call, _an_on_behalf_of_exchange]
+    )
+    async def test_the_request_url_is_not_logged(
+        self, sink: _Sink, level: LogLevel, send: Callable[[], Awaitable[str]]
+    ) -> None:
+        configure_logging(
+            AppConfig.model_validate({"public_base_url": _PUBLIC_BASE_URL, "log_level": level})
+        )
+
+        url = await send()
+
+        host = urlsplit(url).hostname
+        assert host is not None
+        written = sink.stream.getvalue()
+        assert host not in written, f"a line carries {url}: {written}"
 
 
 class TestEveryLineIsJoinable:
