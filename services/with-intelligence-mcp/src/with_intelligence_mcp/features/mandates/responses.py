@@ -12,39 +12,94 @@ from with_intelligence_mcp.models import OmitNoneModel
 
 class MandateAmountResponse(OmitNoneModel):
     value_millions: float | None = Field(
-        default=None, description="Size of the search, in MILLIONS of `currency`."
+        default=None,
+        description="Target allocation size, in MILLIONS of `currency`.",
+        examples=[300.0],
     )
-    currency: str | None = None
+    currency: str | None = Field(
+        default=None,
+        description="ISO-style currency code for `value_millions`.",
+        examples=["USD"],
+    )
 
 
 class MandateResponse(OmitNoneModel):
     """One allocation search by this investor."""
 
-    id: int
+    id: int = Field(description="With Intelligence mandate identifier.", examples=[21])
     status: str | None = Field(
-        default=None, description="Where the search stands, in With Intelligence's own words."
+        default=None,
+        description="With Intelligence's current mandate status; do not infer a boolean.",
+        examples=["Open"],
     )
-    sub_status: str | None = None
+    sub_status: str | None = Field(
+        default=None,
+        description="More specific stage within `status`.",
+        examples=["Shortlisting"],
+    )
     service: str | None = Field(
-        default=None, description="What kind of mandate it is, e.g. a manager search."
+        default=None,
+        description="Type of advisory or allocation search.",
+        examples=["Manager Search"],
     )
-    amount: MandateAmountResponse | None = None
-    asset_classes: list[str] | None = None
-    strategies: list[str] | None = None
-    structures: list[str] | None = None
-    market_focuses: list[str] | None = None
-    awarded_to: str | None = Field(default=None, description="The fund that won it, once one has.")
-    consultant: str | None = None
-    consultant_firm: str | None = None
-    rfp_link: str | None = None
+    amount: MandateAmountResponse | None = Field(
+        default=None, description="Known target allocation amount."
+    )
+    asset_classes: list[str] | None = Field(
+        default=None,
+        description="Asset classes targeted by the mandate.",
+        examples=[["Hedge Funds"]],
+    )
+    strategies: list[str] | None = Field(
+        default=None,
+        description="Primary and secondary strategies targeted by the mandate.",
+        examples=[["Equity", "Long/Short Equity"]],
+    )
+    structures: list[str] | None = Field(
+        default=None,
+        description="Acceptable fund or account structures.",
+        examples=[["Managed Account"]],
+    )
+    market_focuses: list[str] | None = Field(
+        default=None,
+        description="Geographic or market areas targeted by the mandate.",
+        examples=[["North America"]],
+    )
+    awarded_to: str | None = Field(
+        default=None,
+        description="Fund awarded the mandate after selection.",
+        examples=["Example Global Macro Fund"],
+    )
+    consultant: str | None = Field(
+        default=None, description="Consultant contact associated with the mandate."
+    )
+    consultant_firm: str | None = Field(
+        default=None, description="Consulting firm running or advising on the mandate."
+    )
+    rfp_link: str | None = Field(
+        default=None, description="Public request-for-proposal URL when available."
+    )
     last_reviewed: str | None = Field(
         default=None,
         description="When With Intelligence last confirmed it. An old date is a stale mandate.",
+        examples=["2026-06-30"],
     )
-    updated_at: str | None = None
-    note: str | None = None
-    latest_note: str | None = None
-    latest_note_date: str | None = None
+    updated_at: str | None = Field(
+        default=None,
+        description="When With Intelligence last changed this mandate record.",
+        examples=["2026-08-01"],
+    )
+    note: str | None = Field(
+        default=None, description="General note stored directly on the mandate."
+    )
+    latest_note: str | None = Field(
+        default=None, description="Most recent dated note from the mandate's note history."
+    )
+    latest_note_date: str | None = Field(
+        default=None,
+        description="Date associated with `latest_note`.",
+        examples=["2026-07-15"],
+    )
 
     @classmethod
     def from_attributes(cls, attributes: MandateExtendedAttributes) -> Self:
@@ -104,13 +159,17 @@ class InvestorMandatesResponse(OmitNoneModel):
     Status is With Intelligence's vocabulary, not a boolean: read it rather than assuming "active".
     """
 
-    investor_id: int
-    investor_name: str | None = None
-    mandates: list[MandateResponse] = Field(default_factory=list)
+    investor_id: int = Field(description="With Intelligence investor identifier.")
+    investor_name: str | None = Field(default=None, description="Resolved investor name.")
+    mandates: list[MandateResponse] = Field(
+        default_factory=list, description="Mandates on the requested page, newest first."
+    )
     total: int = Field(default=0, description="How many mandates With Intelligence holds in total.")
-    returned: int = 0
-    page: int = 1
-    has_more: bool = False
+    returned: int = Field(default=0, description="Number of mandates returned on this page.")
+    page: int = Field(default=1, description="Page number represented by this response.")
+    has_more: bool = Field(
+        default=False, description="True when another page of mandates is available."
+    )
 
 
 def _names(values: list[ClassificationAttributes]) -> list[str]:
