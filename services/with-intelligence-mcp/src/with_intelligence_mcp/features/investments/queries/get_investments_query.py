@@ -1,9 +1,14 @@
 import asyncio
 import logging
 
-from with_intelligence_mcp.features.investments.fetch_investment import fetch_investment
-from with_intelligence_mcp.features.investments.fetch_investments_for_investor import (
-    fetch_investments_for_investor,
+from pydantic import TypeAdapter
+
+from with_intelligence_mcp.features.investments.api_responses import (
+    InvestmentListItemAttributes,
+)
+from with_intelligence_mcp.features.investments.fetch_investment import (
+    INVESTMENTS_PATH,
+    fetch_investment,
 )
 from with_intelligence_mcp.features.investments.resource_utils import MapPositionToResponseUtil
 from with_intelligence_mcp.features.investments.responses import (
@@ -11,9 +16,14 @@ from with_intelligence_mcp.features.investments.responses import (
     PositionResponse,
 )
 from with_intelligence_mcp.features.investors.api_responses import InvestorExtendedAttributes
-from with_intelligence_mcp.with_intelligence_client import WithIntelligenceClient
+from with_intelligence_mcp.with_intelligence_client import (
+    Page,
+    QueryValue,
+    WithIntelligenceClient,
+)
 
 logger = logging.getLogger(__name__)
+_INVESTMENTS_PAGE = TypeAdapter(Page[InvestmentListItemAttributes])
 
 
 class GetInvestmentsQuery:
@@ -35,7 +45,7 @@ class GetInvestmentsQuery:
         limit: int,
         updated_since: str | None,
     ) -> InvestorPositionsResponse:
-        listed, total = await fetch_investments_for_investor(
+        listed, total = await _fetch_investments_for_investor(
             self._client,
             investor.id,
             limit=limit,
@@ -62,3 +72,25 @@ class GetInvestmentsQuery:
             extra={"investor_id": investor.id, "returned": response.returned, "total": total},
         )
         return response
+
+
+async def _fetch_investments_for_investor(
+    client: WithIntelligenceClient,
+    investor_id: int,
+    *,
+    limit: int,
+    updated_since: str | None,
+) -> tuple[list[InvestmentListItemAttributes], int]:
+    params: dict[str, QueryValue] = {
+        "investor_id": [investor_id],
+        "sort[updated_at]": "desc",
+    }
+    if client.asset_class_groups:
+        params["asset_class_group"] = list(client.asset_class_groups)
+    if updated_since is not None:
+        params["updated_at[from]"] = updated_since
+
+    page = await client.get_page(
+        INVESTMENTS_PATH, _INVESTMENTS_PAGE, params, page=1, page_size=limit
+    )
+    return page.results, page.pagination.total

@@ -3,15 +3,13 @@ from pydantic import TypeAdapter
 from with_intelligence_mcp.features.investments.api_responses import (
     InvestmentExtendedAttributes,
 )
-from with_intelligence_mcp.features.investments.fetch_investments_for_investor import (
-    INVESTMENTS_PATH,
-)
 from with_intelligence_mcp.with_intelligence_client import (
     NotEntitled,
     NotFound,
     WithIntelligenceClient,
 )
 
+INVESTMENTS_PATH = "/v3/investments"
 _INVESTMENT_RESPONSE = TypeAdapter(InvestmentExtendedAttributes)
 
 
