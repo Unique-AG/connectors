@@ -17,7 +17,9 @@ from fastmcp.server.elicitation import (
     DeclinedElicitation,
 )
 from fastmcp.tools import Tool
+from mcp.shared.exceptions import MCPError
 from mcp.types import (
+    METHOD_NOT_FOUND,
     ElicitRequest,
     ElicitRequestFormParams,
     ElicitResult,
@@ -534,7 +536,7 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         create = _ready(graph)
-        confirm = a_person_agrees(_context(RuntimeError("elicitation not supported")))
+        confirm = a_person_agrees(_context(MCPError(METHOD_NOT_FOUND, "Method not found")))
 
         with pytest.raises(ToolError, match="does not support elicitation"):
             _ = await _create(client, attendees=[_ADA], confirm=confirm)
@@ -764,7 +766,7 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
             DeclinedElicitation(),
             CancelledElicitation(),
             AcceptedElicitation(data="do not create"),
-            RuntimeError("elicitation not supported"),
+            MCPError(METHOD_NOT_FOUND, "Method not found"),
             ToolError("the client refused the request"),
         ],
         ids=["declined", "cancelled", "another-answer", "cannot-ask", "client-error"],
@@ -788,7 +790,7 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
             DeclinedElicitation(),
             CancelledElicitation(),
             AcceptedElicitation(data="do not create"),
-            RuntimeError("elicitation not supported"),
+            MCPError(METHOD_NOT_FOUND, "Method not found"),
         ],
         ids=["declined", "cancelled", "another-answer", "cannot-ask"],
     )

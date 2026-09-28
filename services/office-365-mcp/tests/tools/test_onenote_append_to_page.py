@@ -13,7 +13,9 @@ from fastmcp.server.elicitation import (
     DeclinedElicitation,
 )
 from fastmcp.tools import FunctionTool, Tool
+from mcp.shared.exceptions import MCPError
 from mcp.types import (
+    METHOD_NOT_FOUND,
     ElicitRequest,
     ElicitRequestFormParams,
     ElicitResult,
@@ -681,7 +683,7 @@ class TestThePersonBetweenTheAppendAndTheOthersInTheNotebook:
             DeclinedElicitation(),
             CancelledElicitation(),
             AcceptedElicitation(data="do not append"),
-            RuntimeError("elicitation not supported"),
+            MCPError(METHOD_NOT_FOUND, "Method not found"),
             ToolError("the client refused the request"),
         ],
         ids=["declined", "cancelled", "another-answer", "cannot-ask", "client-error"],
@@ -943,7 +945,7 @@ class TestTheClientThatCannotAsk:
 
             async def elicit(self, message: str, response_type: object = None) -> object:
                 assert message and response_type is not None
-                raise RuntimeError("elicitation not supported")
+                raise MCPError(METHOD_NOT_FOUND, "Method not found")
 
         confirm = a_person_agrees(cast("Context", cast("object", _CannotAsk())))
 
