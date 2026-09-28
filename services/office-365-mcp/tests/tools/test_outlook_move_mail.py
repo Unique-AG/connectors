@@ -219,16 +219,14 @@ class TestTheHandlesItHandsBack:
         assert answer.messages[0].new_uri == MailMessageHandle(_FIRST_MOVED_ID).uri
 
     @pytest.mark.usefixtures("first_move")
-    async def test_the_new_handle_is_not_the_one_that_was_passed_in(
+    async def test_the_row_keeps_the_handle_that_was_passed_in(
         self, client: GraphServiceClient
     ) -> None:
         answer = await mover.move_mail(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], destination="archive"
         )
 
-        row = answer.messages[0]
-        assert row.uri == MailMessageHandle(_FIRST_ID).uri
-        assert row.new_uri != row.uri
+        assert answer.messages[0].uri == MailMessageHandle(_FIRST_ID).uri
 
     @pytest.mark.usefixtures("first_move", "second_move")
     async def test_every_row_names_the_handle_it_came_in_with(
@@ -266,15 +264,16 @@ class TestTheHandlesItHandsBack:
         assert failed.new_uri is None
         assert failed.uri == MailMessageHandle(_SECOND_ID).uri
 
-    def test_the_replacement_handle_says_the_old_one_is_dead(self) -> None:
-        described = mover.MovedMessage.model_fields["new_uri"].description
+    def test_neither_handle_claims_that_a_move_kills_the_one_passed_in(self) -> None:
+        uri_described = mover.MovedMessage.model_fields["uri"].description
+        new_uri_described = mover.MovedMessage.model_fields["new_uri"].description
 
-        assert described is not None
-        assert "the only valid handle from now on" in described
-        assert "is now dead" in described
-        assert (
-            "every earlier handle for it, from a search, a listing, or a thread read" in described
-        )
+        assert uri_described is not None
+        assert new_uri_described is not None
+        for described in (uri_described, new_uri_described):
+            assert "addresses nothing" not in described
+            assert "dead" not in described
+            assert "only valid handle" not in described
 
 
 class TestWhenPartOfTheBatchFails:
@@ -643,20 +642,26 @@ class TestWhatItSaysAboutItself:
         assert "stays recoverable in Deleted Items" in described
         assert "no permanent-erase operation" in described
 
-    def test_the_description_warns_that_the_handles_passed_in_die(self) -> None:
+    def test_the_handle_passed_in_is_said_to_survive_a_move_inside_the_mailbox(self) -> None:
         uri_described = mover.MovedMessage.model_fields["uri"].description
-        new_uri_described = mover.MovedMessage.model_fields["new_uri"].description
 
         assert uri_described is not None
-        assert "it addresses nothing" in uri_described
-        assert "never pass it to another tool" in uri_described
-
-        assert new_uri_described is not None
-        assert "is now dead" in new_uri_described
+        assert "does not change when the message moves to another folder" in uri_described
+        assert "still addresses the message" in uri_described
 
     def test_a_stale_handle_is_answered_with_both_recoveries(self) -> None:
         assert "outlook_browse_folders" in mover.GRAPH_NOT_FOUND
         assert "outlook_search_mail" in mover.GRAPH_NOT_FOUND
+
+    def test_a_missing_message_is_never_blamed_on_a_folder_move(self) -> None:
+        assert "already moved" not in mover.GRAPH_NOT_FOUND
+        assert "does not mean that the message moved" not in mover.GRAPH_NOT_FOUND
+        assert "A move to another folder of this mailbox does not change a message handle" in (
+            mover.GRAPH_NOT_FOUND
+        )
+        assert "A permanent delete, or a move to an archive mailbox, can cause this answer" in (
+            mover.GRAPH_NOT_FOUND
+        )
 
     def test_the_example_call_reaches_graph_without_a_folder_read(self) -> None:
         assert mover.GRAPH_CALL_EXAMPLE["destination"] == "archive"

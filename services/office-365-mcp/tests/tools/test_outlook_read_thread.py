@@ -1,11 +1,14 @@
 import httpx
 import pytest
 import respx
+from fastmcp import Client
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
+from office_365_mcp.shared.mail import PREVIEW_CHARACTERS
 from office_365_mcp.tools import outlook_read_thread as reader
 from office_365_mcp.tools.outlook_read_thread import MAX_MESSAGES, read_thread
 
@@ -311,3 +314,15 @@ class TestWhatItRefuses:
 
         with pytest.raises(GraphForbidden):
             await read_thread(client, handle=_HANDLE)
+
+
+class TestWhatItSaysAboutItself:
+    async def test_the_description_says_each_message_is_a_preview_and_names_the_full_reader(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        listed = {tool.name: tool for tool in await every_tool.list_tools()}
+        described = listed[reader.TOOL_NAME].description or ""
+
+        assert f"first {PREVIEW_CHARACTERS} characters" in described
+        assert "outlook_read_mail" in described
+        assert "Reads every message" not in described

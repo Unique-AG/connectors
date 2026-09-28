@@ -47,11 +47,14 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 GRAPH_NOT_FOUND = (
-    "Microsoft 365 did not return the message this reply needed, and no draft was created. The "
-    + "handle is well formed, so the message was most likely moved, filed by a rule or deleted, "
-    + "since it was found. A moved message gets a new id, which is exactly what a stale handle "
-    + "looks like. Find the message again with outlook_search_mail or outlook_list_mail, and "
-    + "pass the `uri` it reports now. Retrying this handle will fail identically."
+    "Microsoft 365 did not return the message that this reply needed. This tool created no "
+    + "draft. The handle is well formed. A move to another folder of this mailbox does not "
+    + "change a message handle. A permanent delete, or a move to an archive mailbox, can cause "
+    + "this answer.\n\n"
+    + "Find the message again with outlook_search_mail or outlook_list_mail. Then pass the "
+    + "`uri` that it reports now. If neither tool finds the message, tell the user that the "
+    + "message is not in this mailbox now. If you try this handle again, the call will fail "
+    + "the same way."
 )
 
 MAX_RECIPIENTS = 10

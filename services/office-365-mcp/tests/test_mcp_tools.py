@@ -725,6 +725,24 @@ class TestTheToolsThisServerAdvertises:
             + f"which case say why here. Unaccounted for: {sorted(found - recorded)}"
         )
 
+    async def test_no_tool_that_takes_a_mailbox_claims_only_the_users_own(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+
+        overclaimed = sorted(
+            name
+            for name, tool in tools.items()
+            if "mailbox" in _properties(tool.input_schema)
+            and "own mailbox" in (tool.description or "")
+            and "`mailbox`" not in (tool.description or "")
+        )
+
+        assert overclaimed == [], (
+            "these tools take `mailbox`, but their description names only the signed-in "
+            + f"user's own mailbox: {overclaimed}"
+        )
+
     async def test_every_tool_declares_its_result_shape(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:

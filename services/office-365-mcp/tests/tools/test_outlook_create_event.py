@@ -1916,6 +1916,13 @@ class TestHowItDeclaresItself:
         described = (CreatedEvent.model_fields["attendees"].description or "").casefold()
         assert "resource` attendee" in described
 
+    def test_the_web_link_names_the_tools_that_change_or_cancel_the_event(self) -> None:
+        described = CreatedEvent.model_fields["web_link"].description or ""
+
+        assert "no tool here can do that" not in described
+        assert "outlook_update_event" in described
+        assert "outlook_cancel_event" in described
+
 
 class TestTheFailuresItPassesOn:
     async def test_a_refused_calendar_read_creates_nothing(
