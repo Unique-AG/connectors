@@ -12,22 +12,37 @@ from with_intelligence_mcp.models import OmitNoneModel
 class PersonResponse(OmitNoneModel):
     """One contact, as their role at the investor asked about — not their whole career."""
 
-    id: int
-    name: str | None = None
-    job_title: str | None = Field(default=None, description="Their title at this organisation.")
+    id: int = Field(description="With Intelligence person identifier.", examples=[650889])
+    name: str | None = Field(
+        default=None, description="Person's full name.", examples=["Jordan Smith"]
+    )
+    job_title: str | None = Field(
+        default=None,
+        description="Person's title at this investor.",
+        examples=["Chief Investment Officer"],
+    )
     seniority: str | None = Field(
         default=None,
         description=(
             "With Intelligence's seniority band. The closest thing to a decision-maker signal."
         ),
+        examples=["C-Suite"],
     )
     specialisms: list[str] | None = Field(
-        default=None, description="What they cover — often several."
+        default=None,
+        description="Investment areas this person covers.",
+        examples=[["Hedge Funds", "Private Equity"]],
     )
-    email: str | None = None
-    phone: str | None = None
-    linkedin: str | None = None
-    biography: str | None = None
+    email: str | None = Field(default=None, description="Primary work email for this role.")
+    phone: str | None = Field(
+        default=None, description="Primary or office phone number for this role."
+    )
+    linkedin: str | None = Field(
+        default=None, description="LinkedIn profile URL recorded for the person."
+    )
+    biography: str | None = Field(
+        default=None, description="With Intelligence biography for the person."
+    )
     is_main_contact: bool | None = Field(
         default=None, description="Flagged by With Intelligence as the main contact here."
     )
@@ -38,8 +53,16 @@ class PersonResponse(OmitNoneModel):
             "contact without saying so."
         ),
     )
-    role_started: str | None = None
-    role_ended: str | None = None
+    role_started: str | None = Field(
+        default=None,
+        description="Date the person started this role.",
+        examples=["2022-01-15"],
+    )
+    role_ended: str | None = Field(
+        default=None,
+        description="Date the person left this role; absent for a current role.",
+        examples=["2026-06-30"],
+    )
 
     @classmethod
     def from_attributes(cls, attributes: PersonExtendedAttributes, *, organisation_id: int) -> Self:
@@ -71,14 +94,25 @@ class PeopleForInvestorResponse(OmitNoneModel):
     authoritative is not documented, so both are reported rather than picking one.
     """
 
-    investor_id: int
-    investor_name: str | None = None
-    people: list[PersonResponse] = Field(default_factory=list)
-    total_at_organisation: int = 0
-    contacts_on_investor_record: int | None = None
-    returned: int = 0
-    page: int = 1
-    has_more: bool = False
+    investor_id: int = Field(description="With Intelligence investor identifier.")
+    investor_name: str | None = Field(default=None, description="Resolved investor name.")
+    people: list[PersonResponse] = Field(
+        default_factory=list,
+        description="People on the requested page, ordered by most recently updated.",
+    )
+    total_at_organisation: int = Field(
+        default=0,
+        description="Total people reported by the person search for this investor.",
+    )
+    contacts_on_investor_record: int | None = Field(
+        default=None,
+        description="Contact count embedded in the investor profile, which may differ.",
+    )
+    returned: int = Field(default=0, description="Number of people returned on this page.")
+    page: int = Field(default=1, description="Page number represented by this response.")
+    has_more: bool = Field(
+        default=False, description="True when another page of people is available."
+    )
 
 
 def _role_at(
