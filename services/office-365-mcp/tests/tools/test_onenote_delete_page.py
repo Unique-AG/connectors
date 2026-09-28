@@ -283,7 +283,7 @@ class TestGraphFailures:
         assert page_route.call_count == 1
         assert delete_route.call_count == 0, "the pre-read failed before anything was deleted"
 
-    async def test_a_404_on_the_delete_is_a_not_found(
+    async def test_a_404_on_the_delete_after_the_pre_read_found_the_page_answers_deleted(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _reads(graph, _page_payload(section=_SECTION, notebook=_NOTEBOOK))
@@ -294,10 +294,33 @@ class TestGraphFailures:
             )
         )
 
-        with pytest.raises(GraphNotFound):
-            _ = await _delete(client)
+        answer = await _delete(client)
 
         assert delete_route.call_count == 1
+        assert answer.deleted is True
+        assert answer.title == "Meeting notes"
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_retried_delete_that_finds_the_page_gone_answers_deleted(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _page_payload(section=_SECTION, notebook=_NOTEBOOK))
+        _ = _notebook_route(graph)
+        delete_route = graph.delete(_PAGE_PATH).mock(
+            side_effect=[
+                httpx.Response(503),
+                httpx.Response(
+                    404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+                ),
+            ]
+        )
+
+        answer = await _delete(client)
+
+        assert delete_route.call_count == 2, "the SDK retried the delete after the 503"
+        assert answer.deleted is True
+        assert answer.title == "Meeting notes"
+        assert answer.section_uri == OnenoteSectionHandle("SECTION1").uri
 
     async def test_a_403_on_the_delete_is_a_forbidden(
         self, client: GraphServiceClient, graph: respx.MockRouter

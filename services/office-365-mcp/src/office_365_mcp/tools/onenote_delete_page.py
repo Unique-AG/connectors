@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from contextlib import suppress
 from typing import Annotated, Literal
 
 import httpx
@@ -9,7 +10,7 @@ from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, not_graph
+from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
 from office_365_mcp.shared.handles import OnenoteSectionHandle, onenote_page_handle
 from office_365_mcp.shared.notes import NotebookAudience, page_for_a_question, write_state_for
 from office_365_mcp.shared.seam import (
@@ -38,13 +39,13 @@ _UNNAMED_NOTEBOOK = "an unnamed notebook"
 _UNNAMED_SECTION = "an unnamed section"
 
 _DESCRIPTION = """\
-Deletes one page outright. This tool always asks the user to agree, because a delete cannot be \
-undone: Microsoft Graph keeps no recycle bin for a page.
+Deletes one page outright. This tool always asks the user to agree, because this change cannot \
+be undone. Microsoft Graph keeps no recycle bin for a page.
 
 Notes:
-- After the delete, the page handle addresses nothing. onenote_read_page, onenote_edit_page and \
-onenote_rename_page answer 404 for it.
-- This call is safe to repeat after a timeout. A second delete finds nothing and reports that.
+- After this tool deletes the page, the page handle names no page. onenote_read_page, \
+onenote_edit_page and onenote_rename_page answer 404 for it.
+- This call is safe to repeat after a timeout. A second call finds no page and reports that.
 """
 
 _NOT_A_PAGE_HANDLE = (
@@ -58,13 +59,12 @@ _NOT_A_PAGE_HANDLE = (
 )
 
 GRAPH_NOT_FOUND = (
-    "Microsoft 365 has no such page to delete. It is most likely already gone — deleted a "
-    + "moment ago by this same call after a lost response, deleted some other way, or moved to "
-    + "another section, which gives it a new id this handle does not name. Either way, nothing "
-    + "was deleted by this call. If the page still needs to go, find it again with "
-    + "onenote_list_pages and take a fresh `uri` from that result; if it does not turn up there "
-    + "either, it is already gone and there is nothing left to delete. This same handle fails "
-    + "the same way every time, so do not retry it unchanged."
+    "Microsoft 365 has no such page to delete, and this call deleted nothing. It is probably "
+    + "already gone: a person or an earlier call deleted it, or it moved to another section. A "
+    + "moved page gets a new id, and this handle does not name it. If you must still delete the "
+    + "page, find it again with onenote_list_pages. Then use the `uri` from that result. If the "
+    + "page is not in that result, it is already gone and nothing is left to delete. This handle "
+    + "fails in the same way every time. Do not retry it unchanged."
 )
 
 
@@ -95,7 +95,11 @@ class DeletedPage(BaseModel):
         )
     )
     deleted: Literal[True] = Field(
-        description=("Always true, because this tool answers only after a successful delete.")
+        description=(
+            "Always true, because this tool answers only when the page is gone. It is also true "
+            + "when the page was there at the start of this call, but Graph then found no page to "
+            + "delete."
+        )
     )
 
 
@@ -118,7 +122,7 @@ async def delete_page(
         asked = answer if isinstance(answer, InputRequiredResult) else None
         refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
-            with graph_step(STEP_DELETE_PAGE):
+            with suppress(GraphNotFound), graph_step(STEP_DELETE_PAGE):
                 await client.me.onenote.pages.by_onenote_page_id(handle.page_id).delete()
 
     if asked is not None:
