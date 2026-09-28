@@ -18,7 +18,10 @@ from fastmcp.server.elicitation import (
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import File
+from mcp.shared.exceptions import MCPError
 from mcp.types import (
+    INVALID_REQUEST,
+    METHOD_NOT_FOUND,
     CallToolRequestParams,
     ElicitRequest,
     ElicitRequestFormParams,
@@ -183,13 +186,26 @@ def _modern_protocol(ctx: Context) -> bool:
     return request is not None and request.protocol_version in MODERN_PROTOCOL_VERSIONS
 
 
+_CANNOT_BE_ASKED = frozenset({METHOD_NOT_FOUND, INVALID_REQUEST})
+
+
 def _nobody_to_ask(nothing_happened: str) -> str:
     return (
-        f"{nothing_happened} This connector asks a person to confirm this, and the MCP "
-        + "client on the other end does not support elicitation, so there was nobody to "
-        + "ask. This is a property of the client and not of the request: retrying will "
-        + "fail the same way. Tell the user that their client cannot confirm this, and "
-        + f"that they can do it in the Microsoft 365 app itself instead. {_ASK_AGAIN}"
+        f"{nothing_happened} This connector must ask a person to agree to this request. The MCP "
+        + "client or its connection does not support elicitation, so this connector cannot ask a "
+        + "person. If you call this tool again, the call will fail the same way.\n\n"
+        + "Tell the user that their client cannot ask them to agree to this request. Tell them "
+        + "that they can do this task in the Microsoft 365 app. "
+        + _ASK_AGAIN
+    )
+
+
+def _no_answer(nothing_happened: str) -> str:
+    return (
+        f"{nothing_happened} This connector tried to ask a person to agree to this request. "
+        + "The MCP client sent no answer that this connector can use. Tell the user that this "
+        + "connector received no answer, and that they can make the same request again. "
+        + _ASK_AGAIN
     )
 
 
@@ -217,8 +233,10 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
             answer = await ctx.elicit(question, response_type=[agree, decline])
         except ToolError as already_a_refusal:
             return str(already_a_refusal)
-        except Exception:
-            return _nobody_to_ask(nothing_happened)
+        except Exception as unanswered:
+            if isinstance(unanswered, MCPError) and unanswered.code in _CANNOT_BE_ASKED:
+                return _nobody_to_ask(nothing_happened)
+            return _no_answer(nothing_happened)
         if not isinstance(answer, AcceptedElicitation) or answer.data != agree:
             return _not_agreed(nothing_happened)
         return None

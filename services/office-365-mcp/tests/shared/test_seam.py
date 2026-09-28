@@ -5,6 +5,7 @@ Both routes to a message are driven here: `graph_tool_errors`, the mapping asked
 could reach. Whether the two agree end to end is `tests/test_error_mapping.py`'s subject.
 """
 
+import asyncio
 from collections.abc import Mapping
 from typing import cast
 
@@ -14,7 +15,13 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.elicitation import AcceptedElicitation, DeclinedElicitation
 from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools.base import ToolResult
+from mcp.shared.exceptions import MCPError, NoBackChannelError
 from mcp.types import (
+    CONNECTION_CLOSED,
+    INTERNAL_ERROR,
+    INVALID_REQUEST,
+    METHOD_NOT_FOUND,
+    REQUEST_TIMEOUT,
     CallToolRequestParams,
     CreateMessageResult,
     ElicitRequest,
@@ -426,7 +433,7 @@ class _Client:
         assert response_type == [_AGREE, _DECLINE], (
             "the person picks between the two answers the caller named"
         )
-        if isinstance(self._answer, Exception):
+        if isinstance(self._answer, BaseException):
             raise self._answer
         return self._answer
 
@@ -443,6 +450,22 @@ def _confirming(client: _Client) -> Confirm:
 
 def _confirm_with(answer: object, era: str | None) -> Confirm:
     return _confirming(_Client(answer, era=era))
+
+
+_CANNOT_BE_ASKED: list[Exception] = [
+    MCPError(METHOD_NOT_FOUND, "Method not found"),
+    MCPError(INVALID_REQUEST, "Elicitation not supported"),
+    NoBackChannelError("elicitation/create"),
+]
+_CANNOT_BE_ASKED_IDS = ["method-not-found", "elicitation-not-supported", "no-back-channel"]
+
+_NO_ANSWER: list[Exception] = [
+    MCPError(REQUEST_TIMEOUT, "Request 'elicitation/create' timed out"),
+    MCPError(INTERNAL_ERROR, "the client failed to show the question"),
+    MCPError(CONNECTION_CLOSED, "Connection closed"),
+    ValueError("Unexpected elicitation action: later"),
+]
+_NO_ANSWER_IDS = ["timed-out", "client-failed", "connection-closed", "unreadable-answer"]
 
 
 @pytest.mark.parametrize(
@@ -473,18 +496,34 @@ class TestHowAWriteIsPutToAPerson:
 
         assert isinstance(refusal, str) and "did not agree" in refusal
 
-    async def test_a_client_that_cannot_ask_writes_nothing(self, era: str | None) -> None:
-        """Fail closed, and say why: an operator cannot tell a broken mailbox from a client
-        that cannot ask."""
-        refusal = await _confirm_with(RuntimeError("elicitation not supported"), era)(
-            _QUESTION, _ABOUT
-        )
+    @pytest.mark.parametrize("failure", _CANNOT_BE_ASKED, ids=_CANNOT_BE_ASKED_IDS)
+    async def test_a_client_that_cannot_ask_writes_nothing(
+        self, failure: Exception, era: str | None
+    ) -> None:
+        refusal = await _confirm_with(failure, era)(_QUESTION, _ABOUT)
 
         assert refusal is not None
         assert isinstance(refusal, str)
         assert refusal.startswith(_NOTHING_HAPPENED)
         assert "does not support elicitation" in refusal
         assert "Do not call this tool again" in refusal
+
+    @pytest.mark.parametrize("failure", _NO_ANSWER, ids=_NO_ANSWER_IDS)
+    async def test_a_question_with_no_answer_does_not_blame_the_client(
+        self, failure: Exception, era: str | None
+    ) -> None:
+        refusal = await _confirm_with(failure, era)(_QUESTION, _ABOUT)
+
+        assert isinstance(refusal, str)
+        assert refusal.startswith(_NOTHING_HAPPENED)
+        assert "no answer" in refusal, refusal
+        assert "does not support elicitation" not in refusal
+        assert "fail the same way" not in refusal
+        assert "Do not call this tool again" in refusal
+
+    async def test_a_cancelled_call_stays_cancelled(self, era: str | None) -> None:
+        with pytest.raises(asyncio.CancelledError):
+            _ = await _confirm_with(asyncio.CancelledError(), era)(_QUESTION, _ABOUT)
 
     async def test_a_tool_error_from_the_client_is_passed_through_as_it_arrived(
         self, era: str | None
@@ -501,10 +540,11 @@ class TestHowAWriteIsPutToAPerson:
         [
             DeclinedElicitation(),
             AcceptedElicitation(data=_DECLINE),
-            RuntimeError("elicitation not supported"),
+            MCPError(METHOD_NOT_FOUND, "Method not found"),
+            MCPError(REQUEST_TIMEOUT, "Request 'elicitation/create' timed out"),
             ToolError("the client refused the request"),
         ],
-        ids=["declined", "another-answer", "cannot-ask", "client-error"],
+        ids=["declined", "another-answer", "cannot-ask", "no-answer", "client-error"],
     )
     async def test_no_refusal_is_ever_raised(self, answer: object, era: str | None) -> None:
         refusal = await _confirm_with(answer, era)(_QUESTION, _ABOUT)

@@ -16,7 +16,8 @@ from fastmcp.server.elicitation import (
     DeclinedElicitation,
 )
 from fastmcp.tools import Tool
-from mcp.types import ElicitResult, InputRequiredResult
+from mcp.shared.exceptions import MCPError
+from mcp.types import METHOD_NOT_FOUND, ElicitResult, InputRequiredResult
 from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field, TypeAdapter
@@ -796,7 +797,7 @@ class TestTheConfirmationTheRegisteredToolBuilds:
             DeclinedElicitation(),
             CancelledElicitation(),
             AcceptedElicitation(data="do not create"),
-            RuntimeError("elicitation not supported"),
+            MCPError(METHOD_NOT_FOUND, "Method not found"),
         ],
         ids=["declined", "cancelled", "another-answer", "cannot-ask"],
     )

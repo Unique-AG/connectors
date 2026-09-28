@@ -12,6 +12,8 @@ import respx
 from fastmcp import Context
 from fastmcp.exceptions import ToolError
 from kiota_http.middleware import retry_handler
+from mcp.shared.exceptions import MCPError
+from mcp.types import METHOD_NOT_FOUND
 from msgraph.generated.models.message import Message
 from msgraph.graph_service_client import GraphServiceClient
 from prometheus_client import generate_latest
@@ -265,7 +267,7 @@ class TestAGraphCallIsCountedAndTimed:
 
             async def elicit(self, message: str, response_type: object = None) -> object:
                 assert message and response_type is not None
-                raise RuntimeError("elicitation not supported")
+                raise MCPError(METHOD_NOT_FOUND, "Method not found")
 
         draft_id = "AAMkAGI2SYNTHETIC-immutable-0002%3D"
         _ = graph.get(f"/me/messages/{draft_id}").mock(
