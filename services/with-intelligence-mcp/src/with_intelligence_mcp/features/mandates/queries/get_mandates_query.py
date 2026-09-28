@@ -6,7 +6,6 @@ from with_intelligence_mcp.features.mandates.fetch_mandate import fetch_mandate
 from with_intelligence_mcp.features.mandates.fetch_mandates_for_investor import (
     fetch_mandates_for_investor,
 )
-from with_intelligence_mcp.features.mandates.resource_utils import MapMandateToResponseUtil
 from with_intelligence_mcp.features.mandates.responses import (
     InvestorMandatesResponse,
     MandateResponse,
@@ -17,14 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class GetMandatesQuery:
-    def __init__(
-        self,
-        *,
-        client: WithIntelligenceClient,
-        map_mandate_to_response_util: MapMandateToResponseUtil,
-    ) -> None:
+    def __init__(self, *, client: WithIntelligenceClient) -> None:
         self._client: WithIntelligenceClient = client
-        self._map_mandate_to_response_util: MapMandateToResponseUtil = map_mandate_to_response_util
 
     async def run(
         self,
@@ -43,7 +36,7 @@ class GetMandatesQuery:
         )
         details = await asyncio.gather(*(fetch_mandate(self._client, entry.id) for entry in listed))
         mandates = [
-            self._map_mandate_to_response_util.run(record=detail)
+            MandateResponse.from_attributes(detail)
             if detail
             else MandateResponse(id=listed[index].id)
             for index, detail in enumerate(details)
