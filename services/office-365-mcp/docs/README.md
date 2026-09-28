@@ -59,8 +59,8 @@ makes. It does not control access to the tool.
 | `outlook_list_categories` | Read | `MailboxSettings.Read` | No | Every category that this mailbox can use to tag mail, events, and contacts, with each category's name and color. |
 | `outlook_mark_mail` | Write, changes or removes | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | The read status, the follow-up flag, and the importance, on up to twenty messages, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
 | `outlook_move_mail` | Write, changes or removes | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | Moves messages into another folder, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. This connector erases mail only by moving it to Deleted Items. |
-| `outlook_draft_mail` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A new message, composed into Drafts, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The tool cannot send it. |
-| `outlook_draft_reply` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A reply or a forward, composed into Drafts and left there, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
+| `outlook_draft_mail` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A new message, composed into Drafts, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The tool cannot send it. The tool cannot add files, so the user adds a file in Outlook before they send the draft. |
+| `outlook_draft_reply` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A reply or a forward, composed into Drafts and left there, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. A forward carries the original message's attachments. The tool cannot add new files, so the user adds a file in Outlook before they send the draft. |
 | `outlook_send_draft` | Write, changes or removes | `Mail.Send`, `Mail.ReadBasic`, `Mail.Send.Shared`, `Mail.Read.Shared` | No | The only tool in this connector that puts mail on the wire. It sends a draft that this connector composed, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
 | `outlook_set_automatic_reply` | Write, safe to repeat | `MailboxSettings.ReadWrite` | No | Turns the out-of-office reply on for a fixed period, or off. The reply never runs with no end date. |
 | `outlook_disable_mail_rule` | Write, safe to repeat | `MailboxSettings.ReadWrite` | No | Turns one existing inbox rule off, and nothing else. |
@@ -276,7 +276,7 @@ the same resource.
 | Read a shared or delegated mailbox | Yes, one mailbox per call | Yes, own and delegated in one search |
 | Search the words inside an attachment | No, file name only | Yes |
 | Change an event's agenda or add a Teams meeting | No | Yes |
-| Add an attachment from Unique's knowledge base to a draft | No | Yes |
+| Add a file to a draft | No, the user adds it in Outlook | Yes, a Unique knowledge-base file by reference, or inline content |
 | Send a message outright | Yes | No, draft only |
 | Mark a message read or unread, set its flag or importance, or move it | Yes | No |
 | Read a whole conversation across folders, in one call | Yes | No, one message at a time |
