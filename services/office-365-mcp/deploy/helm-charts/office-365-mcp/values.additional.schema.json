@@ -6,7 +6,7 @@
   "properties": {
     "mcpConfig": {
       "type": "object",
-      "description": "Configuration for the Office 365 MCP Server, mapped to environment variables (PUBLIC_BASE_URL, ENTRA_TENANT_ID, ENTRA_CLIENT_ID, TOOLS_PRESET/TOOLS_ENABLED).",
+      "description": "Configuration for the Office 365 MCP Server, mapped to environment variables (PUBLIC_BASE_URL, SESSION_IDLE_TIMEOUT_SECONDS, ENTRA_TENANT_ID, ENTRA_CLIENT_ID, TOOLS_PRESET/TOOLS_ENABLED).",
       "properties": {
         "app": {
           "type": "object",
@@ -15,6 +15,11 @@
             "publicBaseUrl": {
               "type": "string",
               "description": "The externally-reachable OAuth issuer URL that clients are redirected to. Must be https. Example: https://office-365.mcp.unique.app"
+            },
+            "sessionIdleTimeoutSeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Seconds an MCP session can stay idle before the server closes it. A later request with that session ID gets 404, and the client must initialize a new session. Keep this value above the idle limit of each client. When not set, the service uses 3600."
             }
           },
           "required": ["publicBaseUrl"]
