@@ -7,7 +7,6 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.followup_flag import FollowupFlag
 from msgraph.generated.models.followup_flag_status import FollowupFlagStatus
 from msgraph.generated.models.importance import Importance
@@ -18,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     WRITE_DESTRUCTIVE_IDEMPOTENT,
@@ -39,8 +39,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 MAX_MESSAGES = 20
 
 type MailImportance = Literal["low", "normal", "high"]
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _FLAG_STATUS: Mapping[bool, FollowupFlagStatus] = {
     True: FollowupFlagStatus.Flagged,
@@ -231,9 +229,7 @@ def _patch_body(change: MarkChange) -> Message:
 
 
 def _request() -> RequestConfiguration[QueryParameters]:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return RequestConfiguration[QueryParameters](options=no_retry(), headers=headers)
+    return RequestConfiguration[QueryParameters](options=no_retry(), headers=immutable_id_headers())
 
 
 def _flag_status_of(message: Message | None) -> str | None:

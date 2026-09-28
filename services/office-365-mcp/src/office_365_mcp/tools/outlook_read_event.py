@@ -19,7 +19,6 @@ import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.event import Event
 from msgraph.generated.users.item.calendars.item.events.item.event_item_request_builder import (
@@ -36,6 +35,7 @@ from office_365_mcp.shared.calendar import (
     zone_named,
 )
 from office_365_mcp.shared.handles import event_handle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_read_event"
@@ -72,7 +72,6 @@ _EVENT_FIELDS: tuple[str, ...] = (
 )
 
 _PREFER_TEXT_BODY = ("Prefer", 'outlook.body-content-type="text"')
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 MAX_BODY_CHARACTERS = 25000
 
@@ -258,11 +257,8 @@ async def read_event(
 
 
 def _request() -> RequestConfiguration[_EventQuery]:
-    """Built per call: kiota's `RequestConfiguration.headers` defaults to one collection
-    shared process-wide, so a preference added to it leaks onto every Graph call."""
-    headers = HeadersCollection()
+    headers = immutable_id_headers()
     headers.add(*_PREFER_TEXT_BODY)
-    headers.add(*_PREFER_IMMUTABLE_IDS)
     return RequestConfiguration[_EventQuery](
         query_parameters=_EventQuery(select=list(_EVENT_FIELDS)),
         headers=headers,

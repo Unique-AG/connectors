@@ -7,7 +7,6 @@ from typing import Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.attendee import Attendee
 from msgraph.generated.models.attendee_type import AttendeeType
 from msgraph.generated.models.body_type import BodyType
@@ -35,6 +34,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.prose import body_opening as body_opening
 from office_365_mcp.shared.prose import cut_for_a_question as cut_for_a_question
@@ -100,8 +100,6 @@ MAX_ZONE_CHARACTERS = 64
 _DefaultCalendarQuery = CalendarRequestBuilder.CalendarRequestBuilderGetQueryParameters
 _NamedCalendarQuery = CalendarItemRequestBuilder.CalendarItemRequestBuilderGetQueryParameters
 _EventItemQuery = EventItemRequestBuilder.EventItemRequestBuilderGetQueryParameters
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _TRANSACTION_NAMESPACE = uuid.UUID("eb6f3437-0196-4593-b4d7-a6044db0acdf")
 
@@ -366,12 +364,6 @@ def repeated_address(addresses: Sequence[str]) -> str | None:
             return address
         named.add(address.casefold())
     return None
-
-
-def immutable_id_headers() -> HeadersCollection:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return headers
 
 
 async def event_of(client: GraphServiceClient, *, calendar_id: str, event_id: str) -> Event:
