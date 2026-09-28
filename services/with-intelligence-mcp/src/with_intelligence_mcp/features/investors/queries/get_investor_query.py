@@ -41,7 +41,7 @@ class GetInvestorQuery:
         if not isinstance(record, InvestorExtendedAttributes):
             logger.info(
                 "investor.resolve.unresolved",
-                extra={"status": record.status, "searched_for": record.searched_for},
+                extra={"status": record.status},
             )
             return record
         response = self._map_investor_to_response_util.run(record=record)
