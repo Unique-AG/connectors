@@ -47,6 +47,11 @@ object to `build_auth` and to `register_tools`.
 The test file `tests/test_app.py` reads the tool files from disk. It does this to make sure that
 every registered tool's permissions reach the consent screen.
 
+The test file `tests/test_mcp_tools.py` reads the input schema of each tool from `list_tools()`. At
+the root of each input schema, it makes sure that `type` is `object`. It also makes sure that the
+root has no `anyOf`, `oneOf`, `allOf`, `not`, `enum` or `const` key. When one tool breaks this
+rule, Azure OpenAI rejects the whole tool list, and every chat fails.
+
 **The `shared/` package is what a file-per-tool design costs.** Two tool files can otherwise
 disagree about a shared fact. The `shared/` package lists every fact they must not disagree about:
 
