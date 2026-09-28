@@ -1535,7 +1535,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = "==1.2.3" },
     { name = "starlette", specifier = "==1.6.0" },
     { name = "tzdata", specifier = "==2026.3" },
-    { name = "unique-mcp", specifier = "==2026.36.1" },
+    { name = "unique-mcp", specifier = "==2026.38.0" },
     { name = "unique-toolkit", extras = ["monitoring", "otel"], specifier = "==2026.38.0" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.53.0" },
 ]
@@ -2696,7 +2696,7 @@ wheels = [
 
 [[package]]
 name = "unique-mcp"
-version = "2026.36.1"
+version = "2026.38.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastmcp", extra = ["azure"] },
@@ -2710,9 +2710,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "unique-toolkit", extra = ["monitoring", "otel"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/38/2c/a5bda2943b88706cd81aebbed5585078f275359b73b842b948d32cf97b74/unique_mcp-2026.36.1.tar.gz", hash = "sha256:cb25858207e26bc4e6b5f1556611693c5bc44f5e4402222aef9ce2ec7328da57", size = 18121, upload-time = "2026-09-01T05:45:30.965Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/b7/b9575098a7ea72fed328a46ea382f8928234d3f892c4fda9f81f980ee331/unique_mcp-2026.38.0.tar.gz", hash = "sha256:620e270d12f8adec80d378d1e34b42ac68876ce2675800072ee22cedf500cd12", size = 18337, upload-time = "2026-09-10T14:11:24.394Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/94/62/b41cb8bf422d2441f38b16a18de8d4f1a110f79c35a240b51c2617e7e928/unique_mcp-2026.36.1-py3-none-any.whl", hash = "sha256:0e69d1964d3ad64118823a299f8e34c402877acf3abb96f89448019ba649dbe6", size = 25275, upload-time = "2026-09-01T05:45:30.011Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/1b/9623abd72e4e3d9f0531b6600c4f9695ec42c970ca6bfe5d525fb134b99b/unique_mcp-2026.38.0-py3-none-any.whl", hash = "sha256:27c8608ac45d98e29b598269ba4dcf6c4b16a58cadbdb84f8d7e02fa39b9be9f", size = 25488, upload-time = "2026-09-10T14:11:23.471Z" },
 ]
 
 [[package]]
