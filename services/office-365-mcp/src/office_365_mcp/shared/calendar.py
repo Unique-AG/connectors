@@ -20,7 +20,6 @@ from msgraph.generated.models.free_busy_status import FreeBusyStatus
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.location import Location
 from msgraph.generated.models.online_meeting_provider_type import OnlineMeetingProviderType
-from msgraph.generated.models.recipient import Recipient
 from msgraph.generated.models.response_type import ResponseType
 from msgraph.generated.models.sensitivity import Sensitivity
 from msgraph.generated.models.user import User
@@ -594,14 +593,4 @@ def _name_of(attendee: Attendee) -> str | None:
 
 def _address_of(attendee: Attendee) -> str | None:
     address = attendee.email_address
-    return None if address is None else address.address
-
-
-def _recipient_name(recipient: Recipient | None) -> str | None:
-    address = None if recipient is None else recipient.email_address
-    return None if address is None else address.name
-
-
-def _recipient_address(recipient: Recipient | None) -> str | None:
-    address = None if recipient is None else recipient.email_address
     return None if address is None else address.address
