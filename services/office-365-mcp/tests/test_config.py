@@ -1,3 +1,4 @@
+import importlib
 import math
 from collections.abc import Awaitable, Callable
 from typing import Protocol, cast
@@ -8,6 +9,7 @@ import pytest
 from asyncpg import connect_utils
 from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
 from pydantic import ValidationError
+from pydantic_settings import BaseSettings
 from testcontainers.community.postgres import PostgresContainer
 
 from office_365_mcp.config import (
@@ -528,6 +530,106 @@ class TestDatabaseConfigDriverDsn:
 
         with pytest.raises(ValidationError, match="DB_HOST"):
             DatabaseConfig()
+
+
+_SECRET = "Q~entraClientSecretValue123XYZ"
+
+_PASSWORD = "Pa55word"
+
+_CREDENTIAL_VARIABLES = (
+    "DATABASE_URL",
+    "DB_URL",
+    "DB_HOST",
+    "DB_NAME",
+    "DB_USER",
+    "DB_PASSWORD",
+    "ENTRA_TENANT_ID",
+    "ENTRA_CLIENT_ID",
+    "ENTRA_CLIENT_SECRET",
+)
+
+
+def _settings_classes(root: type[BaseSettings]) -> list[type[BaseSettings]]:
+    return [
+        found
+        for subclass in root.__subclasses__()
+        for found in (subclass, *_settings_classes(subclass))
+    ]
+
+
+def _shows_part_of(secret: str, text: str) -> bool:
+    return any(secret[start : start + 8] in text for start in range(len(secret) - 7))
+
+
+class TestAConfigurationErrorHidesTheInput:
+    @pytest.mark.parametrize(
+        ("settings", "environment", "secret", "reason"),
+        [
+            (
+                EntraConfig,
+                {
+                    "ENTRA_TENANT_ID": "common",
+                    "ENTRA_CLIENT_ID": _CLIENT_ID,
+                    "ENTRA_CLIENT_SECRET": _SECRET,
+                },
+                _SECRET,
+                "ENTRA_TENANT_ID must name one tenant",
+            ),
+            (
+                DatabaseConfig,
+                {"DB_URL": f"postgresql://u:{_PASSWORD}@db/d?sslmode=x"},
+                _PASSWORD,
+                "Unsupported sslmode='x'",
+            ),
+            (
+                DatabaseConfig,
+                {"DB_URL": f"postgresql://user:{_PASSWORD}@db:notaport/office"},
+                _PASSWORD,
+                "invalid port number",
+            ),
+            (
+                DatabaseConfig,
+                {"DB_HOST": "db", "DB_USER": "user", "DB_PASSWORD": _PASSWORD},
+                _PASSWORD,
+                "Missing required fields: DB_NAME",
+            ),
+        ],
+        ids=["entra-authority", "db-sslmode", "db-port", "db-missing-part"],
+    )
+    def test_the_error_names_the_problem_and_holds_no_part_of_the_secret(
+        self,
+        settings: type[BaseSettings],
+        environment: dict[str, str],
+        secret: str,
+        reason: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        for name in _CREDENTIAL_VARIABLES:
+            monkeypatch.delenv(name, raising=False)
+        for name, value in environment.items():
+            monkeypatch.setenv(name, value)
+
+        with pytest.raises(ValidationError) as raised:
+            settings()
+
+        assert reason in str(raised.value)
+        assert not _shows_part_of(secret, str(raised.value)), str(raised.value)
+
+    def test_every_settings_class_in_the_service_hides_its_input(self) -> None:
+        _ = importlib.import_module("office_365_mcp.app")
+        classes = [
+            settings
+            for settings in _settings_classes(BaseSettings)
+            if settings.__module__.startswith("office_365_mcp.")
+        ]
+        exposed = [
+            settings.__qualname__
+            for settings in classes
+            if settings.model_config.get("hide_input_in_errors") is not True
+        ]
+
+        assert classes
+        assert not exposed, f"set hide_input_in_errors=True on {', '.join(exposed)}"
 
 
 class TestTheDsnReachesARealPostgres:

@@ -199,6 +199,10 @@ innocent-sounding field name, and an innocent-looking credential value, are two 
   JWT, a password in a URL, and a credential in a query string. This service replaces that value
   with `[Redacted]` wherever it appears, including inside an exception's stack trace.
 
+A configuration error at startup occurs before logging starts, so neither net sees it. For this
+reason, the error gives the field and the problem, but it does not print the input that the
+settings class read. Only a validator message can show a value, for example the tenant id.
+
 ## Run locally
 
 ```bash
