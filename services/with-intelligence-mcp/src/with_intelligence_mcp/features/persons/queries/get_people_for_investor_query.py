@@ -5,20 +5,23 @@ from pydantic import TypeAdapter
 
 from with_intelligence_mcp.features.investors.api_responses import InvestorExtendedAttributes
 from with_intelligence_mcp.features.persons.api_responses import (
+    PersonExtendedAttributes,
     PersonListItemAttributes,
 )
-from with_intelligence_mcp.features.persons.fetch_person import fetch_person
 from with_intelligence_mcp.features.persons.responses import (
     PeopleForInvestorResponse,
     PersonResponse,
 )
 from with_intelligence_mcp.with_intelligence_client import (
+    NotEntitled,
+    NotFound,
     Page,
     QueryValue,
     WithIntelligenceClient,
 )
 
 logger = logging.getLogger(__name__)
+_PERSON_RESPONSE = TypeAdapter(PersonExtendedAttributes)
 _PEOPLE_PAGE = TypeAdapter(Page[PersonListItemAttributes])
 
 
@@ -33,7 +36,7 @@ class GetPeopleForInvestorQuery:
             self._client, investor.id, page=page, limit=limit
         )
         details = await asyncio.gather(
-            *(fetch_person(self._client, person.id) for person in listed)
+            *(_fetch_person(self._client, person.id) for person in listed)
         )
         people = [
             PersonResponse.from_attributes(detail, organisation_id=investor.id)
@@ -56,6 +59,15 @@ class GetPeopleForInvestorQuery:
             extra={"investor_id": investor.id, "returned": response.returned, "total": total},
         )
         return response
+
+
+async def _fetch_person(
+    client: WithIntelligenceClient, person_id: int
+) -> PersonExtendedAttributes | None:
+    try:
+        return await client.get_json(f"/v3/persons/{person_id}", _PERSON_RESPONSE)
+    except NotEntitled, NotFound:
+        return None
 
 
 async def _fetch_people_for_organisation(
