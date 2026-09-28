@@ -8,7 +8,7 @@ _PEOPLE_PAGE = TypeAdapter(Page[PersonListItemAttributes])
 
 
 async def fetch_people_for_organisation(
-    client: WithIntelligenceClient, organisation_id: int, *, limit: int
+    client: WithIntelligenceClient, organisation_id: int, *, page: int, limit: int
 ) -> tuple[list[PersonListItemAttributes], int]:
     """People the person search attributes to one organisation, plus how many it reports.
 
@@ -22,5 +22,5 @@ async def fetch_people_for_organisation(
     if client.asset_class_groups:
         params["asset_class_group"] = list(client.asset_class_groups)
 
-    page = await client.get_page(PERSONS_PATH, _PEOPLE_PAGE, params, page=1, page_size=limit)
-    return page.results, page.pagination.total
+    response = await client.get_page(PERSONS_PATH, _PEOPLE_PAGE, params, page=page, page_size=limit)
+    return response.results, response.pagination.total

@@ -51,6 +51,7 @@ async def get_people_for_investor(
         ),
     ] = None,
     investor_id: Annotated[int | None, Field(description="Investor id, when known.")] = None,
+    page: Annotated[int, Field(ge=1, description="Page number to return.")] = 1,
     limit: Annotated[
         int, Field(ge=1, le=50, description="How many people to return, most recent first.")
     ] = 25,
@@ -75,7 +76,7 @@ async def get_people_for_investor(
         return investor
 
     try:
-        return await get_people_for_investor_query.run(investor=investor, limit=limit)
+        return await get_people_for_investor_query.run(investor=investor, page=page, limit=limit)
     except NotEntitled as error:
         return InvestorNotEntitledResponse(
             searched_for=name or str(investor.id),

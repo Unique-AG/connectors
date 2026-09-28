@@ -50,3 +50,5 @@ class PeopleForInvestorResponse(OmitNoneModel):
     total_at_organisation: int = 0
     contacts_on_investor_record: int | None = None
     returned: int = 0
+    page: int = 1
+    has_more: bool = False

@@ -24,6 +24,7 @@ async def get_people_for_investor(
     client: WithIntelligenceClient,
     name: str | None = None,
     investor_id: int | None = None,
+    page: int = 1,
     limit: int = 25,
 ) -> (
     PeopleForInvestorResponse
@@ -34,6 +35,7 @@ async def get_people_for_investor(
     return await call_get_people_for_investor(
         name=name,
         investor_id=investor_id,
+        page=page,
         limit=limit,
         resolve_investor_record_query=ResolveInvestorRecordQuery(client),
         get_people_for_investor_query=GetPeopleForInvestorQuery(
@@ -271,6 +273,23 @@ class TestCountsAndScoping:
         assert "organisation_id=2504" in query
         assert "asset_class_group=hfm" in query
         assert "sort%5Bupdated_at%5D=desc" in query
+
+    @respx.mock
+    async def test_requests_the_selected_page(self) -> None:
+        route = respx.get(f"{BASE_URL}/v3/persons").mock(
+            return_value=httpx.Response(200, json=page_body([], total=500, page=5, size=25))
+        )
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=INVESTOR)
+        )
+        client, _ = build_client()
+        result = await get_people_for_investor(investor_id=2504, page=5, limit=25, client=client)
+        assert isinstance(result, PeopleForInvestorResponse)
+        assert result.page == 5
+        assert result.has_more is True
+        query = sent_query(route)
+        assert "page=5" in query
+        assert "page_size=25" in query
 
     @respx.mock
     async def test_an_ambiguous_name_asks_before_fetching_anyone(self) -> None:

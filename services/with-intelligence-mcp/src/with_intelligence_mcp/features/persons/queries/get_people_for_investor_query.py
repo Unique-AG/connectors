@@ -27,9 +27,11 @@ class GetPeopleForInvestorQuery:
         self._map_person_to_response_util: MapPersonToResponseUtil = map_person_to_response_util
 
     async def run(
-        self, *, investor: InvestorExtendedAttributes, limit: int
+        self, *, investor: InvestorExtendedAttributes, page: int, limit: int
     ) -> PeopleForInvestorResponse:
-        listed, total = await fetch_people_for_organisation(self._client, investor.id, limit=limit)
+        listed, total = await fetch_people_for_organisation(
+            self._client, investor.id, page=page, limit=limit
+        )
         details = await asyncio.gather(
             *(fetch_person(self._client, person.id) for person in listed)
         )
@@ -46,6 +48,8 @@ class GetPeopleForInvestorQuery:
             total_at_organisation=total,
             contacts_on_investor_record=investor.contacts_total,
             returned=len(people),
+            page=page,
+            has_more=(page - 1) * limit + len(people) < total,
         )
         logger.info(
             "people.investor.fetched",
