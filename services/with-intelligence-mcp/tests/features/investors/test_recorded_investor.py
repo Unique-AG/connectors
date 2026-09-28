@@ -7,7 +7,6 @@ import pytest
 from with_intelligence_mcp.features.investors import (
     InvestorExtendedAttributes,
     InvestorProfileResponse,
-    MapInvestorToResponseUtil,
 )
 
 _RECORDING = pathlib.Path(__file__).parent / "recordings" / "investor-extended.json"
@@ -21,7 +20,7 @@ def record() -> InvestorExtendedAttributes:
 
 @pytest.fixture(scope="module")
 def projected(record: InvestorExtendedAttributes) -> InvestorProfileResponse:
-    return MapInvestorToResponseUtil().run(record=record)
+    return InvestorProfileResponse.from_attributes(record)
 
 
 class TestParsingTheRecordedShape:

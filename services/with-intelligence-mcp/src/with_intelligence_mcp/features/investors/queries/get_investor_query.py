@@ -4,7 +4,6 @@ from with_intelligence_mcp.features.investors.api_responses import InvestorExten
 from with_intelligence_mcp.features.investors.queries.resolve_investor_record_query import (
     ResolveInvestorRecordQuery,
 )
-from with_intelligence_mcp.features.investors.resource_utils import MapInvestorToResponseUtil
 from with_intelligence_mcp.features.investors.responses import (
     InvestorAmbiguousResponse,
     InvestorNotEntitledResponse,
@@ -20,13 +19,9 @@ class GetInvestorQuery:
         self,
         *,
         resolve_investor_record_query: ResolveInvestorRecordQuery,
-        map_investor_to_response_util: MapInvestorToResponseUtil,
     ) -> None:
         self._resolve_investor_record_query: ResolveInvestorRecordQuery = (
             resolve_investor_record_query
-        )
-        self._map_investor_to_response_util: MapInvestorToResponseUtil = (
-            map_investor_to_response_util
         )
 
     async def run(
@@ -44,6 +39,6 @@ class GetInvestorQuery:
                 extra={"status": record.status},
             )
             return record
-        response = self._map_investor_to_response_util.run(record=record)
+        response = InvestorProfileResponse.from_attributes(record)
         logger.info("investor.fetched", extra={"investor_id": response.id})
         return response
