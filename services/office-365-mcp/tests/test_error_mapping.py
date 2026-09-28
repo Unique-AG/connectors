@@ -87,10 +87,6 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
     }
 )
 
-_RAISES_WHEN_GRAPH_FAILS: tuple[str, ...] = tuple(
-    tool for tool in TOOL_NAMES if tool != "outlook_mark_mail"
-)
-
 _OUTCOME_UNKNOWN = "Microsoft 365 can make a change and then give an error."
 _CHECK_FIRST = "Do not call this tool again first."
 _ASK_THE_USER = "ask the user if the Microsoft 365 app shows the change."
@@ -667,7 +663,7 @@ class TestAWriteThatFailsCanAlreadyBeDone:
         assert graph_advice(resolve(preset="teams-write", enabled=None))[channel].shown_by == ()
 
     @pytest.mark.usefixtures("obo", "retry_sleeps")
-    @pytest.mark.parametrize("tool", _RAISES_WHEN_GRAPH_FAILS)
+    @pytest.mark.parametrize("tool", TOOL_NAMES)
     async def test_a_tool_gets_the_outage_advice_that_its_annotation_calls_for(
         self, agreeing_client: Client[FastMCPTransport], tool: str
     ) -> None:
