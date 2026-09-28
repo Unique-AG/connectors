@@ -30,6 +30,7 @@ from office_365_mcp.shared.notes import (
 from office_365_mcp.shared.prose import body_opening
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
+    Advised,
     Confirm,
     answer_pending,
     graph_client_for_caller,
@@ -110,10 +111,9 @@ GRAPH_NOT_FOUND = (
 )
 
 _WRITTEN_BUT_UNREAD = (
-    "The edit reached Microsoft 365 and was applied: only the read back that confirms it "
-    + "failed afterward. Read the page with onenote_read_page to see what changed. Sending "
-    + "these same commands to onenote_edit_page again would apply them a second time, so do "
-    + "not retry it for this reason alone."
+    "Microsoft 365 changed the page. Then this connector did not receive the updated page "
+    + "from Microsoft 365. Use onenote_read_page to see the changes. Do not send the same "
+    + "commands to onenote_edit_page again for this error. A second call applies them again."
 )
 
 
@@ -200,7 +200,7 @@ async def edit_page(
             try:
                 summary = await page_summary(client, handle.page_id)
             except GraphFailure as failure:
-                raise ToolError(_WRITTEN_BUT_UNREAD) from failure
+                raise Advised(_WRITTEN_BUT_UNREAD) from failure
 
     if asked is not None:
         return asked

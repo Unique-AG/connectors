@@ -26,6 +26,7 @@ from office_365_mcp.shared.notes import (
 )
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
+    Advised,
     Confirm,
     answer_pending,
     graph_client_for_caller,
@@ -84,11 +85,11 @@ GRAPH_NOT_FOUND = (
 )
 
 _WRITTEN_BUT_UNREAD = (
-    "The rename reached Microsoft 365 and was applied: only the read back that confirms it "
-    + "failed afterward. Read the page with onenote_read_page to see the new title. Calling "
-    + "onenote_rename_page again with the same title is harmless — it sets the title to the "
-    + "same value rather than piling up a second change — so retry it once if you need the "
-    + "answer this call could not give you."
+    "Microsoft 365 changed the title of the page. Then this connector did not receive the "
+    + "updated page from Microsoft 365. Use onenote_read_page to see the new title. A second "
+    + "call to onenote_rename_page with the same title sets the same value again and makes no "
+    + "second change. If you need the answer that this call did not give, you can call "
+    + "onenote_rename_page again one time."
 )
 
 
@@ -142,7 +143,7 @@ async def rename_page(
             try:
                 summary = await page_summary(client, handle.page_id)
             except GraphFailure as failure:
-                raise ToolError(_WRITTEN_BUT_UNREAD) from failure
+                raise Advised(_WRITTEN_BUT_UNREAD) from failure
 
     if asked is not None:
         return asked
