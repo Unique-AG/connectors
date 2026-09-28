@@ -5,7 +5,6 @@ from with_intelligence_mcp.features.investors.api_responses import (
     InvestorExtendedAttributes,
     StrategyGroupAttributes,
 )
-from with_intelligence_mcp.features.investors.html_to_markdown import html_to_markdown
 from with_intelligence_mcp.features.investors.responses import (
     AumResponse,
     ConsultantResponse,
@@ -13,6 +12,7 @@ from with_intelligence_mcp.features.investors.responses import (
     NamedValueResponse,
     StrategyGroupResponse,
 )
+from with_intelligence_mcp.utils import html_to_markdown
 
 
 class MapInvestorToResponseUtil:
