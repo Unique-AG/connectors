@@ -105,8 +105,10 @@ class MarkedMessage(BaseModel):
     )
     failure: str | None = Field(
         description=(
-            "Why Microsoft 365 did not change this message, as it stated it; null if the "
-            "change succeeded."
+            "Why this message did not change. If Microsoft 365 accepted the change, the value is "
+            "null. If Microsoft 365 answered with an error, the value gives the HTTP status, the "
+            "error code and the request id. If the connector did not get an answer that it can "
+            "read, the value says why."
         )
     )
 
@@ -119,7 +121,10 @@ class MarkedMail(BaseModel):
         description="How many of the rows Microsoft 365 accepted the change for."
     )
     failed_count: int = Field(
-        description="How many messages Microsoft 365 refused; see `messages` for which ones."
+        description=(
+            "How many messages did not change. `messages` shows which ones. If no message "
+            "changed, the call gives an error instead of this result."
+        )
     )
 
 
@@ -132,6 +137,12 @@ class MarkChange:
     @property
     def is_nothing(self) -> bool:
         return self.is_read is None and self.flagged is None and self.importance is None
+
+
+@dataclass(frozen=True, slots=True)
+class _Attempt:
+    row: MarkedMessage
+    failure: GraphFailure | None
 
 
 async def mark_mail(
@@ -150,8 +161,10 @@ async def mark_mail(
     reached = graph_mailbox(client, mailbox)
 
     with graph_errors(TOOL_NAME):
-        marked = [await _mark_one(reached, handle=handle, change=change) for handle in handles]
+        attempts = [await _mark_one(reached, handle=handle, change=change) for handle in handles]
+        _raise_when_nothing_changed(attempts)
 
+    marked = [attempt.row for attempt in attempts]
     return MarkedMail(
         messages=marked,
         changed_count=sum(1 for row in marked if row.changed),
@@ -169,29 +182,41 @@ def _handles(message_refs: Sequence[str]) -> list[MailMessageHandle]:
 
 async def _mark_one(
     reached: UserItemRequestBuilder, *, handle: MailMessageHandle, change: MarkChange
-) -> MarkedMessage:
+) -> _Attempt:
     try:
         with graph_step(STEP_MARK):
             updated = await reached.messages.by_message_id(handle.message_id).patch(
                 _patch_body(change), request_configuration=_request()
             )
     except GraphFailure as failure:
-        return MarkedMessage(
-            uri=handle.uri,
-            changed=False,
-            is_read=None,
-            flag_status=None,
-            importance=None,
-            failure=_why(failure),
+        return _Attempt(
+            row=MarkedMessage(
+                uri=handle.uri,
+                changed=False,
+                is_read=None,
+                flag_status=None,
+                importance=None,
+                failure=_why(failure),
+            ),
+            failure=failure,
         )
-    return MarkedMessage(
-        uri=handle.uri,
-        changed=True,
-        is_read=None if updated is None else updated.is_read,
-        flag_status=_flag_status_of(updated),
-        importance=_importance_of(updated),
+    return _Attempt(
+        row=MarkedMessage(
+            uri=handle.uri,
+            changed=True,
+            is_read=None if updated is None else updated.is_read,
+            flag_status=_flag_status_of(updated),
+            importance=_importance_of(updated),
+            failure=None,
+        ),
         failure=None,
     )
+
+
+def _raise_when_nothing_changed(attempts: Sequence[_Attempt]) -> None:
+    failures = [attempt.failure for attempt in attempts if attempt.failure is not None]
+    if len(failures) == len(attempts):
+        raise failures[0]
 
 
 def _patch_body(change: MarkChange) -> Message:

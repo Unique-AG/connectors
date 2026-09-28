@@ -1,16 +1,29 @@
 import json
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from typing import cast
 
 import httpx
 import pytest
 import respx
-from fastmcp import FastMCP
+from azure.core.credentials import AccessToken as GraphAccessToken
+from fastmcp import Client, FastMCP
+from fastmcp.client.client import CallToolResult
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
+from fastmcp.server.auth.providers.azure import AzureProvider
+from fastmcp.server.dependencies import AccessToken
 from fastmcp.tools import Tool
+from mcp.types import TextContent
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_365_mcp.graph_client import GraphSettings
+from office_365_mcp.app import create_app
+from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig
+from office_365_mcp.graph_client import (
+    GraphForbidden,
+    GraphNotFound,
+    GraphSettings,
+    GraphUnavailable,
+)
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.handles import MailMessageHandle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE
@@ -43,7 +56,60 @@ _NOT_FOUND: dict[str, object] = {
     "error": {"code": "ErrorItemNotFound", "message": "The specified object was not found."}
 }
 
+_ACCESS_DENIED: dict[str, object] = {
+    "error": {"code": "ErrorAccessDenied", "message": "Access is denied."}
+}
+
+_REQUEST_ID = "synthetic-request-id"
+
 _DRAFT_ONLY: tuple[str, ...] = ("subject", "body", "toRecipients", "ccRecipients")
+
+_CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
+_CLIENT_TOKEN = "synthetic-fastmcp-session-token"
+
+
+class _StubOboCredential:
+    async def get_token(self, *scopes: str) -> GraphAccessToken:
+        _ = scopes
+        return GraphAccessToken(token="synthetic-obo-graph-token", expires_on=0)
+
+
+@pytest.fixture
+def obo(monkeypatch: pytest.MonkeyPatch) -> None:
+    credential = _StubOboCredential()
+
+    async def get_obo_credential(
+        _self: AzureProvider, *, user_assertion: str
+    ) -> _StubOboCredential:
+        assert user_assertion == _CLIENT_TOKEN, "the client's own token is what gets exchanged"
+        return credential
+
+    monkeypatch.setattr(AzureProvider, "get_obo_credential", get_obo_credential)
+    monkeypatch.setattr(
+        "fastmcp.server.dependencies.get_access_token",
+        lambda: AccessToken(token=_CLIENT_TOKEN, client_id=_CLIENT_ID, scopes=["access_as_user"]),
+    )
+
+
+@pytest.fixture
+async def server_client() -> AsyncIterator[Client[FastMCPTransport]]:
+    app = create_app(
+        config=AppConfig.model_validate({"public_base_url": "https://office-365-mcp.example"}),
+        database_config=DatabaseConfig.model_validate(
+            {"url": "postgresql://user:pass@127.0.0.1:1/nope"}
+        ),
+        entra_config=EntraConfig.model_validate(
+            {
+                "tenant_id": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
+                "client_id": _CLIENT_ID,
+                "client_secret": "s3cr3t",
+            }
+        ),
+        surface_config=SurfaceConfig.model_validate({"tools_enabled": TOOL_NAME}),
+    )
+    server = cast("FastMCP[None]", app.state.fastmcp_server)
+    async with Client(FastMCPTransport(server)) as client:
+        yield client
 
 
 def _updated(
@@ -82,12 +148,33 @@ def _writes(
     )
 
 
+def _refuses(graph: respx.MockRouter, index: int, status: int) -> respx.Route:
+    body = _ACCESS_DENIED if status == 403 else _NOT_FOUND
+    return graph.patch(_PATHS[index]).mock(
+        return_value=httpx.Response(status, headers={"request-id": _REQUEST_ID}, json=body)
+    )
+
+
 def _every_write(graph: respx.MockRouter) -> respx.Route:
     return graph.route(method="PATCH").mock(return_value=httpx.Response(200, json=_updated()))
 
 
 def _sent(route: respx.Route) -> Mapping[str, object]:
     return cast("dict[str, object]", json.loads(route.calls.last.request.content))
+
+
+def _text(result: CallToolResult) -> str:
+    return "\n".join(block.text for block in result.content if isinstance(block, TextContent))
+
+
+async def _call(client: Client[FastMCPTransport]) -> CallToolResult:
+    return await client.call_tool(
+        TOOL_NAME, {"message_refs": list(_REFS[:2]), "is_read": True}, raise_on_error=False
+    )
+
+
+def _answered(result: CallToolResult) -> MarkedMail:
+    return MarkedMail.model_validate(cast("dict[str, object]", result.structured_content))
 
 
 def _arguments(tool: Tool) -> Mapping[str, Mapping[str, object]]:
@@ -209,29 +296,110 @@ class TestEveryWriteIsItsOwnRequest:
     async def test_a_refused_row_says_what_microsoft_answered(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = graph.patch(_PATHS[0]).mock(
-            return_value=httpx.Response(
-                404, headers={"request-id": "synthetic-request-id"}, json=_NOT_FOUND
-            )
-        )
+        _ = _refuses(graph, 0, 404)
+        _ = _writes(graph, 1)
 
-        answer = await _marked(client, is_read=True)
+        answer = await _marked(client, refs=2, is_read=True)
 
         row = answer.messages[0]
         assert row.changed is False
         assert row.failure is not None
         assert "404" in row.failure
-        assert "synthetic-request-id" in row.failure
+        assert "ErrorItemNotFound" in row.failure
+        assert _REQUEST_ID in row.failure
 
     async def test_a_refused_row_reports_no_state_it_could_not_read(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = graph.patch(_PATHS[0]).mock(return_value=httpx.Response(404, json=_NOT_FOUND))
+        _ = _refuses(graph, 0, 404)
+        _ = _writes(graph, 1)
 
-        answer = await _marked(client, is_read=True, flagged=True, importance="high")
+        answer = await _marked(client, refs=2, is_read=True, flagged=True, importance="high")
 
         row = answer.messages[0]
         assert (row.is_read, row.flag_status, row.importance) == (None, None, None)
+
+
+class TestWhenNoMessageChanged:
+    @pytest.mark.parametrize(("status", "raised"), [(403, GraphForbidden), (404, GraphNotFound)])
+    async def test_a_batch_where_every_write_is_refused_raises_instead_of_answering(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        status: int,
+        raised: type[Exception],
+    ) -> None:
+        _ = _refuses(graph, 0, status)
+        _ = _refuses(graph, 1, status)
+
+        with pytest.raises(raised):
+            _ = await _marked(client, refs=2, is_read=True)
+
+    async def test_every_message_is_still_tried_before_it_raises(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = [_refuses(graph, index, 404) for index in range(3)]
+
+        with pytest.raises(GraphNotFound):
+            _ = await _marked(client, refs=3, is_read=True)
+
+        assert [route.call_count for route in routes] == [1, 1, 1]
+
+
+@pytest.mark.usefixtures("obo")
+class TestWhatTheModelIsTold:
+    async def test_a_permission_refused_on_every_message_names_the_permission_to_grant(
+        self, server_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        _ = _refuses(graph, 0, 403)
+        _ = _refuses(graph, 1, 403)
+
+        result = await _call(server_client)
+
+        told = _text(result)
+        assert result.is_error, told
+        assert "administrator" in told
+        assert "Mail.ReadWrite and Mail.ReadWrite.Shared" in told
+        assert f"Graph error code ErrorAccessDenied, Graph request id {_REQUEST_ID}" in told
+
+    async def test_no_message_found_says_where_a_handle_must_come_from(
+        self, server_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        _ = _refuses(graph, 0, 404)
+        _ = _refuses(graph, 1, 404)
+
+        result = await _call(server_client)
+
+        told = _text(result)
+        assert result.is_error, told
+        assert "tool response verbatim" in told
+        assert f"Graph error code ErrorItemNotFound, Graph request id {_REQUEST_ID}" in told
+
+    async def test_one_refusal_of_two_still_answers_row_by_row(
+        self, server_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        _ = _writes(graph, 0)
+        _ = _refuses(graph, 1, 403)
+
+        result = await _call(server_client)
+
+        assert not result.is_error, _text(result)
+        answer = _answered(result)
+        assert [row.changed for row in answer.messages] == [True, False]
+        assert (answer.changed_count, answer.failed_count) == (1, 1)
+
+    async def test_every_write_accepted_answers_row_by_row(
+        self, server_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        _ = _writes(graph, 0)
+        _ = _writes(graph, 1)
+
+        result = await _call(server_client)
+
+        assert not result.is_error, _text(result)
+        answer = _answered(result)
+        assert [row.changed for row in answer.messages] == [True, True]
+        assert (answer.changed_count, answer.failed_count) == (2, 0)
 
 
 class TestItEchoesGraphAndNotItsArguments:
@@ -355,11 +523,11 @@ class TestAWriteIsNotRetried:
     ) -> None:
         route = graph.patch(_PATHS[0]).mock(return_value=httpx.Response(503))
 
-        answer = await _marked(client, is_read=True)
+        with pytest.raises(GraphUnavailable):
+            _ = await _marked(client, is_read=True)
 
         assert route.call_count == 1
         assert GraphSettings().max_retries > 0, "no retries are configured, so this proves nothing"
-        assert answer.messages[0].changed is False
 
 
 class TestWhatItRefusesBeforeWritingAnything:
