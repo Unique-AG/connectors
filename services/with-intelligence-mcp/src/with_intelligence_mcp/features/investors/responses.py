@@ -23,7 +23,7 @@ class NamedValueResponse(OmitNoneModel):
     name: str | None = None
 
 
-class AumResponse(OmitNoneModel):
+class AssetsUnderManagementResponse(OmitNoneModel):
     value_millions: float | None = Field(
         default=None,
         description=(
@@ -72,7 +72,7 @@ class InvestorProfileResponse(OmitNoneModel):
     website: str | None = None
     founded: int | None = None
     location: str | None = None
-    aum: AumResponse | None = None
+    aum: AssetsUnderManagementResponse | None = None
     updated_at: str | None = None
 
     asset_classes: list[NamedValueResponse] | None = None
@@ -130,7 +130,7 @@ class InvestorProfileResponse(OmitNoneModel):
             website=attributes.website,
             founded=attributes.year_of_incorporation,
             location=_location(attributes),
-            aum=_aum(attributes),
+            aum=_assets_under_management(attributes),
             updated_at=attributes.updated_at,
             asset_classes=_when_present(
                 attributes, "asset_classes", _named(attributes.asset_classes)
@@ -249,12 +249,14 @@ def _location(attributes: InvestorExtendedAttributes) -> str | None:
     return ", ".join(part for part in parts if part) or None
 
 
-def _aum(attributes: InvestorExtendedAttributes) -> AumResponse | None:
+def _assets_under_management(
+    attributes: InvestorExtendedAttributes,
+) -> AssetsUnderManagementResponse | None:
     currency = attributes.currency.short_name if attributes.currency else None
     latest = attributes.latest_aum
     if latest is not None and (latest.value is not None or latest.value_usd is not None):
         bands = [entry.label for entry in latest.ranges_usd if entry.label]
-        return AumResponse(
+        return AssetsUnderManagementResponse(
             value_millions=latest.value,
             value_usd_millions=latest.value_usd,
             band=bands[0] if bands else None,
@@ -262,5 +264,5 @@ def _aum(attributes: InvestorExtendedAttributes) -> AumResponse | None:
             currency=currency,
         )
     if attributes.aum is not None:
-        return AumResponse(value_millions=attributes.aum, currency=currency)
+        return AssetsUnderManagementResponse(value_millions=attributes.aum, currency=currency)
     return None
