@@ -1,19 +1,9 @@
-"""One refused Graph call per registered tool, driven through the composed app.
-
-`tests/shared/test_seam.py` and `tests/tools/` look like they cover this, but neither crosses
-`register()`, so a tool whose refusals reach the client untranslated passes both. Every case here
-goes through an in-memory FastMCP client and asserts byte equality with what `shared/seam.py` words
-for the same failure; the wording itself is `tests/shared/test_seam.py`'s subject.
-
-Cases come from `graph_call_examples` over the registered surface. The hand-written table this
-replaced left the file one tool short whenever a tool was registered before its row existed; a tool
-publishing no such call is now a type error (`ToolModule` in `tools/__init__.py`).
-
-The three stubs are this file's own, as they are `test_mcp_tools.py`'s own.
-"""
-
+import ast
+import importlib
 import logging
-from collections.abc import AsyncIterator, Iterator, Mapping
+import pathlib
+from collections.abc import AsyncIterator, Iterable, Iterator, Mapping
+from types import ModuleType
 from typing import cast
 
 import httpx
@@ -29,13 +19,23 @@ from starlette.applications import Starlette
 
 from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
-from office_365_mcp.graph_client import GraphForbidden
+from office_365_mcp.graph_client import GraphFailure, GraphForbidden
+from office_365_mcp.shared.handles import onenote_page_handle
 from office_365_mcp.shared.seam import (
+    Advised,
     GraphAdviceMiddleware,
     ToolAdvice,
     graph_tool_errors,
 )
-from office_365_mcp.tools import GraphCallExample, Selection, graph_call_examples, resolve
+from office_365_mcp.tools import (
+    GraphCallExample,
+    Selection,
+    graph_call_examples,
+    onenote_append_to_page,
+    onenote_edit_page,
+    onenote_rename_page,
+    resolve,
+)
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -80,6 +80,20 @@ _RECORDS_THE_OUTCOME = ("MessageLogMiddleware", "_McpMetrics")
 _DOUBLY_MAPPED = "read_twice"
 _MAPPED_ONCE = "read_once"
 _PERMISSION = "Chat.Read"
+
+_SOURCE = pathlib.Path(__file__).parent.parent / "src" / "office_365_mcp"
+_POLICED = (_SOURCE / "tools", _SOURCE / "shared")
+
+_WRITES_THEN_REREADS: tuple[str, ...] = (
+    onenote_append_to_page.TOOL_NAME,
+    onenote_edit_page.TOOL_NAME,
+    onenote_rename_page.TOOL_NAME,
+)
+_WRITE_EXAMPLES: Mapping[str, GraphCallExample] = graph_call_examples(
+    resolve(preset=None, enabled=_WRITES_THEN_REREADS)
+)
+_OWN_NOTEBOOK = {"id": "NOTEBOOK1", "displayName": "Work", "isShared": False, "userRole": "Owner"}
+_WRITTEN_BUT_UNREAD = "Then this connector did not receive the updated page from Microsoft 365."
 
 
 class _StubOboCredential:
@@ -150,6 +164,19 @@ def two_tools() -> FastMCP[None]:
 
 @pytest.fixture
 def app() -> Starlette:
+    return _composed({"tools_preset": ToolsPreset.TEAMS})
+
+
+@pytest.fixture
+async def onenote_writer() -> AsyncIterator[Client[FastMCPTransport]]:
+    server = cast(
+        "FastMCP[None]", _composed({"tools_enabled": _WRITES_THEN_REREADS}).state.fastmcp_server
+    )
+    async with Client(FastMCPTransport(server)) as client:
+        yield client
+
+
+def _composed(surface: Mapping[str, object]) -> Starlette:
     return create_app(
         config=AppConfig.model_validate({"public_base_url": "https://office-365-mcp.example"}),
         database_config=DatabaseConfig.model_validate(
@@ -162,7 +189,7 @@ def app() -> Starlette:
                 "client_secret": "s3cr3t",
             }
         ),
-        surface_config=SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS}),
+        surface_config=SurfaceConfig.model_validate(surface),
     )
 
 
@@ -374,4 +401,100 @@ class TestTheOrderThePermissionsAreNamed:
 
         assert appearances == sorted(appearances), (
             f"{tool} declares {declared} and its refusal names them in another order: {message}"
+        )
+
+
+def _in_scope(nodes: Iterable[ast.AST]) -> Iterator[ast.AST]:
+    for node in nodes:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | ast.Lambda):
+            continue
+        yield node
+        yield from _in_scope(ast.iter_child_nodes(node))
+
+
+def _module_at(path: pathlib.Path) -> ModuleType:
+    parts = path.relative_to(_SOURCE).with_suffix("").parts
+    return importlib.import_module(
+        ".".join(("office_365_mcp", *(p for p in parts if p != "__init__")))
+    )
+
+
+def _named(node: ast.expr | None, module: ModuleType) -> tuple[object, ...]:
+    if isinstance(node, ast.Tuple):
+        return tuple(value for element in node.elts for value in _named(element, module))
+    if isinstance(node, ast.Name):
+        return (cast("object", getattr(module, node.id, None)),)
+    return ()
+
+
+def _is(value: object, kind: type[BaseException]) -> bool:
+    return isinstance(value, type) and issubclass(value, kind)
+
+
+def _raised_from_a_graph_failure(path: pathlib.Path) -> Iterator[tuple[int, tuple[object, ...]]]:
+    module = _module_at(path)
+    for handler in ast.walk(ast.parse(path.read_text())):
+        if not isinstance(handler, ast.ExceptHandler) or handler.name is None:
+            continue
+        if not any(_is(caught, GraphFailure) for caught in _named(handler.type, module)):
+            continue
+        for node in _in_scope(handler.body):
+            if (
+                isinstance(node, ast.Raise)
+                and isinstance(node.cause, ast.Name)
+                and node.cause.id == handler.name
+                and isinstance(node.exc, ast.Call)
+            ):
+                yield node.lineno, _named(node.exc.func, module)
+
+
+class TestAToolsOwnWordsForALandedWrite:
+    @pytest.mark.usefixtures("obo", "retry_sleeps")
+    @pytest.mark.parametrize("status", [404, 503])
+    @pytest.mark.parametrize("tool", _WRITES_THEN_REREADS)
+    async def test_a_failed_reread_after_the_write_reaches_the_client_as_written(
+        self, onenote_writer: Client[FastMCPTransport], tool: str, status: int
+    ) -> None:
+        example = _WRITE_EXAMPLES[tool]
+        handle = onenote_page_handle(str(example.arguments["page"]))
+        assert handle is not None, f"{tool}'s own call example names no page"
+        page_path = f"/me/onenote/pages/{handle.page_id}"
+        page = {"id": handle.page_id, "title": "Synthetic", "parentNotebook": _OWN_NOTEBOOK}
+        failed = httpx.Response(status, json={"error": {"code": "synthetic", "message": "x"}})
+
+        with respx.mock(base_url=GRAPH_V1, assert_all_called=False) as graph:
+            _ = graph.get(page_path).mock(
+                side_effect=[httpx.Response(200, json=page), *([failed] * 4)]
+            )
+            _ = graph.get(f"/me/onenote/notebooks/{_OWN_NOTEBOOK['id']}").mock(
+                return_value=httpx.Response(200, json=_OWN_NOTEBOOK)
+            )
+            written = graph.post(f"{page_path}/onenotePatchContent").mock(
+                return_value=httpx.Response(204)
+            )
+            with pytest.raises(ToolError) as raised:
+                _ = await onenote_writer.call_tool(tool, dict(example.arguments))
+
+        assert written.call_count == 1, f"{tool} did not write exactly once"
+        assert _WRITTEN_BUT_UNREAD in str(raised.value), (
+            f"{tool} wrote once and told the client: {raised.value}"
+        )
+
+    def test_a_tool_that_words_a_graph_failure_itself_raises_advised(self) -> None:
+        sources = sorted(path for directory in _POLICED for path in directory.rglob("*.py"))
+        raised = [
+            (f"{path.relative_to(_SOURCE)}:{line}", named)
+            for path in sources
+            for line, named in _raised_from_a_graph_failure(path)
+        ]
+        reworded = [
+            where
+            for where, named in raised
+            if any(_is(one, ToolError) and not _is(one, Advised) for one in named)
+        ]
+
+        assert raised, "no raise chains a caught Graph failure, so this check guards nothing"
+        assert not reworded, (
+            "GraphAdviceMiddleware replaces a ToolError chained to a Graph failure with its "
+            + f"generic advice. Raise Advised instead at {reworded}"
         )

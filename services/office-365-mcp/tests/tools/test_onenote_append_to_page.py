@@ -426,7 +426,7 @@ class TestGraphFailures:
             ]
         )
 
-        with pytest.raises(ToolError, match="reached Microsoft 365 and was applied"):
+        with pytest.raises(ToolError, match="Microsoft 365 added the content to the page"):
             _ = await _append(client)
 
         assert patch.call_count == 1
@@ -445,7 +445,7 @@ class TestGraphFailures:
             ]
         )
 
-        with pytest.raises(ToolError, match="reached Microsoft 365 and was applied"):
+        with pytest.raises(ToolError, match="Microsoft 365 added the content to the page"):
             _ = await _append(client)
 
         assert patch.call_count == 1
