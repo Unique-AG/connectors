@@ -41,6 +41,10 @@ one) containers.
 {{- define "chart.config.mcpEnv" -}}
 - name: PUBLIC_BASE_URL
   value: {{ tpl .Values.mcpConfig.app.publicBaseUrl . | quote }}
+{{- if .Values.mcpConfig.app.sessionIdleTimeoutSeconds }}
+- name: SESSION_IDLE_TIMEOUT_SECONDS
+  value: {{ .Values.mcpConfig.app.sessionIdleTimeoutSeconds | quote }}
+{{- end }}
 - name: ENTRA_TENANT_ID
   value: {{ tpl .Values.mcpConfig.entra.tenantId . | quote }}
 - name: ENTRA_CLIENT_ID

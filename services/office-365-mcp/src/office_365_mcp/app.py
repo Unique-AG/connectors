@@ -167,5 +167,6 @@ def create_app(
             Middleware(OpenTelemetryMiddleware, meter_provider=NoOpMeterProvider()),
             Middleware(TraceContextCaptureMiddleware),
             ops_middleware,
-        ]
+        ],
+        session_idle_timeout=config.session_idle_timeout_seconds,
     )

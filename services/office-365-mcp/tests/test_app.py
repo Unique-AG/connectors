@@ -19,14 +19,18 @@ import pytest
 from fastmcp import Client, FastMCP
 from fastmcp.client.client import CallToolResult
 from fastmcp.client.transports import FastMCPTransport
+from fastmcp.server.auth.middleware import RequireAuthMiddleware
 from fastmcp.server.auth.providers.azure import AzureProvider
+from fastmcp.server.http import StreamableHTTPASGIApp
 from key_value.aio.protocols import AsyncKeyValue
 from key_value.aio.stores.memory import MemoryStore
 from key_value.aio.stores.postgresql import PostgreSQLStore
 from key_value.aio.wrappers.base import BaseWrapper
 from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.types import TextContent
 from starlette.applications import Starlette
+from starlette.routing import Route
 from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 from unique_mcp.monitoring import _McpMetrics  # pyright: ignore[reportPrivateUsage]
@@ -123,6 +127,17 @@ def _app(config: AppConfig | None = None) -> Starlette:
 
 def _server_of(app: Starlette) -> FastMCP[None]:
     return cast("FastMCP[None]", app.state.fastmcp_server)
+
+
+def _session_manager(app: Starlette) -> StreamableHTTPSessionManager:
+    path = cast("str", app.state.path)
+    (route,) = [route for route in app.routes if isinstance(route, Route) and route.path == path]
+    guard = route.endpoint
+    assert isinstance(guard, RequireAuthMiddleware), f"{path} is served unauthenticated: {guard!r}"
+    endpoint = cast("object", guard.app)
+    assert isinstance(endpoint, StreamableHTTPASGIApp), f"{path} is not FastMCP's: {endpoint!r}"
+    assert endpoint.session_manager is not None, "the lifespan did not build a session manager"
+    return endpoint.session_manager
 
 
 def _error_text(result: CallToolResult) -> str:
@@ -688,6 +703,20 @@ class TestTheGraphTimeoutBudgetIsInjected:
             _app()
 
         assert built == [GraphSettings()]
+
+
+class TestTheSessionIdleTimeoutIsInjected:
+    def test_the_session_manager_gets_what_an_operator_configured(self) -> None:
+        app = _app(
+            AppConfig.model_validate(
+                {"public_base_url": _PUBLIC_BASE_URL, "session_idle_timeout_seconds": 90.0}
+            )
+        )
+
+        with TestClient(app):
+            manager = _session_manager(app)
+
+        assert manager.session_idle_timeout == 90.0
 
 
 class TestTheNameLabelIsBoundedByWhatIsRegistered:

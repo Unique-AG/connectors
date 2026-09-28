@@ -1,3 +1,4 @@
+import math
 from collections.abc import Awaitable, Callable
 from typing import Protocol, cast
 
@@ -395,6 +396,26 @@ class TestTheGraphTimeoutBudget:
             GraphSettings(max_retries=config.graph_max_retries),
         )
         assert transport is not None
+
+
+class TestTheSessionIdleTimeout:
+    def test_the_default_is_an_hour(self) -> None:
+        assert AppConfig(app_env=AppEnv.DEVELOPMENT).session_idle_timeout_seconds == 3600.0
+
+    def test_an_operator_sets_it_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("APP_ENV", "development")
+        monkeypatch.setenv("SESSION_IDLE_TIMEOUT_SECONDS", "7200")
+
+        assert AppConfig().session_idle_timeout_seconds == 7200.0
+
+    @pytest.mark.parametrize("value", [0, -1, math.inf, math.nan])
+    def test_only_a_positive_finite_timeout_is_accepted(self, value: float) -> None:
+        with pytest.raises(ValidationError, match="session_idle_timeout_seconds"):
+            AppConfig.model_validate(
+                {"app_env": AppEnv.DEVELOPMENT, "session_idle_timeout_seconds": value}
+            )
 
 
 class TestCaseInsensitiveEnumFields:

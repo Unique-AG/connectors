@@ -100,6 +100,8 @@ class AppConfig(BaseSettings):
 
     public_base_url: HttpUrl = HttpUrl("http://localhost:9544")
 
+    session_idle_timeout_seconds: float = Field(default=3600.0, gt=0, allow_inf_nan=False)
+
     graph_request_timeout_seconds: float = Field(default=30.0, gt=0)
     graph_connect_timeout_seconds: float = Field(default=10.0, gt=0)
     graph_max_retries: int = Field(default=3, ge=0, le=RetryHandlerOption.MAX_MAX_RETRIES)
