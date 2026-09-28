@@ -1,18 +1,25 @@
 import asyncio
 import logging
 
+from pydantic import TypeAdapter
+
 from with_intelligence_mcp.features.investors.api_responses import InvestorExtendedAttributes
-from with_intelligence_mcp.features.persons.fetch_people_for_organisation import (
-    fetch_people_for_organisation,
+from with_intelligence_mcp.features.persons.api_responses import (
+    PersonListItemAttributes,
 )
 from with_intelligence_mcp.features.persons.fetch_person import fetch_person
 from with_intelligence_mcp.features.persons.responses import (
     PeopleForInvestorResponse,
     PersonResponse,
 )
-from with_intelligence_mcp.with_intelligence_client import WithIntelligenceClient
+from with_intelligence_mcp.with_intelligence_client import (
+    Page,
+    QueryValue,
+    WithIntelligenceClient,
+)
 
 logger = logging.getLogger(__name__)
+_PEOPLE_PAGE = TypeAdapter(Page[PersonListItemAttributes])
 
 
 class GetPeopleForInvestorQuery:
@@ -22,7 +29,7 @@ class GetPeopleForInvestorQuery:
     async def run(
         self, *, investor: InvestorExtendedAttributes, page: int, limit: int
     ) -> PeopleForInvestorResponse:
-        listed, total = await fetch_people_for_organisation(
+        listed, total = await _fetch_people_for_organisation(
             self._client, investor.id, page=page, limit=limit
         )
         details = await asyncio.gather(
@@ -49,3 +56,23 @@ class GetPeopleForInvestorQuery:
             extra={"investor_id": investor.id, "returned": response.returned, "total": total},
         )
         return response
+
+
+async def _fetch_people_for_organisation(
+    client: WithIntelligenceClient,
+    organisation_id: int,
+    *,
+    page: int,
+    limit: int,
+) -> tuple[list[PersonListItemAttributes], int]:
+    params: dict[str, QueryValue] = {
+        "organisation_id": [organisation_id],
+        "sort[updated_at]": "desc",
+    }
+    if client.asset_class_groups:
+        params["asset_class_group"] = list(client.asset_class_groups)
+
+    response = await client.get_page(
+        "/v3/persons", _PEOPLE_PAGE, params, page=page, page_size=limit
+    )
+    return response.results, response.pagination.total
