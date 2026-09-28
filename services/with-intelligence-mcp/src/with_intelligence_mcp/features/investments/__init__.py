@@ -11,10 +11,6 @@ from with_intelligence_mcp.features.investments.dependencies import (
     get_investments_query_factory,
     get_map_position_to_response_util_factory,
 )
-from with_intelligence_mcp.features.investments.fetch_investment import (
-    INVESTMENTS_PATH,
-    fetch_investment,
-)
 from with_intelligence_mcp.features.investments.queries import GetInvestmentsQuery
 from with_intelligence_mcp.features.investments.resource_utils import MapPositionToResponseUtil
 from with_intelligence_mcp.features.investments.responses import (
@@ -24,7 +20,6 @@ from with_intelligence_mcp.features.investments.responses import (
 )
 
 __all__ = [
-    "INVESTMENTS_PATH",
     "CurrencyAmountAttributes",
     "GetInvestmentsQuery",
     "InvestmentAmountAttributes",
@@ -35,7 +30,6 @@ __all__ = [
     "MapPositionToResponseUtil",
     "PositionAmountResponse",
     "PositionResponse",
-    "fetch_investment",
     "get_investments_query_factory",
     "get_map_position_to_response_util_factory",
 ]
