@@ -37,6 +37,8 @@ STEP_RESPOND = "respond_to_invite"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.ReadWrite",)
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_read_event",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "outlook:///events/AAMkSYNTHETIC-cal-0001%3D/AAMkAGI2SYNTHETIC-event-0001%3D",
     "response": "accept",

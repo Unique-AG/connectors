@@ -40,6 +40,8 @@ STEP_FILL_REPLY = "fill_reply"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
     "mode": "reply",

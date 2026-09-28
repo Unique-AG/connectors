@@ -39,6 +39,8 @@ STEP_MOVE = "move_message"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_read_mail", "outlook_list_mail")
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message_refs": ["outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"],
     "destination": "archive",

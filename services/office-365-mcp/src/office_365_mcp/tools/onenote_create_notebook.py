@@ -21,6 +21,8 @@ STEP_CREATE_NOTEBOOK = "create_notebook"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Create",)
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("onenote_list_notebooks",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"name": "Synthetic notebook"}
 
 MAX_NAME_CHARACTERS = 128

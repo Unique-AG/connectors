@@ -20,7 +20,7 @@ from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, 
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
-    WRITE_DESTRUCTIVE,
+    WRITE_DESTRUCTIVE_IDEMPOTENT,
     graph_client_for_caller,
     graph_mailbox,
 )
@@ -237,7 +237,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         name=TOOL_NAME,
         title="Mark Mail Messages",
         description=_DESCRIPTION,
-        annotations=WRITE_DESTRUCTIVE,
+        annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )
     async def outlook_mark_mail(
         message_refs: Annotated[

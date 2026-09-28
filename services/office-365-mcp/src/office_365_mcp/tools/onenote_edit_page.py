@@ -43,6 +43,8 @@ STEP_EDIT_CONTENT = "edit_content"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.ReadWrite",)
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("onenote_read_page",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "page": "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF",
     "commands": [{"target": "body", "action": "append", "content": "<p>Synthetic.</p>"}],

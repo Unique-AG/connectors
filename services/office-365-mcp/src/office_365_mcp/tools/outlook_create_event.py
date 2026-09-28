@@ -69,6 +69,8 @@ STEP_CREATE = "create_event"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.ReadWrite",)
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_events",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "subject": "Pricing review",
     "starts_at": "2026-03-02T14:00",

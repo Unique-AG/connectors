@@ -107,6 +107,12 @@ class _NarrowsItsCall(Protocol):
     def GRAPH_CALL_NARROWS_TO(self) -> tuple[str, ...]: ...
 
 
+@runtime_checkable
+class _ShowsItsChange(Protocol):
+    @property
+    def CHANGE_SHOWN_BY(self) -> tuple[str, ...]: ...
+
+
 _TOOL_MODULES: tuple[ToolModule, ...] = (
     get_me,
     teams_list_chats,
@@ -399,6 +405,7 @@ def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
         module.TOOL_NAME: ToolAdvice(
             permissions=module.GRAPH_PERMISSIONS,
             not_found=_not_found_advice(module),
+            shown_by=tuple(tool for tool in _shown_by(module) if tool in selection.tools),
         )
         for module in _TOOL_MODULES
         if module.TOOL_NAME in selection.tools
@@ -407,6 +414,10 @@ def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
 
 def _not_found_advice(module: ToolModule) -> str | None:
     return module.GRAPH_NOT_FOUND if isinstance(module, _NarrowsItsNotFound) else None
+
+
+def _shown_by(module: ToolModule) -> tuple[str, ...]:
+    return module.CHANGE_SHOWN_BY if isinstance(module, _ShowsItsChange) else ()
 
 
 @dataclass(frozen=True, slots=True)

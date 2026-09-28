@@ -31,6 +31,8 @@ STEP_SEND = "send_channel_message"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("ChannelMessage.Send",)
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_browse_channel",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "team_id": "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
     "channel_id": "19:general@thread.tacv2",

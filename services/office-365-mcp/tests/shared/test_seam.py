@@ -78,7 +78,9 @@ def _message(failure: GraphFailure) -> str:
     return str(raised.value)
 
 
-async def _middleware_message(delivered: BaseException) -> str:
+async def _middleware_message(
+    delivered: BaseException, advice: GraphAdviceMiddleware = _ADVICE
+) -> str:
     """Driven through `on_call_tool` and not a helper: what the hook catches is never the failure
     itself, and mistaking one for the other is the defect this exists to catch."""
 
@@ -88,7 +90,7 @@ async def _middleware_message(delivered: BaseException) -> str:
 
     context = MiddlewareContext(message=CallToolRequestParams(name=_TOOL, arguments={}))
     with pytest.raises(ToolError) as raised:
-        _ = await _ADVICE.on_call_tool(context, refuse)
+        _ = await advice.on_call_tool(context, refuse)
     return str(raised.value)
 
 
@@ -205,6 +207,39 @@ class TestRetryAdvice:
         message = _message(GraphUnavailable("boom", status=503, code=None, request_id=None))
 
         assert "Retry once" in message
+
+    async def test_an_outage_on_a_tool_with_no_repeatable_hint_says_the_change_can_be_done(
+        self,
+    ) -> None:
+        outage = GraphUnavailable("boom", status=504, code=None, request_id="req-9")
+        delivered = ToolError(f"Error calling tool '{_TOOL}': {outage}")
+        delivered.__cause__ = outage
+
+        assert await _middleware_message(delivered) == (
+            "The connection to Microsoft 365 failed, or Microsoft 365 answered with an internal "
+            + "error. As a result, this connector does not know if Microsoft 365 made the change. "
+            + "Microsoft 365 can make a change and then give an error. Do not call this tool "
+            + "again first. No tool of this deployment can show the change. Before you call this "
+            + "tool again, ask the user if the Microsoft 365 app shows the change. "
+            + "(HTTP 504, Graph request id req-9)"
+        )
+
+    async def test_an_outage_on_a_write_names_the_tools_that_can_show_the_change(self) -> None:
+        outage = GraphUnavailable("boom", status=504, code=None, request_id="req-9")
+        delivered = ToolError(f"Error calling tool '{_TOOL}': {outage}")
+        delivered.__cause__ = outage
+        advice = GraphAdviceMiddleware(
+            {_TOOL: ToolAdvice(permissions=(_PERMISSION,), shown_by=("read_a", "read_b"))}
+        )
+
+        assert await _middleware_message(delivered, advice) == (
+            "The connection to Microsoft 365 failed, or Microsoft 365 answered with an internal "
+            + "error. As a result, this connector does not know if Microsoft 365 made the change. "
+            + "Microsoft 365 can make a change and then give an error. Do not call this tool "
+            + "again first. Before you call this tool again, make sure that the change is not "
+            + "already there. To see if the change is there, use read_a or read_b. "
+            + "(HTTP 504, Graph request id req-9)"
+        )
 
     def test_a_collection_graph_will_not_end_reaches_the_caller_as_advice(self) -> None:
         """The one failure no request produced: Graph answering page after empty page while still

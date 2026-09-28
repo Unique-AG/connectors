@@ -23,6 +23,11 @@ calendar, SharePoint and OneDrive, and OneNote. One tool, `get_me`, is always on
 configuration. The Kind column is a hint to the calling client about the kind of change a tool
 makes. It does not control access to the tool.
 
+The same hint also sets the error text that the model gets when Microsoft 365 fails or does not
+answer. For a tool that makes a change that is not safe to repeat, this text tells the model to
+make sure that the change is not already there. If a tool of the deployment can show the change,
+the text names that tool. If not, the text tells the model to ask the user.
+
 ### Identity
 
 | Tool | Kind | Permission | Admin consent | What it does |
@@ -57,7 +62,7 @@ makes. It does not control access to the tool.
 | `outlook_list_mail` | Read | `Mail.Read`, `Mail.Read.Shared` | No | The newest messages of one folder, in receipt order, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
 | `outlook_get_mailbox_settings` | Read | `MailboxSettings.Read` | No | What acts quietly on this mailbox — the rules, the automatic reply, and the categories — and what this tool cannot show. |
 | `outlook_list_categories` | Read | `MailboxSettings.Read` | No | Every category that this mailbox can use to tag mail, events, and contacts, with each category's name and color. |
-| `outlook_mark_mail` | Write, changes or removes | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | The read status, the follow-up flag, and the importance, on up to twenty messages, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
+| `outlook_mark_mail` | Write, changes or removes, safe to repeat | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | The read status, the follow-up flag, and the importance, on up to twenty messages. The mailbox is the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
 | `outlook_move_mail` | Write, changes or removes | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | Moves messages into another folder, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. This connector erases mail only by moving it to Deleted Items. |
 | `outlook_draft_mail` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A new message, composed into Drafts, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The tool cannot send it. The tool cannot add files, so the user adds a file in Outlook before they send the draft. |
 | `outlook_draft_reply` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A reply or a forward, composed into Drafts and left there, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. A forward carries the original message's attachments. The tool cannot add new files, so the user adds a file in Outlook before they send the draft. |

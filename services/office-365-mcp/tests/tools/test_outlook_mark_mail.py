@@ -13,7 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphSettings
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.handles import MailMessageHandle
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE
+from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT
 from office_365_mcp.tools.outlook_mark_mail import (
     GRAPH_PERMISSIONS,
     MAX_MESSAGES,
@@ -443,7 +443,7 @@ class TestMailboxTargeting:
 
 
 class TestHowItDeclaresItself:
-    async def test_it_says_it_writes_and_that_the_write_can_destroy(
+    async def test_it_says_it_writes_that_the_write_can_destroy_and_that_a_repeat_is_safe(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
@@ -451,7 +451,9 @@ class TestHowItDeclaresItself:
         assert tool.annotations is not None
         assert tool.annotations.read_only_hint is False
         assert tool.annotations.destructive_hint is True
-        assert WRITE_DESTRUCTIVE["destructiveHint"] is True
+        assert tool.annotations.idempotent_hint is True
+        assert WRITE_DESTRUCTIVE_IDEMPOTENT["destructiveHint"] is True
+        assert WRITE_DESTRUCTIVE_IDEMPOTENT["idempotentHint"] is True
 
     def test_it_asks_for_the_permission_that_can_write(self) -> None:
         assert GRAPH_PERMISSIONS == ("Mail.ReadWrite", "Mail.ReadWrite.Shared")

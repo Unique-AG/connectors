@@ -53,6 +53,8 @@ STEP_PAGE = "page"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read", "Notes.Create")
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("onenote_list_pages",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "page": "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF",
     "to_section": "onenote:///sections/1-SYNTHETICSECTION0000",

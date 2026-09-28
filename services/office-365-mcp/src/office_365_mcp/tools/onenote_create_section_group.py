@@ -36,6 +36,8 @@ STEP_CREATE_SECTION_GROUP = "create_section_group"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Create",)
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("onenote_list_sections",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "parent": "onenote:///notebooks/1-SYNTHETICNOTEBOOK0000",
     "name": "Synthetic section group",
