@@ -15,9 +15,6 @@ from with_intelligence_mcp.dependencies import (
     get_with_intelligence_client_factory,
     get_with_intelligence_config,
 )
-from with_intelligence_mcp.features.persons.dependencies import (
-    get_map_person_to_response_util_factory,
-)
 from with_intelligence_mcp.features.wi_session import get_wi_session_cache
 
 
@@ -38,7 +35,6 @@ _CACHED_DEPENDENCY_PROVIDERS: tuple[_CachedDependencyProvider, ...] = (
     get_auth_context,
     get_auth_provider,
     get_wi_session_cache,
-    get_map_person_to_response_util_factory,
 )
 
 

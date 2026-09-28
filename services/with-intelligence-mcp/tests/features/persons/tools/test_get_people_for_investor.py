@@ -12,7 +12,6 @@ from with_intelligence_mcp.features.investors import (
 from with_intelligence_mcp.features.investors.queries import ResolveInvestorRecordQuery
 from with_intelligence_mcp.features.persons import PeopleForInvestorResponse
 from with_intelligence_mcp.features.persons.queries import GetPeopleForInvestorQuery
-from with_intelligence_mcp.features.persons.resource_utils import MapPersonToResponseUtil
 from with_intelligence_mcp.features.persons.tools.get_people_for_investor import (
     get_people_for_investor as call_get_people_for_investor,
 )
@@ -38,10 +37,7 @@ async def get_people_for_investor(
         page=page,
         limit=limit,
         resolve_investor_record_query=ResolveInvestorRecordQuery(client),
-        get_people_for_investor_query=GetPeopleForInvestorQuery(
-            client=client,
-            map_person_to_response_util=MapPersonToResponseUtil(),
-        ),
+        get_people_for_investor_query=GetPeopleForInvestorQuery(client=client),
     )
 
 

@@ -6,7 +6,6 @@ from with_intelligence_mcp.features.persons.fetch_people_for_organisation import
     fetch_people_for_organisation,
 )
 from with_intelligence_mcp.features.persons.fetch_person import fetch_person
-from with_intelligence_mcp.features.persons.resource_utils import MapPersonToResponseUtil
 from with_intelligence_mcp.features.persons.responses import (
     PeopleForInvestorResponse,
     PersonResponse,
@@ -17,14 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class GetPeopleForInvestorQuery:
-    def __init__(
-        self,
-        *,
-        client: WithIntelligenceClient,
-        map_person_to_response_util: MapPersonToResponseUtil,
-    ) -> None:
+    def __init__(self, *, client: WithIntelligenceClient) -> None:
         self._client: WithIntelligenceClient = client
-        self._map_person_to_response_util: MapPersonToResponseUtil = map_person_to_response_util
 
     async def run(
         self, *, investor: InvestorExtendedAttributes, page: int, limit: int
@@ -36,7 +29,7 @@ class GetPeopleForInvestorQuery:
             *(fetch_person(self._client, person.id) for person in listed)
         )
         people = [
-            self._map_person_to_response_util.run(record=detail, organisation_id=investor.id)
+            PersonResponse.from_attributes(detail, organisation_id=investor.id)
             if detail
             else PersonResponse(id=listed[index].id, name=listed[index].name)
             for index, detail in enumerate(details)

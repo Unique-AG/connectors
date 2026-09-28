@@ -7,7 +7,6 @@ from with_intelligence_mcp.features.persons.api_responses import (
     RoleOrganisationAttributes,
 )
 from with_intelligence_mcp.features.persons.dependencies import (
-    get_map_person_to_response_util_factory,
     get_people_for_investor_query_factory,
 )
 from with_intelligence_mcp.features.persons.fetch_people_for_organisation import (
@@ -16,7 +15,6 @@ from with_intelligence_mcp.features.persons.fetch_people_for_organisation import
 )
 from with_intelligence_mcp.features.persons.fetch_person import fetch_person
 from with_intelligence_mcp.features.persons.queries import GetPeopleForInvestorQuery
-from with_intelligence_mcp.features.persons.resource_utils import MapPersonToResponseUtil
 from with_intelligence_mcp.features.persons.responses import (
     PeopleForInvestorResponse,
     PersonResponse,
@@ -25,7 +23,6 @@ from with_intelligence_mcp.features.persons.responses import (
 __all__ = [
     "PERSONS_PATH",
     "GetPeopleForInvestorQuery",
-    "MapPersonToResponseUtil",
     "PeopleForInvestorResponse",
     "PersonExtendedAttributes",
     "PersonListItemAttributes",
@@ -34,6 +31,5 @@ __all__ = [
     "RoleOrganisationAttributes",
     "fetch_people_for_organisation",
     "fetch_person",
-    "get_map_person_to_response_util_factory",
     "get_people_for_investor_query_factory",
 ]
