@@ -531,15 +531,24 @@ def _remedy(
         )
     if failure.status == _CONFLICT:
         return (
-            "Microsoft 365 refused this request because it conflicts with something that already "
-            + "exists there, most often a name already taken at that level. The same arguments "
-            + "fail the same way: change the name, or find the existing item with a listing tool "
-            + "first."
+            "Microsoft 365 rejected this request because an item that is already there prevents "
+            + "it. Most often, an item at that level already has the same name. If you call this "
+            + "tool again with the same arguments, the call will fail the same way. Change the "
+            + "name, or use a tool that shows a list of items to find that item."
+            + _graphs_reason(failure)
         )
     return (
-        "Microsoft 365 rejected this request. This is a bad request rather than an outage or a "
-        + "permission problem, so retrying it unchanged will fail identically."
+        "Microsoft 365 rejected this request because it is a bad request, not an outage or a "
+        + "permission problem. If you call this tool again with the same arguments, the call "
+        + "will fail the same way."
+        + _graphs_reason(failure)
     )
+
+
+def _graphs_reason(failure: GraphFailure) -> str:
+    if failure.reason is None:
+        return ""
+    return f' Microsoft 365 gave this reason: "{failure.reason}"'
 
 
 def _named(permissions: tuple[str, ...]) -> str:

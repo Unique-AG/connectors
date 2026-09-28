@@ -65,7 +65,7 @@ _UNCONSENTED = (
 )
 
 
-_FALLTHROUGH = "This is a bad request rather than an outage or a permission problem"
+_FALLTHROUGH = "because it is a bad request, not an outage or a permission problem"
 
 _ONE_OF_EACH: Mapping[type[GraphFailure], GraphFailure] = {
     GraphThrottled: GraphThrottled(
@@ -263,15 +263,18 @@ class TestRetryAdvice:
     def test_a_bad_request_is_not_worth_retrying(self) -> None:
         message = _message(GraphFailure("bad filter", status=400, code=None, request_id=None))
 
-        assert "retrying it unchanged will fail identically" in message
+        assert (
+            "If you call this tool again with the same arguments, the call will fail the same way."
+            in message
+        )
 
     def test_a_conflict_names_the_collision_rather_than_a_bad_request(self) -> None:
         """A duplicate notebook or section name comes back as 409; calling that a bad request
         sends the model to fix a request that was well formed."""
         message = _message(GraphFailure("taken", status=409, code="20117", request_id=None))
 
-        assert "already exists" in message
-        assert "change the name" in message
+        assert "already there" in message
+        assert "Change the name" in message
         assert "bad request" not in message
 
     def test_a_missing_item_does_not_claim_the_item_does_not_exist(self) -> None:

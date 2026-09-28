@@ -2528,3 +2528,106 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert "AADSTS65001" in message
         assert "resolve dependency" not in message
         assert not route.called
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize("status", [400, 409])
+    async def test_a_rejected_request_tells_the_model_graphs_own_reason(
+        self, mcp_client: Client[FastMCPTransport], graph: respx.MockRouter, status: int
+    ) -> None:
+        _ = graph.get("/me").mock(
+            return_value=httpx.Response(
+                status,
+                headers={"request-id": "synthetic-request-id"},
+                json={
+                    "error": {
+                        "code": "ErrorInvalidRequest",
+                        "message": "The 'start' value must be earlier than 'end'.",
+                    }
+                },
+            )
+        )
+
+        result = await mcp_client.call_tool("get_me", {}, raise_on_error=False)
+
+        assert result.is_error
+        message = _error_text(result)
+        assert "\"The 'start' value must be earlier than 'end'.\"" in message, message
+        assert "fail the same way" in message
+        assert "synthetic-request-id" in message
+
+    @pytest.mark.usefixtures("obo")
+    async def test_graphs_reason_arrives_as_one_line_of_at_most_300_characters(
+        self, mcp_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me").mock(
+            return_value=httpx.Response(
+                400,
+                json={
+                    "error": {
+                        "code": "BadRequest",
+                        "message": "Invalid filter clause:\r\n\tsubject eq\x00 \u202e'"
+                        + "x" * 1000,
+                    }
+                },
+            )
+        )
+
+        result = await mcp_client.call_tool("get_me", {}, raise_on_error=False)
+
+        message = _error_text(result)
+        opening = "Invalid filter clause: subject eq '"
+        reason = opening + "x" * (299 - len(opening)) + "\u2026"
+        assert len(reason) == 300
+        assert f'"{reason}"' in message, message
+        assert not any(character in message for character in "\r\n\t\x00\u202e")
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        "error",
+        [
+            {"code": "ErrorInvalidRequest"},
+            {"code": "ErrorInvalidRequest", "message": ""},
+            {"code": "ErrorInvalidRequest", "message": " \r\n\x00 "},
+        ],
+        ids=["absent", "empty", "blank"],
+    )
+    async def test_a_rejection_without_a_reason_gets_only_the_fixed_advice(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        error: dict[str, str],
+    ) -> None:
+        _ = graph.get("/me").mock(
+            return_value=httpx.Response(
+                400, headers={"request-id": "synthetic-request-id"}, json={"error": error}
+            )
+        )
+
+        result = await mcp_client.call_tool("get_me", {}, raise_on_error=False)
+
+        assert _error_text(result) == (
+            "Microsoft 365 rejected this request because it is a bad request, not an outage or a "
+            + "permission problem. If you call this tool again with the same arguments, the call "
+            + "will fail the same way. "
+            + "(HTTP 400, Graph error code ErrorInvalidRequest, Graph request id "
+            + "synthetic-request-id)"
+        )
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize("status", [401, 403, 404, 500])
+    async def test_a_refusal_whose_advice_is_complete_leaves_graphs_reason_out(
+        self, mcp_client: Client[FastMCPTransport], graph: respx.MockRouter, status: int
+    ) -> None:
+        _ = graph.get("/me").mock(
+            return_value=httpx.Response(
+                status,
+                json={"error": {"code": "Denied", "message": "Item 'Board minutes' is private."}},
+            )
+        )
+
+        result = await mcp_client.call_tool("get_me", {}, raise_on_error=False)
+
+        assert result.is_error
+        message = _error_text(result)
+        assert "Board minutes" not in message, "the advice must not repeat the message of Graph"
+        assert "gave this reason" not in message, message

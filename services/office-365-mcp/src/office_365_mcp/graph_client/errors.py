@@ -8,6 +8,7 @@ to "branch on the `innerError.code` value, not the message text"
 (https://learn.microsoft.com/en-us/graph/api/calltranscript-get).
 """
 
+import unicodedata
 from asyncio import CancelledError
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -42,12 +43,14 @@ class GraphFailure(Exception):
         code: str | None,
         request_id: str | None,
         inner_code: str | None = None,
+        reason: str | None = None,
     ) -> None:
         super().__init__(message)
         self.status: int | None = status
         self.code: str | None = code
         self.request_id: str | None = request_id
         self.inner_code: str | None = inner_code
+        self.reason: str | None = reason
 
 
 class GraphThrottled(GraphFailure):
@@ -331,8 +334,29 @@ def _classify(error: APIError) -> GraphFailure:
             message, status=status, code=code, request_id=request_id, inner_code=inner_code
         )
     return GraphFailure(
-        message, status=status, code=code, request_id=request_id, inner_code=inner_code
+        message,
+        status=status,
+        code=code,
+        request_id=request_id,
+        inner_code=inner_code,
+        reason=_reason(error),
     )
+
+
+_REASON_LIMIT = 300
+
+
+def _reason(error: APIError) -> str | None:
+    if not isinstance(error, ODataError) or error.error is None or error.error.message is None:
+        return None
+    visible = "".join(
+        " " if unicodedata.category(character).startswith("C") else character
+        for character in error.error.message
+    )
+    line = " ".join(visible.split())
+    if len(line) > _REASON_LIMIT:
+        return line[: _REASON_LIMIT - 1] + "\u2026"
+    return line or None
 
 
 def _inner_code(error: APIError) -> str | None:
