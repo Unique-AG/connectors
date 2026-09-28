@@ -7,7 +7,6 @@ from with_intelligence_mcp.features.investments.api_responses import (
     InvestmentExtendedAttributes,
     InvestmentListItemAttributes,
 )
-from with_intelligence_mcp.features.investments.resource_utils import MapPositionToResponseUtil
 from with_intelligence_mcp.features.investments.responses import (
     InvestorPositionsResponse,
     PositionResponse,
@@ -28,16 +27,8 @@ _INVESTMENTS_PAGE = TypeAdapter(Page[InvestmentListItemAttributes])
 
 
 class GetInvestmentsQuery:
-    def __init__(
-        self,
-        *,
-        client: WithIntelligenceClient,
-        map_position_to_response_util: MapPositionToResponseUtil,
-    ) -> None:
+    def __init__(self, *, client: WithIntelligenceClient) -> None:
         self._client: WithIntelligenceClient = client
-        self._map_position_to_response_util: MapPositionToResponseUtil = (
-            map_position_to_response_util
-        )
 
     async def run(
         self,
@@ -56,7 +47,7 @@ class GetInvestmentsQuery:
             *(_fetch_investment(self._client, position.id) for position in listed)
         )
         positions = [
-            self._map_position_to_response_util.run(record=detail)
+            PositionResponse.from_attributes(detail)
             if detail
             else PositionResponse(id=listed[index].id)
             for index, detail in enumerate(details)

@@ -1,5 +1,11 @@
+from typing import Self
+
 from pydantic import Field
 
+from with_intelligence_mcp.features.investments.api_responses import (
+    InvestmentExtendedAttributes,
+)
+from with_intelligence_mcp.features.investors.api_responses import ClassificationAttributes
 from with_intelligence_mcp.models import OmitNoneModel
 
 
@@ -37,6 +43,41 @@ class PositionResponse(OmitNoneModel):
         ),
     )
 
+    @classmethod
+    def from_attributes(cls, attributes: InvestmentExtendedAttributes) -> Self:
+        detail_available = bool(attributes.model_fields_set - {"id"})
+        strategy_available = bool(
+            {"fund_primary_strategies", "fund_secondary_strategies"} & attributes.model_fields_set
+        )
+        return cls(
+            id=attributes.id,
+            fund=attributes.fund.name if attributes.fund else None,
+            fund_id=attributes.fund.id if attributes.fund else None,
+            manager=attributes.manager_firm.name if attributes.manager_firm else None,
+            manager_id=attributes.manager_firm.id if attributes.manager_firm else None,
+            amount=_amount(attributes),
+            asset_classes=(
+                _names(attributes.asset_classes)
+                if "asset_classes" in attributes.model_fields_set
+                else None
+            ),
+            strategies=(
+                _names(attributes.fund_primary_strategies)
+                + _names(attributes.fund_secondary_strategies)
+                if strategy_available
+                else None
+            ),
+            structures=(
+                _names(attributes.fund_structures)
+                if "fund_structures" in attributes.model_fields_set
+                else None
+            ),
+            as_of=attributes.latest_as_of,
+            is_current=not attributes.deleted_at if detail_available else None,
+            exited_on=attributes.deleted_at,
+            fund_unidentified=attributes.fund.unknown if attributes.fund else None,
+        )
+
 
 class InvestorPositionsResponse(OmitNoneModel):
     """An investor's fund roster — who they allocate to, and at what size."""
@@ -48,3 +89,18 @@ class InvestorPositionsResponse(OmitNoneModel):
         default=0, description="How many positions With Intelligence holds in total."
     )
     returned: int = 0
+
+
+def _names(values: list[ClassificationAttributes]) -> list[str]:
+    return [value.name for value in values if value.name]
+
+
+def _amount(attributes: InvestmentExtendedAttributes) -> PositionAmountResponse | None:
+    amount = attributes.amount
+    if amount is None or amount.amount is None:
+        return None
+    return PositionAmountResponse(
+        value_millions=amount.amount,
+        as_of=amount.date,
+        currency=amount.currency.short_name if amount.currency else None,
+    )

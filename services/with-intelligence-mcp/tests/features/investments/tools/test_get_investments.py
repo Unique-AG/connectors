@@ -6,7 +6,6 @@ import respx
 from tests.helpers import BASE_URL, build_client, page_body, sent_query
 from with_intelligence_mcp.features.investments import InvestorPositionsResponse
 from with_intelligence_mcp.features.investments.queries import GetInvestmentsQuery
-from with_intelligence_mcp.features.investments.resource_utils import MapPositionToResponseUtil
 from with_intelligence_mcp.features.investments.tools.get_investments import (
     get_investments as call_get_investments,
 )
@@ -38,10 +37,7 @@ async def get_investments(
         limit=limit,
         updated_since=updated_since,
         resolve_investor_record_query=ResolveInvestorRecordQuery(client),
-        get_investments_query=GetInvestmentsQuery(
-            client=client,
-            map_position_to_response_util=MapPositionToResponseUtil(),
-        ),
+        get_investments_query=GetInvestmentsQuery(client=client),
     )
 
 
