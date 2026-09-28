@@ -8,7 +8,6 @@ from with_intelligence_mcp.features.mandates.api_responses import (
     MandateStatusAttributes,
 )
 from with_intelligence_mcp.features.mandates.dependencies import get_mandates_query_factory
-from with_intelligence_mcp.features.mandates.fetch_mandate import fetch_mandate
 from with_intelligence_mcp.features.mandates.fetch_mandates_for_investor import (
     MANDATES_PATH,
     fetch_mandates_for_investor,
@@ -31,7 +30,6 @@ __all__ = [
     "MandateNoteAttributes",
     "MandateResponse",
     "MandateStatusAttributes",
-    "fetch_mandate",
     "fetch_mandates_for_investor",
     "get_mandates_query_factory",
 ]

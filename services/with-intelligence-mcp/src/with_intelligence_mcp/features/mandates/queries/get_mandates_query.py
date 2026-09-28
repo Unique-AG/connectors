@@ -1,18 +1,26 @@
 import asyncio
 import logging
 
+from pydantic import TypeAdapter
+
 from with_intelligence_mcp.features.investors.api_responses import InvestorExtendedAttributes
-from with_intelligence_mcp.features.mandates.fetch_mandate import fetch_mandate
+from with_intelligence_mcp.features.mandates.api_responses import MandateExtendedAttributes
 from with_intelligence_mcp.features.mandates.fetch_mandates_for_investor import (
+    MANDATES_PATH,
     fetch_mandates_for_investor,
 )
 from with_intelligence_mcp.features.mandates.responses import (
     InvestorMandatesResponse,
     MandateResponse,
 )
-from with_intelligence_mcp.with_intelligence_client import WithIntelligenceClient
+from with_intelligence_mcp.with_intelligence_client import (
+    NotEntitled,
+    NotFound,
+    WithIntelligenceClient,
+)
 
 logger = logging.getLogger(__name__)
+_MANDATE_RESPONSE = TypeAdapter(MandateExtendedAttributes)
 
 
 class GetMandatesQuery:
@@ -34,7 +42,9 @@ class GetMandatesQuery:
             limit=limit,
             updated_since=updated_since,
         )
-        details = await asyncio.gather(*(fetch_mandate(self._client, entry.id) for entry in listed))
+        details = await asyncio.gather(
+            *(_fetch_mandate(self._client, entry.id) for entry in listed)
+        )
         mandates = [
             MandateResponse.from_attributes(detail)
             if detail
@@ -55,3 +65,12 @@ class GetMandatesQuery:
             extra={"investor_id": investor.id, "returned": response.returned, "total": total},
         )
         return response
+
+
+async def _fetch_mandate(
+    client: WithIntelligenceClient, mandate_id: int
+) -> MandateExtendedAttributes | None:
+    try:
+        return await client.get_json(f"{MANDATES_PATH}/{mandate_id}", _MANDATE_RESPONSE)
+    except NotEntitled, NotFound:
+        return None
