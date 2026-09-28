@@ -89,6 +89,8 @@ class InvestorPositionsResponse(OmitNoneModel):
         default=0, description="How many positions With Intelligence holds in total."
     )
     returned: int = 0
+    page: int = 1
+    has_more: bool = False
 
 
 def _names(values: list[ClassificationAttributes]) -> list[str]:

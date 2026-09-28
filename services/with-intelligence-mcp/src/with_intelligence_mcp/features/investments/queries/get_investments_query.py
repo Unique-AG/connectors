@@ -34,12 +34,14 @@ class GetInvestmentsQuery:
         self,
         *,
         investor: InvestorExtendedAttributes,
+        page: int,
         limit: int,
         updated_since: str | None,
     ) -> InvestorPositionsResponse:
         listed, total = await _fetch_investments_for_investor(
             self._client,
             investor.id,
+            page=page,
             limit=limit,
             updated_since=updated_since,
         )
@@ -58,6 +60,8 @@ class GetInvestmentsQuery:
             positions=positions,
             total=total,
             returned=len(positions),
+            page=page,
+            has_more=(page - 1) * limit + len(positions) < total,
         )
         logger.info(
             "investments.investor.fetched",
@@ -70,6 +74,7 @@ async def _fetch_investments_for_investor(
     client: WithIntelligenceClient,
     investor_id: int,
     *,
+    page: int,
     limit: int,
     updated_since: str | None,
 ) -> tuple[list[InvestmentListItemAttributes], int]:
@@ -82,10 +87,10 @@ async def _fetch_investments_for_investor(
     if updated_since is not None:
         params["updated_at[from]"] = updated_since
 
-    page = await client.get_page(
-        _INVESTMENTS_PATH, _INVESTMENTS_PAGE, params, page=1, page_size=limit
+    response = await client.get_page(
+        _INVESTMENTS_PATH, _INVESTMENTS_PAGE, params, page=page, page_size=limit
     )
-    return page.results, page.pagination.total
+    return response.results, response.pagination.total
 
 
 async def _fetch_investment(

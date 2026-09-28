@@ -51,6 +51,7 @@ async def get_investments(
         ),
     ] = None,
     investor_id: Annotated[int | None, Field(description="Investor id, when known.")] = None,
+    page: Annotated[int, Field(ge=1, description="Page number to return.")] = 1,
     limit: Annotated[int, Field(ge=1, le=50, description="How many positions to return.")] = 25,
     updated_since: Annotated[
         str | None,
@@ -80,6 +81,7 @@ async def get_investments(
     try:
         return await get_investments_query.run(
             investor=investor,
+            page=page,
             limit=limit,
             updated_since=updated_since,
         )

@@ -23,6 +23,7 @@ async def get_investments(
     client: WithIntelligenceClient,
     name: str | None = None,
     investor_id: int | None = None,
+    page: int = 1,
     limit: int = 25,
     updated_since: str | None = None,
 ) -> (
@@ -34,6 +35,7 @@ async def get_investments(
     return await call_get_investments(
         name=name,
         investor_id=investor_id,
+        page=page,
         limit=limit,
         updated_since=updated_since,
         resolve_investor_record_query=ResolveInvestorRecordQuery(client),
@@ -216,6 +218,23 @@ class TestScoping:
         assert "investor_id=2504" in query
         assert "asset_class_group=hfm" in query
         assert "sort%5Bupdated_at%5D=desc" in query
+
+    @respx.mock
+    async def test_requests_the_selected_page(self) -> None:
+        route = respx.get(f"{BASE_URL}/v3/investments").mock(
+            return_value=httpx.Response(200, json=page_body([], total=500, page=4, size=25))
+        )
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=INVESTOR)
+        )
+        client, _ = build_client()
+        result = await get_investments(investor_id=2504, page=4, limit=25, client=client)
+        assert isinstance(result, InvestorPositionsResponse)
+        assert result.page == 4
+        assert result.has_more is True
+        query = sent_query(route)
+        assert "page=4" in query
+        assert "page_size=25" in query
 
     @respx.mock
     async def test_updated_since_becomes_a_change_log_window(self) -> None:
