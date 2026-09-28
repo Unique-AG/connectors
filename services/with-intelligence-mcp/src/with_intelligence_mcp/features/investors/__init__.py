@@ -10,7 +10,7 @@ from with_intelligence_mcp.features.investors.dependencies import (
     get_map_investor_to_response_util_factory,
     get_resolve_investor_record_query_factory,
 )
-from with_intelligence_mcp.features.investors.fetch_investor import INVESTORS_PATH, fetch_investor
+from with_intelligence_mcp.features.investors.fetch_investor import fetch_investor
 from with_intelligence_mcp.features.investors.queries import (
     GetInvestorQuery,
     ResolveInvestorRecordQuery,
@@ -34,7 +34,6 @@ from with_intelligence_mcp.features.investors.search_investors_by_name import (
 )
 
 __all__ = [
-    "INVESTORS_PATH",
     "ClassificationAttributes",
     "ConsultantResponse",
     "GetInvestorQuery",

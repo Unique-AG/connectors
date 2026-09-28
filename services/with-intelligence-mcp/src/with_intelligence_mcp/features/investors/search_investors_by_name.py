@@ -1,7 +1,6 @@
 from pydantic import TypeAdapter
 
 from with_intelligence_mcp.features.investors.api_responses import InvestorListItemAttributes
-from with_intelligence_mcp.features.investors.fetch_investor import INVESTORS_PATH
 from with_intelligence_mcp.with_intelligence_client import (
     Page,
     QueryValue,
@@ -23,5 +22,5 @@ async def search_investors_by_name(
     if client.asset_class_groups:
         params["asset_class_group"] = list(client.asset_class_groups)
 
-    page = await client.get_page(INVESTORS_PATH, _INVESTORS_PAGE, params, page=1, page_size=limit)
+    page = await client.get_page("/v3/investors", _INVESTORS_PAGE, params, page=1, page_size=limit)
     return page.results, page.pagination.total
