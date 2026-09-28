@@ -71,16 +71,27 @@ This is only for a custom field the user names, something like `documentType`
 or `department`. A few keys always exist and need no discovery: `mimeType`,
 `title`, `validAsOf`. Filter on those directly.
 
-For anything else, call `content_metadata` first. It returns every field name
-and every distinct value in scope, exhaustively rather than as a sample. Read
-it and you know which `path` keys exist. Skip it and you are guessing at a
-field name, and a filter naming a field that does not exist returns nothing.
-That reads exactly like a knowledge base with no matching content.
+For anything else, call `content_metadata` first. The result is one object
+with `complete`, an optional `notice` list, and exactly one catalog.
+`metadata` maps each field to its values. `metadata_counts`, from
+`counts_only=true`, maps each field to how many distinct values it has.
+Read it and you know which `path` keys exist. Skip it and you are guessing
+at a field name, and a filter naming a field that does not exist returns
+nothing. That reads exactly like a knowledge base with no matching content.
+
+Each field comes back with its 50 most common values. Pass `limit` to see
+more. An admin ceiling clamps that number, and naming `fields` does not
+lift it. A notice line `documentType: showing 50 of 120 values` means the
+rest were withheld. The same `limit` returns the same values.
+`counts_only` ignores `limit` and reports the real count for every field.
+
+If `complete` is false, the scan is still running. Call again with the same
+arguments. Do not tell the user a missing field or value does not exist.
 
 On a large scope, call it with `counts_only=true` first: field names and how
 many distinct values each has, no value lists. Then call again with
-`fields=['the one you need']` to fetch just that field's values. Two cheap
-calls beat one call whose value lists you never asked for and don't need.
+`fields=['the one you need']` to fetch just that field's values. Two calls
+beat one whose value lists you never asked for.
 
 Two things it does not promise. Many knowledge bases carry little or no
 custom taxonomy, so an empty result is normal, not a failure. Fall back to
@@ -98,9 +109,11 @@ and retry before reporting nothing found.
    → locate the Contracts line, copy its (folder_id=scope_...) annotation
      verbatim; re-run with a larger max_depth only if Contracts isn't there yet
 
-2. content_metadata(folder_ids=['scope_...'])
-   → returns e.g. [{"documentType": ["Terms", "Amendment"]}]
-     now you know documentType exists and what it holds
+2. content_metadata(folder_ids=['scope_...'], fields=['documentType'])
+   → {"complete": true,
+      "metadata": [{"documentType": ["Terms", "Amendment"]}]}
+     documentType exists and those are its values. A notice
+     "showing N of M values" means the list was shortened.
 
 3. search(search_string='2031 supplier terms changes',
           folder_ids=['scope_...'],

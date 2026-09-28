@@ -115,8 +115,19 @@ def _files(*metadata_dicts: dict) -> list[tuple[MagicMock, PurePosixPath]]:
     ]
 
 
-def _payload(result: ToolResult) -> list[dict]:
-    return json.loads(result.content[0].text)  # type: ignore[union-attr]
+def _body(result: ToolResult) -> dict[str, Any]:
+    assert result.content is not None
+    assert len(result.content) == 1
+    parsed = json.loads(result.content[0].text)  # type: ignore[union-attr]
+    assert isinstance(parsed, dict)
+    return parsed
+
+
+def _payload(result: ToolResult) -> list[dict[str, Any]]:
+    body = _body(result)
+    catalog = body["metadata"] if "metadata" in body else body["metadata_counts"]
+    assert isinstance(catalog, list)
+    return catalog
 
 
 def test_flatten_metadata_value_scalar_wraps_in_a_single_item_list():
@@ -132,8 +143,20 @@ def test_flatten_metadata_value_drops_nested_objects():
     assert _flatten_metadata_value({"nested": True}) == []
 
 
+def test_output_schema_publishes_the_catalog_fields():
+    schema = content_metadata.__fastmcp__.output_schema  # type: ignore[attr-defined]
+    assert isinstance(schema, dict)
+    assert set(schema["properties"]) == {
+        "complete",
+        "notice",
+        "metadata",
+        "metadata_counts",
+    }
+    assert schema["required"] == ["complete"]
+
+
 @pytest.mark.asyncio
-async def test_returns_json_list_of_single_key_field_to_values_objects():
+async def test_returns_a_complete_metadata_catalog():
     mock_tree = _make_mock_tree(
         snapshot=FakeSnapshot(
             files=_files({"department": "Legal"}, {"department": "Finance"})
@@ -145,8 +168,12 @@ async def test_returns_json_list_of_single_key_field_to_values_objects():
         result = await content_metadata(config=ContentMetadataToolConfig())
 
     assert isinstance(result, ToolResult)
-    payload = _payload(result)
-    assert payload == [{"department": ["Legal", "Finance"]}]
+    body = _body(result)
+    assert result.structured_content == body
+    assert body["complete"] is True
+    assert "notice" not in body
+    assert "metadata_counts" not in body
+    assert body["metadata"] == [{"department": ["Finance", "Legal"]}]
 
 
 @pytest.mark.asyncio
@@ -167,6 +194,65 @@ async def test_values_within_a_field_are_ordered_most_common_first():
 
     payload = _payload(result)
     assert payload == [{"status": ["approved", "draft"]}]
+
+
+@pytest.mark.asyncio
+async def test_tied_ranking_stays_the_same_when_file_order_changes():
+    rows = (
+        {"zeta": "mid", "author": "ada", "mood": "calm", "region": "eu"},
+        {"zeta": "mid", "mood": "glad", "author": "ada"},
+        {"zeta": "mid", "author": "bea", "mood": "sad", "region": "us"},
+        {"zeta": "alpha", "mood": "mad", "author": "bea"},
+        {"zeta": "alpha"},
+        {"zeta": "bravo"},
+        {"zeta": "bravo"},
+        {"zeta": "delta"},
+        {"zeta": "delta"},
+        {"zeta": "echo"},
+        {"zeta": "echo"},
+        {"zeta": "zoo"},
+        {"zeta": "ant"},
+        {"zeta": "moon"},
+    )
+    # Same files, opposite walk order and opposite key order inside each file.
+    orders = (
+        rows,
+        tuple(dict(reversed(row.items())) for row in reversed(rows)),
+    )
+    value_bodies = []
+    count_bodies = []
+    for order in orders:
+        mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=_files(*order)))
+        with patch(
+            "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+        ):
+            values = await content_metadata(limit=3, config=ContentMetadataToolConfig())
+            counts = await content_metadata(
+                counts_only=True, limit=1, config=ContentMetadataToolConfig()
+            )
+        value_bodies.append(_body(values))
+        count_bodies.append(_body(counts))
+
+    assert value_bodies[0] == value_bodies[1]
+    assert value_bodies[0]["metadata"] == [
+        {"zeta": ["mid", "alpha", "bravo"]},
+        {"author": ["ada", "bea"]},
+        {"mood": ["calm", "glad", "mad"]},
+        {"region": ["eu", "us"]},
+    ]
+    assert value_bodies[0]["notice"] == [
+        "zeta: showing 3 of 8 values.",
+        "mood: showing 3 of 4 values.",
+    ]
+    assert count_bodies[0] == count_bodies[1]
+    assert count_bodies[0]["metadata_counts"] == [
+        {"zeta": 8},
+        {"author": 2},
+        {"mood": 4},
+        {"region": 2},
+    ]
+    assert "notice" not in count_bodies[0]
+    assert "metadata" not in count_bodies[0]
 
 
 @pytest.mark.asyncio
@@ -590,9 +676,11 @@ async def test_incomplete_snapshot_leads_with_notice():
     ):
         result = await content_metadata(config=ContentMetadataToolConfig())
 
-    assert len(result.content) == 2  # type: ignore[arg-type]
-    assert result.content[0].text.startswith("This scan is incomplete.")  # type: ignore[union-attr]
-    assert json.loads(result.content[1].text) == [{"department": ["Legal"]}]  # type: ignore[union-attr]
+    body = _body(result)
+    assert body["complete"] is False
+    assert len(body["notice"]) == 1
+    assert body["notice"][0].startswith("This scan is incomplete.")
+    assert body["metadata"] == [{"department": ["Legal"]}]
 
 
 @pytest.mark.asyncio
@@ -612,13 +700,14 @@ async def test_incomplete_snapshot_does_not_claim_requested_fields_are_absent(
             config=ContentMetadataToolConfig(),
         )
 
-    texts = [block.text for block in result.content]  # type: ignore[union-attr]
-    assert len(texts) == 2
-    assert texts[0].startswith("This scan is incomplete.")
-    assert json.loads(texts[1]) == (
+    body = _body(result)
+    assert body["complete"] is False
+    assert body["notice"][0].startswith("This scan is incomplete.")
+    assert "No values found" not in body["notice"][0]
+    catalog_key = "metadata_counts" if counts_only else "metadata"
+    assert body[catalog_key] == (
         [{"department": 1}] if counts_only else [{"department": ["Legal"]}]
     )
-    assert not any("No values found" in text for text in texts)
 
 
 @pytest.mark.asyncio
@@ -765,8 +854,7 @@ async def test_fields_limits_the_catalog_to_the_requested_fields():
             fields=["status", "region"], config=ContentMetadataToolConfig()
         )
 
-    assert _payload(result) == [{"status": ["draft", "approved"]}, {"region": ["EU"]}]
-    assert len(result.content) == 1
+    assert _payload(result) == [{"status": ["approved", "draft"]}, {"region": ["EU"]}]
 
 
 @pytest.mark.asyncio
@@ -825,7 +913,9 @@ async def test_requesting_an_admin_excluded_field_does_not_reveal_it():
         )
 
     assert _payload(result) == []
-    assert "'key'" in result.content[1].text  # type: ignore[union-attr]
+    notice = _body(result)["notice"][0]
+    assert "'key'" in notice
+    assert "counts_only=true" in notice
 
 
 @pytest.mark.asyncio
@@ -839,10 +929,11 @@ async def test_requested_fields_with_no_values_are_named_in_a_notice():
             config=ContentMetadataToolConfig(),
         )
 
-    assert _payload(result) == [{"status": ["draft", "approved"]}]
-    notice = result.content[1].text  # type: ignore[union-attr]
-    assert "['Department']" in notice
-    assert "counts_only=true" in notice
+    body = _body(result)
+    assert body["metadata"] == [{"status": ["approved", "draft"]}]
+    assert len(body["notice"]) == 1
+    assert "['Department']" in body["notice"][0]
+    assert "counts_only=true" in body["notice"][0]
 
 
 @pytest.mark.asyncio
@@ -857,7 +948,6 @@ async def test_empty_fields_list_returns_no_fields(counts_only: bool):
         )
 
     assert _payload(result) == []
-    assert len(result.content) == 1  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
@@ -890,3 +980,92 @@ async def test_counts_only_counts_each_list_element_as_a_distinct_value():
         )
 
     assert _payload(result) == [{"tags": 3}]
+
+
+def _kind_files(*values: str) -> FakeSnapshot:
+    return FakeSnapshot(files=_files(*[{"kind": value} for value in values]))
+
+
+@pytest.mark.asyncio
+async def test_default_limit_keeps_the_most_common_values():
+    values = ["common", "common", "common", *(f"v{i}" for i in range(59))]
+    mock_tree = _make_mock_tree(snapshot=_kind_files(*values))
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(config=ContentMetadataToolConfig())
+
+    body = _body(result)
+    shown = body["metadata"][0]["kind"]
+    assert shown[0] == "common"
+    assert len(shown) == 50
+    assert body["notice"] == ["kind: showing 50 of 60 values."]
+
+
+@pytest.mark.asyncio
+async def test_limit_clamps_to_the_admin_ceiling():
+    mock_tree = _make_mock_tree(snapshot=_kind_files(*(f"v{i}" for i in range(20))))
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(
+            limit=5000,
+            config=ContentMetadataToolConfig(max_values_per_field=10),
+        )
+
+    body = _body(result)
+    assert len(body["metadata"][0]["kind"]) == 10
+    assert body["notice"] == ["kind: showing 10 of 20 values."]
+
+
+@pytest.mark.asyncio
+async def test_fields_does_not_lift_the_value_cap():
+    mock_tree = _make_mock_tree(snapshot=_kind_files(*(f"v{i}" for i in range(5))))
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(
+            fields=["kind"], limit=2, config=ContentMetadataToolConfig()
+        )
+
+    body = _body(result)
+    assert len(body["metadata"][0]["kind"]) == 2
+    assert body["notice"] == ["kind: showing 2 of 5 values."]
+
+
+@pytest.mark.asyncio
+async def test_counts_only_ignores_limit_and_reports_the_real_count():
+    mock_tree = _make_mock_tree(snapshot=_kind_files(*(f"v{i}" for i in range(5))))
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(
+            counts_only=True, limit=1, config=ContentMetadataToolConfig()
+        )
+
+    body = _body(result)
+    assert body["metadata_counts"] == [{"kind": 5}]
+    assert "notice" not in body
+    assert "metadata" not in body
+
+
+@pytest.mark.asyncio
+async def test_incomplete_scan_caps_values_without_a_withheld_count():
+    values = ["common", *(f"v{i}" for i in range(59))]
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=_files(*[{"kind": value} for value in values]),
+            complete=False,
+        )
+    )
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        result = await content_metadata(config=ContentMetadataToolConfig())
+
+    body = _body(result)
+    assert body["complete"] is False
+    assert len(body["metadata"][0]["kind"]) == 50
+    assert len(body["notice"]) == 1
+    assert body["notice"][0].startswith("This scan is incomplete.")
+    assert "showing" not in body["notice"][0]
