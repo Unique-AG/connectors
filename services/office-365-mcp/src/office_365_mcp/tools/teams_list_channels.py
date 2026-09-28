@@ -170,7 +170,6 @@ def _make_sure_the_filter_was_applied(
 
 
 def _headers() -> HeadersCollection:
-    """Built per request. Adding to the shared default collection affects every Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_UNKNOWN_ENUMS)
     return headers

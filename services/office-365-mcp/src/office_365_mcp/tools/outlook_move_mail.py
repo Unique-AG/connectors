@@ -7,7 +7,6 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.mail_folder import MailFolder
 from msgraph.generated.models.mail_search_folder import MailSearchFolder
 from msgraph.generated.users.item.messages.item.move.move_post_request_body import (
@@ -24,6 +23,7 @@ from office_365_mcp.shared.handles import (
     mail_folder_handle,
     mail_message_handle,
 )
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import WellKnownFolder
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -64,8 +64,6 @@ assert _SEARCH_FOLDER_ONLY, (
     "MailSearchFolder declares no property of its own, so the destination check below accepts "
     "every search folder silently"
 )
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 
 _DESCRIPTION = (
@@ -279,9 +277,7 @@ async def _move_one(
 
 
 def _move_request() -> RequestConfiguration[QueryParameters]:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return RequestConfiguration[QueryParameters](headers=headers, options=no_retry())
+    return RequestConfiguration[QueryParameters](headers=immutable_id_headers(), options=no_retry())
 
 
 def _raise_when_nothing_moved(attempts: Sequence[_Attempt]) -> None:

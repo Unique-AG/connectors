@@ -6,7 +6,6 @@ import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.message import Message
@@ -18,6 +17,7 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
     SUMMARY_FIELDS,
     MailAddress,
@@ -49,7 +49,6 @@ _MESSAGE_FIELDS: tuple[str, ...] = (
 )
 
 _PREFER_TEXT_BODY = ("Prefer", 'outlook.body-content-type="text"')
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 MAX_BODY_CHARACTERS = 25000
 
@@ -148,9 +147,8 @@ async def read_mail(
 
 
 def _request() -> RequestConfiguration[_MessageQuery]:
-    headers = HeadersCollection()
+    headers = immutable_id_headers()
     headers.add(*_PREFER_TEXT_BODY)
-    headers.add(*_PREFER_IMMUTABLE_IDS)
     return RequestConfiguration[_MessageQuery](
         query_parameters=_MessageQuery(select=list(_MESSAGE_FIELDS)),
         headers=headers,

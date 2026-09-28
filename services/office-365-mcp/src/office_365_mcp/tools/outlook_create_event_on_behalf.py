@@ -21,7 +21,6 @@ from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
-from kiota_abstractions.headers_collection import HeadersCollection
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.calendar import Calendar
 from msgraph.generated.models.event import Event
@@ -56,6 +55,7 @@ from office_365_mcp.shared.calendar import (
     zone_named,
 )
 from office_365_mcp.shared.handles import EventHandle, calendar_handle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -93,8 +93,6 @@ GRAPH_NOT_FOUND = (
     + "calendar. Call outlook_list_calendars again to see what the signed-in user can still "
     + "write to, and tell the user the calendar is no longer theirs to write to if it is gone."
 )
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _AGREE = "create"
 _DECLINE = "do not create"
@@ -556,18 +554,10 @@ async def _created(
         created = await client.me.calendars.by_calendar_id(calendar_id).events.post(
             event_body(draft, transaction_id=transaction),
             request_configuration=RequestConfiguration[QueryParameters](
-                options=no_retry(), headers=_immutable_ids()
+                options=no_retry(), headers=immutable_id_headers()
             ),
         )
     return created_event(created)
-
-
-def _immutable_ids() -> HeadersCollection:
-    """Built per call: kiota's `RequestConfiguration.headers` default is one collection shared by
-    every configuration in the process, so a preference added to it leaks onto every Graph call."""
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return headers
 
 
 def _answer(created: Event, *, calendar: Calendar, draft: EventDraft) -> CreatedEventOnBehalf:

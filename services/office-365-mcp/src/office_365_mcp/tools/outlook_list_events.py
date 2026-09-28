@@ -21,7 +21,6 @@ import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.event import Event
 from msgraph.generated.users.item.calendars.item.calendar_view.calendar_view_request_builder import (  # noqa: E501
     CalendarViewRequestBuilder,
@@ -40,6 +39,7 @@ from office_365_mcp.shared.calendar import (
     zone_named,
 )
 from office_365_mcp.shared.handles import calendar_handle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import runs_backwards
@@ -72,8 +72,6 @@ MIN_FRAGMENT_CHARACTERS = 2
 type OwnerResponse = Literal["accepted", "tentativelyAccepted", "declined", "notResponded"]
 
 _EARLIEST_FIRST = "start/dateTime"
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _EventsQuery = CalendarViewRequestBuilder.CalendarViewRequestBuilderGetQueryParameters
 
@@ -219,7 +217,7 @@ async def list_events(
         calendar = await calendar_of(client, calendar_id=named)
         calendar_id = calendar.id
         assert calendar_id is not None, "Graph answered a calendar read with a calendar with no id"
-        headers = _headers()
+        headers = immutable_id_headers()
         with graph_step(STEP_EVENTS):
             first_page = await client.me.calendars.by_calendar_id(calendar_id).calendar_view.get(
                 request_configuration=RequestConfiguration[_EventsQuery](
@@ -302,15 +300,6 @@ def _owner_answered(event: Event, owner_response: OwnerResponse) -> bool:
     if status is None or status.response is None:
         return False
     return spelled(status.response) == owner_response
-
-
-def _headers() -> HeadersCollection:
-    """Built per request: kiota's `RequestConfiguration.headers` defaults to one collection shared
-    process-wide, and `collect_pages` needs this same collection or page two arrives as `RestId`s.
-    """
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return headers
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
