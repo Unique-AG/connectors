@@ -1,4 +1,3 @@
-import base64
 import re
 from typing import Literal, Self
 
@@ -26,18 +25,6 @@ PREVIEW_CHARACTERS = 255
 
 ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
-MAX_ATTACHMENTS = 10
-
-MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024
-
-MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION = 150 * 1024 * 1024
-
-ATTACHMENTS_FIELD: str = (
-    f"Files to attach, at most {MAX_ATTACHMENTS}, each with `name`, `content_type`, and "
-    + "base64-encoded `content_bytes`, decoded size under "
-    + f"{MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION // (1024 * 1024)} MB. Omit for no attachment."
-)
-
 
 type WellKnownFolder = Literal[
     "inbox",
@@ -48,25 +35,6 @@ type WellKnownFolder = Literal[
     "junkemail",
     "clutter",
 ]
-
-
-class MailAttachmentInput(BaseModel):
-    name: str = Field(min_length=1, description="The file name shown to the recipient.")
-    content_type: str = Field(min_length=1, description="The file's MIME type.")
-    content_bytes: str = Field(min_length=1, description="The file's bytes, base64-encoded.")
-
-
-class MailAttachmentSummary(BaseModel):
-    name: str = Field(description="The file name.")
-    content_type: str = Field(description="The MIME type.")
-    size: int = Field(description="The decoded size of the attachment, in bytes.")
-
-
-def decode_attachment(content_bytes: str) -> bytes | None:
-    try:
-        return base64.b64decode(content_bytes, validate=True)
-    except ValueError:
-        return None
 
 
 class MailAddress(BaseModel):

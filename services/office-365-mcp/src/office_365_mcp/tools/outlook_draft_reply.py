@@ -10,7 +10,6 @@ from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.email_address import EmailAddress
-from msgraph.generated.models.file_attachment import FileAttachment
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.message import Message
 from msgraph.generated.models.recipient import Recipient
@@ -25,18 +24,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry
-from office_365_mcp.shared.attachment_upload import upload_attachment
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.mail import (
-    ATTACHMENTS_FIELD,
-    MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION,
-    MAX_ATTACHMENTS,
-    ONE_ADDRESS,
-    MailAddress,
-    MailAttachmentInput,
-    MailAttachmentSummary,
-    decode_attachment,
-)
+from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     WRITE_ADDITIVE,
@@ -74,9 +63,10 @@ MODES: tuple[str, ...] = ("reply", "forward")
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _DESCRIPTION = (
-    f"Drafts a reply to, or forward of, a found message into Drafts for review. It cannot "
-    f"send — the user presses Send in Outlook — offers no reply-all, Cc, or Bcc, and can "
-    f"attach up to {MAX_ATTACHMENTS} new files with no fetch from a URL."
+    "Drafts a reply to, or forward of, a found message into Drafts for review. It cannot "
+    "send — the user presses Send in Outlook — and offers no reply-all, Cc, or Bcc. It cannot "
+    "add files to the draft. If the user asks to attach a file, tell them to add it in Outlook "
+    "before they send the draft."
 )
 
 _NOT_A_MESSAGE_HANDLE = (
@@ -163,15 +153,6 @@ class MailReplyDraft(BaseModel):
     failure: str | None = Field(
         description="What Microsoft said when this tool did not write the text; null otherwise."
     )
-    attachments: list[MailAttachmentSummary] = Field(
-        description=(
-            "The NEW files this call attached, in order; shorter than requested means "
-            + "`attachment_failure` is set."
-        )
-    )
-    attachment_failure: str | None = Field(
-        description="What Microsoft said about the first new attachment that did not land."
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,21 +161,13 @@ class _Fill:
     failure: GraphFailure | None
 
 
-@dataclass(frozen=True, slots=True)
-class _Attached:
-    attached: list[MailAttachmentSummary]
-    failure: GraphFailure | None
-
-
 async def draft_reply(
     client: GraphServiceClient,
-    transport: httpx.AsyncClient,
     *,
     message_ref: str,
     mode: MailReplyMode,
     body_html: str,
     to: Sequence[str] = (),
-    attachments: Sequence[MailAttachmentInput] = (),
     mailbox: str | None = None,
 ) -> MailReplyDraft:
     assert len(to) <= MAX_RECIPIENTS, f"the To list is bounded by the schema, got {len(to)}"
@@ -204,18 +177,14 @@ async def draft_reply(
     if handle is None:
         raise ToolError(_NOT_A_MESSAGE_HANDLE)
     recipients = _forward_recipients(mode, to)
-    files = _graph_attachments(attachments)
     reached = graph_mailbox(client, mailbox)
 
     with graph_errors(TOOL_NAME):
         created = await _create(reached, handle=handle, mode=mode, recipients=recipients)
         assert created.id is not None, "Graph created a draft it gave no id, which cannot be filled"
         fill = await _fill(reached, draft_id=created.id, body_html=body_html)
-        attached = await _attach(
-            client, transport, draft_id=created.id, files=files, mailbox=mailbox
-        )
 
-    return _answer(mode, created=created, fill=fill, attached=attached)
+    return _answer(mode, created=created, fill=fill)
 
 
 def _forward_recipients(mode: MailReplyMode, to: Sequence[str]) -> list[Recipient]:
@@ -230,45 +199,6 @@ def _forward_recipients(mode: MailReplyMode, to: Sequence[str]) -> list[Recipien
         if ONE_ADDRESS.match(address) is None:
             raise ToolError(_bad_address(address))
     return [Recipient(email_address=EmailAddress(address=address)) for address in trimmed]
-
-
-def _bad_attachment_base64(name: str) -> str:
-    return (
-        f"outlook_draft_reply did not attach {name!r}: `content_bytes` was not valid base64, "
-        + "so there is no file inside it to attach. No draft was created. Base64-encode the "
-        + "file's own bytes and call again."
-    )
-
-
-def _attachment_too_large(name: str, size: int) -> str:
-    mb = size / (1024 * 1024)
-    ceiling = MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION // (1024 * 1024)
-    return (
-        f"outlook_draft_reply did not attach {name!r}: decoded, it is {mb:.1f} MB, at or past "
-        + f"the {ceiling} MB ceiling Microsoft publishes for a single attachment on an Outlook "
-        + "item at all, inline or through an upload session "
-        + "(https://learn.microsoft.com/en-us/graph/outlook-large-attachments). No draft was "
-        + "created. Tell the user to attach it from Outlook directly instead."
-    )
-
-
-def _graph_attachments(attachments: Sequence[MailAttachmentInput]) -> list[FileAttachment]:
-    assert len(attachments) <= MAX_ATTACHMENTS, (
-        f"attachments is bounded by the schema, got {len(attachments)}"
-    )
-    built: list[FileAttachment] = []
-    for attachment in attachments:
-        decoded = decode_attachment(attachment.content_bytes)
-        if decoded is None:
-            raise ToolError(_bad_attachment_base64(attachment.name))
-        if len(decoded) >= MAX_ATTACHMENT_BYTES_VIA_UPLOAD_SESSION:
-            raise ToolError(_attachment_too_large(attachment.name, len(decoded)))
-        built.append(
-            FileAttachment(
-                name=attachment.name, content_type=attachment.content_type, content_bytes=decoded
-            )
-        )
-    return built
 
 
 async def _create(
@@ -305,52 +235,13 @@ async def _fill(reached: UserItemRequestBuilder, *, draft_id: str, body_html: st
     return _Fill(message=filled, failure=None)
 
 
-async def _attach(
-    client: GraphServiceClient,
-    transport: httpx.AsyncClient,
-    *,
-    draft_id: str,
-    files: Sequence[FileAttachment],
-    mailbox: str | None,
-) -> _Attached:
-    attached: list[MailAttachmentSummary] = []
-    for file in files:
-        assert file.name is not None, "a FileAttachment this file built always carries a name"
-        assert file.content_type is not None, (
-            "a FileAttachment this file built always carries a type"
-        )
-        assert file.content_bytes is not None, (
-            "a FileAttachment this file built always carries bytes"
-        )
-        try:
-            await upload_attachment(
-                client,
-                transport,
-                mailbox=mailbox,
-                message_id=draft_id,
-                name=file.name,
-                content_type=file.content_type,
-                content=file.content_bytes,
-            )
-        except GraphFailure as failure:
-            return _Attached(attached=attached, failure=failure)
-        attached.append(
-            MailAttachmentSummary(
-                name=file.name, content_type=file.content_type, size=len(file.content_bytes)
-            )
-        )
-    return _Attached(attached=attached, failure=None)
-
-
 def _request() -> RequestConfiguration[QueryParameters]:
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
     return RequestConfiguration[QueryParameters](headers=headers, options=no_retry())
 
 
-def _answer(
-    mode: MailReplyMode, *, created: Message, fill: _Fill, attached: _Attached
-) -> MailReplyDraft:
+def _answer(mode: MailReplyMode, *, created: Message, fill: _Fill) -> MailReplyDraft:
     assert created.id is not None, "Graph created a draft it gave no id, which cannot be addressed"
     stored = created if fill.message is None else fill.message
     body = None if fill.message is None or fill.message.body is None else fill.message.body.content
@@ -364,8 +255,6 @@ def _answer(
         body=body,
         body_written=fill.message is not None,
         failure=None if fill.failure is None else str(fill.failure),
-        attachments=attached.attached,
-        attachment_failure=None if attached.failure is None else str(attached.failure),
     )
 
 
@@ -422,20 +311,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        attachments: Annotated[
-            list[MailAttachmentInput],
-            Field(default=[], max_length=MAX_ATTACHMENTS, description=ATTACHMENTS_FIELD),
-        ],
         mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> MailReplyDraft:
         return await draft_reply(
             client,
-            transport,
             message_ref=message_ref,
             mode=mode,
             body_html=body_html,
             to=to,
-            attachments=attachments,
             mailbox=mailbox,
         )
