@@ -76,6 +76,8 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (
     "Calendars.ReadWrite.Shared",
 )
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_events",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "calendar_ref": "outlook:///calendars/AAMkSYNTHETIC-cal-0001%3D",
     "subject": "Pricing review",

@@ -1,19 +1,9 @@
-"""One refused Graph call per registered tool, driven through the composed app.
-
-`tests/shared/test_seam.py` and `tests/tools/` look like they cover this, but neither crosses
-`register()`, so a tool whose refusals reach the client untranslated passes both. Every case here
-goes through an in-memory FastMCP client and asserts byte equality with what `shared/seam.py` words
-for the same failure; the wording itself is `tests/shared/test_seam.py`'s subject.
-
-Cases come from `graph_call_examples` over the registered surface. The hand-written table this
-replaced left the file one tool short whenever a tool was registered before its row existed; a tool
-publishing no such call is now a type error (`ToolModule` in `tools/__init__.py`).
-
-The three stubs are this file's own, as they are `test_mcp_tools.py`'s own.
-"""
-
+import ast
 import logging
-from collections.abc import AsyncIterator, Iterator, Mapping
+import pathlib
+from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Mapping
+from importlib import import_module
+from types import ModuleType
 from typing import cast
 
 import httpx
@@ -21,21 +11,35 @@ import pytest
 import respx
 from azure.core.credentials import AccessToken as GraphAccessToken
 from fastmcp import Client, FastMCP
+from fastmcp.client.elicitation import ElicitRequestParams, ElicitResult
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
 from fastmcp.server.dependencies import AccessToken
+from mcp.types import ElicitRequestFormParams
 from starlette.applications import Starlette
 
 from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
-from office_365_mcp.graph_client import GraphForbidden
+from office_365_mcp.graph_client import GraphFailure, GraphForbidden
+from office_365_mcp.shared.handles import onenote_page_handle
 from office_365_mcp.shared.seam import (
+    Advised,
     GraphAdviceMiddleware,
     ToolAdvice,
     graph_tool_errors,
 )
-from office_365_mcp.tools import GraphCallExample, Selection, graph_call_examples, resolve
+from office_365_mcp.tools import (
+    TOOL_NAMES,
+    GraphCallExample,
+    Selection,
+    graph_advice,
+    graph_call_examples,
+    onenote_append_to_page,
+    onenote_edit_page,
+    onenote_rename_page,
+    resolve,
+)
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -53,6 +57,53 @@ _EVERY_TOOL: Mapping[str, GraphCallExample] = graph_call_examples(_SELECTION)
 _NAMES_SEVERAL: tuple[str, ...] = tuple(
     tool for tool, example in _EVERY_TOOL.items() if len(example.permissions) > 1
 )
+
+_EVERY_REGISTERED_TOOL: Mapping[str, GraphCallExample] = graph_call_examples(
+    resolve(preset=None, enabled=TOOL_NAMES)
+)
+
+_A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
+    {
+        "onenote_append_to_page",
+        "onenote_copy_notebook",
+        "onenote_copy_page",
+        "onenote_copy_section",
+        "onenote_create_notebook",
+        "onenote_create_page",
+        "onenote_create_section",
+        "onenote_create_section_group",
+        "onenote_edit_page",
+        "outlook_cancel_event",
+        "outlook_create_event",
+        "outlook_create_event_on_behalf",
+        "outlook_draft_mail",
+        "outlook_draft_reply",
+        "outlook_move_mail",
+        "outlook_respond_to_invite",
+        "outlook_send_draft",
+        "outlook_update_event",
+        "teams_send_channel_message",
+        "teams_send_chat_message",
+    }
+)
+
+_OUTCOME_UNKNOWN = "Microsoft 365 can make a change and then give an error."
+_CHECK_FIRST = "Do not call this tool again first."
+_ASK_THE_USER = "ask the user if the Microsoft 365 app shows the change."
+_RETRY_ONCE = "Retry once"
+
+_EVERY_ADVICE: Mapping[str, ToolAdvice] = graph_advice(resolve(preset=None, enabled=TOOL_NAMES))
+
+_CHAT_MESSAGES = "/chats/19%3Arelease%40thread.v2/messages"
+_PAGE_ID = "1-SYNTHETICPAGE00000000000000000000!ABCDEF"
+_PAGE_PATH = f"/me/onenote/pages/{_PAGE_ID}"
+_PAGE = {
+    "id": _PAGE_ID,
+    "title": "Notes",
+    "parentSection": {"id": "S1", "displayName": "General"},
+    "parentNotebook": {"id": "NB1", "displayName": "Work"},
+}
+_NOTEBOOK = {"id": "NB1", "displayName": "Work", "isShared": False, "userRole": "Owner"}
 
 # The MCP middleware chain the composed app ends up with, outside-in. Two of the six belong to
 # other packages, so the assertion is on names rather than on the types: `_McpMetrics` is
@@ -80,6 +131,16 @@ _RECORDS_THE_OUTCOME = ("MessageLogMiddleware", "_McpMetrics")
 _DOUBLY_MAPPED = "read_twice"
 _MAPPED_ONCE = "read_once"
 _PERMISSION = "Chat.Read"
+
+_SOURCE = pathlib.Path(__file__).parent.parent / "src" / "office_365_mcp"
+_POLICED = (_SOURCE / "tools", _SOURCE / "shared")
+
+_WRITES_THEN_REREADS: tuple[str, ...] = (
+    onenote_append_to_page.TOOL_NAME,
+    onenote_edit_page.TOOL_NAME,
+    onenote_rename_page.TOOL_NAME,
+)
+_WRITTEN_BUT_UNREAD = "Then this connector did not receive the updated page from Microsoft 365."
 
 
 class _StubOboCredential:
@@ -122,8 +183,6 @@ def graph() -> Iterator[respx.MockRouter]:
 
 @pytest.fixture
 def two_tools() -> FastMCP[None]:
-    """One tool words its own refusal, the other leaves it to the middleware, so moving a mapping
-    between the two stays a change nobody calling this server can see."""
     mcp: FastMCP[None] = FastMCP(
         "Two Tools",
         middleware=[
@@ -148,8 +207,45 @@ def two_tools() -> FastMCP[None]:
     return mcp
 
 
+def _gateway_timeout(request: httpx.Request) -> httpx.Response:
+    _ = request
+    return httpx.Response(504)
+
+
+def _read_timeout(request: httpx.Request) -> httpx.Response:
+    raise httpx.ReadTimeout("timed out", request=request)
+
+
+_A_WRITE_FAILS = pytest.mark.parametrize(
+    "failing", [_gateway_timeout, _read_timeout], ids=["504", "read-timeout"]
+)
+
+
+async def _agree_to_it(
+    _message: str,
+    _response_type: type | None,
+    params: ElicitRequestParams,
+    _context: object,
+) -> ElicitResult[dict[str, str]]:
+    assert isinstance(params, ElicitRequestFormParams)
+    options = cast("list[str]", params.requested_schema["properties"]["value"]["enum"])
+    return ElicitResult(action="accept", content={"value": options[0]})
+
+
+@pytest.fixture
+async def agreeing_client() -> AsyncIterator[Client[FastMCPTransport]]:
+    app = _composed(SurfaceConfig.model_validate({"tools_enabled": ",".join(TOOL_NAMES)}))
+    server = cast("FastMCP[None]", app.state.fastmcp_server)
+    async with Client(FastMCPTransport(server), elicitation_handler=_agree_to_it) as client:
+        yield client
+
+
 @pytest.fixture
 def app() -> Starlette:
+    return _composed(SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS}))
+
+
+def _composed(surface: SurfaceConfig) -> Starlette:
     return create_app(
         config=AppConfig.model_validate({"public_base_url": "https://office-365-mcp.example"}),
         database_config=DatabaseConfig.model_validate(
@@ -162,7 +258,7 @@ def app() -> Starlette:
                 "client_secret": "s3cr3t",
             }
         ),
-        surface_config=SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS}),
+        surface_config=surface,
     )
 
 
@@ -375,3 +471,219 @@ class TestTheOrderThePermissionsAreNamed:
         assert appearances == sorted(appearances), (
             f"{tool} declares {declared} and its refusal names them in another order: {message}"
         )
+
+
+def _in_scope(nodes: Iterable[ast.AST]) -> Iterator[ast.AST]:
+    for node in nodes:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | ast.Lambda):
+            continue
+        yield node
+        yield from _in_scope(ast.iter_child_nodes(node))
+
+
+def _module_at(path: pathlib.Path) -> ModuleType:
+    parts = path.relative_to(_SOURCE).with_suffix("").parts
+    return import_module(".".join(("office_365_mcp", *(p for p in parts if p != "__init__"))))
+
+
+def _named(node: ast.expr | None, module: ModuleType) -> tuple[object, ...]:
+    if isinstance(node, ast.Tuple):
+        return tuple(value for element in node.elts for value in _named(element, module))
+    if isinstance(node, ast.Name):
+        return (cast("object", getattr(module, node.id, None)),)
+    return ()
+
+
+def _is(value: object, kind: type[BaseException]) -> bool:
+    return isinstance(value, type) and issubclass(value, kind)
+
+
+def _raised_from_a_graph_failure(path: pathlib.Path) -> Iterator[tuple[int, tuple[object, ...]]]:
+    module = _module_at(path)
+    for handler in ast.walk(ast.parse(path.read_text())):
+        if not isinstance(handler, ast.ExceptHandler) or handler.name is None:
+            continue
+        if not any(_is(caught, GraphFailure) for caught in _named(handler.type, module)):
+            continue
+        for node in _in_scope(handler.body):
+            if (
+                isinstance(node, ast.Raise)
+                and isinstance(node.cause, ast.Name)
+                and node.cause.id == handler.name
+                and isinstance(node.exc, ast.Call)
+            ):
+                yield node.lineno, _named(node.exc.func, module)
+
+
+class TestAToolsOwnWordsForALandedWrite:
+    @pytest.mark.usefixtures("obo", "retry_sleeps")
+    @pytest.mark.parametrize("status", [404, 503])
+    @pytest.mark.parametrize("tool", _WRITES_THEN_REREADS)
+    async def test_a_failed_reread_after_the_write_reaches_the_client_as_written(
+        self, agreeing_client: Client[FastMCPTransport], tool: str, status: int
+    ) -> None:
+        example = _EVERY_REGISTERED_TOOL[tool]
+        handle = onenote_page_handle(str(example.arguments["page"]))
+        assert handle is not None, f"{tool}'s own call example names no page"
+        page_path = f"/me/onenote/pages/{handle.page_id}"
+        page = {"id": handle.page_id, "title": "Synthetic", "parentNotebook": _NOTEBOOK}
+        failed = httpx.Response(status, json={"error": {"code": "synthetic", "message": "x"}})
+
+        with respx.mock(base_url=GRAPH_V1, assert_all_called=False) as graph:
+            _ = graph.get(page_path).mock(
+                side_effect=[httpx.Response(200, json=page), *([failed] * 4)]
+            )
+            _ = graph.get(f"/me/onenote/notebooks/{_NOTEBOOK['id']}").mock(
+                return_value=httpx.Response(200, json=_NOTEBOOK)
+            )
+            written = graph.post(f"{page_path}/onenotePatchContent").mock(
+                return_value=httpx.Response(204)
+            )
+            with pytest.raises(ToolError) as raised:
+                _ = await agreeing_client.call_tool(tool, dict(example.arguments))
+
+        assert written.call_count == 1, f"{tool} did not write exactly once"
+        assert _WRITTEN_BUT_UNREAD in str(raised.value), (
+            f"{tool} wrote once and told the client: {raised.value}"
+        )
+
+    def test_a_tool_that_words_a_graph_failure_itself_raises_advised(self) -> None:
+        sources = sorted(path for directory in _POLICED for path in directory.rglob("*.py"))
+        raised = [
+            (f"{path.relative_to(_SOURCE)}:{line}", named)
+            for path in sources
+            for line, named in _raised_from_a_graph_failure(path)
+        ]
+        reworded = [
+            where
+            for where, named in raised
+            if any(_is(one, ToolError) and not _is(one, Advised) for one in named)
+        ]
+
+        assert raised, "no raise chains a caught Graph failure, so this check guards nothing"
+        assert not reworded, (
+            "GraphAdviceMiddleware replaces a ToolError chained to a Graph failure with its "
+            + f"generic advice. Raise Advised instead at {reworded}"
+        )
+
+
+class TestAWriteThatFailsCanAlreadyBeDone:
+    @pytest.mark.usefixtures("obo")
+    @_A_WRITE_FAILS
+    async def test_a_teams_message_is_posted_once_and_the_model_checks_before_a_repeat(
+        self,
+        agreeing_client: Client[FastMCPTransport],
+        failing: Callable[[httpx.Request], httpx.Response],
+    ) -> None:
+        with respx.mock(base_url=GRAPH_V1, assert_all_called=False) as graph:
+            post = graph.post(_CHAT_MESSAGES).mock(side_effect=failing)
+            with pytest.raises(ToolError) as raised:
+                _ = await agreeing_client.call_tool(
+                    "teams_send_chat_message",
+                    dict(_EVERY_REGISTERED_TOOL["teams_send_chat_message"].arguments),
+                )
+
+        message = str(raised.value)
+        assert post.call_count == 1
+        assert _OUTCOME_UNKNOWN in message
+        assert _CHECK_FIRST in message
+        assert _RETRY_ONCE not in message
+
+    @pytest.mark.usefixtures("obo")
+    @_A_WRITE_FAILS
+    async def test_a_onenote_append_is_posted_once_and_the_model_checks_before_a_repeat(
+        self,
+        agreeing_client: Client[FastMCPTransport],
+        failing: Callable[[httpx.Request], httpx.Response],
+    ) -> None:
+        with respx.mock(base_url=GRAPH_V1, assert_all_called=False) as graph:
+            _ = graph.get(_PAGE_PATH).mock(return_value=httpx.Response(200, json=_PAGE))
+            _ = graph.get("/me/onenote/notebooks/NB1").mock(
+                return_value=httpx.Response(200, json=_NOTEBOOK)
+            )
+            post = graph.post(f"{_PAGE_PATH}/onenotePatchContent").mock(side_effect=failing)
+            with pytest.raises(ToolError) as raised:
+                _ = await agreeing_client.call_tool(
+                    "onenote_append_to_page",
+                    dict(_EVERY_REGISTERED_TOOL["onenote_append_to_page"].arguments),
+                )
+
+        message = str(raised.value)
+        assert post.call_count == 1
+        assert _OUTCOME_UNKNOWN in message
+        assert _CHECK_FIRST in message
+        assert _RETRY_ONCE not in message
+
+    async def test_the_writes_that_a_repeat_can_do_twice_are_the_ones_annotated_so(
+        self, agreeing_client: Client[FastMCPTransport]
+    ) -> None:
+        annotated = {
+            tool.name
+            for tool in await agreeing_client.list_tools()
+            if tool.annotations is not None
+            and not tool.annotations.read_only_hint
+            and not tool.annotations.idempotent_hint
+        }
+
+        assert annotated == _A_REPEAT_CAN_WRITE_TWICE
+
+    def test_the_writes_that_declare_what_shows_their_change_are_the_ones_a_repeat_can_do_twice(
+        self,
+    ) -> None:
+        declared = {
+            tool
+            for tool in TOOL_NAMES
+            if hasattr(import_module(f"office_365_mcp.tools.{tool}"), "CHANGE_SHOWN_BY")
+        }
+
+        assert declared == _A_REPEAT_CAN_WRITE_TWICE
+
+    async def test_a_tool_that_shows_a_change_is_a_read_only_tool_of_this_server(
+        self, agreeing_client: Client[FastMCPTransport]
+    ) -> None:
+        read_only = {
+            tool.name
+            for tool in await agreeing_client.list_tools()
+            if tool.annotations is not None and tool.annotations.read_only_hint
+        }
+        named = {
+            shown
+            for tool in _A_REPEAT_CAN_WRITE_TWICE
+            for shown in cast(
+                "tuple[str, ...]", import_module(f"office_365_mcp.tools.{tool}").CHANGE_SHOWN_BY
+            )
+        }
+
+        assert named <= read_only, named - read_only
+
+    def test_the_advice_names_only_the_tools_that_the_deployment_turns_on(self) -> None:
+        channel = "teams_send_channel_message"
+
+        assert _EVERY_ADVICE[channel].shown_by == ("teams_browse_channel",)
+        assert graph_advice(resolve(preset="teams-write", enabled=None))[channel].shown_by == ()
+
+    @pytest.mark.usefixtures("obo", "retry_sleeps")
+    @pytest.mark.parametrize("tool", TOOL_NAMES)
+    async def test_a_tool_gets_the_outage_advice_that_its_annotation_calls_for(
+        self, agreeing_client: Client[FastMCPTransport], tool: str
+    ) -> None:
+        with respx.mock(base_url=GRAPH_V1, assert_all_called=False) as graph:
+            _ = graph.route().mock(return_value=httpx.Response(504))
+            with pytest.raises(ToolError) as raised:
+                _ = await agreeing_client.call_tool(
+                    tool, dict(_EVERY_REGISTERED_TOOL[tool].arguments)
+                )
+            reached = bool(graph.calls)
+
+        message = str(raised.value)
+        assert reached, f"{tool} refused its own example arguments before reaching Graph"
+        if tool in _A_REPEAT_CAN_WRITE_TWICE:
+            assert _OUTCOME_UNKNOWN in message, message
+            assert _CHECK_FIRST in message, message
+            assert _RETRY_ONCE not in message, message
+            shown_by = _EVERY_ADVICE[tool].shown_by
+            assert all(shown in message for shown in shown_by), message
+            assert (_ASK_THE_USER in message) == (not shown_by), message
+        else:
+            assert _RETRY_ONCE in message, message
+            assert _OUTCOME_UNKNOWN not in message, message

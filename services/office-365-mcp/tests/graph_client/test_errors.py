@@ -258,3 +258,21 @@ def test_a_bug_of_our_own_is_not_reported_as_graph_being_unavailable() -> None:
     for ours in (AssertionError("an invariant of ours"), TypeError("a bug of ours")):
         with pytest.raises(type(ours)), graph_errors("a_test"):
             raise ours
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    [(400, "Invalid filter clause."), (409, "Invalid filter clause."), (403, None), (404, None)],
+)
+async def test_only_a_rejected_request_keeps_graphs_reason_and_never_in_its_logged_message(
+    client: GraphServiceClient, graph: respx.MockRouter, status: int, reason: str | None
+) -> None:
+    graph.get("/me").mock(
+        return_value=httpx.Response(status, json=error_body("aCode", "Invalid filter clause."))
+    )
+
+    with pytest.raises(GraphFailure) as raised, graph_errors("a_test"):
+        _ = await client.me.get()
+
+    assert raised.value.reason == reason
+    assert "Invalid filter clause" not in str(raised.value)

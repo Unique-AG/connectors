@@ -29,6 +29,7 @@ from office_365_mcp.shared.notes import (
 from office_365_mcp.shared.prose import body_opening
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
+    Advised,
     Confirm,
     answer_pending,
     graph_client_for_caller,
@@ -40,6 +41,8 @@ TOOL_NAME = "onenote_append_to_page"
 STEP_APPEND_CONTENT = "append_content"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.ReadWrite",)
+
+CHANGE_SHOWN_BY: tuple[str, ...] = ("onenote_read_page",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "page": "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF",
@@ -88,10 +91,10 @@ GRAPH_NOT_FOUND = (
 )
 
 _WRITTEN_BUT_UNREAD = (
-    "The append reached Microsoft 365 and was applied to the page: only the read back that "
-    + "confirms it failed afterward. Read the page with onenote_read_page to see the new "
-    + "content. Calling onenote_append_to_page again for this same reason adds the same text a "
-    + "second time, so do not retry it — retry only if the append itself times out."
+    "Microsoft 365 added the content to the page. Then this connector did not receive the "
+    + "updated page from Microsoft 365. Use onenote_read_page to see the new content. Do not "
+    + "call onenote_append_to_page again for this error. A second call adds the same content "
+    + "again."
 )
 
 
@@ -126,7 +129,7 @@ async def append_to_page(
             try:
                 summary = await page_summary(client, handle.page_id)
             except GraphFailure as failure:
-                raise ToolError(_WRITTEN_BUT_UNREAD) from failure
+                raise Advised(_WRITTEN_BUT_UNREAD) from failure
 
     if asked is not None:
         return asked

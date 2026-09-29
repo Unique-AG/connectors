@@ -14,7 +14,9 @@ from fastmcp.server.elicitation import (
     DeclinedElicitation,
 )
 from fastmcp.tools import Tool
+from mcp.shared.exceptions import MCPError
 from mcp.types import (
+    METHOD_NOT_FOUND,
     ElicitRequest,
     ElicitRequestFormParams,
     ElicitResult,
@@ -201,7 +203,7 @@ class TestHowTheQuestionReachesAPerson:
         assert "did not agree" in _refusal_of(await confirm(Message(subject="Invoice 4471"), None))
 
     async def test_a_client_that_cannot_ask_sends_nothing(self) -> None:
-        confirm = a_person_agrees(self._context(RuntimeError("elicitation not supported")))
+        confirm = a_person_agrees(self._context(MCPError(METHOD_NOT_FOUND, "Method not found")))
 
         answer = _refusal_of(await confirm(Message(subject="Invoice 4471"), None))
 
@@ -214,7 +216,7 @@ class TestHowTheQuestionReachesAPerson:
             DeclinedElicitation(),
             CancelledElicitation(),
             AcceptedElicitation(data="do not send"),
-            RuntimeError("elicitation not supported"),
+            MCPError(METHOD_NOT_FOUND, "Method not found"),
             ToolError("the client refused the request"),
         ],
         ids=["declined", "cancelled", "another-answer", "cannot-ask", "client-error"],

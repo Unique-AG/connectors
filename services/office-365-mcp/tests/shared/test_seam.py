@@ -5,6 +5,7 @@ Both routes to a message are driven here: `graph_tool_errors`, the mapping asked
 could reach. Whether the two agree end to end is `tests/test_error_mapping.py`'s subject.
 """
 
+import asyncio
 from collections.abc import Mapping
 from typing import cast
 
@@ -14,7 +15,13 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.elicitation import AcceptedElicitation, DeclinedElicitation
 from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools.base import ToolResult
+from mcp.shared.exceptions import MCPError, NoBackChannelError
 from mcp.types import (
+    CONNECTION_CLOSED,
+    INTERNAL_ERROR,
+    INVALID_REQUEST,
+    METHOD_NOT_FOUND,
+    REQUEST_TIMEOUT,
     CallToolRequestParams,
     CreateMessageResult,
     ElicitRequest,
@@ -58,7 +65,7 @@ _UNCONSENTED = (
 )
 
 
-_FALLTHROUGH = "This is a bad request rather than an outage or a permission problem"
+_FALLTHROUGH = "because it is a bad request, not an outage or a permission problem"
 
 _ONE_OF_EACH: Mapping[type[GraphFailure], GraphFailure] = {
     GraphThrottled: GraphThrottled(
@@ -78,7 +85,9 @@ def _message(failure: GraphFailure) -> str:
     return str(raised.value)
 
 
-async def _middleware_message(delivered: BaseException) -> str:
+async def _middleware_message(
+    delivered: BaseException, advice: GraphAdviceMiddleware = _ADVICE
+) -> str:
     """Driven through `on_call_tool` and not a helper: what the hook catches is never the failure
     itself, and mistaking one for the other is the defect this exists to catch."""
 
@@ -88,7 +97,7 @@ async def _middleware_message(delivered: BaseException) -> str:
 
     context = MiddlewareContext(message=CallToolRequestParams(name=_TOOL, arguments={}))
     with pytest.raises(ToolError) as raised:
-        _ = await _ADVICE.on_call_tool(context, refuse)
+        _ = await advice.on_call_tool(context, refuse)
     return str(raised.value)
 
 
@@ -206,6 +215,39 @@ class TestRetryAdvice:
 
         assert "Retry once" in message
 
+    async def test_an_outage_on_a_tool_with_no_repeatable_hint_says_the_change_can_be_done(
+        self,
+    ) -> None:
+        outage = GraphUnavailable("boom", status=504, code=None, request_id="req-9")
+        delivered = ToolError(f"Error calling tool '{_TOOL}': {outage}")
+        delivered.__cause__ = outage
+
+        assert await _middleware_message(delivered) == (
+            "The connection to Microsoft 365 failed, or Microsoft 365 answered with an internal "
+            + "error. As a result, this connector does not know if Microsoft 365 made the change. "
+            + "Microsoft 365 can make a change and then give an error. Do not call this tool "
+            + "again first. No tool of this deployment can show the change. Before you call this "
+            + "tool again, ask the user if the Microsoft 365 app shows the change. "
+            + "(HTTP 504, Graph request id req-9)"
+        )
+
+    async def test_an_outage_on_a_write_names_the_tools_that_can_show_the_change(self) -> None:
+        outage = GraphUnavailable("boom", status=504, code=None, request_id="req-9")
+        delivered = ToolError(f"Error calling tool '{_TOOL}': {outage}")
+        delivered.__cause__ = outage
+        advice = GraphAdviceMiddleware(
+            {_TOOL: ToolAdvice(permissions=(_PERMISSION,), shown_by=("read_a", "read_b"))}
+        )
+
+        assert await _middleware_message(delivered, advice) == (
+            "The connection to Microsoft 365 failed, or Microsoft 365 answered with an internal "
+            + "error. As a result, this connector does not know if Microsoft 365 made the change. "
+            + "Microsoft 365 can make a change and then give an error. Do not call this tool "
+            + "again first. Before you call this tool again, make sure that the change is not "
+            + "already there. To see if the change is there, use read_a or read_b. "
+            + "(HTTP 504, Graph request id req-9)"
+        )
+
     def test_a_collection_graph_will_not_end_reaches_the_caller_as_advice(self) -> None:
         """The one failure no request produced: Graph answering page after empty page while still
         advertising more, which `collect_pages` refuses. The count is the only evidence there is."""
@@ -221,15 +263,18 @@ class TestRetryAdvice:
     def test_a_bad_request_is_not_worth_retrying(self) -> None:
         message = _message(GraphFailure("bad filter", status=400, code=None, request_id=None))
 
-        assert "retrying it unchanged will fail identically" in message
+        assert (
+            "If you call this tool again with the same arguments, the call will fail the same way."
+            in message
+        )
 
     def test_a_conflict_names_the_collision_rather_than_a_bad_request(self) -> None:
         """A duplicate notebook or section name comes back as 409; calling that a bad request
         sends the model to fix a request that was well formed."""
         message = _message(GraphFailure("taken", status=409, code="20117", request_id=None))
 
-        assert "already exists" in message
-        assert "change the name" in message
+        assert "already there" in message
+        assert "Change the name" in message
         assert "bad request" not in message
 
     def test_a_missing_item_does_not_claim_the_item_does_not_exist(self) -> None:
@@ -391,7 +436,7 @@ class _Client:
         assert response_type == [_AGREE, _DECLINE], (
             "the person picks between the two answers the caller named"
         )
-        if isinstance(self._answer, Exception):
+        if isinstance(self._answer, BaseException):
             raise self._answer
         return self._answer
 
@@ -408,6 +453,22 @@ def _confirming(client: _Client) -> Confirm:
 
 def _confirm_with(answer: object, era: str | None) -> Confirm:
     return _confirming(_Client(answer, era=era))
+
+
+_CANNOT_BE_ASKED: list[Exception] = [
+    MCPError(METHOD_NOT_FOUND, "Method not found"),
+    MCPError(INVALID_REQUEST, "Elicitation not supported"),
+    NoBackChannelError("elicitation/create"),
+]
+_CANNOT_BE_ASKED_IDS = ["method-not-found", "elicitation-not-supported", "no-back-channel"]
+
+_NO_ANSWER: list[Exception] = [
+    MCPError(REQUEST_TIMEOUT, "Request 'elicitation/create' timed out"),
+    MCPError(INTERNAL_ERROR, "the client failed to show the question"),
+    MCPError(CONNECTION_CLOSED, "Connection closed"),
+    ValueError("Unexpected elicitation action: later"),
+]
+_NO_ANSWER_IDS = ["timed-out", "client-failed", "connection-closed", "unreadable-answer"]
 
 
 @pytest.mark.parametrize(
@@ -438,18 +499,34 @@ class TestHowAWriteIsPutToAPerson:
 
         assert isinstance(refusal, str) and "did not agree" in refusal
 
-    async def test_a_client_that_cannot_ask_writes_nothing(self, era: str | None) -> None:
-        """Fail closed, and say why: an operator cannot tell a broken mailbox from a client
-        that cannot ask."""
-        refusal = await _confirm_with(RuntimeError("elicitation not supported"), era)(
-            _QUESTION, _ABOUT
-        )
+    @pytest.mark.parametrize("failure", _CANNOT_BE_ASKED, ids=_CANNOT_BE_ASKED_IDS)
+    async def test_a_client_that_cannot_ask_writes_nothing(
+        self, failure: Exception, era: str | None
+    ) -> None:
+        refusal = await _confirm_with(failure, era)(_QUESTION, _ABOUT)
 
         assert refusal is not None
         assert isinstance(refusal, str)
         assert refusal.startswith(_NOTHING_HAPPENED)
         assert "does not support elicitation" in refusal
         assert "Do not call this tool again" in refusal
+
+    @pytest.mark.parametrize("failure", _NO_ANSWER, ids=_NO_ANSWER_IDS)
+    async def test_a_question_with_no_answer_does_not_blame_the_client(
+        self, failure: Exception, era: str | None
+    ) -> None:
+        refusal = await _confirm_with(failure, era)(_QUESTION, _ABOUT)
+
+        assert isinstance(refusal, str)
+        assert refusal.startswith(_NOTHING_HAPPENED)
+        assert "no answer" in refusal, refusal
+        assert "does not support elicitation" not in refusal
+        assert "fail the same way" not in refusal
+        assert "Do not call this tool again" in refusal
+
+    async def test_a_cancelled_call_stays_cancelled(self, era: str | None) -> None:
+        with pytest.raises(asyncio.CancelledError):
+            _ = await _confirm_with(asyncio.CancelledError(), era)(_QUESTION, _ABOUT)
 
     async def test_a_tool_error_from_the_client_is_passed_through_as_it_arrived(
         self, era: str | None
@@ -466,10 +543,11 @@ class TestHowAWriteIsPutToAPerson:
         [
             DeclinedElicitation(),
             AcceptedElicitation(data=_DECLINE),
-            RuntimeError("elicitation not supported"),
+            MCPError(METHOD_NOT_FOUND, "Method not found"),
+            MCPError(REQUEST_TIMEOUT, "Request 'elicitation/create' timed out"),
             ToolError("the client refused the request"),
         ],
-        ids=["declined", "another-answer", "cannot-ask", "client-error"],
+        ids=["declined", "another-answer", "cannot-ask", "no-answer", "client-error"],
     )
     async def test_no_refusal_is_ever_raised(self, answer: object, era: str | None) -> None:
         refusal = await _confirm_with(answer, era)(_QUESTION, _ABOUT)

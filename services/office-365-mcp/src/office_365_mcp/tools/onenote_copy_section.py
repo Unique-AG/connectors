@@ -59,6 +59,8 @@ STEP_COPY_SECTION = "copy_section"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Create",)
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("onenote_list_sections",)
+
 MAX_NEW_NAME_CHARACTERS = 50
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {

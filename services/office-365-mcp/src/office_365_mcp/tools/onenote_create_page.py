@@ -49,6 +49,8 @@ STEP_CREATE = "create_page"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Create",)
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("onenote_list_pages",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "title": "Synthetic note",
     "body_html": "<p>Synthetic body.</p>",

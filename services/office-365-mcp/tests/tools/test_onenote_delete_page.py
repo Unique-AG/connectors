@@ -12,7 +12,9 @@ from fastmcp.server.elicitation import (
     DeclinedElicitation,
 )
 from fastmcp.tools import Tool
+from mcp.shared.exceptions import MCPError
 from mcp.types import (
+    METHOD_NOT_FOUND,
     ElicitRequest,
     ElicitRequestFormParams,
     ElicitResult,
@@ -283,7 +285,7 @@ class TestGraphFailures:
         assert page_route.call_count == 1
         assert delete_route.call_count == 0, "the pre-read failed before anything was deleted"
 
-    async def test_a_404_on_the_delete_is_a_not_found(
+    async def test_a_404_on_the_delete_after_the_pre_read_found_the_page_answers_deleted(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _reads(graph, _page_payload(section=_SECTION, notebook=_NOTEBOOK))
@@ -294,10 +296,33 @@ class TestGraphFailures:
             )
         )
 
-        with pytest.raises(GraphNotFound):
-            _ = await _delete(client)
+        answer = await _delete(client)
 
         assert delete_route.call_count == 1
+        assert answer.deleted is True
+        assert answer.title == "Meeting notes"
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_retried_delete_that_finds_the_page_gone_answers_deleted(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _page_payload(section=_SECTION, notebook=_NOTEBOOK))
+        _ = _notebook_route(graph)
+        delete_route = graph.delete(_PAGE_PATH).mock(
+            side_effect=[
+                httpx.Response(503),
+                httpx.Response(
+                    404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+                ),
+            ]
+        )
+
+        answer = await _delete(client)
+
+        assert delete_route.call_count == 2, "the SDK retried the delete after the 503"
+        assert answer.deleted is True
+        assert answer.title == "Meeting notes"
+        assert answer.section_uri == OnenoteSectionHandle("SECTION1").uri
 
     async def test_a_403_on_the_delete_is_a_forbidden(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -449,7 +474,7 @@ class TestConfirmationIsAlwaysAsked:
             DeclinedElicitation(),
             CancelledElicitation(),
             AcceptedElicitation(data="keep the page"),
-            RuntimeError("elicitation not supported"),
+            MCPError(METHOD_NOT_FOUND, "Method not found"),
             ToolError("the client refused the request"),
         ],
         ids=["declined", "cancelled", "another-answer", "cannot-ask", "client-error"],
@@ -623,7 +648,7 @@ class TestTheClientThatCannotAsk:
 
             async def elicit(self, message: str, response_type: object = None) -> object:
                 assert message and response_type is not None
-                raise RuntimeError("elicitation not supported")
+                raise MCPError(METHOD_NOT_FOUND, "Method not found")
 
         confirm = a_person_agrees(cast("Context", cast("object", _CannotAsk())))
 
@@ -673,7 +698,7 @@ class TestHowItDeclaresItself:
         assert annotations.destructive_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["destructiveHint"]
         assert annotations.idempotent_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["idempotentHint"]
 
-    async def test_the_description_says_it_always_asks_and_cannot_be_undone(
+    async def test_the_description_says_it_always_asks_and_is_permanent(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
@@ -681,7 +706,7 @@ class TestHowItDeclaresItself:
         description = (tool.description or "").casefold()
         assert "always" in description
         assert "recycle bin" in description
-        assert "cannot be undone" in description
+        assert "this change is permanent" in description
         assert "onenote_read_page" in description
         assert "onenote_edit_page" in description
         assert "onenote_rename_page" in description

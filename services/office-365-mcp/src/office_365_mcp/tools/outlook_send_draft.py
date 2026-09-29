@@ -41,6 +41,8 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (
     "Mail.Read.Shared",
 )
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "draft_ref": "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D"
 }

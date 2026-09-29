@@ -84,8 +84,9 @@ _DESCRIPTION = (
 class InboxRule(BaseModel):
     uri: str = Field(
         description=(
-            "This rule's handle, `outlook:///rules/{id}`; no tool here can change or delete a "
-            + "rule."
+            "This is the handle of the rule, `outlook:///rules/{id}`. If this deployment exposes "
+            + "outlook_disable_mail_rule, pass this handle to that tool to disable the rule. No "
+            + "tool here can delete a rule."
         )
     )
     display_name: str | None = Field(

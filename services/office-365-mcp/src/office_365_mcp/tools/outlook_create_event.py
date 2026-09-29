@@ -69,6 +69,8 @@ STEP_CREATE = "create_event"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.ReadWrite",)
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_events",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "subject": "Pricing review",
     "starts_at": "2026-03-02T14:00",
@@ -307,10 +309,12 @@ class CreatedEvent(BaseModel):
     )
     web_link: str | None = Field(
         description=(
-            "This is Microsoft's own link that opens the event in Outlook on the web, exactly "
-            + "as Graph gave it. Offer this link to the user. The user changes or cancels the "
-            + "event there, and no tool here can do that. This connector never builds or "
-            + "repairs this link. This field is null when Graph returned none."
+            "This is the link from Microsoft that opens the event in Outlook on the web, exactly "
+            + "as Graph gave it. Offer this link to the user. The user can change or cancel the "
+            + "event there. If this deployment exposes outlook_update_event and "
+            + "outlook_cancel_event, these tools can also change or cancel the event. This "
+            + "connector never builds or repairs this link. This field is null when Graph "
+            + "returned none."
         )
     )
     transaction_id: str | None = Field(

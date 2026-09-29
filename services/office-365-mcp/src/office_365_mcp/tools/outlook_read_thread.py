@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailSummary
+from office_365_mcp.shared.mail import PREVIEW_CHARACTERS, SUMMARY_FIELDS, MailSummary
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -48,8 +48,10 @@ type _AnchorQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryP
 type _ThreadQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = (
-    "Reads every message of one conversation held in the signed-in user's mailbox, or, with "
-    "`mailbox`, a shared or delegated one, oldest first."
+    "Lists the messages of one conversation, oldest first, in the signed-in user's own mailbox "
+    "or, with `mailbox`, a shared or delegated one. Each message has only the first "
+    f"{PREVIEW_CHARACTERS} characters of its body. outlook_read_mail reads the full body of one "
+    "message."
 )
 
 _BAD_HANDLE = (

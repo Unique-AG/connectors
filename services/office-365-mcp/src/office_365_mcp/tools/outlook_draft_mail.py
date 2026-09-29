@@ -31,6 +31,8 @@ STEP_CREATE_DRAFT = "create_draft"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
+CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
+
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "to": ["ada@example.invalid"],
     "subject": "Invoice 4471",

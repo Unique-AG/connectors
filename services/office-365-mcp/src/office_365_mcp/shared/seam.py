@@ -18,7 +18,10 @@ from fastmcp.server.elicitation import (
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import File
+from mcp.shared.exceptions import MCPError
 from mcp.types import (
+    INVALID_REQUEST,
+    METHOD_NOT_FOUND,
     CallToolRequestParams,
     ElicitRequest,
     ElicitRequestFormParams,
@@ -183,13 +186,26 @@ def _modern_protocol(ctx: Context) -> bool:
     return request is not None and request.protocol_version in MODERN_PROTOCOL_VERSIONS
 
 
+_CANNOT_BE_ASKED = frozenset({METHOD_NOT_FOUND, INVALID_REQUEST})
+
+
 def _nobody_to_ask(nothing_happened: str) -> str:
     return (
-        f"{nothing_happened} This connector asks a person to confirm this, and the MCP "
-        + "client on the other end does not support elicitation, so there was nobody to "
-        + "ask. This is a property of the client and not of the request: retrying will "
-        + "fail the same way. Tell the user that their client cannot confirm this, and "
-        + f"that they can do it in the Microsoft 365 app itself instead. {_ASK_AGAIN}"
+        f"{nothing_happened} This connector must ask a person to agree to this request. The MCP "
+        + "client or its connection does not support elicitation, so this connector cannot ask a "
+        + "person. If you call this tool again, the call will fail the same way.\n\n"
+        + "Tell the user that their client cannot ask them to agree to this request. Tell them "
+        + "that they can do this task in the Microsoft 365 app. "
+        + _ASK_AGAIN
+    )
+
+
+def _no_answer(nothing_happened: str) -> str:
+    return (
+        f"{nothing_happened} This connector tried to ask a person to agree to this request. "
+        + "The MCP client sent no answer that this connector can use. Tell the user that this "
+        + "connector received no answer, and that they can make the same request again. "
+        + _ASK_AGAIN
     )
 
 
@@ -217,8 +233,10 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
             answer = await ctx.elicit(question, response_type=[agree, decline])
         except ToolError as already_a_refusal:
             return str(already_a_refusal)
-        except Exception:
-            return _nobody_to_ask(nothing_happened)
+        except Exception as unanswered:
+            if isinstance(unanswered, MCPError) and unanswered.code in _CANNOT_BE_ASKED:
+                return _nobody_to_ask(nothing_happened)
+            return _no_answer(nothing_happened)
         if not isinstance(answer, AcceptedElicitation) or answer.data != agree:
             return _not_agreed(nothing_happened)
         return None
@@ -265,6 +283,7 @@ class Advised(ToolError):
 class ToolAdvice:
     permissions: tuple[str, ...]
     not_found: str | None = None
+    shown_by: tuple[str, ...] = ()
 
 
 _NARROWED_PERMISSIONS = "office_365_mcp.narrowed_permissions"
@@ -295,13 +314,19 @@ class GraphAdviceMiddleware(Middleware):
             return await call_next(context)
         except Exception as error:
             narrowed = await _narrowed_permissions(context.fastmcp_context)
-            advised = self._advised(error, context.message.name, narrowed)
+            repeatable = await _repeatable(context.fastmcp_context, context.message.name)
+            advised = self._advised(error, context.message.name, narrowed, repeatable=repeatable)
             if advised is None:
                 raise
             raise advised from error
 
     def _advised(
-        self, error: BaseException, tool: str, narrowed: tuple[str, ...] | None
+        self,
+        error: BaseException,
+        tool: str,
+        narrowed: tuple[str, ...] | None,
+        *,
+        repeatable: bool,
     ) -> ToolError | None:
         for cause in _causes(error):
             if isinstance(cause, Advised):
@@ -313,8 +338,22 @@ class GraphAdviceMiddleware(Middleware):
                 if known is None:
                     return None
                 permissions = known.permissions if narrowed is None else narrowed
-                return ToolError(_advice(cause, permissions, known.not_found))
+                return ToolError(
+                    _advice(
+                        cause,
+                        permissions,
+                        known.not_found,
+                        repeatable=repeatable,
+                        shown_by=known.shown_by,
+                    )
+                )
         return None
+
+
+async def _repeatable(ctx: Context | None, tool: str) -> bool:
+    found = None if ctx is None else await ctx.fastmcp.get_tool(tool)
+    hints = None if found is None else found.annotations
+    return hints is not None and bool(hints.read_only_hint or hints.idempotent_hint)
 
 
 def _causes(error: BaseException) -> Iterator[BaseException]:
@@ -332,7 +371,7 @@ def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Genera
     try:
         yield
     except GraphFailure as failure:
-        raise Advised(_advice(failure, permissions, not_found)) from failure
+        raise Advised(_advice(failure, permissions, not_found, repeatable=True)) from failure
 
 
 _ENTRA_CODE = re.compile(r"AADSTS\d+")
@@ -379,11 +418,49 @@ _TRANSCRIPTS_SWITCHED_OFF = (
 )
 
 
-def _advice(failure: GraphFailure, permissions: tuple[str, ...], not_found: str | None) -> str:
-    return _remedy(failure, permissions, not_found) + _diagnostics(failure)
+_OUTCOME_UNKNOWN = (
+    "The connection to Microsoft 365 failed, or Microsoft 365 answered with an internal error. "
+    + "As a result, this connector does not know if Microsoft 365 made the change. Microsoft 365 "
+    + "can make a change and then give an error. Do not call this tool again first. "
+)
+
+_NO_TOOL_SHOWS_IT = (
+    "No tool of this deployment can show the change. Before you call this tool again, ask the "
+    + "user if the Microsoft 365 app shows the change."
+)
 
 
-def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str | None) -> str:
+def _outcome_unknown(shown_by: tuple[str, ...]) -> str:
+    if not shown_by:
+        return _OUTCOME_UNKNOWN + _NO_TOOL_SHOWS_IT
+    return (
+        _OUTCOME_UNKNOWN
+        + "Before you call this tool again, make sure that the change is not already there. "
+        + f"To see if the change is there, use {' or '.join(shown_by)}."
+    )
+
+
+def _advice(
+    failure: GraphFailure,
+    permissions: tuple[str, ...],
+    not_found: str | None,
+    *,
+    repeatable: bool,
+    shown_by: tuple[str, ...] = (),
+) -> str:
+    return _remedy(
+        failure, permissions, not_found, repeatable=repeatable, shown_by=shown_by
+    ) + _diagnostics(failure)
+
+
+def _remedy(
+    failure: GraphFailure,
+    permissions: tuple[str, ...],
+    not_found: str | None,
+    *,
+    repeatable: bool,
+    shown_by: tuple[str, ...],
+) -> str:
     if isinstance(failure, GraphThrottled):
         advice = failure.retry_after_seconds
         if advice is None:
@@ -428,6 +505,8 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
             + "verbatim rather than being constructed."
         )
     if isinstance(failure, GraphUnavailable):
+        if not repeatable:
+            return _outcome_unknown(shown_by)
         return (
             "Microsoft 365 could not be reached or failed internally. Retry once; if it fails "
             + "again the same way, stop and report it — some Graph 500s are permanent for "
@@ -452,15 +531,24 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
         )
     if failure.status == _CONFLICT:
         return (
-            "Microsoft 365 refused this request because it conflicts with something that already "
-            + "exists there, most often a name already taken at that level. The same arguments "
-            + "fail the same way: change the name, or find the existing item with a listing tool "
-            + "first."
+            "Microsoft 365 rejected this request because an item that is already there prevents "
+            + "it. Most often, an item at that level already has the same name. If you call this "
+            + "tool again with the same arguments, the call will fail the same way. Change the "
+            + "name, or use a tool that shows a list of items to find that item."
+            + _graphs_reason(failure)
         )
     return (
-        "Microsoft 365 rejected this request. This is a bad request rather than an outage or a "
-        + "permission problem, so retrying it unchanged will fail identically."
+        "Microsoft 365 rejected this request because it is a bad request, not an outage or a "
+        + "permission problem. If you call this tool again with the same arguments, the call "
+        + "will fail the same way."
+        + _graphs_reason(failure)
     )
+
+
+def _graphs_reason(failure: GraphFailure) -> str:
+    if failure.reason is None:
+        return ""
+    return f' Microsoft 365 gave this reason: "{failure.reason}"'
 
 
 def _named(permissions: tuple[str, ...]) -> str:

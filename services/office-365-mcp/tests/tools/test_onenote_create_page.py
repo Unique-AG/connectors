@@ -9,7 +9,9 @@ import respx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import FunctionTool, Tool
+from mcp.shared.exceptions import MCPError
 from mcp.types import (
+    METHOD_NOT_FOUND,
     ElicitRequest,
     ElicitRequestFormParams,
     ElicitResult,
@@ -794,7 +796,7 @@ class TestThePersonBetweenTheRequestAndThePage:
         _ = _reads_section_parent(graph, _NOTEBOOK_ID)
         _ = _reads_notebook(graph, is_shared=True, user_role="Owner")
         route = graph.post(_SECTION_ROUTE).mock(return_value=httpx.Response(201))
-        confirm = a_person_agrees(_context(RuntimeError("elicitation not supported")))
+        confirm = a_person_agrees(_context(MCPError(METHOD_NOT_FOUND, "Method not found")))
 
         with pytest.raises(ToolError, match="does not support elicitation"):
             _ = await create_page(

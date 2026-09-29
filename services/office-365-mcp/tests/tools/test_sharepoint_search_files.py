@@ -9,6 +9,7 @@ from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
+from office_365_mcp.shared.files import DriveItemSummary
 from office_365_mcp.shared.handles import DriveFolderHandle, drive_folder_handle
 from office_365_mcp.tools import sharepoint_search_files
 
@@ -148,8 +149,7 @@ class TestReachingTheFolderAroundAHit:
 
         row = answer.files[0]
         assert row.parent_uri == DriveFolderHandle(_DRIVE_ID, "01SYNTHETICPARENT01").uri, (
-            "a search returns no folders, so the parent handle is the only route into a "
-            "SharePoint folder"
+            "the parent handle is the route from a file hit into the folder around it"
         )
         assert drive_folder_handle(row.parent_uri or "") is not None, (
             "sharepoint_browse_folder must accept it verbatim"
@@ -473,6 +473,15 @@ class TestTheHandleItMints:
             "sharepoint:///folders/b%21SYNTHETICDRIVE0001/01SYNTHETICFOLDER001",
         ]
         assert [item.is_folder for item in found.files] == [False, True]
+
+    def test_no_field_claims_that_a_search_returns_no_folder(self) -> None:
+        fields = DriveItemSummary.model_fields
+        is_folder = fields["is_folder"].description or ""
+        parent_uri = fields["parent_uri"].description or ""
+
+        assert "A search never returns a folder" not in is_folder
+        assert "every search result has this false" not in is_folder
+        assert "a search finds files" not in parent_uri
 
     async def test_a_row_carries_the_metadata_a_caller_picks_a_file_by(
         self, client: GraphServiceClient, graph: respx.MockRouter
