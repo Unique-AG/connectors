@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.1.6](https://github.com/Unique-AG/connectors/compare/kb-mcp@0.1.5...kb-mcp@0.1.6) (2026-09-29)
+
+
+### Features
+
+* **kb-mcp,main:** ship the unique-kb-mcp agent skill ([#1083](https://github.com/Unique-AG/connectors/issues/1083)) ([875a1c7](https://github.com/Unique-AG/connectors/commit/875a1c756ecf9c606d352e00f6b6b1a1af2774fa))
+* **kb-mcp:** add a chart field for the Zitadel client id ([#1081](https://github.com/Unique-AG/connectors/issues/1081)) ([5bd6abc](https://github.com/Unique-AG/connectors/commit/5bd6abcc74a78b1eb19500aff573ad8d10899aa5))
+* **kb-mcp:** add params to content metadata for easier filtering ([#1085](https://github.com/Unique-AG/connectors/issues/1085)) ([6d7201a](https://github.com/Unique-AG/connectors/commit/6d7201ae8e87c05610a28667c26b92581ec4a32d))
+* **kb-mcp:** cap distinct values returned per metadata field ([#1090](https://github.com/Unique-AG/connectors/issues/1090)) ([83e0e23](https://github.com/Unique-AG/connectors/commit/83e0e23d506d66b3f3a443e53cf0352756315322))
+
+
+### Bug Fixes
+
+* **kb-mcp:** cap content_tree folders, fix truncation notices ([#1082](https://github.com/Unique-AG/connectors/issues/1082)) ([3686dbe](https://github.com/Unique-AG/connectors/commit/3686dbe142f8dd732d1137bb4343474a7d411f92))
+* **kb-mcp:** rename the MCP and set a connect-time icon ([#1086](https://github.com/Unique-AG/connectors/issues/1086)) ([d522c50](https://github.com/Unique-AG/connectors/commit/d522c503076f9c2a4ef833eab47caf47231094ba))
+
+
+### Dependencies
+
+* bump fastmcp in /* ([#1102](https://github.com/Unique-AG/connectors/issues/1102)) ([1cf61e2](https://github.com/Unique-AG/connectors/commit/1cf61e2c3cd7b0258e82f4be391cafca1f742bab))
+* bump hatchling in /* ([#1108](https://github.com/Unique-AG/connectors/issues/1108)) ([776e037](https://github.com/Unique-AG/connectors/commit/776e037be020704fb437c471c548c16db863c2fc))
+* bump ruff in /* ([#1107](https://github.com/Unique-AG/connectors/issues/1107)) ([9953c11](https://github.com/Unique-AG/connectors/commit/9953c118eeac82f79cd1eacc6038f8a35bc2569c))
+
 ## [0.1.5](https://github.com/Unique-AG/connectors/compare/kb-mcp@0.1.4...kb-mcp@0.1.5) (2026-09-21)
 
 
