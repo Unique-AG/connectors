@@ -11,7 +11,7 @@ from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphFailure, GraphSettings
-from office_365_mcp.shared.seam import WRITE_IDEMPOTENT
+from office_365_mcp.shared.seam import WRITE_IDEMPOTENT, Confirm, Confirmed
 from office_365_mcp.tools.outlook_set_automatic_reply import (
     GRAPH_PERMISSIONS,
     TOOL_NAME,
@@ -26,6 +26,22 @@ _SETTINGS = "/me/mailboxSettings"
 
 _STORED_INTERNAL = "<p>Back on the 14th.</p>"
 _STORED_EXTERNAL = "<p>Away until the 14th. Reach Grace at grace@example.invalid.</p>"
+
+_NOT_CHANGED = "The automatic reply was not changed."
+
+
+async def _agrees(question: str, about: str) -> Confirmed:
+    assert question and about
+    return None
+
+
+async def _refuses(question: str, about: str) -> Confirmed:
+    assert question and about
+    return _NOT_CHANGED
+
+
+async def _never_asked(question: str, about: str) -> Confirmed:
+    raise AssertionError(f"a person was asked {question!r} about {about!r}")
 
 
 def _setting(
@@ -98,9 +114,11 @@ async def _scheduled(
     internal_message: str | None = None,
     external_message: str | None = None,
     external_audience: ExternalAudience | None = None,
+    confirm: Confirm = _agrees,
 ) -> AutomaticReplyReport:
-    return await set_automatic_reply(
+    report = await set_automatic_reply(
         client,
+        confirm=confirm,
         change=ReplyChange(
             status="scheduled",
             start=start,
@@ -111,6 +129,8 @@ async def _scheduled(
             external_audience=external_audience,
         ),
     )
+    assert isinstance(report, AutomaticReplyReport), "the confirmation asked instead of answering"
+    return report
 
 
 class TestTheReplyItWillNotSet:
@@ -148,6 +168,81 @@ class TestTheReplyItWillNotSet:
         tool = await _registered(transport)
 
         assert _status_values(tool) == ["scheduled", "disabled"]
+
+
+class TestThePersonBeforeTheReplyGoesOn:
+    @pytest.mark.usefixtures("reads")
+    async def test_a_refusal_writes_nothing(
+        self, client: GraphServiceClient, writes: respx.Route
+    ) -> None:
+        with pytest.raises(ToolError, match=_NOT_CHANGED):
+            _ = await _scheduled(client, confirm=_refuses)
+
+        assert writes.call_count == 0
+
+    @pytest.mark.usefixtures("reads", "writes")
+    async def test_the_question_names_the_window_the_audience_and_both_texts(
+        self, client: GraphServiceClient
+    ) -> None:
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await _scheduled(client, confirm=capturing)
+
+        assert len(asked) == 1
+        assert "2026-09-01T08:00:00 UTC" in asked[0]
+        assert "2026-09-14T18:00:00 UTC" in asked[0]
+        assert "Back on the 14th." in asked[0]
+        assert "Away until the 14th." in asked[0]
+        assert "Everyone outside the organization" in asked[0]
+        assert "cannot recall" in asked[0]
+
+    @pytest.mark.usefixtures("reads", "writes")
+    async def test_an_audience_of_nobody_shows_no_outside_text(
+        self, client: GraphServiceClient
+    ) -> None:
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await _scheduled(client, external_audience="none", confirm=capturing)
+
+        assert "Nobody outside the organization" in asked[0]
+        assert "Away until the 14th." not in asked[0]
+
+    @pytest.mark.usefixtures("reads", "writes")
+    async def test_two_different_replies_bind_the_agreement_to_different_states(
+        self, client: GraphServiceClient
+    ) -> None:
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _scheduled(client, internal_message="<p>One.</p>", confirm=capturing)
+        _ = await _scheduled(client, internal_message="<p>Two.</p>", confirm=capturing)
+
+        assert len(bound) == 2
+        assert bound[0] != bound[1]
+
+    @pytest.mark.usefixtures("reads")
+    async def test_turning_it_off_asks_nobody(
+        self, client: GraphServiceClient, writes: respx.Route
+    ) -> None:
+        _ = await set_automatic_reply(
+            client, change=ReplyChange(status="disabled"), confirm=_never_asked
+        )
+
+        assert writes.call_count == 1
 
 
 class TestItSendsTheWholeSetting:
@@ -215,7 +310,9 @@ class TestItSendsTheWholeSetting:
     async def test_turning_it_off_writes_the_disabled_status(
         self, client: GraphServiceClient, writes: respx.Route
     ) -> None:
-        _ = await set_automatic_reply(client, change=ReplyChange(status="disabled"))
+        _ = await set_automatic_reply(
+            client, change=ReplyChange(status="disabled"), confirm=_never_asked
+        )
 
         assert _sent(writes)["status"] == "disabled"
 
@@ -239,7 +336,9 @@ class TestItSendsTheWholeSetting:
     async def test_a_window_the_call_omits_is_sent_as_the_mailbox_had_it(
         self, client: GraphServiceClient, writes: respx.Route
     ) -> None:
-        _ = await set_automatic_reply(client, change=ReplyChange(status="disabled"))
+        _ = await set_automatic_reply(
+            client, change=ReplyChange(status="disabled"), confirm=_never_asked
+        )
 
         sent = _sent(writes)
         assert sent["scheduledStartDateTime"] == {
@@ -367,6 +466,15 @@ class TestHowItDeclaresItself:
         assert tool.annotations.destructive_hint is False
         assert tool.annotations.idempotent_hint is True
         assert WRITE_IDEMPOTENT["idempotentHint"] is True
+
+    async def test_it_says_turning_it_on_asks_the_user_first(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        assert tool.description is not None
+        assert "asks the user to agree" in tool.description
+        assert "ctx" not in cast("Mapping[str, object]", tool.parameters["properties"])
 
     def test_it_asks_for_the_permission_that_can_write_mailbox_settings(self) -> None:
         assert GRAPH_PERMISSIONS == ("MailboxSettings.ReadWrite",)

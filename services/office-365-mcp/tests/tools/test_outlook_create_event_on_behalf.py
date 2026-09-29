@@ -640,6 +640,7 @@ class TestThePersonBetweenTheRequestAndTheCalendar:
 
         assert _ADA in asked[0]
         assert f"{_GRACE} (optional)" in asked[0]
+        assert "to 2 people" in asked[0], "the question hid how many people are mailed"
         assert "cannot be recalled" in asked[0]
 
     async def test_the_question_names_the_place_the_teams_meeting_and_the_body(

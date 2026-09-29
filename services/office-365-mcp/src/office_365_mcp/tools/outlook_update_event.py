@@ -21,6 +21,7 @@ from office_365_mcp.shared.calendar import (
     EventPatch,
     EventSummary,
     confirmation_id_for,
+    counted_people,
     event_of,
     event_patch_body,
     invited_attendee,
@@ -340,7 +341,7 @@ def _question(before: Event, patch: EventPatch) -> str:
             f"{one} (optional)" for one in patch.optional_attendees or ()
         ]
         changes.append(
-            f"the attendee list to {', '.join(invited)}"
+            f"the attendee list to {counted_people(invited)}: {', '.join(invited)}"
             if invited
             else "the attendee list to nobody"
         )

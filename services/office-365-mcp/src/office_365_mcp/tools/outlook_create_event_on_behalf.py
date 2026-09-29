@@ -36,6 +36,7 @@ from office_365_mcp.shared.calendar import (
     EventDraft,
     EventTime,
     calendar_of,
+    counted_people,
     created_event,
     cut_for_a_question,
     draft_details,
@@ -474,7 +475,8 @@ def _question(calendar: Calendar, draft: EventDraft) -> str:
     invited = _everyone(draft)
     if invited:
         invitations = (
-            f"Invitations go out now under the name of {owner!r} and cannot be recalled: "
+            f"Invitations go out now under the name of {owner!r} to {counted_people(invited)} "
+            + "and cannot be recalled: "
             + f"{', '.join(invited)}."
         )
     elif draft.location:

@@ -580,6 +580,7 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         assert _ADA in question
         assert _GRACE in question
         assert f"{_PAM} (optional)" in question, "an optional attendee reads as a required one"
+        assert "invite 3 people:" in question, "the question hid how many people are mailed"
         assert "cannot recall" in question
         assert bound == [_sent(create)["transactionId"]]
 

@@ -544,6 +544,10 @@ def invited_attendee(address: str, kind: AttendeeType) -> Attendee:
     return Attendee(email_address=EmailAddress(address=address), type=kind)
 
 
+def counted_people(addresses: Sequence[str]) -> str:
+    return "1 person" if len(addresses) == 1 else f"{len(addresses)} people"
+
+
 def invited_attendees(required: Sequence[str], optional: Sequence[str]) -> list[Attendee]:
     return [invited_attendee(address, AttendeeType.Required) for address in required] + [
         invited_attendee(address, AttendeeType.Optional) for address in optional

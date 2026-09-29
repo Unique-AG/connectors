@@ -1,12 +1,14 @@
+import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Annotated, Literal, Self
 
 import httpx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
+from mcp.types import InputRequiredResult
 from msgraph.generated.models.automatic_replies_setting import AutomaticRepliesSetting
 from msgraph.generated.models.automatic_replies_status import AutomaticRepliesStatus
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
@@ -18,8 +20,14 @@ from msgraph.generated.users.item.mailbox_settings.mailbox_settings_request_buil
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
-from office_365_mcp.shared.seam import WRITE_IDEMPOTENT, graph_client_for_caller
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.prose import body_opening
+from office_365_mcp.shared.seam import (
+    WRITE_IDEMPOTENT,
+    Confirm,
+    graph_client_for_caller,
+    person_confirms,
+)
 
 TOOL_NAME = "outlook_set_automatic_reply"
 
@@ -49,8 +57,13 @@ _AUDIENCE_TO_WRITE: Mapping[ExternalAudience, ExternalAudienceScope] = {
     "all": ExternalAudienceScope.All,
 }
 
+_AGREE = "turn on"
+_DECLINE = "do not turn on"
+_NOTHING_CHANGED = "The automatic reply was not changed."
+
 _DESCRIPTION = (
-    "Turns the signed-in user's automatic reply (out of office) on for a fixed window, or off."
+    "Turns the signed-in user's automatic reply (out of office) on for a fixed window, or off. "
+    "Turning it on asks the user to agree first."
 )
 
 _NO_WINDOW = (
@@ -125,17 +138,77 @@ class ReplyChange:
 
 
 async def set_automatic_reply(
-    client: GraphServiceClient, *, change: ReplyChange
-) -> AutomaticReplyReport:
+    client: GraphServiceClient, *, change: ReplyChange, confirm: Confirm
+) -> AutomaticReplyReport | InputRequiredResult:
     if change.status == "scheduled" and change.has_no_window:
         raise ToolError(_NO_WINDOW)
 
+    stored: AutomaticRepliesSetting | None = None
+    asked: InputRequiredResult | None = None
+    refused: str | None = None
     with graph_errors(TOOL_NAME):
         current = await _read_setting(client)
-        written = await _write_setting(client, _whole_setting(current, change))
-        stored = written if written is not None else await _read_setting(client)
+        whole = _whole_setting(current, change)
+        if change.status == "scheduled":
+            with not_graph():
+                answer = await confirm(_question(whole), _about(whole))
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
+        if asked is None and refused is None:
+            written = await _write_setting(client, whole)
+            stored = written if written is not None else await _read_setting(client)
 
+    if asked is not None:
+        return asked
+    if refused is not None:
+        raise ToolError(refused)
     return AutomaticReplyReport.from_setting(stored)
+
+
+def _question(setting: AutomaticRepliesSetting) -> str:
+    return (
+        f"Turn on the automatic reply from {_moment_text(setting.scheduled_start_date_time)} to "
+        + f"{_moment_text(setting.scheduled_end_date_time)}? Microsoft answers every sender in "
+        + "that time, and this connector cannot recall a reply. "
+        + f"Senders inside the organization get {_reply_text(setting.internal_reply_message)}. "
+        + _outside_sentence(setting)
+    )
+
+
+def _outside_sentence(setting: AutomaticRepliesSetting) -> str:
+    text = _reply_text(setting.external_reply_message)
+    match setting.external_audience:
+        case ExternalAudienceScope.All:
+            return f"Everyone outside the organization gets {text}."
+        case ExternalAudienceScope.ContactsOnly:
+            return f"Contacts outside the organization get {text}."
+        case _:
+            return "Nobody outside the organization gets a reply."
+
+
+def _moment_text(moment: DateTimeTimeZone | None) -> str:
+    assert moment is not None, "a scheduled reply carries both ends of its window"
+    return f"{moment.date_time} {moment.time_zone}"
+
+
+def _reply_text(message: str | None) -> str:
+    opening = body_opening(message) if message else ""
+    return repr(opening) if opening else "an empty reply"
+
+
+def _about(setting: AutomaticRepliesSetting) -> str:
+    parts = (
+        _moment_text(setting.scheduled_start_date_time),
+        _moment_text(setting.scheduled_end_date_time),
+        str(setting.external_audience),
+        setting.internal_reply_message or "",
+        setting.external_reply_message or "",
+    )
+    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
+
+
+def a_person_agrees(ctx: Context) -> Confirm:
+    return person_confirms(ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_CHANGED)
 
 
 async def _read_setting(client: GraphServiceClient) -> AutomaticRepliesSetting | None:
@@ -235,6 +308,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             SettableStatus,
             Field(description="scheduled turns the reply on between start and end; disabled off."),
         ],
+        ctx: Context,
         start: Annotated[
             str | None,
             Field(description="When the reply starts, ISO-8601. Required with scheduled."),
@@ -260,9 +334,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(description="Who outside the organization is answered at all."),
         ] = None,
         client: GraphServiceClient = graph,
-    ) -> AutomaticReplyReport:
+    ) -> AutomaticReplyReport | InputRequiredResult:
         return await set_automatic_reply(
             client,
+            confirm=a_person_agrees(ctx),
             change=ReplyChange(
                 status=status,
                 start=start,

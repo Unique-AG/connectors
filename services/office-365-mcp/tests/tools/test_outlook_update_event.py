@@ -399,7 +399,7 @@ class TestThePersonBetweenTheRequestAndTheChange:
         question = asked[0]
         assert "Renamed" in question
         assert "Room 9" in question
-        assert _GRACE in question
+        assert f"the attendee list to 1 person: {_GRACE}" in question
         assert "cannot recall" in question
 
 

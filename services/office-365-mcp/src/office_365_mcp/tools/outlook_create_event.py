@@ -36,6 +36,7 @@ from office_365_mcp.shared.calendar import (
     EventDraft,
     EventTime,
     calendar_of,
+    counted_people,
     created_event,
     draft_details,
     event_body,
@@ -474,8 +475,8 @@ def _question(draft: EventDraft) -> str:
     if not invited:
         return f"{opening}? {NOBODY_INVITED_BUT_A_PLACE}"
     return (
-        f"{opening} and invite {', '.join(invited)}? Microsoft mails the invitations as the event "
-        "is created, and this connector cannot recall them."
+        f"{opening} and invite {counted_people(invited)}: {', '.join(invited)}? Microsoft mails "
+        "the invitations as the event is created, and this connector cannot recall them."
     )
 
 
