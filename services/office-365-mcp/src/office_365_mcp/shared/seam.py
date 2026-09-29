@@ -1,6 +1,5 @@
 import re
-from collections.abc import Awaitable, Callable, Generator, Iterator, Mapping
-from contextlib import contextmanager
+from collections.abc import Awaitable, Callable, Iterator, Mapping
 from dataclasses import dataclass
 from types import TracebackType
 from typing import cast, override
@@ -363,15 +362,6 @@ def _causes(error: BaseException) -> Iterator[BaseException]:
         seen.add(id(cause))
         yield cause
         cause = cause.__cause__
-
-
-@contextmanager
-def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Generator[None]:
-    assert permissions, "a Graph call is made under at least one permission"
-    try:
-        yield
-    except GraphFailure as failure:
-        raise Advised(_advice(failure, permissions, not_found, repeatable=True)) from failure
 
 
 _ENTRA_CODE = re.compile(r"AADSTS\d+")

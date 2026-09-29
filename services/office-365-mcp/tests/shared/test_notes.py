@@ -378,107 +378,7 @@ class TestDefaultNotebookAudience:
         assert audience.notebook_id == _NOTEBOOK_C
 
 
-class TestSectionNotebookId:
-    async def test_it_sends_the_exact_select_and_expand(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        route = graph.get(f"/me/onenote/sections/{_AUDIENCE_SECTION_ID}").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": _AUDIENCE_SECTION_ID,
-                    "parentNotebook": {"id": _AUDIENCE_NOTEBOOK_ID},
-                },
-            )
-        )
-
-        _ = await notes.section_notebook_id(client, _AUDIENCE_SECTION_ID)
-
-        assert route.call_count == 1
-        params = route.calls.last.request.url.params
-        assert params["$select"] == "id"
-        assert params["$expand"] == "parentNotebook"
-
-    async def test_it_answers_the_parent_notebook_id(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = graph.get(f"/me/onenote/sections/{_AUDIENCE_SECTION_ID}").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": _AUDIENCE_SECTION_ID,
-                    "parentNotebook": {"id": _AUDIENCE_NOTEBOOK_ID},
-                },
-            )
-        )
-
-        found = await notes.section_notebook_id(client, _AUDIENCE_SECTION_ID)
-
-        assert found == _AUDIENCE_NOTEBOOK_ID
-
-    async def test_a_section_with_no_parent_notebook_answers_none(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = graph.get(f"/me/onenote/sections/{_AUDIENCE_SECTION_ID}").mock(
-            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_ID})
-        )
-
-        found = await notes.section_notebook_id(client, _AUDIENCE_SECTION_ID)
-
-        assert found is None
-
-
 _AUDIENCE_SECTION_GROUP_ID = "1-77777777-7777-4777-8777-777777777777!101"
-
-
-class TestSectionGroupNotebookId:
-    async def test_it_sends_the_exact_select_and_expand(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        route = graph.get(f"/me/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": _AUDIENCE_SECTION_GROUP_ID,
-                    "parentNotebook": {"id": _AUDIENCE_NOTEBOOK_ID},
-                },
-            )
-        )
-
-        _ = await notes.section_group_notebook_id(client, _AUDIENCE_SECTION_GROUP_ID)
-
-        assert route.call_count == 1
-        params = route.calls.last.request.url.params
-        assert params["$select"] == "id"
-        assert params["$expand"] == "parentNotebook"
-
-    async def test_it_answers_the_parent_notebook_id(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = graph.get(f"/me/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": _AUDIENCE_SECTION_GROUP_ID,
-                    "parentNotebook": {"id": _AUDIENCE_NOTEBOOK_ID},
-                },
-            )
-        )
-
-        found = await notes.section_group_notebook_id(client, _AUDIENCE_SECTION_GROUP_ID)
-
-        assert found == _AUDIENCE_NOTEBOOK_ID
-
-    async def test_a_section_group_with_no_parent_notebook_answers_none(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = graph.get(f"/me/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}").mock(
-            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_GROUP_ID})
-        )
-
-        found = await notes.section_group_notebook_id(client, _AUDIENCE_SECTION_GROUP_ID)
-
-        assert found is None
 
 
 class TestSectionAudience:
@@ -510,39 +410,6 @@ class TestSectionAudience:
         )
 
         audience = await notes.section_audience(client, _AUDIENCE_SECTION_ID)
-
-        assert audience == notes.UNKNOWN_AUDIENCE
-
-
-class TestSectionGroupAudience:
-    async def test_it_reads_the_parent_notebooks_audience(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = graph.get(f"/me/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": _AUDIENCE_SECTION_GROUP_ID,
-                    "parentNotebook": {"id": _AUDIENCE_NOTEBOOK_ID},
-                },
-            )
-        )
-        _ = graph.get(f"/me/onenote/notebooks/{_AUDIENCE_NOTEBOOK_ID}").mock(
-            return_value=httpx.Response(200, json=_notebook_payload(_AUDIENCE_NOTEBOOK_ID))
-        )
-
-        audience = await notes.section_group_audience(client, _AUDIENCE_SECTION_GROUP_ID)
-
-        assert audience.notebook_id == _AUDIENCE_NOTEBOOK_ID
-
-    async def test_a_section_group_with_no_parent_notebook_answers_an_unknown_audience(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = graph.get(f"/me/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}").mock(
-            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_GROUP_ID})
-        )
-
-        audience = await notes.section_group_audience(client, _AUDIENCE_SECTION_GROUP_ID)
 
         assert audience == notes.UNKNOWN_AUDIENCE
 

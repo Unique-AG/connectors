@@ -263,32 +263,6 @@ def _chosen_default(notebooks: list[Notebook], *, capped: bool) -> NotebookAudie
     return audience_of(notebooks[0])
 
 
-async def section_notebook_id(client: GraphServiceClient, section_id: str) -> str | None:
-    with graph_step(STEP_SECTION):
-        found = await client.me.onenote.sections.by_onenote_section_id(section_id).get(
-            request_configuration=RequestConfiguration[_SectionQuery](
-                query_parameters=_SectionQuery(select=["id"], expand=["parentNotebook"])
-            )
-        )
-    assert found is not None, "Graph answered a section read with no section"
-    parent = found.parent_notebook
-    return parent.id if parent is not None else None
-
-
-async def section_group_notebook_id(
-    client: GraphServiceClient, section_group_id: str
-) -> str | None:
-    with graph_step(STEP_SECTION_GROUP):
-        found = await client.me.onenote.section_groups.by_section_group_id(section_group_id).get(
-            request_configuration=RequestConfiguration[_SectionGroupQuery](
-                query_parameters=_SectionGroupQuery(select=["id"], expand=["parentNotebook"])
-            )
-        )
-    assert found is not None, "Graph answered a section group read with no section group"
-    parent = found.parent_notebook
-    return parent.id if parent is not None else None
-
-
 _CONTAINER_FIELDS: tuple[str, ...] = ("id", "displayName")
 
 
@@ -344,12 +318,6 @@ async def section_group_container(
 
 async def section_audience(client: GraphServiceClient, section_id: str) -> NotebookAudience:
     return (await section_container(client, section_id)).notebook
-
-
-async def section_group_audience(
-    client: GraphServiceClient, section_group_id: str
-) -> NotebookAudience:
-    return (await section_group_container(client, section_group_id)).notebook
 
 
 async def container_audience(

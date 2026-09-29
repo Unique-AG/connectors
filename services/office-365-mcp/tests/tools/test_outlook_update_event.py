@@ -11,7 +11,6 @@ from fastmcp.exceptions import ToolError
 from mcp.types import ElicitRequest, ElicitRequestFormParams, ElicitResult, InputRequiredResult
 from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
-from respx.models import Call
 
 from office_365_mcp.graph_client import GraphNotFound, GraphThrottled, GraphUnavailable
 from office_365_mcp.shared.calendar import MAX_ATTENDEES, MAX_TIMED_EVENT_HOURS
@@ -141,10 +140,6 @@ async def _update(
 
 def _sent(route: respx.Route) -> dict[str, object]:
     return cast("dict[str, object]", json.loads(route.calls.last.request.content))
-
-
-def _made(route: respx.Route) -> Sequence[Call]:
-    return cast("Sequence[Call]", route.calls)
 
 
 def _object(value: object) -> Mapping[str, object]:

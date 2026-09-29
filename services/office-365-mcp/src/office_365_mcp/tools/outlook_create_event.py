@@ -21,7 +21,6 @@ from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
-from kiota_abstractions.headers_collection import HeadersCollection
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.calendar import Calendar
 from msgraph.generated.models.event import Event
@@ -55,6 +54,7 @@ from office_365_mcp.shared.calendar import (
     zone_named,
 )
 from office_365_mcp.shared.handles import EventHandle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -83,8 +83,6 @@ _ME = "me"
 
 # Graph accepts Windows zone names such as `W. Europe Standard Time` that `zoneinfo` cannot resolve.
 _FALLBACK_ZONE = ZoneInfo("UTC")
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _CREATE = "create"
 _DO_NOT_CREATE = "do not create"
@@ -398,7 +396,7 @@ async def create_event(
                 created = await client.me.events.post(
                     event_body(draft, transaction_id=transaction),
                     request_configuration=RequestConfiguration[QueryParameters](
-                        options=no_retry(), headers=_immutable_ids()
+                        options=no_retry(), headers=immutable_id_headers()
                     ),
                 )
 
@@ -527,14 +525,6 @@ def _question(draft: EventDraft) -> str:
         f"{opening} and invite {', '.join(invited)}? Microsoft mails the invitations as the event "
         "is created, and this connector cannot recall them."
     )
-
-
-def _immutable_ids() -> HeadersCollection:
-    """Built per call: kiota's `RequestConfiguration.headers` default is one collection shared by
-    every configuration in the process, so a preference added to it leaks onto every Graph call."""
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return headers
 
 
 def _answer(created: Event, *, calendar: Calendar, zone: ZoneInfo) -> CreatedEvent:

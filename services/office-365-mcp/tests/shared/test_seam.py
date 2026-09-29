@@ -1,16 +1,10 @@
-"""What a model is told when Graph says no, and what it is told when a person says no.
-
-Both routes to a message are driven here: `graph_tool_errors`, the mapping asked directly, and
-`GraphAdviceMiddleware`, which covers every registered tool and the dependency resolution no block
-could reach. Whether the two agree end to end is `tests/test_error_mapping.py`'s subject.
-"""
-
 import asyncio
 from collections.abc import Mapping
 from typing import cast
 
 import pytest
-from fastmcp import Context
+from fastmcp import Client, Context, FastMCP
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.elicitation import AcceptedElicitation, DeclinedElicitation
 from fastmcp.server.middleware import MiddlewareContext
@@ -42,12 +36,12 @@ from office_365_mcp.graph_client import (
     GraphUnavailable,
 )
 from office_365_mcp.shared.seam import (
+    READ_ONLY,
     Confirm,
     Confirmed,
     GraphAdviceMiddleware,
     TokenExchangeFailed,
     ToolAdvice,
-    graph_tool_errors,
     person_confirms,
 )
 
@@ -79,18 +73,25 @@ _ONE_OF_EACH: Mapping[type[GraphFailure], GraphFailure] = {
 }
 
 
-def _message(failure: GraphFailure) -> str:
-    with pytest.raises(ToolError) as raised, graph_tool_errors(_PERMISSION):
+async def _message(failure: GraphFailure, *, not_found: str | None = None) -> str:
+    advice = GraphAdviceMiddleware(
+        {_TOOL: ToolAdvice(permissions=(_PERMISSION,), not_found=not_found)}
+    )
+    server: FastMCP[None] = FastMCP("reader", middleware=[advice])
+
+    @server.tool(name=_TOOL, annotations=READ_ONLY)
+    def refuse() -> str:
         raise failure
+
+    async with Client(FastMCPTransport(server)) as client:
+        with pytest.raises(ToolError) as raised:
+            _ = await client.call_tool(_TOOL, {})
     return str(raised.value)
 
 
 async def _middleware_message(
     delivered: BaseException, advice: GraphAdviceMiddleware = _ADVICE
 ) -> str:
-    """Driven through `on_call_tool` and not a helper: what the hook catches is never the failure
-    itself, and mistaking one for the other is the defect this exists to catch."""
-
     async def refuse(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
         _ = context
         raise delivered
@@ -123,17 +124,17 @@ async def _token_message(failure: Exception, *permissions: str) -> str:
 class TestTheTwoRemediesGraphCannotTellApart:
     """401 and 403 are both `GraphForbidden`. One is fixed by the user, the other by an admin."""
 
-    def test_a_rejected_token_asks_the_user_to_sign_in_again(self) -> None:
-        message = _message(
+    async def test_a_rejected_token_asks_the_user_to_sign_in_again(self) -> None:
+        message = await _message(
             GraphForbidden("nope", status=401, code="InvalidAuthenticationToken", request_id=None)
         )
 
         assert "sign in" in message
         assert _PERMISSION not in message, "a 401 is not a missing-permission problem"
 
-    def test_a_missing_permission_names_the_permission_and_who_must_grant_it(self) -> None:
+    async def test_a_missing_permission_names_the_permission_and_who_must_grant_it(self) -> None:
         """Graph never says which permission was missing, so the tool has to."""
-        message = _message(
+        message = await _message(
             GraphForbidden("nope", status=403, code="Authorization_RequestDenied", request_id=None)
         )
 
@@ -141,11 +142,11 @@ class TestTheTwoRemediesGraphCannotTellApart:
         assert "administrator" in message
         assert "Retrying will not help" in message
 
-    def test_the_transcript_tenant_switch_is_neither_of_those_and_says_so(self) -> None:
+    async def test_the_transcript_tenant_switch_is_neither_of_those_and_says_so(self) -> None:
         """A third remedy behind the same status and outer code, and not a permission at all:
         Graph access to Teams meeting transcripts is a tenant-wide Teams setting, off by default,
         that no app can turn on."""
-        message = _message(
+        message = await _message(
             GraphForbidden(
                 "nope",
                 status=403,
@@ -162,9 +163,9 @@ class TestTheTwoRemediesGraphCannotTellApart:
             "no permission is missing, and naming one sends an administrator after nothing"
         )
 
-    def test_an_ordinary_403_is_still_about_a_permission(self) -> None:
+    async def test_an_ordinary_403_is_still_about_a_permission(self) -> None:
         """Recognition is by inner code and never by status alone."""
-        message = _message(
+        message = await _message(
             GraphForbidden("nope", status=403, code="Forbidden", request_id=None, inner_code="Foo")
         )
 
@@ -173,9 +174,9 @@ class TestTheTwoRemediesGraphCannotTellApart:
 
 
 class TestRetryAdvice:
-    def test_throttling_passes_graphs_own_delay_through(self) -> None:
+    async def test_throttling_passes_graphs_own_delay_through(self) -> None:
         """`Retry-After` is the documented fastest way out; an eager retry makes it last longer."""
-        message = _message(
+        message = await _message(
             GraphThrottled(
                 "slow down",
                 status=429,
@@ -187,11 +188,11 @@ class TestRetryAdvice:
 
         assert "42 seconds" in message
 
-    def test_a_5xx_that_named_a_delay_passes_it_on_without_naming_a_cause(self) -> None:
+    async def test_a_5xx_that_named_a_delay_passes_it_on_without_naming_a_cause(self) -> None:
         """`GraphThrottled` is not only 429: a 503 carrying `Retry-After` shares the class because
         the delay is the remedy for both. Only the 429 is rate limiting — calling a 503 that sends
         an operator looking for a quota that was never spent."""
-        message = _message(
+        message = await _message(
             GraphThrottled("busy", status=503, code=None, request_id=None, retry_after_seconds=7.0)
         )
 
@@ -200,8 +201,8 @@ class TestRetryAdvice:
         assert "Microsoft 365 is rate-limiting this connector" not in message
         assert "Retry once" not in message, "not an outage: Graph said when to come back"
 
-    def test_throttling_without_a_delay_still_says_not_to_spin(self) -> None:
-        message = _message(
+    async def test_throttling_without_a_delay_still_says_not_to_spin(self) -> None:
+        message = await _message(
             GraphThrottled(
                 "slow down", status=429, code=None, request_id=None, retry_after_seconds=None
             )
@@ -210,8 +211,8 @@ class TestRetryAdvice:
         assert "loop" in message
         assert "seconds" not in message, "no invented number when Graph gave no advice"
 
-    def test_an_outage_is_worth_exactly_one_retry(self) -> None:
-        message = _message(GraphUnavailable("boom", status=503, code=None, request_id=None))
+    async def test_an_outage_is_worth_exactly_one_retry(self) -> None:
+        message = await _message(GraphUnavailable("boom", status=503, code=None, request_id=None))
 
         assert "Retry once" in message
 
@@ -248,10 +249,10 @@ class TestRetryAdvice:
             + "(HTTP 504, Graph request id req-9)"
         )
 
-    def test_a_collection_graph_will_not_end_reaches_the_caller_as_advice(self) -> None:
+    async def test_a_collection_graph_will_not_end_reaches_the_caller_as_advice(self) -> None:
         """The one failure no request produced: Graph answering page after empty page while still
         advertising more, which `collect_pages` refuses. The count is the only evidence there is."""
-        message = _message(
+        message = await _message(
             GraphPagingUnending("11 empty pages in a row, and Graph says more", empty_pages=11)
         )
 
@@ -260,58 +261,60 @@ class TestRetryAdvice:
         assert "no other arguments will avoid it" in message, "not a bad-request remedy"
         assert "None" not in message, "no status, no code, nothing invented in their place"
 
-    def test_a_bad_request_is_not_worth_retrying(self) -> None:
-        message = _message(GraphFailure("bad filter", status=400, code=None, request_id=None))
+    async def test_a_bad_request_is_not_worth_retrying(self) -> None:
+        message = await _message(GraphFailure("bad filter", status=400, code=None, request_id=None))
 
         assert (
             "If you call this tool again with the same arguments, the call will fail the same way."
             in message
         )
 
-    def test_a_conflict_names_the_collision_rather_than_a_bad_request(self) -> None:
+    async def test_a_conflict_names_the_collision_rather_than_a_bad_request(self) -> None:
         """A duplicate notebook or section name comes back as 409; calling that a bad request
         sends the model to fix a request that was well formed."""
-        message = _message(GraphFailure("taken", status=409, code="20117", request_id=None))
+        message = await _message(GraphFailure("taken", status=409, code="20117", request_id=None))
 
         assert "already there" in message
         assert "Change the name" in message
         assert "bad request" not in message
 
-    def test_a_missing_item_does_not_claim_the_item_does_not_exist(self) -> None:
+    async def test_a_missing_item_does_not_claim_the_item_does_not_exist(self) -> None:
         """Graph returns 404 both for "no such thing" and for "none of your business"."""
-        message = _message(GraphNotFound("gone", status=404, code=None, request_id=None))
+        message = await _message(GraphNotFound("gone", status=404, code=None, request_id=None))
 
         assert "not allowed to know it exists" in message
 
-    def test_a_tool_whose_id_came_from_another_tool_can_say_so_instead(self) -> None:
+    async def test_a_tool_whose_id_came_from_another_tool_can_say_so_instead(self) -> None:
         """Only the 404 advice is replaceable: it is the only one whose remedy depends on where
         the argument came from."""
-        with pytest.raises(ToolError) as raised, graph_tool_errors(_PERMISSION, not_found="Gone."):
-            raise GraphNotFound("gone", status=404, code=None, request_id="req-7")
+        message = await _message(
+            GraphNotFound("gone", status=404, code=None, request_id="req-7"), not_found="Gone."
+        )
 
-        assert str(raised.value) == "Gone. (HTTP 404, Graph request id req-7)"
+        assert message == "Gone. (HTTP 404, Graph request id req-7)"
 
-    def test_it_does_not_replace_the_advice_for_any_other_failure(self) -> None:
-        with pytest.raises(ToolError) as raised, graph_tool_errors(_PERMISSION, not_found="Gone."):
-            raise GraphForbidden("nope", status=403, code=None, request_id=None)
+    async def test_it_does_not_replace_the_advice_for_any_other_failure(self) -> None:
+        message = await _message(
+            GraphForbidden("nope", status=403, code=None, request_id=None), not_found="Gone."
+        )
 
-        assert "Gone." not in str(raised.value)
-        assert _PERMISSION in str(raised.value)
+        assert "Gone." not in message
+        assert _PERMISSION in message
 
 
 class TestEveryFailureGetsItsOwnRemedy:
     """The fallthrough says Graph rejected a bad request, which is false of a failure that is not
     Graph's verdict, so every subclass needs a branch of its own."""
 
-    def test_no_subclass_falls_through_to_the_bad_request_sentence(self) -> None:
+    async def test_no_subclass_falls_through_to_the_bad_request_sentence(self) -> None:
         assert set(GraphFailure.__subclasses__()) == set(_ONE_OF_EACH), (
             "a new GraphFailure needs a remedy in `_remedy` and a sample here"
         )
         for failure in _ONE_OF_EACH.values():
-            assert _FALLTHROUGH not in _message(failure), type(failure).__name__
+            assert _FALLTHROUGH not in await _message(failure), type(failure).__name__
 
-    def test_an_answer_too_large_to_hold_does_not_blame_the_request(self) -> None:
-        message = _message(_ONE_OF_EACH[GraphResponseTooLarge])
+    async def test_an_answer_too_large_to_hold_does_not_blame_the_request(self) -> None:
+        message = await _message(_ONE_OF_EACH[GraphResponseTooLarge])
 
         assert "larger than this connector can hold" in message
         assert "The limit is 10 bytes" in message
@@ -319,9 +322,9 @@ class TestEveryFailureGetsItsOwnRemedy:
 
 
 class TestDiagnostics:
-    def test_the_graph_request_id_survives(self) -> None:
+    async def test_the_graph_request_id_survives(self) -> None:
         """It exists only in that one response, and Microsoft support asks for it first."""
-        message = _message(
+        message = await _message(
             GraphUnavailable("boom", status=500, code="internalError", request_id="req-42")
         )
 
@@ -329,16 +332,12 @@ class TestDiagnostics:
         assert "Graph error code internalError" in message
         assert "Graph request id req-42" in message
 
-    def test_nothing_is_invented_when_graph_sent_no_evidence(self) -> None:
-        message = _message(GraphUnavailable("unreachable", status=None, code=None, request_id=None))
+    async def test_nothing_is_invented_when_graph_sent_no_evidence(self) -> None:
+        message = await _message(
+            GraphUnavailable("unreachable", status=None, code=None, request_id=None)
+        )
 
         assert "None" not in message
-
-    def test_a_success_passes_through_untouched(self) -> None:
-        with graph_tool_errors(_PERMISSION):
-            outcome = "fine"
-
-        assert outcome == "fine"
 
 
 class TestTheRefusalThatHappensBeforeGraph:
@@ -693,33 +692,18 @@ class TestTheEraWithNoBackChannel:
 class TestWhatTheMiddlewareLeavesAlone:
     """The middleware words a refusal *or* keeps its hands off it. There is nothing in between."""
 
-    async def test_it_words_a_graph_refusal_the_way_the_mapping_itself_does(self) -> None:
-        """Byte equality and not keywords: one wording for a refusal is the whole promise of
-        moving the mapping out of ten tool bodies."""
+    async def test_it_words_a_wrapped_refusal_as_it_words_the_bare_one(self) -> None:
         refusal = GraphForbidden(
             "nope", status=403, code="Authorization_RequestDenied", request_id="req-7"
         )
         delivered = ToolError(f"Error calling tool '{_TOOL}': {refusal}")
         delivered.__cause__ = refusal
 
-        assert await _middleware_message(delivered) == _message(
+        assert await _middleware_message(delivered) == await _message(
             GraphForbidden(
                 "nope", status=403, code="Authorization_RequestDenied", request_id="req-7"
             )
         )
-
-    async def test_a_refusal_already_worded_by_the_mapping_is_passed_through_unchanged(
-        self,
-    ) -> None:
-        """Whatever `graph_tool_errors` worded arrives as a type the middleware recognises rather
-        than re-derives, which matters where the two wordings would differ."""
-        with pytest.raises(ToolError) as raised, graph_tool_errors(_CHANNELS):
-            raise GraphForbidden("nope", status=403, code=None, request_id=None)
-        advised = raised.value
-
-        assert await _middleware_message(advised) == str(advised)
-        assert _CHANNELS in str(advised), "the tool's own permission, not the table's"
-        assert _PERMISSION not in str(advised)
 
     async def test_a_tool_error_about_an_argument_is_not_a_graph_failure(self) -> None:
         refusal = ToolError("teams_read_transcript takes teams:///transcripts/{a}/{b}.")

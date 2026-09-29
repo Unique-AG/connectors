@@ -104,18 +104,6 @@ def _daily_series(graph: respx.MockRouter, *, total: int = _PAST_THE_CAP) -> res
     )
 
 
-def _weekly_series(graph: respx.MockRouter, *, end: str | None = "2026-02-17T15:00:00Z") -> None:
-    """Three occurrences in one collection, because Graph publishes no occurrence id and no
-    per-occurrence addressing."""
-    _resolved(graph, meeting_type="recurring", end=end)
-    _listed(
-        graph,
-        recording_payload(recording_id="week-1", created_at="2026-02-03T14:02:00Z"),
-        recording_payload(recording_id="week-2", created_at="2026-02-10T14:01:00Z"),
-        recording_payload(recording_id="week-3", created_at="2026-02-17T14:04:00Z"),
-    )
-
-
 async def _listing(
     client: GraphServiceClient,
     *,
