@@ -1,6 +1,6 @@
 [project]
 name = "with-intelligence-mcp"
-version = "0.0.1"
+version = "0.0.0"
 description = "With Intelligence FastMCP server with OAuth credential bridging"
 requires-python = ">=3.14"
 dependencies = [
