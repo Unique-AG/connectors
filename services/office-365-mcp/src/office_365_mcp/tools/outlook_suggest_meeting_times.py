@@ -23,7 +23,6 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.calendar import (
-    MAX_ATTENDEES,
     EventTime,
     event_time,
     repeated_address,
@@ -102,13 +101,6 @@ def _repeated(argument: str, address: str) -> str:
         f"outlook_suggest_meeting_times was given {address!r} twice in `{argument}`. Drop the "
         + "repeat and call again."
     )
-
-
-_TOO_MANY_ATTENDEES = (
-    "outlook_suggest_meeting_times refused this call because the two attendee lists hold more "
-    + f"than {MAX_ATTENDEES} addresses between them. Ask the user who genuinely needs to be "
-    + "on the list."
-)
 
 
 class SuggestedAttendee(BaseModel):
@@ -266,8 +258,6 @@ def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
 
 
 def _invited_once(required: tuple[str, ...], optional: tuple[str, ...]) -> None:
-    if len(required) + len(optional) > MAX_ATTENDEES:
-        raise ToolError(_TOO_MANY_ATTENDEES)
     both = {a.casefold() for a in required} & {a.casefold() for a in optional}
     for address in required:
         if address.casefold() in both:
@@ -293,10 +283,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     async def outlook_suggest_meeting_times(
         attendees: Annotated[
             list[str],
-            Field(
-                max_length=MAX_ATTENDEES,
-                description="The people who must attend, one SMTP address per entry.",
-            ),
+            Field(description="The people who must attend, one SMTP address per entry."),
         ],
         starts_at: Annotated[
             str,
@@ -314,7 +301,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 default=[],
-                max_length=MAX_ATTENDEES,
                 description="People the meeting works without.",
             ),
         ],

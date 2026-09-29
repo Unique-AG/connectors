@@ -144,16 +144,6 @@ class TestTheQueryItComposes:
         ]
 
     @pytest.mark.usefixtures("signed_in")
-    async def test_the_window_is_asked_of_graph_rather_than_only_applied_here(
-        self, client: GraphServiceClient, calendars: respx.Route
-    ) -> None:
-        calendars.mock(return_value=_page(_own()))
-
-        _ = await lister.list_calendars(client)
-
-        assert calendars.calls.last.request.url.params["$top"] == str(lister.MAX_CALENDARS)
-
-    @pytest.mark.usefixtures("signed_in")
     async def test_it_asks_for_all_the_calendars_and_never_one_calendar_group(
         self, client: GraphServiceClient, calendars: respx.Route
     ) -> None:
@@ -333,7 +323,7 @@ class TestWhatItAnswers:
     async def test_a_cap_that_left_more_calendars_on_offer_says_capped(
         self, client: GraphServiceClient, graph: respx.MockRouter, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr(lister, "MAX_CALENDARS", 1)
+        monkeypatch.setattr(lister, "MAX_SCANNED_ITEMS", 1)
         graph.get(_CALENDARS, params={"$skiptoken": "second"}).mock(
             return_value=_page(_delegated())
         )

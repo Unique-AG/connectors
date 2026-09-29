@@ -20,7 +20,7 @@ from msgraph.generated.users.item.onenote.sections.sections_request_builder impo
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
@@ -39,10 +39,6 @@ STEP_SECTION_GROUPS = "section_groups"
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
-
-MAX_NOTEBOOKS = 200
-MAX_SECTIONS = 2000
-MAX_SECTION_GROUPS = 1000
 
 _NOTEBOOK_FIELDS: tuple[str, ...] = (
     "id",
@@ -69,7 +65,6 @@ _SectionsQuery = SectionsRequestBuilder.SectionsRequestBuilderGetQueryParameters
 _SectionGroupsQuery = SectionGroupsRequestBuilder.SectionGroupsRequestBuilderGetQueryParameters
 
 _MIN_NAME_FRAGMENT_CHARACTERS = 1
-_MAX_NAME_FRAGMENT_CHARACTERS = 200
 
 _Role = Literal["Owner", "Contributor", "Reader"]
 
@@ -227,7 +222,7 @@ async def list_notebooks(
             )
             assert first_notebooks is not None, "Graph answered notebooks with no collection"
             notebooks_collected = await collect_pages(
-                first_notebooks, client, limit=MAX_NOTEBOOKS, max_scanned=MAX_NOTEBOOKS
+                first_notebooks, client, limit=MAX_SCANNED_ITEMS
             )
         with graph_step(STEP_SECTIONS):
             first_sections = await client.me.onenote.sections.get(
@@ -239,7 +234,7 @@ async def list_notebooks(
             )
             assert first_sections is not None, "Graph answered sections with no collection"
             sections_collected = await collect_pages(
-                first_sections, client, limit=MAX_SECTIONS, max_scanned=MAX_SECTIONS
+                first_sections, client, limit=MAX_SCANNED_ITEMS
             )
         with graph_step(STEP_SECTION_GROUPS):
             first_groups = await client.me.onenote.section_groups.get(
@@ -250,9 +245,7 @@ async def list_notebooks(
                 )
             )
             assert first_groups is not None, "Graph answered section groups with no collection"
-            groups_collected = await collect_pages(
-                first_groups, client, limit=MAX_SECTION_GROUPS, max_scanned=MAX_SECTION_GROUPS
-            )
+            groups_collected = await collect_pages(first_groups, client, limit=MAX_SCANNED_ITEMS)
 
     return _assemble(
         notebooks_collected.items,
@@ -375,7 +368,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=_MIN_NAME_FRAGMENT_CHARACTERS,
-                max_length=_MAX_NAME_FRAGMENT_CHARACTERS,
                 description=(
                     "Keep only the notebooks whose name contains this text, compared without "
                     + "regard to case. A matched notebook still carries every one of its "

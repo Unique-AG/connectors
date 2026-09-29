@@ -249,6 +249,21 @@ class TestWhatItSendsToGraph:
             "Replace",
         ]
 
+    async def test_many_commands_with_a_long_target_and_content_reach_graph_whole(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _patches(graph)
+        _ = _rereads(graph, _page_payload())
+        target, content = "#" + "t" * 600, "<p>" + "c" * 600_000 + "</p>"
+        commands = [EditCommand(target=target, action="append", content=content)] * 21
+
+        _ = await _edit(client, commands=commands)
+
+        sent_commands = cast("list[dict[str, object]]", _sent(patch)["commands"])
+        assert len(sent_commands) == 21
+        assert sent_commands[0]["target"] == target
+        assert sent_commands[0]["content"] == content
+
     async def test_the_patch_content_type_is_json(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

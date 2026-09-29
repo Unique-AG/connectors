@@ -36,8 +36,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "is_read": True,
 }
 
-MAX_MESSAGES = 20
-
 type MailImportance = Literal["low", "normal", "high"]
 
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
@@ -48,9 +46,8 @@ _FLAG_STATUS: Mapping[bool, FollowupFlagStatus] = {
 }
 
 _DESCRIPTION = (
-    f"Marks up to {MAX_MESSAGES} messages as read or unread, flags them for follow-up, or "
-    "sets their importance, in the signed-in user's own mailbox or, with `mailbox`, a shared "
-    "or delegated one."
+    "Marks messages as read or unread, flags them for follow-up, or sets their importance, in "
+    "the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one."
 )
 
 _NOTHING_TO_CHANGE = (
@@ -152,9 +149,7 @@ async def mark_mail(
     change: MarkChange,
     mailbox: str | None = None,
 ) -> MarkedMail:
-    assert 1 <= len(message_refs) <= MAX_MESSAGES, (
-        f"the batch is bounded by the schema at 1..{MAX_MESSAGES}, got {len(message_refs)}"
-    )
+    assert len(message_refs) >= 1, "the schema admits no empty batch"
     if change.is_nothing:
         raise ToolError(_NOTHING_TO_CHANGE)
     handles = _handles(message_refs)
@@ -269,10 +264,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 min_length=1,
-                max_length=MAX_MESSAGES,
                 description=(
-                    f"The messages to change: up to {MAX_MESSAGES} `uri` values from a search, "
-                    "list, read, or thread result."
+                    "The messages to change: `uri` values from a search, list, read, or thread "
+                    "result."
                 ),
             ),
         ],

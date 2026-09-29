@@ -53,7 +53,7 @@ GRAPH_NOT_FOUND = (
     + "what this mailbox actually has. Retrying with the same argument will fail identically."
 )
 
-MAX_RESULTS = 50
+MAX_RESULTS = 1000
 
 DEFAULT_FOLDER: WellKnownFolder = "inbox"
 

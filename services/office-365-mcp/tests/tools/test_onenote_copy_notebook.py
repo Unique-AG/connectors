@@ -340,13 +340,21 @@ class TestHowItDeclaresItself:
         assert "do not call this tool again first" in description
         assert "onenote_get_operation" in description
 
-    async def test_the_new_name_description_states_the_documented_naming_rule(
+    async def test_the_new_name_description_lists_the_forbidden_characters(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
         properties = cast("Mapping[str, object]", tool.parameters["properties"])
         new_name = cast("Mapping[str, object]", properties["new_name"])
         description = cast("str", new_name["description"])
-        assert "128" in description
+        for character in "?*/:<>|'\"":
+            assert character in description, f"{character!r} missing from the description"
         assert "400" not in description
         assert "409" not in description
+
+    async def test_the_new_name_schema_sets_no_maximum_length(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", tool.parameters["properties"])
+        assert "maxLength" not in json.dumps(properties["new_name"])

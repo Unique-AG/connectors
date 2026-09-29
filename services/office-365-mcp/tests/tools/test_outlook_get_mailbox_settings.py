@@ -159,7 +159,6 @@ class TestWhatItAsksGraphFor:
             "hasError",
             "actions",
         ]
-        assert params["$top"] == str(settings_tool.MAX_RULES)
 
     async def test_it_never_asks_for_the_conditions_it_does_not_report(
         self, client: GraphServiceClient, rules: respx.Route
@@ -539,22 +538,21 @@ class TestPaging:
         assert [rule.display_name for rule in answer.rules] == ["Newsletters", "Send to personal"]
         assert answer.rules_capped is False
 
-    async def test_a_rule_listing_wider_than_the_bound_says_it_was_capped(
-        self, client: GraphServiceClient, rules: respx.Route
+    async def test_a_rule_listing_wider_than_the_scan_limit_says_it_was_capped(
+        self,
+        client: GraphServiceClient,
+        rules: respx.Route,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        monkeypatch.setattr(settings_tool, "MAX_SCANNED_ITEMS", 2)
         rules.mock(
-            return_value=_page(
-                *(
-                    _rule_payload(f"{_RULE_ID}-{number}")
-                    for number in range(settings_tool.MAX_RULES + 1)
-                )
-            )
+            return_value=_page(*(_rule_payload(f"{_RULE_ID}-{number}") for number in range(3)))
         )
 
         answer = await settings_tool.get_mailbox_settings(client, include="rules")
 
         assert answer.rules is not None
-        assert len(answer.rules) == settings_tool.MAX_RULES
+        assert len(answer.rules) == 2
         assert answer.rules_capped is True
 
 

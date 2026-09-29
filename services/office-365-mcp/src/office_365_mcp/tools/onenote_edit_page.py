@@ -50,10 +50,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "commands": [{"target": "body", "action": "append", "content": "<p>Synthetic.</p>"}],
 }
 
-MAX_COMMANDS = 20
-MAX_TARGET_CHARACTERS = 500
-MAX_CONTENT_CHARACTERS = 500_000
-
 type _Action = Literal["append", "insert", "prepend", "replace"]
 type _Position = Literal["before", "after"]
 
@@ -81,7 +77,7 @@ _UNTITLED_PAGE = "an untitled page"
 _UNNAMED_NOTEBOOK = "an unnamed notebook"
 
 _DESCRIPTION = """\
-Adds content next to an element on one page, or replaces an element. One to twenty `commands` run \
+Adds content next to an element on one page, or replaces an element. One or more `commands` run \
 in order. There is no `delete` action. onenote_rename_page is the sibling for the title. OneNote \
 can show the change to everyone who opens the notebook.
 
@@ -122,7 +118,6 @@ _WRITTEN_BUT_UNREAD = (
 class EditCommand(BaseModel):
     target: str = Field(
         min_length=1,
-        max_length=MAX_TARGET_CHARACTERS,
         description=(
             "The element to change: `body` (the page's first div), `title`, a `#data-id` the "
             + "author wrote with the `#` kept, or a generated id. Read the page with "
@@ -154,7 +149,6 @@ class EditCommand(BaseModel):
         ),
     )
     content: str = Field(
-        max_length=MAX_CONTENT_CHARACTERS,
         description=(
             "The well-formed HTML to add, or to replace `target` with. Escape `&`, `<` and `>` "
             + "where they must read as themselves rather than as markup."
@@ -170,9 +164,7 @@ async def edit_page(
     confirm: Confirm,
     answer_pending: bool = False,
 ) -> PageSummary | InputRequiredResult:
-    assert 1 <= len(commands) <= MAX_COMMANDS, (
-        f"commands is bounded by the schema, got {len(commands)}"
-    )
+    assert len(commands) >= 1, f"commands is bounded by the schema, got {len(commands)}"
     handle = onenote_page_handle(page)
     if handle is None:
         raise ToolError(_NOT_A_PAGE_HANDLE)
@@ -297,9 +289,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[EditCommand],
             Field(
                 min_length=1,
-                max_length=MAX_COMMANDS,
                 description=(
-                    "One to twenty changes to run against the page, in order. Each command "
+                    "One or more changes to run against the page, in order. Each command "
                     + "runs as its own `PATCH` command inside one request."
                 ),
             ),

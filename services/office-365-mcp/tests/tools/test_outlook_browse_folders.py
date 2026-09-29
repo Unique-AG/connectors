@@ -143,12 +143,18 @@ class TestTheLevelItAsksFor:
 
         assert top_level.calls.last.request.url.params["$top"] == "7"
 
-    @pytest.mark.parametrize("limit", [0, browser.MAX_FOLDERS + 1])
-    async def test_a_limit_outside_the_window_is_a_programming_error(
-        self, client: GraphServiceClient, limit: int
+    async def test_a_limit_above_two_hundred_reaches_graph_unchanged(
+        self, client: GraphServiceClient, top_level: respx.Route
     ) -> None:
+        top_level.mock(return_value=_page(_folder_payload(_INBOX_ID)))
+
+        _ = await browser.browse_folders(client, limit=201)
+
+        assert top_level.calls.last.request.url.params["$top"] == "201"
+
+    async def test_a_limit_of_zero_is_a_programming_error(self, client: GraphServiceClient) -> None:
         with pytest.raises(AssertionError):
-            _ = await browser.browse_folders(client, limit=limit)
+            _ = await browser.browse_folders(client, limit=0)
 
 
 class TestTheLevelItAnswers:

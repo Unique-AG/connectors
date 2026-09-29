@@ -1120,6 +1120,13 @@ class TestHowItDeclaresItself:
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert set(properties) == {"section", "to_notebook", "to_section_group", "new_name"}
 
+    async def test_the_new_name_schema_sets_no_maximum_length(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert "maxLength" not in json.dumps(properties["new_name"])
+
     @pytest.mark.parametrize("word", ["client", "ctx", "context", "token", "graph"])
     async def test_no_wiring_of_this_server_is_published_as_an_argument(
         self, transport: httpx.AsyncClient, word: str

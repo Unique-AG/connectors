@@ -494,32 +494,23 @@ class TestScopingToOneOccurrence:
         )
         assert len(listing.calls) == 3
 
-    async def test_a_short_list_means_the_collection_was_read_to_its_end(
+    async def test_a_limit_above_the_scan_cap_returns_what_was_read_and_says_so(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """ "Fewer than `limit` means there are no more" is trustworthy here only because the
-        largest `limit` a caller may ask for sits below the scan cap. A read that stops at the cap
-        therefore always has more rows in hand than it was asked for, and can never hand back a
-        short list that a caller would misread as the end of the collection."""
-        assert lister.MAX_TRANSCRIPTS < meetings.MAX_ARTIFACT_SCAN, (
-            "the ceiling that makes a short list mean what the field says it means"
-        )
         _resolved(graph, meeting_type="recurring")
         _daily_series(graph)
 
         found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
-            limit=lister.MAX_TRANSCRIPTS,
+            limit=meetings.MAX_ARTIFACT_SCAN + 50,
             include_scan_completeness=True,
         )
 
         assert found.scan_incomplete is True, "the collection was not read to its end"
-        assert len(found.transcripts) == lister.MAX_TRANSCRIPTS, (
-            "and even the largest limit is answered in full, so nothing here reads as an end"
-        )
+        assert len(found.transcripts) == meetings.MAX_ARTIFACT_SCAN
         described = str(lister.MeetingTranscripts.model_fields["transcripts"].description)
-        assert "Fewer rows than `limit` means none remain." in described
+        assert "means none remain, unless the read reached that cap" in described
 
     async def test_the_order_is_promised_over_what_was_read_and_not_over_the_meeting(self) -> None:
         described = str(lister.MeetingTranscripts.model_fields["transcripts"].description)
@@ -528,17 +519,6 @@ class TestScopingToOneOccurrence:
         assert "the latest of what this tool read" in described
         assert "not just one page of Microsoft's answer" in described
         assert "The order is over the whole collection" not in described
-
-    async def test_a_limit_above_the_ceiling_is_a_programming_error(
-        self, client: GraphServiceClient
-    ) -> None:
-        with pytest.raises(AssertionError):
-            _ = await lister.teams_list_meeting_transcripts(
-                client,
-                handle=_handle(),
-                limit=lister.MAX_TRANSCRIPTS + 1,
-                include_scan_completeness=False,
-            )
 
     async def test_each_transcript_carries_a_handle_and_the_link_to_its_recording(
         self, client: GraphServiceClient, graph: respx.MockRouter

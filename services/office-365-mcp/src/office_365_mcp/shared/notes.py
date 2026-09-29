@@ -31,7 +31,12 @@ from msgraph.generated.users.item.onenote.sections.item import (
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import FetchedResponse, collect_pages, graph_step
+from office_365_mcp.graph_client import (
+    MAX_SCANNED_ITEMS,
+    FetchedResponse,
+    collect_pages,
+    graph_step,
+)
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOperationHandle,
@@ -51,8 +56,6 @@ STEP_SECTION = "section"
 STEP_SECTION_GROUP = "section_group"
 STEP_NOTEBOOKS = "notebooks"
 STEP_PAGE = "page"
-
-_MAX_NOTEBOOKS = 200
 
 _NotebookQuery = NotebookItemRequestBuilder.NotebookItemRequestBuilderGetQueryParameters
 _NotebooksQuery = NotebooksRequestBuilder.NotebooksRequestBuilderGetQueryParameters
@@ -245,7 +248,7 @@ async def default_notebook_audience(client: GraphServiceClient) -> NotebookAudie
             )
         )
         assert first_page is not None, "Graph answered notebooks with no collection"
-        collected = await collect_pages(first_page, client, limit=_MAX_NOTEBOOKS)
+        collected = await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)
     return _chosen_default(collected.items, capped=collected.capped)
 
 

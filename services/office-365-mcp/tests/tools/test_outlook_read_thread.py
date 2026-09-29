@@ -10,7 +10,7 @@ from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import PREVIEW_CHARACTERS
 from office_365_mcp.tools import outlook_read_thread as reader
-from office_365_mcp.tools.outlook_read_thread import MAX_MESSAGES, read_thread
+from office_365_mcp.tools.outlook_read_thread import read_thread
 
 _ANCHOR_ID = "AAMkAGI2SYNTHETIC-anchor-0001="
 _OLDER_ID = "AAMkAGI2SYNTHETIC-older-0002="
@@ -48,10 +48,14 @@ def thread(graph: respx.MockRouter) -> respx.Route:
     return graph.get("/me/messages")
 
 
-def _page(messages: list[dict[str, object]], *, more: bool = False) -> dict[str, object]:
+def _page(
+    messages: list[dict[str, object]], *, more: bool = False, next_link: str | None = None
+) -> dict[str, object]:
     page: dict[str, object] = {"value": messages}
     if more:
         page["@odata.nextLink"] = "https://graph.microsoft.com/v1.0/me/messages?%24skip=100"
+    if next_link is not None:
+        page["@odata.nextLink"] = next_link
     return page
 
 
@@ -210,32 +214,68 @@ class TestWhatItAnswers:
         assert "archive" in result.searched_scope
         assert "delegated" in result.searched_scope
 
-    async def test_a_thread_graph_had_more_of_says_it_is_incomplete(
-        self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
+    async def test_a_thread_of_two_pages_is_read_whole(
+        self, client: GraphServiceClient, graph: respx.MockRouter, anchor: respx.Route
     ) -> None:
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
-        thread.mock(return_value=httpx.Response(200, json=_page([_message(_ANCHOR_ID)], more=True)))
+        second = graph.get("/me/messages", params={"$skiptoken": "second"}).mock(
+            return_value=httpx.Response(200, json=_page([_message(_OLDER_ID)]))
+        )
+        graph.get("/me/messages").mock(
+            return_value=httpx.Response(
+                200,
+                json=_page(
+                    [_message(_ANCHOR_ID)],
+                    next_link="https://graph.microsoft.com/v1.0/me/messages?$skiptoken=second",
+                ),
+            )
+        )
 
         result = await read_thread(client, handle=_HANDLE)
 
-        assert result.complete is False
+        assert result.message_count == 2
+        assert result.complete is True
+        assert 'IdType="ImmutableId"' in second.calls.last.request.headers["Prefer"]
 
-    async def test_a_thread_longer_than_one_page_answers_without_the_anchor_on_it(
+    async def test_a_page_of_more_than_one_hundred_messages_is_answered_whole(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
-        crowd = [_message(f"{_OLDER_ID}{index}") for index in range(MAX_MESSAGES)]
+        crowd = [_message(f"{_OLDER_ID}{index}") for index in range(100)]
+        crowd.append(_message(_ANCHOR_ID))
+        anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
+        thread.mock(return_value=httpx.Response(200, json=_page(crowd)))
+
+        result = await read_thread(client, handle=_HANDLE)
+
+        assert result.message_count == 101
+        assert result.complete is True
+
+    async def test_a_thread_longer_than_the_scan_limit_says_it_is_incomplete(
+        self,
+        client: GraphServiceClient,
+        anchor: respx.Route,
+        thread: respx.Route,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(reader, "MAX_SCANNED_ITEMS", 3)
+        crowd = [_message(f"{_OLDER_ID}{index}") for index in range(5)]
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
         thread.mock(return_value=httpx.Response(200, json=_page(crowd, more=True)))
 
         result = await read_thread(client, handle=_HANDLE)
 
-        assert result.message_count == MAX_MESSAGES
+        assert result.message_count == 3
         assert result.complete is False
 
-    async def test_a_foreign_conversation_is_refused_even_on_a_truncated_page(
-        self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
+    async def test_a_foreign_conversation_is_refused_even_when_the_scan_limit_stopped_the_read(
+        self,
+        client: GraphServiceClient,
+        anchor: respx.Route,
+        thread: respx.Route,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        crowd = [_message(f"{_OLDER_ID}{index}") for index in range(MAX_MESSAGES - 1)]
+        monkeypatch.setattr(reader, "MAX_SCANNED_ITEMS", 5)
+        crowd = [_message(f"{_OLDER_ID}{index}") for index in range(4)]
         crowd.append(_message(_OLDER_ID, conversation=_OTHER_CONVERSATION))
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
         thread.mock(return_value=httpx.Response(200, json=_page(crowd, more=True)))

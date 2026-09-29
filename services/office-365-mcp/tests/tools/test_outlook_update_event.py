@@ -14,7 +14,6 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphNotFound, GraphThrottled, GraphUnavailable
-from office_365_mcp.shared.calendar import MAX_ATTENDEES, MAX_TIMED_EVENT_HOURS
 from office_365_mcp.shared.handles import EventHandle
 from office_365_mcp.shared.seam import Confirm
 from office_365_mcp.tools.outlook_update_event import UpdatedEvent, a_person_agrees, update_event
@@ -219,6 +218,27 @@ class TestWhatItSendsToGraph:
             for a in cast("Sequence[Mapping[str, object]]", sent["attendees"])
         ]
         assert invited == [(_ADA, "required"), (_GRACE, "required"), (_PAM, "optional")]
+
+    async def test_twenty_one_attendees_reach_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _ready(graph)
+        many = [f"guest{index}@example.invalid" for index in range(21)]
+
+        _ = await _update(client, attendees=many, optional_attendees=[])
+
+        assert len(cast("Sequence[object]", _sent(patch)["attendees"])) == 21
+
+    async def test_a_span_of_two_days_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _ready(graph)
+
+        _ = await _update(
+            client, starts_at="2026-03-02T09:00", ends_at="2026-03-04T09:00", time_zone="UTC"
+        )
+
+        assert patch.call_count == 1
 
     async def test_clearing_every_attendee_sends_an_explicit_empty_list(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -536,19 +556,6 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
-    async def test_a_span_longer_than_the_ceiling_never_reaches_graph(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        with pytest.raises(ToolError, match=f"{MAX_TIMED_EVENT_HOURS} hours"):
-            _ = await _update(
-                client,
-                starts_at="2026-03-02T09:00",
-                ends_at="2026-03-04T09:00",
-                time_zone="UTC",
-            )
-
-        assert len(graph.calls) == 0
-
     async def test_attendees_given_without_optional_attendees_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -580,16 +587,6 @@ class TestWhatItRefuses:
     ) -> None:
         with pytest.raises(ToolError, match="both"):
             _ = await _update(client, attendees=[_ADA], optional_attendees=[_ADA])
-
-        assert len(graph.calls) == 0
-
-    async def test_more_addresses_than_the_ceiling_never_reach_graph(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        too_many = [f"guest{index}@example.invalid" for index in range(MAX_ATTENDEES + 1)]
-
-        with pytest.raises(ToolError, match="between them"):
-            _ = await _update(client, attendees=too_many, optional_attendees=[])
 
         assert len(graph.calls) == 0
 

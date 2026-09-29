@@ -9,7 +9,7 @@ from msgraph.generated.models.recent_notebook import RecentNotebook as GraphRece
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
 from office_365_mcp.shared.notes import client_url_of, web_url_of
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -29,8 +29,6 @@ STEP_RECENT_NOTEBOOKS = "recent_notebooks"
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
-
-MAX_RECENT = 50
 
 _DESCRIPTION = """\
 Lists the notebooks the signed-in user recently opened, as Microsoft recorded it, newest \
@@ -82,10 +80,8 @@ class RecentNotebooks(BaseModel):
     )
     capped: bool = Field(
         description=(
-            f"True when a safety cap of {MAX_RECENT} stopped this list while Microsoft still "
-            + "had more to give. This tool has no `limit` to raise: list the user's notebooks "
-            + "with onenote_list_notebooks instead when the fifty most recently opened are not "
-            + "enough. False means the list is complete."
+            "True when a safety cap stopped this list while Microsoft still had more to give. "
+            + "This tool has no `limit` to raise. False means the list is complete."
         )
     )
 
@@ -100,9 +96,7 @@ async def list_recent_notebooks(
             ).get()
         )
         assert first_page is not None, "Graph answered getRecentNotebooks with no collection"
-        collected = await collect_pages(
-            first_page, client, limit=MAX_RECENT, max_scanned=MAX_RECENT
-        )
+        collected = await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)
 
     return RecentNotebooks(
         notebooks=[_row(item) for item in collected.items], capped=collected.capped

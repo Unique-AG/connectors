@@ -61,8 +61,6 @@ GRAPH_NOT_FOUND = (
     + "If you call this tool again with the same arguments, the call will fail the same way."
 )
 
-MAX_MESSAGES = 20
-
 _SEARCH_FOLDER_ONLY: frozenset[str] = frozenset(
     MailSearchFolder().get_field_deserializers()
 ) - frozenset(MailFolder().get_field_deserializers())
@@ -76,10 +74,10 @@ _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 
 _DESCRIPTION = (
-    f"Moves up to {MAX_MESSAGES} messages into another folder, in the signed-in user's own "
-    "mailbox or, with `mailbox`, a shared or delegated one — moving to `deleteditems` is the "
-    "only way this connector erases mail, and the message stays recoverable in Deleted Items "
-    "because there is no permanent-erase operation."
+    "Moves messages into another folder, in the signed-in user's own mailbox or, with "
+    "`mailbox`, a shared or delegated one — moving to `deleteditems` is the only way this "
+    "connector erases mail, and the message stays recoverable in Deleted Items because there is "
+    "no permanent-erase operation."
 )
 
 _BOTH_DESTINATIONS = (
@@ -194,9 +192,7 @@ async def move_mail(
     folder_ref: str | None = None,
     mailbox: str | None = None,
 ) -> MailMoved:
-    assert 1 <= len(message_refs) <= MAX_MESSAGES, (
-        f"message_refs is bounded by the schema at 1..{MAX_MESSAGES}, got {len(message_refs)}"
-    )
+    assert len(message_refs) >= 1, "the schema admits no empty batch"
     handles = _message_handles(message_refs)
     wanted = _destination_asked_for(destination, folder_ref)
     reached = graph_mailbox(client, mailbox)
@@ -324,10 +320,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 min_length=1,
-                max_length=MAX_MESSAGES,
                 description=(
-                    f"The messages to move: up to {MAX_MESSAGES} `uri` values from a search, "
-                    "list, or thread result."
+                    "The messages to move: `uri` values from a search, list, or thread result."
                 ),
             ),
         ],

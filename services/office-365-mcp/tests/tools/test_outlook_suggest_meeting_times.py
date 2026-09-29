@@ -9,7 +9,6 @@ from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
-from office_365_mcp.shared.calendar import MAX_ATTENDEES
 from office_365_mcp.tools.outlook_suggest_meeting_times import (
     SuggestedMeetingTimes,
     suggest_meeting_times,
@@ -117,6 +116,16 @@ class TestWhatItSendsToGraph:
             for a in attendees
         ] == [(_ADA, "required"), (_GRACE, "optional")]
 
+    async def test_twenty_one_attendees_reach_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        find = _finds_times(graph, [_suggestion()])
+        many = [f"guest{index}@example.invalid" for index in range(21)]
+
+        _ = await _suggest(client, attendees=many)
+
+        assert len(cast("Sequence[object]", _sent(find)["attendees"])) == 21
+
     async def test_the_window_and_duration_reach_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -163,16 +172,6 @@ class TestWhatItRefuses:
     ) -> None:
         with pytest.raises(ToolError, match="both"):
             _ = await _suggest(client, attendees=[_ADA], optional_attendees=[_ADA])
-
-        assert len(graph.calls) == 0
-
-    async def test_more_addresses_than_the_ceiling_never_reach_graph(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        too_many = [f"guest{index}@example.invalid" for index in range(MAX_ATTENDEES + 1)]
-
-        with pytest.raises(ToolError, match="between them"):
-            _ = await _suggest(client, attendees=too_many)
 
         assert len(graph.calls) == 0
 

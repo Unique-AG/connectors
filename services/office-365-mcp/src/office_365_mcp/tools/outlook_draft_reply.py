@@ -59,8 +59,6 @@ GRAPH_NOT_FOUND = (
     + "arguments, the call will fail the same way."
 )
 
-MAX_RECIPIENTS = 10
-
 type MailReplyMode = Literal["reply", "forward"]
 
 MODES: tuple[str, ...] = ("reply", "forward")
@@ -175,7 +173,6 @@ async def draft_reply(
     to: Sequence[str] = (),
     mailbox: str | None = None,
 ) -> MailReplyDraft:
-    assert len(to) <= MAX_RECIPIENTS, f"the To list is bounded by the schema, got {len(to)}"
     if mode not in MODES:
         raise ToolError(_UNKNOWN_MODE)
     handle = mail_message_handle(message_ref)
@@ -307,7 +304,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 default=[],
-                max_length=MAX_RECIPIENTS,
                 description=(
                     "Where a forward goes, one address per entry, required with "
                     + '`mode: "forward"` and refused with `mode: "reply"`; take it from the '

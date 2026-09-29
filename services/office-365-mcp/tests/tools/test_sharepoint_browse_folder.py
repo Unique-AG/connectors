@@ -165,8 +165,18 @@ class TestTheLevelItAsksFor:
 
         assert root_children.calls.last.request.url.params["$top"] == "7"
 
-    @pytest.mark.parametrize("limit", [0, browser.MAX_ITEMS + 1])
-    async def test_a_limit_outside_the_window_is_a_programming_error(
+    @pytest.mark.usefixtures("my_drive")
+    async def test_a_limit_of_500_reaches_graph_as_top(
+        self, client: GraphServiceClient, root_children: respx.Route
+    ) -> None:
+        root_children.mock(return_value=_page(_item_payload(_BUDGET_ID)))
+
+        _ = await browser.browse_folder(client, limit=500)
+
+        assert root_children.calls.last.request.url.params["$top"] == "500"
+
+    @pytest.mark.parametrize("limit", [0, -1])
+    async def test_a_limit_below_one_is_a_programming_error(
         self, client: GraphServiceClient, limit: int
     ) -> None:
         with pytest.raises(AssertionError):

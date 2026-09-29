@@ -54,7 +54,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 MAX_SECTIONS = 100
 
 _MIN_NAME_FRAGMENT_CHARACTERS = 1
-_MAX_NAME_FRAGMENT_CHARACTERS = 200
 
 _SECTION_FIELDS: tuple[str, ...] = (
     "id",
@@ -373,7 +372,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=_MIN_NAME_FRAGMENT_CHARACTERS,
-                max_length=_MAX_NAME_FRAGMENT_CHARACTERS,
                 description=(
                     "Keep only the sections and section groups whose name contains this text, "
                     + "compared without regard to case. Applies to both lists. Omit it to list "

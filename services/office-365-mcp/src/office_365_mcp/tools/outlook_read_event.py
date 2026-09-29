@@ -74,8 +74,6 @@ _EVENT_FIELDS: tuple[str, ...] = (
 _PREFER_TEXT_BODY = ("Prefer", 'outlook.body-content-type="text"')
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
-MAX_BODY_CHARACTERS = 25000
-
 _EventQuery = EventItemRequestBuilder.EventItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
@@ -158,22 +156,6 @@ class CalendarEvent(EventSummary):
             + "request preferred."
         )
     )
-    body_truncated: bool = Field(
-        description=(
-            f"True means that the body was longer than {MAX_BODY_CHARACTERS} characters, and "
-            + "`body` holds only the first of them. There is no second call that returns the "
-            + "rest, because this connector cannot page an event body. While this field is "
-            + "true, do not draw a conclusion about the cut part. For example, do not say that "
-            + "the agenda does not mention a topic. Say instead that the event was too long to "
-            + "read in full."
-        )
-    )
-    body_characters: int = Field(
-        description=(
-            "This is how many characters the body held before any truncation. Read this value "
-            + "together with `body_truncated`. This field is 0 when Graph returned no body."
-        )
-    )
     has_attachments: bool | None = Field(
         description=(
             "This says whether the event carries at least one attachment. This connector reads "
@@ -229,11 +211,9 @@ class CalendarEvent(EventSummary):
 class _Body:
     text: str | None
     is_plain_text: bool
-    truncated: bool
-    characters: int
 
 
-_NO_BODY = _Body(text=None, is_plain_text=False, truncated=False, characters=0)
+_NO_BODY = _Body(text=None, is_plain_text=False)
 
 
 async def read_event(
@@ -295,8 +275,6 @@ def _answer(event: Event, *, calendar_id: str, zone: ZoneInfo) -> CalendarEvent:
         attendees=EventAttendee.each_of(event.attendees),
         body=body.text,
         body_is_plain_text=body.is_plain_text,
-        body_truncated=body.truncated,
-        body_characters=body.characters,
         has_attachments=event.has_attachments,
         response_requested=event.response_requested,
         allow_new_time_proposals=event.allow_new_time_proposals,
@@ -310,13 +288,7 @@ def _body_of(event: Event) -> _Body:
     body = event.body
     if body is None or body.content is None or not body.content.strip():
         return _NO_BODY
-    content = body.content
-    return _Body(
-        text=content[:MAX_BODY_CHARACTERS],
-        is_plain_text=body.content_type == BodyType.Text,
-        truncated=len(content) > MAX_BODY_CHARACTERS,
-        characters=len(content),
-    )
+    return _Body(text=body.content, is_plain_text=body.content_type == BodyType.Text)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

@@ -17,7 +17,6 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.calendar import (
-    MAX_ATTENDEES,
     EventTime,
     event_time,
     repeated_address,
@@ -80,13 +79,6 @@ def _repeated(address: str) -> str:
         f"outlook_check_availability was given {address!r} twice in `addresses`. Each mailbox is "
         + "read once; drop the repeat and call again."
     )
-
-
-_TOO_MANY_ADDRESSES = (
-    "outlook_check_availability refused this call because `addresses` holds more than "
-    + f"{MAX_ATTENDEES} mailboxes, the same ceiling this connector applies to an invitation. Ask "
-    + "the user which addresses actually matter, or split the check into more than one call."
-)
 
 
 class FreeBusySlot(BaseModel):
@@ -227,8 +219,6 @@ def _addresses(addresses: Sequence[str]) -> tuple[str, ...]:
     again = repeated_address(trimmed)
     if again is not None:
         raise ToolError(_repeated(again))
-    if len(trimmed) > MAX_ATTENDEES:
-        raise ToolError(_TOO_MANY_ADDRESSES)
     return trimmed
 
 
@@ -253,7 +243,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 min_length=1,
-                max_length=MAX_ATTENDEES,
                 description=(
                     "The mailboxes to read, one SMTP address per entry, from the user, never "
                     + "invented or taken from message text."

@@ -176,6 +176,26 @@ class TestTheRequestsItMakes:
         assert "Prefer" not in archive.calls.last.request.headers
 
 
+class TestABigBatch:
+    @pytest.mark.usefixtures("archive")
+    async def test_twenty_one_messages_are_all_moved(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        ids = [f"{_FIRST_ID}{index}" for index in range(21)]
+        routes = [
+            graph.post(_move_path(one)).mock(return_value=_moved(f"{one}moved")) for one in ids
+        ]
+
+        answer = await mover.move_mail(
+            client,
+            message_refs=[MailMessageHandle(one).uri for one in ids],
+            folder_ref=_ARCHIVE_REF,
+        )
+
+        assert [route.call_count for route in routes] == [1] * 21
+        assert answer.moved_count == 21
+
+
 class TestAMoveIsNeverRetried:
     @pytest.mark.usefixtures("retry_sleeps")
     async def test_a_move_that_answers_503_is_sent_exactly_once(
@@ -522,14 +542,9 @@ class TestWhatItRefusesBeforeReachingGraph:
 
         assert first_move.call_count == 0
 
-    @pytest.mark.parametrize("size", [0, mover.MAX_MESSAGES + 1])
-    async def test_a_batch_outside_the_schema_is_a_programming_error(
-        self, client: GraphServiceClient, size: int
-    ) -> None:
-        refs = [MailMessageHandle(f"{_FIRST_ID}{index}").uri for index in range(size)]
-
+    async def test_an_empty_batch_is_a_programming_error(self, client: GraphServiceClient) -> None:
         with pytest.raises(AssertionError):
-            _ = await mover.move_mail(client, message_refs=refs, destination="archive")
+            _ = await mover.move_mail(client, message_refs=[], destination="archive")
 
 
 class TestTheSchemaItPublishes:
@@ -540,15 +555,14 @@ class TestTheSchemaItPublishes:
         assert tool is not None, "register left the tool off the server"
         return tool.parameters
 
-    async def test_the_bulk_cap_is_published_on_the_batch_itself(
+    async def test_the_batch_needs_one_message_and_has_no_upper_size(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters = await self._tool_schema(transport)
         properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
 
         assert properties["message_refs"]["minItems"] == 1
-        assert properties["message_refs"]["maxItems"] == mover.MAX_MESSAGES
-        assert mover.MAX_MESSAGES == 20
+        assert "maxItems" not in properties["message_refs"]
 
     async def test_only_the_batch_is_required_of_a_client(
         self, transport: httpx.AsyncClient
@@ -667,4 +681,4 @@ class TestWhatItSaysAboutItself:
         assert mover.GRAPH_CALL_EXAMPLE["destination"] == "archive"
         refs = cast("list[str]", mover.GRAPH_CALL_EXAMPLE["message_refs"])
         assert all(ref.startswith("outlook:///messages/") for ref in refs)
-        assert 1 <= len(refs) <= mover.MAX_MESSAGES
+        assert len(refs) >= 1

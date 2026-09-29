@@ -16,8 +16,6 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.shared.handles import MessageHandle
 
-MAX_REPLIES_PER_POST = 10
-
 
 class MessageSender(BaseModel):
     display_name: str | None = Field(description="The sender's name as Teams shows it.")

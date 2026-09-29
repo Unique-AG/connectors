@@ -162,15 +162,19 @@ class TestTheCap:
         assert [row.name for row in answer.notebooks] == ["First", "Second"]
         assert answer.capped is False
 
-    async def test_more_than_the_cap_in_one_page_says_capped(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+    async def test_more_than_the_safety_cap_in_one_page_says_capped(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        items = [_recent(name=f"Notebook {i}") for i in range(lister.MAX_RECENT + 1)]
+        monkeypatch.setattr(lister, "MAX_SCANNED_ITEMS", 3)
+        items = [_recent(name=f"Notebook {i}") for i in range(4)]
         _ = graph.get(_TRUE_PATH).mock(return_value=httpx.Response(200, json={"value": items}))
 
         answer = await _list(client)
 
-        assert len(answer.notebooks) == lister.MAX_RECENT
+        assert len(answer.notebooks) == 3
         assert answer.capped is True
 
 

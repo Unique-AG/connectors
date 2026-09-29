@@ -103,6 +103,20 @@ class TestWhichSitesHoldTheMatches:
             "siteId, webUrl and SPWebUrl are accepted and then silently grouped nothing"
         )
 
+    async def test_it_asks_for_no_bucket_count(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([_file_hit()]))
+        )
+
+        _ = await sharepoint_search_files.sharepoint_search_files(
+            client, query="report", offset=0, limit=25
+        )
+
+        asked = cast("list[dict[str, object]]", _request(route)["aggregations"])
+        assert "size" not in asked[0]
+
     async def test_the_sites_come_back_largest_first_with_the_address_path_wants(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -442,16 +456,16 @@ class TestAWindowThatHoldsNothing:
         assert "no word to look for" in str(refused.value)
         assert route.call_count == 0
 
-    async def test_a_limit_above_what_the_schema_allows_is_a_programming_error(
-        self, client: GraphServiceClient
+    async def test_a_limit_of_500_reaches_graph_unchanged(
+        self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        with pytest.raises(AssertionError):
-            _ = await sharepoint_search_files.sharepoint_search_files(
-                client,
-                query="budget",
-                offset=0,
-                limit=sharepoint_search_files.MAX_RESULTS + 1,
-            )
+        route = _matching(graph, _file_hit())
+
+        _ = await sharepoint_search_files.sharepoint_search_files(
+            client, query="budget", offset=0, limit=500
+        )
+
+        assert _request(route)["size"] == 500
 
 
 class TestTheHandleItMints:

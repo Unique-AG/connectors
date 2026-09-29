@@ -26,8 +26,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Team.ReadBasic.All",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
-MAX_TEAMS = 200
-
 _DESCRIPTION = """\
 Lists the teams the signed-in user belongs to, in no particular order, as the starting point for \
 any question about a team or a channel. It does not cover chats, group chats, or meeting chats, \
@@ -78,7 +76,7 @@ class TeamList(BaseModel):
 
 
 async def teams_list_my_teams(client: GraphServiceClient, *, limit: int) -> TeamList:
-    assert 1 <= limit <= MAX_TEAMS, f"limit must be within 1..{MAX_TEAMS}, got {limit}"
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
 
     with graph_errors(TOOL_NAME, step=STEP):
         first_page = await client.me.joined_teams.get()
@@ -102,9 +100,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             int,
             Field(
                 ge=1,
-                le=MAX_TEAMS,
                 description=(
-                    f"Teams to return, 1–{MAX_TEAMS}. The result is already the whole answer for "
+                    "How many teams to return. The result is already the whole answer for "
                     + "this call. Repeating it with the same `limit` returns the same teams, not "
                     + "the next page. Raise `limit` to see more."
                 ),

@@ -29,7 +29,6 @@ from office_365_mcp.shared.handles import MailMessageHandle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT
 from office_365_mcp.tools.outlook_mark_mail import (
     GRAPH_PERMISSIONS,
-    MAX_MESSAGES,
     TOOL_NAME,
     MailImportance,
     MarkChange,
@@ -204,19 +203,8 @@ async def _marked(
     )
 
 
-class TestTheBulkCap:
-    async def test_a_batch_over_the_cap_never_reaches_graph(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        route = _every_write(graph)
-        too_many = [MailMessageHandle(f"SYNTHETIC-{number}").uri for number in range(21)]
-
-        with pytest.raises(AssertionError):
-            _ = await mark_mail(client, message_refs=too_many, change=MarkChange(is_read=True))
-
-        assert route.call_count == 0
-
-    async def test_a_batch_of_nothing_is_refused_too(
+class TestTheBatchSize:
+    async def test_a_batch_of_nothing_is_refused(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         route = _every_write(graph)
@@ -226,25 +214,25 @@ class TestTheBulkCap:
 
         assert route.call_count == 0
 
-    async def test_a_batch_exactly_at_the_cap_is_written(
+    async def test_twenty_one_messages_are_all_written(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         route = _every_write(graph)
-        full = [MailMessageHandle(f"SYNTHETIC-{number}").uri for number in range(MAX_MESSAGES)]
+        many = [MailMessageHandle(f"SYNTHETIC-{number}").uri for number in range(21)]
 
-        answer = await mark_mail(client, message_refs=full, change=MarkChange(is_read=True))
+        answer = await mark_mail(client, message_refs=many, change=MarkChange(is_read=True))
 
-        assert route.call_count == MAX_MESSAGES
-        assert len(answer.messages) == MAX_MESSAGES
+        assert route.call_count == 21
+        assert len(answer.messages) == 21
 
-    async def test_the_schema_publishes_the_cap_a_client_is_held_to(
+    async def test_the_schema_needs_one_message_and_has_no_upper_size(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
         refs = _arguments(tool)["message_refs"]
-        assert refs["maxItems"] == MAX_MESSAGES
         assert refs["minItems"] == 1
+        assert "maxItems" not in refs
 
 
 class TestEveryWriteIsItsOwnRequest:

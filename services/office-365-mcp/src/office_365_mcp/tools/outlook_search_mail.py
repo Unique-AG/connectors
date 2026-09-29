@@ -37,7 +37,7 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "User.Read", "Mail.Read.Share
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 
-MAX_RESULTS = 50
+MAX_RESULTS = 1000
 
 _DESCRIPTION = (
     "Searches the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one, by "

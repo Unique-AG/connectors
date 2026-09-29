@@ -344,7 +344,7 @@ class TestDefaultNotebookAudience:
         graph: respx.MockRouter,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(notes, "_MAX_NOTEBOOKS", 1)
+        monkeypatch.setattr(notes, "MAX_SCANNED_ITEMS", 1)
         _ = graph.get("/me/onenote/notebooks").mock(
             return_value=_collection(
                 _notebook_payload(_NOTEBOOK_A, display_name="Personal", is_default=False),

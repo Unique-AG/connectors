@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
@@ -16,11 +16,6 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import (
-    MAX_ATTENDEES,
-    MAX_LOCATION_CHARACTERS,
-    MAX_SUBJECT_CHARACTERS,
-    MAX_TIMED_EVENT_HOURS,
-    MAX_ZONE_CHARACTERS,
     ZONE_NAME,
     EventAttendee,
     EventPatch,
@@ -135,12 +130,6 @@ _BACKWARD_TIMES = (
     + "and call again."
 )
 
-_TOO_LONG = (
-    f"outlook_update_event refused this because it runs longer than {MAX_TIMED_EVENT_HOURS} "
-    + "hours, which is almost always a wrong argument. NOTHING WAS CHANGED. Read the two times "
-    + "back to the user and ask which one is wrong."
-)
-
 
 def _bad_address(argument: str, value: str) -> str:
     return (
@@ -163,13 +152,6 @@ def _repeated(argument: str, address: str) -> str:
         f"outlook_update_event was given {address!r} twice in `{argument}`. NOTHING WAS CHANGED. "
         + "Drop the repeat and call again."
     )
-
-
-_TOO_MANY_ATTENDEES = (
-    "outlook_update_event refused this call because the two attendee lists hold more than "
-    + f"{MAX_ATTENDEES} addresses between them. NOTHING WAS CHANGED. Ask the user who genuinely "
-    + "needs to stay on the invitation."
-)
 
 
 class UpdatedEvent(EventSummary):
@@ -289,8 +271,6 @@ def _validated_span(starts_at: str, ends_at: str) -> None:
     closes = _moment("ends_at", ends_at)
     if closes <= opens:
         raise ToolError(_BACKWARD_TIMES)
-    if closes - opens > timedelta(hours=MAX_TIMED_EVENT_HOURS):
-        raise ToolError(_TOO_LONG)
 
 
 def _moment(argument: str, value: str) -> datetime:
@@ -321,8 +301,6 @@ def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
 
 
 def _invited_once(required: tuple[str, ...], optional: tuple[str, ...]) -> None:
-    if len(required) + len(optional) > MAX_ATTENDEES:
-        raise ToolError(_TOO_MANY_ATTENDEES)
     both = {a.casefold() for a in required} & {a.casefold() for a in optional}
     for address in required:
         if address.casefold() in both:
@@ -430,7 +408,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=1,
-                max_length=MAX_SUBJECT_CHARACTERS,
                 description="The new subject line. Omit to leave it unchanged.",
             ),
         ] = None,
@@ -446,31 +423,21 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=1,
-                max_length=MAX_ZONE_CHARACTERS,
                 pattern=ZONE_NAME,
                 description="The zone starts_at and ends_at are written in.",
             ),
         ] = None,
         location: Annotated[
             str | None,
-            Field(
-                max_length=MAX_LOCATION_CHARACTERS,
-                description="The new location. Omit to leave it unchanged.",
-            ),
+            Field(description="The new location. Omit to leave it unchanged."),
         ] = None,
         attendees: Annotated[
             list[str] | None,
-            Field(
-                max_length=MAX_ATTENDEES,
-                description="The full required-attendee list this event must now have.",
-            ),
+            Field(description="The full required-attendee list this event must now have."),
         ] = None,
         optional_attendees: Annotated[
             list[str] | None,
-            Field(
-                max_length=MAX_ATTENDEES,
-                description="The full optional-attendee list this event must now have.",
-            ),
+            Field(description="The full optional-attendee list this event must now have."),
         ] = None,
         client: GraphServiceClient = graph,
     ) -> UpdatedEvent | InputRequiredResult:

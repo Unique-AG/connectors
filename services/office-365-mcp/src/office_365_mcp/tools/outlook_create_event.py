@@ -12,7 +12,7 @@
 """
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
@@ -30,12 +30,6 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import (
-    MAX_ALL_DAY_EVENT_DAYS,
-    MAX_ATTENDEES,
-    MAX_LOCATION_CHARACTERS,
-    MAX_SUBJECT_CHARACTERS,
-    MAX_TIMED_EVENT_HOURS,
-    MAX_ZONE_CHARACTERS,
     NOBODY_INVITED_BUT_A_PLACE,
     ZONE_NAME,
     CalendarSummary,
@@ -145,24 +139,6 @@ _ENDS_BEFORE_IT_STARTS = (
     + "identically."
 )
 
-_TOO_LONG_FOR_A_MEETING = (
-    "outlook_create_event refused this event because it runs longer than "
-    + f"{MAX_TIMED_EVENT_HOURS} hours, which is almost always a wrong argument rather than a "
-    + "wrong intention: a date typed for the wrong day, or an `ends_at` in the following month. "
-    + "NO EVENT WAS CREATED and nobody was invited. Read the two times back to the user and ask "
-    + "which one is wrong. For something that genuinely covers whole days, set `all_day` and give "
-    + f"midnight-to-midnight times, up to {MAX_ALL_DAY_EVENT_DAYS} days. Retrying these values "
-    + "will fail identically."
-)
-
-_TOO_LONG_FOR_AN_ALL_DAY_EVENT = (
-    "outlook_create_event refused this all-day event because it covers more than "
-    + f"{MAX_ALL_DAY_EVENT_DAYS} days. An all-day event runs midnight to midnight, so its "
-    + "`ends_at` is the midnight AFTER the last day it covers, and a value further out than that "
-    + "is usually a wrong date rather than a long holiday. NO EVENT WAS CREATED and nobody was "
-    + "invited. Read the two dates back to the user. Retrying these values will fail identically."
-)
-
 
 def _not_midnight(starts_at: str, ends_at: str) -> str:
     return (
@@ -174,16 +150,6 @@ def _not_midnight(starts_at: str, ends_at: str) -> str:
         + "covers, or leave `all_day` off and create it as a timed event at the hours the user "
         + "named. Retrying these values will fail identically."
     )
-
-
-_TOO_MANY_ATTENDEES = (
-    "outlook_create_event refused this call because `attendees` and `optional_attendees` hold "
-    + f"more than {MAX_ATTENDEES} addresses between them. Every one of them is a person who "
-    + "receives mail from Microsoft that this connector cannot recall, so the two lists are "
-    + "counted together against one ceiling. NO EVENT WAS CREATED and nobody was invited. Ask the "
-    + "user who genuinely needs the invitation, or let them send it from Outlook, which has no "
-    + "such limit. Retrying this list will fail identically."
-)
 
 
 def _bad_address(argument: str, value: str) -> str:
@@ -364,9 +330,7 @@ async def create_event(
     A connection with no server-to-client channel cannot answer inside the call: `confirm` hands the
     question back and this returns it, for the client to put to a person and call again with.
     """
-    assert 1 <= len(subject) <= MAX_SUBJECT_CHARACTERS, (
-        f"the subject is bounded by the schema, got {len(subject)} characters"
-    )
+    assert len(subject) >= 1, f"the subject is bounded by the schema, got {len(subject)} characters"
     draft = _drafted(
         subject=subject,
         starts_at=starts_at,
@@ -432,7 +396,6 @@ def _drafted(
         raise ToolError(_ENDS_BEFORE_IT_STARTS)
     if all_day and not (is_midnight(opens) and is_midnight(closes)):
         raise ToolError(_not_midnight(starts_at, ends_at))
-    _within_one_event(closes - opens, all_day=all_day)
     required = _addresses(attendees, argument="attendees")
     optional = _addresses(optional_attendees, argument="optional_attendees")
     _invited_once(required, optional)
@@ -456,8 +419,8 @@ def _place(location: str | None) -> str | None:
 
 
 def _moment(argument: str, value: str) -> datetime:
-    """One wall-clock time, for the order and the length checks only: the caller's own string is
-    what reaches Graph, beside the `time_zone` name Microsoft reads both bounds in."""
+    """One wall-clock time, for the order check only: the caller's own string is what reaches
+    Graph, beside the `time_zone` name Microsoft reads both bounds in."""
     moment = wall_clock(value)
     if moment is not None:
         return moment
@@ -473,13 +436,6 @@ def _a_zone_of_its_own(value: str) -> bool:
         return False
 
 
-def _within_one_event(length: timedelta, *, all_day: bool) -> None:
-    if all_day and length > timedelta(days=MAX_ALL_DAY_EVENT_DAYS):
-        raise ToolError(_TOO_LONG_FOR_AN_ALL_DAY_EVENT)
-    if not all_day and length > timedelta(hours=MAX_TIMED_EVENT_HOURS):
-        raise ToolError(_TOO_LONG_FOR_A_MEETING)
-
-
 def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
     trimmed = tuple(address.strip() for address in addresses)
     for address in trimmed:
@@ -488,14 +444,10 @@ def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
     again = repeated_address(trimmed)
     if again is not None:
         raise ToolError(_repeated(argument, again))
-    if len(trimmed) > MAX_ATTENDEES:
-        raise ToolError(_TOO_MANY_ATTENDEES)
     return trimmed
 
 
 def _invited_once(required: tuple[str, ...], optional: tuple[str, ...]) -> None:
-    if len(required) + len(optional) > MAX_ATTENDEES:
-        raise ToolError(_TOO_MANY_ATTENDEES)
     both = {address.casefold() for address in required} & {
         address.casefold() for address in optional
     }
@@ -577,7 +529,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                max_length=MAX_SUBJECT_CHARACTERS,
                 description=(
                     "This is the subject line, as the user writes it. This tool stores it "
                     + "verbatim. This is what every attendee sees in the invitation and in the "
@@ -615,7 +566,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                max_length=MAX_ZONE_CHARACTERS,
                 pattern=ZONE_NAME,
                 description=(
                     "`starts_at` and `ends_at` use this zone. This parameter is required, with "
@@ -636,7 +586,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         attendees: Annotated[
             list[str],
             Field(
-                max_length=MAX_ATTENDEES,
                 description=(
                     "These are the people who must attend, one SMTP address for each entry and "
                     + "nothing else in the entry. An entry has no display name, no angle "
@@ -651,12 +600,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 default=[],
-                max_length=MAX_ATTENDEES,
                 description=(
                     "These are the people who are welcome but not needed, under the same rule "
-                    + f"as `attendees`. The two lists share one ceiling of {MAX_ATTENDEES} "
-                    + "addresses. This tool mails everybody here exactly as it mails an attendee "
-                    + "of the first list. Nobody belongs in both lists."
+                    + "as `attendees`. This tool mails everybody here exactly as it mails an "
+                    + "attendee of the first list. Nobody belongs in both lists."
                 ),
             ),
         ],
@@ -679,7 +626,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=1,
-                max_length=MAX_LOCATION_CHARACTERS,
                 description=(
                     "This is where the event is, as one line of text: a room name, an address, "
                     + "a city, or a URL. Null, or a value of only whitespace, leaves the event "
@@ -687,8 +633,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "one exception. In that case only, this tool creates the event and does "
                     + "not ask the user to agree. Whether Microsoft books a room from this text "
                     + "is not settled by this field alone. The `attendees` field in this call's "
-                    + "answer is the record of what actually happened. At most "
-                    + f"{MAX_LOCATION_CHARACTERS} characters reach the calendar."
+                    + "answer is the record of what actually happened."
                 ),
             ),
         ] = None,

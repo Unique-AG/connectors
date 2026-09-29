@@ -39,8 +39,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "body_html": "Sending this over for review.",
 }
 
-MAX_RECIPIENTS = 10
-
 MAX_SUBJECT_CHARACTERS = 255
 
 _DESCRIPTION = (
@@ -97,8 +95,7 @@ async def draft_mail(
     cc: Sequence[str] = (),
     mailbox: str | None = None,
 ) -> MailDraft:
-    assert 1 <= len(to) <= MAX_RECIPIENTS, f"the To list is bounded by the schema, got {len(to)}"
-    assert len(cc) <= MAX_RECIPIENTS, f"the Cc list is bounded by the schema, got {len(cc)}"
+    assert len(to) >= 1, "the schema admits no empty To list"
     recipients = _recipients(to, argument="to")
     copies = _recipients(cc, argument="cc")
     reached = graph_mailbox(client, mailbox)
@@ -164,7 +161,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 min_length=1,
-                max_length=MAX_RECIPIENTS,
                 description=(
                     "The To recipients, one SMTP address per entry, from the user or "
                     + "outlook_find_recipient."
@@ -193,7 +189,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 default=[],
-                max_length=MAX_RECIPIENTS,
                 description="The Cc recipients, under the same rule as `to`.",
             ),
         ],

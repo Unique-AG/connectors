@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import CHANNEL_PERMISSION, MessageHandle
-from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST, TeamsMessage, event_of
+from office_365_mcp.shared.messages import TeamsMessage, event_of
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "teams_browse_channel"
@@ -33,14 +33,14 @@ MAX_POSTS = 50
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = (
-    "Reads a Teams channel's posts and their newest replies in one call, ordered by reply "
+    "Reads a Teams channel's posts and their replies in one call, ordered by reply "
     "activity rather than post date."
 )
 
 
 class ChannelPosts(BaseModel):
     messages: list[TeamsMessage] = Field(
-        description="The channel's posts and their newest replies, in thread order."
+        description="The channel's posts and their replies, in thread order."
     )
     more_posts_in_channel: bool | None = Field(
         description=(
@@ -112,8 +112,7 @@ def _is_a_post(message: ChatMessage) -> bool:
 
 
 def _replies(post: ChatMessage) -> list[ChatMessage]:
-    replies = sorted((reply for reply in post.replies or [] if _is_a_post(reply)), key=_sent_at)
-    return replies[-MAX_REPLIES_PER_POST:]
+    return sorted((reply for reply in post.replies or [] if _is_a_post(reply)), key=_sent_at)
 
 
 def _sent_at(message: ChatMessage) -> datetime:

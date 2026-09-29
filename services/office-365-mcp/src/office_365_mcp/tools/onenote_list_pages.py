@@ -41,7 +41,6 @@ GRAPH_NOT_FOUND = (
 MAX_PAGES = 100
 
 _MIN_TITLE_FRAGMENT_CHARACTERS = 1
-_MAX_TITLE_FRAGMENT_CHARACTERS = 200
 
 _PagesQuery = PagesRequestBuilder.PagesRequestBuilderGetQueryParameters
 
@@ -297,7 +296,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=_MIN_TITLE_FRAGMENT_CHARACTERS,
-                max_length=_MAX_TITLE_FRAGMENT_CHARACTERS,
                 description=(
                     "Keep only the pages whose title contains this text, compared without "
                     + "regard to case. Omit it to list every page. Pass it to search for one "

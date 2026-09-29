@@ -234,18 +234,22 @@ class TestTheAddressesItRefuses:
 
         assert _addressed(_sent(route), "toRecipients") == [_ADA]
 
-    @pytest.mark.parametrize("count", [0, drafter.MAX_RECIPIENTS + 1])
-    async def test_a_recipient_list_outside_the_schema_is_a_programming_error(
-        self, client: GraphServiceClient, count: int
-    ) -> None:
-        with pytest.raises(AssertionError):
-            _ = await _draft(client, to=[_ADA] * count)
-
-    async def test_a_cc_list_outside_the_schema_is_a_programming_error(
+    async def test_an_empty_recipient_list_is_a_programming_error(
         self, client: GraphServiceClient
     ) -> None:
         with pytest.raises(AssertionError):
-            _ = await _draft(client, cc=[_ADA] * (drafter.MAX_RECIPIENTS + 1))
+            _ = await _draft(client, to=[])
+
+    async def test_eleven_recipients_on_each_line_all_reach_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+        many = [f"person{number}@example.invalid" for number in range(11)]
+
+        _ = await _draft(client, to=many, cc=many)
+
+        assert _addressed(_sent(route), "toRecipients") == many
+        assert _addressed(_sent(route), "ccRecipients") == many
 
 
 class TestTheSchemaItPublishes:
@@ -277,7 +281,7 @@ class TestTheSchemaItPublishes:
         assert not [name for name in properties if "attach" in name.casefold()]
         assert "content_bytes" not in json.dumps(published)
 
-    async def test_at_least_one_recipient_is_required_and_ten_is_the_ceiling(
+    async def test_at_least_one_recipient_is_required_and_there_is_no_ceiling(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
@@ -285,18 +289,16 @@ class TestTheSchemaItPublishes:
         properties = cast("Mapping[str, object]", parameters["properties"])
         to = cast("Mapping[str, object]", properties["to"])
         assert to["minItems"] == 1
-        assert to["maxItems"] == drafter.MAX_RECIPIENTS
+        assert "maxItems" not in to
         assert cast("Sequence[str]", parameters["required"]) == ["to", "subject", "body_html"]
 
-    async def test_cc_is_optional_and_bounded_the_same_way(
-        self, transport: httpx.AsyncClient
-    ) -> None:
+    async def test_cc_is_optional_and_has_no_ceiling(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
         cc = cast("Mapping[str, object]", properties["cc"])
         assert cc["default"] == []
-        assert cc["maxItems"] == drafter.MAX_RECIPIENTS
+        assert "maxItems" not in cc
 
     async def test_two_calls_do_not_share_one_cc_list(
         self, client: GraphServiceClient, graph: respx.MockRouter

@@ -7,7 +7,6 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.handles import message_handle
-from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST
 from office_365_mcp.tools import teams_browse_channel as browser
 
 from .conftest import GRAPH_V1, reaction_payload
@@ -375,7 +374,7 @@ class TestBrowsingOneChannel:
         )
         assert resolved.channel_id == _CHANNEL_ID, "the handle round-trips its decoded ids"
 
-    async def test_replies_are_sorted_and_the_newest_of_a_long_thread_are_kept(
+    async def test_replies_are_sorted_and_a_long_thread_is_kept_whole(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         replies = [
@@ -384,7 +383,7 @@ class TestBrowsingOneChannel:
                 root_id="1770000000000",
                 created_at=f"2026-02-11T10:{index:02d}:00Z",
             )
-            for index in range(MAX_REPLIES_PER_POST + 3)
+            for index in range(13)
         ]
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(
@@ -402,12 +401,7 @@ class TestBrowsingOneChannel:
         )
 
         kept = [message.message_id for message in browsed.messages[1:]]
-        assert kept == [reply["id"] for reply in replies[-MAX_REPLIES_PER_POST:]], (
-            "the newest replies, oldest first"
-        )
-        assert len(kept) == MAX_REPLIES_PER_POST, (
-            "a thread filled to the window is how a caller sees that it may have older replies"
-        )
+        assert kept == [reply["id"] for reply in replies], "every reply, oldest first"
 
     async def test_a_thread_graph_itself_paged_is_not_chased(
         self, client: GraphServiceClient, graph: respx.MockRouter

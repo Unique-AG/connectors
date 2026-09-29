@@ -35,8 +35,6 @@ GRAPH_NOT_FOUND = (
     + "this handle fails in the same way."
 )
 
-MAX_ITEMS = 200
-
 _ROOT_ITEM = "root"
 
 _DRIVE_FIELDS: tuple[str, ...] = ("id",)
@@ -87,7 +85,7 @@ class DriveFolderLevel(BaseModel):
 async def browse_folder(
     client: GraphServiceClient, *, folder: str | None = None, limit: int
 ) -> DriveFolderLevel:
-    assert 1 <= limit <= MAX_ITEMS, f"limit must be within 1..{MAX_ITEMS}, got {limit}"
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
     handle = _folder_to_browse(folder)
 
     with graph_errors(TOOL_NAME):
@@ -166,9 +164,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             int,
             Field(
                 ge=1,
-                le=MAX_ITEMS,
                 description=(
-                    f"How many items to return from this level, at most {MAX_ITEMS}. This "
+                    "How many items to return from this level. This "
                     + "limit applies to this level only. If you raise it, this tool still does "
                     + "not reach items inside a nested folder."
                 ),

@@ -360,11 +360,16 @@ class TestTheModesAndAddressesItRefuses:
 
         assert len(graph.calls) == 0
 
-    async def test_a_recipient_list_outside_the_schema_is_a_programming_error(
-        self, client: GraphServiceClient
+    async def test_eleven_forward_recipients_all_reach_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        with pytest.raises(AssertionError):
-            _ = await _reply(client, mode="forward", to=[_GRACE] * (replier.MAX_RECIPIENTS + 1))
+        create = _creates(graph, _CREATE_FORWARD)
+        _ = _fills(graph)
+        many = [f"person{number}@example.invalid" for number in range(11)]
+
+        _ = await _reply(client, mode="forward", to=many)
+
+        assert _addressed(_sent(create), "ToRecipients") == many
 
 
 class TestTheSchemaItPublishes:
@@ -421,12 +426,14 @@ class TestTheSchemaItPublishes:
             "body_html",
         ]
 
-    async def test_to_defaults_to_nobody_and_is_bounded(self, transport: httpx.AsyncClient) -> None:
+    async def test_to_defaults_to_nobody_and_has_no_ceiling(
+        self, transport: httpx.AsyncClient
+    ) -> None:
         parameters, _tool = await _registered(transport)
 
         to = _properties(parameters)["to"]
         assert to["default"] == []
-        assert to["maxItems"] == replier.MAX_RECIPIENTS
+        assert "maxItems" not in to
 
     async def test_two_calls_do_not_share_one_recipient_list(
         self, client: GraphServiceClient, graph: respx.MockRouter

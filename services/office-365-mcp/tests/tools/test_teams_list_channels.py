@@ -123,8 +123,8 @@ class TestTheQueryItSends:
         params = route.calls.last.request.url.params
         assert params["$filter"] == f"membershipType eq '{membership_type}'"
 
-    @pytest.mark.parametrize("limit", [0, lister.MAX_CHANNELS + 1])
-    async def test_a_limit_outside_the_window_is_a_programming_error(
+    @pytest.mark.parametrize("limit", [0, -1])
+    async def test_a_limit_below_one_is_a_programming_error(
         self, client: GraphServiceClient, limit: int
     ) -> None:
         with pytest.raises(AssertionError):

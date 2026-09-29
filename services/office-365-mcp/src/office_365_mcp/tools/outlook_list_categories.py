@@ -11,7 +11,7 @@ from msgraph.generated.users.item.outlook.master_categories.master_categories_re
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_categories"
@@ -21,8 +21,6 @@ STEP = "categories"
 GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.Read",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
-
-MAX_CATEGORIES = 500
 
 _CATEGORY_FIELDS: tuple[str, ...] = ("displayName", "color")
 
@@ -67,9 +65,7 @@ class Categories(BaseModel):
         )
     )
     capped: bool = Field(
-        description=(
-            f"True if the listing stopped at {MAX_CATEGORIES} categories with more remaining."
-        )
+        description="True if the listing stopped early with more categories remaining."
     )
 
 
@@ -77,11 +73,11 @@ async def list_categories(client: GraphServiceClient) -> Categories:
     with graph_errors(TOOL_NAME, step=STEP):
         first_page = await client.me.outlook.master_categories.get(
             request_configuration=RequestConfiguration[_CategoriesQuery](
-                query_parameters=_CategoriesQuery(select=list(_CATEGORY_FIELDS), top=MAX_CATEGORIES)
+                query_parameters=_CategoriesQuery(select=list(_CATEGORY_FIELDS))
             )
         )
         assert first_page is not None, "Graph answered a category listing with no collection"
-        collected = await collect_pages(first_page, client, limit=MAX_CATEGORIES)
+        collected = await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)
 
     return Categories(
         categories=[Category.from_category(category) for category in collected.items],
