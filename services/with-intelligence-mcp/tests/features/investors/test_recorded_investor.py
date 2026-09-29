@@ -40,6 +40,10 @@ class TestParsingTheRecordedShape:
         `_shape` note all pass through without breaking parsing."""
         assert record.contacts_total == 64
 
+    def test_manager_ids_keep_their_sign(self, record: InvestorExtendedAttributes) -> None:
+        """Manager ids are signed in the live data; treating them as unsigned would drop rows."""
+        assert [manager.id for manager in record.managers] == [2145858758, -179975042]
+
 
 class TestWhatTheToolPublishes:
     def test_aum_is_labelled_as_millions_with_the_wi_band(
@@ -82,12 +86,15 @@ class TestWhatTheToolPublishes:
         assert projected.contact_ids == [650889, 471270, 779796]
         assert projected.contacts_total == 64
 
-    def test_managers_keep_their_ids_including_negative_ones(
-        self, projected: InvestorProfileResponse
-    ) -> None:
-        """Manager ids are signed in the live data; treating them as unsigned would drop rows."""
-        assert projected.managers is not None
-        assert [m.id for m in projected.managers] == [2145858758, -179975042]
+    def test_vocabulary_lists_are_names(self, projected: InvestorProfileResponse) -> None:
+        assert projected.asset_classes == ["Hedge Funds", "Alternative"]
+        assert projected.investment_regions == ["Developed Markets"]
+        assert projected.investment_countries == ["United States"]
+        assert projected.fund_structures == ["Open-End Fund"]
+        assert projected.instruments == ["Equities"]
+        assert projected.managers == ["Manager One", "Manager Two"]
+        assert "primary_strategies" not in projected.model_dump()
+        assert "secondary_strategies" not in projected.model_dump()
 
     def test_preferences_are_reported_unavailable_on_this_subscription(
         self, projected: InvestorProfileResponse

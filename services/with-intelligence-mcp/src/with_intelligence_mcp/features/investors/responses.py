@@ -16,13 +16,6 @@ from with_intelligence_mcp.models import OmitNoneModel
 from with_intelligence_mcp.utils import html_to_markdown
 
 
-class NamedValueResponse(OmitNoneModel):
-    id: int | None = Field(
-        default=None, description="With Intelligence's id, for follow-up filters."
-    )
-    name: str | None = None
-
-
 class AssetsUnderManagementResponse(OmitNoneModel):
     value_millions: float | None = Field(
         default=None,
@@ -75,27 +68,38 @@ class InvestorProfileResponse(OmitNoneModel):
     aum: AssetsUnderManagementResponse | None = None
     updated_at: str | None = None
 
-    asset_classes: list[NamedValueResponse] | None = None
+    asset_classes: list[str] | None = Field(
+        default=None, description="Asset classes they allocate to.", examples=[["Hedge Funds"]]
+    )
     strategies: list[StrategyGroupResponse] | None = Field(
         default=None,
         description=(
             "What they allocate to, grouped: each primary strategy with the secondaries "
-            "recorded under it. Prefer this over the flat lists below, which mix every asset "
-            "class's strategies together."
+            "recorded under it."
         ),
     )
-    primary_strategies: list[NamedValueResponse] | None = None
-    secondary_strategies: list[NamedValueResponse] | None = None
-    investment_regions: list[NamedValueResponse] | None = None
-    investment_countries: list[NamedValueResponse] | None = None
-    fund_structures: list[NamedValueResponse] | None = None
-    instruments: list[NamedValueResponse] | None = None
+    investment_regions: list[str] | None = Field(
+        default=None, description="Regions they allocate in.", examples=[["Developed Markets"]]
+    )
+    investment_countries: list[str] | None = Field(
+        default=None, description="Countries they allocate in.", examples=[["United States"]]
+    )
+    fund_structures: list[str] | None = Field(
+        default=None, description="Fund structures they use.", examples=[["Open-End Fund"]]
+    )
+    instruments: list[str] | None = Field(
+        default=None, description="Instruments they allocate through.", examples=[["Equities"]]
+    )
     capital_structure_ids: list[int] | None = Field(
         default=None,
         description="Ids only — the API returns no names for capital structures here.",
     )
 
-    managers: list[NamedValueResponse] | None = None
+    managers: list[str] | None = Field(
+        default=None,
+        description="Managers they currently allocate to.",
+        examples=[["Bridgewater Associates"]],
+    )
     consultants: list[ConsultantResponse] | None = None
 
     contacts_total: int | None = Field(
@@ -133,41 +137,33 @@ class InvestorProfileResponse(OmitNoneModel):
             aum=_assets_under_management(attributes),
             updated_at=attributes.updated_at,
             asset_classes=_when_present(
-                attributes, "asset_classes", _named(attributes.asset_classes)
+                attributes, "asset_classes", _names(attributes.asset_classes)
             ),
             strategies=_when_present(
                 attributes,
                 "investment_strategies",
                 [_strategy_group(group) for group in attributes.investment_strategies],
             ),
-            primary_strategies=_when_present(
-                attributes, "primary_strategies", _named(attributes.primary_strategies)
-            ),
-            secondary_strategies=_when_present(
-                attributes, "secondary_strategies", _named(attributes.secondary_strategies)
-            ),
             investment_regions=_when_present(
-                attributes, "investment_regions", _named(attributes.investment_regions)
+                attributes, "investment_regions", _names(attributes.investment_regions)
             ),
             investment_countries=_when_present(
-                attributes, "investment_countries", _named(attributes.investment_countries)
+                attributes, "investment_countries", _names(attributes.investment_countries)
             ),
             fund_structures=_when_present(
                 attributes,
                 "investment_fund_structures",
-                _named(attributes.investment_fund_structures),
+                _names(attributes.investment_fund_structures),
             ),
             instruments=_when_present(
-                attributes,
-                "investment_instruments",
-                _named(attributes.investment_instruments),
+                attributes, "investment_instruments", _names(attributes.investment_instruments)
             ),
             capital_structure_ids=_when_present(
                 attributes,
                 "investment_capital_structures",
                 _ids(attributes.investment_capital_structures),
             ),
-            managers=_when_present(attributes, "managers", _named(attributes.managers)),
+            managers=_when_present(attributes, "managers", _names(attributes.managers)),
             consultants=_when_present(
                 attributes,
                 "consultants",
@@ -220,8 +216,8 @@ def _strategy_group(attributes: StrategyGroupAttributes) -> StrategyGroupRespons
     )
 
 
-def _named(values: list[ClassificationAttributes]) -> list[NamedValueResponse]:
-    return [NamedValueResponse(id=value.id, name=value.name) for value in values]
+def _names(values: list[ClassificationAttributes]) -> list[str]:
+    return [value.name for value in values if value.name]
 
 
 def _ids(values: list[EntityAttributes]) -> list[int]:

@@ -309,16 +309,16 @@ class TestProjection:
         assert result.location == "Richmond"
 
     @respx.mock
-    async def test_keeps_vocabulary_ids_for_follow_up_filters(self) -> None:
+    async def test_publishes_vocabulary_as_names(self) -> None:
         respx.get(f"{BASE_URL}/v3/investors/2504").mock(
             return_value=httpx.Response(200, json=VIRGINIA)
         )
         client, _ = build_client()
         result = await get_investor(investor_id=2504, client=client)
         assert isinstance(result, InvestorProfileResponse)
-        assert result.primary_strategies is not None
-        assert result.primary_strategies[0].id == 3
-        assert result.primary_strategies[0].name == "Equity Long/Short"
+        assert result.investment_countries == ["United States"]
+        assert result.managers == ["Bridgewater Associates"]
+        assert "primary_strategies" not in result.model_dump()
 
     @respx.mock
     async def test_a_sparse_record_does_not_break_parsing(self) -> None:
