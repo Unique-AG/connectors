@@ -91,7 +91,7 @@ class ToolsPreset(StrEnum):
 
 
 class AppConfig(BaseSettings):
-    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict()
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(hide_input_in_errors=True)
 
     app_env: AppEnv = AppEnv.PRODUCTION
     version: str = PKG_VERSION
@@ -143,7 +143,7 @@ class AppConfig(BaseSettings):
 
 
 class SurfaceConfig(BaseSettings):
-    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict()
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(hide_input_in_errors=True)
 
     tools_preset: ToolsPreset | None = None
     tools_enabled: Annotated[tuple[str, ...] | None, NoDecode] = None
@@ -186,7 +186,9 @@ _NAMED_AUTHORITIES = _PERSONAL_ACCOUNT_AUTHORITIES | {ORGANIZATIONS}
 
 
 class EntraConfig(BaseSettings):
-    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="ENTRA_")
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        env_prefix="ENTRA_", hide_input_in_errors=True
+    )
 
     tenant_id: str = Field(min_length=1)
     client_id: str = Field(min_length=1)
@@ -215,7 +217,9 @@ class EntraConfig(BaseSettings):
 
 
 class DatabaseConfig(BaseSettings):
-    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="DB_")
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        env_prefix="DB_", hide_input_in_errors=True
+    )
 
     url: PostgresDsn | None = None
     host: str | None = None

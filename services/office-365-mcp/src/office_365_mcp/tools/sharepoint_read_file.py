@@ -1,4 +1,6 @@
 from collections.abc import Mapping
+from pathlib import Path
+from tempfile import gettempdir
 from typing import Annotated, Literal
 
 import httpx
@@ -6,6 +8,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.utilities.types import File
 from kiota_abstractions.base_request_configuration import RequestConfiguration
+from kiota_abstractions.request_information import RequestInformation
 from msgraph.generated.drives.item.items.item.content.content_request_builder import (
     ContentRequestBuilder,
 )
@@ -16,7 +19,12 @@ from msgraph.generated.models.drive_item import DriveItem
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step
+from office_365_mcp.graph_client import (
+    GraphResponseTooLarge,
+    download_to_file,
+    graph_errors,
+    graph_step,
+)
 from office_365_mcp.shared.files import ITEM_FIELDS
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
 from office_365_mcp.shared.seam import READ_ONLY, FileFromGraph, graph_client_for_caller
@@ -105,20 +113,28 @@ type ConvertTo = Literal["pdf"]
 
 
 async def sharepoint_read_file(
-    client: GraphServiceClient, *, file: str, convert_to: ConvertTo | None = None
+    client: GraphServiceClient,
+    transport: httpx.AsyncClient,
+    *,
+    file: str,
+    convert_to: ConvertTo | None = None,
 ) -> File:
     handle = drive_file_handle(file)
     if handle is None:
         raise ToolError(_NOT_A_FILE_HANDLE)
 
-    fetched = await _fetched(client, handle, convert_to=convert_to)
+    fetched = await _fetched(client, transport, handle, convert_to=convert_to)
     if isinstance(fetched, str):
         raise ToolError(fetched)
     return fetched
 
 
 async def _fetched(
-    client: GraphServiceClient, handle: DriveFileHandle, *, convert_to: ConvertTo | None
+    client: GraphServiceClient,
+    transport: httpx.AsyncClient,
+    handle: DriveFileHandle,
+    *,
+    convert_to: ConvertTo | None,
 ) -> File | str:
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_ITEM):
@@ -134,14 +150,21 @@ async def _fetched(
         if item.size > MAX_BYTES:
             return _too_large(size=item.size, web_url=item.web_url)
 
-        with graph_step(STEP_CONTENT):
-            content = await _content(client, handle, convert_to=convert_to)
+        try:
+            with graph_step(STEP_CONTENT):
+                async with download_to_file(
+                    client,
+                    transport,
+                    _content_request(client, handle, convert_to=convert_to),
+                    directory=Path(gettempdir()),
+                    max_bytes=MAX_BYTES,
+                ) as downloaded:
+                    body = downloaded.path.read_bytes()
+        except GraphResponseTooLarge:
+            return _too_large(size=None, web_url=item.web_url)
 
-        if content is None and item.size > 0:
+        if body == b"" and item.size > 0:
             return _NOTHING_CAME_BACK
-        body = content or b""
-        if len(body) > MAX_BYTES:
-            return _too_large(size=len(body), web_url=item.web_url)
         if convert_to is None:
             return FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
         return FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE)
@@ -159,15 +182,15 @@ async def _item(client: GraphServiceClient, handle: DriveFileHandle) -> DriveIte
     )
 
 
-async def _content(
+def _content_request(
     client: GraphServiceClient, handle: DriveFileHandle, *, convert_to: ConvertTo | None
-) -> bytes | None:
+) -> RequestInformation:
     content = (
         client.drives.by_drive_id(handle.drive_id).items.by_drive_item_id(handle.item_id).content
     )
     if convert_to is None:
-        return await content.get()
-    return await content.get(
+        return content.to_get_request_information()
+    return content.to_get_request_information(
         request_configuration=RequestConfiguration[_ContentQuery](
             query_parameters=_ContentQuery(format=convert_to)
         )
@@ -208,17 +231,21 @@ def _is_a_folder(handle: DriveFileHandle) -> str:
     )
 
 
-def _too_large(*, size: int, web_url: str | None) -> str:
+def _too_large(*, size: int | None, web_url: str | None) -> str:
+    how_large = (
+        f"{_megabytes(size)} MB" if size is not None else f"more than {_megabytes(MAX_BYTES)} MB"
+    )
     where = (
         "Tell the user to open the file in a browser instead, at " + web_url + "."
         if web_url is not None
-        else "Microsoft gave no web address for this file, so open it from the site itself."
+        else "Microsoft gave no web address for this file. Tell the user to open the file from "
+        + "the site itself."
     )
     return (
-        f"This file is {_megabytes(size)} MB, and sharepoint_read_file returns a file of "
-        + f"{_megabytes(MAX_BYTES)} MB or less. The whole file must be held in memory and sent to "
-        + "you in one message, so a file this large cannot come back at all. This tool never "
-        + "sends part of a file: half a spreadsheet is worse than a clear refusal. "
+        f"This file is {how_large}, and sharepoint_read_file returns a file of "
+        + f"{_megabytes(MAX_BYTES)} MB or less. This tool must hold the whole file in memory and "
+        + "send it to you in one message. As a result, this tool cannot return a file this large. "
+        + "This tool never sends part of a file: half a spreadsheet is worse than a clear refusal. "
         + where
         + " No other tool here returns this file, and a second call fails the same way."
     )
@@ -268,4 +295,4 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ] = None,
         client: GraphServiceClient = graph,
     ) -> File:
-        return await sharepoint_read_file(client, file=file, convert_to=convert_to)
+        return await sharepoint_read_file(client, transport, file=file, convert_to=convert_to)

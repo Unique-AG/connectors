@@ -199,6 +199,16 @@ innocent-sounding field name, and an innocent-looking credential value, are two 
   JWT, a password in a URL, and a credential in a query string. This service replaces that value
   with `[Redacted]` wherever it appears, including inside an exception's stack trace.
 
+A configuration error at startup occurs before logging starts, so neither net sees it. For this
+reason, the error gives the field and the problem, but it does not print the input that the
+configuration class read. Only a validator message can show a value, for example the tenant id.
+
+A Microsoft Graph URL can contain user data, for example, search words, mailbox addresses, and chat
+ids. By default, three loggers write the URL of each outbound request at `info`: `httpx`, `httpx2`,
+and `azure.core.pipeline.policies.http_logging_policy`. For this reason, this service sets these
+three loggers to `warning` at every `LOG_LEVEL`. As a result, these loggers write only warnings and
+errors.
+
 ## Run locally
 
 ```bash
