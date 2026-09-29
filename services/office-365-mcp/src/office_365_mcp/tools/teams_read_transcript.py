@@ -266,7 +266,6 @@ async def _read(
 
 
 def _accepting(media_type: str) -> HeadersCollection:
-    """A `HeadersCollection` that asks for `media_type`, built per request rather than shared."""
     headers = HeadersCollection()
     headers.add("Accept", media_type)
     headers.add(*_NO_CONTENT_CODING)

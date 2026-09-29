@@ -7,7 +7,6 @@ from typing import Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.attendee import Attendee
 from msgraph.generated.models.attendee_type import AttendeeType
 from msgraph.generated.models.body_type import BodyType
@@ -20,7 +19,6 @@ from msgraph.generated.models.free_busy_status import FreeBusyStatus
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.location import Location
 from msgraph.generated.models.online_meeting_provider_type import OnlineMeetingProviderType
-from msgraph.generated.models.recipient import Recipient
 from msgraph.generated.models.response_type import ResponseType
 from msgraph.generated.models.sensitivity import Sensitivity
 from msgraph.generated.models.user import User
@@ -36,6 +34,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.prose import body_opening as body_opening
 from office_365_mcp.shared.prose import cut_for_a_question as cut_for_a_question
@@ -90,8 +89,6 @@ ZONE_NAME = r"^[A-Za-z0-9][A-Za-z0-9 _./+-]*$"
 _DefaultCalendarQuery = CalendarRequestBuilder.CalendarRequestBuilderGetQueryParameters
 _NamedCalendarQuery = CalendarItemRequestBuilder.CalendarItemRequestBuilderGetQueryParameters
 _EventItemQuery = EventItemRequestBuilder.EventItemRequestBuilderGetQueryParameters
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _TRANSACTION_NAMESPACE = uuid.UUID("eb6f3437-0196-4593-b4d7-a6044db0acdf")
 
@@ -358,12 +355,6 @@ def repeated_address(addresses: Sequence[str]) -> str | None:
     return None
 
 
-def immutable_id_headers() -> HeadersCollection:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return headers
-
-
 async def event_of(client: GraphServiceClient, *, calendar_id: str, event_id: str) -> Event:
     with graph_step(STEP_EVENT):
         found = (
@@ -583,14 +574,4 @@ def _name_of(attendee: Attendee) -> str | None:
 
 def _address_of(attendee: Attendee) -> str | None:
     address = attendee.email_address
-    return None if address is None else address.address
-
-
-def _recipient_name(recipient: Recipient | None) -> str | None:
-    address = None if recipient is None else recipient.email_address
-    return None if address is None else address.name
-
-
-def _recipient_address(recipient: Recipient | None) -> str | None:
-    address = None if recipient is None else recipient.email_address
     return None if address is None else address.address

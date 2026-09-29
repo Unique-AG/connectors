@@ -27,6 +27,7 @@ from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
 from office_365_mcp.shared import meetings
+from office_365_mcp.tools import TOOL_NAMES
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -1295,6 +1296,25 @@ class TestTheToolsThisServerAdvertises:
             assert annotations is not None
             assert annotations.destructive_hint is not None, f"{name} does not say"
             assert annotations.idempotent_hint is not None, f"{name} does not say"
+
+    async def test_every_input_schema_is_a_plain_object_at_its_root(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+        refused_at_root = {"anyOf", "oneOf", "allOf", "not", "enum", "const"}
+
+        offenders = {
+            name: sorted(refused_at_root & set(tool.input_schema))
+            or f"type={tool.input_schema.get('type')!r}"
+            for name, tool in tools.items()
+            if tool.input_schema.get("type") != "object" or refused_at_root & set(tool.input_schema)
+        }
+
+        assert set(tools) == set(TOOL_NAMES)
+        assert offenders == {}, (
+            "If the parameters root of one tool is not a plain object, Azure OpenAI rejects the "
+            + f"whole tool list and every chat fails: {offenders}"
+        )
 
 
 class TestCallingThem:

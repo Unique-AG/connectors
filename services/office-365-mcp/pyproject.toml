@@ -96,7 +96,6 @@ include = ["src", "tests"]
 extraPaths = ["src", "."]
 reportUnusedCallResult = false
 reportMissingTypeStubs = false
-reportUnusedFunction = false
 
 [tool.uv]
 # unique-mcp pins fastmcp<4 but imports nothing 4.x changed; drop when it allows fastmcp 4.

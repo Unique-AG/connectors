@@ -6,7 +6,6 @@ import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.message import Message
 from msgraph.generated.users.item.mail_folders.item.mail_folder_item_request_builder import (
     MailFolderItemRequestBuilder,
@@ -19,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import mail_folder_handle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
     ONE_ADDRESS,
     SUMMARY_FIELDS,
@@ -60,8 +60,6 @@ DEFAULT_FOLDER: WellKnownFolder = "inbox"
 _FOLDER_FIELDS: tuple[str, ...] = ("displayName", "totalItemCount", "unreadItemCount")
 
 _NEWEST_FIRST = "receivedDateTime desc"
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQueryParameters
 _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
@@ -154,7 +152,7 @@ async def list_mail(
                 )
             )
         assert found is not None, "Graph answered a mail folder read with no folder"
-        headers = _headers()
+        headers = immutable_id_headers()
         with graph_step(STEP_MESSAGES):
             first_page = await reached.mail_folders.by_mail_folder_id(address).messages.get(
                 request_configuration=RequestConfiguration[_MessagesQuery](
@@ -285,12 +283,6 @@ def _one_address(from_address: str | None) -> str | None:
 def _summary(message: Message) -> MailSummary:
     assert message.id is not None, "Graph returned a message with no id"
     return MailSummary.from_message(message, message_id=message.id)
-
-
-def _headers() -> HeadersCollection:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return headers
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

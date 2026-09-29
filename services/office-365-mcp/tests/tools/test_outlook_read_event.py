@@ -195,8 +195,6 @@ class TestWhatItAsksGraphFor:
     async def test_the_preferences_are_not_added_to_every_other_graph_request(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """kiota's `RequestConfiguration.headers` defaults to one `HeadersCollection` shared by
-        every configuration in the process, so a header added to the default leaks everywhere."""
         _ = _reads(graph, _payload(body=_body("Agenda attached.")))
         profile = graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
 

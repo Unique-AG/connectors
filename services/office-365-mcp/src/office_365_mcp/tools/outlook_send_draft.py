@@ -7,7 +7,6 @@ from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
-from kiota_abstractions.headers_collection import HeadersCollection
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.message import Message
 from msgraph.generated.users.item.messages.item.message_item_request_builder import (
@@ -19,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -48,8 +48,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 _DRAFT_FIELDS: tuple[str, ...] = ("toRecipients", "ccRecipients", "subject", "isDraft")
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
 
@@ -188,18 +186,12 @@ async def _send(reached: UserItemRequestBuilder, handle: MailDraftHandle) -> dat
 def _read_request() -> RequestConfiguration[_MessageQuery]:
     return RequestConfiguration[_MessageQuery](
         query_parameters=_MessageQuery(select=list(_DRAFT_FIELDS)),
-        headers=_immutable_ids(),
+        headers=immutable_id_headers(),
     )
 
 
 def _send_request() -> RequestConfiguration[QueryParameters]:
-    return RequestConfiguration[QueryParameters](headers=_immutable_ids(), options=no_retry())
-
-
-def _immutable_ids() -> HeadersCollection:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return headers
+    return RequestConfiguration[QueryParameters](headers=immutable_id_headers(), options=no_retry())
 
 
 def _answer(draft: Message, *, sent_at: datetime) -> MailSent:

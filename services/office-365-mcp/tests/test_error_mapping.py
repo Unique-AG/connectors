@@ -16,7 +16,9 @@ from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
 from fastmcp.server.dependencies import AccessToken
-from mcp.types import ElicitRequestFormParams
+from fastmcp.server.middleware import MiddlewareContext
+from fastmcp.tools.base import ToolResult
+from mcp.types import CallToolRequestParams, ElicitRequestFormParams
 from starlette.applications import Starlette
 
 from office_365_mcp.app import create_app
@@ -27,7 +29,6 @@ from office_365_mcp.shared.seam import (
     Advised,
     GraphAdviceMiddleware,
     ToolAdvice,
-    graph_tool_errors,
 )
 from office_365_mcp.tools import (
     TOOL_NAMES,
@@ -127,10 +128,7 @@ _CHAIN = (
 # above, is the ordering the class below is named for.
 _RECORDS_THE_OUTCOME = ("MessageLogMiddleware", "_McpMetrics")
 
-# Two synthetic tools that refuse identically, one of them mapping its own refusal first.
-_DOUBLY_MAPPED = "read_twice"
-_MAPPED_ONCE = "read_once"
-_PERMISSION = "Chat.Read"
+_ORACLE = "worded_alone"
 
 _SOURCE = pathlib.Path(__file__).parent.parent / "src" / "office_365_mcp"
 _POLICED = (_SOURCE / "tools", _SOURCE / "shared")
@@ -179,32 +177,6 @@ def graph() -> Iterator[respx.MockRouter]:
             return_value=httpx.Response(403, headers={"request-id": _REQUEST_ID}, json=_REFUSED)
         )
         yield router
-
-
-@pytest.fixture
-def two_tools() -> FastMCP[None]:
-    mcp: FastMCP[None] = FastMCP(
-        "Two Tools",
-        middleware=[
-            GraphAdviceMiddleware(
-                {
-                    _DOUBLY_MAPPED: ToolAdvice(permissions=(_PERMISSION,)),
-                    _MAPPED_ONCE: ToolAdvice(permissions=(_PERMISSION,)),
-                }
-            )
-        ],
-    )
-
-    @mcp.tool(name=_DOUBLY_MAPPED)
-    async def read_twice() -> str:
-        with graph_tool_errors(_PERMISSION):
-            raise _refused()
-
-    @mcp.tool(name=_MAPPED_ONCE)
-    async def read_once() -> str:
-        raise _refused()
-
-    return mcp
 
 
 def _gateway_timeout(request: httpx.Request) -> httpx.Response:
@@ -276,9 +248,15 @@ def _refused() -> GraphForbidden:
     )
 
 
-def _advice_for(permissions: tuple[str, ...]) -> str:
-    with pytest.raises(ToolError) as raised, graph_tool_errors(*permissions):
+async def _advice_for(permissions: tuple[str, ...]) -> str:
+    async def refuse(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+        _ = context
         raise _refused()
+
+    advice = GraphAdviceMiddleware({_ORACLE: ToolAdvice(permissions=permissions)})
+    context = MiddlewareContext(message=CallToolRequestParams(name=_ORACLE, arguments={}))
+    with pytest.raises(ToolError) as raised:
+        _ = await advice.on_call_tool(context, refuse)
     return str(raised.value)
 
 
@@ -314,7 +292,7 @@ class TestEveryToolTranslatesItsOwnRefusal:
             _ = await mcp_client.call_tool(tool, dict(refused.arguments))
 
         assert graph.calls, f"{tool} refused its own example arguments before reaching Graph"
-        assert str(raised.value) == _advice_for(refused.permissions)
+        assert str(raised.value) == await _advice_for(refused.permissions)
 
     @pytest.mark.usefixtures("obo", "graph")
     @pytest.mark.parametrize("tool", _SELECTION.tools)
@@ -357,8 +335,12 @@ class TestEveryToolTranslatesItsOwnRefusal:
                 "teams_search_messages", dict(_EVERY_TOOL["teams_search_messages"].arguments)
             )
 
-        assert str(narrowed.value) == _advice_for(_EVERY_TOOL["teams_read_message"].permissions)
-        assert str(after.value) == _advice_for(_EVERY_TOOL["teams_search_messages"].permissions)
+        assert str(narrowed.value) == await _advice_for(
+            _EVERY_TOOL["teams_read_message"].permissions
+        )
+        assert str(after.value) == await _advice_for(
+            _EVERY_TOOL["teams_search_messages"].permissions
+        )
 
 
 class TestWhereTheMappingSits:
@@ -423,28 +405,10 @@ class TestWhereTheMappingSits:
         assert any(isinstance(cause, GraphForbidden) for cause in causes), causes
 
 
-class TestMappingTwiceChangesNothing:
-    async def test_a_tool_block_and_the_middleware_agree_word_for_word(
-        self, two_tools: FastMCP[None]
-    ) -> None:
-        async with Client(FastMCPTransport(two_tools)) as client:
-            with pytest.raises(ToolError) as doubly:
-                _ = await client.call_tool(_DOUBLY_MAPPED, {})
-            with pytest.raises(ToolError) as once:
-                _ = await client.call_tool(_MAPPED_ONCE, {})
-
-        assert str(doubly.value) == str(once.value)
-        assert str(doubly.value) == _advice_for((_PERMISSION,))
-
-
 class TestTheOrderThePermissionsAreNamed:
     """The order is prose: "OnlineMeetings.Read and OnlineMeetingTranscript.Read.All" reads as
     resolve the meeting, then read its transcript. Hence a table rather than a tool's own `tags`,
     which lose the order.
-
-    Both routes to a message pass the permissions through the same `_named`, so a sort there leaves
-    every byte-equality assertion in this file agreeing with itself. The comparison here is
-    therefore against the tuple the tool module declares.
     """
 
     def test_a_sort_would_be_visible_in_at_least_one_of_them(self) -> None:

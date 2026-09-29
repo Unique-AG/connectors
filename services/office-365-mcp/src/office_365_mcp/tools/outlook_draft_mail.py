@@ -6,7 +6,6 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.item_body import ItemBody
@@ -17,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.handles import MailDraftHandle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -110,7 +110,7 @@ async def draft_mail(
                     cc_recipients=copies,
                 ),
                 request_configuration=RequestConfiguration[QueryParameters](
-                    options=no_retry(), headers=_immutable_ids()
+                    options=no_retry(), headers=immutable_id_headers()
                 ),
             )
         assert draft is not None, "Graph answered a draft create with no message"
@@ -136,15 +136,6 @@ def _answer(draft: Message) -> MailDraft:
         subject=draft.subject,
         body=None if draft.body is None else draft.body.content,
     )
-
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
-
-
-def _immutable_ids() -> HeadersCollection:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return headers
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

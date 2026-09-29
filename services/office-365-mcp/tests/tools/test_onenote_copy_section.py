@@ -162,13 +162,6 @@ def _copies_to_notebook_with_header_only(
     )
 
 
-def _copies_to_group_with_body(
-    graph: respx.MockRouter, *, status: int = 202, payload: Mapping[str, object] | None = None
-) -> respx.Route:
-    body = dict(payload) if payload is not None else _operation_payload()
-    return graph.post(_COPY_TO_GROUP_PATH).mock(return_value=httpx.Response(status, json=body))
-
-
 def _copies_to_group_with_header_only(
     graph: respx.MockRouter, *, status: int = 202, operation_id: str = _OPERATION_ID
 ) -> respx.Route:

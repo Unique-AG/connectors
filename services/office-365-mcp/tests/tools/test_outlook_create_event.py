@@ -316,8 +316,6 @@ class TestWhatItSendsToGraph:
     async def test_the_preference_does_not_leak_onto_the_calendar_read(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Kiota's RequestConfiguration.headers default is one collection shared across every
-        configuration in the process, so a header added to it survives into the next call."""
         read = _reads(graph)
         _ = _creates(graph)
 

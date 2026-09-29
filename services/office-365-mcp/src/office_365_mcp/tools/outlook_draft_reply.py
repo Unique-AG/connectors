@@ -7,7 +7,6 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.item_body import ItemBody
@@ -25,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -62,8 +62,6 @@ GRAPH_NOT_FOUND = (
 type MailReplyMode = Literal["reply", "forward"]
 
 MODES: tuple[str, ...] = ("reply", "forward")
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _DESCRIPTION = (
     "Drafts a reply to, or forward of, a found message into Drafts for review. It cannot "
@@ -238,9 +236,7 @@ async def _fill(reached: UserItemRequestBuilder, *, draft_id: str, body_html: st
 
 
 def _request() -> RequestConfiguration[QueryParameters]:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return RequestConfiguration[QueryParameters](headers=headers, options=no_retry())
+    return RequestConfiguration[QueryParameters](headers=immutable_id_headers(), options=no_retry())
 
 
 def _answer(mode: MailReplyMode, *, created: Message, fill: _Fill) -> MailReplyDraft:

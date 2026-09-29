@@ -5,7 +5,6 @@ import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.message import Message
 from msgraph.generated.users.item.messages.item.message_item_request_builder import (
     MessageItemRequestBuilder,
@@ -16,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import PREVIEW_CHARACTERS, SUMMARY_FIELDS, MailSummary
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import (
@@ -35,8 +35,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "Mail.Read.Shared")
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
 }
-
-_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _ANCHOR_FIELDS: tuple[str, ...] = ("id", "conversationId")
 
@@ -115,7 +113,7 @@ async def read_thread(
             )
             assert first_page is not None, "Graph answered a thread listing with no collection"
             collected = await collect_pages(
-                first_page, client, limit=MAX_SCANNED_ITEMS, headers=_immutable_ids()
+                first_page, client, limit=MAX_SCANNED_ITEMS, headers=immutable_id_headers()
             )
 
     _make_sure_the_filter_was_applied(
@@ -171,7 +169,7 @@ def _anchor_request() -> RequestConfiguration[_AnchorQuery]:
         query_parameters=MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters(
             select=list(_ANCHOR_FIELDS)
         ),
-        headers=_immutable_ids(),
+        headers=immutable_id_headers(),
     )
 
 
@@ -182,14 +180,8 @@ def _thread_request(conversation: str) -> RequestConfiguration[_ThreadQuery]:
             select=list(_THREAD_FIELDS),
             top=MAX_SCANNED_ITEMS,
         ),
-        headers=_immutable_ids(),
+        headers=immutable_id_headers(),
     )
-
-
-def _immutable_ids() -> HeadersCollection:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_IMMUTABLE_IDS)
-    return headers
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
