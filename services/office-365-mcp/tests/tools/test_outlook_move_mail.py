@@ -1,5 +1,5 @@
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import cast
 from urllib.parse import quote
 
@@ -8,7 +8,9 @@ import pytest
 import respx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
 
 from office_365_mcp.graph_client import (
     GraphForbidden,
@@ -17,6 +19,8 @@ from office_365_mcp.graph_client import (
     GraphUnavailable,
 )
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle
+from office_365_mcp.shared.mail import WellKnownFolder
+from office_365_mcp.shared.seam import Confirm, Confirmed
 from office_365_mcp.tools import outlook_move_mail as mover
 
 _FIRST_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
@@ -32,6 +36,10 @@ _ARCHIVE_REF = MailFolderHandle(_ARCHIVE_ID).uri
 
 _WELL_KNOWN = "/me/mailFolders/archive"
 
+_MAILBOX = "alex@example.invalid"
+
+_NOT_MOVED = "No message was moved."
+
 _NEVER_A_DESTINATION: tuple[str, ...] = (
     "recoverableitemsdeletions",
     "msgfolderroot",
@@ -43,6 +51,43 @@ _NEVER_A_DESTINATION: tuple[str, ...] = (
     "serverfailures",
     "syncissues",
 )
+
+
+async def _agrees(question: str, about: str) -> Confirmed:
+    assert question and about
+    return None
+
+
+async def _declines(question: str, about: str) -> Confirmed:
+    assert question and about
+    return _NOT_MOVED
+
+
+async def _never_asked(question: str, about: str) -> Confirmed:
+    raise AssertionError(f"a person was asked {question!r} about {about!r}")
+
+
+async def _move(
+    client: GraphServiceClient,
+    *,
+    message_refs: Sequence[str],
+    destination: WellKnownFolder | None = None,
+    folder_ref: str | None = None,
+    mailbox: str | None = None,
+    confirm: Confirm = _never_asked,
+) -> mover.MailMoved:
+    answer = await mover.move_mail(
+        client,
+        message_refs=message_refs,
+        confirm=confirm,
+        destination=destination,
+        folder_ref=folder_ref,
+        mailbox=mailbox,
+    )
+    assert not isinstance(answer, InputRequiredResult), (
+        "the confirmation asked instead of answering"
+    )
+    return answer
 
 
 def _move_path(message_id: str) -> str:
@@ -88,6 +133,10 @@ _SEARCH_FOLDER_PROPERTIES: Mapping[str, object] = {
 }
 
 
+def _paths(route: respx.Route) -> list[str]:
+    return [call.request.url.path for call in cast("Sequence[Call]", route.calls)]
+
+
 def _sent_body(route: respx.Route) -> Mapping[str, object]:
     return cast("Mapping[str, object]", json.loads(route.calls.last.request.content))
 
@@ -114,7 +163,7 @@ class TestTheRequestsItMakes:
     ) -> None:
         named = graph.get(_WELL_KNOWN)
 
-        _ = await mover.move_mail(
+        _ = await _move(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], destination="archive"
         )
 
@@ -125,7 +174,7 @@ class TestTheRequestsItMakes:
     async def test_a_folder_handle_sends_that_folders_own_id(
         self, client: GraphServiceClient, first_move: respx.Route
     ) -> None:
-        _ = await mover.move_mail(
+        _ = await _move(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
         )
 
@@ -140,7 +189,7 @@ class TestTheRequestsItMakes:
     ) -> None:
         third = graph.post(_move_path(_THIRD_ID)).mock(return_value=_moved("NEW-0003="))
 
-        _ = await mover.move_mail(
+        _ = await _move(
             client,
             message_refs=[
                 MailMessageHandle(_FIRST_ID).uri,
@@ -155,7 +204,7 @@ class TestTheRequestsItMakes:
     async def test_every_move_declares_the_immutable_id_space(
         self, client: GraphServiceClient, first_move: respx.Route, second_move: respx.Route
     ) -> None:
-        _ = await mover.move_mail(
+        _ = await _move(
             client,
             message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
             destination="archive",
@@ -168,7 +217,7 @@ class TestTheRequestsItMakes:
     async def test_the_preference_does_not_leak_onto_the_folder_read(
         self, client: GraphServiceClient, archive: respx.Route
     ) -> None:
-        _ = await mover.move_mail(
+        _ = await _move(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
         )
 
@@ -186,7 +235,7 @@ class TestABigBatch:
             graph.post(_move_path(one)).mock(return_value=_moved(f"{one}moved")) for one in ids
         ]
 
-        answer = await mover.move_mail(
+        answer = await _move(
             client,
             message_refs=[MailMessageHandle(one).uri for one in ids],
             folder_ref=_ARCHIVE_REF,
@@ -205,7 +254,7 @@ class TestAMoveIsNeverRetried:
         route = graph.post(_move_path(_FIRST_ID)).mock(return_value=httpx.Response(503))
 
         with pytest.raises(GraphUnavailable):
-            _ = await mover.move_mail(
+            _ = await _move(
                 client, message_refs=[MailMessageHandle(_FIRST_ID).uri], destination="archive"
             )
 
@@ -217,7 +266,7 @@ class TestAMoveIsNeverRetried:
     ) -> None:
         second = graph.post(_move_path(_SECOND_ID)).mock(return_value=httpx.Response(503))
 
-        answer = await mover.move_mail(
+        answer = await _move(
             client,
             message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
             destination="archive",
@@ -232,7 +281,7 @@ class TestTheHandlesItHandsBack:
     async def test_the_new_handle_is_read_off_graphs_answer(
         self, client: GraphServiceClient
     ) -> None:
-        answer = await mover.move_mail(
+        answer = await _move(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], destination="archive"
         )
 
@@ -242,7 +291,7 @@ class TestTheHandlesItHandsBack:
     async def test_the_row_keeps_the_handle_that_was_passed_in(
         self, client: GraphServiceClient
     ) -> None:
-        answer = await mover.move_mail(
+        answer = await _move(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], destination="archive"
         )
 
@@ -252,7 +301,7 @@ class TestTheHandlesItHandsBack:
     async def test_every_row_names_the_handle_it_came_in_with(
         self, client: GraphServiceClient
     ) -> None:
-        answer = await mover.move_mail(
+        answer = await _move(
             client,
             message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
             destination="archive",
@@ -273,7 +322,7 @@ class TestTheHandlesItHandsBack:
         _ = first_move
         _ = graph.post(_move_path(_SECOND_ID)).mock(return_value=_refused(404))
 
-        answer = await mover.move_mail(
+        answer = await _move(
             client,
             message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
             destination="archive",
@@ -303,7 +352,7 @@ class TestWhenPartOfTheBatchFails:
         _ = first_move
         _ = graph.post(_move_path(_SECOND_ID)).mock(return_value=_refused(404))
 
-        answer = await mover.move_mail(
+        answer = await _move(
             client,
             message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
             destination="archive",
@@ -318,7 +367,7 @@ class TestWhenPartOfTheBatchFails:
         _ = second_move
         _ = graph.post(_move_path(_FIRST_ID)).mock(return_value=_refused(404))
 
-        answer = await mover.move_mail(
+        answer = await _move(
             client,
             message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
             destination="archive",
@@ -333,7 +382,7 @@ class TestWhenPartOfTheBatchFails:
         _ = graph.post(_move_path(_SECOND_ID)).mock(return_value=_refused(404))
         _ = graph.post(_move_path(_THIRD_ID)).mock(return_value=_refused(404))
 
-        answer = await mover.move_mail(
+        answer = await _move(
             client,
             message_refs=[
                 MailMessageHandle(_FIRST_ID).uri,
@@ -353,7 +402,7 @@ class TestWhenPartOfTheBatchFails:
         _ = graph.post(_move_path(_SECOND_ID)).mock(return_value=_refused(404))
 
         with pytest.raises(GraphNotFound):
-            _ = await mover.move_mail(
+            _ = await _move(
                 client,
                 message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
                 destination="archive",
@@ -369,7 +418,7 @@ class TestWhenPartOfTheBatchFails:
         )
 
         with pytest.raises(GraphForbidden):
-            _ = await mover.move_mail(
+            _ = await _move(
                 client, message_refs=[MailMessageHandle(_FIRST_ID).uri], destination="archive"
             )
 
@@ -384,7 +433,7 @@ class TestTheDestinationItRefuses:
         )
 
         with pytest.raises(ToolError, match="hidden"):
-            _ = await mover.move_mail(
+            _ = await _move(
                 client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
             )
 
@@ -405,7 +454,7 @@ class TestTheDestinationItRefuses:
         )
 
         with pytest.raises(ToolError, match="search folder"):
-            _ = await mover.move_mail(
+            _ = await _move(
                 client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
             )
 
@@ -423,7 +472,7 @@ class TestTheDestinationItRefuses:
         )
 
         with pytest.raises(ToolError, match="search folder"):
-            _ = await mover.move_mail(
+            _ = await _move(
                 client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
             )
 
@@ -433,7 +482,7 @@ class TestTheDestinationItRefuses:
     async def test_the_destination_read_narrows_nothing(
         self, client: GraphServiceClient, archive: respx.Route
     ) -> None:
-        _ = await mover.move_mail(
+        _ = await _move(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
         )
 
@@ -445,8 +494,8 @@ class TestTheDestinationItRefuses:
     ) -> None:
         refs = [MailMessageHandle(_FIRST_ID).uri]
 
-        _ = await mover.move_mail(client, message_refs=refs, folder_ref=_ARCHIVE_REF)
-        _ = await mover.move_mail(client, message_refs=refs, folder_ref=_ARCHIVE_REF)
+        _ = await _move(client, message_refs=refs, folder_ref=_ARCHIVE_REF)
+        _ = await _move(client, message_refs=refs, folder_ref=_ARCHIVE_REF)
 
         assert archive.call_count == 2
 
@@ -455,7 +504,7 @@ class TestTheDestinationItRefuses:
         self, client: GraphServiceClient, first_move: respx.Route
     ) -> None:
         _ = first_move
-        answer = await mover.move_mail(
+        answer = await _move(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
         )
 
@@ -469,7 +518,7 @@ class TestWhatItRefusesBeforeReachingGraph:
         move = graph.post(_move_path(_FIRST_ID))
 
         with pytest.raises(ToolError, match="alternatives"):
-            _ = await mover.move_mail(
+            _ = await _move(
                 client,
                 message_refs=[MailMessageHandle(_FIRST_ID).uri],
                 destination="archive",
@@ -484,7 +533,7 @@ class TestWhatItRefusesBeforeReachingGraph:
         move = graph.post(_move_path(_FIRST_ID))
 
         with pytest.raises(ToolError, match="no destination"):
-            _ = await mover.move_mail(client, message_refs=[MailMessageHandle(_FIRST_ID).uri])
+            _ = await _move(client, message_refs=[MailMessageHandle(_FIRST_ID).uri])
 
         assert move.call_count == 0
 
@@ -504,7 +553,7 @@ class TestWhatItRefusesBeforeReachingGraph:
         move = graph.post(_move_path(_FIRST_ID))
 
         with pytest.raises(ToolError, match="folder handle"):
-            _ = await mover.move_mail(
+            _ = await _move(
                 client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=folder_ref
             )
 
@@ -526,7 +575,7 @@ class TestWhatItRefusesBeforeReachingGraph:
         move = graph.post(_move_path(_FIRST_ID))
 
         with pytest.raises(ToolError, match="message handles"):
-            _ = await mover.move_mail(client, message_refs=[message_ref], destination="archive")
+            _ = await _move(client, message_refs=[message_ref], destination="archive")
 
         assert move.call_count == 0
 
@@ -534,7 +583,7 @@ class TestWhatItRefusesBeforeReachingGraph:
         self, client: GraphServiceClient, first_move: respx.Route
     ) -> None:
         with pytest.raises(ToolError, match="message handles"):
-            _ = await mover.move_mail(
+            _ = await _move(
                 client,
                 message_refs=[MailMessageHandle(_FIRST_ID).uri, "not-a-handle"],
                 destination="archive",
@@ -544,7 +593,7 @@ class TestWhatItRefusesBeforeReachingGraph:
 
     async def test_an_empty_batch_is_a_programming_error(self, client: GraphServiceClient) -> None:
         with pytest.raises(AssertionError):
-            _ = await mover.move_mail(client, message_refs=[], destination="archive")
+            _ = await _move(client, message_refs=[], destination="archive")
 
 
 class TestTheSchemaItPublishes:
@@ -570,6 +619,29 @@ class TestTheSchemaItPublishes:
         parameters = await self._tool_schema(transport)
 
         assert parameters["required"] == ["message_refs"]
+
+    async def test_the_description_says_it_asks_before_it_changes_another_mailbox_and_not_its_own(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        mover.register(mcp, transport)
+
+        tool = await mcp.get_tool(mover.TOOL_NAME)
+
+        assert tool is not None, "register left the tool off the server"
+        assert (
+            "This tool asks the user to agree before it changes a shared or delegated mailbox. "
+            "It changes the user's own mailbox without a question."
+        ) in (tool.description or "")
+
+    async def test_the_confirmation_is_no_argument_of_the_published_schema(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters = await self._tool_schema(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+
+        assert "ctx" not in properties
+        assert "confirm" not in properties
 
     async def test_the_destination_vocabulary_is_the_closed_one(
         self, transport: httpx.AsyncClient
@@ -615,7 +687,7 @@ class TestMailboxTargeting:
     async def test_no_mailbox_moves_mail_in_the_signed_in_users_own_mailbox(
         self, client: GraphServiceClient, archive: respx.Route, first_move: respx.Route
     ) -> None:
-        _ = await mover.move_mail(
+        _ = await _move(
             client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
         )
 
@@ -632,16 +704,239 @@ class TestMailboxTargeting:
             f"/users/alex@example.invalid/messages/{quote(_FIRST_ID, safe='')}/move"
         ).mock(return_value=_moved(_FIRST_MOVED_ID))
 
-        moved = await mover.move_mail(
+        moved = await _move(
             client,
             message_refs=[MailMessageHandle(_FIRST_ID).uri],
             folder_ref=_ARCHIVE_REF,
             mailbox="alex@example.invalid",
+            confirm=_agrees,
         )
 
         assert folder.called
         assert move.called
         assert moved.messages[0].moved is True
+
+
+class TestThePersonBeforeAnotherMailboxLosesMail:
+    async def test_the_own_mailbox_asks_nobody_and_moves(
+        self, client: GraphServiceClient, first_move: respx.Route, second_move: respx.Route
+    ) -> None:
+        _ = await _move(
+            client,
+            message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
+            destination="deleteditems",
+            confirm=_never_asked,
+        )
+
+        assert (first_move.call_count, second_move.call_count) == (1, 1)
+
+    async def test_a_delegated_mailbox_asks_once_for_the_whole_batch(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        moves = graph.route(method="POST").mock(return_value=_moved(_FIRST_MOVED_ID))
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await _move(
+            client,
+            message_refs=[
+                MailMessageHandle(_FIRST_ID).uri,
+                MailMessageHandle(_SECOND_ID).uri,
+                MailMessageHandle(_THIRD_ID).uri,
+            ],
+            destination="archive",
+            mailbox=_MAILBOX,
+            confirm=capturing,
+        )
+
+        assert len(asked) == 1
+        assert moves.call_count == 3
+        assert all(path.startswith(f"/v1.0/users/{_MAILBOX}/messages/") for path in _paths(moves))
+
+    async def test_a_refusal_moves_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        moves = graph.route(method="POST").mock(return_value=_moved(_FIRST_MOVED_ID))
+
+        with pytest.raises(ToolError, match=_NOT_MOVED):
+            _ = await _move(
+                client,
+                message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
+                destination="deleteditems",
+                mailbox=_MAILBOX,
+                confirm=_declines,
+            )
+
+        assert moves.call_count == 0
+
+    async def test_the_question_for_a_deletion_says_the_messages_stay_recoverable(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route(method="POST").mock(return_value=_moved(_FIRST_MOVED_ID))
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await _move(
+            client,
+            message_refs=[MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri],
+            destination="deleteditems",
+            mailbox=_MAILBOX,
+            confirm=capturing,
+        )
+
+        assert f"Delete 2 messages in the mailbox '{_MAILBOX}'?" in asked[0]
+        assert "This tool moves them to Deleted Items." in asked[0]
+        assert "They stay recoverable in Deleted Items." in asked[0]
+        assert "belongs to someone else" in asked[0]
+
+    async def test_the_question_for_a_well_known_folder_names_that_folder(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route(method="POST").mock(return_value=_moved(_FIRST_MOVED_ID))
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await _move(
+            client,
+            message_refs=[MailMessageHandle(_FIRST_ID).uri],
+            destination="archive",
+            mailbox=_MAILBOX,
+            confirm=capturing,
+        )
+
+        assert f"Move 1 message in the mailbox '{_MAILBOX}' to the folder 'archive'?" in asked[0]
+        assert "Deleted Items" not in asked[0]
+
+    async def test_the_question_for_a_folder_handle_names_the_folder_graph_reported(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/users/{_MAILBOX}/mailFolders/{_ARCHIVE_ID}").mock(
+            return_value=httpx.Response(200, json=_folder_payload(display_name="Invoices 2026"))
+        )
+        _ = graph.route(method="POST").mock(return_value=_moved(_FIRST_MOVED_ID))
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await _move(
+            client,
+            message_refs=[MailMessageHandle(_FIRST_ID).uri],
+            folder_ref=_ARCHIVE_REF,
+            mailbox=_MAILBOX,
+            confirm=capturing,
+        )
+
+        assert "to the folder 'Invoices 2026'?" in asked[0]
+
+    async def test_a_very_long_folder_name_is_cut_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        long_name = "F" * 300
+        _ = graph.get(f"/users/{_MAILBOX}/mailFolders/{_ARCHIVE_ID}").mock(
+            return_value=httpx.Response(200, json=_folder_payload(display_name=long_name))
+        )
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return _NOT_MOVED
+
+        with pytest.raises(ToolError):
+            _ = await _move(
+                client,
+                message_refs=[MailMessageHandle(_FIRST_ID).uri],
+                folder_ref=_ARCHIVE_REF,
+                mailbox=_MAILBOX,
+                confirm=capturing,
+            )
+
+        assert long_name not in asked[0]
+        assert "…" in asked[0]
+
+    async def test_a_folder_that_cannot_receive_mail_is_refused_before_anybody_is_asked(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/users/{_MAILBOX}/mailFolders/{_ARCHIVE_ID}").mock(
+            return_value=httpx.Response(200, json=_folder_payload(is_hidden=True))
+        )
+        moves = graph.route(method="POST").mock(return_value=_moved(_FIRST_MOVED_ID))
+
+        with pytest.raises(ToolError, match="hidden"):
+            _ = await _move(
+                client,
+                message_refs=[MailMessageHandle(_FIRST_ID).uri],
+                folder_ref=_ARCHIVE_REF,
+                mailbox=_MAILBOX,
+                confirm=_never_asked,
+            )
+
+        assert moves.call_count == 0
+
+    async def test_a_different_mailbox_folder_or_message_binds_a_different_agreement(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route(method="POST").mock(return_value=_moved(_FIRST_MOVED_ID))
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return None
+
+        both = [MailMessageHandle(_FIRST_ID).uri, MailMessageHandle(_SECOND_ID).uri]
+        for mailbox, refs, destination in (
+            (_MAILBOX, both, "archive"),
+            ("sam@example.invalid", both, "archive"),
+            (_MAILBOX, both[:1], "archive"),
+            (_MAILBOX, both, "deleteditems"),
+        ):
+            _ = await _move(
+                client,
+                message_refs=refs,
+                destination=cast("WellKnownFolder", destination),
+                mailbox=mailbox,
+                confirm=capturing,
+            )
+
+        assert len(set(bound)) == 4
+
+    async def test_the_same_request_binds_the_same_agreement(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route(method="POST").mock(return_value=_moved(_FIRST_MOVED_ID))
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return None
+
+        for _ in range(2):
+            _ = await _move(
+                client,
+                message_refs=[MailMessageHandle(_FIRST_ID).uri],
+                destination="archive",
+                mailbox=_MAILBOX,
+                confirm=capturing,
+            )
+
+        assert bound[0] == bound[1]
 
 
 class TestWhatItSaysAboutItself:

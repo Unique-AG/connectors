@@ -1,12 +1,15 @@
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
 import httpx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
+from mcp.types import InputRequiredResult
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.item_body import ItemBody
@@ -18,23 +21,37 @@ from msgraph.generated.users.item.messages.item.create_forward.create_forward_po
 from msgraph.generated.users.item.messages.item.create_reply.create_reply_post_request_body import (
     CreateReplyPostRequestBody,
 )
+from msgraph.generated.users.item.messages.item.message_item_request_builder import (
+    MessageItemRequestBuilder,
+)
 from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry
+from office_365_mcp.graph_client import (
+    GraphFailure,
+    graph_errors,
+    graph_step,
+    no_retry,
+    not_graph,
+)
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     WRITE_ADDITIVE,
+    Confirm,
+    Confirmed,
     graph_client_for_caller,
     graph_mailbox,
+    person_confirms,
 )
 
 TOOL_NAME = "outlook_draft_reply"
 
+STEP_READ_MESSAGE = "mail_message"
 STEP_CREATE_REPLY = "create_reply"
 STEP_FILL_REPLY = "fill_reply"
 
@@ -63,11 +80,24 @@ type MailReplyMode = Literal["reply", "forward"]
 
 MODES: tuple[str, ...] = ("reply", "forward")
 
+_ORIGINAL_FIELDS: tuple[str, ...] = ("subject", "from", "replyTo")
+
+_MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
+
+_AGREE = "create the draft"
+_DECLINE = "do not create the draft"
+_NOTHING_CREATED = "No draft was created."
+
+_UNNAMED_ADDRESS = "an address that Microsoft did not record"
+_CHOSEN_BY_MICROSOFT = "an address that Microsoft chooses"
+
 _DESCRIPTION = (
     "Drafts a reply to, or forward of, a found message into Drafts for review. It cannot "
     "send — the user presses Send in Outlook — and offers no reply-all, Cc, or Bcc. It cannot "
     "add files to the draft. If the user asks to attach a file, tell them to add it in Outlook "
-    "before they send the draft."
+    "before they send the draft. Set `mailbox` to draft in a shared or delegated mailbox. "
+    "This tool asks the user to agree before it changes a shared or delegated mailbox. "
+    "It changes the user's own mailbox without a question."
 )
 
 _NOT_A_MESSAGE_HANDLE = (
@@ -162,32 +192,64 @@ class _Fill:
     failure: GraphFailure | None
 
 
+def a_person_agrees(ctx: Context) -> Confirm:
+    return person_confirms(ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_CREATED)
+
+
 async def draft_reply(
     client: GraphServiceClient,
     *,
     message_ref: str,
     mode: MailReplyMode,
     body_html: str,
+    confirm: Confirm,
     to: Sequence[str] = (),
     mailbox: str | None = None,
-) -> MailReplyDraft:
+) -> MailReplyDraft | InputRequiredResult:
     if mode not in MODES:
         raise ToolError(_UNKNOWN_MODE)
     handle = mail_message_handle(message_ref)
     if handle is None:
         raise ToolError(_NOT_A_MESSAGE_HANDLE)
-    recipients = _forward_recipients(mode, to)
+    forwarded_to = _forward_addresses(mode, to)
     reached = graph_mailbox(client, mailbox)
 
+    answer: Confirmed = None
+    created: Message | None = None
+    fill: _Fill | None = None
     with graph_errors(TOOL_NAME):
-        created = await _create(reached, handle=handle, mode=mode, recipients=recipients)
-        assert created.id is not None, "Graph created a draft it gave no id, which cannot be filled"
-        fill = await _fill(reached, draft_id=created.id, body_html=body_html)
+        if mailbox is not None:
+            original = await _read_original(reached, handle)
+            addressed = forwarded_to or _reply_addresses(original)
+            with not_graph():
+                answer = await confirm(
+                    _question(mailbox, mode=mode, subject=original.subject, addressed=addressed),
+                    _about(
+                        mailbox,
+                        message_id=handle.message_id,
+                        mode=mode,
+                        body_html=body_html,
+                        addressed=addressed,
+                    ),
+                )
+        if answer is None:
+            created = await _create(
+                reached, handle=handle, mode=mode, recipients=_recipients(forwarded_to)
+            )
+            assert created.id is not None, (
+                "Graph created a draft it gave no id, which cannot be filled"
+            )
+            fill = await _fill(reached, draft_id=created.id, body_html=body_html)
 
+    if isinstance(answer, InputRequiredResult):
+        return answer
+    if answer is not None:
+        raise ToolError(answer)
+    assert created is not None and fill is not None, "an agreed draft was written in two steps"
     return _answer(mode, created=created, fill=fill)
 
 
-def _forward_recipients(mode: MailReplyMode, to: Sequence[str]) -> list[Recipient]:
+def _forward_addresses(mode: MailReplyMode, to: Sequence[str]) -> list[str]:
     trimmed = [address.strip() for address in to]
     if mode == "reply":
         if trimmed:
@@ -198,7 +260,60 @@ def _forward_recipients(mode: MailReplyMode, to: Sequence[str]) -> list[Recipien
     for address in trimmed:
         if ONE_ADDRESS.match(address) is None:
             raise ToolError(_bad_address(address))
-    return [Recipient(email_address=EmailAddress(address=address)) for address in trimmed]
+    return trimmed
+
+
+def _recipients(addresses: Sequence[str]) -> list[Recipient]:
+    return [Recipient(email_address=EmailAddress(address=address)) for address in addresses]
+
+
+async def _read_original(reached: UserItemRequestBuilder, handle: MailMessageHandle) -> Message:
+    with graph_step(STEP_READ_MESSAGE):
+        original = await reached.messages.by_message_id(handle.message_id).get(
+            request_configuration=RequestConfiguration[_MessageQuery](
+                query_parameters=_MessageQuery(select=list(_ORIGINAL_FIELDS)),
+                headers=immutable_id_headers(),
+            )
+        )
+    assert original is not None, "Graph answered a message read with no message"
+    return original
+
+
+def _reply_addresses(original: Message) -> list[str]:
+    sender = [] if original.from_ is None else [original.from_]
+    return _spelled(original.reply_to or sender)
+
+
+def _spelled(recipients: list[Recipient]) -> list[str]:
+    return [one.address or one.name or _UNNAMED_ADDRESS for one in MailAddress.each_of(recipients)]
+
+
+def _question(
+    mailbox: str, *, mode: MailReplyMode, subject: str | None, addressed: Sequence[str]
+) -> str:
+    preposition = "of" if mode == "forward" else "to"
+    named = "with no subject" if not subject else repr(cut_for_a_question(subject))
+    return (
+        f"Create a {mode} draft in the mailbox {cut_for_a_question(mailbox)!r}? "
+        + f"The {mode} is {preposition} the message {named}. "
+        + "That mailbox is not the signed-in user's own. "
+        + f"The draft is addressed to {', '.join(addressed) or _CHOSEN_BY_MICROSOFT}. "
+        + "Nothing is sent. "
+        + "The draft appears in that mailbox, and anyone with access to it can see it."
+    )
+
+
+def _about(
+    mailbox: str,
+    *,
+    message_id: str,
+    mode: MailReplyMode,
+    body_html: str,
+    addressed: Sequence[str],
+) -> str:
+    return hashlib.sha256(
+        json.dumps([mailbox, message_id, mode, body_html, addressed]).encode()
+    ).hexdigest()
 
 
 async def _create(
@@ -308,14 +423,16 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
+        ctx: Context,
         mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
-    ) -> MailReplyDraft:
+    ) -> MailReplyDraft | InputRequiredResult:
         return await draft_reply(
             client,
             message_ref=message_ref,
             mode=mode,
             body_html=body_html,
+            confirm=a_person_agrees(ctx),
             to=to,
             mailbox=mailbox,
         )

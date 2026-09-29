@@ -1,4 +1,5 @@
 import json
+import re
 from collections.abc import Mapping, Sequence
 from typing import cast
 
@@ -9,11 +10,13 @@ from fastmcp import Client, FastMCP
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import Tool
+from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
 
-from office_365_mcp.graph_client import GraphForbidden, GraphUnavailable
+from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import MailMessageHandle, mail_draft_handle, mail_message_handle
-from office_365_mcp.shared.seam import WRITE_ADDITIVE
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import outlook_draft_reply as replier
 from office_365_mcp.tools.outlook_draft_reply import MailReplyDraft, MailReplyMode
 
@@ -39,6 +42,33 @@ _BODY = "Friday works for me."
 _SEEDED = "<div>From: Ada Lovelace<br>Sent: Monday<br>Can we meet Friday?</div>"
 
 _REFUSED: dict[str, object] = {"error": {"code": "ErrorAccessDenied", "message": "denied"}}
+
+_SHARED_MAILBOX = "alex@example.invalid"
+_SHARED_MESSAGE = f"/users/{_SHARED_MAILBOX}/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+_SHARED_CREATE_REPLY = f"{_SHARED_MESSAGE}/createReply"
+_SHARED_CREATE_FORWARD = f"{_SHARED_MESSAGE}/createForward"
+_SHARED_FILL = f"/users/{_SHARED_MAILBOX}/messages/AAMkAGI2SYNTHETIC-reply-draft-0001%3D"
+
+_NOT_CREATED = "No draft was created."
+
+
+async def _agrees(question: str, about: str) -> Confirmed:
+    assert question and about
+    return None
+
+
+async def _refuses(question: str, about: str) -> Confirmed:
+    assert question and about
+    return _NOT_CREATED
+
+
+async def _never_asked(question: str, about: str) -> Confirmed:
+    raise AssertionError(f"a person was asked {question!r} about {about!r}")
+
+
+async def _asks_the_client(question: str, about: str) -> Confirmed:
+    assert question and about
+    return InputRequiredResult(input_requests={}, request_state=about)
 
 
 def _recipient(name: str | None, address: str) -> dict[str, object]:
@@ -100,6 +130,39 @@ def _fills(graph: respx.MockRouter, payload: dict[str, object] | None = None) ->
     )
 
 
+def _original(
+    *,
+    subject: str | None = "Invoice 4471",
+    sender: str | None = _ADA,
+    reply_to: Sequence[str] = (),
+) -> dict[str, object]:
+    return {
+        "id": _MESSAGE_ID,
+        "subject": subject,
+        "from": None if sender is None else _recipient("Ada Lovelace", sender),
+        "replyTo": [_recipient(None, address) for address in reply_to],
+    }
+
+
+def _reads(graph: respx.MockRouter, payload: dict[str, object] | None = None) -> respx.Route:
+    return graph.get(_SHARED_MESSAGE).mock(
+        return_value=httpx.Response(200, json=payload if payload is not None else _original())
+    )
+
+
+def _shared_writes(graph: respx.MockRouter, create: str = _SHARED_CREATE_REPLY) -> respx.Route:
+    _ = graph.patch(_SHARED_FILL).mock(return_value=httpx.Response(200, json=_filled()))
+    return graph.post(create).mock(return_value=httpx.Response(201, json=_draft()))
+
+
+def _methods(graph: respx.MockRouter) -> list[str]:
+    return [call.request.method for call in cast("Sequence[Call]", graph.calls)]
+
+
+def _written(graph: respx.MockRouter) -> list[str]:
+    return [method for method in _methods(graph) if method != "GET"]
+
+
 async def _reply(client: GraphServiceClient, **overrides: object) -> MailReplyDraft:
     arguments: dict[str, object] = {
         "message_ref": _MESSAGE_REF,
@@ -107,13 +170,17 @@ async def _reply(client: GraphServiceClient, **overrides: object) -> MailReplyDr
         "body_html": _BODY,
     }
     arguments.update(overrides)
-    return await replier.draft_reply(
+    answer = await replier.draft_reply(
         client,
         message_ref=cast("str", arguments["message_ref"]),
         mode=cast("MailReplyMode", arguments["mode"]),
         body_html=cast("str", arguments["body_html"]),
+        confirm=cast("Confirm", arguments.get("confirm", _never_asked)),
         to=cast("Sequence[str]", arguments.get("to", ())),
+        mailbox=cast("str | None", arguments.get("mailbox")),
     )
+    assert isinstance(answer, MailReplyDraft), "the confirmation asked instead of answering"
+    return answer
 
 
 def _sent(route: respx.Route) -> dict[str, object]:
@@ -518,6 +585,18 @@ class TestHowItDeclaresItself:
             + "the draft."
         ) in description
 
+    async def test_the_description_says_a_shared_mailbox_needs_agreement_and_the_own_one_does_not(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert (
+            "This tool asks the user to agree before it changes a shared or delegated mailbox. "
+            + "It changes the user's own mailbox without a question."
+        ) in description
+        assert "`mailbox`" in description
+
     def test_a_stale_handle_is_told_where_to_find_the_message_again(self) -> None:
         assert "outlook_search_mail" in replier.GRAPH_NOT_FOUND
 
@@ -537,24 +616,202 @@ class TestMailboxTargeting:
     async def test_a_mailbox_replies_in_that_mailbox_instead_of_me(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        created = graph.post(
-            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D/createReply"
-        ).mock(return_value=httpx.Response(201, json=_draft()))
-        filled = graph.patch(
-            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-reply-draft-0001%3D"
-        ).mock(return_value=httpx.Response(200, json=_filled()))
+        _ = _reads(graph)
+        created = graph.post(_SHARED_CREATE_REPLY).mock(
+            return_value=httpx.Response(201, json=_draft())
+        )
+        filled = graph.patch(_SHARED_FILL).mock(return_value=httpx.Response(200, json=_filled()))
+
+        answer = await _reply(client, confirm=_agrees, mailbox=_SHARED_MAILBOX)
+
+        assert created.called
+        assert filled.called
+        assert answer.body_written is True
+
+
+def _questions() -> tuple[list[str], Confirm]:
+    asked: list[str] = []
+
+    async def capturing(question: str, about: str) -> Confirmed:
+        asked.append(question)
+        assert about
+        return None
+
+    return asked, capturing
+
+
+class TestThePersonBeforeTheDraftIsCreated:
+    async def test_the_signed_in_users_own_mailbox_asks_nobody_and_reads_nothing_first(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+        _ = _fills(graph)
+
+        _ = await _reply(client, confirm=_never_asked)
+
+        assert _methods(graph) == ["POST", "PATCH"]
+
+    async def test_a_shared_mailbox_is_asked_about_once_and_gets_one_draft(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph)
+        create = _shared_writes(graph)
+        asked, capturing = _questions()
+
+        _ = await _reply(client, mailbox=_SHARED_MAILBOX, confirm=capturing)
+
+        assert len(asked) == 1
+        assert read.call_count == 1
+        assert create.call_count == 1
+        assert _written(graph) == ["POST", "PATCH"]
+
+    async def test_a_refusal_writes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _shared_writes(graph)
+
+        with pytest.raises(ToolError, match=_NOT_CREATED):
+            _ = await _reply(client, mailbox=_SHARED_MAILBOX, confirm=_refuses)
+
+        assert _written(graph) == []
+
+    async def test_a_question_the_client_must_carry_writes_nothing_and_is_returned(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _shared_writes(graph)
 
         answer = await replier.draft_reply(
             client,
             message_ref=_MESSAGE_REF,
             mode="reply",
             body_html=_BODY,
-            mailbox="alex@example.invalid",
+            confirm=_asks_the_client,
+            mailbox=_SHARED_MAILBOX,
         )
 
-        assert created.called
-        assert filled.called
-        assert answer.body_written is True
+        assert isinstance(answer, InputRequiredResult)
+        assert _written(graph) == []
+
+    async def test_a_message_that_is_gone_is_a_not_found_before_any_question_or_write(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_SHARED_MESSAGE).mock(return_value=httpx.Response(404, json=_REFUSED))
+        _ = _shared_writes(graph)
+
+        with pytest.raises(GraphNotFound):
+            _ = await _reply(client, mailbox=_SHARED_MAILBOX, confirm=_never_asked)
+
+        assert _written(graph) == []
+
+    async def test_the_question_for_a_reply_names_the_mailbox_the_message_and_the_sender(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _shared_writes(graph)
+        asked, capturing = _questions()
+
+        _ = await _reply(client, mailbox=_SHARED_MAILBOX, confirm=capturing)
+
+        (question,) = asked
+        assert "Create a reply draft in the mailbox 'alex@example.invalid'?" in question
+        assert "The reply is to the message 'Invoice 4471'." in question
+        assert "not the signed-in user's own" in question
+        assert f"addressed to {_ADA}." in question
+        assert "Nothing is sent." in question
+        assert "anyone with access to it can see it" in question
+        sentences = re.split(r"(?<=[.?])\s+", question)
+        assert max(len(sentence.split()) for sentence in sentences) <= 20, sentences
+
+    async def test_the_question_for_a_reply_names_the_reply_to_address_over_the_sender(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _original(reply_to=["invoices@example.invalid"]))
+        _ = _shared_writes(graph)
+        asked, capturing = _questions()
+
+        _ = await _reply(client, mailbox=_SHARED_MAILBOX, confirm=capturing)
+
+        assert "addressed to invoices@example.invalid." in asked[0]
+        assert _ADA not in asked[0]
+
+    async def test_the_question_for_a_forward_names_the_forward_and_where_it_goes(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _shared_writes(graph, _SHARED_CREATE_FORWARD)
+        asked, capturing = _questions()
+
+        _ = await _reply(
+            client, mode="forward", to=[_GRACE, _PAM], mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+
+        (question,) = asked
+        assert "Create a forward draft in the mailbox" in question
+        assert "The forward is of the message 'Invoice 4471'." in question
+        assert f"addressed to {_GRACE}, {_PAM}." in question
+        assert _ADA not in question
+
+    async def test_a_message_with_no_subject_and_no_sender_is_still_described(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _original(subject=None, sender=None))
+        _ = _shared_writes(graph)
+        asked, capturing = _questions()
+
+        _ = await _reply(client, mailbox=_SHARED_MAILBOX, confirm=capturing)
+
+        assert "The reply is to the message with no subject." in asked[0]
+        assert "addressed to an address that Microsoft chooses." in asked[0]
+
+    async def test_a_long_mailbox_and_subject_are_cut_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        long_mailbox = f"{'m' * 300}@example.invalid"
+        _ = graph.get(f"/users/{long_mailbox}/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D").mock(
+            return_value=httpx.Response(200, json=_original(subject="s" * 255))
+        )
+        _ = graph.post(
+            f"/users/{long_mailbox}/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D/createReply"
+        ).mock(return_value=httpx.Response(201, json=_draft()))
+        _ = graph.patch(
+            f"/users/{long_mailbox}/messages/AAMkAGI2SYNTHETIC-reply-draft-0001%3D"
+        ).mock(return_value=httpx.Response(200, json=_filled()))
+        asked, capturing = _questions()
+
+        _ = await _reply(client, mailbox=long_mailbox, confirm=capturing)
+
+        assert "m" * 300 not in asked[0]
+        assert "s" * 255 not in asked[0]
+
+    async def test_a_changed_body_mode_or_addressee_binds_the_agreement_to_a_different_state(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _shared_writes(graph)
+        _ = _shared_writes(graph, _SHARED_CREATE_FORWARD)
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _reply(client, mailbox=_SHARED_MAILBOX, confirm=capturing)
+        _ = await _reply(client, mailbox=_SHARED_MAILBOX, confirm=capturing)
+        _ = await _reply(
+            client, body_html="<p>Other.</p>", mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+        _ = await _reply(
+            client, mode="forward", to=[_GRACE], mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+        _ = await _reply(
+            client, mode="forward", to=[_PAM], mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+
+        assert bound[0] == bound[1]
+        assert len({*bound}) == 4
 
 
 class TestWhatItAnswers:
