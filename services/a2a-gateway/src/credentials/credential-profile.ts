@@ -5,9 +5,16 @@ const secret = z
   .min(1)
   .max(16_384)
   .regex(/^[\x20-\x7e]+$/);
-const httpsUrl = z.url().refine((value) => {
+// HTTPS is enforced by the egress policy, which only admits http: in local development.
+const remoteUrl = z.url().refine((value) => {
   const url = new URL(value);
-  return url.protocol === 'https:' && !url.username && !url.password && !url.hash && !url.search;
+  return (
+    ['https:', 'http:'].includes(url.protocol) &&
+    !url.username &&
+    !url.password &&
+    !url.hash &&
+    !url.search
+  );
 });
 
 export const credentialProfile = z.discriminatedUnion('type', [
@@ -31,8 +38,8 @@ export const credentialProfile = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('oauth2_client_credentials'),
-      issuer: httpsUrl,
-      tokenEndpoint: httpsUrl,
+      issuer: remoteUrl,
+      tokenEndpoint: remoteUrl,
       clientId: secret,
       clientSecret: secret,
       scope: z.string().max(4096).optional(),
@@ -48,7 +55,7 @@ export type CredentialProfile = z.infer<typeof credentialProfile>;
 export const connectionWrite = z
   .object({
     name: z.string().trim().min(1).max(200),
-    agentCardUrl: httpsUrl.refine((value) => !new URL(value).search),
+    agentCardUrl: remoteUrl.refine((value) => !new URL(value).search),
     credential: credentialProfile,
   })
   .strict();

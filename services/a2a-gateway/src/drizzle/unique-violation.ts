@@ -11,3 +11,8 @@ export function isUniqueViolation(error: unknown, constraint: string): boolean {
     Reflect.get(cause, 'constraint') === constraint
   );
 }
+
+export function isForeignKeyViolation(error: unknown): boolean {
+  const cause = databaseError(error);
+  return typeof cause === 'object' && cause !== null && Reflect.get(cause, 'code') === '23503';
+}

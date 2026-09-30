@@ -37,11 +37,13 @@
     "absurd-sdk": "0.5.0",
     "drizzle-orm": "catalog:",
     "express": "5.2.1",
+    "ipaddr.js": "2.5.0",
     "oauth4webapi": "3.8.8",
     "pg": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
     "typeid-js": "catalog:",
+    "undici": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -5,6 +5,8 @@ import {
   Delete,
   Get,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
@@ -65,6 +67,21 @@ export class ConnectionController {
       id: connectionId,
       version: version(ifMatch),
     });
+  }
+
+  @Post(':connectionId/test')
+  @HttpCode(HttpStatus.OK)
+  public test(@Req() request: Request, @Param('connectionId') connectionId: string) {
+    return this.connections.test(requestIdentity(request), connectionId);
+  }
+
+  @Delete(':connectionId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  public remove(
+    @Req() request: Request,
+    @Param('connectionId') connectionId: string,
+  ): Promise<void> {
+    return this.connections.remove(requestIdentity(request), connectionId);
   }
 
   @Delete(':connectionId/credentials')

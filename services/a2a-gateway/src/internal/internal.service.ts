@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { RequestIdentity } from '../auth/identity.guard.js';
+import { ConnectionRepository } from '../drizzle/connection.repository.js';
 import { PublicationRepository } from '../drizzle/publication.repository.js';
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { UniqueInternalError } from '../unique/unique-internal.error.js';
@@ -14,6 +15,7 @@ export interface PublicationReconciliation {
 export class InternalService {
   public constructor(
     private readonly publications: PublicationRepository,
+    private readonly connections: ConnectionRepository,
     private readonly unique: UniqueInternalClient,
   ) {}
 
@@ -38,6 +40,7 @@ export class InternalService {
         throw error;
       }
       await this.publications.disable(identity.companyId, reconciliation.assistantId);
+      await this.connections.unbindAssistant(identity.companyId, reconciliation.assistantId);
     }
   }
 }

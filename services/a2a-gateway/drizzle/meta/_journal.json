@@ -15,6 +15,13 @@
       "when": 1790761990842,
       "tag": "0001_context_chat_after_admission",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790772751855,
+      "tag": "0002_outbound_execution_and_binding",
+      "breakpoints": true
     }
   ]
 }

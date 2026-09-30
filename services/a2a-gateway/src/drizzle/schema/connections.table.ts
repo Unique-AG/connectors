@@ -8,6 +8,7 @@ export const connections = pgTable(
     id: typeId('conn'),
     companyId: text().notNull(),
     name: text().notNull(),
+    assistantId: text(),
     agentCardUrl: text().notNull(),
     agentCardSnapshot: jsonb().$type<Record<string, unknown>>(),
     negotiatedCapabilities: jsonb().$type<Record<string, unknown>>().default({}).notNull(),
@@ -22,6 +23,7 @@ export const connections = pgTable(
   (table) => [
     unique('a2a_connections_company_id_unique').on(table.companyId, table.id),
     unique('a2a_connections_company_name_unique').on(table.companyId, table.name),
+    unique('a2a_connections_company_assistant_unique').on(table.companyId, table.assistantId),
     check('a2a_connections_version_positive', sql`${table.version} > 0`),
     index('a2a_connections_company_idx').on(table.companyId),
   ],

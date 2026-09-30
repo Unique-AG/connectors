@@ -59,6 +59,7 @@ const configSchema = z
             .map((host) => host.trim())
             .filter(Boolean) ?? [],
       ),
+    EGRESS_ALLOW_INSECURE: booleanFromEnvironment.prefault('false'),
     MAX_REMOTE_FILE_BYTES: z.coerce
       .number()
       .int()
@@ -75,7 +76,7 @@ const configSchema = z
     PUSH_MAX_FAILURES: z.coerce.number().int().positive().default(10),
     RECONCILE_INTERVAL: z.coerce.number().int().positive().default(300),
     WORKER_ENABLED: booleanFromEnvironment.prefault('true'),
-    WORKER_CONCURRENCY: z.coerce.number().int().positive().default(4),
+    WORKER_CONCURRENCY: z.coerce.number().int().positive().default(32),
     DEPENDENCY_TIMEOUT_MS: z.coerce.number().int().positive().default(2_000),
   })
   .superRefine((config, context) => {
@@ -94,6 +95,13 @@ const configSchema = z
           message: 'public OAuth URLs must be clean HTTPS URLs in production',
         });
       }
+    }
+    if (config.NODE_ENV === 'production' && config.EGRESS_ALLOW_INSECURE) {
+      context.addIssue({
+        code: 'custom',
+        path: ['EGRESS_ALLOW_INSECURE'],
+        message: 'insecure egress is forbidden in production',
+      });
     }
     if (config.NODE_ENV === 'production' && config.AUTH_MODE === 'development') {
       context.addIssue({
@@ -117,6 +125,7 @@ const configSchema = z
     encryptionKey: config.ENCRYPTION_KEY,
     corsAllowedOrigins: config.CORS_ALLOWED_ORIGINS,
     egressAllowedHosts: config.EGRESS_ALLOWED_HOSTS,
+    egressAllowInsecure: config.EGRESS_ALLOW_INSECURE,
     maxRemoteFileBytes: config.MAX_REMOTE_FILE_BYTES,
     syncWaitMaxMs: config.SYNC_WAIT_MAX_MS,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,

@@ -19,6 +19,8 @@ export const executions = pgTable(
     elicitationId: text(),
     deadlineAt: timestamp({ withTimezone: true }),
     lastError: text(),
+    cancelRequestedAt: timestamp({ withTimezone: true }),
+    finishedAt: timestamp({ withTimezone: true }),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     ...timestamps,
   },
