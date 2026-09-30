@@ -15,6 +15,12 @@ import { CredentialProviderService } from './credential-provider.service.js';
 import type { CredentialVault } from './credential-vault.js';
 import { EgressService } from './egress.service.js';
 
+const remoteFetch = vi.hoisted(() => vi.fn());
+vi.mock('undici', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('undici')>()),
+  fetch: remoteFetch,
+}));
+
 const identity = { companyId: 'company-1', userId: 'user-1', roles: [] };
 const config = loadConfig({
   NODE_ENV: 'test',
@@ -29,6 +35,21 @@ const config = loadConfig({
   EGRESS_ALLOWED_HOSTS: 'remote.example,oauth.example',
 });
 
+async function call(
+  provider: CredentialProviderService,
+  principal: typeof identity,
+  url: string,
+  body?: string,
+  executionId?: string,
+) {
+  const remoteFetch = await provider.remoteFetch(principal, {
+    assistantId: 'space-1',
+    connectionId: 'conn-1',
+    ...(executionId ? { executionId } : {}),
+  });
+  return remoteFetch(url, body === undefined ? {} : { method: 'POST', body });
+}
+
 function subject(profile: unknown = { type: 'bearer', token: 'remote-secret' }) {
   const row = {
     id: 'conn-1',
@@ -39,6 +60,7 @@ function subject(profile: unknown = { type: 'bearer', token: 'remote-secret' }) 
     credentialType: (profile as { type: string }).type,
     credentialCiphertext: Buffer.from('encrypted'),
     name: 'Remote',
+    assistantId: 'space-1',
   };
   const connections = {
     find: vi.fn().mockResolvedValue(row),
@@ -86,18 +108,20 @@ function subject(profile: unknown = { type: 'bearer', token: 'remote-secret' }) 
       vault as unknown as CredentialVault,
       egress,
       executions as unknown as ExecutionRepository,
+      config,
     ),
     service: new ConnectionService(
       connections as unknown as ConnectionRepository,
       authorization as unknown as AuthorizationService,
       vault as unknown as CredentialVault,
       egress,
+      {} as CredentialProviderService,
     ),
   };
 }
 
 describe('outbound credentials', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => remoteFetch.mockReset());
 
   it.each([
     'authorization',
@@ -131,6 +155,13 @@ describe('outbound credentials', () => {
       credentialType: 'bearer',
       version: 1,
       disabled: false,
+      bound: true,
+      assistantId: 'space-1',
+      verified: false,
+      verifiedAt: null,
+      lastError: null,
+      agent: null,
+      capabilities: {},
       remotePermissions: 'shared',
     });
     await service.revoke(identity, 'conn-1', 1);
@@ -157,6 +188,7 @@ describe('outbound credentials', () => {
         credentialType: 'none',
       }),
       1,
+      { keepVerification: true },
     );
   });
 
@@ -168,9 +200,9 @@ describe('outbound credentials', () => {
     'applies only the explicit $type profile without forwarding Unique identity',
     async (profile) => {
       const { provider } = subject(profile);
-      const fetchMock = vi.fn().mockImplementation(async () => Response.json({ ok: true }));
-      vi.stubGlobal('fetch', fetchMock);
-      await provider.request(identity, 'space-1', 'conn-1', 'https://remote.example/rpc', '{}');
+      remoteFetch.mockImplementation(async () => Response.json({ ok: true }));
+      const fetchMock = remoteFetch;
+      await call(provider, identity, 'https://remote.example/rpc', '{}');
       const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
       expect(init.redirect).toBe('error');
       const headers = new Headers(init.headers);
@@ -190,33 +222,28 @@ describe('outbound credentials', () => {
       executionProvider: 'A2A',
       a2aConnectionId: 'conn-other',
     });
-    await expect(
-      provider.request(identity, 'space-1', 'conn-1', 'https://remote.example/rpc'),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(call(provider, identity, 'https://remote.example/rpc')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
     expect(vault.open).not.toHaveBeenCalled();
   });
 
   it('rejects ciphertext copied from another tenant', async () => {
     const { provider } = subject();
     await expect(
-      provider.request(
-        { ...identity, companyId: 'other' },
-        'space-1',
-        'conn-1',
-        'https://remote.example/rpc',
-      ),
+      call(provider, { ...identity, companyId: 'other' }, 'https://remote.example/rpc'),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('does not release credentials to another allowlisted origin', async () => {
     const { provider } = subject();
-    await expect(
-      provider.request(identity, 'space-1', 'conn-1', 'https://oauth.example/rpc'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(call(provider, identity, 'https://oauth.example/rpc')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('bounds remote response bodies and hides upstream errors', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('too large')));
+    remoteFetch.mockImplementation(vi.fn().mockResolvedValue(new Response('too large')));
     await expect(subject().egress.fetch('https://remote.example', {}, 2)).rejects.toThrow(
       'remote request failed',
     );
@@ -238,38 +265,30 @@ describe('outbound credentials', () => {
           ? Response.json({ access_token: 'access', token_type: 'Bearer', expires_in: 3600 })
           : Response.json({ ok: true }),
       );
-    vi.stubGlobal('fetch', fetchMock);
+    remoteFetch.mockImplementation(fetchMock);
     await Promise.all([
-      provider.request(identity, 'space-1', 'conn-1', 'https://remote.example/rpc'),
-      provider.request(identity, 'space-1', 'conn-1', 'https://remote.example/rpc'),
+      call(provider, identity, 'https://remote.example/rpc'),
+      call(provider, identity, 'https://remote.example/rpc'),
     ]);
     expect(
       fetchMock.mock.calls.filter(([url]) => (url as URL).hostname === 'oauth.example'),
     ).toHaveLength(1);
     connections.findWithCredential.mockResolvedValue({ ...row, disabledAt: new Date() });
-    await expect(
-      provider.request(identity, 'space-1', 'conn-1', 'https://remote.example/rpc'),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(call(provider, identity, 'https://remote.example/rpc')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 
   it('allows only existing active executions to continue after feature disable', async () => {
     const { provider, authorization, executions, unique } = subject();
     authorization.assertNewUse.mockRejectedValue(new ForbiddenException());
-    vi.stubGlobal(
-      'fetch',
+    remoteFetch.mockImplementation(
       vi.fn().mockImplementation(() => Promise.resolve(Response.json({ ok: true }))),
     );
-    await expect(
-      provider.request(identity, 'space-1', 'conn-1', 'https://remote.example/rpc'),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    await provider.request(
-      identity,
-      'space-1',
-      'conn-1',
-      'https://remote.example/rpc',
-      '{}',
-      'exec-1',
+    await expect(call(provider, identity, 'https://remote.example/rpc')).rejects.toBeInstanceOf(
+      ForbiddenException,
     );
+    await call(provider, identity, 'https://remote.example/rpc', '{}', 'exec-1');
     expect(executions.findOwned).toHaveBeenCalledWith(identity, 'exec-1');
     expect(unique.getAssistant).toHaveBeenCalledWith(identity, 'space-1');
     executions.findOwned.mockResolvedValue({
@@ -278,7 +297,7 @@ describe('outbound credentials', () => {
       state: 'completed',
     });
     await expect(
-      provider.request(identity, 'space-1', 'conn-1', 'https://remote.example/rpc', '{}', 'exec-1'),
+      call(provider, identity, 'https://remote.example/rpc', '{}', 'exec-1'),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -291,16 +310,15 @@ describe('outbound credentials', () => {
       clientSecret: 'secret',
       authMethod: 'client_secret_post',
     });
-    vi.stubGlobal(
-      'fetch',
+    remoteFetch.mockImplementation(
       vi
         .fn()
         .mockResolvedValue(
           Response.json({ error: 'invalid_client', error_description: 'secret' }, { status: 401 }),
         ),
     );
-    await expect(
-      provider.request(identity, 'space-1', 'conn-1', 'https://remote.example/rpc'),
-    ).rejects.toThrow(new ServiceUnavailableException('remote authentication failed'));
+    await expect(call(provider, identity, 'https://remote.example/rpc')).rejects.toThrow(
+      new ServiceUnavailableException('remote authentication failed'),
+    );
   });
 });

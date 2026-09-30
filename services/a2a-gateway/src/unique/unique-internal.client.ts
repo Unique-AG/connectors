@@ -107,7 +107,10 @@ export class UniqueInternalClient {
       this.config.uniqueChatUrl,
       identity,
       `query A2aMessage($chatId: String!, $messageId: String!) {
-        message(chatId: $chatId, messageId: $messageId) { id text completedAt stoppedStreamingAt segments }
+        message(chatId: $chatId, messageId: $messageId) {
+          id text completedAt stoppedStreamingAt userAbortedAt
+          references { name url sequenceNumber sourceId source }
+        }
       }`,
       { chatId, messageId },
       'message',
@@ -130,28 +133,79 @@ export class UniqueInternalClient {
     );
   }
 
-  public getPendingElicitation(identity: EffectiveIdentity, messageId: string): Promise<unknown> {
+  /** Pushes an unpersisted progress update of a streaming answer to the chat UI. */
+  public publishMessageProgress(
+    identity: EffectiveIdentity,
+    chatId: string,
+    messageId: string,
+    input: { text: string },
+  ): Promise<unknown> {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `query A2aPendingElicitation($messageId: ID!) { elicitationGetPending(messageId: $messageId) { id mode schema url } }`,
+      `mutation A2aMessageProgress($chatId: String!, $messageId: String!, $input: MessageCreateEventInput) {
+        messageCreateEvent(chatId: $chatId, messageId: $messageId, input: $input) { id }
+      }`,
+      { chatId, messageId, input },
+      'messageCreateEvent',
+    );
+  }
+
+  public updateAssistantMessage(
+    identity: EffectiveIdentity,
+    chatId: string,
+    messageId: string,
+    input: Record<string, unknown>,
+  ): Promise<unknown> {
+    return this.graphql(
+      this.config.uniqueChatUrl,
+      identity,
+      `mutation A2aMessageUpdate($chatId: String!, $messageId: String!, $input: MessagePublicUpdateInput!) {
+        messagePublicUpdate(chatId: $chatId, messageId: $messageId, input: $input) { id completedAt stoppedStreamingAt }
+      }`,
+      { chatId, messageId, input },
+      'messagePublicUpdate',
+    );
+  }
+
+  public getMessageElicitations(identity: EffectiveIdentity, messageId: string): Promise<unknown> {
+    return this.graphql(
+      this.config.uniqueChatUrl,
+      identity,
+      `query A2aMessageElicitations($messageId: String!) {
+        elicitationsByMessage(messageId: $messageId) { id userId mode status message schema url expiresAt responseContent }
+      }`,
       { messageId },
-      'elicitationGetPending',
+      'elicitationsByMessage',
+    );
+  }
+
+  public getElicitation(identity: EffectiveIdentity, elicitationId: string): Promise<unknown> {
+    return this.graphql(
+      this.config.uniqueChatUrl,
+      identity,
+      `query A2aElicitation($id: String!) {
+        elicitation(id: $id) { id userId mode status message schema url expiresAt responseContent }
+      }`,
+      { id: elicitationId },
+      'elicitation',
     );
   }
 
   public respondToElicitation(
     identity: EffectiveIdentity,
     elicitationId: string,
-    action: string,
-    content?: unknown,
+    action: 'ACCEPT' | 'DECLINE' | 'CANCEL',
+    content?: Record<string, unknown>,
   ): Promise<unknown> {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `mutation A2aElicitationRespond($input: ElicitationRespondInput!) { elicitationRespond(input: $input) { id status } }`,
-      { input: { elicitationId, action, content } },
-      'elicitationRespond',
+      `mutation A2aElicitationRespond($input: ElicitationResponseInput!) {
+        respondToElicitation(input: $input) { success message }
+      }`,
+      { input: { elicitationId, action, ...(content ? { content } : {}) } },
+      'respondToElicitation',
     );
   }
 
@@ -162,22 +216,9 @@ export class UniqueInternalClient {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `mutation A2aElicitationCreate($input: ElicitationCreateInput!) { elicitationCreate(input: $input) { id } }`,
+      `mutation A2aElicitationCreate($input: ElicitationCreateInput!) { createElicitation(input: $input) { id expiresAt } }`,
       { input },
-      'elicitationCreate',
-    );
-  }
-
-  public updateAssistantMessage(
-    identity: EffectiveIdentity,
-    input: Record<string, unknown>,
-  ): Promise<unknown> {
-    return this.graphql(
-      this.config.uniqueChatUrl,
-      identity,
-      `mutation A2aMessageUpdate($input: MessagePublicUpdateInput!) { messagePublicUpdate(input: $input) { id completedAt } }`,
-      { input },
-      'messagePublicUpdate',
+      'createElicitation',
     );
   }
 

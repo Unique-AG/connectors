@@ -5,6 +5,7 @@ import { PersistenceModule } from './drizzle/persistence.module.js';
 import { HealthModule } from './health/health.module.js';
 import { InternalModule } from './internal/internal.module.js';
 import { ManagementModule } from './management/management.module.js';
+import { OutboundModule } from './outbound/outbound.module.js';
 import { UniqueModule } from './unique/unique.module.js';
 
 @Module({
@@ -15,6 +16,7 @@ import { UniqueModule } from './unique/unique.module.js';
     A2aServerModule,
     ManagementModule,
     InternalModule,
+    OutboundModule,
     HealthModule,
   ],
 })

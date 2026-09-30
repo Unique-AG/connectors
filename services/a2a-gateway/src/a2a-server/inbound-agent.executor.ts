@@ -14,7 +14,6 @@ import { ContextRepository } from '../drizzle/context.repository.js';
 import { PublicationRepository } from '../drizzle/publication.repository.js';
 import { ChatEventConsumer } from '../event-bus/chat-event.consumer.js';
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
-import { UniqueInternalError } from '../unique/unique-internal.error.js';
 import { awaitsInput, callIdentity, callPublicationId, messageText } from './call-context.js';
 import { PgTaskStore } from './pg-task.store.js';
 
@@ -32,7 +31,7 @@ const completedMessageSchema = z.object({
 const elicitationSchema = z.object({
   mode: z.enum(['FORM', 'URL']),
   schema: z.unknown().optional(),
-  url: z.string().optional(),
+  url: z.string().nullish(),
 });
 
 type ExecutionOutcome =
@@ -165,15 +164,13 @@ export class InboundAgentExecutor implements AgentExecutor {
     if (!storedTask?.assistantMessageId || !storedTask.chatId) {
       throw new NotFoundException('task not found');
     }
-    const elicitation = z
-      .object({ id: z.string().min(1) })
-      .parse(await this.unique.getPendingElicitation(identity, storedTask.assistantMessageId));
-    await this.unique.respondToElicitation(
-      identity,
-      elicitation.id,
-      'ACCEPT',
-      messageText(request.userMessage),
-    );
+    const elicitation = await this.pendingElicitation(identity, storedTask.assistantMessageId);
+    if (!elicitation) {
+      throw new NotFoundException('no pending elicitation');
+    }
+    await this.unique.respondToElicitation(identity, elicitation.id, 'ACCEPT', {
+      answer: messageText(request.userMessage),
+    });
     eventBus.publish(AgentEvent.task({ ...current, status: status(TaskState.TASK_STATE_WORKING) }));
     return this.waitForOutcome(identity, storedTask.chatId, storedTask.assistantMessageId);
   }
@@ -328,18 +325,16 @@ export class InboundAgentExecutor implements AgentExecutor {
     if (message.completedAt || message.stoppedStreamingAt) {
       return { kind: 'completed', message };
     }
-    try {
-      return {
-        kind: 'elicitation',
-        elicitation: elicitationSchema.parse(
-          await this.unique.getPendingElicitation(identity, assistantMessageId),
-        ),
-      };
-    } catch (error) {
-      if (error instanceof UniqueInternalError && error.code === 'NOT_FOUND') {
-        return undefined;
-      }
-      throw error;
-    }
+    const elicitation = await this.pendingElicitation(identity, assistantMessageId);
+    return elicitation ? { kind: 'elicitation', elicitation } : undefined;
+  }
+
+  private async pendingElicitation(identity: RequestIdentity, messageId: string) {
+    const elicitations = z
+      .array(elicitationSchema.extend({ id: z.string(), userId: z.string(), status: z.string() }))
+      .parse(await this.unique.getMessageElicitations(identity, messageId));
+    return elicitations.find(
+      (elicitation) => elicitation.status === 'PENDING' && elicitation.userId === identity.userId,
+    );
   }
 }

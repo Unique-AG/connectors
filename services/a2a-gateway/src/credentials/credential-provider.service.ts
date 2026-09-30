@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -8,8 +9,9 @@ import * as oauth from 'oauth4webapi';
 import { z } from 'zod';
 import { AuthorizationService } from '../auth/authorization.service.js';
 import type { RequestIdentity } from '../auth/identity.guard.js';
+import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { ConnectionRepository } from '../drizzle/connection.repository.js';
-import { ExecutionRepository } from '../drizzle/execution.repository.js';
+import { ACTIVE_EXECUTION_STATES, ExecutionRepository } from '../drizzle/execution.repository.js';
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { type CredentialProfile, credentialProfile } from './credential-profile.js';
 import { CredentialVault } from './credential-vault.js';
@@ -21,16 +23,40 @@ const envelopeSchema = z.object({
   origin: z.string(),
   profile: credentialProfile,
 });
+
 const externalAssistant = z.object({
   id: z.string(),
   executionProvider: z.literal('A2A'),
   a2aConnectionId: z.string(),
 });
+
 interface CachedToken {
   token: string;
   expiresAt: number;
 }
 
+interface CredentialedConnection {
+  id: string;
+  companyId: string;
+  version: number;
+  agentCardUrl: string;
+  credentialType: string | null;
+  credentialCiphertext: Buffer | null;
+  disabledAt: Date | null;
+}
+
+export interface RemoteScope {
+  assistantId: string;
+  connectionId: string;
+  executionId?: string;
+}
+
+export type RemoteFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
+/**
+ * Releases a connection's shared credential only to that connection's origin, only for a caller
+ * who may currently use the external space, and never together with any Unique identity.
+ */
 @Injectable()
 export class CredentialProviderService {
   private readonly tokens = new Map<string, { version: number; result: Promise<CachedToken> }>();
@@ -42,88 +68,151 @@ export class CredentialProviderService {
     private readonly vault: CredentialVault,
     private readonly egress: EgressService,
     private readonly executions: ExecutionRepository,
+    @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
-  public async request(
-    identity: RequestIdentity,
-    assistantId: string,
-    connectionId: string,
-    destination: string,
-    body?: string,
-    executionId?: string,
-  ): Promise<Response> {
-    if (executionId) {
-      const execution = await this.executions.findOwned(identity, executionId);
-      if (
-        execution.assistantId !== assistantId ||
-        execution.connectionId !== connectionId ||
-        !['submitted', 'working', 'input-required', 'auth-required'].includes(execution.state)
-      ) {
-        throw new ForbiddenException('active execution access required');
+  /**
+   * Authorizes the caller once and returns a fetch bound to the connection. Every request still
+   * re-checks that the execution is active and that the connection was not rotated or revoked.
+   */
+  public async remoteFetch(identity: RequestIdentity, scope: RemoteScope): Promise<RemoteFetch> {
+    await this.authorizeScope(identity, scope);
+    const connection = await this.connections.findWithCredential(
+      identity.companyId,
+      scope.connectionId,
+    );
+    if (
+      !connection ||
+      connection.disabledAt ||
+      !connection.credentialCiphertext ||
+      connection.assistantId !== scope.assistantId
+    ) {
+      throw new ForbiddenException('connection is unavailable');
+    }
+    const origin = new URL(connection.agentCardUrl).origin;
+    const profile = this.openProfile(identity.companyId, connection, origin);
+    return async (input, init = {}) => {
+      const destination = input instanceof Request ? input.url : input.toString();
+      const url = this.egress.approve(destination);
+      if (url.origin !== origin) {
+        throw new BadRequestException('credential destination does not match the connection');
       }
+      if (scope.executionId) {
+        await this.assertActiveExecution(identity, scope);
+      }
+      const headers = new Headers(init.headers);
+      for (const [name, value] of Object.entries(
+        await this.credentialHeaders(identity.companyId, connection, profile),
+      )) {
+        headers.set(name, value);
+      }
+      await this.assertUnchanged(identity.companyId, connection);
+      const response = await this.egress.stream(
+        url,
+        { ...init, headers },
+        this.config.maxRemoteFileBytes * 2,
+      );
+      if (response.status === 401) {
+        this.tokens.delete(`${identity.companyId}:${connection.id}`);
+      }
+      return response;
+    };
+  }
+
+  /** Headers for a management-time request (connection test) to the connection's own origin. */
+  public async connectionHeaders(
+    companyId: string,
+    connection: CredentialedConnection,
+    destination: URL,
+  ): Promise<Record<string, string>> {
+    const origin = new URL(connection.agentCardUrl).origin;
+    if (destination.origin !== origin || !connection.credentialCiphertext) {
+      return {};
+    }
+    return this.credentialHeaders(
+      companyId,
+      connection,
+      this.openProfile(companyId, connection, origin),
+    );
+  }
+
+  private async authorizeScope(identity: RequestIdentity, scope: RemoteScope): Promise<void> {
+    if (scope.executionId) {
+      await this.assertActiveExecution(identity, scope);
     } else {
       await this.authorization.assertNewUse(identity);
     }
     const assistant = externalAssistant.safeParse(
-      await this.unique.getAssistant(identity, assistantId),
+      await this.unique.getAssistant(identity, scope.assistantId),
     );
     if (
       !assistant.success ||
-      assistant.data.id !== assistantId ||
-      assistant.data.a2aConnectionId !== connectionId
+      assistant.data.id !== scope.assistantId ||
+      assistant.data.a2aConnectionId !== scope.connectionId
     ) {
       throw new ForbiddenException('connection is not authorized for this space');
     }
-    const connection = await this.connections.findWithCredential(identity.companyId, connectionId);
-    if (!connection || connection.disabledAt || !connection.credentialCiphertext) {
-      throw new ForbiddenException('connection is unavailable');
+  }
+
+  private async assertActiveExecution(identity: RequestIdentity, scope: RemoteScope) {
+    const execution = await this.executions.findOwned(identity, scope.executionId ?? '');
+    if (
+      execution.assistantId !== scope.assistantId ||
+      execution.connectionId !== scope.connectionId ||
+      !ACTIVE_EXECUTION_STATES.includes(execution.state)
+    ) {
+      throw new ForbiddenException('active execution access required');
     }
-    const url = this.egress.approve(destination);
-    if (url.origin !== new URL(connection.agentCardUrl).origin) {
-      throw new BadRequestException('credential destination does not match the connection');
+  }
+
+  // A rotation/revocation during a token refresh must not release the stale credential.
+  private async assertUnchanged(companyId: string, connection: CredentialedConnection) {
+    const current = await this.connections.find(companyId, connection.id);
+    if (!current || current.disabledAt || current.version !== connection.version) {
+      throw new ForbiddenException('connection changed; retry the request');
     }
-    let profile: CredentialProfile;
+  }
+
+  private openProfile(
+    companyId: string,
+    connection: CredentialedConnection,
+    origin: string,
+  ): CredentialProfile {
     try {
       const envelope = envelopeSchema.parse(
-        JSON.parse(this.vault.open(connection.credentialCiphertext)),
+        JSON.parse(this.vault.open(connection.credentialCiphertext ?? Buffer.alloc(0))),
       );
       if (
-        envelope.companyId !== identity.companyId ||
-        envelope.connectionId !== connectionId ||
-        envelope.origin !== url.origin ||
+        envelope.companyId !== companyId ||
+        envelope.connectionId !== connection.id ||
+        envelope.origin !== origin ||
         envelope.profile.type !== connection.credentialType
       ) {
         throw new Error('credential scope mismatch');
       }
-      profile = envelope.profile;
+      return envelope.profile;
     } catch {
       throw new ForbiddenException('connection credential is unavailable');
     }
-    const headers = new Headers({ 'content-type': 'application/json' });
+  }
+
+  private async credentialHeaders(
+    companyId: string,
+    connection: CredentialedConnection,
+    profile: CredentialProfile,
+  ): Promise<Record<string, string>> {
     if (profile.type === 'bearer') {
-      headers.set('authorization', `Bearer ${profile.token}`);
-    } else if (profile.type === 'api_key') {
-      headers.set(profile.header, profile.value);
-    } else if (profile.type === 'oauth2_client_credentials') {
-      headers.set(
-        'authorization',
-        `Bearer ${await this.token(identity.companyId, connectionId, connection.version, profile)}`,
-      );
+      return { authorization: `Bearer ${profile.token}` };
     }
-    // A rotation/revocation during a token refresh must not release the stale credential.
-    const current = await this.connections.find(identity.companyId, connectionId);
-    if (!current || current.disabledAt || current.version !== connection.version) {
-      throw new ForbiddenException('connection changed; retry the request');
+    if (profile.type === 'api_key') {
+      return { [profile.header]: profile.value };
     }
-    const response = await this.egress.fetch(url, {
-      method: body === undefined ? 'GET' : 'POST',
-      body,
-      headers,
-    });
-    if (response.status === 401) {
-      this.tokens.delete(`${identity.companyId}:${connectionId}`);
+    if (profile.type === 'oauth2_client_credentials') {
+      return {
+        authorization: `Bearer ${await this.token(companyId, connection.id, connection.version, profile)}`,
+      };
     }
-    return response;
+    return {};
   }
 
   private async token(
@@ -188,6 +277,7 @@ export class CredentialProviderService {
       parameters,
       {
         [oauth.customFetch]: (url, init) => this.egress.fetch(url, init),
+        [oauth.allowInsecureRequests]: this.config.egressAllowInsecure,
       },
     );
     const token = await oauth.processClientCredentialsResponse(server, client, response);
