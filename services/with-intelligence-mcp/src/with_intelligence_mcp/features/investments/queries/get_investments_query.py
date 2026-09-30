@@ -38,15 +38,14 @@ class GetInvestmentsQuery:
         limit: int,
         updated_since: str | None,
     ) -> InvestorPositionsResponse:
-        listed, total = await _fetch_investments_for_investor(
-            self._client,
-            investor.id,
+        listed, total = await self._fetch_investments_for_investor(
+            investor_id=investor.id,
             page=page,
             limit=limit,
             updated_since=updated_since,
         )
         details = await asyncio.gather(
-            *(_fetch_investment(self._client, position.id) for position in listed)
+            *(self._fetch_investment(position.id) for position in listed)
         )
         positions = [
             PositionResponse.from_attributes(detail)
@@ -69,34 +68,36 @@ class GetInvestmentsQuery:
         )
         return response
 
+    async def _fetch_investments_for_investor(
+        self,
+        *,
+        investor_id: int,
+        page: int,
+        limit: int,
+        updated_since: str | None,
+    ) -> tuple[list[InvestmentListItemAttributes], int]:
+        params: dict[str, QueryValue] = {
+            "investor_id": [investor_id],
+            "sort[updated_at]": "desc",
+        }
+        if self._client.asset_class_groups:
+            params["asset_class_group"] = list(self._client.asset_class_groups)
+        if updated_since is not None:
+            params["updated_at[from]"] = updated_since
 
-async def _fetch_investments_for_investor(
-    client: WithIntelligenceClient,
-    investor_id: int,
-    *,
-    page: int,
-    limit: int,
-    updated_since: str | None,
-) -> tuple[list[InvestmentListItemAttributes], int]:
-    params: dict[str, QueryValue] = {
-        "investor_id": [investor_id],
-        "sort[updated_at]": "desc",
-    }
-    if client.asset_class_groups:
-        params["asset_class_group"] = list(client.asset_class_groups)
-    if updated_since is not None:
-        params["updated_at[from]"] = updated_since
+        response = await self._client.get_page(
+            _INVESTMENTS_PATH,
+            _INVESTMENTS_PAGE,
+            params,
+            page=page,
+            page_size=limit,
+        )
+        return response.results, response.pagination.total
 
-    response = await client.get_page(
-        _INVESTMENTS_PATH, _INVESTMENTS_PAGE, params, page=page, page_size=limit
-    )
-    return response.results, response.pagination.total
-
-
-async def _fetch_investment(
-    client: WithIntelligenceClient, investment_id: int
-) -> InvestmentExtendedAttributes | None:
-    try:
-        return await client.get_json(f"{_INVESTMENTS_PATH}/{investment_id}", _INVESTMENT_RESPONSE)
-    except NotEntitled, NotFound:
-        return None
+    async def _fetch_investment(self, investment_id: int) -> InvestmentExtendedAttributes | None:
+        try:
+            return await self._client.get_json(
+                f"{_INVESTMENTS_PATH}/{investment_id}", _INVESTMENT_RESPONSE
+            )
+        except NotEntitled, NotFound:
+            return None

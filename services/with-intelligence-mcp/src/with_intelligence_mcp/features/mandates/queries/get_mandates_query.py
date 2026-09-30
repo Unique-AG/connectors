@@ -37,16 +37,13 @@ class GetMandatesQuery:
         limit: int,
         updated_since: str | None,
     ) -> InvestorMandatesResponse:
-        listed, total = await _fetch_mandates_for_investor(
-            self._client,
-            investor.id,
+        listed, total = await self._fetch_mandates_for_investor(
+            investor_id=investor.id,
             page=page,
             limit=limit,
             updated_since=updated_since,
         )
-        details = await asyncio.gather(
-            *(_fetch_mandate(self._client, entry.id) for entry in listed)
-        )
+        details = await asyncio.gather(*(self._fetch_mandate(entry.id) for entry in listed))
         mandates = [
             MandateResponse.from_attributes(detail)
             if detail
@@ -68,34 +65,34 @@ class GetMandatesQuery:
         )
         return response
 
+    async def _fetch_mandate(self, mandate_id: int) -> MandateExtendedAttributes | None:
+        try:
+            return await self._client.get_json(f"/v3/mandates/{mandate_id}", _MANDATE_RESPONSE)
+        except NotEntitled, NotFound:
+            return None
 
-async def _fetch_mandate(
-    client: WithIntelligenceClient, mandate_id: int
-) -> MandateExtendedAttributes | None:
-    try:
-        return await client.get_json(f"/v3/mandates/{mandate_id}", _MANDATE_RESPONSE)
-    except NotEntitled, NotFound:
-        return None
+    async def _fetch_mandates_for_investor(
+        self,
+        *,
+        investor_id: int,
+        page: int,
+        limit: int,
+        updated_since: str | None,
+    ) -> tuple[list[MandateListItemAttributes], int]:
+        params: dict[str, QueryValue] = {
+            "investor_id": [investor_id],
+            "sort[updated_at]": "desc",
+        }
+        if self._client.asset_class_groups:
+            params["asset_class_group"] = list(self._client.asset_class_groups)
+        if updated_since is not None:
+            params["updated_at[from]"] = updated_since
 
-
-async def _fetch_mandates_for_investor(
-    client: WithIntelligenceClient,
-    investor_id: int,
-    *,
-    page: int,
-    limit: int,
-    updated_since: str | None,
-) -> tuple[list[MandateListItemAttributes], int]:
-    params: dict[str, QueryValue] = {
-        "investor_id": [investor_id],
-        "sort[updated_at]": "desc",
-    }
-    if client.asset_class_groups:
-        params["asset_class_group"] = list(client.asset_class_groups)
-    if updated_since is not None:
-        params["updated_at[from]"] = updated_since
-
-    response = await client.get_page(
-        "/v3/mandates", _MANDATES_PAGE, params, page=page, page_size=limit
-    )
-    return response.results, response.pagination.total
+        response = await self._client.get_page(
+            "/v3/mandates",
+            _MANDATES_PAGE,
+            params,
+            page=page,
+            page_size=limit,
+        )
+        return response.results, response.pagination.total
