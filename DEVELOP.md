@@ -33,9 +33,9 @@ pnpm fix-all          # auto-fix style + syncpack
 
 ## Helm Chart Tests
 
-Charts keep [helm-unittest](https://github.com/helm-unittest/helm-unittest) suites in a `tests/` directory. CI runs `helm unittest .` in the chart directory, after `helm dependency update`.
+Charts keep [helm-unittest](https://github.com/helm-unittest/helm-unittest) suites in a `tests/` directory. CI runs `helm lint . --strict` and `helm unittest .` in the chart directory, after `helm dependency update`. If the chart has a `ci-values.yaml` file, the lint command also gets `--values ci-values.yaml`.
 
-To run the suites on your machine, install the plugin once with `helm plugin install https://github.com/helm-unittest/helm-unittest`. Then run the same two commands in the chart directory.
+To run the same commands on your machine, use Helm v3.19.0. This is the version that CI uses, and a newer version can report more problems. Install the plugin once with `helm plugin install https://github.com/helm-unittest/helm-unittest`. Then run the commands in the chart directory, as CI does.
 
 ## Release Workflows
 

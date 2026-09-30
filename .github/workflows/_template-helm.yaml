@@ -63,6 +63,16 @@ jobs:
             helm template .
           fi
 
+      - name: Lint chart
+        if: steps.check-helm.outputs.exists == 'true'
+        working-directory: ${{ env.SERVICE_PATH }}/deploy/helm-charts/${{ env.SERVICE_NAME }}
+        run: |
+          if [ -f ci-values.yaml ]; then
+            helm lint . --strict --values ci-values.yaml
+          else
+            helm lint . --strict
+          fi
+
       - name: Install the Helm unit test plugin
         if: steps.check-helm.outputs.tests == 'true'
         run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.1.2
