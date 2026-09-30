@@ -5,6 +5,7 @@ from typing import Protocol, cast
 
 import pytest
 from cryptography.fernet import Fernet
+from fastmcp import FastMCP
 from starlette.testclient import TestClient
 
 from with_intelligence_mcp.app import create_app
@@ -87,7 +88,32 @@ class TestMcpEndpoint:
         assert _get(client, "/mcp").status_code != 404
 
     def test_the_registered_tools_are_reachable(self) -> None:
-        assert [getattr(fn, "__name__", "") for fn in TOOLS] == []
+        assert [getattr(fn, "__name__", "") for fn in TOOLS] == [
+            "get_investor",
+            "get_people_for_investor",
+            "get_investments",
+            "get_mandates",
+        ]
+
+    async def test_tools_publish_typed_output_schemas_and_closed_world_annotations(self) -> None:
+        mcp = FastMCP("test")
+        for function in TOOLS:
+            mcp.add_tool(function)
+
+        tools = await mcp.list_tools()
+        assert len(tools) == len(TOOLS)
+        for registered in tools:
+            schema = registered.output_schema
+            assert schema is not None
+            alternatives = schema.get("anyOf")
+            assert isinstance(alternatives, list)
+            assert all(
+                isinstance(alternative, dict) and "properties" in alternative
+                for alternative in cast("list[object]", alternatives)
+            )
+            assert registered.annotations is not None
+            assert registered.annotations.destructive_hint is False
+            assert registered.annotations.open_world_hint is False
 
 
 class TestAuthIsRequired:
