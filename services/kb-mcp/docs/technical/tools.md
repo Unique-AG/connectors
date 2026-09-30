@@ -91,8 +91,9 @@ changed, call again with `refresh=true` instead of waiting it out. See
 
 Discovers what metadata fields and values exist on the knowledge base's visible content, so a
 caller can build a `metadata_filter` for `search` or `content_tree` instead of guessing one.
-Returns every known field with its distinct values, e.g. `[{"department": ["Legal", "Finance"]}]`,
-or with `counts_only`, just the count of distinct values per field.
+Returns `complete`, an optional `notice`, and one catalog, `metadata` for the values themselves,
+e.g. `{"complete": true, "metadata": [{"department": ["Legal", "Finance"]}]}`, or `metadata_counts`
+with `counts_only` for just the distinct-value count per field.
 
 | Argument | Purpose |
 |---|---|
