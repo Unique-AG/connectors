@@ -1,16 +1,20 @@
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta, timezone
+from typing import cast
 
 import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle
 from office_365_mcp.shared.mail import SUMMARY_FIELDS, FlagMoment, MailFlag, WellKnownFolder
 from office_365_mcp.tools import outlook_list_mail as lister
+from office_365_mcp.tools.outlook_list_mail import MailImportance
 
 from .conftest import GRAPH_V1
 
@@ -23,6 +27,9 @@ _PROJECTS_MESSAGES = f"{_PROJECTS}/messages"
 
 _FIRST_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 _SECOND_ID = "AAMkAGI2SYNTHETIC-immutable-0002="
+_THIRD_ID = "AAMkAGI2SYNTHETIC-immutable-0003="
+_FOURTH_ID = "AAMkAGI2SYNTHETIC-immutable-0004="
+_FIFTH_ID = "AAMkAGI2SYNTHETIC-immutable-0005="
 
 
 def _folder_payload(
@@ -470,6 +477,35 @@ class TestTheQueryItComposes:
         assert answered.messages == []
 
     @pytest.mark.usefixtures("inbox")
+    @pytest.mark.parametrize("flagged", [True, False])
+    @pytest.mark.parametrize("has_attachments", [True, False])
+    @pytest.mark.parametrize("received_after", [None, date(2026, 3, 4)])
+    async def test_importance_flag_attachments_and_category_add_no_term_to_the_query(
+        self,
+        client: GraphServiceClient,
+        inbox_messages: respx.Route,
+        flagged: bool,
+        has_attachments: bool,
+        received_after: date | None,
+    ) -> None:
+        _ = await lister.list_mail(
+            client,
+            received_after=received_after,
+            importance="high",
+            flagged=flagged,
+            has_attachments=has_attachments,
+            category="Invoices",
+            limit=25,
+        )
+
+        params = inbox_messages.calls.last.request.url.params
+        assert "$search" not in params
+        if received_after is None:
+            assert "$filter" not in params
+        else:
+            assert params["$filter"] == "receivedDateTime ge 2026-03-04T00:00:00Z"
+
+    @pytest.mark.usefixtures("inbox")
     async def test_the_first_page_is_never_reached_by_skipping(
         self, client: GraphServiceClient, inbox_messages: respx.Route
     ) -> None:
@@ -724,6 +760,177 @@ class TestWhatItAnswers:
         assert answer.messages == []
 
     @pytest.mark.usefixtures("inbox")
+    @pytest.mark.parametrize("importance", ["low", "normal", "high"])
+    async def test_importance_keeps_the_rows_of_that_importance_and_drops_the_rest(
+        self, client: GraphServiceClient, inbox_messages: respx.Route, importance: MailImportance
+    ) -> None:
+        inbox_messages.mock(
+            return_value=_page(
+                _message_payload(_FIRST_ID) | {"importance": "low"},
+                _message_payload(_SECOND_ID) | {"importance": "normal"},
+                _message_payload(_THIRD_ID) | {"importance": "high"},
+                _message_payload(_FOURTH_ID),
+            )
+        )
+
+        answer = await lister.list_mail(client, importance=importance, limit=25)
+
+        assert [message.importance for message in answer.messages] == [importance]
+
+    @pytest.mark.usefixtures("inbox")
+    @pytest.mark.parametrize(
+        ("flagged", "kept"),
+        [
+            (True, [_FIRST_ID]),
+            (False, [_SECOND_ID, _THIRD_ID]),
+        ],
+    )
+    async def test_flagged_keeps_the_rows_by_follow_up_status_and_no_flag_matches_neither(
+        self,
+        client: GraphServiceClient,
+        inbox_messages: respx.Route,
+        flagged: bool,
+        kept: list[str],
+    ) -> None:
+        inbox_messages.mock(
+            return_value=_page(
+                _message_payload(_FIRST_ID) | {"flag": {"flagStatus": "flagged"}},
+                _message_payload(_SECOND_ID) | {"flag": {"flagStatus": "notFlagged"}},
+                _message_payload(_THIRD_ID) | {"flag": {"flagStatus": "complete"}},
+                _message_payload(_FOURTH_ID),
+            )
+        )
+
+        answer = await lister.list_mail(client, flagged=flagged, limit=25)
+
+        assert [message.uri for message in answer.messages] == [
+            MailMessageHandle(message_id).uri for message_id in kept
+        ]
+
+    @pytest.mark.usefixtures("inbox")
+    @pytest.mark.parametrize(
+        ("has_attachments", "kept"), [(True, [_FIRST_ID]), (False, [_SECOND_ID])]
+    )
+    async def test_has_attachments_keeps_the_rows_graph_reported_that_way(
+        self,
+        client: GraphServiceClient,
+        inbox_messages: respx.Route,
+        has_attachments: bool,
+        kept: list[str],
+    ) -> None:
+        inbox_messages.mock(
+            return_value=_page(
+                _message_payload(_FIRST_ID) | {"hasAttachments": True},
+                _message_payload(_SECOND_ID) | {"hasAttachments": False},
+                _message_payload(_THIRD_ID) | {"hasAttachments": None},
+            )
+        )
+
+        answer = await lister.list_mail(client, has_attachments=has_attachments, limit=25)
+
+        assert [message.uri for message in answer.messages] == [
+            MailMessageHandle(message_id).uri for message_id in kept
+        ]
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_category_matches_the_whole_name_and_ignores_case(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        inbox_messages.mock(
+            return_value=_page(
+                _message_payload(_FIRST_ID) | {"categories": ["Invoices"]},
+                _message_payload(_SECOND_ID) | {"categories": ["Red category", "invoices"]},
+                _message_payload(_THIRD_ID) | {"categories": ["Invoices 2025"]},
+                _message_payload(_FOURTH_ID),
+            )
+        )
+
+        answer = await lister.list_mail(client, category="INVOICES", limit=25)
+
+        assert [message.uri for message in answer.messages] == [
+            MailMessageHandle(_FIRST_ID).uri,
+            MailMessageHandle(_SECOND_ID).uri,
+        ]
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_every_filter_must_pass_for_a_row_to_stay(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        everything = {
+            "importance": "high",
+            "flag": {"flagStatus": "flagged"},
+            "hasAttachments": True,
+            "categories": ["Invoices"],
+        }
+        inbox_messages.mock(
+            return_value=_page(
+                _message_payload(_FIRST_ID) | everything,
+                _message_payload(_SECOND_ID) | everything | {"importance": "low"},
+                _message_payload(_THIRD_ID) | everything | {"flag": {"flagStatus": "notFlagged"}},
+                _message_payload(_FOURTH_ID) | everything | {"hasAttachments": False},
+                _message_payload(_FIFTH_ID) | everything | {"categories": ["Receipts"]},
+            )
+        )
+
+        answer = await lister.list_mail(
+            client,
+            importance="high",
+            flagged=True,
+            has_attachments=True,
+            category="Invoices",
+            limit=25,
+        )
+
+        assert [message.uri for message in answer.messages] == [MailMessageHandle(_FIRST_ID).uri]
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_filter_reads_on_past_the_rows_it_drops_until_the_limit_is_met(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get(_INBOX_MESSAGES, params={"$skiptoken": "second"}).mock(
+            return_value=_page(_message_payload(_SECOND_ID) | {"importance": "high"})
+        )
+        graph.get(_INBOX_MESSAGES).mock(
+            return_value=_page(
+                _message_payload(_FIRST_ID) | {"importance": "low"},
+                next_link=f"{GRAPH_V1}{_INBOX_MESSAGES}?$skiptoken=second",
+            )
+        )
+
+        answer = await lister.list_mail(client, importance="high", limit=1)
+
+        assert [message.uri for message in answer.messages] == [MailMessageHandle(_SECOND_ID).uri]
+        assert answer.capped is False
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_filter_that_leaves_more_matches_than_the_limit_says_capped(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        inbox_messages.mock(
+            return_value=_page(
+                _message_payload(_FIRST_ID) | {"importance": "low"},
+                _message_payload(_SECOND_ID) | {"importance": "high"},
+                _message_payload(_THIRD_ID) | {"importance": "high"},
+            )
+        )
+
+        answer = await lister.list_mail(client, importance="high", limit=1)
+
+        assert [message.uri for message in answer.messages] == [MailMessageHandle(_SECOND_ID).uri]
+        assert answer.capped is True
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_a_filter_no_row_passes_answers_no_rows_and_no_cap_at_the_folders_end(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        inbox_messages.mock(return_value=_page(_message_payload(_FIRST_ID) | {"importance": "low"}))
+
+        answer = await lister.list_mail(client, importance="high", limit=25)
+
+        assert answer.messages == []
+        assert answer.capped is False
+
+    @pytest.mark.usefixtures("inbox")
     async def test_the_pages_of_a_folder_are_followed_rather_than_read_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -941,6 +1148,78 @@ class TestTheSchemaItPublishes:
         assert tool is not None, "register left the tool off the server"
         assert tool.parameters.get("required", []) == []
         assert tool.parameters["properties"]["folder"]["default"] == "inbox"
+
+
+class TestWhatItTellsAModel:
+    async def test_the_description_keeps_its_lead_facts_and_names_the_search_sibling(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "newest received first" in description
+        assert "`mailbox`" in description
+        assert "outlook_search_mail" in description
+
+    async def test_the_description_is_a_lead_and_a_few_notes_of_the_house_length(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = tool.description or ""
+        lead, separator, notes = description.partition("\n\nNotes:\n")
+        assert separator, "the description has no Notes section"
+        assert lead.strip() != ""
+        assert 1 <= len([line for line in notes.splitlines() if line.startswith("- ")]) <= 4
+        assert 45 <= len(description.split()) <= 210
+
+    async def test_the_description_tells_a_model_what_to_check_before_it_says_nothing_matches(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        assert "`capped`" in (tool.description or "")
+
+    async def test_each_new_filter_says_the_tool_applies_it_to_the_messages_it_reads(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, str]]", tool.parameters["properties"])
+        for name in ("importance", "flagged", "has_attachments", "category"):
+            assert "applies this filter to the messages it reads" in properties[name]["description"]
+
+    async def test_importance_admits_the_three_values_graph_reports_and_nothing_else(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        assert tool.parameters["$defs"]["MailImportance"]["enum"] == ["low", "normal", "high"]
+
+    async def test_a_category_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
+        tool = await _registered(transport)
+
+        assert {"minLength": 1, "type": "string"} in tool.parameters["properties"]["category"][
+            "anyOf"
+        ]
+
+    async def test_capped_tells_a_model_whether_the_filters_left_more_to_find(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        assert tool.output_schema is not None
+        capped = cast("str", tool.output_schema["properties"]["capped"]["description"])
+        assert "filters" in capped
+        assert "complete" in capped
+
+
+async def _registered(transport: httpx.AsyncClient) -> Tool:
+    mcp: FastMCP = FastMCP(name="schema-under-test")
+    lister.register(mcp, transport)
+    tool = await mcp.get_tool(lister.TOOL_NAME)
+    assert tool is not None, "register left the tool off the server"
+    return tool
 
 
 class TestMailboxTargeting:
