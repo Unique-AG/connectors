@@ -66,6 +66,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Refuse to overwrite a released version
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          IMAGE: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:${{ inputs.service-version }}
+        run: |
+          if docker buildx imagetools inspect "$IMAGE" > /dev/null 2>&1; then
+            echo "::error::${IMAGE} exists. Release a new version instead."
+            exit 1
+          fi
+
       - name: Login to Azure as uniquecr token issuer (OIDC)
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # Azure Login Action v3.1.0
         with:
@@ -119,6 +129,7 @@ jobs:
           push: true
           sbom: true
           tags: ${{ steps.meta.outputs.tags }}
+          no-cache-filters: runtime,runner
           cache-from: |
             type=gha,scope=${{ inputs.service-name }}
             type=registry,ref=${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:cache
