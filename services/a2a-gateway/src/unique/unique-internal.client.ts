@@ -10,7 +10,7 @@ export interface EffectiveIdentity {
 }
 
 const graphQlResponse = z.object({
-  data: z.record(z.string(), z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).nullish(),
   errors: z
     .array(
       z.object({ message: z.string(), extensions: z.record(z.string(), z.unknown()).optional() }),
@@ -33,6 +33,28 @@ function errorCode(status: number): UniqueInternalError['code'] {
     return 'CONFLICT';
   }
   return 'UNAVAILABLE';
+}
+
+// Core services report GraphQL errors with named codes or with the HTTP status as code.
+function graphQlErrorCode(
+  extensions: Record<string, unknown> | undefined,
+): UniqueInternalError['code'] {
+  const response = extensions?.response;
+  const status =
+    typeof response === 'object' && response !== null
+      ? Reflect.get(response, 'statusCode')
+      : undefined;
+  const code = String(extensions?.code ?? status ?? '');
+  if (['FORBIDDEN', 'UNAUTHENTICATED', '401', '403'].includes(code)) {
+    return 'UNAUTHORIZED';
+  }
+  if (['NOT_FOUND', '404'].includes(code)) {
+    return 'NOT_FOUND';
+  }
+  if (['CONFLICT', '409'].includes(code)) {
+    return 'CONFLICT';
+  }
+  return 'INVALID_RESPONSE';
 }
 
 @Injectable()
@@ -405,16 +427,11 @@ export class UniqueInternalClient {
     }
     const firstError = parsed.data.errors?.[0];
     if (firstError) {
-      const extensionCode = firstError.extensions?.code;
-      const code =
-        extensionCode === 'FORBIDDEN' || extensionCode === 'UNAUTHENTICATED'
-          ? 'UNAUTHORIZED'
-          : extensionCode === 'NOT_FOUND'
-            ? 'NOT_FOUND'
-            : extensionCode === 'CONFLICT'
-              ? 'CONFLICT'
-              : 'INVALID_RESPONSE';
-      throw new UniqueInternalError('Unique internal operation failed', code, false);
+      throw new UniqueInternalError(
+        'Unique internal operation failed',
+        graphQlErrorCode(firstError.extensions),
+        false,
+      );
     }
     const result = parsed.data.data?.[resultKey];
     if (result === undefined || result === null) {

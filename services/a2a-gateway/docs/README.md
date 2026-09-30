@@ -17,5 +17,6 @@ Linear: [KRA-11](https://linear.app/krauss/issue/KRA-11) (epic) · [KRA-18](http
 | [compatibility-profile.md](./compatibility-profile.md) | Pinned protocol profile, SDK, content matrix, peer limitations |
 | [decisions.md](./decisions.md) | Decision log and open questions |
 | [implementation-plan.md](./implementation-plan.md) | Target layout, config, ticket mapping (KRA-19/20/21) |
+| [operations.md](./operations.md) | Retention, recovery, alerts, disable/uninstall, backup |
 
-Status: **draft for review** — nothing in this folder is implemented yet. Implementation starts with KRA-19.
+Status: implemented (KRA-18 – KRA-46). [operations.md](./operations.md) covers lifecycle, recovery, alerts, disabling and uninstalling.

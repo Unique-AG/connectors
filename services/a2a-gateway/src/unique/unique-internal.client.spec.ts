@@ -96,4 +96,25 @@ describe('UniqueInternalClient', () => {
       }),
     );
   });
+
+  it.each([
+    [{ code: '404', response: { statusCode: 404 } }, 'NOT_FOUND'],
+    [{ code: 'NOT_FOUND' }, 'NOT_FOUND'],
+    [{ code: 'FORBIDDEN' }, 'UNAUTHORIZED'],
+    [{ code: '403' }, 'UNAUTHORIZED'],
+    [{ code: 'INTERNAL_SERVER_ERROR' }, 'INVALID_RESPONSE'],
+  ] as const)('maps the GraphQL error extensions %o to %s', async (extensions, code) => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ errors: [{ message: 'Assistant not found', extensions }], data: null }),
+        ),
+    );
+
+    await expect(
+      new UniqueInternalClient(config).getAssistant(identity, 'assistant-1'),
+    ).rejects.toEqual(expect.objectContaining<Partial<UniqueInternalError>>({ code }));
+  });
 });
