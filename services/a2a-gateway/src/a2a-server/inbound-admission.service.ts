@@ -56,20 +56,23 @@ export class InboundAdmissionService {
       return { params };
     }
 
+    if (
+      message.contextId &&
+      !(await this.contexts.findOwned(identity, publicationId, message.contextId))
+    ) {
+      throw new RequestMalformedError('unknown contextId');
+    }
+    const duplicate = await this.taskStore.findByClientMessage(
+      context,
+      message.contextId || undefined,
+      message.messageId,
+    );
+    if (duplicate) {
+      return { duplicate };
+    }
     const contextId = message.contextId || typeid('ctx').toString();
     if (!message.contextId) {
       await this.contexts.create(identity, publicationId, contextId);
-    } else if (!(await this.contexts.findOwned(identity, publicationId, contextId))) {
-      throw new RequestMalformedError('unknown contextId');
-    } else {
-      const duplicate = await this.taskStore.findByClientMessage(
-        context,
-        contextId,
-        message.messageId,
-      );
-      if (duplicate) {
-        return { duplicate };
-      }
     }
     try {
       await this.quota.assertInbound(identity.companyId);

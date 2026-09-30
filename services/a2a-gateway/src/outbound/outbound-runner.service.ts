@@ -106,6 +106,9 @@ interface RemoteSession {
   fetchImpl: typeof fetch;
 }
 
+/** The peer refused the connection credential; the SDK would only report an opaque error. */
+class CredentialsRejected extends Error {}
+
 class Interrupted extends Error {
   public constructor(public readonly kind: 'cancel' | 'deadline') {
     super(kind);
@@ -120,6 +123,8 @@ const MESSAGES = {
   unsupportedInput: 'The external agent does not accept text messages.',
   unsupported: 'The external agent does not support this request.',
   failed: 'The external agent could not complete the request.',
+  credentials:
+    "The external agent rejected this space's connection credentials. Ask a space administrator to rotate them.",
   unknown:
     'The external agent may have received this request, but its outcome is unknown. Check with the external provider before retrying.',
   unreachable:
@@ -162,6 +167,9 @@ function peerFailure(error: unknown): Outcome | undefined {
   }
   if (error instanceof UnsupportedOperationError) {
     return new Outcome('failed', MESSAGES.unsupported, 'unsupported');
+  }
+  if (error instanceof CredentialsRejected) {
+    return new Outcome('failed', MESSAGES.credentials, 'peer-auth');
   }
   if (error instanceof A2AError) {
     return new Outcome('failed', MESSAGES.failed, `peer-error:${error.name}`);
@@ -522,9 +530,9 @@ export class OutboundRunner implements OnModuleInit {
     if (!acceptsText(card)) {
       throw new Outcome('failed', MESSAGES.unsupportedInput, 'input-modes');
     }
-    let fetchImpl: typeof fetch;
+    let remoteFetch: typeof fetch;
     try {
-      fetchImpl = (await this.credentials.remoteFetch(identity, {
+      remoteFetch = (await this.credentials.remoteFetch(identity, {
         assistantId: execution.assistantId,
         connectionId: execution.connectionId,
         executionId: execution.id,
@@ -535,6 +543,13 @@ export class OutboundRunner implements OnModuleInit {
       }
       throw error;
     }
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const response = await remoteFetch(input, init);
+      if (response.status === 401 || response.status === 403) {
+        throw new CredentialsRejected(`remote agent returned ${response.status}`);
+      }
+      return response;
+    };
     const client = await new ClientFactory({
       transports: [new JsonRpcTransportFactory({ fetchImpl })],
       preferredTransports: ['JSONRPC'],

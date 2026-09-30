@@ -295,4 +295,16 @@ describe('outbound runner against A2A 1.0 peers', () => {
     await expect(run()).resolves.toEqual({ state: 'failed' });
     expect(scenario.final?.text).toMatch(/does not accept text/);
   });
+
+  it('reports rejected connection credentials instead of a generic failure', async () => {
+    const protectedAgent = await startFixtureAgent({ streaming: true, token: 'current' });
+    try {
+      const { scenario, run } = harness(await card(protectedAgent), 'hello');
+      await expect(run()).resolves.toEqual({ state: 'failed' });
+      expect(scenario.final?.text).toMatch(/rejected this space's connection credentials/);
+      expect(scenario.execution.lastError).toBe('peer-auth');
+    } finally {
+      await protectedAgent.close();
+    }
+  });
 });

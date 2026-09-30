@@ -256,6 +256,16 @@ describe.skipIf(!databaseUrl)('gateway security boundaries', () => {
       }
     });
 
+    it('returns the same task for a retried first message', async () => {
+      const retry = {
+        message: { role: 'ROLE_USER', messageId: crypto.randomUUID(), parts: [{ text: 'once' }] },
+        configuration: { returnImmediately: true },
+      };
+      const first = await rpc(manager, 'SendMessage', retry);
+      const second = await rpc(manager, 'SendMessage', retry);
+      expect(second.body.result?.task?.id).toBe(first.body.result?.task?.id);
+    });
+
     it('caps concurrent streams per user and releases them on disconnect', async () => {
       core.state.answerDelayMs = 60_000;
       const { body } = await rpc(manager, 'SendMessage', {

@@ -18,5 +18,6 @@ Linear: [KRA-11](https://linear.app/krauss/issue/KRA-11) (epic) · [KRA-18](http
 | [decisions.md](./decisions.md) | Decision log and open questions |
 | [implementation-plan.md](./implementation-plan.md) | Target layout, config, ticket mapping (KRA-19/20/21) |
 | [operations.md](./operations.md) | Retention, recovery, alerts, disable/uninstall, backup |
+| [rollout.md](./rollout.md) | Setup, identity, administration, troubleshooting, staged enablement and rollback |
 
-Status: implemented (KRA-18 – KRA-46). [operations.md](./operations.md) covers lifecycle, recovery, alerts, disabling and uninstalling.
+Status: implemented (KRA-18 – KRA-46). Start with [rollout.md](./rollout.md) to deploy and enable it.

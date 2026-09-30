@@ -272,21 +272,30 @@ export class PgTaskStore implements TaskStore {
       .limit(limit);
   }
 
+  /** A retried send of the caller; without a context, across its contexts of this publication. */
   public async findByClientMessage(
     context: ServerCallContext,
-    contextId: string,
+    contextId: string | undefined,
     clientMessageId: string,
   ): Promise<Task | undefined> {
     const owner = identity(context);
-    const row = await this.database.query.tasks.findFirst({
-      columns: { taskSnapshot: true },
-      where: and(
-        eq(tasks.companyId, owner.companyId),
-        eq(tasks.userId, owner.userId),
-        eq(tasks.contextId, contextId),
-        eq(tasks.clientMessageId, clientMessageId),
-      ),
-    });
+    const [row] = await this.database
+      .select({ taskSnapshot: tasks.taskSnapshot })
+      .from(tasks)
+      .innerJoin(
+        contexts,
+        and(eq(contexts.companyId, tasks.companyId), eq(contexts.id, tasks.contextId)),
+      )
+      .where(
+        and(
+          eq(tasks.companyId, owner.companyId),
+          eq(tasks.userId, owner.userId),
+          eq(contexts.publicationId, owner.publicationId),
+          eq(tasks.clientMessageId, clientMessageId),
+          contextId ? eq(tasks.contextId, contextId) : undefined,
+        ),
+      )
+      .limit(1);
     return row?.taskSnapshot as unknown as Task | undefined;
   }
 

@@ -125,6 +125,17 @@ describe('InboundAdmissionService', () => {
     expect(taskStore.reserve).not.toHaveBeenCalled();
   });
 
+  it('returns the existing task for a retried first message without opening a context', async () => {
+    const { service, contexts, taskStore } = subject();
+    const existing = { id: 'task_1', status: { state: TaskState.TASK_STATE_WORKING } };
+    taskStore.findByClientMessage.mockResolvedValue(existing);
+
+    await expect(service.admit(request({}), context)).resolves.toEqual({ duplicate: existing });
+    expect(taskStore.findByClientMessage).toHaveBeenCalledWith(context, undefined, 'msg-1');
+    expect(contexts.create).not.toHaveBeenCalled();
+    expect(taskStore.reserve).not.toHaveBeenCalled();
+  });
+
   it('resolves a concurrent duplicate send through the client message constraint', async () => {
     const { service, contexts, taskStore } = subject();
     const existing = { id: 'task_1', status: { state: TaskState.TASK_STATE_WORKING } };
