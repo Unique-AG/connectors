@@ -12,8 +12,9 @@ With Intelligence session that comes back — a 1-hour access token over a 30-da
 encrypted (Fernet) and stored in Postgres per user, so every tool call acts as that user rather
 than as a shared service account.
 
-> **Status: authenticated, two tools.** Every MCP client logs in through the hosted form and
-> is served as itself. `get_investor` and `get_people_for_investor` answer against the live API.
+> **Status: authenticated, four tools.** Every MCP client logs in through the hosted form and
+> is served as itself. `get_investor`, `get_people_for_investor`, `get_investments`, and
+> `get_mandates` answer against the live API.
 
 ## Layout
 

@@ -67,14 +67,25 @@ def _access_token(base_url: str, username: str, password: str, refresh: bool) ->
         issued_at = cached.get("issued_at")
         token = cached.get("access_token")
         if (
-            isinstance(issued_at, (int, float))
+            cached.get("base_url") == base_url
+            and cached.get("username") == username
+            and isinstance(issued_at, (int, float))
             and isinstance(token, str)
             and time.time() - issued_at < _TOKEN_TTL_SECONDS
         ):
             return token
 
     token = _sign_in(base_url, username, password)
-    _TOKEN_FILE.write_text(json.dumps({"access_token": token, "issued_at": time.time()}))
+    _TOKEN_FILE.write_text(
+        json.dumps(
+            {
+                "access_token": token,
+                "issued_at": time.time(),
+                "base_url": base_url,
+                "username": username,
+            }
+        )
+    )
     return token
 
 
@@ -86,22 +97,28 @@ def _required_env(name: str) -> str:
 
 
 def main() -> None:
-    load_dotenv(_HERE / ".env")
-    base_url = os.environ.get("WITH_INTELLIGENCE_BASE_URL", "https://api.withintelligence.com")
-    username = _required_env("WITH_INTELLIGENCE_USERNAME")
-    password = _required_env("WITH_INTELLIGENCE_PASSWORD")
-
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("path", help="e.g. /v3/investors or /v3/investors/2504")
     parser.add_argument("-p", "--param", action="append", default=[], help="key=value")
     parser.add_argument("--refresh", action="store_true", help="ignore the cached response")
     args = parser.parse_args(namespace=_Args())
+
+    load_dotenv(_HERE / ".env")
+    base_url = os.environ.get("WITH_INTELLIGENCE_BASE_URL", "https://api.withintelligence.com")
+    username = _required_env("WITH_INTELLIGENCE_USERNAME")
+    password = _required_env("WITH_INTELLIGENCE_PASSWORD")
     params = dict(p.split("=", 1) for p in args.param)
 
     _CACHE.mkdir(exist_ok=True)
     key = hashlib.sha256(
         json.dumps(
-            {"base_url": base_url, "path": args.path, "query": params}, sort_keys=True
+            {
+                "base_url": base_url,
+                "username": username,
+                "path": args.path,
+                "query": params,
+            },
+            sort_keys=True,
         ).encode()
     ).hexdigest()[:16]
     cache_file = _CACHE / f"{key}.json"

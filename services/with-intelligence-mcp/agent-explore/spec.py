@@ -88,6 +88,14 @@ def _type_of(schema: Json) -> str:
     ref = schema.get("$ref")
     if isinstance(ref, str):
         return _ref_name(ref)
+    members = [_as_dict(member) for member in _as_list(schema.get("allOf"))]
+    if members:
+        parts = [_type_of(member) for member in members]
+        concrete = [part for part in parts if part != "object"]
+        if len(concrete) == 1:
+            return concrete[0]
+        if concrete:
+            return " & ".join(concrete)
     kind = _as_str(schema.get("type"))
     if kind == "array":
         return f"array<{_type_of(_as_dict(schema.get('items')))}>"
@@ -193,11 +201,7 @@ def _refs_in(node: object) -> list[str]:
 
 
 def cmd_snapshot(spec: Json, _target: str) -> None:
-    """Write the pruned snapshot the conformance test reads.
-
-    Only the schemas we model are kept, so the committed file stays small enough to read in a
-    diff — refreshing it is then a visible change to With Intelligence contract we depend on.
-    """
+    """Write the pruned schema snapshot the conformance test reads."""
     schemas = _referenced_schemas(spec, SNAPSHOT_ROOTS)
     payload = {
         "_source": SPEC_URL,
