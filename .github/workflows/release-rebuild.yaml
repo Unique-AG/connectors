@@ -58,5 +58,5 @@ jobs:
               --base main \
               --head "$branch" \
               --title "$title" \
-              --body "This pull request rebuilds ${service}. It changes one date file and no code. The release build takes the newest operating system patches. Merge this pull request. Then merge the release pull request that release-please opens."
+              --body "This pull request rebuilds ${service}. It changes one date file and no code. The release build takes the newest operating system patches. GitHub holds the workflow runs on this pull request. Approve the runs. Then merge this pull request. Then merge the release pull request that release-please opens."
           done

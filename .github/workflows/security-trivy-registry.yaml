@@ -26,6 +26,8 @@ jobs:
       services: ${{ steps.build-matrix.outputs.services }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Build service matrix
         id: build-matrix
@@ -78,6 +80,7 @@ jobs:
             /.github/trivy-templates/
             /.github/trivyignore.yaml
           sparse-checkout-cone-mode: false
+          persist-credentials: false
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:

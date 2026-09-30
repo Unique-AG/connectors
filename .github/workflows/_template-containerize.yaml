@@ -15,7 +15,6 @@ on:
 permissions:
   contents: read
   packages: read
-  actions: write
 
 jobs:
   containerize:
@@ -28,11 +27,13 @@ jobs:
       GHA_CACHE_SCOPE: ${{ inputs.service-name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Check if Dockerfile exists
         id: check-dockerfile
         run: |
-          if [ -f "${{ env.SERVICE_PATH }}/deploy/Dockerfile" ]; then
+          if [ -f "$SERVICE_PATH/deploy/Dockerfile" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -41,8 +42,7 @@ jobs:
       - name: Resolve image tar path
         id: image-tar
         if: steps.check-dockerfile.outputs.exists == 'true'
-        shell: bash
-        run: echo "path=${RUNNER_TEMP}/${{ inputs.service-name }}.tar" >> "$GITHUB_OUTPUT"
+        run: echo "path=${RUNNER_TEMP}/${SERVICE_NAME}.tar" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
         if: steps.check-dockerfile.outputs.exists == 'true'

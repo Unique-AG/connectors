@@ -1,13 +1,6 @@
-# Python CI — uv-managed services and shared Python packages outside pnpm/turbo.
-# Service jobs run for changed services and consumers of changed shared packages.
-
 name: "[CI] Python"
 
 on:
-  # Design decision: no `branches` filter. Features here land as stacks of PRs that target their
-  # parent branch, not `main`; a `branches: [main]` filter silently skipped this gate for every
-  # PR in a stack except the base one. `paths` alone decides — the gate matters wherever the
-  # files it guards change, whatever the PR merges into.
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
@@ -25,8 +18,7 @@ on:
 
 permissions:
   contents: read
-  actions: write # required for docker GHA cache writes in _template-containerize.yaml
-  packages: read # required for helm OCI chart dependency pulls from GHCR
+  packages: read
 
 concurrency:
   group: ci-python-${{ github.event.pull_request.number || github.ref }}
@@ -36,12 +28,15 @@ jobs:
   detect-changes:
     name: Detect changes (Python)
     runs-on: ubuntu-slim
+    timeout-minutes: 5
     outputs:
       packages: ${{ steps.build-matrix.outputs.packages }}
       shared-auth-changed: ${{ steps.filter.outputs.shared_auth }}
       workflow-changed: ${{ steps.filter.outputs.workflow }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name != 'workflow_dispatch'
@@ -58,10 +53,6 @@ jobs:
               - '.github/workflows/_template-containerize.yaml'
               - 'scripts/render-values-schema.sh'
 
-      # Builds a JSON array of Python service names to fan out into parallel CI matrix jobs.
-      # It combines directly changed services with consumers of changed shared packages.
-      # Workflow changes validate every Python service; workflow_dispatch accepts a validated list.
-      # Node/TS services (package.json only) are never included — they use services-ci.yaml.
       - name: Build package matrix
         id: build-matrix
         env:
@@ -73,7 +64,7 @@ jobs:
           WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
         run: |
           list_python_services() {
-            find services -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/pyproject.toml' \; -print | xargs -n1 basename | sort
+            find services -mindepth 2 -maxdepth 2 -type f -name pyproject.toml | cut -d/ -f2 | sort
           }
 
           list_changed_python_services() {
@@ -110,7 +101,8 @@ jobs:
               packages=$(list_changed_python_services)
             fi
             if [ "$SHARED_AUTH_CHANGED" = "true" ]; then
-              packages=$(jq -c '. + ["backstop-mcp", "with-intelligence-mcp"] | unique' <<< "$packages")
+              consumers=$(grep -l '"mcp-credential-auth' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
             fi
           fi
 
@@ -132,6 +124,8 @@ jobs:
         working-directory: services/${{ matrix.package }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
@@ -145,10 +139,6 @@ jobs:
       - name: Sync dependencies
         run: uv sync --locked
 
-      # In this job and not validate-terraform: the generator imports the service's own Python to
-      # render the module's registry locals, and needs no terraform binary to tell whether the
-      # committed file is stale. Guarded on the file rather than the matrix entry, so a second
-      # service gaining a generator needs no edit here.
       - name: Check generated Terraform registry drift
         run: |
           if [ -f scripts/render-terraform-registry.py ]; then
@@ -192,6 +182,8 @@ jobs:
         working-directory: packages/mcp-credential-auth
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
@@ -235,11 +227,13 @@ jobs:
       SERVICE_NAME: ${{ matrix.package }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Check if Helm charts exist
         id: check-helm
         run: |
-          if [ -d "${{ env.SERVICE_PATH }}/deploy/helm-charts" ]; then
+          if [ -d "$SERVICE_PATH/deploy/helm-charts" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -252,36 +246,25 @@ jobs:
 
       - name: Login to GHCR (for OCI chart dependencies)
         if: steps.check-helm.outputs.exists == 'true'
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$REGISTRY_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
 
       - name: Render chart
         if: steps.check-helm.outputs.exists == 'true'
         working-directory: ${{ env.SERVICE_PATH }}/deploy/helm-charts/${{ env.SERVICE_NAME }}
         run: |
           helm dependency update
-          VALUES_FLAG=""
           if [ -f ci-values.yaml ]; then
-            VALUES_FLAG="--values ci-values.yaml"
+            helm template . --values ci-values.yaml
+          else
+            helm template .
           fi
-          helm template . ${VALUES_FLAG}
 
-      # The same step _template-ci.yaml runs for Node services. Python services never reached it,
-      # because that template is only called from services-ci.yaml, which matrixes on package.json —
-      # so a Python service's chart could sit with a values.schema.json that no longer matches its
-      # values.additional.schema.json and nothing said so. The script checks every chart it knows
-      # about, not just this matrix entry; that is how the Node template calls it too.
       - name: Check values.schema.json drift
         if: steps.check-helm.outputs.exists == 'true'
         run: scripts/render-values-schema.sh --check
 
-  # Validates Terraform configurations if they exist for this service. Same job as
-  # _template-ci.yaml's, which Python services never reached either, plus two steps that one lacks:
-  #   - `fmt -check`, so a module is formatted the way `terraform fmt` would format it;
-  #   - `test`, because `validate` is a weak gate. It reports Success on a self-referential
-  #     `identifier_uris` (silently pruning the edge from the graph — only plan fails), and it skips
-  #     variable validations on defaulted variables, so it passes an office-365-mcp registration with
-  #     no tool selection at all. `terraform test` with `mock_provider` runs credential-free.
   validate-terraform:
     name: Terraform ${{ matrix.package }}
     needs: detect-changes
@@ -298,11 +281,13 @@ jobs:
       SERVICE_PATH: services/${{ matrix.package }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Check if Terraform exists
         id: check-terraform
         run: |
-          if [ -d "${{ env.SERVICE_PATH }}/deploy/terraform" ]; then
+          if [ -d "$SERVICE_PATH/deploy/terraform" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -316,17 +301,13 @@ jobs:
       - name: Validate Terraform modules
         if: steps.check-terraform.outputs.exists == 'true'
         run: |
-          # -mindepth/-maxdepth 2 is `deploy/terraform/<cloud>/<module>`, so a module's own `tests/`
-          # directory at depth 3 is not mistaken for a root module of its own.
-          for dir in $(find ${{ env.SERVICE_PATH }}/deploy/terraform -mindepth 2 -maxdepth 2 -type d); do
+          while IFS= read -r -d '' dir; do
             echo "Validating: $dir"
-            cd "$dir"
-            terraform fmt -check -recursive
-            terraform init -backend=false
-            terraform validate
-            terraform test
-            cd - > /dev/null
-          done
+            terraform fmt -check -recursive "$dir"
+            terraform -chdir="$dir" init -backend=false
+            terraform -chdir="$dir" validate
+            terraform -chdir="$dir" test
+          done < <(find "$SERVICE_PATH/deploy/terraform" -mindepth 2 -maxdepth 2 -type d -print0)
 
   containerize:
     name: Containerize ${{ matrix.package }}

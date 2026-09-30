@@ -2,7 +2,7 @@ name: "[CI] Services Cache Warming"
 
 on:
   schedule:
-    - cron: "0 5 * * *" # Every day at 5 AM UTC
+    - cron: "0 5 * * *"
   workflow_dispatch:
     inputs:
       services:
@@ -12,21 +12,21 @@ on:
 
 permissions:
   contents: read
-  packages: read # Required for docker/login-action to authenticate with GHCR
-  actions: read # Required for cache-from: type=gha
+  packages: read
+  actions: read
 
 jobs:
   build-matrix:
     name: Build matrix
     runs-on: ubuntu-slim
+    timeout-minutes: 5
     outputs:
       services: ${{ steps.matrix.outputs.services }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      # Builds a JSON array of service names to fan out into parallel cache warming jobs.
-      # On manual dispatch with specific services, validates input and uses the comma-separated input.
-      # Otherwise (scheduled or "all"), auto-discovers services from the services/ directory.
       - name: Build service matrix
         id: matrix
         env:
@@ -54,8 +54,6 @@ jobs:
           fi
           echo "services=$services" >> "$GITHUB_OUTPUT"
 
-  # Fans out into one job per service using the reusable cache template.
-  # Dockerfile paths are derived from the convention: services/<name>/deploy/Dockerfile
   cache:
     name: ${{ matrix.service }}
     needs: build-matrix

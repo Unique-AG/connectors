@@ -7,21 +7,19 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
   id-token: write
-  issues: write
   packages: write
-  pull-requests: write
   security-events: write
 
 jobs:
   release-please:
-    # Restrict to only what this job needs — CD jobs get their permissions from _template-cd.yaml
     permissions:
       contents: write
       issues: write
       pull-requests: write
     runs-on: ubuntu-slim
+    timeout-minutes: 10
     outputs:
       "services/sharepoint-connector--release_created": ${{ steps.release.outputs['services/sharepoint-connector--release_created'] }}
       "services/sharepoint-connector--version": ${{ steps.release.outputs['services/sharepoint-connector--version'] }}
@@ -47,15 +45,17 @@ jobs:
         id: release
 
       - name: Debug release outputs
-        continue-on-error: true # even if the nice printout fails, we want to continue
+        continue-on-error: true
         env:
           RELEASE_OUTPUTS: ${{ toJson(steps.release.outputs) }}
         run: |
           echo "$RELEASE_OUTPUTS" | jq
-          echo '## Release Please Outputs' >> $GITHUB_STEP_SUMMARY
-          echo '```json' >> $GITHUB_STEP_SUMMARY
-          echo "$RELEASE_OUTPUTS" | jq . >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          {
+            echo '## Release Please Outputs'
+            echo '```json'
+            echo "$RELEASE_OUTPUTS" | jq .
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   release-sharepoint-connector:
     needs: release-please
@@ -65,7 +65,6 @@ jobs:
     with:
       service-name: sharepoint-connector
       service-version: ${{ needs.release-please.outputs['services/sharepoint-connector--version'] }}
-      dockerfile: services/sharepoint-connector/deploy/Dockerfile
       docs-path: services/sharepoint-connector/docs
 
   release-teams-mcp:
@@ -76,75 +75,60 @@ jobs:
     with:
       service-name: teams-mcp
       service-version: ${{ needs.release-please.outputs['services/teams-mcp--version'] }}
-      dockerfile: services/teams-mcp/deploy/Dockerfile
       docs-path: services/teams-mcp/docs
 
   release-confluence-connector:
     needs: release-please
     if: needs.release-please.outputs['services/confluence-connector--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
-    secrets: inherit
     with:
       service-name: confluence-connector
       service-version: ${{ needs.release-please.outputs['services/confluence-connector--version'] }}
-      dockerfile: services/confluence-connector/deploy/Dockerfile
 
   release-outlook-semantic-mcp:
     needs: release-please
     if: needs.release-please.outputs['services/outlook-semantic-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
-    secrets: inherit
     with:
       service-name: outlook-semantic-mcp
       service-version: ${{ needs.release-please.outputs['services/outlook-semantic-mcp--version'] }}
-      dockerfile: services/outlook-semantic-mcp/deploy/Dockerfile
 
   release-hello-mcp:
     needs: release-please
     if: needs.release-please.outputs['services/hello-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
-    secrets: inherit
     with:
       service-name: hello-mcp
       service-version: ${{ needs.release-please.outputs['services/hello-mcp--version'] }}
-      dockerfile: services/hello-mcp/deploy/Dockerfile
 
   release-kb-mcp:
     needs: release-please
     if: needs.release-please.outputs['services/kb-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
-    secrets: inherit
     with:
       service-name: kb-mcp
       service-version: ${{ needs.release-please.outputs['services/kb-mcp--version'] }}
-      dockerfile: services/kb-mcp/deploy/Dockerfile
 
   release-backstop-mcp:
     needs: release-please
     if: needs.release-please.outputs['services/backstop-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
-    secrets: inherit
     with:
       service-name: backstop-mcp
       service-version: ${{ needs.release-please.outputs['services/backstop-mcp--version'] }}
-      dockerfile: services/backstop-mcp/deploy/Dockerfile
 
   release-office-365-mcp:
     needs: release-please
     if: needs.release-please.outputs['services/office-365-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
-    secrets: inherit
     with:
       service-name: office-365-mcp
       service-version: ${{ needs.release-please.outputs['services/office-365-mcp--version'] }}
-      dockerfile: services/office-365-mcp/deploy/Dockerfile
 
   release-with-intelligence-mcp:
     needs: release-please
     if: needs.release-please.outputs['services/with-intelligence-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
-    secrets: inherit
     with:
       service-name: with-intelligence-mcp
       service-version: ${{ needs.release-please.outputs['services/with-intelligence-mcp--version'] }}
-      dockerfile: services/with-intelligence-mcp/deploy/Dockerfile

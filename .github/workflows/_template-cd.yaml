@@ -11,17 +11,12 @@ on:
         description: "Version of the package (e.g., 1.2.0)"
         required: true
         type: string
-      dockerfile:
-        description: "Path to a specific Dockerfile (e.g., services/outlook-semantic-mcp/deploy/Dockerfile)"
-        default: "./Dockerfile"
-        type: string
       docs-path:
         description: "Path to the docs directory relative to repo root (optional)"
         required: false
         type: string
 
 jobs:
-  # Build and push container to registry
   containerize:
     permissions:
       packages: write
@@ -45,6 +40,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Setup docker buildx
         uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
@@ -79,7 +75,7 @@ jobs:
       - name: Login to Azure as uniquecr token issuer (OIDC)
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
-          client-id: 46c63b6f-67ac-476a-9d5d-6db2d18743bb # acr_oidc uniquecr_push
+          client-id: 46c63b6f-67ac-476a-9d5d-6db2d18743bb
           tenant-id: 99330c76-81d2-460e-861e-35af8e2a4266
           subscription-id: fb8bce09-908a-459f-b200-a578005bfeb2
 
@@ -88,7 +84,7 @@ jobs:
         run: |
           TOKEN=$(az acr login --name uniquecr --expose-token --output tsv --query accessToken)
           echo "::add-mask::$TOKEN"
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Login to ACR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -100,7 +96,7 @@ jobs:
       - name: Login to Azure as getunique token issuer (OIDC)
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
-          client-id: daa88f8d-0943-459c-890a-17b1a018d11e # acr_oidc getunique_push
+          client-id: daa88f8d-0943-459c-890a-17b1a018d11e
           tenant-id: 99330c76-81d2-460e-861e-35af8e2a4266
           subscription-id: fb8bce09-908a-459f-b200-a578005bfeb2
 
@@ -109,20 +105,24 @@ jobs:
         run: |
           TOKEN=$(az acr login --name getunique --expose-token --output tsv --query accessToken)
           echo "::add-mask::$TOKEN"
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Login to helm registries
+        env:
+          UNIQUECR_TOKEN: ${{ steps.acr-token.outputs.token }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GETUNIQUE_TOKEN: ${{ steps.acr-token-getunique.outputs.token }}
         run: |
-          echo "${{ steps.acr-token.outputs.token }}" | helm registry login ${{ env.UNIQUECR_REGISTRY }} --username 00000000-0000-0000-0000-000000000000 --password-stdin
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.GHCR_REGISTRY }} --username ${{ github.actor }} --password-stdin
-          echo "${{ steps.acr-token-getunique.outputs.token }}" | helm registry login ${{ env.GETUNIQUE_REGISTRY }} --username 00000000-0000-0000-0000-000000000000 --password-stdin
+          echo "$UNIQUECR_TOKEN" | helm registry login "$UNIQUECR_REGISTRY" --username 00000000-0000-0000-0000-000000000000 --password-stdin
+          echo "$GHCR_TOKEN" | helm registry login "$GHCR_REGISTRY" --username "$GITHUB_ACTOR" --password-stdin
+          echo "$GETUNIQUE_TOKEN" | helm registry login "$GETUNIQUE_REGISTRY" --username 00000000-0000-0000-0000-000000000000 --password-stdin
 
       - name: Build and push container
         id: build-and-push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          file: ${{ inputs.dockerfile }}
+          file: services/${{ inputs.service-name }}/deploy/Dockerfile
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
           provenance: mode=max
@@ -144,31 +144,34 @@ jobs:
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |
-          images=""
-          for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
-          done
-          cosign sign --yes ${images}
-          cosign verify ${images} \
-          --certificate-identity-regexp="^https://github.com/${{ github.repository }}/\.github/workflows/.*@refs/heads/main$" \
-          --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+          images=()
+          while IFS= read -r tag; do
+            if [ -n "$tag" ]; then
+              images+=("${tag}@${DIGEST}")
+            fi
+          done <<< "$TAGS"
+          cosign sign --yes "${images[@]}"
+          cosign verify "${images[@]}" \
+            --certificate-identity-regexp="^https://github.com/${GITHUB_REPOSITORY}/\.github/workflows/.*@refs/heads/main$" \
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com
 
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
 
       - name: Push Helm charts
         env:
           DESTINATION: /tmp
+          SERVICE_NAME: ${{ inputs.service-name }}
         run: |
           deno run \
-          --allow-run \
-          --allow-read \
-          --allow-write=${{ env.DESTINATION }} \
-          scripts/helm-package-push.ts \
-          --chart services/${{ inputs.service-name }}/deploy/helm-charts/${{ inputs.service-name }} \
-          --destination ${{ env.DESTINATION }} \
-          --registry oci://${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_CHART_REPO }} \
-          --registry oci://${{ env.GHCR_REGISTRY }}/${{ env.GHCR_CHART_REPO }} \
-          --registry oci://${{ env.GETUNIQUE_REGISTRY }}/${{ env.GETUNIQUE_CHART_REPO }}
+            --allow-run \
+            --allow-read \
+            --allow-write="$DESTINATION" \
+            scripts/helm-package-push.ts \
+            --chart "services/$SERVICE_NAME/deploy/helm-charts/$SERVICE_NAME" \
+            --destination "$DESTINATION" \
+            --registry "oci://$UNIQUECR_REGISTRY/$UNIQUECR_CHART_REPO" \
+            --registry "oci://$GHCR_REGISTRY/$GHCR_CHART_REPO" \
+            --registry "oci://$GETUNIQUE_REGISTRY/$GETUNIQUE_CHART_REPO"
 
   security-trivy-image-scan:
     needs: containerize
@@ -186,6 +189,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: .github/trivy-templates
+          persist-credentials: false
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:

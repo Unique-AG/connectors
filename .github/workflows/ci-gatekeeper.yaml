@@ -19,12 +19,15 @@ jobs:
     permissions:
       pull-requests: read
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
       PR_NUMBER: ${{ github.event.number }}
       PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
 
@@ -45,7 +48,6 @@ jobs:
         run: |
           SCOPE=$(printenv PR_TITLE | grep -oP '^[a-z]+\(\K[^)]+' || true)
 
-          # Derive service list from release-please-config.json (stays in sync automatically)
           SERVICES=$(jq -r '.packages | keys[] | ltrimstr("services/")' release-please-config.json)
 
           COUNT=0
@@ -65,13 +67,12 @@ jobs:
       statuses: read
       pull-requests: read
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Run Merge Gatekeeper
         uses: upsidr/merge-gatekeeper@09af7a82c1666d0e64d2bd8c01797a0bcfd3bb5d # v1.2.1
-        timeout-minutes: 25
         with:
           self: gatekeeper
           token: ${{ secrets.GITHUB_TOKEN }}
           timeout: "1200"
           interval: "60"
-          ignored: "Test $${{ '{{' }} matrix.package }},Helm $${{ '{{' }} matrix.package }},Terraform $${{ '{{' }} matrix.package }},Containerize $${{ '{{' }} matrix.package }},matrix.service"

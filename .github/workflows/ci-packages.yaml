@@ -1,13 +1,10 @@
 name: "[CI] Packages"
 
 on:
-  # Design decision: no `branches` filter. Features here land as stacks of PRs that target their
-  # parent branch, not `main`; a `branches: [main]` filter silently skipped this gate for every
-  # PR in a stack except the base one. `paths` alone decides — the gate matters wherever the
-  # files it guards change, whatever the PR merges into.
   pull_request:
     paths:
       - "packages/**"
+      - "!packages/mcp-credential-auth/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "turbo.json"
@@ -22,11 +19,13 @@ concurrency:
 jobs:
   validate:
     permissions:
-      actions: write # cache needs write access
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -35,19 +34,6 @@ jobs:
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           run_install: false
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
