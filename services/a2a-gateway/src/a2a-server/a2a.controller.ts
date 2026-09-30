@@ -17,6 +17,8 @@ import { KongIdentityGuard, requestIdentity } from '../auth/identity.guard.js';
 import { A2aSdkService } from './a2a-sdk.service.js';
 import { PublicationService } from './publication.service.js';
 
+const KEEP_ALIVE_MS = 15_000;
+
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
   return (
     typeof value === 'object' &&
@@ -81,9 +83,24 @@ export class A2aController {
     response.setHeader('Content-Type', 'text/event-stream');
     response.setHeader('Cache-Control', 'no-cache');
     response.setHeader('X-Accel-Buffering', 'no');
-    for await (const event of result) {
-      response.write(formatSSEEvent(event));
+    response.flushHeaders();
+    // A disconnecting client only ends its subscription; the task keeps running and can be
+    // re-attached with SubscribeToTask.
+    let closed = false;
+    request.on('close', () => {
+      closed = true;
+    });
+    const keepAlive = setInterval(() => response.write(': keep-alive\n\n'), KEEP_ALIVE_MS);
+    try {
+      for await (const event of result) {
+        if (closed) {
+          break;
+        }
+        response.write(formatSSEEvent(event));
+      }
+    } finally {
+      clearInterval(keepAlive);
+      response.end();
     }
-    response.end();
   }
 }

@@ -117,6 +117,58 @@ export class UniqueInternalClient {
     );
   }
 
+  /** All assistant segments answering one user turn (multi-segment spaces). */
+  public getTurnSegments(
+    identity: EffectiveIdentity,
+    chatId: string,
+    userMessageId: string,
+  ): Promise<unknown> {
+    return this.graphql(
+      this.config.uniqueChatUrl,
+      identity,
+      `query A2aTurn($chatId: String!, $where: MessageWhereInput) {
+        messages(chatId: $chatId, where: $where) {
+          id text segmentKind segmentIndex completedAt stoppedStreamingAt userAbortedAt
+          references { name url sequenceNumber sourceId source }
+        }
+      }`,
+      {
+        chatId,
+        where: { responseTurnId: { equals: userMessageId }, role: { equals: 'ASSISTANT' } },
+      },
+      'messages',
+    );
+  }
+
+  public getChatElicitations(identity: EffectiveIdentity, chatId: string): Promise<unknown> {
+    return this.graphql(
+      this.config.uniqueChatUrl,
+      identity,
+      `query A2aChatElicitations($chatId: String!) {
+        elicitationsByChat(chatId: $chatId) { id userId messageId mode status message schema url expiresAt }
+      }`,
+      { chatId },
+      'elicitationsByChat',
+    );
+  }
+
+  /** Replies to a message; the assistant shell of a user turn is its first reply. */
+  public getMessageReplies(
+    identity: EffectiveIdentity,
+    chatId: string,
+    messageId: string,
+  ): Promise<unknown> {
+    return this.graphql(
+      this.config.uniqueChatUrl,
+      identity,
+      `query A2aMessageReplies($chatId: String!, $messageId: String!) {
+        message(chatId: $chatId, messageId: $messageId) { id messages { id } }
+      }`,
+      { chatId, messageId },
+      'message',
+    );
+  }
+
   public stopMessage(
     identity: EffectiveIdentity,
     chatId: string,

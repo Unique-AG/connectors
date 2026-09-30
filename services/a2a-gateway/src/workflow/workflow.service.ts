@@ -60,6 +60,12 @@ export class WorkflowService implements OnApplicationBootstrap, OnApplicationShu
     return this.absurd.spawn(name, params, options);
   }
 
+  /** `undefined` when absurd no longer knows the task (e.g. cleaned up after completion). */
+  public async taskState(taskId: string): Promise<string | undefined> {
+    const snapshot = await this.absurd.fetchTaskResult(taskId);
+    return snapshot?.state;
+  }
+
   /** Event payloads are immutable per name, so event names must identify one occurrence. */
   public emitEvent(name: string, payload?: JsonValue): Promise<void> {
     return this.absurd.emitEvent(name, payload);

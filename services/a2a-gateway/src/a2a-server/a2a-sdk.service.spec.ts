@@ -1,13 +1,15 @@
-import { TaskState } from '@a2a-js/sdk';
+import { type Task, TaskState } from '@a2a-js/sdk';
 import {
   AgentEvent,
   type ExecutionEventBus,
   InMemoryTaskStore,
   type RequestContext,
+  type ServerCallContext,
 } from '@a2a-js/sdk/server';
 import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import type { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
+import { loadConfig } from '../config/config.js';
 import type { ContextRepository } from '../drizzle/context.repository.js';
 import { A2aSdkService } from './a2a-sdk.service.js';
 import { InboundAdmissionService } from './inbound-admission.service.js';
@@ -17,8 +19,24 @@ import type { PublicationService } from './publication.service.js';
 
 const identity = { companyId: 'company-1', userId: 'user-1', roles: [] };
 
+const config = loadConfig({
+  NODE_ENV: 'test',
+  DATABASE_URL: 'postgresql://localhost/a2a',
+  AMQP_URL: 'amqp://localhost',
+  PUBLIC_BASE_URL: 'https://gateway.example/',
+  ZITADEL_ISSUER: 'https://identity.example/',
+  UNIQUE_CHAT_URL: 'http://node-chat/',
+  UNIQUE_SCOPE_MANAGEMENT_URL: 'http://scope-management/',
+  UNIQUE_INGESTION_URL: 'http://node-ingestion/',
+  ENCRYPTION_KEY: '00'.repeat(32),
+});
+
 function subject() {
-  const taskStore = new InMemoryTaskStore();
+  const memory = new InMemoryTaskStore();
+  const taskStore = Object.assign(memory, {
+    reserve: (task: Task, context: ServerCallContext) => memory.save(task, context),
+    findByClientMessage: vi.fn(),
+  });
   const authorization = { publication: vi.fn() };
   const contexts = { create: vi.fn(), findOwned: vi.fn() };
   const executor = {
@@ -65,6 +83,7 @@ function subject() {
       executor as unknown as InboundAgentExecutor,
       publications as unknown as PublicationService,
       taskStore as unknown as PgTaskStore,
+      config,
     ),
     authorization,
     contexts,

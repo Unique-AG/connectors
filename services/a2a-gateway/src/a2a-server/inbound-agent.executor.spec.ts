@@ -7,6 +7,7 @@ import type { PublicationRepository } from '../drizzle/publication.repository.js
 import type { ChatEventConsumer } from '../event-bus/chat-event.consumer.js';
 import type { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { InboundAgentExecutor } from './inbound-agent.executor.js';
+import { NativeRunObserver } from './native-run-observer.js';
 import type { PgTaskStore } from './pg-task.store.js';
 
 type AgentEvent = Parameters<ExecutionEventBus['publish']>[0];
@@ -50,28 +51,42 @@ const request = {
 
 function subject(unique: Record<string, ReturnType<typeof vi.fn>>) {
   const events: AgentEvent[] = [];
+  const client = {
+    createMessage: vi.fn().mockResolvedValue({
+      id: 'user-msg',
+      chatId: 'chat-1',
+      messages: [{ id: 'assistant-msg' }],
+    }),
+    getMessageReplies: vi.fn().mockResolvedValue({ messages: [] }),
+    getTurnSegments: vi.fn().mockResolvedValue([]),
+    getChatElicitations: vi.fn().mockResolvedValue([]),
+    ...unique,
+  } as unknown as UniqueInternalClient;
+  const contexts = {
+    findOwned: vi.fn().mockResolvedValue({ id: 'ctx_1', chatId: null }),
+    attachChat: vi.fn(),
+    attachMessages: vi.fn(),
+    findTask: vi.fn(),
+  };
   const executor = new InboundAgentExecutor(
-    {
-      findOwned: vi.fn().mockResolvedValue({ id: 'ctx_1', chatId: null }),
-      attachChat: vi.fn(),
-      attachMessages: vi.fn(),
-    } as unknown as ContextRepository,
-    { subscribe: vi.fn().mockReturnValue(() => undefined) } as unknown as ChatEventConsumer,
+    contexts as unknown as ContextRepository,
+    new NativeRunObserver(
+      { subscribe: vi.fn().mockReturnValue(() => undefined) } as unknown as ChatEventConsumer,
+      client,
+      { streamTimeoutMs: 1_000 } as GatewayConfig,
+    ),
     {
       findById: vi.fn().mockResolvedValue({ enabled: true, assistantId: 'assistant-1' }),
     } as unknown as PublicationRepository,
-    { save: vi.fn() } as unknown as PgTaskStore,
-    {
-      createMessage: vi.fn().mockResolvedValue({
-        id: 'user-msg',
-        chatId: 'chat-1',
-        messages: [{ id: 'assistant-msg' }],
-      }),
-      ...unique,
-    } as unknown as UniqueInternalClient,
-    { streamTimeoutMs: 1_000 } as GatewayConfig,
+    { save: vi.fn(), heartbeat: vi.fn() } as unknown as PgTaskStore,
+    client,
   );
-  return { executor, bus: { publish: (event: AgentEvent) => events.push(event) }, events };
+  return {
+    executor,
+    contexts,
+    bus: { publish: (event: AgentEvent) => events.push(event) },
+    events,
+  };
 }
 
 describe('InboundAgentExecutor', () => {
@@ -103,5 +118,57 @@ describe('InboundAgentExecutor', () => {
       data: { status: { state: TaskState.TASK_STATE_FAILED } },
     });
     expect(JSON.stringify(events)).not.toContain('node-chat');
+  });
+
+  it('reports a native error as failed and a user stop as canceled', async () => {
+    const failed = subject({
+      getMessage: vi.fn().mockResolvedValue({
+        id: 'assistant-msg',
+        text: 'error',
+        stoppedStreamingAt: '2026-09-30T00:00:00.000Z',
+      }),
+    });
+    await failed.executor.execute(request, failed.bus as never);
+    expect(failed.events.at(-1)).toMatchObject({
+      data: { status: { state: TaskState.TASK_STATE_FAILED } },
+    });
+
+    const canceled = subject({
+      getMessage: vi.fn().mockResolvedValue({
+        id: 'assistant-msg',
+        stoppedStreamingAt: '2026-09-30T00:00:00.000Z',
+        userAbortedAt: '2026-09-30T00:00:00.000Z',
+      }),
+    });
+    await canceled.executor.execute(request, canceled.bus as never);
+    expect(canceled.events.at(-1)).toMatchObject({
+      data: { status: { state: TaskState.TASK_STATE_CANCELED } },
+    });
+  });
+
+  it('marks a task canceled only when core confirms the stop', async () => {
+    const stopMessage = vi
+      .fn()
+      .mockResolvedValue({ id: 'assistant-msg', stoppedStreamingAt: null });
+    const { executor, contexts, bus, events } = subject({ stopMessage });
+    contexts.findTask.mockResolvedValue({
+      companyId: 'company-1',
+      userId: 'user-1',
+      contextId: 'ctx_1',
+      chatId: 'chat-1',
+      userMessageId: 'user-msg',
+      assistantMessageId: 'assistant-msg',
+    });
+
+    await expect(executor.cancelTask('task_1', bus as never)).rejects.toMatchObject({
+      name: 'TaskNotCancelableError',
+    });
+    expect(events).toHaveLength(0);
+
+    stopMessage.mockResolvedValue({ id: 'assistant-msg', stoppedStreamingAt: 'now' });
+    await executor.cancelTask('task_1', bus as never);
+    expect(events.at(-1)).toMatchObject({
+      data: { status: { state: TaskState.TASK_STATE_CANCELED } },
+    });
   });
 });

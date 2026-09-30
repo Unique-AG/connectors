@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { type SendMessageRequest, TaskState } from '@a2a-js/sdk';
 import { ServerCallContext } from '@a2a-js/sdk/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -38,7 +39,7 @@ function request(message: Partial<SendMessageRequest['message']>): SendMessageRe
 function subject() {
   const authorization = { publication: vi.fn() };
   const contexts = { create: vi.fn(), findOwned: vi.fn() };
-  const taskStore = { save: vi.fn(), load: vi.fn() };
+  const taskStore = { reserve: vi.fn(), load: vi.fn(), findByClientMessage: vi.fn() };
   return {
     service: new InboundAdmissionService(
       authorization as unknown as ResourceAuthorizationService,
@@ -62,12 +63,14 @@ describe('InboundAdmissionService', () => {
       'pub-1',
       true,
     );
-    expect(taskStore.save).toHaveBeenCalledWith(
+    assert.ok('params' in admitted);
+    expect(taskStore.reserve).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: admitted.message?.taskId,
+        id: admitted.params.message?.taskId,
         status: expect.objectContaining({ state: TaskState.TASK_STATE_SUBMITTED }),
       }),
       context,
+      'msg-1',
     );
   });
 
@@ -77,13 +80,13 @@ describe('InboundAdmissionService', () => {
     await expect(
       service.admit(request({ contextId: 'ctx_foreign' }), context),
     ).rejects.toMatchObject({ name: 'RequestMalformedError' });
-    expect(taskStore.save).not.toHaveBeenCalled();
+    expect(taskStore.reserve).not.toHaveBeenCalled();
   });
 
   it('reports a busy context when another task is active', async () => {
     const { service, contexts, taskStore } = subject();
     contexts.findOwned.mockResolvedValue({ id: 'ctx_1' });
-    taskStore.save.mockRejectedValue(
+    taskStore.reserve.mockRejectedValue(
       new Error('insert failed', {
         cause: { code: '23505', constraint: 'a2a_tasks_one_active_per_context_unique' },
       }),
@@ -92,6 +95,34 @@ describe('InboundAdmissionService', () => {
     await expect(service.admit(request({ contextId: 'ctx_1' }), context)).rejects.toMatchObject({
       name: 'RequestMalformedError',
       reason: 'CONTEXT_BUSY',
+    });
+  });
+
+  it('returns the existing task for a retried send instead of starting another run', async () => {
+    const { service, contexts, taskStore } = subject();
+    const existing = { id: 'task_1', status: { state: TaskState.TASK_STATE_WORKING } };
+    contexts.findOwned.mockResolvedValue({ id: 'ctx_1' });
+    taskStore.findByClientMessage.mockResolvedValue(existing);
+
+    await expect(service.admit(request({ contextId: 'ctx_1' }), context)).resolves.toEqual({
+      duplicate: existing,
+    });
+    expect(taskStore.reserve).not.toHaveBeenCalled();
+  });
+
+  it('resolves a concurrent duplicate send through the client message constraint', async () => {
+    const { service, contexts, taskStore } = subject();
+    const existing = { id: 'task_1', status: { state: TaskState.TASK_STATE_WORKING } };
+    contexts.findOwned.mockResolvedValue({ id: 'ctx_1' });
+    taskStore.findByClientMessage.mockResolvedValueOnce(undefined).mockResolvedValueOnce(existing);
+    taskStore.reserve.mockRejectedValue(
+      new Error('insert failed', {
+        cause: { code: '23505', constraint: 'a2a_tasks_client_message_unique' },
+      }),
+    );
+
+    await expect(service.admit(request({ contextId: 'ctx_1' }), context)).resolves.toEqual({
+      duplicate: existing,
     });
   });
 

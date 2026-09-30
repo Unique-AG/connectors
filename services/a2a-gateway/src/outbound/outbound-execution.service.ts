@@ -1,6 +1,8 @@
 import {
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   Logger,
@@ -13,11 +15,17 @@ import type { RequestIdentity } from '../auth/identity.guard.js';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { ConnectionRepository } from '../drizzle/connection.repository.js';
 import { ExecutionRepository } from '../drizzle/execution.repository.js';
+import { isUniqueViolation } from '../drizzle/unique-violation.js';
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { UniqueInternalError } from '../unique/unique-internal.error.js';
 import { WorkflowService } from '../workflow/workflow.service.js';
 
 export const OUTBOUND_RUN_TASK = 'outbound.run';
+
+export const OUTBOUND_RUN_OPTIONS = {
+  maxAttempts: 5,
+  retryStrategy: { kind: 'exponential' as const, baseSeconds: 2, maxSeconds: 60 },
+};
 
 const id = z.string().min(1).max(200);
 
@@ -99,7 +107,7 @@ export class OutboundExecutionService {
       throw new ConflictException('connection is disabled or not verified');
     }
     const expiresAt = new Date(Date.now() + this.config.executionRetentionDays * 86_400_000);
-    const execution = await this.executions.createIdempotent(
+    const execution = await this.createExecution(
       identity,
       {
         connectionId,
@@ -119,11 +127,11 @@ export class OutboundExecutionService {
       companyId: identity.companyId,
       userId: identity.userId,
     };
-    await this.workflow.spawn(OUTBOUND_RUN_TASK, params, {
+    const { taskID } = await this.workflow.spawn(OUTBOUND_RUN_TASK, params, {
+      ...OUTBOUND_RUN_OPTIONS,
       idempotencyKey: execution.id,
-      maxAttempts: 5,
-      retryStrategy: { kind: 'exponential', baseSeconds: 2, maxSeconds: 60 },
     });
+    await this.executions.setWorkflowTask(identity.companyId, execution.id, taskID);
     this.logger.log({
       action: 'execution.start',
       companyId: identity.companyId,
@@ -133,5 +141,19 @@ export class OutboundExecutionService {
       assistantId: request.assistantId,
     });
     return { executionId: execution.id };
+  }
+
+  private async createExecution(...args: Parameters<ExecutionRepository['createIdempotent']>) {
+    try {
+      return await this.executions.createIdempotent(...args);
+    } catch (error) {
+      if (isUniqueViolation(error, 'a2a_executions_one_active_per_chat_unique')) {
+        throw new HttpException(
+          'the external agent is still working on the previous message',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      throw error;
+    }
   }
 }

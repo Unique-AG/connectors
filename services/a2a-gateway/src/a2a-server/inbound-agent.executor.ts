@@ -1,69 +1,38 @@
 import assert from 'node:assert';
-import { Role, type Task, TaskState, type TaskStatus } from '@a2a-js/sdk';
+import { type Task, TaskState } from '@a2a-js/sdk';
+import { TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import {
   AgentEvent,
   type AgentExecutor,
   type ExecutionEventBus,
   type RequestContext,
 } from '@a2a-js/sdk/server';
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import type { RequestIdentity } from '../auth/identity.guard.js';
-import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { ContextRepository } from '../drizzle/context.repository.js';
 import { PublicationRepository } from '../drizzle/publication.repository.js';
-import { ChatEventConsumer } from '../event-bus/chat-event.consumer.js';
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { awaitsInput, callIdentity, callPublicationId, messageText } from './call-context.js';
+import {
+  failedStatus,
+  outcomeArtifacts,
+  outcomeStatus,
+  taskStatus,
+  textArtifact,
+} from './inbound-translation.js';
+import { NativeRunObserver, type NativeTurn, type RunOutcome } from './native-run-observer.js';
 import { PgTaskStore } from './pg-task.store.js';
 
 const createdMessageSchema = z.object({
   id: z.string().min(1),
   chatId: z.string().min(1),
-  messages: z.array(z.object({ id: z.string().min(1) })).min(1),
-});
-const completedMessageSchema = z.object({
-  id: z.string(),
-  text: z.string().nullish(),
-  completedAt: z.string().nullish(),
-  stoppedStreamingAt: z.string().nullish(),
-});
-const elicitationSchema = z.object({
-  mode: z.enum(['FORM', 'URL']),
-  schema: z.unknown().optional(),
-  url: z.string().nullish(),
+  messages: z.array(z.object({ id: z.string().min(1) })),
 });
 
-type ExecutionOutcome =
-  | { kind: 'completed'; message: z.infer<typeof completedMessageSchema> }
-  | { kind: 'elicitation'; elicitation: z.infer<typeof elicitationSchema> };
+const repliesSchema = z.object({ messages: z.array(z.object({ id: z.string().min(1) })) });
 
-function status(state: TaskState): TaskStatus {
-  return { state, message: undefined, timestamp: new Date().toISOString() };
-}
-
-function failedStatus(request: RequestContext): TaskStatus {
-  return {
-    ...status(TaskState.TASK_STATE_FAILED),
-    message: {
-      messageId: `failure-${request.taskId}`,
-      contextId: request.contextId,
-      taskId: request.taskId,
-      role: Role.ROLE_AGENT,
-      parts: [
-        {
-          content: { $case: 'text', value: 'The space could not complete this request.' },
-          metadata: undefined,
-          filename: '',
-          mediaType: 'text/plain',
-        },
-      ],
-      metadata: undefined,
-      extensions: [],
-      referenceTaskIds: [],
-    },
-  };
-}
+const stoppedSchema = z.object({ stoppedStreamingAt: z.string().nullish() });
 
 @Injectable()
 export class InboundAgentExecutor implements AgentExecutor {
@@ -71,11 +40,10 @@ export class InboundAgentExecutor implements AgentExecutor {
 
   public constructor(
     private readonly contexts: ContextRepository,
-    private readonly events: ChatEventConsumer,
+    private readonly observer: NativeRunObserver,
     private readonly publications: PublicationRepository,
     private readonly taskStore: PgTaskStore,
     private readonly unique: UniqueInternalClient,
-    @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
   public async execute(request: RequestContext, eventBus: ExecutionEventBus): Promise<void> {
@@ -83,13 +51,30 @@ export class InboundAgentExecutor implements AgentExecutor {
     assert.ok(current, 'task was not admitted');
     try {
       const identity = callIdentity(request.context);
-      const outcome = awaitsInput(current)
+      const run = awaitsInput(current)
         ? await this.resume(request, current, identity, eventBus)
         : await this.start(request, current, identity, eventBus);
+      const outcome = await this.observer.observe({
+        identity,
+        turn: run,
+        onText: (text) => {
+          eventBus.publish(
+            AgentEvent.artifactUpdate({
+              taskId: request.taskId,
+              contextId: request.contextId,
+              artifact: textArtifact(request.taskId, text),
+              append: false,
+              lastChunk: false,
+              metadata: undefined,
+            }),
+          );
+        },
+        onHeartbeat: () => this.taskStore.heartbeat(identity.companyId, request.taskId),
+      });
       this.publishOutcome(request, eventBus, outcome);
     } catch (error) {
       this.logger.error({ msg: 'native execution failed', taskId: request.taskId, err: error });
-      const failed: Task = { ...current, status: failedStatus(request) };
+      const failed: Task = { ...current, status: failedStatus(current) };
       eventBus.publish(AgentEvent.task(failed));
       eventBus.publish(
         AgentEvent.statusUpdate({
@@ -102,21 +87,27 @@ export class InboundAgentExecutor implements AgentExecutor {
     }
   }
 
+  /** Stops the native turn; the task is canceled only once core confirms the stop. */
   public async cancelTask(taskId: string, eventBus: ExecutionEventBus): Promise<void> {
     const storedTask = await this.contexts.findTask(taskId);
     if (!storedTask?.assistantMessageId || !storedTask.chatId) {
-      throw new NotFoundException('task not found');
+      throw new TaskNotCancelableError('the task has not started a native run');
     }
-    await this.unique.stopMessage(
-      { companyId: storedTask.companyId, userId: storedTask.userId, roles: [] },
-      storedTask.chatId,
-      storedTask.assistantMessageId,
+    const stopped = stoppedSchema.parse(
+      await this.unique.stopMessage(
+        { companyId: storedTask.companyId, userId: storedTask.userId, roles: [] },
+        storedTask.chatId,
+        storedTask.assistantMessageId,
+      ),
     );
+    if (!stopped.stoppedStreamingAt) {
+      throw new TaskNotCancelableError('the space did not confirm the cancellation');
+    }
     eventBus.publish(
       AgentEvent.statusUpdate({
         taskId,
         contextId: storedTask.contextId,
-        status: status(TaskState.TASK_STATE_CANCELED),
+        status: taskStatus(TaskState.TASK_STATE_CANCELED),
         metadata: undefined,
       }),
     );
@@ -127,7 +118,7 @@ export class InboundAgentExecutor implements AgentExecutor {
     current: Task,
     identity: RequestIdentity,
     eventBus: ExecutionEventBus,
-  ): Promise<ExecutionOutcome> {
+  ): Promise<NativeTurn> {
     const publicationId = callPublicationId(request.context);
     const publication = await this.publications.findById(identity.companyId, publicationId);
     const context = await this.contexts.findOwned(identity, publicationId, request.contextId);
@@ -145,13 +136,17 @@ export class InboundAgentExecutor implements AgentExecutor {
     if (!context.chatId) {
       await this.contexts.attachChat(identity, request.contextId, created.chatId);
     }
-    const assistantMessageId = created.messages[0]?.id;
+    // The mutation returns the user message as persisted before its assistant shell.
+    const assistantMessageId =
+      created.messages[0]?.id ??
+      repliesSchema.parse(await this.unique.getMessageReplies(identity, created.chatId, created.id))
+        .messages[0]?.id;
     assert.ok(assistantMessageId, 'assistant message was not created');
-    const working: Task = { ...current, status: status(TaskState.TASK_STATE_WORKING) };
-    await this.taskStore.save(working, request.context);
     await this.contexts.attachMessages(identity, request.taskId, created.id, assistantMessageId);
+    const working: Task = { ...current, status: taskStatus(TaskState.TASK_STATE_WORKING) };
+    await this.taskStore.save(working, request.context);
     eventBus.publish(AgentEvent.task(working));
-    return this.waitForOutcome(identity, created.chatId, assistantMessageId);
+    return { chatId: created.chatId, userMessageId: created.id, messageId: assistantMessageId };
   }
 
   private async resume(
@@ -159,93 +154,39 @@ export class InboundAgentExecutor implements AgentExecutor {
     current: Task,
     identity: RequestIdentity,
     eventBus: ExecutionEventBus,
-  ): Promise<ExecutionOutcome> {
+  ): Promise<NativeTurn> {
     const storedTask = await this.contexts.findTask(request.taskId);
     if (!storedTask?.assistantMessageId || !storedTask.chatId) {
       throw new NotFoundException('task not found');
     }
-    const elicitation = await this.pendingElicitation(identity, storedTask.assistantMessageId);
+    const elicitation = await this.observer.pendingElicitation(identity, storedTask.chatId);
     if (!elicitation) {
       throw new NotFoundException('no pending elicitation');
     }
     await this.unique.respondToElicitation(identity, elicitation.id, 'ACCEPT', {
       answer: messageText(request.userMessage),
     });
-    eventBus.publish(AgentEvent.task({ ...current, status: status(TaskState.TASK_STATE_WORKING) }));
-    return this.waitForOutcome(identity, storedTask.chatId, storedTask.assistantMessageId);
+    eventBus.publish(
+      AgentEvent.task({ ...current, status: taskStatus(TaskState.TASK_STATE_WORKING) }),
+    );
+    return {
+      chatId: storedTask.chatId,
+      userMessageId: storedTask.userMessageId,
+      messageId: storedTask.assistantMessageId,
+    };
   }
 
   private publishOutcome(
     request: RequestContext,
     eventBus: ExecutionEventBus,
-    outcome: ExecutionOutcome,
+    outcome: RunOutcome,
   ): void {
-    if (outcome.kind === 'elicitation') {
-      const elicitation = outcome.elicitation;
-      const part =
-        elicitation.mode === 'FORM'
-          ? {
-              content: { $case: 'data' as const, value: elicitation.schema ?? {} },
-              metadata: undefined,
-              filename: '',
-              mediaType: 'application/json',
-            }
-          : {
-              content: { $case: 'text' as const, value: elicitation.url ?? '' },
-              metadata: undefined,
-              filename: '',
-              mediaType: 'text/plain',
-            };
-      eventBus.publish(
-        AgentEvent.statusUpdate({
-          taskId: request.taskId,
-          contextId: request.contextId,
-          status: {
-            ...status(
-              elicitation.mode === 'FORM'
-                ? TaskState.TASK_STATE_INPUT_REQUIRED
-                : TaskState.TASK_STATE_AUTH_REQUIRED,
-            ),
-            message: {
-              messageId: `elicitation-${request.taskId}`,
-              contextId: request.contextId,
-              taskId: request.taskId,
-              role: Role.ROLE_AGENT,
-              parts: [part],
-              metadata: undefined,
-              extensions: [],
-              referenceTaskIds: [],
-            },
-          },
-          metadata: undefined,
-        }),
-      );
-      return;
-    }
-    const completed = outcome.message;
-    const terminalState = completed.stoppedStreamingAt
-      ? TaskState.TASK_STATE_CANCELED
-      : TaskState.TASK_STATE_COMPLETED;
-    if (completed.text) {
+    for (const artifact of outcomeArtifacts(request.taskId, outcome)) {
       eventBus.publish(
         AgentEvent.artifactUpdate({
           taskId: request.taskId,
           contextId: request.contextId,
-          artifact: {
-            artifactId: `text-${request.taskId}`,
-            name: 'Response',
-            description: '',
-            parts: [
-              {
-                content: { $case: 'text', value: completed.text },
-                metadata: undefined,
-                filename: '',
-                mediaType: 'text/plain',
-              },
-            ],
-            metadata: undefined,
-            extensions: [],
-          },
+          artifact,
           append: false,
           lastChunk: true,
           metadata: undefined,
@@ -256,85 +197,9 @@ export class InboundAgentExecutor implements AgentExecutor {
       AgentEvent.statusUpdate({
         taskId: request.taskId,
         contextId: request.contextId,
-        status: status(terminalState),
+        status: outcomeStatus({ id: request.taskId, contextId: request.contextId }, outcome),
         metadata: undefined,
       }),
-    );
-  }
-
-  private waitForOutcome(
-    identity: RequestIdentity,
-    chatId: string,
-    assistantMessageId: string,
-  ): Promise<ExecutionOutcome> {
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const settle = (outcome: () => Promise<ExecutionOutcome | undefined>): void => {
-        outcome().then(
-          (result) => {
-            if (result && !settled) {
-              settled = true;
-              cleanup();
-              resolve(result);
-            }
-          },
-          (error: unknown) => {
-            if (!settled) {
-              settled = true;
-              cleanup();
-              reject(error);
-            }
-          },
-        );
-      };
-      const unsubscribe = this.events.subscribe(identity.companyId, assistantMessageId, (event) => {
-        if (event.type === 'unique.chat.elicitation.created') {
-          settle(async () => ({
-            kind: 'elicitation',
-            elicitation: elicitationSchema.parse(event.payload),
-          }));
-        } else if (event.type === 'unique.chat.assistant-message.finished') {
-          settle(async () => ({
-            kind: 'completed',
-            message: completedMessageSchema.parse(
-              await this.unique.getMessage(identity, chatId, assistantMessageId),
-            ),
-          }));
-        }
-      });
-      const timer = setTimeout(() => {
-        settle(() => Promise.reject(new Error('native execution timed out')));
-      }, this.config.streamTimeoutMs);
-      const cleanup = (): void => {
-        unsubscribe();
-        clearTimeout(timer);
-      };
-      // The run may already have finished or paused before the subscription existed.
-      settle(() => this.currentOutcome(identity, chatId, assistantMessageId));
-    });
-  }
-
-  private async currentOutcome(
-    identity: RequestIdentity,
-    chatId: string,
-    assistantMessageId: string,
-  ): Promise<ExecutionOutcome | undefined> {
-    const message = completedMessageSchema.parse(
-      await this.unique.getMessage(identity, chatId, assistantMessageId),
-    );
-    if (message.completedAt || message.stoppedStreamingAt) {
-      return { kind: 'completed', message };
-    }
-    const elicitation = await this.pendingElicitation(identity, assistantMessageId);
-    return elicitation ? { kind: 'elicitation', elicitation } : undefined;
-  }
-
-  private async pendingElicitation(identity: RequestIdentity, messageId: string) {
-    const elicitations = z
-      .array(elicitationSchema.extend({ id: z.string(), userId: z.string(), status: z.string() }))
-      .parse(await this.unique.getMessageElicitations(identity, messageId));
-    return elicitations.find(
-      (elicitation) => elicitation.status === 'PENDING' && elicitation.userId === identity.userId,
     );
   }
 }

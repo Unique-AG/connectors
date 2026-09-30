@@ -15,6 +15,8 @@ export const tasks = pgTable(
     userMessageId: text().notNull(),
     assistantMessageId: text(),
     elicitationId: text(),
+    clientMessageId: text(),
+    heartbeatAt: timestamp({ withTimezone: true }),
     taskSnapshot: jsonb().$type<Record<string, unknown>>().notNull(),
     statusTimestamp: timestamp({ withTimezone: true }).defaultNow().notNull(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
@@ -23,6 +25,12 @@ export const tasks = pgTable(
   (table) => [
     unique('a2a_tasks_company_id_unique').on(table.companyId, table.id),
     unique('a2a_tasks_company_user_message_unique').on(table.companyId, table.userMessageId),
+    unique('a2a_tasks_client_message_unique').on(
+      table.companyId,
+      table.userId,
+      table.contextId,
+      table.clientMessageId,
+    ),
     foreignKey({
       name: 'a2a_tasks_company_context_fk',
       columns: [table.companyId, table.contextId],

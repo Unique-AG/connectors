@@ -1,7 +1,19 @@
 import type { ListTasksRequest, ListTasksResponse, Task } from '@a2a-js/sdk';
 import type { ServerCallContext, TaskStore } from '@a2a-js/sdk/server';
 import { Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { and, count, desc, eq, gte, inArray, lt, or, type SQL } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  notInArray,
+  or,
+  type SQL,
+} from 'drizzle-orm';
 import { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { DRIZZLE, type GatewayDatabase } from '../drizzle/drizzle.module.js';
@@ -67,6 +79,13 @@ function encodeCursor(timestamp: Date, id: string): string {
   );
 }
 
+const TERMINAL_STATES = ['3', '4', '5', '7'];
+
+// Terminal tasks accept only an idempotent re-save of the same state.
+function terminalGuard(nextState: string): SQL {
+  return or(notInArray(tasks.state, TERMINAL_STATES), eq(tasks.state, nextState)) as SQL;
+}
+
 function projectTask(task: Task, params: ListTasksRequest): Task {
   const historyLength = params.historyLength;
   return {
@@ -120,12 +139,131 @@ export class PgTaskStore implements TaskStore {
           eq(tasks.companyId, owner.companyId),
           eq(tasks.userId, owner.userId),
           eq(tasks.contextId, task.contextId),
+          terminalGuard(String(task.status?.state ?? 0)),
         ),
       })
       .returning({ id: tasks.id });
     if (!saved) {
+      const existing = await this.database.query.tasks.findFirst({
+        columns: { id: true },
+        where: and(
+          eq(tasks.id, task.id),
+          eq(tasks.companyId, owner.companyId),
+          eq(tasks.userId, owner.userId),
+        ),
+      });
+      if (existing) {
+        // A terminal task is immutable; late events are ignored.
+        return;
+      }
       throw new UnauthorizedException('task belongs to another tenant or user');
     }
+  }
+
+  /**
+   * Inserts a new SUBMITTED task keyed by the client's messageId, so a retried send and a
+   * concurrent send in the same context are both rejected by constraints, never by a race.
+   */
+  public async reserve(task: Task, context: ServerCallContext, clientMessageId: string) {
+    const owner = identity(context);
+    await this.authorization.context(owner, owner.publicationId, task.contextId);
+    const statusTimestamp = new Date(task.status?.timestamp ?? Date.now());
+    await this.database.insert(tasks).values({
+      id: task.id,
+      companyId: owner.companyId,
+      userId: owner.userId,
+      clientId: owner.clientId,
+      contextId: task.contextId,
+      state: String(task.status?.state ?? 0),
+      userMessageId: task.id,
+      clientMessageId,
+      taskSnapshot: task as unknown as Record<string, unknown>,
+      statusTimestamp,
+      expiresAt: new Date(statusTimestamp.getTime() + this.config.taskRetentionDays * 86_400_000),
+    });
+  }
+
+  /** Recovery write of the gateway's own snapshot; reads stay authorized per caller. */
+  public async systemSave(companyId: string, task: Task): Promise<void> {
+    await this.database
+      .update(tasks)
+      .set({
+        state: String(task.status?.state ?? 0),
+        taskSnapshot: task as unknown as Record<string, unknown>,
+        statusTimestamp: new Date(task.status?.timestamp ?? Date.now()),
+        heartbeatAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(tasks.id, task.id),
+          eq(tasks.companyId, companyId),
+          terminalGuard(String(task.status?.state ?? 0)),
+        ),
+      );
+  }
+
+  public async findSnapshot(companyId: string, taskId: string): Promise<Task | undefined> {
+    const row = await this.database.query.tasks.findFirst({
+      columns: { taskSnapshot: true },
+      where: and(eq(tasks.id, taskId), eq(tasks.companyId, companyId)),
+    });
+    return row?.taskSnapshot as unknown as Task | undefined;
+  }
+
+  public async heartbeat(companyId: string, taskId: string): Promise<void> {
+    await this.database
+      .update(tasks)
+      .set({ heartbeatAt: new Date() })
+      .where(and(eq(tasks.id, taskId), eq(tasks.companyId, companyId)));
+  }
+
+  /** Non-terminal tasks whose executor stopped heartbeating, across tenants. */
+  public async findOrphaned(before: Date, limit = 100) {
+    return this.database
+      .select({
+        id: tasks.id,
+        companyId: tasks.companyId,
+        userId: tasks.userId,
+        contextId: tasks.contextId,
+        userMessageId: tasks.userMessageId,
+        assistantMessageId: tasks.assistantMessageId,
+        chatId: contexts.chatId,
+        snapshot: tasks.taskSnapshot,
+      })
+      .from(tasks)
+      .innerJoin(
+        contexts,
+        and(eq(contexts.companyId, tasks.companyId), eq(contexts.id, tasks.contextId)),
+      )
+      .where(
+        and(
+          notInArray(tasks.state, TERMINAL_STATES),
+          or(
+            lt(tasks.heartbeatAt, before),
+            and(isNull(tasks.heartbeatAt), lt(tasks.updatedAt, before)),
+          ),
+        ),
+      )
+      .limit(limit);
+  }
+
+  public async findByClientMessage(
+    context: ServerCallContext,
+    contextId: string,
+    clientMessageId: string,
+  ): Promise<Task | undefined> {
+    const owner = identity(context);
+    const row = await this.database.query.tasks.findFirst({
+      columns: { taskSnapshot: true },
+      where: and(
+        eq(tasks.companyId, owner.companyId),
+        eq(tasks.userId, owner.userId),
+        eq(tasks.contextId, contextId),
+        eq(tasks.clientMessageId, clientMessageId),
+      ),
+    });
+    return row?.taskSnapshot as unknown as Task | undefined;
   }
 
   public async load(taskId: string, context: ServerCallContext): Promise<Task | undefined> {

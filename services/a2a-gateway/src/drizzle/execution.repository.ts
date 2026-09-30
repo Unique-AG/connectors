@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { DRIZZLE, type GatewayDatabase } from './drizzle.module.js';
 import type { TenantPrincipal } from './repository.types.js';
 import { executions } from './schema/executions.table.js';
@@ -173,5 +173,31 @@ export class ExecutionRepository {
       throw new NotFoundException('remote context not found');
     }
     return existing;
+  }
+
+  public async setWorkflowTask(companyId: string, executionId: string, workflowTaskId: string) {
+    await this.database
+      .update(executions)
+      .set({ workflowTaskId })
+      .where(and(eq(executions.id, executionId), eq(executions.companyId, companyId)));
+  }
+
+  /** Active executions without a transition since `before`, across tenants, for recovery. */
+  public async findStale(before: Date, limit = 100) {
+    return this.database.query.executions.findMany({
+      where: and(inArray(executions.state, ACTIVE_EXECUTION_STATES), lt(executions.updatedAt, before)),
+      limit,
+    });
+  }
+
+  public async recordRecovery(companyId: string, executionId: string, workflowTaskId: string) {
+    await this.database
+      .update(executions)
+      .set({
+        workflowTaskId,
+        recoveries: sql`${executions.recoveries} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(executions.id, executionId), eq(executions.companyId, companyId)));
   }
 }

@@ -1,4 +1,4 @@
-import { type SendMessageRequest, TaskState } from '@a2a-js/sdk';
+import { type SendMessageRequest, type Task, TaskState } from '@a2a-js/sdk';
 import { RequestMalformedError, UnsupportedOperationError } from '@a2a-js/sdk/errors';
 import type { ServerCallContext } from '@a2a-js/sdk/server';
 import { Injectable } from '@nestjs/common';
@@ -15,6 +15,9 @@ function contextBusy(): RequestMalformedError {
   });
 }
 
+/** A retried send (same client messageId in the same context) returns the existing task. */
+export type Admission = { params: SendMessageRequest } | { duplicate: Task };
+
 /**
  * Validates a send before any native work starts and reserves the task as SUBMITTED, so the
  * one-active-task-per-context index rejects concurrent sends atomically (D-06).
@@ -27,10 +30,7 @@ export class InboundAdmissionService {
     private readonly taskStore: PgTaskStore,
   ) {}
 
-  public async admit(
-    params: SendMessageRequest,
-    context: ServerCallContext,
-  ): Promise<SendMessageRequest> {
+  public async admit(params: SendMessageRequest, context: ServerCallContext): Promise<Admission> {
     const message = params.message;
     if (!message?.messageId) {
       throw new RequestMalformedError('message.messageId is required');
@@ -47,7 +47,7 @@ export class InboundAdmissionService {
           'task is not awaiting input; send a new message in the same context',
         );
       }
-      return params;
+      return { params };
     }
 
     const contextId = message.contextId || typeid('ctx').toString();
@@ -55,10 +55,19 @@ export class InboundAdmissionService {
       await this.contexts.create(identity, publicationId, contextId);
     } else if (!(await this.contexts.findOwned(identity, publicationId, contextId))) {
       throw new RequestMalformedError('unknown contextId');
+    } else {
+      const duplicate = await this.taskStore.findByClientMessage(
+        context,
+        contextId,
+        message.messageId,
+      );
+      if (duplicate) {
+        return { duplicate };
+      }
     }
     const admitted = { ...message, contextId, taskId: typeid('task').toString() };
     try {
-      await this.taskStore.save(
+      await this.taskStore.reserve(
         {
           id: admitted.taskId,
           contextId,
@@ -72,13 +81,24 @@ export class InboundAdmissionService {
           metadata: undefined,
         },
         context,
+        message.messageId,
       );
     } catch (error) {
+      if (isUniqueViolation(error, 'a2a_tasks_client_message_unique')) {
+        const duplicate = await this.taskStore.findByClientMessage(
+          context,
+          contextId,
+          message.messageId,
+        );
+        if (duplicate) {
+          return { duplicate };
+        }
+      }
       if (isUniqueViolation(error, 'a2a_tasks_one_active_per_context_unique')) {
         throw contextBusy();
       }
       throw error;
     }
-    return { ...params, message: admitted };
+    return { params: { ...params, message: admitted } };
   }
 }

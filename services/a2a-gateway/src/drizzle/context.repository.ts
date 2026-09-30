@@ -58,6 +58,7 @@ export class ContextRepository {
         companyId: tasks.companyId,
         userId: tasks.userId,
         contextId: tasks.contextId,
+        userMessageId: tasks.userMessageId,
         assistantMessageId: tasks.assistantMessageId,
         chatId: contexts.chatId,
       })
@@ -79,7 +80,7 @@ export class ContextRepository {
   ): Promise<void> {
     await this.database
       .update(tasks)
-      .set({ userMessageId, assistantMessageId, updatedAt: new Date() })
+      .set({ userMessageId, assistantMessageId, heartbeatAt: new Date(), updatedAt: new Date() })
       .where(
         and(
           eq(tasks.id, taskId),

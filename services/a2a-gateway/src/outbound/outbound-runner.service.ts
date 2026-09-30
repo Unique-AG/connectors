@@ -43,6 +43,10 @@ const OUTPUT_MODES = ['text/plain', 'text/markdown', 'application/json'];
 
 const userMessage = z.object({ text: z.string().nullish() });
 
+const abortState = z.object({ userAbortedAt: z.string().nullish() });
+
+const parentTurn = z.object({ parentChatId: z.string(), parentMessageId: z.string() });
+
 type OutcomeState = Extract<ExecutionState, 'completed' | 'failed' | 'canceled' | 'unknown'>;
 
 /** A decided end of a run. Anything else thrown is infrastructure and lets absurd retry. */
@@ -155,6 +159,27 @@ export class OutboundRunner implements OnModuleInit {
     }
     await this.finish(execution, identity, writer, outcome);
     return { state: outcome.state };
+  }
+
+  /** Settles an execution whose outcome can no longer be determined. */
+  public async abandon(execution: Execution): Promise<void> {
+    const identity = { companyId: execution.companyId, userId: execution.userId, roles: [] };
+    const writer = new ChatWriter(
+      this.unique,
+      identity,
+      execution.chatId,
+      execution.assistantMessageId,
+    );
+    await this.finish(
+      execution,
+      identity,
+      writer,
+      new Outcome(
+        'unknown',
+        execution.remoteTaskId ? MESSAGES.unreachable : MESSAGES.unknown,
+        'recovery-exhausted',
+      ),
+    );
   }
 
   private async drive(
@@ -365,10 +390,15 @@ export class OutboundRunner implements OnModuleInit {
   ): Promise<void> {
     const controller = new AbortController();
     let interruption: Interrupted | undefined;
+    let ticks = 0;
     const check = async (): Promise<void> => {
       await context.heartbeat();
       const current = await this.executions.findOwned(identity, execution.id);
-      if (current.cancelRequestedAt) {
+      // Events can be missed while no replica is subscribed; core state is authoritative.
+      if (!current.cancelRequestedAt && ticks++ % 5 === 0 && (await this.stoppedInCore(current))) {
+        await this.executions.requestCancel(identity.companyId, execution.id);
+        interruption = new Interrupted('cancel');
+      } else if (current.cancelRequestedAt) {
         interruption = new Interrupted('cancel');
       } else if (Date.now() >= deadlineAt.getTime()) {
         interruption = new Interrupted('deadline');
@@ -393,6 +423,24 @@ export class OutboundRunner implements OnModuleInit {
     if (interruption) {
       throw interruption;
     }
+  }
+
+  private async stoppedInCore(execution: Execution): Promise<boolean> {
+    const identity = { companyId: execution.companyId, userId: execution.userId, roles: [] };
+    const messages = [{ chatId: execution.chatId, messageId: execution.assistantMessageId }];
+    const parent = parentTurn.safeParse(execution.correlation);
+    if (parent.success) {
+      messages.push({ chatId: parent.data.parentChatId, messageId: parent.data.parentMessageId });
+    }
+    for (const { chatId, messageId } of messages) {
+      const message = abortState.safeParse(
+        await this.unique.getMessage(identity, chatId, messageId),
+      );
+      if (message.success && message.data.userAbortedAt) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Cancels remotely and reports only what the remote agent confirms. */
