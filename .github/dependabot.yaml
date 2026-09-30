@@ -73,10 +73,6 @@ updates:
       per-dependency:
         patterns:
           - "*"
-        update-types:
-          - major
-          - minor
-          - patch
         group-by: dependency-name
 
   - package-ecosystem: github-actions
