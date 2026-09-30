@@ -12,7 +12,10 @@ function subject() {
   const publications = {
     findFirst: vi.fn().mockResolvedValue({ assistantId: 'space-1', enabled: true }),
   };
-  const authorization = { useSpace: vi.fn(), assertNewUse: vi.fn() };
+  const authorization = {
+    useSpace: vi.fn().mockResolvedValue({ id: 'space-1', executionProvider: 'NATIVE' }),
+    assertNewUse: vi.fn(),
+  };
   return {
     contexts,
     publications,
@@ -62,5 +65,14 @@ describe('ResourceAuthorizationService', () => {
     await expect(service.publication(identity, 'pub-1', true)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+  it('refuses new use of a published space that now runs an external agent', async () => {
+    const { service, authorization } = subject();
+    authorization.useSpace.mockResolvedValue({ id: 'space-1', executionProvider: 'A2A' });
+    await expect(service.publication(identity, 'pub-1')).resolves.toBeUndefined();
+    await expect(service.publication(identity, 'pub-1', true)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(authorization.assertNewUse).not.toHaveBeenCalled();
   });
 });

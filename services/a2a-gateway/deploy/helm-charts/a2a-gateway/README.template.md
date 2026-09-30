@@ -76,7 +76,7 @@ The `protected` route disables response buffering and sets a one-hour read timeo
 
 ### NetworkPolicy
 
-With `networkPolicy.enabled`, the CiliumNetworkPolicy allows ingress to the app port from Kong (`internalServices.dependents.ingressGateway`) and node-chat (`internalServices.dependents.chat`), metrics from Prometheus, and egress to DNS, PostgreSQL, RabbitMQ and the Unique services. Egress to remote agents is derived from `a2aConfig.egress.allowedHosts` (also `EGRESS_ALLOWED_HOSTS`), so both stay in sync; add ports other than 443 to `a2aConfig.egress.ports`. With push notifications, `a2aConfig.pushNotifications.allowedHosts` are allowed as well; webhooks to any public host need `networkPolicy.baseline.egress.pushWebhooks.enabled`.
+With `networkPolicy.enabled`, the CiliumNetworkPolicy allows ingress to the app port from Kong (`internalServices.dependents.ingressGateway`) and node-chat (`internalServices.dependents.chat`), metrics from Prometheus, and egress to DNS, PostgreSQL, RabbitMQ and the Unique services. Egress to remote agents is derived from `a2aConfig.egress.allowedHosts` (also `EGRESS_ALLOWED_HOSTS`), so both stay in sync; add ports other than 443 to `a2aConfig.egress.ports`. With push notifications, `a2aConfig.pushNotifications.allowedHosts` are allowed as well.
 
 PostgreSQL and RabbitMQ egress is derived from `connection.host`; in URL mode keep `host` set as well.
 

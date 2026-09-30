@@ -74,7 +74,7 @@ The `protected` route disables response buffering and sets a one-hour read timeo
 
 ### NetworkPolicy
 
-With `networkPolicy.enabled`, the CiliumNetworkPolicy allows ingress to the app port from Kong (`internalServices.dependents.ingressGateway`) and node-chat (`internalServices.dependents.chat`), metrics from Prometheus, and egress to DNS, PostgreSQL, RabbitMQ and the Unique services. Egress to remote agents is derived from `a2aConfig.egress.allowedHosts` (also `EGRESS_ALLOWED_HOSTS`), so both stay in sync; add ports other than 443 to `a2aConfig.egress.ports`. With push notifications, `a2aConfig.pushNotifications.allowedHosts` are allowed as well; webhooks to any public host need `networkPolicy.baseline.egress.pushWebhooks.enabled`.
+With `networkPolicy.enabled`, the CiliumNetworkPolicy allows ingress to the app port from Kong (`internalServices.dependents.ingressGateway`) and node-chat (`internalServices.dependents.chat`), metrics from Prometheus, and egress to DNS, PostgreSQL, RabbitMQ and the Unique services. Egress to remote agents is derived from `a2aConfig.egress.allowedHosts` (also `EGRESS_ALLOWED_HOSTS`), so both stay in sync; add ports other than 443 to `a2aConfig.egress.ports`. With push notifications, `a2aConfig.pushNotifications.allowedHosts` are allowed as well.
 
 PostgreSQL and RabbitMQ egress is derived from `connection.host`; in URL mode keep `host` set as well.
 
@@ -88,7 +88,7 @@ PostgreSQL and RabbitMQ egress is derived from `connection.host`; in URL mode ke
 | a2aConfig.egress.ports | list | `["443"]` | Ports the CiliumNetworkPolicy opens for allowedHosts |
 | a2aConfig.limits.maxRequestBytes | int | `26214400` | Request body limit; also enforced by Kong on the protected and callback routes. |
 | a2aConfig.publicBaseUrl | string | `"{{ fail \"a2aConfig.publicBaseUrl is mandatory. Override in your deployment values.\" }}"` | Kong-facing HTTPS base URL, used for agent cards, file URLs and callbacks. example: https://a2a.unique.app |
-| a2aConfig.pushNotifications.allowedHosts | list | `[]` | Limit client webhooks to these hostnames; empty allows any public HTTPS host. The CiliumNetworkPolicy allows these hosts on a2aConfig.egress.ports; any host needs networkPolicy.baseline.egress.pushWebhooks. |
+| a2aConfig.pushNotifications.allowedHosts | list | `[]` | Hostnames client webhooks may target (HTTPS on 443); required when enabled. The CiliumNetworkPolicy allows the same hosts. |
 | a2aConfig.unique | object | `{"chatUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.chat) }}","ingestionUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.ingestion) }}","scopeManagementUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.scopeManagement) }}"}` | Unique services; auto-derived from internalServices.dependencies (node-chat appends /graphql). |
 | a2aConfig.zitadelIssuer | string | `"{{ fail \"a2aConfig.zitadelIssuer is mandatory. Override in your deployment values.\" }}"` | Zitadel issuer URL, advertised in the OAuth protected-resource metadata. example: https://id.unique.app |
 | deployment.metadata.annotations."reloader.stakater.com/auto" | string | `"true"` |  |
@@ -143,10 +143,6 @@ PostgreSQL and RabbitMQ egress is derived from `connection.host`; in URL mode ke
 | internalServices.dependents.ingressGateway.name | string | `"gateway"` |  |
 | internalServices.dependents.ingressGateway.namespace | string | `"system"` |  |
 | nameOverride | string | `"a2a-gateway"` |  |
-| networkPolicy.baseline.egress.pushWebhooks.enabled | bool | `false` |  |
-| networkPolicy.baseline.egress.pushWebhooks.toEntities[0] | string | `"world"` |  |
-| networkPolicy.baseline.egress.pushWebhooks.toPorts[0].ports[0].port | string | `"443"` |  |
-| networkPolicy.baseline.egress.pushWebhooks.toPorts[0].ports[0].protocol | string | `"TCP"` |  |
 | networkPolicy.baseline.prometheus.namespace | string | `"system"` |  |
 | networkPolicy.enableDefaultDeny.egress | bool | `true` |  |
 | networkPolicy.enableDefaultDeny.ingress | bool | `true` |  |

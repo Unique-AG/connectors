@@ -28,18 +28,22 @@ export class ResourceAuthorizationService {
     if (!publication || (newUse && !publication.enabled)) {
       throw new NotFoundException('publication not found');
     }
-    try {
-      await this.authorization.useSpace(identity, publication.assistantId);
-    } catch (error) {
-      if (
-        error instanceof UniqueInternalError &&
-        ['NOT_FOUND', 'UNAUTHORIZED'].includes(error.code)
-      ) {
+    const assistant = await this.authorization
+      .useSpace(identity, publication.assistantId)
+      .catch((error: unknown) => {
+        if (
+          error instanceof UniqueInternalError &&
+          ['NOT_FOUND', 'UNAUTHORIZED'].includes(error.code)
+        ) {
+          throw new NotFoundException('publication not found');
+        }
+        throw error;
+      });
+    if (newUse) {
+      // A space switched to an external agent after publishing must not relay its credentials.
+      if (assistant.executionProvider === 'A2A') {
         throw new NotFoundException('publication not found');
       }
-      throw error;
-    }
-    if (newUse) {
       await this.authorization.assertNewUse(identity);
     }
   }

@@ -1,24 +1,24 @@
-name: "A2A Gateway TCK"
+name: "A2A Gateway e2e"
 
-# Runs the official A2A 1.0 TCK against the gateway backed by a stub core. Unit and contract
-# tests run in services-ci.yaml.
+# Runs the official A2A 1.0 TCK and the security boundary e2e tests against the gateway backed by
+# a stub core. Unit and contract tests run in services-ci.yaml.
 on:
   pull_request:
     paths:
       - "services/a2a-gateway/**"
       - "pnpm-lock.yaml"
-      - ".github/workflows/a2a-gateway.tck.yaml"
+      - ".github/workflows/a2a-gateway.e2e.yaml"
   workflow_dispatch:
 
 concurrency:
-  group: a2a-gateway-tck-${{ github.event.pull_request.number || github.ref }}
+  group: a2a-gateway-e2e-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  tck:
+  e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -59,6 +59,15 @@ jobs:
       - name: Run TCK
         working-directory: services/a2a-gateway
         run: ./test/tck/run-tck.sh
+
+      # Reuses the database the TCK run migrated and initialised.
+      - name: Run security e2e tests
+        if: success() || failure()
+        working-directory: services/a2a-gateway
+        env:
+          E2E_DATABASE_URL: ${{ env.DATABASE_URL }}
+          E2E_AMQP_URL: ${{ env.AMQP_URL }}
+        run: pnpm test:e2e
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()

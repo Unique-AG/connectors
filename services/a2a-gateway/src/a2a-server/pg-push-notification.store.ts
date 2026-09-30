@@ -88,15 +88,14 @@ export class PgPushNotificationStore implements PushNotificationStore {
   ): Promise<TaskPushNotificationConfig[]> {
     await this.ownedTask(taskId, context);
     const targets = await this.targets(context.tenant ?? '', taskId);
+    // Webhook secrets are write-only: reads return the configuration without them.
     return targets.map((target) => ({
       tenant: '',
       id: target.id,
       taskId,
       url: target.url,
-      token: target.token,
-      authentication: target.scheme
-        ? { scheme: target.scheme, credentials: target.credentials }
-        : undefined,
+      token: '',
+      authentication: target.scheme ? { scheme: target.scheme, credentials: '' } : undefined,
     }));
   }
 

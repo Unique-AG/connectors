@@ -36,7 +36,7 @@ import {
 } from '../bridge/file-policy.js';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { CredentialProviderService } from '../credentials/credential-provider.service.js';
-import { EgressService } from '../credentials/egress.service.js';
+import { boundedBody, EgressService } from '../credentials/egress.service.js';
 import { ConnectionRepository } from '../drizzle/connection.repository.js';
 import {
   ACTIVE_EXECUTION_STATES,
@@ -80,6 +80,7 @@ const elicitationState = z.object({
 });
 
 const MAX_INTERACTION_ROUNDS = 10;
+const MAX_ANSWER_FILES = 10;
 const ELICITATION_POLL_MS = 2_000;
 
 type OutcomeState = Extract<ExecutionState, 'completed' | 'failed' | 'canceled' | 'unknown'>;
@@ -895,11 +896,20 @@ export class OutboundRunner implements OnModuleInit {
     if (!files.length) {
       return this.settle(turn);
     }
-    const materialized = await context.step('answer-files', () =>
-      Promise.all(
-        files.map((part, index) => this.materialize(part, index + 1, execution, identity, session)),
-      ),
-    );
+    // One file at a time and a bounded count, so a remote agent cannot exhaust worker memory.
+    const materialized = await context.step('answer-files', async () => {
+      const results: MaterializedFile[] = [];
+      for (const [index, part] of files.entries()) {
+        results.push(
+          index < MAX_ANSWER_FILES
+            ? await this.materialize(part, index + 1, execution, identity, session)
+            : {
+                markdown: `_${safeFilename(part.filename, `file-${index + 1}`)} was not accepted: too many files._`,
+              },
+        );
+      }
+      return results;
+    });
     const rendered = new Map(files.map((part, index) => [part, materialized[index]]));
     const text = renderParts(parts, (part) => rendered.get(part)?.markdown ?? '');
     const references = materialized.flatMap((file) => (file.reference ? [file.reference] : []));
@@ -984,12 +994,13 @@ export class OutboundRunner implements OnModuleInit {
     } catch {
       return undefined;
     }
-    if (!response.ok) {
+    if (!response.ok || !response.body) {
       return undefined;
     }
     try {
+      const body = boundedBody(response.body, this.config.maxRemoteFileBytes);
       return {
-        bytes: Buffer.from(await response.arrayBuffer()),
+        bytes: Buffer.from(await new Response(body).arrayBuffer()),
         mediaType: response.headers.get('content-type') ?? '',
       };
     } catch {

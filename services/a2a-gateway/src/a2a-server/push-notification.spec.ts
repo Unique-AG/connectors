@@ -23,6 +23,7 @@ function config(environment: Record<string, string> = {}): GatewayConfig {
     UNIQUE_INGESTION_URL: 'http://node-ingestion/',
     ENCRYPTION_KEY: '11'.repeat(32),
     PUSH_NOTIFICATIONS_ENABLED: 'true',
+    PUSH_ALLOWED_HOSTS: 'hooks.example',
     ...environment,
   });
 }
@@ -88,6 +89,8 @@ describe('push notification configs', () => {
     'https://127.0.0.1/a2a',
     'https://169.254.169.254/latest',
     'https://user:pass@hooks.example/a2a',
+    'https://hooks.example:8443/a2a',
+    'https://hooks.not-approved.example/a2a',
   ])('refuses the webhook %s', async (url) => {
     const { store: subject, insert } = store();
     await expect(subject.save('task-1', context, pushConfig(url))).rejects.toMatchObject({

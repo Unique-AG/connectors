@@ -125,6 +125,13 @@ const configSchema = z
         });
       }
     }
+    if (config.PUSH_NOTIFICATIONS_ENABLED && !config.PUSH_ALLOWED_HOSTS.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['PUSH_ALLOWED_HOSTS'],
+        message: 'push notifications require approved webhook hosts',
+      });
+    }
     if (config.NODE_ENV === 'production' && config.EGRESS_ALLOW_INSECURE) {
       context.addIssue({
         code: 'custom',

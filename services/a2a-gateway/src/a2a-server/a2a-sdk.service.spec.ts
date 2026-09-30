@@ -4,7 +4,7 @@ import {
   type ExecutionEventBus,
   InMemoryTaskStore,
   type RequestContext,
-  type ServerCallContext,
+  ServerCallContext,
 } from '@a2a-js/sdk/server';
 import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
@@ -102,6 +102,7 @@ function subject() {
     authorization,
     contexts,
     executor,
+    taskStore,
   };
 }
 
@@ -167,5 +168,40 @@ describe('A2aSdkService', () => {
     await call(service, 'GetExtendedAgentCard', {});
 
     expect(authorization.publication).toHaveBeenCalledWith(identity, 'pub-1');
+  });
+
+  it('stops following a durable task snapshot once the client disconnects', async () => {
+    const { service, taskStore } = subject();
+    const context = new ServerCallContext({
+      tenant: identity.companyId,
+      user: { isAuthenticated: true, userName: identity.userId },
+    });
+    await taskStore.save(
+      {
+        id: 'task-1',
+        contextId: 'ctx-1',
+        status: { state: TaskState.TASK_STATE_WORKING, message: undefined, timestamp: '' },
+        artifacts: [],
+        history: [],
+        metadata: undefined,
+      },
+      context,
+    );
+    const load = vi.spyOn(taskStore, 'load');
+    const disconnected = new AbortController();
+    const stream = (await service.handleJsonRpc({
+      body: { jsonrpc: '2.0', id: 1, method: 'SubscribeToTask', params: { id: 'task-1' } },
+      headers: {},
+      identity,
+      publicationId: 'pub-1',
+      signal: disconnected.signal,
+    })) as AsyncIterable<unknown>;
+    const events = stream[Symbol.asyncIterator]();
+    await events.next();
+    const pending = events.next();
+    disconnected.abort();
+
+    await expect(pending).resolves.toMatchObject({ done: true });
+    expect(load).toHaveBeenCalledTimes(1);
   });
 });

@@ -27,6 +27,8 @@ interface JsonRpcCall {
   identity: RequestIdentity;
   publicationId: string;
   requestedVersion?: string;
+  /** Aborted when the HTTP client disconnects; ends durable subscriptions. */
+  signal?: AbortSignal;
 }
 
 interface DurableSubscription {
@@ -84,9 +86,14 @@ class AdmittingRequestHandler extends DefaultRequestHandler {
     }
     yield { payload: { $case: 'task', value: task } };
     const deadline = Date.now() + this.durable.timeoutMs;
+    const signal = context.state.get('signal');
+    const disconnected = signal instanceof AbortSignal ? signal : undefined;
     let last = JSON.stringify(task);
-    while (Date.now() < deadline) {
-      await delay(SNAPSHOT_POLL_MS);
+    while (Date.now() < deadline && !disconnected?.aborted) {
+      await delay(SNAPSHOT_POLL_MS, undefined, { signal: disconnected }).catch(() => undefined);
+      if (disconnected?.aborted) {
+        return;
+      }
       const next: Task | undefined = await this.durable.taskStore.load(params.id, context);
       if (!next) {
         return;
@@ -146,6 +153,7 @@ export class A2aSdkService {
         ['headers', call.headers],
         ['publicationId', call.publicationId],
         ['roles', call.identity.roles],
+        ['signal', call.signal],
       ]),
     });
     const body =

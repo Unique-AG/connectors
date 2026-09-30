@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, hkdfSync, timingSafeEqual } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { Inject, Injectable } from '@nestjs/common';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
@@ -10,11 +10,17 @@ import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 @Injectable()
 export class CallbackWakeups {
   private readonly waiters = new Map<string, Set<() => void>>();
+  // Derived, so the credential vault key is never used for signing directly.
+  private readonly signingKey: Buffer;
 
-  public constructor(@Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig) {}
+  public constructor(@Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig) {
+    this.signingKey = Buffer.from(
+      hkdfSync('sha256', config.encryptionKey, '', 'a2a-gateway callback tokens', 32),
+    );
+  }
 
   public token(executionId: string): string {
-    return createHmac('sha256', this.config.encryptionKey)
+    return createHmac('sha256', this.signingKey)
       .update(`a2a-callback:${executionId}`)
       .digest('base64url');
   }

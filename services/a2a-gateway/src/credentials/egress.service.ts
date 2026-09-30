@@ -20,7 +20,7 @@ function isPublicAddress(address: string): boolean {
   return parsed.range() === 'unicast';
 }
 
-function boundedBody(body: ReadableStream<Uint8Array>, maxBytes: number) {
+export function boundedBody(body: ReadableStream<Uint8Array>, maxBytes: number) {
   let size = 0;
   return body.pipeThrough(
     new TransformStream<Uint8Array, Uint8Array>({
@@ -95,8 +95,8 @@ export class EgressService implements OnApplicationShutdown {
   }
 
   /**
-   * Client-registered webhook URLs: HTTPS to a public address (checked again at connect time),
-   * optionally limited to operator-approved hosts. No gateway credential is ever attached.
+   * Client-registered webhook URLs: HTTPS on 443 to an operator-approved host that resolves to a
+   * public address (checked again at connect time). No gateway credential is ever attached.
    */
   public approveWebhook(value: string): URL {
     let url: URL;
@@ -113,8 +113,8 @@ export class EgressService implements OnApplicationShutdown {
       url.username ||
       url.password ||
       url.hash ||
-      (this.config.pushAllowedHosts.length > 0 &&
-        !this.config.pushAllowedHosts.includes(url.hostname)) ||
+      (url.port !== '' && !this.config.egressAllowInsecure) ||
+      !this.config.pushAllowedHosts.includes(url.hostname) ||
       (!this.config.egressAllowInsecure && ipaddr.isValid(literal) && !isPublicAddress(literal))
     ) {
       throw new BadRequestException('webhook URL is not allowed');

@@ -3,6 +3,7 @@ import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 
 import { DRIZZLE, type GatewayDatabase } from './drizzle.module.js';
 import { connections } from './schema/connections.table.js';
+import { isUniqueViolation } from './unique-violation.js';
 
 export interface ConnectionWrite {
   id: string;
@@ -10,6 +11,13 @@ export interface ConnectionWrite {
   agentCardUrl: string;
   credentialType: string;
   credentialCiphertext: Buffer;
+}
+
+function duplicateName(error: unknown): never {
+  if (isUniqueViolation(error, 'a2a_connections_company_name_unique')) {
+    throw new ConflictException('a connection with this name already exists');
+  }
+  throw error;
 }
 
 @Injectable()
@@ -66,7 +74,8 @@ export class ConnectionRepository {
           eq(connections.version, expectedVersion),
         ),
       )
-      .returning({ id: connections.id });
+      .returning({ id: connections.id })
+      .catch(duplicateName);
     if (!updated) {
       throw new ConflictException('connection version does not match If-Match');
     }
@@ -108,7 +117,8 @@ export class ConnectionRepository {
         name: connections.name,
         agentCardUrl: connections.agentCardUrl,
         version: connections.version,
-      });
+      })
+      .catch(duplicateName);
     return connection;
   }
 

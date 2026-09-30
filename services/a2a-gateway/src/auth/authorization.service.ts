@@ -40,8 +40,14 @@ export class AuthorizationService {
     }
   }
 
-  public async useSpace(identity: RequestIdentity, assistantId: string): Promise<void> {
-    this.validateAssistant(await this.unique.getAssistant(identity, assistantId), assistantId);
+  public async useSpace(
+    identity: RequestIdentity,
+    assistantId: string,
+  ): Promise<z.infer<typeof assistantSchema>> {
+    return this.validateAssistant(
+      await this.unique.getAssistant(identity, assistantId),
+      assistantId,
+    );
   }
 
   public async manageSpace(identity: RequestIdentity, assistantId: string): Promise<void> {

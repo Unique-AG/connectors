@@ -317,8 +317,8 @@ a2aConfig:
 
   pushNotifications:
     enabled: false
-    # -- Limit client webhooks to these hostnames; empty allows any public HTTPS host.
-    # The CiliumNetworkPolicy allows these hosts on a2aConfig.egress.ports; any host needs networkPolicy.baseline.egress.pushWebhooks.
+    # -- Hostnames client webhooks may target (HTTPS on 443); required when enabled.
+    # The CiliumNetworkPolicy allows the same hosts.
     allowedHosts: []
 
   worker:
@@ -352,13 +352,3 @@ networkPolicy:
   baseline:
     prometheus:
       namespace: system
-    egress:
-      # Push notifications to arbitrary public webhook hosts (a2aConfig.pushNotifications.allowedHosts empty).
-      pushWebhooks:
-        enabled: false
-        toEntities:
-          - world
-        toPorts:
-          - ports:
-              - port: "443"
-                protocol: TCP

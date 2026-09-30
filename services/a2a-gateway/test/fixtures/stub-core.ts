@@ -4,12 +4,21 @@
  * surface in CI without LLMs. One native space `assistant_tck` answers every turn with
  * "Hello from TCK" after a short delay.
  *
+ * Permissions follow the forwarded identity headers: in company `tck-company`, `tck-user` manages
+ * the space, `tck-colleague` may use it and anyone else has no access. `assistant_external` is an
+ * A2A-provider space. `state` toggles the rollout flag for gate tests.
+ *
  *   STUB_CORE_PORT=9590 node test/fixtures/stub-core.ts
  */
+import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 export const TCK_ASSISTANT_ID = 'assistant_tck';
+export const EXTERNAL_ASSISTANT_ID = 'assistant_external';
+export const TCK_COMPANY = 'tck-company';
+export const TCK_MANAGER = 'tck-user';
+export const TCK_COLLEAGUE = 'tck-colleague';
 const ANSWER = 'Hello from TCK';
 const ANSWER_DELAY_MS = Number(process.env.STUB_CORE_ANSWER_DELAY_MS ?? 200);
 
@@ -31,6 +40,13 @@ interface Variables {
   input: { text: string };
 }
 
+const FORBIDDEN = Symbol('forbidden');
+
+interface Identity {
+  companyId: string;
+  userId: string;
+}
+
 function body(request: IncomingMessage): Promise<string> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
@@ -44,29 +60,55 @@ function send(response: ServerResponse, status: number, payload: unknown): void 
 }
 
 export async function startStubCore(port = 0) {
-  let sequence = 0;
-  const id = (prefix: string) => `${prefix}_${++sequence}`;
+  // Unique across runs: gateway state in a reused database references these ids.
+  const id = (prefix: string) => `${prefix}_${randomUUID()}`;
   const messages = new Map<string, StoredMessage>();
-  const assistant = {
-    id: TCK_ASSISTANT_ID,
-    name: 'TCK space',
-    executionProvider: 'NATIVE',
-    a2aConnectionId: null,
-  };
+  const state = { a2aEnabled: true, answerDelayMs: ANSWER_DELAY_MS };
+  const assistants = new Map([
+    [
+      TCK_ASSISTANT_ID,
+      {
+        id: TCK_ASSISTANT_ID,
+        name: 'TCK space',
+        executionProvider: 'NATIVE',
+        a2aConnectionId: null,
+      },
+    ],
+    [
+      EXTERNAL_ASSISTANT_ID,
+      {
+        id: EXTERNAL_ASSISTANT_ID,
+        name: 'External space',
+        executionProvider: 'A2A',
+        a2aConnectionId: null,
+      },
+    ],
+  ]);
+  const inCompany = (identity: Identity) => identity.companyId === TCK_COMPANY;
+  const isManager = (identity: Identity) => inCompany(identity) && identity.userId === TCK_MANAGER;
+  const isMember = (identity: Identity) =>
+    isManager(identity) || (inCompany(identity) && identity.userId === TCK_COLLEAGUE);
 
-  const operations: Record<string, (variables: Variables) => unknown> = {
+  const operations: Record<string, (variables: Variables, identity: Identity) => unknown> = {
     A2aCapabilities: () => ({
-      a2aCapabilities: { configured: true, enabled: true, available: true, retryable: false },
+      a2aCapabilities: {
+        configured: true,
+        enabled: state.a2aEnabled,
+        available: true,
+        retryable: false,
+      },
     }),
-    A2aPermissions: () => ({
-      getUserPermissions: { uiPermissions: { canAccessSpaceManagement: true } },
+    A2aPermissions: (_variables, identity) => ({
+      getUserPermissions: { uiPermissions: { canAccessSpaceManagement: isManager(identity) } },
     }),
-    A2aAssistant: ({ assistantId }) => ({
-      assistantByUser: assistantId === TCK_ASSISTANT_ID ? assistant : null,
-    }),
-    A2aManagedAssistant: ({ assistantId }) => ({
-      assistantByCompany: assistantId === TCK_ASSISTANT_ID ? assistant : null,
-    }),
+    A2aAssistant: ({ assistantId }, identity) =>
+      isMember(identity)
+        ? { assistantByUser: assistants.get(assistantId ?? '') ?? null }
+        : FORBIDDEN,
+    A2aManagedAssistant: ({ assistantId }, identity) =>
+      isManager(identity)
+        ? { assistantByCompany: assistants.get(assistantId ?? '') ?? null }
+        : FORBIDDEN,
     A2aChatCreate: () => ({ chatCreate: { id: id('chat') } }),
     A2aMessageCreate: ({ chatId, input }) => {
       const chat = chatId ?? id('chat');
@@ -96,7 +138,7 @@ export async function startStubCore(port = 0) {
           reply.text = ANSWER;
           reply.completedAt = new Date().toISOString();
         }
-      }, ANSWER_DELAY_MS);
+      }, state.answerDelayMs);
       return { messageCreate: { id: user.id, chatId: chat, messages: [] } };
     },
     A2aMessage: ({ messageId }) => ({
@@ -148,11 +190,22 @@ export async function startStubCore(port = 0) {
       });
       return;
     }
-    send(response, 200, { data: handler(variables ?? { input: { text: '' } }) });
+    const identity = {
+      companyId: String(request.headers['x-company-id'] ?? ''),
+      userId: String(request.headers['x-user-id'] ?? ''),
+    };
+    const data = handler(variables ?? { input: { text: '' } }, identity);
+    send(
+      response,
+      200,
+      data === FORBIDDEN
+        ? { errors: [{ message: 'forbidden', extensions: { code: 'FORBIDDEN' } }], data: null }
+        : { data },
+    );
   });
   await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  return { url, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+  return { url, state, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

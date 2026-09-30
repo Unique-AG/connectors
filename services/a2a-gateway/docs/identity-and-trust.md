@@ -31,7 +31,7 @@ sequenceDiagram
 - **Existing user OAuth flow** (D-18): reuse normal Zitadel login and Kong token validation without custom principal claims or changes to Zitadel. Caller-supplied identity headers must not be trusted; use only Kong-stamped identity. Machine-to-machine onboarding is out of scope. Tasks record `x-client-id` for attribution only; Kong does not forward the OAuth client yet, so they are `unattributed` (no Lua or plugin changes).
 - A valid token is required per **request** (`SendMessage`, `GetTask`, SSE open). A running task continues when the token expires because core calls use the header identity. Reconnect requires a fresh token for the **same user**.
 - Gateway → core calls omit role headers, so core resolves current roles from scope-management instead of trusting stale token roles.
-- Push-notification webhooks: outbound only, credentials from `TaskPushNotificationConfig.authentication`, URL passes egress policy, payload = task id + state (no content).
+- Push-notification webhooks: outbound only, HTTPS on 443 to `PUSH_ALLOWED_HOSTS` (required when enabled), credentials from `TaskPushNotificationConfig.authentication` (write-only), payload = task id + state (no content).
 
 ## Outbound: Unique user → remote agent
 
@@ -61,7 +61,7 @@ sequenceDiagram
 
 | Boundary | Trust | Control |
 | --- | --- | --- |
-| Internet → Kong → `/a2a` | Kong-stamped identity | headers required; rate limits + body size limit (Kong and gateway); JSON-RPC schema validation (SDK); per-tenant quotas |
+| Internet → Kong → `/a2a` | Kong-stamped identity | headers required; body size limit (Kong and gateway); JSON-RPC schema validation (SDK); per-tenant quotas; ≤ 20 concurrent streams per user and replica |
 | Internet → Kong → `/a2a/.../agent-card.json` | unauthenticated | only admin-approved fields; no ids beyond `publicationId`; cache headers |
 | Internet → Kong → `/management` | Kong-stamped identity | object-level check against core for every write; role check for connections |
 | `node-chat` → `/internal` | trusted network (NetworkPolicy) | headers accepted only from cluster; no fallback identity; deny if `x-user-id`/`x-company-id` missing |
@@ -81,3 +81,14 @@ Threats explicitly covered:
 - **SSRF via connection URL / push URL / file URI**: shared egress guard (SECURITY-RULES §3).
 - **Silent approval**: elicitations are never auto-approved; `autoApproveElicitation` is never set.
 - **Content in logs**: ids and states only (SECURITY-RULES §6).
+
+## Verification
+
+`test/security/security.e2e-spec.ts` runs this matrix over HTTP against the real gateway (Kong auth mode, PostgreSQL, absurd) with the stub core as permission authority, in CI (`a2a-gateway.e2e.yaml`): missing/forged identity on every route, service identities, cross-user/company task, context, catalog, file and management access, external-space publication, rollout flag, body and stream limits, SSRF on connection and webhook URLs, credential redaction and callback forgery. Unit tests cover DNS pinning, redirects, vault binding, token caching and revocation.
+
+Known gaps, accepted for the first rollout:
+
+- No per-user request rate limit at Kong yet (the platform has no rate-limiting plugin configured); quotas and stream caps bound the gateway.
+- Inbound quotas are per tenant, not per user.
+- Remote markdown (links, images) relies on the chat renderer's sanitization; inbound file types are checked by declared media type, and core ingestion processes the content.
+- Deployed Kong behavior (header stripping, route precedence, SSE buffering) must be verified on the first cluster.

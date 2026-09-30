@@ -39,7 +39,7 @@ Not designed for up front (D-09). When a real peer is onboarded, the connection 
 
 ## Conformance
 
-- **Server**: the official [a2a-tck](https://github.com/a2aproject/a2a-tck) (pinned commit, JSON-RPC, A2A 1.0) runs in CI (`a2a-gateway.tck.yaml`) against the gateway backed by a stub core (`test/fixtures/stub-core.ts`). Run it locally with `test/tck/run-tck.sh`; reports land in `test/tck/reports/`.
+- **Server**: the official [a2a-tck](https://github.com/a2aproject/a2a-tck) (pinned commit, JSON-RPC, A2A 1.0) runs in CI (`a2a-gateway.e2e.yaml`) against the gateway backed by a stub core (`test/fixtures/stub-core.ts`). Run it locally with `test/tck/run-tck.sh`; reports land in `test/tck/reports/`.
 - **Client**: `test/contract/` drives the outbound runner through the production SDK client against the fixture agents (`test/fixtures/fixture-agent.ts`): streaming and polling peers, direct messages, failure, JSON, files, input-required, auth-required, cancellation, unknown send outcome and mode negotiation.
 
 ### TCK

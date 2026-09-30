@@ -22,6 +22,9 @@ import { InboundFilesService } from './inbound-files.service.js';
 import { PublicationService } from './publication.service.js';
 
 const KEEP_ALIVE_MS = 15_000;
+const STREAMING_METHODS = new Set(['SendStreamingMessage', 'SubscribeToTask']);
+// Per replica; bounds long-lived connections one user can hold open.
+const MAX_STREAMS_PER_USER = 20;
 const SUPPORTED_VERSION = /^1(\.0)?$/;
 
 function jsonRpcId(body: unknown): string | number | null {
@@ -48,6 +51,8 @@ function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
 
 @Controller('a2a/agents')
 export class A2aController {
+  private readonly streams = new Map<string, number>();
+
   public constructor(
     private readonly a2a: A2aSdkService,
     private readonly publications: PublicationService,
@@ -129,12 +134,40 @@ export class A2aController {
       );
       return;
     }
+    const identity = requestIdentity(request);
+    const streamKey = `${identity.companyId}:${identity.userId}`;
+    const method = typeof body === 'object' && body !== null ? Reflect.get(body, 'method') : '';
+    const streaming = STREAMING_METHODS.has(String(method));
+    const streams = this.streams.get(streamKey) ?? 0;
+    if (streaming && streams >= MAX_STREAMS_PER_USER) {
+      response
+        .status(HttpStatus.TOO_MANY_REQUESTS)
+        .json(jsonRpcError(id, -32603, 'too many concurrent streams'));
+      return;
+    }
+    // The response (not the request) reports a client disconnect once the body has been read.
+    const disconnected = new AbortController();
+    if (streaming) {
+      this.streams.set(streamKey, streams + 1);
+    }
+    response.on('close', () => {
+      disconnected.abort();
+      if (streaming) {
+        const remaining = (this.streams.get(streamKey) ?? 1) - 1;
+        if (remaining > 0) {
+          this.streams.set(streamKey, remaining);
+        } else {
+          this.streams.delete(streamKey);
+        }
+      }
+    });
     const result = await this.a2a.handleJsonRpc({
       body,
       headers: request.headers,
-      identity: requestIdentity(request),
+      identity,
       publicationId,
       requestedVersion,
+      signal: disconnected.signal,
     });
     if (!isAsyncIterable(result)) {
       response.json(result);
@@ -162,16 +195,16 @@ export class A2aController {
     response.flushHeaders();
     // A disconnecting client only ends its subscription; the task keeps running and can be
     // re-attached with SubscribeToTask.
-    let closed = false;
-    request.on('close', () => {
-      closed = true;
-    });
     const keepAlive = setInterval(() => response.write(': keep-alive\n\n'), KEEP_ALIVE_MS);
     try {
-      for (let next = first; !next.done && !closed; next = await events.next()) {
+      for (
+        let next = first;
+        !next.done && !disconnected.signal.aborted;
+        next = await events.next()
+      ) {
         response.write(formatSSEEvent(next.value));
       }
-      if (closed) {
+      if (disconnected.signal.aborted) {
         await events.return?.(undefined);
       }
     } finally {
