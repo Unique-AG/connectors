@@ -6,25 +6,25 @@ To report a vulnerability, read [SECURITY.md](./SECURITY.md). This document does
 
 ## The whole process, at a glance
 
-A pull request can come from a person or from Dependabot. Up to four checks run on it. Two checks can stop it. A merged change later becomes part of a release. A release builds an image, signs it, and pushes it to two registries. After that, a scan reads the published image every week, for as long as the image stays there.
+A pull request can come from a person or from Dependabot. Up to four checks run on it. One check can stop it. A merged change later becomes part of a release. A release builds an image, signs it, and pushes it to two registries. After that, a scan reads the published image every week, for as long as the image stays there.
 
 ```mermaid
 flowchart LR
   author[A person opens a pull request] --> checks
   dependabot[Dependabot opens a pull request] --> checks
   checks{Up to four checks run} -->|clean, or a waiver label| merge[The change merges]
-  checks -->|a finding with a fix, no waiver| stop[The pull request stops]
+  checks -->|a dependency advisory that the change adds, no waiver| stop[The pull request stops]
   merge --> release[A release builds and signs the image]
   release --> registry[(The image sits in the registry)]
   registry -->|a scan runs every Wednesday| found{A new finding with a fix}
-  found -->|yes| again[Release the service again]
+  found -->|yes| again[Ship a new version]
   found -->|no| quiet[Nothing to do]
   again --> release
 ```
 
 | When | What happens |
 |---|---|
-| A pull request | Up to four checks run. The files that you change decide which. Two can stop the merge. |
+| A pull request | Up to four checks run. The files that you change decide which. One can stop the merge. |
 | Friday, 06:00 Europe/Berlin | Dependabot opens up to 5 pull requests for each ecosystem. |
 | Every release | The image is built, signed, and pushed. Two more scans run against it. |
 | Wednesday, 06:00 UTC | A scan reads every published image again. |
@@ -38,7 +38,7 @@ A published advisory names a package, a version range, and a severity. Four chec
 
 ### What runs on your pull request
 
-Up to four checks run on a pull request. Two of them can stop it. The files that you change decide which checks run.
+Up to four checks run on a pull request. One of them can stop it. The files that you change decide which checks run.
 
 ```mermaid
 flowchart TD
@@ -48,7 +48,7 @@ flowchart TD
   pr --> codeql[CodeQL]
 
   deps -->|a HIGH advisory| stop[The pull request stops]
-  gate -->|a finding that has a fix| stop
+  gate -->|a finding that has a fix| warn[A warning. The pull request continues.]
   docker -->|a finding| alert[An alert opens in the Security tab]
   codeql -->|a finding| alert
 ```
@@ -56,7 +56,7 @@ flowchart TD
 | Check | It reads | It stops the merge |
 |---|---|---|
 | Dependency review | the dependencies your pull request adds or changes, for npm and for Python | yes, at HIGH severity |
-| Image vulnerability check | the container image your pull request builds, before any push | yes, when a finding has a fix |
+| Image vulnerability check | the container image your pull request builds, before any push | no, it reports a warning |
 | Dockerfile scan | our own Dockerfiles | no |
 | CodeQL | our source code: our workflow files, our JavaScript and TypeScript, and our Python | no |
 
@@ -69,7 +69,7 @@ This table shows which files start each check.
 | Dockerfile scan | any file |
 | CodeQL | any file |
 
-A file under `services/` starts the image build, even a docs file.
+A file under `services/` starts the image build, even a docs file. The build only reports, so it does not stop the pull request.
 
 Every check runs on a stacked pull request. No check carries a branch filter.
 
@@ -84,9 +84,17 @@ Two facts keep the four checks apart.
 - **A Dockerfile is a build input.** It never appears inside the image it builds. No image scan can read a Dockerfile.
 - **An image holds software that no lockfile lists.** Examples are a base operating system package, and a file that a build step adds by hand. No lockfile scan can find these.
 
+#### Why only the dependency review stops a pull request
+
+A pull request answers for what it changes. The dependency review compares your lockfile with the base branch. It stops the merge only for an advisory that your change adds.
+
+The image scan reads the whole image. This includes packages that your change did not touch. A new advisory can change its result with no change from you. An author cannot fix an operating system package. So the image scan reports and never stops a pull request.
+
+The image build uses fresh operating system packages. The final stage runs again on each build, with no build cache. A release does the same, so the pull request image shows what a release gets.
+
 ### The severity threshold
 
-A threshold applies to every check in this document except CodeQL. The severity decides whether a finding can stop a pull request, or open an alert. Some checks also need a fix to exist:
+A threshold applies to every check in this document except CodeQL. The severity decides whether a check reports a finding, stops a pull request, or opens an alert. Some checks also need a fix to exist:
 
 - The severity must be CRITICAL or HIGH.
 - The image vulnerability check, the registry scan, and the release image scan also need a fix to exist.
@@ -104,60 +112,42 @@ Trivy is the tool behind the image vulnerability check, the Dockerfile scan, the
 
 The license scan sets a wider threshold because an unclassified license is itself the finding. See [License scanning](#license-scanning).
 
-In the image vulnerability check, a CRITICAL or HIGH finding with no fix does not stop the pull request. It becomes a warning instead. See [The image vulnerability check stopped it](#the-image-vulnerability-check-stopped-it).
-
-A LOW finding lets the pull request merge. So does a HIGH finding with no fix in a container image.
+The image vulnerability check reports only a finding that has a fix. It never stops a pull request.
 
 ### What to do when a check stops your pull request
-
-#### The image vulnerability check stopped it
-
-The image vulnerability check stops only on a finding that has a fix. Each finding gets one annotation. The annotation names the package, the version you have, and the version with the fix.
-
-```mermaid
-flowchart TD
-  caught[The image vulnerability check stopped the pull request] --> read[Read the annotation. It names the package and the fixed version.]
-  read --> decide{Can you take the fix now}
-  decide -->|yes| raise[Raise the version, or add an override for a pinned parent]
-  decide -->|no| waive[Add the security-exception label]
-  raise --> push[Push the change. A new run starts.]
-  waive --> relabel[The label starts a new run. Do not re-run the job.]
-```
-
-1. Read the annotation on the failed check.
-2. Raise the version in the lockfile.
-3. If a parent package pins the version exactly, add a pnpm override instead.
-4. If you cannot take the fix now, add the `security-exception` label.
-
-**Do not use Re-run jobs.** A re-run reads the event data of the first run. It never reads a label that you added after that run. Adding the label starts a new run by itself.
-
-A finding with no fix does not stop the pull request. It becomes a warning.
 
 #### The dependency review stopped it
 
 The dependency review stops the merge when your change adds a dependency with a HIGH advisory. It writes a comment on the pull request that names the advisory.
 
 1. Raise the version of the dependency you added.
-2. If you cannot raise it, add the `security-exception` label.
+2. If a parent package pins the version exactly, add a pnpm override instead.
+3. If you cannot take the fix now, add the `security-exception` label.
 
-#### An alert opened, and the pull request still merges
+**Do not use Re-run jobs.** A re-run reads the event data of the first run. It never reads a label that you added after that run. If you add the label, a new run starts by itself.
 
-The Dockerfile scan and CodeQL open an alert. They stop nothing. Fix the finding, or dismiss the alert and give a reason.
+#### A finding was reported, and the pull request still merges
+
+The Dockerfile scan and CodeQL open an alert. The image vulnerability check writes a summary and one warning for each finding. They stop nothing. Fix an alert, or dismiss it and give a reason. You do not need to act on an image warning. The weekly scan and the next release handle it.
 
 ### After a release
 
-The release image scan runs after the image reaches the registry. It stops nothing. It is the only scan that opens and closes the image alerts on `main`.
+The release image scan runs after the image reaches the registry. It stops nothing. The weekly image scan uploads to the same alert category. Together they open and close the image alerts on `main`.
 
-An image does not change after we publish it. New vulnerabilities appear against it while nobody pushes a commit. The registry image scan finds them every Wednesday, at 06:00 UTC.
+An image does not change after we publish it. New vulnerabilities appear against it while nobody pushes a commit. The registry image scan finds them every Wednesday, at 06:00 UTC. It turns the run red and opens an alert in the Security tab.
 
-A second scan of the same image only adds findings. It never removes them. **To clear a finding in a published image, release the service again.** A fix in the tree does not change the image that we already published. This includes a finding you waived with `security-exception` before merge. See [Labels](#labels).
+A second scan of the same image only adds findings. It never removes them. **To clear a finding in a published image, ship a new version.** A release builds the final stage again, so the new image takes new operating system patches and the locked dependencies on `main`. A fix in the tree does not change the image that we already published. This includes a finding you waived with `security-exception` before merge. See [Labels](#labels).
+
+The manual re-run workflow of a service refuses a version that already has an image. An image never changes behind its tag.
+
+To accept a finding in the weekly scan, add it to `.github/trivyignore.yaml`. Give the entry an `expired_at` date. Trivy ignores the entry after that date.
 
 ```mermaid
 flowchart LR
   release[A release publishes the image] --> scan[The release scan opens alerts]
   scan --> quiet[Weeks pass with no release]
   quiet --> weekly[The Wednesday scan finds new advisories]
-  weekly --> rebuild[Release the service again]
+  weekly --> rebuild[Ship a new version]
   rebuild --> release
 ```
 
@@ -166,11 +156,11 @@ flowchart LR
 | Result | Where to look |
 |---|---|
 | Dependency review | a check on the pull request, and a comment when it fails |
-| Image vulnerability check | a check on the pull request, with one annotation for each finding |
+| Image vulnerability check | a summary on the pull request check, with one warning for each finding |
 | Dockerfile scan | Security tab, code scanning, category `trivy-config` |
 | CodeQL | Security tab, code scanning, one category for each language |
 | Release image scan | Security tab, code scanning, category `trivy-image/<service>` |
-| Registry image scan | Actions tab, a red run each Wednesday, with a table in the run summary |
+| Registry image scan | Actions tab, a red run each Wednesday with a table in the run summary, and the Security tab under the same category |
 | Dependabot alerts | Security tab, Dependabot |
 
 ## 2. Dependency management
@@ -277,14 +267,11 @@ One label waives a check: `security-exception`. Adding it needs write access to 
 
 | Label | It waives |
 |---|---|
-| `security-exception` | the dependency review, and it reports image vulnerability check findings as warnings |
+| `security-exception` | the dependency review |
 
-`security-exception` waives two controls:
+`security-exception` waives one control. The dependency review does not run.
 
-- The dependency review does not run.
-- The image vulnerability check reports a finding as a warning, instead of stopping the merge.
-
-Use it only when you accept both.
+Use it only when you accept the advisory.
 
 **`security-exception` only changes what happens on your pull request.** It does not reach the release image scan or the registry image scan. Once you merge and release, the same finding can open a fresh alert in the Security tab, with no link back to this label.
 
@@ -294,9 +281,9 @@ Use it only when you accept both.
 |---|---|
 | `.github/dependabot.yaml` | the ecosystems, the schedule, and the labels for dependency updates |
 | `.github/workflows/dependency-review.yaml` | the dependency review |
-| `.github/workflows/_template-containerize.yaml` | the pull request image build, and the call to the image vulnerability check |
-| `.github/actions/container-image-vuln-gate/action.yml` | the image vulnerability check itself |
+| `.github/workflows/_template-containerize.yaml` | the pull request image build and the report of its findings |
 | `.github/workflows/security-trivy-repo.yaml` | the Dockerfile scan |
-| `.github/workflows/security-trivy-registry.yaml` | the Wednesday scan of published images |
-| `.github/workflows/_template-cd.yaml` | the release build: push, sign, attest, the release image scan, and the license scan |
+| `.github/workflows/security-trivy-registry.yaml` | the Wednesday scan of published images, with its alert upload |
+| `.github/trivyignore.yaml` | the findings that the Wednesday scan accepts, each with an expiry date |
+| `.github/workflows/_template-cd.yaml` | the release build: the re-run guard, push, sign, attest, the release image scan, and the license scan |
 | `services/*/deploy/Dockerfile` | how each image is built and hardened |
