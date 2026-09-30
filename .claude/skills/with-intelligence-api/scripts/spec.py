@@ -223,7 +223,8 @@ def _write_snapshot(spec: Json, _target: str) -> None:
     }
     snapshot_path.parent.mkdir(parents=True, exist_ok=True)
     _ = snapshot_path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n")
-    print(f"wrote {snapshot_path.relative_to(Path.cwd())} with {len(schemas)} schemas")
+    printed = snapshot_path.relative_to(Path.cwd(), walk_up=True)
+    print(f"wrote {printed} with {len(schemas)} schemas")
 
 
 _COMMANDS: dict[str, Callable[[Json, str], None]] = {
