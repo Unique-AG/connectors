@@ -175,18 +175,19 @@ Dependency management does not ask whether a version is safe. The checks in [Vul
 
 ### Dependabot raises versions
 
-Dependabot watches six kinds of dependency, called ecosystems. It reads `.github/dependabot.yaml` for the list.
+Dependabot watches five kinds of dependency, called ecosystems. It reads `.github/dependabot.yaml` for the list.
 
 | Ecosystem | What it covers | Label |
 |---|---|---|
 | npm | the root `pnpm-lock.yaml`, and every `package.json` | `npm` |
 | uv | Python dependencies, under `packages/mcp-credential-auth` and every service | `uv` |
-| docker | the base image in each Dockerfile | `docker` |
+| docker | the base image tag and digest in each Dockerfile | `docker` |
 | github-actions | the actions this repository calls | `github-actions` |
 | terraform | Terraform providers and modules, under each service | `terraform` |
-| helm | Helm chart dependencies, under each service | `helm` |
 
 Every pull request that Dependabot opens carries two labels: the ecosystem label above, and `dependencies`.
+
+Dependabot does not watch Helm charts. Its Helm job fails on the OCI repository of the `base` chart. Update the version of that chart by hand.
 
 ### When Dependabot opens a pull request
 
