@@ -5,6 +5,7 @@ import {
   InMemoryTaskStore,
   type RequestContext,
 } from '@a2a-js/sdk/server';
+import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import type { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
 import type { ContextRepository } from '../drizzle/context.repository.js';
@@ -109,6 +110,20 @@ describe('A2aSdkService', () => {
     });
 
     expect(response).toMatchObject({ error: { code: -32602 } });
+    expect(contexts.create).not.toHaveBeenCalled();
+    expect(executor.execute).not.toHaveBeenCalled();
+  });
+
+  it('never starts work for an unauthorized, disabled or unpublished space', async () => {
+    const { service, authorization, contexts, executor } = subject();
+    authorization.publication.mockRejectedValue(new NotFoundException('publication not found'));
+
+    const response = await call(service, 'SendMessage', {
+      message: { messageId: 'msg-1', role: 'ROLE_USER', parts: [{ text: 'Hello' }] },
+    });
+
+    expect(response).toHaveProperty('error');
+    expect(authorization.publication).toHaveBeenCalledWith(identity, 'pub-1', true);
     expect(contexts.create).not.toHaveBeenCalled();
     expect(executor.execute).not.toHaveBeenCalled();
   });
