@@ -14,8 +14,10 @@ import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { InboundAdmissionService } from './inbound-admission.service.js';
 import { InboundAgentExecutor } from './inbound-agent.executor.js';
 import { isTerminal } from './inbound-translation.js';
+import { PgPushNotificationStore } from './pg-push-notification.store.js';
 import { PgTaskStore } from './pg-task.store.js';
 import { PublicationService } from './publication.service.js';
+import { DurablePushNotificationSender } from './push-notification.sender.js';
 
 const SNAPSHOT_POLL_MS = 1_000;
 
@@ -112,6 +114,8 @@ export class A2aSdkService {
     private readonly executor: InboundAgentExecutor,
     private readonly publications: PublicationService,
     private readonly taskStore: PgTaskStore,
+    private readonly pushStore: PgPushNotificationStore,
+    private readonly pushSender: DurablePushNotificationSender,
     @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
@@ -127,8 +131,8 @@ export class A2aSdkService {
       this.taskStore,
       this.executor,
       this.buses,
-      undefined,
-      undefined,
+      this.config.pushNotificationsEnabled ? this.pushStore : undefined,
+      this.config.pushNotificationsEnabled ? this.pushSender : undefined,
       async () => {
         await this.authorization.publication(call.identity, call.publicationId);
         return card;

@@ -1,5 +1,11 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { type AgentCard, type Message, type Part, Role } from '@a2a-js/sdk';
+import {
+  type AgentCard,
+  type Message,
+  type Part,
+  Role,
+  type TaskPushNotificationConfig,
+} from '@a2a-js/sdk';
 import { type Client, ClientFactory, JsonRpcTransportFactory } from '@a2a-js/sdk/client';
 import {
   A2AError,
@@ -41,12 +47,14 @@ import {
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { UniqueInternalError } from '../unique/unique-internal.error.js';
 import { WorkflowService } from '../workflow/workflow.service.js';
+import { CallbackWakeups } from './callback-wakeups.service.js';
 import { type ChatReference, ChatWriter } from './chat-writer.js';
 import { OUTBOUND_RUN_TASK, type OutboundRunParams } from './outbound-execution.service.js';
 import { RemoteTurn, renderParts } from './remote-turn.js';
 
 const WATCH_INTERVAL_MS = 2_000;
 const MAX_POLL_INTERVAL_MS = 5_000;
+const MAX_CALLBACK_POLL_INTERVAL_MS = 30_000;
 const MAX_CONSECUTIVE_POLL_FAILURES = 12;
 const OUTPUT_MODES = ['text/plain', 'text/markdown', 'application/json'];
 
@@ -170,6 +178,7 @@ export class OutboundRunner implements OnModuleInit {
     private readonly workflow: WorkflowService,
     private readonly chatFiles: ChatFilesService,
     private readonly egress: EgressService,
+    private readonly wakeups: CallbackWakeups,
     @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
@@ -282,7 +291,7 @@ export class OutboundRunner implements OnModuleInit {
         turn.taskId = execution.remoteTaskId;
         await this.resume(client, streaming, turn, onUpdate, signal);
       }
-      await this.poll(client, turn, onUpdate, signal);
+      await this.poll(execution, card, client, turn, onUpdate, signal);
     });
     let elicitationId = execution.state === 'input-required' ? execution.elicitationId : null;
     for (
@@ -322,8 +331,16 @@ export class OutboundRunner implements OnModuleInit {
       await this.executions.transition(identity, execution.id, 'working', { elicitationId: null });
       elicitationId = null;
       await watched(async (signal) => {
-        await this.sendFollowUp(client, streaming, followUp, turn, onUpdate, signal);
-        await this.poll(client, turn, onUpdate, signal);
+        await this.sendFollowUp(
+          client,
+          streaming,
+          followUp,
+          turn,
+          onUpdate,
+          signal,
+          this.callbackConfig(execution, card),
+        );
+        await this.poll(execution, card, client, turn, onUpdate, signal);
       });
     }
     const outcome = this.settle(turn);
@@ -419,13 +436,14 @@ export class OutboundRunner implements OnModuleInit {
     turn: RemoteTurn,
     onUpdate: () => Promise<void>,
     signal: AbortSignal,
+    pushConfig: TaskPushNotificationConfig | undefined,
   ): Promise<void> {
     const request = {
       tenant: '',
       message,
       configuration: {
         acceptedOutputModes: OUTPUT_MODES,
-        taskPushNotificationConfig: undefined,
+        taskPushNotificationConfig: pushConfig,
         returnImmediately: true,
       },
       metadata: undefined,
@@ -442,6 +460,24 @@ export class OutboundRunner implements OnModuleInit {
     }
     turn.apply(await client.sendMessage(request, { signal }));
     await onUpdate();
+  }
+
+  /** Registers a callback only when both sides support push; state is still read via GetTask. */
+  private callbackConfig(
+    execution: Execution,
+    card: AgentCard,
+  ): TaskPushNotificationConfig | undefined {
+    if (!this.config.pushNotificationsEnabled || card.capabilities?.pushNotifications !== true) {
+      return undefined;
+    }
+    return {
+      tenant: '',
+      id: '',
+      taskId: '',
+      url: this.wakeups.callbackUrl(execution.id),
+      token: this.wakeups.token(execution.id),
+      authentication: undefined,
+    };
   }
 
   private async cancelQuietly(client: Client, turn: RemoteTurn): Promise<void> {
@@ -509,7 +545,7 @@ export class OutboundRunner implements OnModuleInit {
       message,
       configuration: {
         acceptedOutputModes: OUTPUT_MODES,
-        taskPushNotificationConfig: undefined,
+        taskPushNotificationConfig: this.callbackConfig(execution, session.card),
         returnImmediately: true,
       },
       metadata: undefined,
@@ -567,16 +603,22 @@ export class OutboundRunner implements OnModuleInit {
   }
 
   private async poll(
+    execution: Execution,
+    card: AgentCard,
     client: Client,
     turn: RemoteTurn,
     onUpdate: () => Promise<void>,
     signal: AbortSignal,
   ): Promise<void> {
+    // With remote callbacks a callback wakes the poll early, so polling itself can back off more.
+    const maxInterval = this.callbackConfig(execution, card)
+      ? MAX_CALLBACK_POLL_INTERVAL_MS
+      : MAX_POLL_INTERVAL_MS;
     let interval = 1_000;
     let failures = 0;
     while (!turn.isSettled) {
-      await delay(interval, undefined, { signal });
-      interval = Math.min(interval * 1.5, MAX_POLL_INTERVAL_MS);
+      await this.wakeups.sleep(execution.id, interval, signal);
+      interval = Math.min(interval * 1.5, maxInterval);
       try {
         turn.apply(await client.getTask({ tenant: '', id: turn.taskId ?? '' }, { signal }));
         failures = 0;

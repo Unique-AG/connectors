@@ -15,6 +15,7 @@ import {
 } from './inbound-translation.js';
 import { NativeRunObserver } from './native-run-observer.js';
 import { PgTaskStore } from './pg-task.store.js';
+import { DurablePushNotificationSender } from './push-notification.sender.js';
 
 const INBOUND_WATCH_TASK = 'inbound.watch';
 const ORPHANED_AFTER_MS = 90_000;
@@ -47,6 +48,7 @@ export class InboundRecovery implements OnModuleInit {
     private readonly observer: NativeRunObserver,
     private readonly taskStore: PgTaskStore,
     private readonly workflow: WorkflowService,
+    private readonly push: DurablePushNotificationSender,
     @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
@@ -121,15 +123,17 @@ export class InboundRecovery implements OnModuleInit {
         await this.taskStore.heartbeat(params.companyId, params.taskId);
       },
     });
+    const status = outcomeStatus(snapshot, outcome);
     await this.taskStore.systemSave(params.companyId, {
       ...snapshot,
-      status: outcomeStatus(snapshot, outcome),
+      status,
       artifacts: outcomeArtifacts(
         snapshot.id,
         outcome,
         fileUrlFor(this.config.publicBaseUrl, params.publicationId, snapshot.id),
       ),
     });
+    await this.push.notify(params.companyId, snapshot.id, snapshot.contextId, status.state);
     return { state: outcome.kind };
   }
 }

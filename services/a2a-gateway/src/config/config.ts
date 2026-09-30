@@ -60,6 +60,17 @@ const configSchema = z
             .filter(Boolean) ?? [],
       ),
     EGRESS_ALLOW_INSECURE: booleanFromEnvironment.prefault('false'),
+    PUSH_NOTIFICATIONS_ENABLED: booleanFromEnvironment.prefault('false'),
+    PUSH_ALLOWED_HOSTS: z
+      .string()
+      .optional()
+      .transform(
+        (value) =>
+          value
+            ?.split(',')
+            .map((host) => host.trim())
+            .filter(Boolean) ?? [],
+      ),
     MAX_REMOTE_FILE_BYTES: z.coerce
       .number()
       .int()
@@ -127,6 +138,8 @@ const configSchema = z
     corsAllowedOrigins: config.CORS_ALLOWED_ORIGINS,
     egressAllowedHosts: config.EGRESS_ALLOWED_HOSTS,
     egressAllowInsecure: config.EGRESS_ALLOW_INSECURE,
+    pushNotificationsEnabled: config.PUSH_NOTIFICATIONS_ENABLED,
+    pushAllowedHosts: config.PUSH_ALLOWED_HOSTS,
     maxRemoteFileBytes: config.MAX_REMOTE_FILE_BYTES,
     elicitationTimeoutSeconds: config.ELICITATION_TIMEOUT_SECONDS,
     syncWaitMaxMs: config.SYNC_WAIT_MAX_MS,

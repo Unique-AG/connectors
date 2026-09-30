@@ -14,8 +14,10 @@ import type { ContextRepository } from '../drizzle/context.repository.js';
 import { A2aSdkService } from './a2a-sdk.service.js';
 import { InboundAdmissionService } from './inbound-admission.service.js';
 import type { InboundAgentExecutor } from './inbound-agent.executor.js';
+import type { PgPushNotificationStore } from './pg-push-notification.store.js';
 import type { PgTaskStore } from './pg-task.store.js';
 import type { PublicationService } from './publication.service.js';
+import type { DurablePushNotificationSender } from './push-notification.sender.js';
 
 const identity = { companyId: 'company-1', userId: 'user-1', roles: [] };
 
@@ -84,6 +86,8 @@ function subject() {
       executor as unknown as InboundAgentExecutor,
       publications as unknown as PublicationService,
       taskStore as unknown as PgTaskStore,
+      {} as PgPushNotificationStore,
+      {} as DurablePushNotificationSender,
       config,
     ),
     authorization,

@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { KongIdentityGuard } from '../auth/identity.guard.js';
 import { OAuthDiscoveryController } from '../auth/oauth-discovery.controller.js';
 import { ChatFilesService } from '../bridge/chat-files.service.js';
+import { CredentialsModule } from '../credentials/credentials.module.js';
+import { DrizzleModule } from '../drizzle/drizzle.module.js';
 import { PersistenceModule } from '../drizzle/persistence.module.js';
 import { EventBusModule } from '../event-bus/event-bus.module.js';
 import { UniqueModule } from '../unique/unique.module.js';
@@ -13,10 +15,19 @@ import { InboundAgentExecutor } from './inbound-agent.executor.js';
 import { InboundFilesService } from './inbound-files.service.js';
 import { InboundRecovery } from './inbound-recovery.service.js';
 import { NativeRunObserver } from './native-run-observer.js';
+import { PgPushNotificationStore } from './pg-push-notification.store.js';
 import { PublicationService } from './publication.service.js';
+import { DurablePushNotificationSender } from './push-notification.sender.js';
 
 @Module({
-  imports: [PersistenceModule, UniqueModule, EventBusModule, WorkflowModule],
+  imports: [
+    DrizzleModule,
+    PersistenceModule,
+    UniqueModule,
+    EventBusModule,
+    WorkflowModule,
+    CredentialsModule,
+  ],
   controllers: [A2aController, OAuthDiscoveryController],
   providers: [
     A2aSdkService,
@@ -26,6 +37,8 @@ import { PublicationService } from './publication.service.js';
     InboundFilesService,
     InboundRecovery,
     NativeRunObserver,
+    PgPushNotificationStore,
+    DurablePushNotificationSender,
     KongIdentityGuard,
     PublicationService,
   ],

@@ -94,6 +94,38 @@ export class EgressService implements OnApplicationShutdown {
     return url;
   }
 
+  /**
+   * Client-registered webhook URLs: HTTPS to a public address (checked again at connect time),
+   * optionally limited to operator-approved hosts. No gateway credential is ever attached.
+   */
+  public approveWebhook(value: string): URL {
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new BadRequestException('invalid webhook URL');
+    }
+    const secure =
+      url.protocol === 'https:' || (this.config.egressAllowInsecure && url.protocol === 'http:');
+    const literal = url.hostname.replace(/^\[|\]$/g, '');
+    if (
+      !secure ||
+      url.username ||
+      url.password ||
+      url.hash ||
+      (this.config.pushAllowedHosts.length > 0 &&
+        !this.config.pushAllowedHosts.includes(url.hostname)) ||
+      (!this.config.egressAllowInsecure && ipaddr.isValid(literal) && !isPublicAddress(literal))
+    ) {
+      throw new BadRequestException('webhook URL is not allowed');
+    }
+    return url;
+  }
+
+  public async postWebhook(url: string, init: RequestInit): Promise<Response> {
+    return this.send(this.approveWebhook(url), { ...init, method: 'POST' }, 16_384, 10_000);
+  }
+
   /** Buffers the whole bounded response; for JSON documents and OAuth token responses. */
   public async fetch(url: string | URL, init: RequestInit, maxBytes = 65_536): Promise<Response> {
     const response = await this.stream(url, init, maxBytes, this.config.dependencyTimeoutMs);
@@ -115,7 +147,15 @@ export class EgressService implements OnApplicationShutdown {
     maxBytes: number,
     timeoutMs = this.config.streamTimeoutMs,
   ): Promise<Response> {
-    const approved = this.approve(url.toString());
+    return this.send(this.approve(url.toString()), init, maxBytes, timeoutMs);
+  }
+
+  private async send(
+    approved: URL,
+    init: RequestInit,
+    maxBytes: number,
+    timeoutMs: number,
+  ): Promise<Response> {
     const timeout = AbortSignal.timeout(timeoutMs);
     const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
     let response: Awaited<ReturnType<typeof undiciFetch>>;

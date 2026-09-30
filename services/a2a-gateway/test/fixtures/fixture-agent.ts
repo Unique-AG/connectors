@@ -19,6 +19,7 @@ import {
   type AgentExecutor,
   DefaultRequestHandler,
   type ExecutionEventBus,
+  InMemoryPushNotificationStore,
   InMemoryTaskStore,
   type RequestContext,
 } from '@a2a-js/sdk/server';
@@ -28,6 +29,7 @@ import express from 'express';
 const port = Number(process.env.FIXTURE_PORT ?? 9571);
 const streaming = process.env.FIXTURE_STREAMING !== 'false';
 const token = process.env.FIXTURE_TOKEN;
+const push = process.env.FIXTURE_PUSH === 'true';
 const baseUrl = process.env.FIXTURE_BASE_URL ?? `http://127.0.0.1:${port}`;
 
 function text(value: string): Part {
@@ -281,7 +283,7 @@ const card: AgentCard = {
   ],
   provider: { organization: 'Unique fixtures', url: baseUrl },
   version: '1.0.0',
-  capabilities: { streaming, pushNotifications: false, extendedAgentCard: false, extensions: [] },
+  capabilities: { streaming, pushNotifications: push, extendedAgentCard: false, extensions: [] },
   securitySchemes: token
     ? {
         bearer: {
@@ -310,9 +312,27 @@ const card: AgentCard = {
   signatures: [],
 };
 
-const requestHandler = new DefaultRequestHandler(card, new InMemoryTaskStore(), executor);
+const requestHandler = new DefaultRequestHandler(
+  card,
+  new InMemoryTaskStore(),
+  executor,
+  undefined,
+  push ? new InMemoryPushNotificationStore() : undefined,
+);
+// Records push notifications this fixture receives, e.g. from the gateway's inbound tasks.
+const received: unknown[] = [];
 const app = express();
 app.use('/.well-known/agent-card.json', agentCardHandler({ agentCardProvider: requestHandler }));
+app.post('/webhook-sink', express.json({ type: '*/*' }), (request, response) => {
+  received.push({
+    headers: { token: request.headers['x-a2a-notification-token'] },
+    body: request.body,
+  });
+  response.status(204).end();
+});
+app.get('/webhook-sink', (_request, response) => {
+  response.json(received);
+});
 app.get('/files/chart.csv', (_request, response) => {
   response.type('text/csv').send('city,temperature\nZurich,21\n');
 });

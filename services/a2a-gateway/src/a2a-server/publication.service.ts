@@ -105,7 +105,7 @@ export class PublicationService {
       version: String(publication.version),
       capabilities: {
         streaming: true,
-        pushNotifications: false,
+        pushNotifications: this.config.pushNotificationsEnabled,
         extendedAgentCard: true,
         extensions: [],
       },
