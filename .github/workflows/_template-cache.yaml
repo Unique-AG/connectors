@@ -18,7 +18,6 @@ permissions:
   actions: read
 
 env:
-  SERVICE_PATH: ${{ inputs.service-path }}
   CHART_REPO: ghcr.io/unique-ag/connectors/services/${{ inputs.service-name }}
   GHA_CACHE_SCOPE: ${{ inputs.service-name }}
 
@@ -28,13 +27,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Skip if no changes in last 3 days under ${{ inputs.service-path }}
-        run: |
-          if ! git log --since="3 days ago" --name-only --pretty=format: | grep -q '^${{ inputs.service-path }}/'; then
-            echo "No recent changes; skipping warm."
-            exit 0
-          fi
 
       - uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
 

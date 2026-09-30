@@ -33,7 +33,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_SERVICES: ${{ github.event.inputs.services }}
         run: |
-          available=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+          available=$(find services -mindepth 3 -maxdepth 3 -type f -path 'services/*/deploy/Dockerfile' | cut -d/ -f2 | sort)
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_SERVICES" != "all" ]; then
             IFS=',' read -ra requested <<< "$INPUT_SERVICES"
