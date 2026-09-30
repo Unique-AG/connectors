@@ -9,13 +9,12 @@ on:
   # PR in a stack except the base one. `paths` alone decides — the gate matters wherever the
   # files it guards change, whatever the PR merges into.
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened]
     paths:
       - "packages/mcp-credential-auth/**"
       - "services/**"
       - ".github/workflows/python-ci.yaml"
       - ".github/workflows/_template-containerize.yaml"
-      - ".github/actions/container-image-vuln-gate/**"
       - "scripts/render-values-schema.sh"
   workflow_dispatch:
     inputs:
@@ -57,7 +56,6 @@ jobs:
             workflow:
               - '.github/workflows/python-ci.yaml'
               - '.github/workflows/_template-containerize.yaml'
-              - '.github/actions/container-image-vuln-gate/**'
               - 'scripts/render-values-schema.sh'
 
       # Builds a JSON array of Python service names to fan out into parallel CI matrix jobs.
