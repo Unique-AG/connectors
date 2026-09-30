@@ -1,0 +1,13 @@
+{{- if include "chart.kong.enabled" . }}
+# Mirrors the gateway's MAX_REQUEST_BYTES at the edge.
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ include "base.fullname" . }}-request-size
+  labels:
+    {{- include "base.labels.common" . | nindent 4 }}
+plugin: request-size-limiting
+config:
+  allowed_payload_size: {{ .Values.a2aConfig.limits.maxRequestBytes | int }}
+  size_unit: bytes
+{{- end }}

@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "A2A Gateway Values",
+  "description": "Values for the A2A gateway Helm chart. Optional bidirectional A2A gateway for Unique.",
+  "type": "object",
+  "properties": {
+    "a2aConfig": {
+      "type": "object",
+      "description": "Configuration of the A2A gateway, mapped to environment variables",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Map a2aConfig to environment variables"
+        },
+        "publicBaseUrl": {
+          "type": "string",
+          "description": "Kong-facing HTTPS base URL (PUBLIC_BASE_URL). Example: https://a2a.unique.app"
+        },
+        "zitadelIssuer": {
+          "type": "string",
+          "description": "Zitadel issuer URL (ZITADEL_ISSUER). Example: https://id.unique.app"
+        },
+        "corsAllowedOrigins": {
+          "type": "array",
+          "description": "Allowed browser origins (CORS_ALLOWED_ORIGINS)",
+          "items": { "type": "string" }
+        },
+        "unique": {
+          "type": "object",
+          "description": "Base URLs of the Unique services",
+          "additionalProperties": false,
+          "properties": {
+            "chatUrl": { "type": "string", "description": "UNIQUE_CHAT_URL" },
+            "scopeManagementUrl": {
+              "type": "string",
+              "description": "UNIQUE_SCOPE_MANAGEMENT_URL"
+            },
+            "ingestionUrl": { "type": "string", "description": "UNIQUE_INGESTION_URL" }
+          },
+          "required": ["chatUrl", "scopeManagementUrl", "ingestionUrl"]
+        },
+        "egress": {
+          "type": "object",
+          "description": "Outbound traffic to remote agents",
+          "additionalProperties": false,
+          "properties": {
+            "allowedHosts": {
+              "type": "array",
+              "description": "Operator-approved remote agent and token endpoint hostnames (EGRESS_ALLOWED_HOSTS); also allowed by the CiliumNetworkPolicy",
+              "items": { "type": "string" }
+            },
+            "ports": {
+              "type": "array",
+              "description": "Ports the CiliumNetworkPolicy opens for the allowed hosts",
+              "items": { "type": ["string", "integer"] }
+            }
+          }
+        },
+        "pushNotifications": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "description": "PUSH_NOTIFICATIONS_ENABLED" },
+            "allowedHosts": {
+              "type": "array",
+              "description": "Allowed webhook hostnames (PUSH_ALLOWED_HOSTS); empty allows any public HTTPS host",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "worker": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "description": "WORKER_ENABLED" },
+            "concurrency": { "type": "integer", "minimum": 1, "description": "WORKER_CONCURRENCY" }
+          }
+        },
+        "reconcileIntervalSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "RECONCILE_INTERVAL"
+        },
+        "retention": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "taskDays": { "type": "integer", "minimum": 1, "description": "TASK_RETENTION_DAYS" },
+            "executionDays": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "EXECUTION_RETENTION_DAYS"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxRequestBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "MAX_REQUEST_BYTES, also enforced by Kong"
+            },
+            "maxRemoteFileBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "MAX_REMOTE_FILE_BYTES"
+            },
+            "streamTimeoutMs": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "STREAM_TIMEOUT_MS"
+            },
+            "elicitationTimeoutSeconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 86400,
+              "description": "ELICITATION_TIMEOUT_SECONDS"
+            },
+            "maxActiveExecutionsPerTenant": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "MAX_ACTIVE_EXECUTIONS_PER_TENANT"
+            },
+            "maxActiveExecutionsPerConnection": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "MAX_ACTIVE_EXECUTIONS_PER_CONNECTION"
+            },
+            "maxActiveTasksPerTenant": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "MAX_ACTIVE_TASKS_PER_TENANT"
+            }
+          }
+        }
+      },
+      "required": ["publicBaseUrl", "zitadelIssuer", "unique"]
+    }
+  }
+}

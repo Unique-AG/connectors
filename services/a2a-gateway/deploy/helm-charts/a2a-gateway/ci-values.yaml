@@ -1,0 +1,31 @@
+a2aConfig:
+  publicBaseUrl: https://a2a.example.com
+  zitadelIssuer: https://id.example.com
+  corsAllowedOrigins:
+    - https://admin.example.com
+  egress:
+    allowedHosts:
+      - agent.example.com
+
+postgresql:
+  connection:
+    url:
+      fromSecret:
+        name: a2a-gateway-postgresql
+        key: url
+
+rabbitmq:
+  connection:
+    host:
+      fromKubernetesService:
+        name: rabbitmq
+        namespace: rabbitmq
+        podPort: 5672
+    username:
+      fromSecret:
+        name: rabbitmq-service-binding
+        key: AMQP_USERNAME
+    password:
+      fromSecret:
+        name: rabbitmq-service-binding
+        key: AMQP_PASSWORD

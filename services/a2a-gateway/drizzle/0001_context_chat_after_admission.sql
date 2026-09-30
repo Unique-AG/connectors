@@ -1,0 +1,1 @@
+ALTER TABLE "a2a_contexts" ALTER COLUMN "chat_id" DROP NOT NULL;

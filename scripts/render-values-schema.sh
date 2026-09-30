@@ -30,6 +30,7 @@ CHART_DIRS=(
   "services/backstop-mcp/deploy/helm-charts/backstop-mcp"
   "services/office-365-mcp/deploy/helm-charts/office-365-mcp"
   "services/with-intelligence-mcp/deploy/helm-charts/with-intelligence-mcp"
+  "services/a2a-gateway/deploy/helm-charts/a2a-gateway"
 )
 
 had_drift=false
