@@ -65,6 +65,7 @@ jobs:
           pull: true
           provenance: false
           tags: ${{ env.GHCR_REPO }}:ci
+          no-cache-filters: runtime,runner
           cache-from: |
             type=gha,scope=${{ env.GHA_CACHE_SCOPE }}
             type=registry,ref=${{ env.GHCR_REPO }}:cache

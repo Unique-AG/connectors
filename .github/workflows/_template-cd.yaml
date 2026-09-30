@@ -119,6 +119,7 @@ jobs:
           push: true
           sbom: true
           tags: ${{ steps.meta.outputs.tags }}
+          no-cache-filters: runtime,runner
           cache-from: |
             type=gha,scope=${{ inputs.service-name }}
             type=registry,ref=${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:cache
