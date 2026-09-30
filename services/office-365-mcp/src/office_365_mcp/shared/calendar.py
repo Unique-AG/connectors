@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from typing import Self
+from typing import Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
@@ -12,16 +12,24 @@ from msgraph.generated.models.attendee_type import AttendeeType
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.calendar import Calendar
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
+from msgraph.generated.models.day_of_week import DayOfWeek
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.event import Event
 from msgraph.generated.models.event_type import EventType
 from msgraph.generated.models.free_busy_status import FreeBusyStatus
+from msgraph.generated.models.importance import Importance
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.location import Location
 from msgraph.generated.models.online_meeting_provider_type import OnlineMeetingProviderType
+from msgraph.generated.models.patterned_recurrence import PatternedRecurrence
+from msgraph.generated.models.recurrence_pattern import RecurrencePattern
+from msgraph.generated.models.recurrence_pattern_type import RecurrencePatternType
+from msgraph.generated.models.recurrence_range import RecurrenceRange
+from msgraph.generated.models.recurrence_range_type import RecurrenceRangeType
 from msgraph.generated.models.response_type import ResponseType
 from msgraph.generated.models.sensitivity import Sensitivity
 from msgraph.generated.models.user import User
+from msgraph.generated.models.week_index import WeekIndex
 from msgraph.generated.users.item.calendar.calendar_request_builder import CalendarRequestBuilder
 from msgraph.generated.users.item.calendars.item.calendar_item_request_builder import (
     CalendarItemRequestBuilder,
@@ -76,6 +84,9 @@ SUMMARY_FIELDS: tuple[str, ...] = (
     "responseStatus",
     "attendees",
     "webLink",
+    "categories",
+    "importance",
+    "recurrence",
 )
 
 NOBODY_INVITED_BUT_A_PLACE = (
@@ -97,6 +108,18 @@ _UNANSWERED_YEAR = 1
 _NO_SUCH_ZONE: tuple[type[Exception], ...] = (ZoneInfoNotFoundError, ValueError)
 
 _AN_EVENT = "#microsoft.graph.event"
+
+type PatternType = Literal[
+    "daily", "weekly", "absoluteMonthly", "relativeMonthly", "absoluteYearly", "relativeYearly"
+]
+
+type DayName = Literal[
+    "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"
+]
+
+type WeekIndexName = Literal["first", "second", "third", "fourth", "last"]
+
+type RangeType = Literal["endDate", "noEnd", "numbered"]
 
 
 class EventTime(BaseModel):
