@@ -26,10 +26,9 @@ flowchart LR
 | Unique API | Source of truth for knowledge-base search, the content tree, and file content, called live via `unique-toolkit` on every tool invocation |
 | Postgres | Durable storage for OAuth-proxy state only; never holds knowledge-base data |
 
-In a Kubernetes deployment, the call to the Unique API is wired through the monorepo-wide
-`internalServices.dependencies` convention rather than a hardcoded URL. See
-[Deployment: Network Policies](../operator/deployment.md#Network-Policies) for how that generates
-both the env var and the matching egress rule.
+The Unique API address is plain configuration (`UNIQUE_API_BASE_URL`), not hardcoded. With
+`networkPolicy.enabled`, the egress rule to it is not created by the chart. See
+[Deployment: Network Policies](../operator/deployment.md#Network-Policies).
 
 ## Authentication Architecture
 
