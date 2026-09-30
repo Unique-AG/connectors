@@ -2,7 +2,7 @@ name: "[CI] Services Cache Warming"
 
 on:
   schedule:
-    - cron: "0 5 * * *"
+    - cron: "0 5 * * *" # Every day at 5 AM UTC
   workflow_dispatch:
     inputs:
       services:
@@ -11,9 +11,9 @@ on:
         default: "all"
 
 permissions:
-  contents: read
-  packages: read
-  actions: read
+  contents: read # to read the repository
+  packages: read # to let the called workflow log in to GHCR and read the cache image
+  actions: read # to let the called workflow read the GitHub Actions cache
 
 jobs:
   build-matrix:
@@ -27,6 +27,8 @@ jobs:
         with:
           persist-credentials: false
 
+      # The list contains a service only if it has the file services/<name>/deploy/Dockerfile.
+      # A service without a Dockerfile fails the build.
       - name: Build service matrix
         id: matrix
         env:

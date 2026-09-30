@@ -13,8 +13,8 @@ on:
         type: string
 
 permissions:
-  contents: read
-  packages: read
+  contents: read # to read the repository
+  packages: read # to read the cache image from GHCR
 
 jobs:
   containerize:

@@ -12,7 +12,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: read # to read the repository
 
 concurrency:
   group: security-trivy-repo-${{ github.event.pull_request.number || github.ref }}
@@ -24,8 +24,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
-      contents: read
-      security-events: write
+      contents: read # to read the repository
+      security-events: write # to upload the results to code scanning
     env:
       TRIVY_DISABLE_VEX_NOTICE: "true"
     steps:

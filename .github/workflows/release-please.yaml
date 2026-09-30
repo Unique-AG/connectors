@@ -7,14 +7,14 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: read # to read the repository
 
 jobs:
   release-please:
     permissions:
-      contents: write
-      issues: write
-      pull-requests: write
+      contents: write # to create the tags and the releases
+      issues: write # to set the release labels
+      pull-requests: write # to open and update the release pull request
     runs-on: ubuntu-slim
     timeout-minutes: 10
     outputs:
@@ -30,7 +30,7 @@ jobs:
         id: release
 
       - name: Debug release outputs
-        continue-on-error: true
+        continue-on-error: true # a failed printout must not stop the release plan
         env:
           RELEASE_OUTPUTS: ${{ toJson(steps.release.outputs) }}
         run: |
@@ -75,10 +75,10 @@ jobs:
       matrix:
         release: ${{ fromJson(needs.release-please.outputs.releases) }}
     permissions:
-      contents: read
-      id-token: write
-      packages: write
-      security-events: write
+      contents: read # to let the called workflow read the repository
+      id-token: write # to let the called workflow sign in to Azure and sign the image
+      packages: write # to let the called workflow push the image and the charts to GHCR
+      security-events: write # to let the called workflow upload the scan results
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:

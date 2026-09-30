@@ -1,6 +1,11 @@
+# Python services are not part of the pnpm and turbo workspace, so ci-services.yaml does not cover them.
+# Each service job runs for a changed service and for every service that uses a changed shared package.
 name: "[CI] Python"
 
 on:
+  # No `branches` filter. Stacked pull requests target their parent branch, not `main`.
+  # A `branches: [main]` filter skips this workflow for all pull requests in a stack except the first.
+  # Only `paths` decides when the workflow runs.
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
@@ -18,8 +23,8 @@ on:
         default: "all"
 
 permissions:
-  contents: read
-  packages: read
+  contents: read # to read the repository
+  packages: read # to let the called workflows pull the base chart and the cache image from GHCR
 
 concurrency:
   group: ci-python-${{ github.event.pull_request.number || github.ref }}
@@ -55,6 +60,9 @@ jobs:
               - '.github/workflows/_template-helm.yaml'
               - '.github/workflows/_template-terraform.yaml'
 
+      # This step builds the list of Python services for the matrix jobs.
+      # A change to a workflow file lists every service. A manual run lists the services that the input names.
+      # Node services (package.json only) are never listed. ci-services.yaml covers them.
       - name: Build package matrix
         id: build-matrix
         env:
@@ -141,6 +149,9 @@ jobs:
       - name: Sync dependencies
         run: uv sync --locked
 
+      # This step runs here and not in the Terraform template.
+      # The generator imports the Python code of the service and needs no terraform binary.
+      # The test for the file, not a matrix entry, selects the services. A second service with a generator needs no edit here.
       - name: Check generated Terraform registry drift
         run: |
           if [ -f scripts/render-terraform-registry.py ]; then
@@ -220,8 +231,8 @@ jobs:
       matrix:
         package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
     permissions:
-      contents: read
-      packages: read
+      contents: read # to let the called workflow read the repository
+      packages: read # to let the called workflow pull the base chart from GHCR
     uses: ./.github/workflows/_template-helm.yaml
     with:
       service-name: ${{ matrix.package }}
@@ -236,7 +247,7 @@ jobs:
       matrix:
         package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
     permissions:
-      contents: read
+      contents: read # to let the called workflow read the repository
     uses: ./.github/workflows/_template-terraform.yaml
     with:
       service-path: services/${{ matrix.package }}

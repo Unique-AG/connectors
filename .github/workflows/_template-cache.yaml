@@ -13,9 +13,9 @@ on:
         type: string
 
 permissions:
-  contents: read
-  packages: read
-  actions: read
+  contents: read # to read the repository
+  packages: read # to log in to GHCR and read the cache image
+  actions: read # to read the GitHub Actions cache (cache-from type=gha)
 
 env:
   GHCR_REPO: ghcr.io/unique-ag/connectors/services/${{ inputs.service-name }}

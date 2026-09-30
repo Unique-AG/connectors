@@ -11,8 +11,8 @@ on:
       - ".github/workflows/security-dependency-review.yaml"
 
 permissions:
-  contents: read
-  pull-requests: write
+  contents: read # to read the repository
+  pull-requests: write # to comment the summary on the pull request
 
 concurrency:
   group: security-dependency-review-${{ github.event.pull_request.number }}

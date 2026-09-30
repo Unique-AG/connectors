@@ -11,13 +11,14 @@ concurrency:
 jobs:
   conventional-pr-title:
     name: Validate PR title and scope
+    # These labels skip the job: the two release-please labels, the Dependabot label, and the title exception.
     if: >-
       !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') &&
       !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') &&
       !contains(github.event.pull_request.labels.*.name, 'dependencies') &&
       !contains(github.event.pull_request.labels.*.name, 'title-exception')
     permissions:
-      pull-requests: read
+      pull-requests: read # to list the files of the pull request
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -63,9 +64,9 @@ jobs:
 
   gatekeeper:
     permissions:
-      checks: read
-      statuses: read
-      pull-requests: read
+      checks: read # to read the check runs of the pull request
+      statuses: read # to read the commit statuses of the pull request
+      pull-requests: read # to find the pull request of the commit
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:

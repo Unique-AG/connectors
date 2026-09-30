@@ -2,7 +2,7 @@ name: "[Security] Trivy Registry Image Scan"
 
 on:
   schedule:
-    - cron: "0 6 * * 3"
+    - cron: "0 6 * * 3" # Every Wednesday at 6 AM UTC
   workflow_dispatch:
     inputs:
       services:
@@ -11,7 +11,7 @@ on:
         default: all
 
 permissions:
-  contents: read
+  contents: read # to read the repository
 
 concurrency:
   group: security-trivy-registry
@@ -64,9 +64,9 @@ jobs:
       matrix:
         service: ${{ fromJson(needs.detect-services.outputs.services) }}
     permissions:
-      contents: read
-      packages: read
-      security-events: write
+      contents: read # to read the repository
+      packages: read # to pull the image from GHCR
+      security-events: write # to upload the results to code scanning
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:

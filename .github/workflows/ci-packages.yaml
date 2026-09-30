@@ -1,6 +1,9 @@
 name: "[CI] Packages"
 
 on:
+  # No `branches` filter. Stacked pull requests target their parent branch, not `main`.
+  # A `branches: [main]` filter skips this workflow for all pull requests in a stack except the first.
+  # Only `paths` decides when the workflow runs.
   pull_request:
     paths:
       - "packages/**"
@@ -19,7 +22,7 @@ concurrency:
 jobs:
   validate:
     permissions:
-      contents: read
+      contents: read # to read the repository
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

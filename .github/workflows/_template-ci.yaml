@@ -19,7 +19,7 @@ concurrency:
 jobs:
   validate:
     permissions:
-      contents: read
+      contents: read # to read the repository
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -82,8 +82,8 @@ jobs:
 
   validate-helm:
     permissions:
-      contents: read
-      packages: read
+      contents: read # to let the called workflow read the repository
+      packages: read # to let the called workflow pull the base chart from GHCR
     uses: ./.github/workflows/_template-helm.yaml
     with:
       service-name: ${{ inputs.service-name }}
@@ -91,15 +91,15 @@ jobs:
 
   validate-terraform:
     permissions:
-      contents: read
+      contents: read # to let the called workflow read the repository
     uses: ./.github/workflows/_template-terraform.yaml
     with:
       service-path: ${{ inputs.service-path }}
 
   containerize:
     permissions:
-      contents: read
-      packages: read
+      contents: read # to let the called workflow read the repository
+      packages: read # to let the called workflow read the cache image from GHCR
     uses: ./.github/workflows/_template-containerize.yaml
     with:
       service-name: ${{ inputs.service-name }}

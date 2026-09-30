@@ -8,8 +8,8 @@ on:
         required: true
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: write # to push one branch for each service
+  pull-requests: write # to open one pull request for each service
 
 jobs:
   rebuild:

@@ -15,8 +15,8 @@ on:
 jobs:
   validate:
     permissions:
-      contents: read
-      packages: read
+      contents: read # to read the repository
+      packages: read # to pull the base chart from GHCR
     runs-on: ubuntu-slim
     timeout-minutes: 10
     env:

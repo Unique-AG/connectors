@@ -37,7 +37,7 @@ Charts keep [helm-unittest](https://github.com/helm-unittest/helm-unittest) suit
 
 To run the suites on your machine, install the plugin once with `helm plugin install https://github.com/helm-unittest/helm-unittest`. Then run the same two commands in the chart directory.
 
-## Releases
+## Release Workflows
 
 release-please opens one release pull request for each service. Merge it to start `[Release] Please`. The workflow handles each released service that has a Helm chart. It builds the image from the release tag and signs it. It also pushes the chart, scans the image, and publishes the docs in `services/<service>/docs` to Confluence.
 

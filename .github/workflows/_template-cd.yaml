@@ -28,8 +28,8 @@ jobs:
       group: release-${{ inputs.service-name }}-${{ inputs.service-version }}
       cancel-in-progress: false
     permissions:
-      packages: write
-      id-token: write
+      packages: write # to push the image and the charts to GHCR
+      id-token: write # to sign in to Azure and to sign the image with OIDC
     outputs:
       digest: ${{ steps.existing.outputs.digest || steps.build-and-push.outputs.digest }}
     runs-on: ubuntu-24.04
@@ -81,7 +81,7 @@ jobs:
       - name: Login to Azure as uniquecr token issuer (OIDC)
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
-          client-id: 46c63b6f-67ac-476a-9d5d-6db2d18743bb
+          client-id: 46c63b6f-67ac-476a-9d5d-6db2d18743bb # acr_oidc uniquecr_push
           tenant-id: 99330c76-81d2-460e-861e-35af8e2a4266
           subscription-id: fb8bce09-908a-459f-b200-a578005bfeb2
 
@@ -102,7 +102,7 @@ jobs:
       - name: Login to Azure as getunique token issuer (OIDC)
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
-          client-id: daa88f8d-0943-459c-890a-17b1a018d11e
+          client-id: daa88f8d-0943-459c-890a-17b1a018d11e # acr_oidc getunique_push
           tenant-id: 99330c76-81d2-460e-861e-35af8e2a4266
           subscription-id: fb8bce09-908a-459f-b200-a578005bfeb2
 
@@ -225,9 +225,9 @@ jobs:
   security-trivy-image-scan:
     needs: containerize
     permissions:
-      contents: read
-      packages: read
-      security-events: write
+      contents: read # to read the repository
+      packages: read # to pull the image from GHCR
+      security-events: write # to upload the results to code scanning
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -282,8 +282,8 @@ jobs:
   security-trivy-license-scan:
     needs: containerize
     permissions:
-      contents: read
-      packages: read
+      contents: read # to read the repository
+      packages: read # to pull the image from GHCR
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -324,7 +324,7 @@ jobs:
   publish-docs:
     if: inputs.publish-docs
     permissions:
-      contents: read
+      contents: read # to let the called workflow read the repository
     uses: ./.github/workflows/_template-docs-confluence.yaml
     secrets: inherit
     with:

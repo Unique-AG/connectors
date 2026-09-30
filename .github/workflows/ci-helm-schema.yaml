@@ -8,8 +8,8 @@ on:
       - ".github/workflows/ci-helm-schema.yaml"
 
 permissions:
-  contents: read
-  packages: read
+  contents: read # to read the repository
+  packages: read # to pull the base chart from GHCR
 
 concurrency:
   group: ci-helm-schema-${{ github.event.pull_request.number }}
@@ -33,5 +33,6 @@ jobs:
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "$REGISTRY_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
 
+      # The script compares every chart with its committed schema. This job runs once for each pull request.
       - name: Check values.schema.json drift
         run: scripts/render-values-schema.sh --check

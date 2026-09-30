@@ -23,17 +23,17 @@ on:
         type: string
 
 permissions:
-  contents: read
-  packages: write
-  id-token: write
-  security-events: write
+  contents: read # to let the called workflow read the repository
+  packages: write # to let the called workflow push the image and the charts to GHCR
+  id-token: write # to let the called workflow sign in to Azure and sign the image
+  security-events: write # to let the called workflow upload the scan results
 
 jobs:
   guard:
     runs-on: ubuntu-slim
     timeout-minutes: 5
     permissions:
-      contents: read
+      contents: read # to read the repository
     env:
       SERVICE: ${{ inputs.service }}
       VERSION: ${{ inputs.existing-version }}
