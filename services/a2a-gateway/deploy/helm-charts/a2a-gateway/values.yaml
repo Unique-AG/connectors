@@ -1,59 +1,364 @@
+# ════ Identity ════════════════════════════════════════════════════════════════
+nameOverride: a2a-gateway
+# KongPlugin names in extraRoutes annotations are derived from this name.
+fullnameOverride: a2a-gateway
+selectorComponentLabel: server
+
+# ════ Compute ═════════════════════════════════════════════════════════════════
+
+# ── Deployment ────────────────────────────────────────────────────────────────
+# Multiple replicas are supported: absurd coordinates the workers through PostgreSQL and every
+# replica consumes the event bus with its own auto-delete queue.
 replicaCount: 1
 
+deployment:
+  revisionHistoryLimit: 3
+  metadata:
+    annotations:
+      reloader.stakater.com/auto: "true"
+
+pdb:
+  maxUnavailable: 1
+
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  AUTH_MODE: kong
+  NODE_ENV: production
+  OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+  OTEL_EXPORTER_PROMETHEUS_PORT: "9564"
+  OTEL_METRICS_EXPORTER: prometheus
+
+# -- Environment variables from secrets
+envVars:
+  # 32-byte hex key for AES-256-GCM encryption of stored credentials (openssl rand -hex 32)
+  - name: ENCRYPTION_KEY
+    valueFrom:
+      secretKeyRef:
+        name: a2a-gateway
+        key: ENCRYPTION_KEY
+
 image:
-  repository: ghcr.io/unique-ag/connectors/services/a2a-gateway
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/a2a-gateway
   tag: 0.0.0 # x-release-please-version
   pullPolicy: IfNotPresent
 
-imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
-
-serviceAccount:
-  create: true
-  name: ""
-
-podAnnotations: {}
-podLabels: {}
-
-service:
-  port: 9560
-
-config:
-  authMode: kong
-  publicBaseUrl: ""
-  zitadelIssuer: ""
-  uniqueChatUrl: ""
-  uniqueScopeManagementUrl: ""
-  uniqueIngestionUrl: ""
-  corsAllowedOrigins: []
-  workerEnabled: true
-  workerConcurrency: 4
-
-secretRef: a2a-gateway
-
-kong:
-  enabled: false
-  projectId: ""
-  parentRefs: []
-  hostnames: []
+ports:
+  application: 9560
+  metrics: 9564
 
 resources:
-  requests:
-    cpu: 100m
-    memory: 256Mi
   limits:
+    memory: 1Gi
+  requests:
+    cpu: 250m
     memory: 512Mi
 
-networkPolicy:
+probes:
   enabled: true
-  ingressNamespaceSelector: {}
-  ingressPodSelector:
-    matchExpressions:
-      - key: app.kubernetes.io/name
-        operator: In
-        values: [kong, node-chat]
+  liveness:
+    httpGet:
+      path: /health/live
+      port: http
+    periodSeconds: 10
+    failureThreshold: 6
+  # Ready only when PostgreSQL, RabbitMQ, the absurd worker and the Unique services are reachable.
+  readiness:
+    httpGet:
+      path: /health/ready
+      port: http
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  startup:
+    httpGet:
+      path: /health/live
+      port: http
+    periodSeconds: 5
+    failureThreshold: 30
 
-nodeSelector: {}
-tolerations: []
-affinity: {}
+serviceAccount:
+  enabled: true
+
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 1Gi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+# ════ Data ════════════════════════════════════════════════════════════════════
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+# Projected as DATABASE_URL. The absurd schema and the `a2a-gateway` queue must exist, see README.
+postgresql:
+  enabled: true
+  connection:
+    sslMode: verify
+    # ── In-cluster PostgreSQL (CloudNativePG) ─────────────────────────────────
+    #
+    # host:
+    #   fromKubernetesService:
+    #     name: <release-name>-pg-cluster-rw
+    #     namespace: <namespace>
+    #     podPort: 5432
+    #     podSelectorLabels:
+    #       k8s:cnpg.io/cluster: <release-name>-pg-cluster
+    #
+    # url:
+    #   fromSecret:
+    #     name: <release-name>-pg-cluster-app
+    #     key: fqdn-uri
+    #
+    # Keep `host` next to `url`: the CiliumNetworkPolicy egress is derived from it.
+
+# ── RabbitMQ ──────────────────────────────────────────────────────────────────
+# Projected as AMQP_URL. With structured fields (host/username/password) the chart composes
+# AMQP_URL from the AMQP_* variables, so the credentials must be URL-safe.
+rabbitmq:
+  enabled: true
+  connection: {}
+  # ── In-cluster RabbitMQ Cluster Operator ──────────────────────────────────
+  #
+  # host:
+  #   fromKubernetesService:
+  #     name: <rabbitmqcluster-name>
+  #     namespace: <namespace>
+  #     podPort: 5672
+  #     podSelectorLabels:
+  #       k8s:app.kubernetes.io/component: rabbitmq
+  #       k8s:app.kubernetes.io/name: <rabbitmqcluster-name>
+  # username:
+  #   fromSecret:
+  #     name: rabbitmq-cluster-chat-service-binding
+  #     key: AMQP_USERNAME
+  # password:
+  #   fromSecret:
+  #     name: rabbitmq-cluster-chat-service-binding
+  #     key: AMQP_PASSWORD
+
+# ── InternalServices ──────────────────────────────────────────────────────────
+internalServices:
+  dependencies:
+    chat:
+      name: chat
+      servicePort: 8093
+      podPort: 8080
+    ingestion:
+      name: ingestion
+      servicePort: 8091
+      podPort: 8080
+    scopeManagement:
+      name: scope-management
+      servicePort: 8094
+      podPort: 8080
+  dependents:
+    # Kong: /a2a, /management and the public discovery routes.
+    ingressGateway:
+      name: gateway
+      namespace: system
+    # node-chat: /internal (never routed through Kong).
+    chat:
+      name: chat
+
+# ════ Exposure ════════════════════════════════════════════════════════════════
+
+# ── Service ───────────────────────────────────────────────────────────────────
+service:
+  port: 80
+
+# ── HTTPRoute ─────────────────────────────────────────────────────────────────
+# All external traffic enters through Kong; the gateway has no ingress of its own.
+# The paths sit at the root of `routes.hostname` (RFC 9728 discovery lives at /.well-known/...),
+# so PUBLIC_BASE_URL is https://<routes.hostname>. /internal is intentionally never routed.
+routes:
+  # -- Kong-facing hostname, e.g. a2a.unique.app
+  hostname: ""
+
+extraRoutes:
+  # Agent cards and OAuth protected-resource metadata, no authentication.
+  public:
+    enabled: false
+    annotations:
+      konghq.com/plugins: a2a-gateway-strip-identity,unique-route-metrics
+    hostnames:
+      - '{{ .Values.routes.hostname }}'
+    matches:
+      - method: GET
+        path:
+          type: RegularExpression
+          value: '^/a2a/agents/pub_[0-9a-z]+/\.well-known/agent-card\.json$'
+      - method: GET
+        path:
+          type: Exact
+          value: /.well-known/oauth-protected-resource/a2a
+  # Remote agent push callbacks; authenticated by a per-execution token in the gateway, no JWT.
+  callbacks:
+    enabled: false
+    annotations:
+      konghq.com/plugins: a2a-gateway-strip-identity,a2a-gateway-request-size,unique-route-metrics
+    hostnames:
+      - '{{ .Values.routes.hostname }}'
+    matches:
+      - method: POST
+        path:
+          type: PathPrefix
+          value: /a2a/callbacks
+  # JSON-RPC (incl. SSE streaming), catalog, file downloads and management, Kong JWT validation.
+  # Keep read-timeout in line with a2aConfig.limits.streamTimeoutMs.
+  protected:
+    enabled: false
+    annotations:
+      konghq.com/plugins: unique-jwt-auth,a2a-gateway-client-id,a2a-gateway-request-size,unique-route-metrics
+      konghq.com/read-timeout: "3600000"
+      konghq.com/response-buffering: "false"
+    hostnames:
+      - '{{ .Values.routes.hostname }}'
+    matches:
+      - path:
+          type: PathPrefix
+          value: /a2a
+      - path:
+          type: PathPrefix
+          value: /management
+
+# ════ Operations ══════════════════════════════════════════════════════════════
+
+# ── Job (migration hook) ──────────────────────────────────────────────────────
+hooks:
+  migration:
+    enabled: true
+    command: |
+      cd /app && ./node_modules/.bin/drizzle-kit migrate
+
+# ── Prometheus ────────────────────────────────────────────────────────────────
+prometheus:
+  additionalAlerts:
+    A2aGatewayStuckRuns:
+      alert: A2aGatewayStuckRuns
+      annotations:
+        summary: "A2A gateway runs are stuck"
+        description: "{{ $value }} {{ $labels.direction }} A2A runs of company {{ $labels.company_id }} made no progress beyond the recovery threshold."
+        runbook: |
+          1. Inspect gateway logs for the affected company and direction
+          2. Check that the remote agents are reachable and approved in EGRESS_ALLOWED_HOSTS
+          3. Check the absurd worker (WORKER_ENABLED) and the /health/ready endpoint
+      expr: |
+        max by (company_id, direction) (a2a_gateway_stuck_runs) > 0
+      for: 30m
+      labels:
+        severity: warning
+        alertGroup: a2a-gateway
+    A2aGatewayRunFailureRate:
+      alert: A2aGatewayRunFailureRate
+      annotations:
+        summary: "A2A gateway run failure rate is high"
+        description: "{{ $value | humanizePercentage }} of {{ $labels.direction }} A2A runs finished as failed or unknown."
+        runbook: |
+          1. Inspect gateway logs for failed runs
+          2. Check remote agent availability and credentials
+          3. Check the Unique services the gateway depends on
+      expr: |
+        (
+          sum by (direction) (rate(a2a_gateway_runs_finished_total{state=~"failed|unknown"}[15m]))
+          /
+          sum by (direction) (rate(a2a_gateway_runs_finished_total[15m]))
+        ) > 0.1
+      for: 15m
+      labels:
+        severity: warning
+        alertGroup: a2a-gateway
+    A2aGatewayQuotaRejections:
+      alert: A2aGatewayQuotaRejections
+      annotations:
+        summary: "A2A gateway rejects requests by quota"
+        description: "Company {{ $labels.company_id }} hit the {{ $labels.scope }} quota {{ $value }} times in 15 minutes ({{ $labels.direction }})."
+        runbook: |
+          1. Check whether the company runs unusually many concurrent A2A runs
+          2. Raise a2aConfig.limits.maxActive* if the load is legitimate
+      expr: |
+        sum by (company_id, direction, scope) (increase(a2a_gateway_quota_rejections_total[15m])) > 50
+      for: 15m
+      labels:
+        severity: warning
+        alertGroup: a2a-gateway
+
+# -- Configuration of the A2A gateway, mapped to environment variables
+a2aConfig:
+  enabled: true
+
+  # -- Kong-facing HTTPS base URL, used for agent cards, file URLs and callbacks.
+  # example: https://a2a.unique.app
+  publicBaseUrl: '{{ fail "a2aConfig.publicBaseUrl is mandatory. Override in your deployment values." }}'
+  # -- Zitadel issuer URL, advertised in the OAuth protected-resource metadata.
+  # example: https://id.unique.app
+  zitadelIssuer: '{{ fail "a2aConfig.zitadelIssuer is mandatory. Override in your deployment values." }}'
+  # -- Allowed browser origins, e.g. the Unique admin frontend.
+  # example: [https://admin.unique.app]
+  corsAllowedOrigins: []
+
+  # -- Unique services; auto-derived from internalServices.dependencies (node-chat appends /graphql).
+  unique:
+    chatUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.chat) }}'
+    scopeManagementUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.scopeManagement) }}'
+    ingestionUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.ingestion) }}'
+
+  egress:
+    # -- Operator-approved remote agent and token endpoint hostnames (exact match, HTTPS only).
+    # Empty denies all outbound agent traffic. The CiliumNetworkPolicy allows the same hosts.
+    allowedHosts: []
+    # -- Ports the CiliumNetworkPolicy opens for allowedHosts
+    ports:
+      - "443"
+
+  pushNotifications:
+    enabled: false
+    # -- Limit client webhooks to these hostnames; empty allows any public HTTPS host.
+    # The CiliumNetworkPolicy allows these hosts on a2aConfig.egress.ports; any host needs networkPolicy.baseline.egress.pushWebhooks.
+    allowedHosts: []
+
+  worker:
+    # Disable only on API-only replicas while another replica runs the workers.
+    enabled: true
+    concurrency: 32
+
+  reconcileIntervalSeconds: 300
+
+  retention:
+    taskDays: 30
+    executionDays: 30
+
+  limits:
+    # -- Request body limit; also enforced by Kong on the protected and callback routes.
+    maxRequestBytes: 26214400
+    maxRemoteFileBytes: 52428800
+    streamTimeoutMs: 3600000
+    elicitationTimeoutSeconds: 600
+    maxActiveExecutionsPerTenant: 50
+    maxActiveExecutionsPerConnection: 20
+    maxActiveTasksPerTenant: 50
+
+# ── NetworkPolicy ─────────────────────────────────────────────────────────────
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      namespace: system
+    egress:
+      # Push notifications to arbitrary public webhook hosts (a2aConfig.pushNotifications.allowedHosts empty).
+      pushWebhooks:
+        enabled: false
+        toEntities:
+          - world
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP

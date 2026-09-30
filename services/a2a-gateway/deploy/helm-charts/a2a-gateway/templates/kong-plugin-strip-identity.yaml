@@ -1,0 +1,20 @@
+{{- if include "chart.kong.enabled" . }}
+# Unauthenticated routes: drop caller-supplied identity headers.
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ include "base.fullname" . }}-strip-identity
+  labels:
+    {{- include "base.labels.common" . | nindent 4 }}
+plugin: request-transformer
+config:
+  remove:
+    headers:
+      - x-user-id
+      - x-user-roles
+      - x-company-id
+      - x-company-name
+      - x-company-domain
+      - x-client-id
+      - x-service-id
+{{- end }}

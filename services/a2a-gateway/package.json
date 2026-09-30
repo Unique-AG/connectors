@@ -4,11 +4,11 @@
   "version": "0.0.0",
   "private": true,
   "license": "Unique License v1",
-  "type": "module",
   "files": [
     "dist",
     "deploy"
   ],
+  "type": "module",
   "scripts": {
     "build": "nest build",
     "predev": "pnpm --filter @unique-ag/aes-gcm-encryption build",
@@ -38,6 +38,7 @@
     "@unique-ag/aes-gcm-encryption": "workspace:*",
     "@unique-ag/instrumentation": "workspace:*",
     "absurd-sdk": "0.5.0",
+    "drizzle-kit": "catalog:",
     "drizzle-orm": "catalog:",
     "express": "5.2.1",
     "ipaddr.js": "2.5.0",
@@ -59,7 +60,6 @@
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
-    "drizzle-kit": "catalog:",
     "typescript": "6.0.2",
     "unplugin-swc": "catalog:",
     "vitest": "catalog:"

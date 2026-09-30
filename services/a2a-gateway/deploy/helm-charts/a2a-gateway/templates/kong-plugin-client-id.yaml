@@ -1,0 +1,26 @@
+{{- if include "chart.kong.enabled" . }}
+# JWT routes: runs after unique-jwt-auth (which overwrites x-user-id/x-company-id and clears
+# x-user-roles), drops caller-supplied x-client-id/x-service-id and forwards the OAuth client
+# (azp, falling back to client_id) of the verified token as x-client-id.
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ include "base.fullname" . }}-client-id
+  labels:
+    {{- include "base.labels.common" . | nindent 4 }}
+plugin: post-function
+config:
+  access:
+    - |
+      kong.service.request.clear_header("x-client-id")
+      kong.service.request.clear_header("x-service-id")
+      local token = kong.ctx.shared.unique_jwt_token
+      if type(token) ~= "string" then return end
+      local payload = token:match("^[^.]+%.([^.]+)%.")
+      if not payload then return end
+      payload = payload:gsub("%-", "+"):gsub("_", "/")
+      local claims = ngx.decode_base64(payload .. string.rep("=", (4 - #payload % 4) % 4))
+      if not claims then return end
+      local client = claims:match('"azp"%s*:%s*"([^"]+)"') or claims:match('"client_id"%s*:%s*"([^"]+)"')
+      if client then kong.service.request.set_header("x-client-id", client) end
+{{- end }}
