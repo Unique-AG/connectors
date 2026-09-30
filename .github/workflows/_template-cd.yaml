@@ -265,5 +265,4 @@ jobs:
     uses: ./.github/workflows/_template-docs-confluence.yaml
     secrets: inherit
     with:
-      service-name: ${{ inputs.service-name }}
       docs-path: ${{ inputs.docs-path }}

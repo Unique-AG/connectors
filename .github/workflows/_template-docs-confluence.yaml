@@ -3,10 +3,6 @@ name: "[Template] Docs to Confluence"
 on:
   workflow_call:
     inputs:
-      service-name:
-        description: "Name of the service (e.g., teams-mcp)"
-        required: true
-        type: string
       docs-path:
         description: "Path to the docs directory relative to repo root"
         required: true
@@ -31,10 +27,9 @@ jobs:
           CONFLUENCE_USER_NAME: ${{ secrets.ATLASSIAN_UNIQUE_CODE_PUBLISHER_USERNAME }}
           CONFLUENCE_API_KEY: ${{ secrets.ATLASSIAN_UNIQUE_CODE_PUBLISHER_APIKEY }}
           DOCS_PATH: ${{ inputs.docs-path }}
-          SERVICE_NAME: ${{ inputs.service-name }}
           MD2CONF_IMAGE: leventehunyadi/md2conf:0.6.1@sha256:c06844e455977be323fda0d6d709863dc84cf522ce4266ed1b68a45c45ddc6a6
         run: |
-          echo "-- Publishing $SERVICE_NAME docs to Confluence --"
+          echo "-- Publishing $DOCS_PATH to Confluence --"
           docker run --rm \
             -v "$GITHUB_WORKSPACE/$DOCS_PATH:/data" \
             -e CONFLUENCE_DOMAIN \
