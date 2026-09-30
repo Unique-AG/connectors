@@ -25,22 +25,13 @@ give it the URL. You never need a client ID, a client secret, or an API key.
 
 ## Claude Desktop / claude.ai
 
+Add `kb-mcp` as a custom connector with your URL, following Claude's guide:
+[Get started with custom connectors using remote MCP](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
+On Team and Enterprise plans an Owner adds it once for everyone. Then connect it and sign in with
+your normal company account.
+
 Your `kb-mcp` URL must be reachable over the public internet: custom connectors connect from
 Claude's cloud, not from your device.
-
-**If your organization is on a Team or Enterprise plan**, an Owner adds it once for everyone:
-
-1. Owner navigates to Organization settings → Connectors, clicks "Add," hovers "Custom," selects
-   "Web," and pastes the `kb-mcp` URL.
-2. Everyone else finds it under their own Customize → Connectors (labeled "Custom"), clicks
-   "Connect," and signs in with their normal company account.
-
-**Otherwise**, add it yourself:
-
-1. Navigate to Customize → Connectors and click "Add custom connector."
-2. Enter a name and paste your `kb-mcp` URL.
-3. Click "Add," then "Connect." Sign in with your normal company account and approve the
-   connection.
 
 ## Claude Code
 
@@ -49,7 +40,8 @@ claude mcp add --transport http kb-mcp https://kb-mcp.<tenant>.unique.app/mcp
 ```
 
 Then complete sign-in: run `/mcp` if you're already inside a session, or `claude mcp login kb-mcp`
-from a bare shell if you're not.
+from a bare shell if you're not. See Claude Code's [MCP documentation](https://code.claude.com/docs/en/mcp)
+for the other options.
 
 Optionally, install the `unique-kb-mcp` skill, which teaches Claude how to combine the tools
 (scoping to a folder, checking metadata before filtering):
@@ -73,7 +65,8 @@ everywhere:
 }
 ```
 
-Open Cursor's MCP settings and sign in when prompted.
+Open Cursor's MCP settings and sign in when prompted. See Cursor's
+[MCP documentation](https://cursor.com/docs/mcp) for the other options.
 
 ## Related Documentation
 
