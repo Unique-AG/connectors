@@ -140,6 +140,12 @@ A second scan of the same image only adds findings. It never removes them. **To 
 
 The manual re-run workflow of a service refuses a version that already has an image. An image never changes behind its tag.
 
+A finding in an operating system package needs no code change, so no commit starts a release. The Rebuild Service workflow closes this gap. It opens one pull request for each service that you name. Each pull request changes only the date file `services/<service>/deploy/rebuild-date`.
+
+1. Run the Rebuild Service workflow. Enter the service names, or `all`.
+2. Merge the pull request that the workflow opens for each service.
+3. Merge the release pull request that release-please opens.
+
 To accept a finding in the weekly scan, add it to `.github/trivyignore.yaml`. Give the entry an `expired_at` date. Trivy ignores the entry after that date.
 
 ```mermaid
@@ -284,6 +290,7 @@ Use it only when you accept the advisory.
 | `.github/workflows/_template-containerize.yaml` | the pull request image build and the report of its findings |
 | `.github/workflows/security-trivy-repo.yaml` | the Dockerfile scan |
 | `.github/workflows/security-trivy-registry.yaml` | the Wednesday scan of published images, with its alert upload |
+| `.github/workflows/rebuild-service.yaml` | the workflow that opens a rebuild pull request for a service |
 | `.github/trivyignore.yaml` | the findings that the Wednesday scan accepts, each with an expiry date |
 | `.github/workflows/_template-cd.yaml` | the release build: the re-run guard, push, sign, attest, the release image scan, and the license scan |
 | `services/*/deploy/Dockerfile` | how each image is built and hardened |
