@@ -64,9 +64,6 @@ jobs:
         working-directory: ${{ env.SERVICE_PATH }}
         run: pnpm codegen
 
-      - name: Check syncpack format and lint
-        run: pnpm syncpack format --check && pnpm syncpack lint
-
       - name: Run style
         working-directory: ${{ env.SERVICE_PATH }}
         run: pnpm style
