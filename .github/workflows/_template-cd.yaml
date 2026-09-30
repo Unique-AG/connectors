@@ -28,6 +28,7 @@ jobs:
       group: release-${{ inputs.service-name }}-${{ inputs.service-version }}
       cancel-in-progress: false
     permissions:
+      contents: read # to read the repository
       packages: write # to push the image and the charts to GHCR
       id-token: write # to sign in to Azure and to sign the image with OIDC
     outputs:
@@ -128,6 +129,7 @@ jobs:
         env:
           GHCR_IMAGE: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:${{ inputs.service-version }}
           UNIQUECR_IMAGE: ${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_REPO }}:${{ inputs.service-version }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
           digest_of() {
             local output error
@@ -149,6 +151,18 @@ jobs:
           fi
           if [ -n "$ghcr_digest" ] && [ -n "$uniquecr_digest" ] && [ "$ghcr_digest" != "$uniquecr_digest" ]; then
             echo "::error::The registries hold different images for this version. GHCR: $ghcr_digest. uniquecr: $uniquecr_digest. Delete one tag by hand. This workflow never overwrites a released tag."
+            exit 1
+          fi
+          # The label does not prove who built the image. It stops a reuse of an image from another commit.
+          if [ -n "$ghcr_digest" ]; then
+            existing_ref="$GHCR_REGISTRY/$GHCR_REPO@$ghcr_digest"
+          else
+            existing_ref="$UNIQUECR_REGISTRY/$UNIQUECR_REPO@$uniquecr_digest"
+          fi
+          image_config=$(docker buildx imagetools inspect "$existing_ref" --format '{{json .Image}}')
+          revision=$(jq -r '.config.Labels["org.opencontainers.image.revision"] // empty' <<< "$image_config")
+          if [ "$revision" != "$SOURCE_SHA" ]; then
+            echo "::error::The existing image for this version comes from ${revision:-an unknown commit}, not from the commit $SOURCE_SHA of the release tag. This workflow does not reuse or sign it. If the image is wrong, delete the tag by hand."
             exit 1
           fi
           if [ -z "$uniquecr_digest" ]; then

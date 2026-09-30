@@ -43,7 +43,7 @@ release-please opens one release pull request for each service. Merge it to star
 
 If a release stops halfway, do not use "Re-run failed jobs" on the `release-please` job. That job finds no release the second time. Run `[Release] Manual Re-Run` instead. Start it from `main`, choose the service, and type the version without a leading v.
 
-The re-run builds from the release tag and reuses an image that exists. If only one registry has the image, it copies the image to the other registry. It never overwrites a released tag. It does not publish docs. Use it as a last resort.
+The re-run builds from the release tag. It reuses an image that exists only if the revision label of the image names the commit of that tag. Otherwise it stops. If only one registry has the image, it copies the image to the other registry. It never overwrites a released tag. It does not publish docs. Use it as a last resort.
 
 To publish docs before a release, run `[Docs] Publish to Confluence` from `main` and choose the docs directory. Use it also when the docs job of a release failed.
 
