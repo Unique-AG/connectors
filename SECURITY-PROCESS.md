@@ -6,13 +6,13 @@ To report a vulnerability, read [SECURITY.md](./SECURITY.md). This document does
 
 ## The whole process, at a glance
 
-A pull request can come from a person or from Dependabot. Four checks run on it. Two checks can stop it. A merged change later becomes part of a release. A release builds an image, signs it, and pushes it to three registries. After that, a scan reads the published image every week, for as long as the image stays there.
+A pull request can come from a person or from Dependabot. Up to four checks run on it. Two checks can stop it. A merged change later becomes part of a release. A release builds an image, signs it, and pushes it to three registries. After that, a scan reads the published image every week, for as long as the image stays there.
 
 ```mermaid
 flowchart LR
   author[A person opens a pull request] --> checks
   dependabot[Dependabot opens a pull request] --> checks
-  checks{Four checks run} -->|clean, or a waiver label| merge[The change merges]
+  checks{Up to four checks run} -->|clean, or a waiver label| merge[The change merges]
   checks -->|a finding with a fix, no waiver| stop[The pull request stops]
   merge --> release[A release builds and signs the image]
   release --> registry[(The image sits in the registry)]
@@ -24,7 +24,7 @@ flowchart LR
 
 | When | What happens |
 |---|---|
-| Every pull request | Four checks run. Two can stop the merge. |
+| A pull request | Up to four checks run. The files that you change decide which. Two can stop the merge. |
 | Friday, 06:00 Europe/Berlin | Dependabot opens up to 5 pull requests for each ecosystem. |
 | Every release | The image is built, signed, and pushed. Two more scans run against it. |
 | Wednesday, 06:00 UTC | A scan reads every published image again. |
@@ -38,7 +38,7 @@ A published advisory names a package, a version range, and a severity. Four chec
 
 ### What runs on your pull request
 
-Four checks run on every pull request. Two of them can stop it.
+Up to four checks run on a pull request. Two of them can stop it. The files that you change decide which checks run.
 
 ```mermaid
 flowchart TD
@@ -59,6 +59,17 @@ flowchart TD
 | Image vulnerability check | the container image your pull request builds, before any push | yes, when a finding has a fix |
 | Dockerfile scan | our own Dockerfiles | no |
 | CodeQL | our source code: our workflow files, our JavaScript and TypeScript, and our Python | no |
+
+This table shows which files start each check.
+
+| Check | It runs when your pull request changes |
+|---|---|
+| Dependency review | `pnpm-lock.yaml`, a `package.json` or `uv.lock` under `services/`, or a file under `packages/` |
+| Image vulnerability check | a file under `services/` or `packages/`, `pnpm-lock.yaml`, or a workflow file that builds or scans images |
+| Dockerfile scan | any file |
+| CodeQL | any file |
+
+A file under `services/` starts the image build, even a docs file.
 
 Every check runs on a stacked pull request. No check carries a branch filter.
 
