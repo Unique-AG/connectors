@@ -6,7 +6,7 @@ To report a vulnerability, read [SECURITY.md](./SECURITY.md). This document does
 
 ## The whole process, at a glance
 
-A pull request can come from a person or from Dependabot. Up to four checks run on it. Two checks can stop it. A merged change later becomes part of a release. A release builds an image, signs it, and pushes it to three registries. After that, a scan reads the published image every week, for as long as the image stays there.
+A pull request can come from a person or from Dependabot. Up to four checks run on it. Two checks can stop it. A merged change later becomes part of a release. A release builds an image, signs it, and pushes it to two registries. After that, a scan reads the published image every week, for as long as the image stays there.
 
 ```mermaid
 flowchart LR
@@ -221,7 +221,7 @@ No vulnerability scan and no version check covers how an image is built, or whet
 
 ### How an image is built
 
-Every service with a `deploy/Dockerfile` builds in two stages. The first stage installs the full toolchain and every dependency. The second stage starts from a fresh base image and copies in only the compiled output.
+Every service with a `deploy/Dockerfile` builds in stages. The early stages install the full toolchain and every dependency. The last stage starts from a fresh base image and copies in only the compiled output. A Python service has two stages. A Node.js service has five.
 
 ```mermaid
 flowchart LR
@@ -235,12 +235,12 @@ Four practices apply to every service:
 
 - **The base image is pinned to one exact digest**, not to a tag such as `slim` or `latest`. A tag can point to a different image tomorrow. A digest cannot.
 - **The build step removes the package manager from the final stage.** A Python image removes `pip`, and makes sure that Python can no longer import it. A Node.js image removes `npm` and `npx`. Code that reaches the running container then has no package manager to pull in more code.
-- **The final stage runs `apt-get upgrade`** before it copies in application files. This step takes the newest operating system patches available at build time.
+- **The final stage runs `apt-get upgrade`** before it copies in application files. The pull request build and the release build run the final stage again on every build, with no build cache. Each build takes the newest operating system patches that exist at that time.
 - **The container runs as a non-root user**, never as `root`.
 
 ### How a release is signed and proven
 
-A release builds the image again, from the same Dockerfile. It pushes the image to three registries: GHCR (GitHub's container registry), and the Azure registries `uniquecr` and `getunique`. The matching Helm chart goes out to the same three destinations.
+A release builds the image again, from the same Dockerfile. It pushes the image to two registries: GHCR (GitHub's container registry) and the Azure registry `uniquecr`. The matching Helm chart goes to those two registries and to the Azure registry `getunique`.
 
 ```mermaid
 flowchart LR
