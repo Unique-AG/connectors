@@ -35,7 +35,7 @@ stored in Postgres. For local development, set
 
 Set `UNIQUE_API_BASE_URL` to the internal Unique API service in Kubernetes.
 `UNIQUE_APP_ID` and `UNIQUE_APP_KEY` are needed for every deployment except one calling
-`node-chat` directly in-cluster: local development, and any deployment (Azure, GCP, AWS, or
+the Unique API directly in-cluster: local development, and any deployment (Azure, GCP, AWS, or
 elsewhere) that reaches the Unique API through the Kong gateway rather than an internal
 cluster IP.
 

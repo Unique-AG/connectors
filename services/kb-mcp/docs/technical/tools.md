@@ -73,7 +73,7 @@ view; only that mode's arguments apply, and passing one that doesn't (e.g. `quer
 | `match_on` | `search` | Match against the file name (`key`), the full path (`path`), or both |
 | `case_sensitive` | `search` | Whether fuzzy matching is case-sensitive |
 | `min_score` | `search` | Minimum fuzzy-match score in `[0.0, 1.0]`; higher is stricter |
-| `limit` | all | Maximum files/matches to return; in `mode='tree'` it caps what's rendered, and the output says so when it truncated |
+| `limit` | all | Maximum files/matches to return; in `mode='tree'` it caps folders too, each independently. The output says so when it truncated |
 | `refresh` | all | Drop this caller's cached tree and refetch (~20s); use when the user reports added/deleted/changed files |
 | `timeout` | all | Seconds to wait before returning a partial tree; the walk continues in the background |
 | `metadata_filter` | all | UniqueQL narrowing, AND-ed with the admin filter (see [Permissions](./permissions.md)) |
@@ -83,8 +83,8 @@ filter excluding `user-memory` folders.
 
 !!! note "Incomplete vs. truncated"
     Incomplete means the walk is still running; calling again with the same arguments usually
-    finishes it. Truncated means the walk finished and `mode='tree'` capped the result at `limit`;
-    calling again returns the same thing, raise `limit` or narrow `folder_path` instead.
+    finishes it. Truncated means the walk finished and the result was capped at `limit`; calling again returns
+    the same thing, raise `limit` or narrow `folder_path` instead.
 
 Results are cached briefly (`KB_MCP_TREE_CACHE_TTL_SECONDS`, default `600`) to keep repeat calls
 fast; a change can take up to that long to show up. If the user reports files just added or

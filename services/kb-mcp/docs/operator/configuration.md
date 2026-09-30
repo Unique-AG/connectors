@@ -51,6 +51,8 @@ Defaults:
 {"metadata_filter": null, "default_limit": 50, "default_tree_limit": 1000, "default_min_score": 0.6, "default_match_on": "both", "default_case_sensitive": false, "max_concurrent_scope_lookups": 25}
 ```
 
+A `null` `metadata_filter` falls back to excluding `user-memory` folders.
+
 ##### `content_metadata`
 
 `UNIQUE_MCP_TOOL_CONTENT_METADATA_TOOL_CONFIG`
@@ -61,6 +63,8 @@ Defaults:
 ```json
 {"metadata_filter": null, "excluded_fields": ["key", "url", "title", "folderId", "mimeType", "companyId", "contentId", "validAsOf", "folderIdPath", "externalFileOwner"], "max_values_per_field": 1000, "max_concurrent_scope_lookups": 25}
 ```
+
+A `null` `metadata_filter` falls back to excluding `user-memory` folders.
 
 `excluded_fields` replaces this list rather than adding to it: repeat the entries above alongside
 any of your own, or the catalog narrows to just what you passed.
