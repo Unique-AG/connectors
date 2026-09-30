@@ -58,14 +58,14 @@ def _as_str(value: object) -> str:
     return value if isinstance(value, str) else ""
 
 
-def _at(mapping: Json, *keys: str) -> Json:
+def _nested_dict(mapping: Json, *keys: str) -> Json:
     current = mapping
     for key in keys:
         current = _as_dict(current.get(key))
     return current
 
 
-def load_spec(refresh: bool) -> Json:
+def _load_spec(refresh: bool) -> Json:
     if _CACHE.exists() and not refresh:
         return _as_dict(_JSON.validate_json(_CACHE.read_text()))
     _CACHE.parent.mkdir(exist_ok=True)
@@ -80,7 +80,7 @@ def _ref_name(ref: str) -> str:
 
 
 def _schema(spec: Json, name: str) -> Json:
-    return _as_dict(_at(spec, "components", "schemas").get(_ref_name(name)))
+    return _as_dict(_nested_dict(spec, "components", "schemas").get(_ref_name(name)))
 
 
 def _type_of(schema: Json) -> str:
@@ -103,13 +103,13 @@ def _type_of(schema: Json) -> str:
 
 
 def _get_operation(spec: Json, path: str) -> Json:
-    operation = _at(spec, "paths", path, "get")
+    operation = _nested_dict(spec, "paths", path, "get")
     if not operation:
         raise SystemExit(f"no GET operation for {path!r} — try: paths")
     return operation
 
 
-def cmd_paths(spec: Json, target: str) -> None:
+def _print_paths(spec: Json, target: str) -> None:
     paths = _as_dict(spec.get("paths"))
     for path in sorted(paths):
         if target.lower() not in path.lower():
@@ -118,7 +118,7 @@ def cmd_paths(spec: Json, target: str) -> None:
         print(f"{path}\t{methods}")
 
 
-def cmd_params(spec: Json, target: str) -> None:
+def _print_params(spec: Json, target: str) -> None:
     for entry in _as_list(_get_operation(spec, target).get("parameters")):
         parameter = _as_dict(entry)
         description = " ".join(_as_str(parameter.get("description")).split())
@@ -127,7 +127,7 @@ def cmd_params(spec: Json, target: str) -> None:
         print(f"{name}\t{_type_of(_as_dict(parameter.get('schema')))}\t{required}\t{description}")
 
 
-def cmd_schema(spec: Json, target: str) -> None:
+def _print_schema(spec: Json, target: str) -> None:
     schema = _schema(spec, target)
     if not schema:
         raise SystemExit(f"no schema named {target!r}")
@@ -139,11 +139,11 @@ def cmd_schema(spec: Json, target: str) -> None:
         print(f"{field}\t{_type_of(field_schema)}\t{marker}\t{description}")
 
 
-def cmd_response(spec: Json, target: str) -> None:
+def _print_response(spec: Json, target: str) -> None:
     responses = _as_dict(_get_operation(spec, target).get("responses"))
     for status, entry in responses.items():
         response = _as_dict(entry)
-        schema = _at(response, "content", "application/json", "schema")
+        schema = _nested_dict(response, "content", "application/json", "schema")
         shape = _type_of(schema) if schema else ""
         print(f"{status}\t{shape}\t{_as_str(response.get('description'))}")
 
@@ -170,7 +170,7 @@ _SNAPSHOT_PATH = Path(__file__).resolve().parent.parent / "tests" / "spec" / "wi
 
 def _referenced_schemas(spec: Json, roots: tuple[str, ...]) -> dict[str, Json]:
     """The named schemas reachable from `roots`, following `$ref` transitively."""
-    all_schemas = _at(spec, "components", "schemas")
+    all_schemas = _nested_dict(spec, "components", "schemas")
     collected: dict[str, Json] = {}
     queue = list(roots)
     while queue:
@@ -200,7 +200,7 @@ def _refs_in(node: object) -> list[str]:
     return []
 
 
-def cmd_snapshot(spec: Json, _target: str) -> None:
+def _write_snapshot(spec: Json, _target: str) -> None:
     """Write the pruned schema snapshot the conformance test reads."""
     schemas = _referenced_schemas(spec, SNAPSHOT_ROOTS)
     payload = {
@@ -215,11 +215,11 @@ def cmd_snapshot(spec: Json, _target: str) -> None:
 
 
 _COMMANDS: dict[str, Callable[[Json, str], None]] = {
-    "paths": cmd_paths,
-    "params": cmd_params,
-    "schema": cmd_schema,
-    "response": cmd_response,
-    "snapshot": cmd_snapshot,
+    "paths": _print_paths,
+    "params": _print_params,
+    "schema": _print_schema,
+    "response": _print_response,
+    "snapshot": _write_snapshot,
 }
 
 
@@ -232,7 +232,7 @@ def main() -> None:
 
     if args.command not in ("paths", "snapshot") and not args.target:
         raise SystemExit(f"{args.command} needs a target")
-    _COMMANDS[args.command](load_spec(args.refresh), args.target)
+    _COMMANDS[args.command](_load_spec(args.refresh), args.target)
 
 
 if __name__ == "__main__":

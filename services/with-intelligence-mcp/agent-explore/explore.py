@@ -5,8 +5,8 @@
     uv run agent-explore/explore.py /v3/mandates -p investor_id=2504 -p asset_class_group=hfm
 
 Signs in once, caches the access token for its hour, and caches responses under `.probe-cache/`
-so a recorded body can become a test fixture. The only POSTs it will ever make are the two auth
-calls. Read `.claude/skills/with-intelligence-api/SKILL.md` first.
+so a recorded body can become a test fixture. The only POST it makes is `/v3/auth/sign-in`.
+Read `.claude/skills/with-intelligence-api/SKILL.md` first.
 """
 
 from __future__ import annotations
@@ -61,8 +61,8 @@ def _sign_in(base_url: str, username: str, password: str) -> str:
     return token
 
 
-def _access_token(base_url: str, username: str, password: str, refresh: bool) -> str:
-    if _TOKEN_FILE.exists() and not refresh:
+def _access_token(base_url: str, username: str, password: str, *, force_sign_in: bool) -> str:
+    if _TOKEN_FILE.exists() and not force_sign_in:
         cached = cast(dict[str, object], json.loads(_TOKEN_FILE.read_text()))
         issued_at = cached.get("issued_at")
         token = cached.get("access_token")
@@ -126,7 +126,7 @@ def main() -> None:
         print(cache_file.read_text())
         return
 
-    token = _access_token(base_url, username, password, args.refresh)
+    token = _access_token(base_url, username, password, force_sign_in=args.refresh)
     headers = {"authorization": f"Bearer {token}", "accept": "application/json"}
     with httpx.Client(base_url=base_url, headers=headers, timeout=120.0) as client:
         try:
@@ -136,7 +136,7 @@ def main() -> None:
                 "With Intelligence did not respond within 2 minutes; treat the API as down."
             ) from None
         if response.status_code == 401:
-            token = _access_token(base_url, username, password, refresh=True)
+            token = _access_token(base_url, username, password, force_sign_in=True)
             client.headers["authorization"] = f"Bearer {token}"
             response = client.get(args.path, params=params)
 
