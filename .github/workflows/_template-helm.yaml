@@ -27,13 +27,18 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Check if Helm charts exist
+      - name: Check if Helm charts and tests exist
         id: check-helm
         run: |
           if [ -d "$SERVICE_PATH/deploy/helm-charts" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -d "$SERVICE_PATH/deploy/helm-charts/$SERVICE_NAME/tests" ]; then
+            echo "tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tests=false" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
@@ -57,3 +62,12 @@ jobs:
           else
             helm template .
           fi
+
+      - name: Install the Helm unit test plugin
+        if: steps.check-helm.outputs.tests == 'true'
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.1.2
+
+      - name: Run the Helm unit tests
+        if: steps.check-helm.outputs.tests == 'true'
+        working-directory: ${{ env.SERVICE_PATH }}/deploy/helm-charts/${{ env.SERVICE_NAME }}
+        run: helm unittest .

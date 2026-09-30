@@ -29,8 +29,13 @@ pnpm style:fix        # auto-fix
 pnpm check-types      # type checking
 pnpm check-all        # style + types + tests + syncpack
 pnpm fix-all          # auto-fix style + syncpack
-pnpm quality          # Helm chart linting
 ```
+
+## Helm Chart Tests
+
+Charts keep [helm-unittest](https://github.com/helm-unittest/helm-unittest) suites in a `tests/` directory. CI runs `helm unittest .` in the chart directory, after `helm dependency update`.
+
+To run the suites on your machine, install the plugin once with `helm plugin install https://github.com/helm-unittest/helm-unittest`. Then run the same two commands in the chart directory.
 
 ## Python Services
 
