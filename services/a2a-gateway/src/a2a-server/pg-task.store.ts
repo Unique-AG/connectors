@@ -13,6 +13,7 @@ import {
   notInArray,
   or,
   type SQL,
+  sql,
 } from 'drizzle-orm';
 import { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
@@ -223,6 +224,16 @@ export class PgTaskStore implements TaskStore {
       where: and(eq(tasks.id, taskId), eq(tasks.companyId, companyId)),
     });
     return row?.taskSnapshot as unknown as Task | undefined;
+  }
+
+  public async addBytes(companyId: string, taskId: string, bytesIn: number, bytesOut: number) {
+    await this.database
+      .update(tasks)
+      .set({
+        bytesIn: sql`${tasks.bytesIn} + ${bytesIn}`,
+        bytesOut: sql`${tasks.bytesOut} + ${bytesOut}`,
+      })
+      .where(and(eq(tasks.id, taskId), eq(tasks.companyId, companyId)));
   }
 
   public async heartbeat(companyId: string, taskId: string): Promise<void> {

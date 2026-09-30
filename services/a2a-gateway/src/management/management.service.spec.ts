@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import type { AuthorizationService } from '../auth/authorization.service.js';
 import type { PublicationRepository } from '../drizzle/publication.repository.js';
+import type { AuditLog } from '../observability/audit-log.service.js';
 import { ManagementService } from './management.service.js';
 
 const identity = { companyId: 'company-1', userId: 'user-1', roles: [] };
@@ -21,6 +22,7 @@ function subject() {
     service: new ManagementService(
       publications as unknown as PublicationRepository,
       authorization as unknown as AuthorizationService,
+      { record: vi.fn() } as unknown as AuditLog,
     ),
     publications,
     authorization,

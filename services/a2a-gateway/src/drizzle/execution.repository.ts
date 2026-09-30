@@ -200,4 +200,14 @@ export class ExecutionRepository {
       })
       .where(and(eq(executions.id, executionId), eq(executions.companyId, companyId)));
   }
+
+  public async addBytes(companyId: string, executionId: string, bytesIn: number, bytesOut: number) {
+    await this.database
+      .update(executions)
+      .set({
+        bytesIn: sql`${executions.bytesIn} + ${bytesIn}`,
+        bytesOut: sql`${executions.bytesOut} + ${bytesOut}`,
+      })
+      .where(and(eq(executions.id, executionId), eq(executions.companyId, companyId)));
+  }
 }

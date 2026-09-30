@@ -8,6 +8,7 @@ import type { AuthorizationService } from '../auth/authorization.service.js';
 import { loadConfig } from '../config/config.js';
 import type { ConnectionRepository } from '../drizzle/connection.repository.js';
 import type { ExecutionRepository } from '../drizzle/execution.repository.js';
+import type { AuditLog } from '../observability/audit-log.service.js';
 import type { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { ConnectionService } from './connection.service.js';
 import { credentialProfile } from './credential-profile.js';
@@ -116,6 +117,7 @@ function subject(profile: unknown = { type: 'bearer', token: 'remote-secret' }) 
       vault as unknown as CredentialVault,
       egress,
       {} as CredentialProviderService,
+      { record: vi.fn() } as unknown as AuditLog,
     ),
   };
 }

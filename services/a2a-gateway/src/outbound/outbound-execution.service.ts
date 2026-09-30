@@ -5,7 +5,6 @@ import {
   HttpStatus,
   Inject,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type { JsonObject } from 'absurd-sdk';
@@ -16,6 +15,8 @@ import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { ConnectionRepository } from '../drizzle/connection.repository.js';
 import { ExecutionRepository } from '../drizzle/execution.repository.js';
 import { isUniqueViolation } from '../drizzle/unique-violation.js';
+import { AuditLog } from '../observability/audit-log.service.js';
+import { QuotaService } from '../observability/quota.service.js';
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { UniqueInternalError } from '../unique/unique-internal.error.js';
 import { WorkflowService } from '../workflow/workflow.service.js';
@@ -61,14 +62,14 @@ const externalAssistant = z.object({
 
 @Injectable()
 export class OutboundExecutionService {
-  private readonly logger = new Logger(OutboundExecutionService.name);
-
   public constructor(
     private readonly authorization: AuthorizationService,
     private readonly connections: ConnectionRepository,
     private readonly executions: ExecutionRepository,
     private readonly unique: UniqueInternalClient,
     private readonly workflow: WorkflowService,
+    private readonly quota: QuotaService,
+    private readonly audit: AuditLog,
     @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
@@ -106,6 +107,7 @@ export class OutboundExecutionService {
     ) {
       throw new ConflictException('connection is disabled or not verified');
     }
+    await this.quota.assertOutbound(identity.companyId, connectionId);
     const expiresAt = new Date(Date.now() + this.config.executionRetentionDays * 86_400_000);
     const execution = await this.createExecution(
       identity,
@@ -132,13 +134,11 @@ export class OutboundExecutionService {
       idempotencyKey: execution.id,
     });
     await this.executions.setWorkflowTask(identity.companyId, execution.id, taskID);
-    this.logger.log({
-      action: 'execution.start',
-      companyId: identity.companyId,
-      userId: identity.userId,
+    this.audit.record('execution.start', identity, {
       executionId: execution.id,
       connectionId,
       assistantId: request.assistantId,
+      delegated: request.correlation !== undefined,
     });
     return { executionId: execution.id };
   }

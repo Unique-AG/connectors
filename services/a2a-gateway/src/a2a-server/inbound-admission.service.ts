@@ -7,6 +7,8 @@ import { ResourceAuthorizationService } from '../auth/resource-authorization.ser
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { ContextRepository } from '../drizzle/context.repository.js';
 import { isUniqueViolation } from '../drizzle/unique-violation.js';
+import { GatewayMetrics } from '../observability/gateway-metrics.service.js';
+import { QuotaExceededError, QuotaService } from '../observability/quota.service.js';
 import { awaitsInput, callIdentity, callPublicationId, messageContent } from './call-context.js';
 import { PgTaskStore } from './pg-task.store.js';
 
@@ -29,6 +31,8 @@ export class InboundAdmissionService {
     private readonly authorization: ResourceAuthorizationService,
     private readonly contexts: ContextRepository,
     private readonly taskStore: PgTaskStore,
+    private readonly quota: QuotaService,
+    private readonly metrics: GatewayMetrics,
     @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
@@ -40,7 +44,7 @@ export class InboundAdmissionService {
     const identity = callIdentity(context);
     const publicationId = callPublicationId(context);
     await this.authorization.publication(identity, publicationId, true);
-    messageContent(message, this.config.maxRemoteFileBytes);
+    const content = messageContent(message, this.config.maxRemoteFileBytes);
 
     if (message.taskId) {
       const task = await this.taskStore.load(message.taskId, context);
@@ -66,6 +70,16 @@ export class InboundAdmissionService {
       if (duplicate) {
         return { duplicate };
       }
+    }
+    try {
+      await this.quota.assertInbound(identity.companyId);
+    } catch (error) {
+      if (error instanceof QuotaExceededError) {
+        throw Object.assign(new RequestMalformedError('too many active tasks; retry later'), {
+          reason: 'QUOTA_EXCEEDED',
+        });
+      }
+      throw error;
     }
     const admitted = { ...message, contextId, taskId: typeid('task').toString() };
     try {
@@ -101,6 +115,11 @@ export class InboundAdmissionService {
       }
       throw error;
     }
+    const bytesIn =
+      Buffer.byteLength(content.text) +
+      content.files.reduce((total, file) => total + file.bytes.byteLength, 0);
+    await this.taskStore.addBytes(identity.companyId, admitted.taskId, bytesIn, 0);
+    this.metrics.bytesExchanged(identity.companyId, 'inbound', 'in', bytesIn);
     return { params: { ...params, message: admitted } };
   }
 }

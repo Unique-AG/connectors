@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { foreignKey, index, jsonb, pgTable, text, timestamp, unique, uniqueIndex } from 'drizzle-orm/pg-core';
+import { bigint, foreignKey, index, jsonb, pgTable, text, timestamp, unique, uniqueIndex } from 'drizzle-orm/pg-core';
 import { timestamps, typeId } from './columns.js';
 import { contexts } from './contexts.table.js';
 
@@ -17,6 +17,8 @@ export const tasks = pgTable(
     elicitationId: text(),
     clientMessageId: text(),
     heartbeatAt: timestamp({ withTimezone: true }),
+    bytesIn: bigint({ mode: 'number' }).default(0).notNull(),
+    bytesOut: bigint({ mode: 'number' }).default(0).notNull(),
     taskSnapshot: jsonb().$type<Record<string, unknown>>().notNull(),
     statusTimestamp: timestamp({ withTimezone: true }).defaultNow().notNull(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),

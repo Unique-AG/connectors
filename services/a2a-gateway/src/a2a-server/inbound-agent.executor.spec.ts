@@ -6,6 +6,8 @@ import type { GatewayConfig } from '../config/config.js';
 import type { ContextRepository } from '../drizzle/context.repository.js';
 import type { PublicationRepository } from '../drizzle/publication.repository.js';
 import type { ChatEventConsumer } from '../event-bus/chat-event.consumer.js';
+import type { AuditLog } from '../observability/audit-log.service.js';
+import type { GatewayMetrics } from '../observability/gateway-metrics.service.js';
 import type { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { InboundAgentExecutor } from './inbound-agent.executor.js';
 import { NativeRunObserver } from './native-run-observer.js';
@@ -79,9 +81,15 @@ function subject(unique: Record<string, ReturnType<typeof vi.fn>>) {
     {
       findById: vi.fn().mockResolvedValue({ enabled: true, assistantId: 'assistant-1' }),
     } as unknown as PublicationRepository,
-    { save: vi.fn(), heartbeat: vi.fn() } as unknown as PgTaskStore,
+    { save: vi.fn(), heartbeat: vi.fn(), addBytes: vi.fn() } as unknown as PgTaskStore,
     client,
     { upload: vi.fn() } as unknown as ChatFilesService,
+    {
+      bytesExchanged: vi.fn(),
+      runFinished: vi.fn(),
+      quotaRejected: vi.fn(),
+    } as unknown as GatewayMetrics,
+    { record: vi.fn() } as unknown as AuditLog,
     { maxRemoteFileBytes: 1024 } as GatewayConfig,
   );
   return {

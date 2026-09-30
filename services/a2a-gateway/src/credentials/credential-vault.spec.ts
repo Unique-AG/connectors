@@ -16,5 +16,6 @@ describe('CredentialVault', () => {
     expect(ciphertext.toString()).not.toContain('secret-token');
     expect(vault.open(ciphertext)).toBe('secret-token');
     expect(module.get(AesGcmEncryptionService)).toBeDefined();
-  });
+    // Compiling a real Nest module is slow when the suite runs in parallel.
+  }, 20_000);
 });

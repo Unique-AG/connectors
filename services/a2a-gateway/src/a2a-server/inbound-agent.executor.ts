@@ -14,6 +14,8 @@ import { ChatFilesService } from '../bridge/chat-files.service.js';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { ContextRepository } from '../drizzle/context.repository.js';
 import { PublicationRepository } from '../drizzle/publication.repository.js';
+import { AuditLog } from '../observability/audit-log.service.js';
+import { GatewayMetrics } from '../observability/gateway-metrics.service.js';
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import {
   awaitsInput,
@@ -73,6 +75,8 @@ export class InboundAgentExecutor implements AgentExecutor {
     private readonly taskStore: PgTaskStore,
     private readonly unique: UniqueInternalClient,
     private readonly chatFiles: ChatFilesService,
+    private readonly metrics: GatewayMetrics,
+    private readonly audit: AuditLog,
     @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
@@ -102,6 +106,7 @@ export class InboundAgentExecutor implements AgentExecutor {
         onHeartbeat: () => this.taskStore.heartbeat(identity.companyId, request.taskId),
       });
       this.publishOutcome(request, eventBus, outcome);
+      await this.recordOutcome(identity.companyId, request.taskId, outcome, current);
     } catch (error) {
       this.logger.error({ msg: 'native execution failed', taskId: request.taskId, err: error });
       const failed: Task = { ...current, status: failedStatus(current) };
@@ -133,6 +138,13 @@ export class InboundAgentExecutor implements AgentExecutor {
     if (!stopped.stoppedStreamingAt) {
       throw new TaskNotCancelableError('the space did not confirm the cancellation');
     }
+    this.audit.record(
+      'task.cancel',
+      { companyId: storedTask.companyId, userId: storedTask.userId },
+      {
+        taskId,
+      },
+    );
     eventBus.publish(
       AgentEvent.statusUpdate({
         taskId,
@@ -227,6 +239,26 @@ export class InboundAgentExecutor implements AgentExecutor {
       userMessageId: storedTask.userMessageId,
       messageId: storedTask.assistantMessageId,
     };
+  }
+
+  private async recordOutcome(
+    companyId: string,
+    taskId: string,
+    outcome: RunOutcome,
+    task: Task,
+  ): Promise<void> {
+    const bytesOut =
+      outcome.kind === 'elicitation' ? 0 : Buffer.byteLength(outcome.message.text ?? '');
+    await this.taskStore.addBytes(companyId, taskId, 0, bytesOut);
+    this.metrics.bytesExchanged(companyId, 'inbound', 'out', bytesOut);
+    if (outcome.kind !== 'elicitation') {
+      this.metrics.runFinished(
+        companyId,
+        'inbound',
+        outcome.kind,
+        new Date(task.status?.timestamp ?? Date.now()),
+      );
+    }
   }
 
   private publishOutcome(

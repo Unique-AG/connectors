@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
 import type { GatewayConfig } from '../config/config.js';
 import type { ContextRepository } from '../drizzle/context.repository.js';
+import type { AuditLog } from '../observability/audit-log.service.js';
 import type { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { InboundFilesService } from './inbound-files.service.js';
 import { fileUrlFor, outcomeArtifacts } from './inbound-translation.js';
@@ -48,6 +49,7 @@ function subject() {
       findSnapshot: vi.fn().mockResolvedValue({ id: 'task-1', artifacts: completed }),
     } as unknown as PgTaskStore,
     unique as unknown as UniqueInternalClient,
+    { record: vi.fn() } as unknown as AuditLog,
     { maxRemoteFileBytes: 1024 } as GatewayConfig,
   );
   return { service, contexts, authorization, unique };

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   foreignKey,
   index,
   integer,
@@ -33,6 +34,8 @@ export const executions = pgTable(
     cancelRequestedAt: timestamp({ withTimezone: true }),
     workflowTaskId: text(),
     recoveries: integer().default(0).notNull(),
+    bytesIn: bigint({ mode: 'number' }).default(0).notNull(),
+    bytesOut: bigint({ mode: 'number' }).default(0).notNull(),
     finishedAt: timestamp({ withTimezone: true }),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     ...timestamps,

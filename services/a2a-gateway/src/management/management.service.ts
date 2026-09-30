@@ -1,16 +1,16 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { AuthorizationService } from '../auth/authorization.service.js';
 import type { RequestIdentity } from '../auth/identity.guard.js';
 import { PublicationRepository } from '../drizzle/publication.repository.js';
+import { AuditLog } from '../observability/audit-log.service.js';
 import type { PublicationConfiguration } from './publication-configuration.js';
 
 @Injectable()
 export class ManagementService {
-  private readonly logger = new Logger(ManagementService.name);
-
   public constructor(
     private readonly publications: PublicationRepository,
     private readonly authorization: AuthorizationService,
+    private readonly audit: AuditLog,
   ) {}
 
   public async getPublication(identity: RequestIdentity, assistantId: string) {
@@ -39,23 +39,13 @@ export class ManagementService {
       },
       expectedVersion,
     );
-    this.logger.log({
-      action: 'publication.configure',
-      companyId: identity.companyId,
-      userId: identity.userId,
-      assistantId,
-    });
+    this.audit.record('publication.configure', identity, { assistantId });
     return publication;
   }
 
   public async disablePublication(identity: RequestIdentity, assistantId: string): Promise<void> {
     await this.authorization.manageSpace(identity, assistantId);
     await this.publications.disable(identity.companyId, assistantId);
-    this.logger.log({
-      action: 'publication.disable',
-      companyId: identity.companyId,
-      userId: identity.userId,
-      assistantId,
-    });
+    this.audit.record('publication.disable', identity, { assistantId });
   }
 }

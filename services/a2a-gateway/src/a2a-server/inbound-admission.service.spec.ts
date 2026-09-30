@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
 import type { GatewayConfig } from '../config/config.js';
 import type { ContextRepository } from '../drizzle/context.repository.js';
+import type { GatewayMetrics } from '../observability/gateway-metrics.service.js';
+import type { QuotaService } from '../observability/quota.service.js';
 import { InboundAdmissionService } from './inbound-admission.service.js';
 import type { PgTaskStore } from './pg-task.store.js';
 
@@ -40,12 +42,23 @@ function request(message: Partial<SendMessageRequest['message']>): SendMessageRe
 function subject() {
   const authorization = { publication: vi.fn() };
   const contexts = { create: vi.fn(), findOwned: vi.fn() };
-  const taskStore = { reserve: vi.fn(), load: vi.fn(), findByClientMessage: vi.fn() };
+  const taskStore = {
+    reserve: vi.fn(),
+    load: vi.fn(),
+    findByClientMessage: vi.fn(),
+    addBytes: vi.fn(),
+  };
   return {
     service: new InboundAdmissionService(
       authorization as unknown as ResourceAuthorizationService,
       contexts as unknown as ContextRepository,
       taskStore as unknown as PgTaskStore,
+      { assertInbound: vi.fn(), assertOutbound: vi.fn() } as unknown as QuotaService,
+      {
+        bytesExchanged: vi.fn(),
+        runFinished: vi.fn(),
+        quotaRejected: vi.fn(),
+      } as unknown as GatewayMetrics,
       { maxRemoteFileBytes: 1024 } as GatewayConfig,
     ),
     authorization,

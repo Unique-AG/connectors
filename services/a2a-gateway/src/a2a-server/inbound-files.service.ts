@@ -4,6 +4,7 @@ import { ResourceAuthorizationService } from '../auth/resource-authorization.ser
 import { safeFilename } from '../bridge/file-policy.js';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { ContextRepository } from '../drizzle/context.repository.js';
+import { AuditLog } from '../observability/audit-log.service.js';
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { taskFileUrl } from './inbound-translation.js';
 import { PgTaskStore } from './pg-task.store.js';
@@ -19,6 +20,7 @@ export class InboundFilesService {
     private readonly contexts: ContextRepository,
     private readonly taskStore: PgTaskStore,
     private readonly unique: UniqueInternalClient,
+    private readonly audit: AuditLog,
     @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
@@ -48,6 +50,7 @@ export class InboundFilesService {
       task.chatId,
       this.config.maxRemoteFileBytes,
     );
+    this.audit.record('file.download', identity, { taskId, contentId, publicationId });
     return { ...file, filename: safeFilename(file.filename, contentId) };
   }
 }

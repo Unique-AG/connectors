@@ -11,6 +11,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
 import { loadConfig } from '../config/config.js';
 import type { ContextRepository } from '../drizzle/context.repository.js';
+import type { GatewayMetrics } from '../observability/gateway-metrics.service.js';
+import type { QuotaService } from '../observability/quota.service.js';
 import { A2aSdkService } from './a2a-sdk.service.js';
 import { InboundAdmissionService } from './inbound-admission.service.js';
 import type { InboundAgentExecutor } from './inbound-agent.executor.js';
@@ -38,6 +40,7 @@ function subject() {
   const taskStore = Object.assign(memory, {
     reserve: (task: Task, context: ServerCallContext) => memory.save(task, context),
     findByClientMessage: vi.fn(),
+    addBytes: vi.fn(),
   });
   const authorization = { publication: vi.fn() };
   const contexts = { create: vi.fn(), findOwned: vi.fn() };
@@ -77,6 +80,12 @@ function subject() {
     authorization as unknown as ResourceAuthorizationService,
     contexts as unknown as ContextRepository,
     taskStore as unknown as PgTaskStore,
+    { assertInbound: vi.fn(), assertOutbound: vi.fn() } as unknown as QuotaService,
+    {
+      bytesExchanged: vi.fn(),
+      runFinished: vi.fn(),
+      quotaRejected: vi.fn(),
+    } as unknown as GatewayMetrics,
     config,
   );
   return {

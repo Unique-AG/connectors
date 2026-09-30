@@ -4,7 +4,6 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { typeid } from 'typeid-js';
@@ -12,6 +11,7 @@ import { AuthorizationService } from '../auth/authorization.service.js';
 import type { RequestIdentity } from '../auth/identity.guard.js';
 import { ConnectionRepository } from '../drizzle/connection.repository.js';
 import { isForeignKeyViolation } from '../drizzle/unique-violation.js';
+import { AuditLog } from '../observability/audit-log.service.js';
 import {
   cardPreview,
   IncompatibleAgentError,
@@ -47,14 +47,13 @@ function verificationError(error: unknown): string {
 
 @Injectable()
 export class ConnectionService {
-  private readonly logger = new Logger(ConnectionService.name);
-
   public constructor(
     private readonly connections: ConnectionRepository,
     private readonly authorization: AuthorizationService,
     private readonly vault: CredentialVault,
     private readonly egress: EgressService,
     private readonly credentials: CredentialProviderService,
+    private readonly audit: AuditLog,
   ) {}
 
   public async list(identity: RequestIdentity) {
@@ -108,10 +107,7 @@ export class ConnectionService {
     } else {
       await this.connections.create(identity.companyId, input);
     }
-    this.logger.log({
-      action: existing ? 'connection.rotate' : 'connection.create',
-      companyId: identity.companyId,
-      userId: identity.userId,
+    this.audit.record(existing ? 'connection.rotate' : 'connection.create', identity, {
       connectionId: id,
       credentialType: configuration.credential.type,
     });
@@ -177,10 +173,7 @@ export class ConnectionService {
     if (!recorded) {
       throw new ConflictException('connection changed during the test; retry');
     }
-    this.logger.log({
-      action: 'connection.test',
-      companyId: identity.companyId,
-      userId: identity.userId,
+    this.audit.record('connection.test', identity, {
       connectionId,
       ok: result.ok,
     });
@@ -205,10 +198,7 @@ export class ConnectionService {
     if (!deleted) {
       throw new ConflictException('connection is used by a space');
     }
-    this.logger.log({
-      action: 'connection.delete',
-      companyId: identity.companyId,
-      userId: identity.userId,
+    this.audit.record('connection.delete', identity, {
       connectionId,
     });
   }
@@ -221,10 +211,7 @@ export class ConnectionService {
       throw new ConflictException('connection is disabled or not verified');
     }
     await this.connections.bind(identity.companyId, connectionId, assistantId);
-    this.logger.log({
-      action: 'connection.bind',
-      companyId: identity.companyId,
-      userId: identity.userId,
+    this.audit.record('connection.bind', identity, {
       connectionId,
       assistantId,
     });
@@ -239,10 +226,7 @@ export class ConnectionService {
     await this.authorization.manageConnections(identity);
     await this.find(identity.companyId, connectionId);
     await this.connections.revoke(identity.companyId, connectionId, expectedVersion);
-    this.logger.log({
-      action: 'connection.revoke',
-      companyId: identity.companyId,
-      userId: identity.userId,
+    this.audit.record('connection.revoke', identity, {
       connectionId,
     });
   }

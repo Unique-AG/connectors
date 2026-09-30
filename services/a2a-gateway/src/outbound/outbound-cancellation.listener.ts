@@ -1,6 +1,7 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { ExecutionRepository } from '../drizzle/execution.repository.js';
 import { type ChatEvent, ChatEventConsumer } from '../event-bus/chat-event.consumer.js';
+import { AuditLog } from '../observability/audit-log.service.js';
 
 const MESSAGE_UPDATE = 'unique.chat.assistant-message.update';
 
@@ -10,12 +11,12 @@ const MESSAGE_UPDATE = 'unique.chat.assistant-message.update';
  */
 @Injectable()
 export class OutboundCancellationListener implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(OutboundCancellationListener.name);
   private unsubscribe: (() => void) | undefined;
 
   public constructor(
     private readonly events: ChatEventConsumer,
     private readonly executions: ExecutionRepository,
+    private readonly audit: AuditLog,
   ) {}
 
   public onModuleInit(): void {
@@ -33,11 +34,13 @@ export class OutboundCancellationListener implements OnModuleInit, OnModuleDestr
     const executions = await this.executions.findActiveForMessage(event.companyId, event.messageId);
     for (const execution of executions) {
       if (await this.executions.requestCancel(event.companyId, execution.id)) {
-        this.logger.log({
-          action: 'execution.cancel-requested',
-          companyId: event.companyId,
-          executionId: execution.id,
-        });
+        this.audit.record(
+          'execution.cancel',
+          { companyId: event.companyId },
+          {
+            executionId: execution.id,
+          },
+        );
       }
     }
   }

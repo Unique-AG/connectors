@@ -87,6 +87,14 @@ const configSchema = z
     EXECUTION_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     PUSH_MAX_FAILURES: z.coerce.number().int().positive().default(10),
     RECONCILE_INTERVAL: z.coerce.number().int().positive().default(300),
+    MAX_ACTIVE_EXECUTIONS_PER_TENANT: z.coerce.number().int().positive().default(50),
+    MAX_ACTIVE_EXECUTIONS_PER_CONNECTION: z.coerce.number().int().positive().default(20),
+    MAX_ACTIVE_TASKS_PER_TENANT: z.coerce.number().int().positive().default(50),
+    MAX_REQUEST_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(25 * 1024 * 1024),
     WORKER_ENABLED: booleanFromEnvironment.prefault('true'),
     WORKER_CONCURRENCY: z.coerce.number().int().positive().default(32),
     DEPENDENCY_TIMEOUT_MS: z.coerce.number().int().positive().default(2_000),
@@ -148,6 +156,10 @@ const configSchema = z
     executionRetentionDays: config.EXECUTION_RETENTION_DAYS,
     pushMaxFailures: config.PUSH_MAX_FAILURES,
     reconcileIntervalSeconds: config.RECONCILE_INTERVAL,
+    maxActiveExecutionsPerTenant: config.MAX_ACTIVE_EXECUTIONS_PER_TENANT,
+    maxActiveExecutionsPerConnection: config.MAX_ACTIVE_EXECUTIONS_PER_CONNECTION,
+    maxActiveTasksPerTenant: config.MAX_ACTIVE_TASKS_PER_TENANT,
+    maxRequestBytes: config.MAX_REQUEST_BYTES,
     workerEnabled: config.WORKER_ENABLED,
     workerConcurrency: config.WORKER_CONCURRENCY,
     dependencyTimeoutMs: config.DEPENDENCY_TIMEOUT_MS,

@@ -44,6 +44,8 @@ import {
   ExecutionRepository,
   type ExecutionState,
 } from '../drizzle/execution.repository.js';
+import { AuditLog } from '../observability/audit-log.service.js';
+import { GatewayMetrics } from '../observability/gateway-metrics.service.js';
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { UniqueInternalError } from '../unique/unique-internal.error.js';
 import { WorkflowService } from '../workflow/workflow.service.js';
@@ -179,6 +181,8 @@ export class OutboundRunner implements OnModuleInit {
     private readonly chatFiles: ChatFilesService,
     private readonly egress: EgressService,
     private readonly wakeups: CallbackWakeups,
+    private readonly metrics: GatewayMetrics,
+    private readonly audit: AuditLog,
     @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
@@ -480,6 +484,23 @@ export class OutboundRunner implements OnModuleInit {
     };
   }
 
+  private async recordSent(execution: Execution, message: Message): Promise<void> {
+    const bytes = message.parts.reduce(
+      (total, part) =>
+        total +
+        (part.content?.$case === 'text'
+          ? Buffer.byteLength(part.content.value)
+          : part.content?.$case === 'raw'
+            ? part.content.value.byteLength
+            : part.content?.$case === 'data'
+              ? Buffer.byteLength(JSON.stringify(part.content.value))
+              : 0),
+      0,
+    );
+    await this.executions.addBytes(execution.companyId, execution.id, 0, bytes);
+    this.metrics.bytesExchanged(execution.companyId, 'outbound', 'out', bytes);
+  }
+
   private async cancelQuietly(client: Client, turn: RemoteTurn): Promise<void> {
     if (!turn.taskId) {
       return;
@@ -540,6 +561,7 @@ export class OutboundRunner implements OnModuleInit {
     }
     const message = await this.remoteMessage(execution, identity, session.card);
     await this.executions.transition(identity, execution.id, 'sending');
+    await this.recordSent(execution, message);
     const request = {
       tenant: '',
       message,
@@ -777,9 +799,11 @@ export class OutboundRunner implements OnModuleInit {
     await this.executions.transition(identity, execution.id, outcome.state, {
       lastError: outcome.reason ?? null,
     });
-    this.logger.log({
-      action: 'execution.finish',
-      companyId: identity.companyId,
+    const answerBytes = Buffer.byteLength(outcome.text);
+    await this.executions.addBytes(identity.companyId, execution.id, answerBytes, 0);
+    this.metrics.bytesExchanged(identity.companyId, 'outbound', 'in', answerBytes);
+    this.metrics.runFinished(identity.companyId, 'outbound', outcome.state, execution.createdAt);
+    this.audit.record('execution.finish', identity, {
       executionId: execution.id,
       state: outcome.state,
       reason: outcome.reason,
@@ -922,6 +946,8 @@ export class OutboundRunner implements OnModuleInit {
       mimeType: mediaType,
       filename,
     });
+    await this.executions.addBytes(execution.companyId, execution.id, bytes.byteLength, 0);
+    this.metrics.bytesExchanged(execution.companyId, 'outbound', 'in', bytes.byteLength);
     return {
       markdown: `**${filename}** <sup>${number}</sup>`,
       reference: {

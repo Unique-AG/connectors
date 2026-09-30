@@ -5,12 +5,14 @@ import { PersistenceModule } from './drizzle/persistence.module.js';
 import { HealthModule } from './health/health.module.js';
 import { InternalModule } from './internal/internal.module.js';
 import { ManagementModule } from './management/management.module.js';
+import { ObservabilityModule } from './observability/observability.module.js';
 import { OutboundModule } from './outbound/outbound.module.js';
 import { UniqueModule } from './unique/unique.module.js';
 
 @Module({
   imports: [
     GatewayConfigModule,
+    ObservabilityModule,
     PersistenceModule,
     UniqueModule,
     A2aServerModule,
