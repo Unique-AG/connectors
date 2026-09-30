@@ -751,9 +751,15 @@ class TestTheToolsThisServerAdvertises:
         assert set(_properties(tools["get_me"].output_schema)) == {
             "user_id",
             "display_name",
+            "given_name",
+            "surname",
             "email",
             "user_principal_name",
             "job_title",
+            "office_location",
+            "business_phones",
+            "mobile_phone",
+            "preferred_language",
         }
         assert set(_properties(tools["teams_list_chats"].output_schema)) == {"chats", "capped"}
         assert set(_properties(tools["teams_list_my_teams"].output_schema)) == {"teams"}
