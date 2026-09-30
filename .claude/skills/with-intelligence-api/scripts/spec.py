@@ -1,12 +1,12 @@
 """Query the public With Intelligence OpenAPI spec. No credentials needed.
 
-    uv run agent-explore/spec.py paths [filter]
-    uv run agent-explore/spec.py params /v3/investors
-    uv run agent-explore/spec.py schema InvestorExtended
-    uv run agent-explore/spec.py response '/v3/investors/{id}'
-    uv run agent-explore/spec.py snapshot            # refresh tests/spec/wi_schemas.json
+Run from services/with-intelligence-mcp so `uv run` supplies httpx:
 
-Through `uv run`: it imports httpx from the service venv. Output is tab-separated.
+    uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py paths [filter]
+    uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py schema InvestorExtended
+    uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py snapshot
+
+Output is tab-separated. `snapshot` refreshes that service's tests/spec/wi_schemas.json.
 
 Shapes only. Behaviour comes from a live GET (`explore.py`) — the spec says an endpoint takes
 `primary_strategy_id`, never which ids exist or what a 403 means for your subscription.
@@ -165,7 +165,18 @@ SNAPSHOT_ROOTS = (
     "PaginatedMandate",
     "Auth",
 )
-_SNAPSHOT_PATH = Path(__file__).resolve().parent.parent / "tests" / "spec" / "wi_schemas.json"
+
+
+def _service_root() -> Path:
+    start = Path.cwd().resolve()
+    for directory in (start, *start.parents):
+        marker = directory / "pyproject.toml"
+        if marker.is_file() and 'name = "with-intelligence-mcp"' in marker.read_text():
+            return directory
+        service = directory / "services" / "with-intelligence-mcp"
+        if (service / "pyproject.toml").is_file():
+            return service
+    raise SystemExit("snapshot writes tests/spec/wi_schemas.json; run it from the connectors repo")
 
 
 def _referenced_schemas(spec: Json, roots: tuple[str, ...]) -> dict[str, Json]:
@@ -202,6 +213,7 @@ def _refs_in(node: object) -> list[str]:
 
 def _write_snapshot(spec: Json, _target: str) -> None:
     """Write the pruned schema snapshot the conformance test reads."""
+    snapshot_path = _service_root() / "tests" / "spec" / "wi_schemas.json"
     schemas = _referenced_schemas(spec, SNAPSHOT_ROOTS)
     payload = {
         "_source": SPEC_URL,
@@ -209,9 +221,9 @@ def _write_snapshot(spec: Json, _target: str) -> None:
         "_roots": list(SNAPSHOT_ROOTS),
         "schemas": dict(sorted(schemas.items())),
     }
-    _SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _ = _SNAPSHOT_PATH.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n")
-    print(f"wrote {_SNAPSHOT_PATH.relative_to(Path.cwd())} with {len(schemas)} schemas")
+    snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+    _ = snapshot_path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n")
+    print(f"wrote {snapshot_path.relative_to(Path.cwd())} with {len(schemas)} schemas")
 
 
 _COMMANDS: dict[str, Callable[[Json, str], None]] = {

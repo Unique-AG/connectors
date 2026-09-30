@@ -121,16 +121,16 @@ uv run basedpyright .        # type check
 ## With Intelligence API
 
 Read `.claude/skills/with-intelligence-api/` before adding a feature that touches a new entity.
-Two CLIs under `agent-explore/` answer the two kinds of question:
+Its `scripts/` directory answers the two kinds of question:
 
 ```bash
-uv run agent-explore/spec.py paths investor          # shapes, from the public OpenAPI spec
-uv run agent-explore/spec.py schema InvestorExtended
-uv run agent-explore/explore.py /v3/investors/2504   # behaviour, from a live GET (needs .env)
+uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py paths investor
+uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py schema InvestorExtended
+uv run python ../../.claude/skills/with-intelligence-api/scripts/explore.py /v3/investors/2504
 ```
 
 `spec.py` needs no credentials — the spec is public. `explore.py` signs in with the username and
-password from `agent-explore/.env`, caches the token and every response, and only ever GETs.
+password from the skill's `scripts/.env`, caches the token and every response, and only ever GETs.
 
 The wire models under `features/*/wi_responses.py` are hand-written, and
 `tests/test_spec_conformance.py` checks every field they declare against With Intelligence's own
@@ -139,10 +139,10 @@ fails the suite. The schemas it compares against are pruned into
 `tests/spec/wi_schemas.json`; refresh them, as a deliberate and readable diff, with:
 
 ```bash
-uv run agent-explore/spec.py snapshot
+uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py snapshot
 ```
 
-Add a schema name to `SNAPSHOT_ROOTS` in `agent-explore/spec.py` when a feature starts modelling
+Add a schema name to `SNAPSHOT_ROOTS` in that `spec.py` when a feature starts modelling
 a new entity. What conformance cannot tell you is whether a field is ever populated — for that,
 record a real response with `explore.py`.
 

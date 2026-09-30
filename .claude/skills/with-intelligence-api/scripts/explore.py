@@ -1,8 +1,8 @@
 """GET-only CLI for the live With Intelligence v3 API. Loads .env from this directory.
 
-    uv run agent-explore/explore.py /v3/investors -p 'name=Virginia Retirement System'
-    uv run agent-explore/explore.py /v3/investors/2504
-    uv run agent-explore/explore.py /v3/mandates -p investor_id=2504 -p asset_class_group=hfm
+Run from services/with-intelligence-mcp so `uv run` supplies httpx:
+
+    uv run python ../../.claude/skills/with-intelligence-api/scripts/explore.py /v3/investors/2504
 
 Signs in once, caches the access token for its hour, and caches responses under `.probe-cache/`
 so a recorded body can become a test fixture. The only POST it makes is `/v3/auth/sign-in`.

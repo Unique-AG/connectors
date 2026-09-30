@@ -6,9 +6,9 @@ object. Everything passed, because the test fixture was invented in the same wro
 agreed with the code instead of with the API.
 
 The snapshot in `tests/spec/wi_schemas.json` is pruned to the schemas we model, so a
-refresh (`uv run agent-explore/spec.py snapshot`) is a readable diff of the contract we depend
-on. This checks transcription, not live behaviour: whether a field is ever populated, and
-whether the spec itself is honest, only a recorded response can settle.
+refresh (`spec.py snapshot` in the with-intelligence-api skill) is a readable diff of the
+contract we depend on. This checks transcription, not live behaviour: whether a field is
+ever populated, and whether the spec itself is honest, only a recorded response can settle.
 """
 
 import json

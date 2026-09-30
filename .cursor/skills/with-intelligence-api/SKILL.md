@@ -23,13 +23,13 @@ believing an empty result.
 
 ## 1. Tooling, and the public spec
 
-Scripts and `.env` live in `services/with-intelligence-mcp/agent-explore/`. Run them through
-`uv run` from the service root; the system interpreter has no httpx.
+`scripts/spec.py` and `scripts/explore.py` sit next to this file, with `.env.example`.
+Run them through the service virtualenv; the system interpreter has no httpx.
 
 ```bash
 cd services/with-intelligence-mcp
-uv run agent-explore/spec.py paths investor          # no credentials needed
-uv run agent-explore/explore.py /v3/investors/2504   # needs .env
+uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py paths investor
+uv run python ../../.claude/skills/with-intelligence-api/scripts/explore.py /v3/investors/2504
 ```
 
 The spec is public and needs no auth — `GET https://api.withintelligence.com/v3/docs/json`,
