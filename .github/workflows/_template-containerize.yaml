@@ -1,4 +1,4 @@
-name: "[TEMPLATE] Containerize"
+name: "[Template] Containerize"
 
 on:
   workflow_call:

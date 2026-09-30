@@ -1,4 +1,4 @@
-name: "[TEMPLATE] Cache Warming"
+name: "[Template] Cache Warming"
 
 on:
   workflow_call:
@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       service-path:
-        description: "Path to the services directory (e.g., services/sharepoint-connector)"
+        description: "Path to the service directory (e.g., services/sharepoint-connector)"
         required: true
         type: string
 
@@ -59,4 +59,3 @@ jobs:
 
           cache-to: |
             type=gha,scope=${{ env.GHA_CACHE_SCOPE }},mode=max,ignore-error=true
-

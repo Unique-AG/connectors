@@ -1,9 +1,5 @@
 name: "[Security] Dependency Review"
 
-concurrency:
-  group: dependency-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
@@ -12,11 +8,15 @@ on:
       - "services/**/package.json"
       - "services/**/uv.lock"
       - "packages/**"
-      - ".github/workflows/dependency-review.yaml"
+      - ".github/workflows/security-dependency-review.yaml"
 
 permissions:
   contents: read
   pull-requests: write
+
+concurrency:
+  group: security-dependency-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   dependency-review:

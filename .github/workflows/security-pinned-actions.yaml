@@ -1,12 +1,5 @@
 name: "[Security] Pinned Actions"
 
-concurrency:
-  group: pinned-actions-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
 on:
   # Design decision: no `branches` filter. Features here land as stacks of PRs that target their
   # parent branch, not `main`; a `branches: [main]` filter silently skipped this gate for every
@@ -16,6 +9,13 @@ on:
     paths:
       - .github/workflows/**
       - .github/actions/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-pinned-actions-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   check-pinned-actions:

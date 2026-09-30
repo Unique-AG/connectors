@@ -1,21 +1,24 @@
-name: "🚧 Gatekeeper"
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+name: "[CI] Gatekeeper"
 
 on:
   pull_request:
     types: [opened, edited, synchronize, labeled, unlabeled]
 
+concurrency:
+  group: ci-gatekeeper-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   conventional-pr-title:
-    runs-on: ubuntu-24.04
     name: Validate PR title and scope
-    # Skip automated PRs (release-please, dependabot) and urgent PRs by label
-    if: "!contains(github.event.pull_request.labels.*.name, 'autorelease: pending') && !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') && !contains(github.event.pull_request.labels.*.name, 'dependencies') && !contains(github.event.pull_request.labels.*.name, 'title-exception')"
+    if: >-
+      !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') &&
+      !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') &&
+      !contains(github.event.pull_request.labels.*.name, 'dependencies') &&
+      !contains(github.event.pull_request.labels.*.name, 'title-exception')
     permissions:
       pull-requests: read
+    runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
       PR_NUMBER: ${{ github.event.number }}
@@ -57,14 +60,14 @@ jobs:
           fi
 
   gatekeeper:
-    runs-on: ubuntu-24.04
     permissions:
       checks: read
       statuses: read
       pull-requests: read
+    runs-on: ubuntu-latest
     steps:
       - name: Run Merge Gatekeeper
-        uses: upsidr/merge-gatekeeper@09af7a82c1666d0e64d2bd8c01797a0bcfd3bb5d #v1.2.1
+        uses: upsidr/merge-gatekeeper@09af7a82c1666d0e64d2bd8c01797a0bcfd3bb5d # v1.2.1
         timeout-minutes: 25
         with:
           self: gatekeeper

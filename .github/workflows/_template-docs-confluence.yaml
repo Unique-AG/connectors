@@ -1,4 +1,4 @@
-name: "[TEMPLATE] Docs to Confluence"
+name: "[Template] Docs to Confluence"
 
 on:
   workflow_call:
@@ -14,7 +14,7 @@ on:
 
 jobs:
   publish-docs:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:

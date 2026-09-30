@@ -1,4 +1,4 @@
-name: "[packages] Validate"
+name: "[CI] Packages"
 
 on:
   # Design decision: no `branches` filter. Features here land as stacks of PRs that target their
@@ -13,17 +13,17 @@ on:
       - "turbo.json"
       - "tsconfig.json"
       - "biome.json"
-      - .github/workflows/packages.ci.yaml
+      - ".github/workflows/ci-packages.yaml"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-packages-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
     permissions:
       actions: write # cache needs write access
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -41,8 +41,8 @@ jobs:
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        name: Setup pnpm cache
+      - name: Setup pnpm cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -52,7 +52,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Sync pack format and lint
+      - name: Check syncpack format and lint
         run: pnpm syncpack format --check && pnpm syncpack lint
 
       - name: Run style (all packages)

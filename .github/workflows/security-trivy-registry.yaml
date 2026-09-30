@@ -1,9 +1,5 @@
 name: "[Security] Trivy Registry Image Scan"
 
-concurrency:
-  group: security-trivy-registry
-  cancel-in-progress: false
-
 on:
   schedule:
     - cron: "0 6 * * 3"
@@ -16,6 +12,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: security-trivy-registry
+  cancel-in-progress: false
 
 jobs:
   detect-services:
@@ -57,8 +57,6 @@ jobs:
   scan:
     name: Image ${{ matrix.service.service }}
     needs: detect-services
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -67,6 +65,8 @@ jobs:
       contents: read
       packages: read
       security-events: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       IMAGE: ghcr.io/unique-ag/connectors/services/${{ matrix.service.service }}
       VERSION: ${{ matrix.service.version }}

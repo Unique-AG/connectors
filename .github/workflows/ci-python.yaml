@@ -1,7 +1,7 @@
 # Python CI — uv-managed services and shared Python packages outside pnpm/turbo.
 # Service jobs run for changed services and consumers of changed shared packages.
 
-name: "Python CI"
+name: "[CI] Python"
 
 on:
   # Design decision: no `branches` filter. Features here land as stacks of PRs that target their
@@ -13,7 +13,7 @@ on:
     paths:
       - "packages/mcp-credential-auth/**"
       - "services/**"
-      - ".github/workflows/python-ci.yaml"
+      - ".github/workflows/ci-python.yaml"
       - ".github/workflows/_template-containerize.yaml"
       - "scripts/render-values-schema.sh"
   workflow_dispatch:
@@ -23,14 +23,14 @@ on:
         required: true
         default: "all"
 
-concurrency:
-  group: python-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
   actions: write # required for docker GHA cache writes in _template-containerize.yaml
   packages: read # required for helm OCI chart dependency pulls from GHCR
+
+concurrency:
+  group: ci-python-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   detect-changes:
@@ -54,7 +54,7 @@ jobs:
             shared_auth:
               - 'packages/mcp-credential-auth/**'
             workflow:
-              - '.github/workflows/python-ci.yaml'
+              - '.github/workflows/ci-python.yaml'
               - '.github/workflows/_template-containerize.yaml'
               - 'scripts/render-values-schema.sh'
 
@@ -191,10 +191,10 @@ jobs:
       run:
         working-directory: packages/mcp-credential-auth
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: "0.11.33"
           enable-cache: true
@@ -292,7 +292,7 @@ jobs:
         package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
     permissions:
       contents: read
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       SERVICE_PATH: services/${{ matrix.package }}

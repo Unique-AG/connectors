@@ -1,4 +1,4 @@
-name: "Release, Please 🤖"
+name: "[Release] Please"
 
 on:
   workflow_dispatch:
@@ -59,7 +59,7 @@ jobs:
 
   release-sharepoint-connector:
     needs: release-please
-    if: ${{ needs.release-please.outputs['services/sharepoint-connector--release_created'] == 'true' }}
+    if: needs.release-please.outputs['services/sharepoint-connector--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
@@ -70,7 +70,7 @@ jobs:
 
   release-teams-mcp:
     needs: release-please
-    if: ${{ needs.release-please.outputs['services/teams-mcp--release_created'] == 'true' }}
+    if: needs.release-please.outputs['services/teams-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
@@ -81,7 +81,7 @@ jobs:
 
   release-confluence-connector:
     needs: release-please
-    if: ${{ needs.release-please.outputs['services/confluence-connector--release_created'] == 'true' }}
+    if: needs.release-please.outputs['services/confluence-connector--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
@@ -91,7 +91,7 @@ jobs:
 
   release-outlook-semantic-mcp:
     needs: release-please
-    if: ${{ needs.release-please.outputs['services/outlook-semantic-mcp--release_created'] == 'true' }}
+    if: needs.release-please.outputs['services/outlook-semantic-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
@@ -101,7 +101,7 @@ jobs:
 
   release-hello-mcp:
     needs: release-please
-    if: ${{ needs.release-please.outputs['services/hello-mcp--release_created'] == 'true' }}
+    if: needs.release-please.outputs['services/hello-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
@@ -111,7 +111,7 @@ jobs:
 
   release-kb-mcp:
     needs: release-please
-    if: ${{ needs.release-please.outputs['services/kb-mcp--release_created'] == 'true' }}
+    if: needs.release-please.outputs['services/kb-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
@@ -121,16 +121,17 @@ jobs:
 
   release-backstop-mcp:
     needs: release-please
-    if: ${{ needs.release-please.outputs['services/backstop-mcp--release_created'] == 'true' }}
+    if: needs.release-please.outputs['services/backstop-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
       service-name: backstop-mcp
       service-version: ${{ needs.release-please.outputs['services/backstop-mcp--version'] }}
       dockerfile: services/backstop-mcp/deploy/Dockerfile
+
   release-office-365-mcp:
     needs: release-please
-    if: ${{ needs.release-please.outputs['services/office-365-mcp--release_created'] == 'true' }}
+    if: needs.release-please.outputs['services/office-365-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
@@ -140,7 +141,7 @@ jobs:
 
   release-with-intelligence-mcp:
     needs: release-please
-    if: ${{ needs.release-please.outputs['services/with-intelligence-mcp--release_created'] == 'true' }}
+    if: needs.release-please.outputs['services/with-intelligence-mcp--release_created'] == 'true'
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:

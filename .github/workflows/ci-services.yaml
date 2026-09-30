@@ -1,4 +1,4 @@
-name: "Services CI"
+name: "[CI] Services"
 
 on:
   # Design decision: no `branches` filter. Features here land as stacks of PRs that target their
@@ -11,7 +11,7 @@ on:
       - "services/**"
       - "packages/**"
       - "pnpm-lock.yaml"
-      - ".github/workflows/services-ci.yaml"
+      - ".github/workflows/ci-services.yaml"
       - ".github/workflows/_template-ci.yaml"
       - ".github/workflows/_template-containerize.yaml"
       - "scripts/render-values-schema.sh"
@@ -22,14 +22,14 @@ on:
         required: true
         default: "all"
 
-concurrency:
-  group: services-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
   actions: write # required for pnpm cache writes in _template-ci.yaml (reusable workflows cannot exceed caller permissions)
   packages: read # required for validate-helm and helm-schema-check jobs in _template-ci.yaml to pull OCI chart dependencies from GHCR
+
+concurrency:
+  group: ci-services-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   detect-changes:
@@ -54,7 +54,7 @@ jobs:
             lockfile:
               - 'pnpm-lock.yaml'
             workflow:
-              - '.github/workflows/services-ci.yaml'
+              - '.github/workflows/ci-services.yaml'
               - '.github/workflows/_template-ci.yaml'
               - '.github/workflows/_template-containerize.yaml'
               - 'scripts/render-values-schema.sh'

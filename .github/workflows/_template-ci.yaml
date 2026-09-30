@@ -1,4 +1,4 @@
-name: "[TEMPLATE] CI"
+name: "[Template] CI"
 
 on:
   workflow_call:
@@ -54,8 +54,8 @@ jobs:
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        name: Setup pnpm cache
+      - name: Setup pnpm cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -79,7 +79,7 @@ jobs:
         working-directory: ${{ env.SERVICE_PATH }}
         run: pnpm codegen
 
-      - name: Sync pack format and lint
+      - name: Check syncpack format and lint
         working-directory: .
         run: pnpm syncpack format --check && pnpm syncpack lint
 
@@ -182,7 +182,7 @@ jobs:
   validate-terraform:
     permissions:
       contents: read
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       SERVICE_PATH: ${{ inputs.service-path }}

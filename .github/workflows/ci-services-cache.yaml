@@ -1,4 +1,4 @@
-name: "Services Cache Warming"
+name: "[CI] Services Cache Warming"
 
 on:
   schedule:
