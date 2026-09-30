@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       docs-path:
-        description: "Docs directory to publish"
+        description: "Docs directory to publish. Releases publish docs already. Use this workflow as a last resort, or to publish before a release."
         required: true
         type: choice
         options:
@@ -24,7 +24,18 @@ permissions:
   contents: read
 
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Start from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Start this workflow from main."
+          exit 1
+
   publish-docs:
+    needs: guard
     uses: ./.github/workflows/_template-docs-confluence.yaml
     secrets: inherit
     with:

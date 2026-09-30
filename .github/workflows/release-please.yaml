@@ -8,9 +8,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
-  packages: write
-  security-events: write
 
 jobs:
   release-please:
@@ -21,26 +18,14 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 10
     outputs:
-      "services/sharepoint-connector--release_created": ${{ steps.release.outputs['services/sharepoint-connector--release_created'] }}
-      "services/sharepoint-connector--version": ${{ steps.release.outputs['services/sharepoint-connector--version'] }}
-      "services/teams-mcp--release_created": ${{ steps.release.outputs['services/teams-mcp--release_created'] }}
-      "services/teams-mcp--version": ${{ steps.release.outputs['services/teams-mcp--version'] }}
-      "services/confluence-connector--release_created": ${{ steps.release.outputs['services/confluence-connector--release_created'] }}
-      "services/confluence-connector--version": ${{ steps.release.outputs['services/confluence-connector--version'] }}
-      "services/outlook-semantic-mcp--release_created": ${{ steps.release.outputs['services/outlook-semantic-mcp--release_created'] }}
-      "services/outlook-semantic-mcp--version": ${{ steps.release.outputs['services/outlook-semantic-mcp--version'] }}
-      "services/hello-mcp--release_created": ${{ steps.release.outputs['services/hello-mcp--release_created'] }}
-      "services/hello-mcp--version": ${{ steps.release.outputs['services/hello-mcp--version'] }}
-      "services/kb-mcp--release_created": ${{ steps.release.outputs['services/kb-mcp--release_created'] }}
-      "services/kb-mcp--version": ${{ steps.release.outputs['services/kb-mcp--version'] }}
-      "services/backstop-mcp--release_created": ${{ steps.release.outputs['services/backstop-mcp--release_created'] }}
-      "services/backstop-mcp--version": ${{ steps.release.outputs['services/backstop-mcp--version'] }}
-      "services/office-365-mcp--release_created": ${{ steps.release.outputs['services/office-365-mcp--release_created'] }}
-      "services/office-365-mcp--version": ${{ steps.release.outputs['services/office-365-mcp--version'] }}
-      "services/with-intelligence-mcp--release_created": ${{ steps.release.outputs['services/with-intelligence-mcp--release_created'] }}
-      "services/with-intelligence-mcp--version": ${{ steps.release.outputs['services/with-intelligence-mcp--version'] }}
-
+      releases: ${{ steps.plan.outputs.releases }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: /services/*/deploy/helm-charts/*/Chart.yaml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
 
@@ -57,78 +42,46 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-  release-sharepoint-connector:
+      - name: Plan the releases
+        id: plan
+        env:
+          RELEASE_OUTPUTS: ${{ toJson(steps.release.outputs) }}
+        run: |
+          paths=$(jq -r '(.paths_released // "[]" | fromjson)[]' <<< "$RELEASE_OUTPUTS")
+          releases='[]'
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            service=${path#services/}
+            if [ -f "$path/deploy/helm-charts/$service/Chart.yaml" ]; then
+              version=$(jq -r --arg key "$path--version" '.[$key] // empty' <<< "$RELEASE_OUTPUTS")
+              tag=$(jq -r --arg key "$path--tag_name" '.[$key] // empty' <<< "$RELEASE_OUTPUTS")
+              if [ -z "$version" ] || [ -z "$tag" ]; then
+                echo "::error::release-please returned no version or tag for $path."
+                exit 1
+              fi
+              releases=$(jq -c --arg service "$service" --arg version "$version" --arg ref "refs/tags/$tag" '. + [{service: $service, version: $version, ref: $ref}]' <<< "$releases")
+            else
+              echo "::notice::$service has no Helm chart, so its release publishes no image."
+            fi
+          done <<< "$paths"
+          echo "releases=$releases" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: ${{ matrix.release.service }}
     needs: release-please
-    if: needs.release-please.outputs['services/sharepoint-connector--release_created'] == 'true'
+    if: github.ref == 'refs/heads/main' && needs.release-please.outputs.releases != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ${{ fromJson(needs.release-please.outputs.releases) }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      security-events: write
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
-      service-name: sharepoint-connector
-      service-version: ${{ needs.release-please.outputs['services/sharepoint-connector--version'] }}
-      docs-path: services/sharepoint-connector/docs
-
-  release-teams-mcp:
-    needs: release-please
-    if: needs.release-please.outputs['services/teams-mcp--release_created'] == 'true'
-    uses: ./.github/workflows/_template-cd.yaml
-    secrets: inherit
-    with:
-      service-name: teams-mcp
-      service-version: ${{ needs.release-please.outputs['services/teams-mcp--version'] }}
-      docs-path: services/teams-mcp/docs
-
-  release-confluence-connector:
-    needs: release-please
-    if: needs.release-please.outputs['services/confluence-connector--release_created'] == 'true'
-    uses: ./.github/workflows/_template-cd.yaml
-    with:
-      service-name: confluence-connector
-      service-version: ${{ needs.release-please.outputs['services/confluence-connector--version'] }}
-
-  release-outlook-semantic-mcp:
-    needs: release-please
-    if: needs.release-please.outputs['services/outlook-semantic-mcp--release_created'] == 'true'
-    uses: ./.github/workflows/_template-cd.yaml
-    with:
-      service-name: outlook-semantic-mcp
-      service-version: ${{ needs.release-please.outputs['services/outlook-semantic-mcp--version'] }}
-
-  release-hello-mcp:
-    needs: release-please
-    if: needs.release-please.outputs['services/hello-mcp--release_created'] == 'true'
-    uses: ./.github/workflows/_template-cd.yaml
-    with:
-      service-name: hello-mcp
-      service-version: ${{ needs.release-please.outputs['services/hello-mcp--version'] }}
-
-  release-kb-mcp:
-    needs: release-please
-    if: needs.release-please.outputs['services/kb-mcp--release_created'] == 'true'
-    uses: ./.github/workflows/_template-cd.yaml
-    with:
-      service-name: kb-mcp
-      service-version: ${{ needs.release-please.outputs['services/kb-mcp--version'] }}
-
-  release-backstop-mcp:
-    needs: release-please
-    if: needs.release-please.outputs['services/backstop-mcp--release_created'] == 'true'
-    uses: ./.github/workflows/_template-cd.yaml
-    with:
-      service-name: backstop-mcp
-      service-version: ${{ needs.release-please.outputs['services/backstop-mcp--version'] }}
-
-  release-office-365-mcp:
-    needs: release-please
-    if: needs.release-please.outputs['services/office-365-mcp--release_created'] == 'true'
-    uses: ./.github/workflows/_template-cd.yaml
-    with:
-      service-name: office-365-mcp
-      service-version: ${{ needs.release-please.outputs['services/office-365-mcp--version'] }}
-
-  release-with-intelligence-mcp:
-    needs: release-please
-    if: needs.release-please.outputs['services/with-intelligence-mcp--release_created'] == 'true'
-    uses: ./.github/workflows/_template-cd.yaml
-    with:
-      service-name: with-intelligence-mcp
-      service-version: ${{ needs.release-please.outputs['services/with-intelligence-mcp--version'] }}
+      service-name: ${{ matrix.release.service }}
+      service-version: ${{ matrix.release.version }}
+      ref: ${{ matrix.release.ref }}
