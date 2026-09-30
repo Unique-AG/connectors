@@ -126,24 +126,22 @@ and setting `postgresql.enabled: false`, bypassing the `postgresql.connection` c
 ## Network Policies
 
 `networkPolicy.enabled` defaults to `false` (`flavor: cilium`); set it to `true` for a default-deny
-`CiliumNetworkPolicy`. `kb-mcp` needs egress to DNS, the Unique API, Zitadel and the platform gateway
-(the chart ships a baseline `toFQDNs: ["*.unique.app"]` rule), and its Postgres host if external.
+`CiliumNetworkPolicy`. `kb-mcp` needs egress to DNS, the Unique API, Zitadel and the platform gateway,
+and its Postgres host if external. The chart's baseline only allows `toFQDNs: ["*.unique.app"]` on
+443, so an in-cluster Unique API address (the `UNIQUE_API_BASE_URL` in Minimal Values) is not
+covered: add its egress rule in your overlay, under `networkPolicy.egress[]` or as an
+`internalServices.dependencies.<key>` entry, which builds the rule from `servicePort` and `podPort`.
+The chart does not emit `UNIQUE_API_BASE_URL` from it, so keep setting that under `envVars`.
 
 !!! warning "`toEndpoints` rules match the pod port, not the Service port"
     Cilium's eBPF Service DNAT happens *before* a `CiliumNetworkPolicy`'s `toEndpoints` rule is
-    evaluated, so the rule must allow the container's actual listening port. For `kb-mcp` calling
-    the Unique API directly in-cluster, that means the Unique API's container port (`8080`), not
-    its Service port (`8093`).
-
-The monorepo-wide `internalServices` convention encodes this automatically: a chart declaring
-`internalServices.dependencies.<key>` gets both the env var and a matching egress rule targeting the
-dependency's real pod port, via separate `servicePort`/`podPort` fields.
+    evaluated, so the rule must allow the container's actual listening port. When the Service
+    port and the container port differ, set `podPort` to the container port.
 
 !!! note "The allowlist is bidirectional"
-    Declaring `dependencies` builds only `kb-mcp`'s egress rule. The Unique API must separately
-    allowlist `kb-mcp` under its own `internalServices.dependents.kbMcp`, which defaults to
-    `enabled: false`. Otherwise its ingress policy drops the connection silently, with no
-    application error, just a timeout.
+    Egress from `kb-mcp` is only half of it. The Unique API must also allow `kb-mcp` in its own
+    ingress policy. Otherwise it drops the connection silently, with no application error, just a
+    timeout.
 
 ## Health Checks
 
@@ -160,7 +158,7 @@ dependency's real pod port, via separate `servicePort`/`podPort` fields.
 
 - **Startup hangs under a default-deny network policy**: FastMCP pings `pypi.org` on startup.
   Set `FASTMCP_CHECK_FOR_UPDATES: "off"`.
-- **Tool calls hang or time out**: the egress rule is probably targeting the Unique API's Service
-  port instead of its pod port. See [Network Policies](#Network-Policies).
+- **Tool calls hang or time out**: there is probably no egress rule for the Unique API, or it targets
+  the Service port instead of the pod port. See [Network Policies](#Network-Policies).
 - **Server refuses to boot**: `kb-mcp` requires both `DATABASE_URL` and `ENCRYPTION_KEY` unless
   `ALLOW_EPHEMERAL_OAUTH_STORAGE=true`.
