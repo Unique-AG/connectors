@@ -51,6 +51,13 @@ claude mcp add --transport http kb-mcp https://kb-mcp.<tenant>.unique.app/mcp
 Then complete sign-in: run `/mcp` if you're already inside a session, or `claude mcp login kb-mcp`
 from a bare shell if you're not.
 
+Optionally, install the `unique-kb-mcp` skill, which teaches Claude how to combine the tools
+(scoping to a folder, checking metadata before filtering):
+
+```bash
+npx skills add Unique-AG/connectors
+```
+
 ## Cursor
 
 Add this to `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` to make it available

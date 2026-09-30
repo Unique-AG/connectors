@@ -38,6 +38,10 @@ flowchart LR
 Nothing forces that order. A well-scoped question can call `search` directly with no `folder_ids`
 or `metadata_filter` at all: an unrestricted search is the default and correct for most requests.
 
+`kb-mcp` also ships this guidance as an agent skill, `unique-kb-mcp`, with worked examples. The
+server serves it as an MCP resource while all four tools are enabled, and it can be
+[read on GitHub](https://github.com/Unique-AG/connectors/tree/main/services/kb-mcp/src/kb_mcp/skills/unique-kb-mcp).
+
 ### `search`
 
 Semantic and internal search over the knowledge base: finds relevant passages by meaning, not
