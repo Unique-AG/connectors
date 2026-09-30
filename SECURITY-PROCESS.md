@@ -86,27 +86,27 @@ Two facts keep the four checks apart.
 
 ### The severity threshold
 
-A threshold applies to every check in this document except CodeQL. Two conditions decide whether a finding can stop a pull request, or open an alert:
+A threshold applies to every check in this document except CodeQL. The severity decides whether a finding can stop a pull request, or open an alert. Some checks also need a fix to exist:
 
 - The severity must be CRITICAL or HIGH.
-- A fix must already exist.
+- The image vulnerability check, the registry scan, and the release image scan also need a fix to exist.
 
-| Check | Severity threshold |
-|---|---|
-| Image vulnerability check | CRITICAL, HIGH |
-| Dockerfile scan | CRITICAL, HIGH |
-| Registry scan | CRITICAL, HIGH |
-| Release image scan | CRITICAL, HIGH |
-| Dependency review | HIGH and above, set by `fail-on-severity: high` |
-| License scan | UNKNOWN, HIGH, CRITICAL |
+| Check | Severity threshold | A fix must exist |
+|---|---|---|
+| Image vulnerability check | CRITICAL, HIGH | yes |
+| Dockerfile scan | CRITICAL, HIGH | no condition set |
+| Registry scan | CRITICAL, HIGH | yes |
+| Release image scan | CRITICAL, HIGH | yes |
+| Dependency review | HIGH and above, set by `fail-on-severity: high` | no condition set |
+| License scan | UNKNOWN, HIGH, CRITICAL | not applicable |
 
 Trivy is the tool behind the image vulnerability check, the Dockerfile scan, the registry scan, and the release image scan. No part of this document tracks a MEDIUM or LOW finding.
 
 The license scan sets a wider threshold because an unclassified license is itself the finding. See [License scanning](#license-scanning).
 
-A CRITICAL or HIGH finding with no fix does not stop the pull request. It becomes a warning instead. See [The image vulnerability check stopped it](#the-image-vulnerability-check-stopped-it).
+In the image vulnerability check, a CRITICAL or HIGH finding with no fix does not stop the pull request. It becomes a warning instead. See [The image vulnerability check stopped it](#the-image-vulnerability-check-stopped-it).
 
-A LOW finding lets the pull request merge. So does a HIGH finding with no fix.
+A LOW finding lets the pull request merge. So does a HIGH finding with no fix in a container image.
 
 ### What to do when a check stops your pull request
 
