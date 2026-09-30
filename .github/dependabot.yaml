@@ -73,10 +73,6 @@ updates:
       per-dependency:
         patterns:
           - "*"
-        update-types:
-          - major
-          - minor
-          - patch
         group-by: dependency-name
 
   - package-ecosystem: github-actions
@@ -116,32 +112,6 @@ updates:
     labels:
       - dependencies
       - terraform
-    commit-message:
-      prefix: build
-    open-pull-requests-limit: 5
-    rebase-strategy: disabled
-    groups:
-      per-dependency:
-        patterns:
-          - "*"
-        update-types:
-          - major
-          - minor
-          - patch
-        group-by: dependency-name
-
-  - package-ecosystem: helm
-    directories:
-      - services/**/*
-    schedule:
-      interval: cron
-      cronjob: "0 6 * * 5"
-      timezone: Europe/Berlin
-    cooldown:
-      default-days: 3
-    labels:
-      - dependencies
-      - helm
     commit-message:
       prefix: build
     open-pull-requests-limit: 5
