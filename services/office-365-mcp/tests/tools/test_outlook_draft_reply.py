@@ -341,9 +341,10 @@ class TestTheModesAndAddressesItRefuses:
     ) -> None:
         _ = _creates(graph)
 
-        with pytest.raises(ToolError, match="reply-all"):
+        with pytest.raises(ToolError, match="reply-all") as raised:
             _ = await _reply(client, mode=mode)
 
+        assert "outlook_draft_reply_all" in str(raised.value)
         assert len(graph.calls) == 0
 
     async def test_to_on_a_reply_is_refused_and_the_refusal_names_the_mode(
@@ -565,13 +566,17 @@ class TestHowItDeclaresItself:
         mode_description = cast("str", _properties(parameters)["mode"]["description"])
         assert "carries the original's own attachments" in mode_description.casefold()
 
-    async def test_the_description_rules_out_reply_all_and_the_copy_fields(
+    async def test_the_description_rules_out_the_copy_fields_and_names_the_reply_all_tool(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
 
-        lowered = (tool.description or "").casefold()
-        assert "offers no reply-all, cc, or bcc" in lowered
+        description = tool.description or ""
+        assert "offers no cc or bcc" in description.casefold()
+        assert (
+            "If this deployment exposes outlook_draft_reply_all, that tool drafts a reply-all."
+        ) in description
+        assert "no reply-all" not in description.casefold()
 
     async def test_the_description_says_it_cannot_add_files_and_where_the_user_adds_one(
         self, transport: httpx.AsyncClient

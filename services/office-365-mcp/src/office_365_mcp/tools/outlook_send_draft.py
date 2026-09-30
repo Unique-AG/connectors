@@ -1,3 +1,5 @@
+import hashlib
+import json
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from typing import Annotated
@@ -47,23 +49,23 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "draft_ref": "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D"
 }
 
-_DRAFT_FIELDS: tuple[str, ...] = ("toRecipients", "ccRecipients", "subject", "isDraft")
+_DRAFT_FIELDS: tuple[str, ...] = ("toRecipients", "ccRecipients", "subject", "isDraft", "changeKey")
 
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = (
-    "Sends a draft from outlook_draft_mail or outlook_draft_reply onto the wire. This cannot "
-    "be undone, and asks the person to approve before sending."
+    "Sends a draft from outlook_draft_mail, outlook_draft_reply or outlook_draft_reply_all onto "
+    "the wire. This cannot be undone, and asks the person to approve before sending."
 )
 
 _NOT_A_DRAFT_HANDLE = (
-    "outlook_send_draft takes the `draft_ref` handle that outlook_draft_mail or "
-    + "outlook_draft_reply answered with, and this is not one. A sendable handle has exactly one "
-    + "shape:\n"
+    "outlook_send_draft takes the `draft_ref` handle that outlook_draft_mail, "
+    + "outlook_draft_reply or outlook_draft_reply_all answered with, and this is not one. "
+    + "A sendable handle has exactly one shape:\n"
     + "  outlook:///drafts/{draft_id}\n"
     + "with the id percent-encoded, for example "
     + "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D. Only a handle of the drafts family is "
-    + "accepted, and only the two drafting tools mint one. A subject line, an email address, a "
+    + "accepted, and only the drafting tools mint one. A subject line, an email address, a "
     + "message id and an Outlook web link are not handles. Neither is a folder or rule handle "
     + "under the same scheme, which addresses something that is not a draft. Nothing was sent. "
     + "If the mail still needs writing, call outlook_draft_mail and send the handle it answers "
@@ -73,8 +75,9 @@ _NOT_A_DRAFT_HANDLE = (
 _A_MESSAGE_IS_NOT_A_DRAFT = (
     "That is a message handle (outlook:///messages/{id}), and outlook_send_draft will not send "
     + "it. Nothing was sent. Only a draft THIS CONNECTOR COMPOSED can be sent. That is why a "
-    + "draft has a handle family of its own: outlook:///drafts/{id}, minted by outlook_draft_mail "
-    + "and outlook_draft_reply, and by nothing else. A message handle comes from reading the "
+    + "draft has a handle family of its own: outlook:///drafts/{id}, minted by outlook_draft_mail, "
+    + "outlook_draft_reply and outlook_draft_reply_all, and by nothing else. "
+    + "A message handle comes from reading the "
     + "mailbox: a search hit, a folder listing, a thread. So it addresses mail somebody else "
     + "wrote, or mail that was already sent. Neither one has a route here to an outbound "
     + "message. If the user wants to reply to that message, draft the reply first with "
@@ -132,7 +135,8 @@ def a_person_agrees(ctx: Context) -> _Confirm:
             f"Send the draft {draft.subject or '(no subject)'!r} to "
             f"{', '.join(everyone) or 'nobody'}{identity}? Sending cannot be undone."
         )
-        return await confirm(question, question)
+        about = hashlib.sha256(json.dumps([question, draft.change_key]).encode()).hexdigest()
+        return await confirm(question, about)
 
     return asked
 
@@ -218,8 +222,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The draft to send: the uri that outlook_draft_mail or outlook_draft_reply "
-                    "answered with."
+                    "The draft to send: the `uri` that outlook_draft_mail, outlook_draft_reply, "
+                    "outlook_draft_reply_all or outlook_update_draft answered with. Copy it "
+                    "exactly."
                 ),
             ),
         ],

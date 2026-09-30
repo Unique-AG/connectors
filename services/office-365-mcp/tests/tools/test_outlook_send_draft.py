@@ -48,6 +48,8 @@ _PAM = "pam@example.invalid"
 
 _SUBJECT = "Invoice 4471"
 
+_CHANGE_KEY = "CQAAABYAAAC4SYNTHETIC-version-0001"
+
 _NOTHING_SENT = "Nothing was sent, and the draft is untouched and still in Drafts."
 
 
@@ -66,10 +68,12 @@ def _draft(
     cc: Sequence[Mapping[str, object]] = (),
     subject: str | None = _SUBJECT,
     is_draft: bool | None = True,
+    change_key: str = _CHANGE_KEY,
 ) -> dict[str, object]:
     return {
         "id": _DRAFT_ID,
         "isDraft": is_draft,
+        "changeKey": change_key,
         "subject": subject,
         "toRecipients": [dict(one) for one in (to or [_recipient("Ada Lovelace", _ADA)])],
         "ccRecipients": [dict(one) for one in cc],
@@ -289,7 +293,7 @@ def _modern_context(
     return cast("Context", cast("object", _Client()))
 
 
-def _the_question(answer: MailSent | InputRequiredResult) -> tuple[str, str, str]:
+def _the_question(answer: MailSent | InputRequiredResult) -> tuple[str, str, str, str]:
     assert isinstance(answer, InputRequiredResult), "the question was never put to anybody"
     requests = answer.input_requests or {}
     assert len(requests) == 1, f"one question per call, and this one asked {sorted(requests)}"
@@ -303,10 +307,11 @@ def _the_question(answer: MailSent | InputRequiredResult) -> tuple[str, str, str
     properties = cast("Mapping[str, object]", schema["properties"])
     choices = cast("Sequence[str]", cast("Mapping[str, object]", properties["value"])["enum"])
     assert list(choices) == [sender.SEND, "do not send"], f"the answers offered were {choices}"
-    assert answer.request_state == params.message, (
-        "the answer is bound to the question, so an edited draft cannot be sent on a stale accept"
+    assert answer.request_state, "the answer is bound to nothing"
+    assert params.message not in answer.request_state, (
+        "the answer is bound to the bare question, so an edited body can be sent on a stale accept"
     )
-    return key, params.message, choices[0]
+    return key, params.message, answer.request_state, choices[0]
 
 
 class TestTheEraWithNoBackChannel:
@@ -320,7 +325,7 @@ class TestTheEraWithNoBackChannel:
             client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
         )
 
-        _key, _state, _agrees_with = _the_question(answer)
+        _key, _question, _state, _agrees_with = _the_question(answer)
         assert read.call_count == 1
         assert send.call_count == 0, "an unanswered question sent the mail anyway"
 
@@ -336,7 +341,7 @@ class TestTheEraWithNoBackChannel:
             client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
         )
 
-        _key, question, _agrees_with = _the_question(answer)
+        _key, question, _state, _agrees_with = _the_question(answer)
         assert _SUBJECT in question
         assert _ADA in question
         assert _PAM in question
@@ -346,7 +351,7 @@ class TestTheEraWithNoBackChannel:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         send = _ready(graph)
-        key, state, agrees_with = _the_question(
+        key, _question, state, agrees_with = _the_question(
             await send_draft(
                 client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
             )
@@ -377,7 +382,7 @@ class TestTheEraWithNoBackChannel:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         send = _ready(graph)
-        key, _state, agrees_with = _the_question(
+        key, _question, _state, agrees_with = _the_question(
             await send_draft(
                 client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
             )
@@ -403,7 +408,7 @@ class TestTheEraWithNoBackChannel:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         send = _ready(graph)
-        key, state, _agrees_with = _the_question(
+        key, _question, state, _agrees_with = _the_question(
             await send_draft(
                 client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
             )
@@ -426,7 +431,7 @@ class TestTheEraWithNoBackChannel:
     ) -> None:
         read = _reads(graph, _draft())
         send = _sends(graph)
-        key, state, agrees_with = _the_question(
+        key, _question, state, agrees_with = _the_question(
             await send_draft(
                 client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
             )
@@ -448,6 +453,64 @@ class TestTheEraWithNoBackChannel:
             )
 
         assert send.call_count == 0, "a message that was no longer a draft was sent anyway"
+
+    async def test_a_draft_changed_between_the_rounds_is_refused_and_never_sent(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, _draft())
+        send = _sends(graph)
+        key, _question, state, agrees_with = _the_question(
+            await send_draft(
+                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+            )
+        )
+        _ = read.mock(
+            return_value=httpx.Response(
+                200, json=_draft(change_key="CQAAABYAAAC4SYNTHETIC-version-0002")
+            )
+        )
+
+        with pytest.raises(ToolError, match="given for a different request") as raised:
+            _ = await send_draft(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+                draft_ref=_DRAFT_REF,
+            )
+
+        assert str(raised.value).startswith(_NOTHING_SENT)
+        assert send.call_count == 0, "a body edited after the question went out on the old accept"
+
+    async def test_the_same_question_about_a_changed_draft_is_bound_to_a_different_state(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, _draft())
+        _ = _sends(graph)
+        _key, first_question, first_state, _agrees_with = _the_question(
+            await send_draft(
+                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+            )
+        )
+        _ = read.mock(
+            return_value=httpx.Response(
+                200, json=_draft(change_key="CQAAABYAAAC4SYNTHETIC-version-0002")
+            )
+        )
+
+        _key, second_question, second_state, _agrees_with = _the_question(
+            await send_draft(
+                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+            )
+        )
+
+        assert first_question == second_question
+        assert first_state != second_state
 
 
 class TestWhatItAsksGraphFor:
@@ -478,6 +541,7 @@ class TestWhatItAsksGraphFor:
         assert "ccRecipients" in selected
         assert "subject" in selected
         assert "isDraft" in selected
+        assert "changeKey" in selected
 
     async def test_the_pre_read_never_asks_for_the_body(
         self, client: GraphServiceClient, graph: respx.MockRouter

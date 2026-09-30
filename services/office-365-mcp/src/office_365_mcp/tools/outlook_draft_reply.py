@@ -93,7 +93,8 @@ _CHOSEN_BY_MICROSOFT = "an address that Microsoft chooses"
 
 _DESCRIPTION = (
     "Drafts a reply to, or forward of, a found message into Drafts for review. It cannot "
-    "send — the user presses Send in Outlook — and offers no reply-all, Cc, or Bcc. It cannot "
+    "send — the user presses Send in Outlook — and offers no Cc or Bcc. If this deployment "
+    "exposes outlook_draft_reply_all, that tool drafts a reply-all. It cannot "
     "add files to the draft. If the user asks to attach a file, tell them to add it in Outlook "
     "before they send the draft. Set `mailbox` to draft in a shared or delegated mailbox. "
     "This tool asks the user to agree before it changes a shared or delegated mailbox. "
@@ -111,12 +112,11 @@ _NOT_A_MESSAGE_HANDLE = (
 )
 
 _UNKNOWN_MODE = (
-    "outlook_draft_reply has exactly two modes, `reply` and `forward`, and this is neither. In "
-    + "particular, there is no reply-all. A reply-all is addressed to everyone in the original "
-    + "message's To and Cc, a list that whoever sent the message chose. So one mail with two "
-    + "hundred addresses on it becomes a draft addressed to two hundred people. Reply to the "
-    + "sender with `reply`, or name the recipients yourself with `forward` and `to`. Nothing was "
-    + "created."
+    "outlook_draft_reply has exactly two modes, `reply` and `forward`, and this is neither. "
+    + "This tool has no reply-all mode. If this deployment exposes outlook_draft_reply_all, that "
+    + "tool drafts a reply-all. A reply-all goes to everyone on the original message, and the "
+    + "sender of that message chose that list. Reply to the sender with `reply`, or name the "
+    + "recipients yourself with `forward` and `to`. Nothing was created."
 )
 
 _TO_ON_A_REPLY = (
