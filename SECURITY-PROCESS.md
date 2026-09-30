@@ -140,7 +140,9 @@ A second scan of the same image only adds findings. It never removes them. **To 
 
 The manual re-run workflow of a service refuses a version that already has an image. An image never changes behind its tag.
 
-A finding in an operating system package needs no code change, so no commit starts a release. The Rebuild Service workflow closes this gap. It opens one pull request for each service that you name. Each pull request changes only the date file `services/<service>/deploy/rebuild-date`.
+A release starts when a `feat`, `fix`, or `build` commit changes a file in the service folder. A Dependabot update of a base image changes a Dockerfile, and a Python lockfile update changes `uv.lock`. Both start a release.
+
+Some fixes change no file in the service folder, so no commit starts a release. An operating system package is one case. A Node.js dependency is another, because `pnpm-lock.yaml` sits at the repository root. The Rebuild Service workflow closes this gap. It opens one pull request for each service that you name. Each pull request changes only the date file `services/<service>/deploy/rebuild-date`.
 
 1. Run the Rebuild Service workflow. Enter the service names, or `all`.
 2. Merge the pull request that the workflow opens for each service.
