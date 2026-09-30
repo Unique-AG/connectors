@@ -1,11 +1,14 @@
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from typing import Annotated
 
 import httpx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
+from mcp.types import InputRequiredResult
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.item_body import ItemBody
@@ -18,11 +21,14 @@ from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.handles import MailDraftHandle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     WRITE_ADDITIVE,
+    Confirm,
     graph_client_for_caller,
     graph_mailbox,
+    person_confirms,
 )
 
 TOOL_NAME = "outlook_draft_mail"
@@ -39,15 +45,19 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "body_html": "Sending this over for review.",
 }
 
-MAX_RECIPIENTS = 10
-
 MAX_SUBJECT_CHARACTERS = 255
+
+_AGREE = "create the draft"
+_DECLINE = "do not create the draft"
+_NOTHING_CREATED = "No draft was created."
 
 _DESCRIPTION = (
     "Composes a new message into Drafts for review; it cannot send mail, offers no Bcc, and "
     "recipients should come from the user or outlook_find_recipient. It cannot add files to the "
     "draft. If the user asks to attach a file, tell them to add it in Outlook before they send "
-    "the draft."
+    "the draft. Set `mailbox` to draft in a shared or delegated mailbox. "
+    "This tool asks the user to agree before it changes a shared or delegated mailbox. "
+    "It changes the user's own mailbox without a question."
 )
 
 
@@ -88,20 +98,34 @@ class MailDraft(BaseModel):
     )
 
 
+def a_person_agrees(ctx: Context) -> Confirm:
+    return person_confirms(ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_CREATED)
+
+
 async def draft_mail(
     client: GraphServiceClient,
     *,
     to: Sequence[str],
     subject: str,
     body_html: str,
+    confirm: Confirm,
     cc: Sequence[str] = (),
     mailbox: str | None = None,
-) -> MailDraft:
-    assert 1 <= len(to) <= MAX_RECIPIENTS, f"the To list is bounded by the schema, got {len(to)}"
-    assert len(cc) <= MAX_RECIPIENTS, f"the Cc list is bounded by the schema, got {len(cc)}"
-    recipients = _recipients(to, argument="to")
-    copies = _recipients(cc, argument="cc")
+) -> MailDraft | InputRequiredResult:
+    assert len(to) >= 1, "the schema admits no empty To list"
+    primary = _one_address_each(to, argument="to")
+    copied = _one_address_each(cc, argument="cc")
     reached = graph_mailbox(client, mailbox)
+
+    if mailbox is not None:
+        answer = await confirm(
+            _question(mailbox, subject=subject, to=primary, cc=copied),
+            _about(mailbox, subject=subject, body_html=body_html, to=primary, cc=copied),
+        )
+        if isinstance(answer, InputRequiredResult):
+            return answer
+        if answer is not None:
+            raise ToolError(answer)
 
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_CREATE_DRAFT):
@@ -109,8 +133,8 @@ async def draft_mail(
                 Message(
                     subject=subject,
                     body=ItemBody(content_type=BodyType.Html, content=body_html),
-                    to_recipients=recipients,
-                    cc_recipients=copies,
+                    to_recipients=_recipients(primary),
+                    cc_recipients=_recipients(copied),
                 ),
                 request_configuration=RequestConfiguration[QueryParameters](
                     options=no_retry(), headers=immutable_id_headers()
@@ -121,12 +145,35 @@ async def draft_mail(
     return _answer(draft)
 
 
-def _recipients(addresses: Sequence[str], *, argument: str) -> list[Recipient]:
+def _one_address_each(addresses: Sequence[str], *, argument: str) -> list[str]:
     trimmed = [address.strip() for address in addresses]
     for address in trimmed:
         if ONE_ADDRESS.match(address) is None:
             raise ToolError(_bad_address(argument, address))
-    return [Recipient(email_address=EmailAddress(address=address)) for address in trimmed]
+    return trimmed
+
+
+def _recipients(addresses: Sequence[str]) -> list[Recipient]:
+    return [Recipient(email_address=EmailAddress(address=address)) for address in addresses]
+
+
+def _question(mailbox: str, *, subject: str, to: Sequence[str], cc: Sequence[str]) -> str:
+    copies = f" It is copied to {', '.join(cc)}." if cc else ""
+    return (
+        f"Create a draft in the mailbox {cut_for_a_question(mailbox)!r}? "
+        + "That mailbox is not the signed-in user's own. "
+        + f"The draft has the subject {cut_for_a_question(subject)!r}. "
+        + f"It is addressed to {', '.join(to)}."
+        + copies
+        + " Nothing is sent. "
+        + "The draft appears in that mailbox, and anyone with access to it can see it."
+    )
+
+
+def _about(
+    mailbox: str, *, subject: str, body_html: str, to: Sequence[str], cc: Sequence[str]
+) -> str:
+    return hashlib.sha256(json.dumps([mailbox, subject, body_html, to, cc]).encode()).hexdigest()
 
 
 def _answer(draft: Message) -> MailDraft:
@@ -155,7 +202,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 min_length=1,
-                max_length=MAX_RECIPIENTS,
                 description=(
                     "The To recipients, one SMTP address per entry, from the user or "
                     + "outlook_find_recipient."
@@ -184,18 +230,19 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 default=[],
-                max_length=MAX_RECIPIENTS,
                 description="The Cc recipients, under the same rule as `to`.",
             ),
         ],
+        ctx: Context,
         mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
-    ) -> MailDraft:
+    ) -> MailDraft | InputRequiredResult:
         return await draft_mail(
             client,
             to=to,
             subject=subject,
             body_html=body_html,
+            confirm=a_person_agrees(ctx),
             cc=cc,
             mailbox=mailbox,
         )

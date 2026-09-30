@@ -61,8 +61,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Create",)
 
 CHANGE_SHOWN_BY: tuple[str, ...] = ("onenote_list_sections",)
 
-MAX_NEW_NAME_CHARACTERS = 50
-
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "section": "onenote:///sections/1-SYNTHETICSECTION0000",
     "to_notebook": "onenote:///notebooks/1-SYNTHETICNOTEBOOK0000",
@@ -345,13 +343,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=1,
-                max_length=MAX_NEW_NAME_CHARACTERS,
                 description=(
                     "A new name for the copy. Omit it to keep the section's own name. The name "
                     + "must be unique among the sections and section groups directly inside the "
-                    + "parent, at most 50 characters long. It must not contain any of these "
-                    + "characters: ? * / : < > | & # ' % ~. Microsoft refuses a bad name and no "
-                    + "copy starts."
+                    + "parent. It must not contain any of these characters: ? * / : < > | & "
+                    + "# ' % ~. Microsoft refuses a bad name and no copy starts."
                 ),
             ),
         ] = None,

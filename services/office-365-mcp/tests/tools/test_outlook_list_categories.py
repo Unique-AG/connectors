@@ -73,15 +73,6 @@ class TestTheQueryItComposes:
             "color",
         ]
 
-    async def test_the_window_is_asked_of_graph_rather_than_only_applied_here(
-        self, client: GraphServiceClient, categories: respx.Route
-    ) -> None:
-        categories.mock(return_value=_page(_category_payload()))
-
-        _ = await lister.list_categories(client)
-
-        assert categories.calls.last.request.url.params["$top"] == str(lister.MAX_CATEGORIES)
-
     async def test_no_filter_or_ordering_narrows_the_mailboxs_own_list(
         self, client: GraphServiceClient, categories: respx.Route
     ) -> None:
@@ -161,13 +152,25 @@ class TestWhatItAnswers:
         assert [row.name for row in listed.categories] == ["Follow up", "Confidential"]
         assert listed.capped is False, "the walk reached the end of the listing"
 
-    async def test_a_cap_that_left_more_categories_on_offer_says_capped(
+    async def test_more_than_five_hundred_categories_are_all_listed(
+        self, client: GraphServiceClient, categories: respx.Route
+    ) -> None:
+        categories.mock(
+            return_value=_page(*(_category_payload(display_name=f"c{n}") for n in range(501)))
+        )
+
+        listed = await lister.list_categories(client)
+
+        assert len(listed.categories) == 501
+        assert listed.capped is False
+
+    async def test_a_scan_limit_that_left_more_categories_on_offer_says_capped(
         self,
         client: GraphServiceClient,
         graph: respx.MockRouter,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(lister, "MAX_CATEGORIES", 1)
+        monkeypatch.setattr(lister, "MAX_SCANNED_ITEMS", 1)
         graph.get(_CATEGORIES, params={"$skiptoken": "second"}).mock(
             return_value=_page(_category_payload(display_name="Confidential"))
         )

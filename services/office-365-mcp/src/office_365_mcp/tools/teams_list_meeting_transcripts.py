@@ -57,9 +57,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     + "%2F19%253ameeting_TjAwMDAwMDAwMDAwMA%2540thread.v2%2F0"
 }
 
-# Graph documents `$top` but publishes no ceiling, so this limit is ours.
-MAX_TRANSCRIPTS = 50
-
 type _TranscriptsQuery = TranscriptsRequestBuilder.TranscriptsRequestBuilderGetQueryParameters
 
 _FILTER_IGNORED = (
@@ -182,9 +179,9 @@ class MeetingTranscripts(BaseModel):
             + "just one page of Microsoft's answer. Past that cap, the first entry is the "
             + "latest of what this tool read, not the meeting's latest. If as many rows as "
             + "`limit` come back, older transcripts can remain. Raise `limit` to reach "
-            + "further, within that cap. Fewer rows than `limit` means none remain. Set "
-            + "`include_scan_completeness` to learn whether the read reached the end. This "
-            + "list is empty for every status other than `available`."
+            + "further, within that cap. Fewer rows than `limit` means none remain, unless the "
+            + "read reached that cap. Set `include_scan_completeness` to learn whether the read "
+            + "reached the end. This list is empty for every status other than `available`."
         )
     )
     scan_incomplete: bool | None = Field(
@@ -204,7 +201,7 @@ async def teams_list_meeting_transcripts(
     include_scan_completeness: bool,
 ) -> MeetingTranscripts:
     """Transcripts of the meeting `handle` addresses. At most two Graph requests: resolve, list."""
-    assert 1 <= limit <= MAX_TRANSCRIPTS, f"limit must be within 1..{MAX_TRANSCRIPTS}, got {limit}"
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
 
     with graph_errors(TOOL_NAME):
         meeting = await resolve_meeting(client, handle)
@@ -319,9 +316,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             int,
             Field(
                 ge=1,
-                le=MAX_TRANSCRIPTS,
                 description=(
-                    f"How many transcripts to return, at most {MAX_TRANSCRIPTS}. This tool "
+                    "How many transcripts to return. This tool "
                     + f"reads up to {MAX_ARTIFACT_SCAN} and sorts them before this cuts the "
                     + "list. If you raise `limit`, you get more results, but only within that "
                     + "read."

@@ -35,11 +35,7 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.Read.All",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "budget"}
 
-MAX_RESULTS = 50
-
 _SITE_FIELD = "SPSiteURL"
-
-MAX_SITES = 10
 
 _DESCRIPTION = """\
 This tool searches the files and folders that the signed-in user can see across OneDrive and \
@@ -134,7 +130,7 @@ async def sharepoint_search_files(
     offset: int,
     limit: int,
 ) -> FileSearchResults:
-    assert 1 <= limit <= MAX_RESULTS, f"limit is bounded by the schema, got {limit}"
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
     assert offset >= 0, f"offset must not be negative, got {offset}"
     if runs_backwards(modified_after, modified_before):
         raise ToolError(_WINDOW_RUNS_BACKWARDS)
@@ -158,7 +154,6 @@ async def sharepoint_search_files(
                 aggregations=[
                     AggregationOption(
                         field=_SITE_FIELD,
-                        size=MAX_SITES,
                         bucket_definition=BucketAggregationDefinition(
                             sort_by=BucketAggregationSortProperty.Count,
                             is_descending=True,
@@ -335,11 +330,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             int,
             Field(
                 ge=1,
-                le=MAX_RESULTS,
-                description=(
-                    "How many matches one page holds. The default value is 25, and the "
-                    + f"maximum value is {MAX_RESULTS}."
-                ),
+                description="How many matches one page holds. The default value is 25.",
             ),
         ] = 25,
         client: GraphServiceClient = graph,

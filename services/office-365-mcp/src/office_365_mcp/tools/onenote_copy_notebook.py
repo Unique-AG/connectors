@@ -31,8 +31,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Create",)
 
 CHANGE_SHOWN_BY: tuple[str, ...] = ("onenote_list_notebooks",)
 
-MAX_NEW_NAME_CHARACTERS = 128
-
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "notebook": "onenote:///notebooks/1-SYNTHETICNOTEBOOK0000"
 }
@@ -129,12 +127,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=1,
-                max_length=MAX_NEW_NAME_CHARACTERS,
                 description=(
                     "A new name for the copy. Omit it to keep the notebook's own name. The name "
-                    + "must be unique across the user's OneNote, at most 128 characters long, and "
-                    + "must not contain any of these characters: ? * / : < > | ' \". Microsoft "
-                    + "refuses a bad name and no copy starts."
+                    + "must be unique across the user's OneNote and must not contain any of "
+                    + "these characters: ? * / : < > | ' \". Microsoft refuses a bad name and no "
+                    + "copy starts."
                 ),
             ),
         ] = None,

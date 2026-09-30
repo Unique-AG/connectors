@@ -205,6 +205,18 @@ class TestWhatItSendsToGraph:
         commands = cast("list[dict[str, object]]", _sent(patch)["commands"])
         assert commands[0]["content"] == "Q&amp;A &lt;2026&gt;"
 
+    async def test_a_long_title_reaches_graph_whole(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _patches(graph)
+        _ = _rereads(graph, _page_payload())
+        title = "t" * 300
+
+        _ = await _rename(client, title=title)
+
+        commands = cast("list[dict[str, object]]", _sent(patch)["commands"])
+        assert commands[0]["content"] == title
+
     async def test_the_patch_content_type_is_json(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

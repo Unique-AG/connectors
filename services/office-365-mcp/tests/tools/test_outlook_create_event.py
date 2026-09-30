@@ -37,15 +37,7 @@ from office_365_mcp.graph_client import (
     GraphThrottled,
     GraphUnavailable,
 )
-from office_365_mcp.shared.calendar import (
-    MAX_ALL_DAY_EVENT_DAYS,
-    MAX_ATTENDEES,
-    MAX_LOCATION_CHARACTERS,
-    MAX_SUBJECT_CHARACTERS,
-    MAX_TIMED_EVENT_HOURS,
-    MAX_ZONE_CHARACTERS,
-    STEP_CALENDAR,
-)
+from office_365_mcp.shared.calendar import STEP_CALENDAR
 from office_365_mcp.shared.handles import CalendarHandle, event_handle
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
 from office_365_mcp.tools import outlook_create_event as creator
@@ -588,6 +580,7 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         assert _ADA in question
         assert _GRACE in question
         assert f"{_PAM} (optional)" in question, "an optional attendee reads as a required one"
+        assert "invite 3 people:" in question, "the question hid how many people are mailed"
         assert "cannot recall" in question
         assert bound == [_sent(create)["transactionId"]]
 
@@ -1111,44 +1104,22 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
-    async def test_a_meeting_longer_than_a_day_never_reaches_graph(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _ready(graph)
-
-        with pytest.raises(ToolError, match=f"{MAX_TIMED_EVENT_HOURS} hours"):
-            _ = await _create(client, starts_at="2026-03-02T14:00", ends_at="2026-03-03T15:00")
-
-        assert len(graph.calls) == 0
-
-    async def test_a_meeting_of_exactly_a_day_is_allowed(
+    async def test_a_meeting_longer_than_a_day_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         create = _ready(graph)
 
-        _ = await _create(client, starts_at="2026-03-02T09:00", ends_at="2026-03-03T09:00")
+        _ = await _create(client, starts_at="2026-03-02T14:00", ends_at="2026-03-03T15:00")
 
         assert create.call_count == 1
 
-    async def test_an_all_day_event_longer_than_two_weeks_never_reaches_graph(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _ready(graph)
-
-        with pytest.raises(ToolError, match=f"{MAX_ALL_DAY_EVENT_DAYS} days"):
-            _ = await _create(
-                client, starts_at="2026-03-02T00:00", ends_at="2026-03-17T00:00", all_day=True
-            )
-
-        assert len(graph.calls) == 0
-
-    async def test_an_all_day_event_of_exactly_two_weeks_is_allowed(
+    async def test_an_all_day_event_longer_than_two_weeks_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         create = _ready(graph)
 
         _ = await _create(
-            client, starts_at="2026-03-02T00:00", ends_at="2026-03-16T00:00", all_day=True
+            client, starts_at="2026-03-02T00:00", ends_at="2026-03-17T00:00", all_day=True
         )
 
         assert create.call_count == 1
@@ -1196,27 +1167,15 @@ class TestWhatItRefuses:
 
         assert _invited(_sent(create)) == [(_ADA, "required")]
 
-    async def test_more_addresses_than_the_ceiling_never_reach_graph(
+    async def test_twenty_one_attendees_reach_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _ready(graph)
-        too_many = [f"guest{index}@example.invalid" for index in range(MAX_ATTENDEES + 1)]
+        create = _ready(graph)
+        many = [f"guest{index}@example.invalid" for index in range(21)]
 
-        with pytest.raises(ToolError, match="between them"):
-            _ = await _create(client, attendees=too_many)
+        _ = await _create(client, attendees=many)
 
-        assert len(graph.calls) == 0
-
-    async def test_the_two_lists_are_counted_against_one_ceiling(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _ready(graph)
-        half = [f"guest{index}@example.invalid" for index in range(MAX_ATTENDEES)]
-
-        with pytest.raises(ToolError, match=f"more than {MAX_ATTENDEES}"):
-            _ = await _create(client, attendees=half, optional_attendees=[_PAM])
-
-        assert len(graph.calls) == 0
+        assert len(_invited(_sent(create))) == 21
 
     @pytest.mark.parametrize("optional", ["ada@example.invalid", "ADA@Example.Invalid"])
     async def test_one_person_in_both_lists_never_reaches_graph(
@@ -1251,12 +1210,6 @@ class TestWhatItRefuses:
             _ = await _create(client, optional_attendees=[_PAM, _PAM])
 
         assert len(graph.calls) == 0
-
-    async def test_a_subject_outside_the_schema_is_a_programming_error(
-        self, client: GraphServiceClient
-    ) -> None:
-        with pytest.raises(AssertionError):
-            _ = await _create(client, subject="x" * (MAX_SUBJECT_CHARACTERS + 1))
 
     async def test_an_empty_subject_is_a_programming_error_too(
         self, client: GraphServiceClient
@@ -1674,15 +1627,8 @@ class TestTheSchemaItPublishes:
         parameters, _tool = await _registered(transport)
 
         published = _object(_object(parameters["properties"])["time_zone"])
-        assert published["maxLength"] == MAX_ZONE_CHARACTERS
         accepted: TypeAdapter[str] = TypeAdapter(
-            Annotated[
-                str,
-                Field(
-                    pattern=cast("str", published["pattern"]),
-                    max_length=cast("int", published["maxLength"]),
-                ),
-            ]
+            Annotated[str, Field(pattern=cast("str", published["pattern"]))]
         )
 
         assert accepted.validate_python(zone) == zone
@@ -1738,21 +1684,21 @@ class TestTheSchemaItPublishes:
         properties = _object(parameters["properties"])
         assert not [name for name in properties if word in name.casefold()]
 
-    async def test_both_attendee_lists_are_bounded_where_this_connector_bounds_them(
+    async def test_the_optional_list_defaults_to_empty_and_neither_list_has_a_size_bound(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
 
         properties = _object(parameters["properties"])
-        assert _object(properties["attendees"])["maxItems"] == MAX_ATTENDEES
         optional = _object(properties["optional_attendees"])
-        assert optional["maxItems"] == MAX_ATTENDEES
+        assert "maxItems" not in _object(properties["attendees"])
+        assert "maxItems" not in optional
         assert optional["default"] == []
 
-    async def test_a_place_longer_than_the_ceiling_never_reaches_this_tool_at_all(
+    async def test_a_place_has_a_floor_of_one_character_and_no_ceiling(
         self, transport: httpx.AsyncClient
     ) -> None:
-        parameters, tool = await _registered(transport)
+        parameters, _tool = await _registered(transport)
 
         text = next(
             branch
@@ -1763,18 +1709,7 @@ class TestTheSchemaItPublishes:
             if branch.get("type") == "string"
         )
         assert text["minLength"] == 1
-        assert text["maxLength"] == MAX_LOCATION_CHARACTERS
-        with pytest.raises(ValidationError, match=f"at most {MAX_LOCATION_CHARACTERS} characters"):
-            _ = await tool.run(
-                {
-                    "subject": _SUBJECT,
-                    "starts_at": _STARTS,
-                    "ends_at": _ENDS,
-                    "time_zone": "UTC",
-                    "attendees": [],
-                    "location": "Z" * (MAX_LOCATION_CHARACTERS + 1),
-                }
-            )
+        assert "maxLength" not in text
 
     async def test_a_later_call_with_no_optional_attendees_invites_nobody(
         self, client: GraphServiceClient, graph: respx.MockRouter

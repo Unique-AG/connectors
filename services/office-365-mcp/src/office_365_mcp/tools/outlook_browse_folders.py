@@ -41,8 +41,6 @@ GRAPH_NOT_FOUND = (
     + "now. Retrying with this one will fail identically."
 )
 
-MAX_FOLDERS = 200
-
 _FOLDER_FIELDS: tuple[str, ...] = (
     "id",
     "displayName",
@@ -115,7 +113,7 @@ async def browse_folders(
     limit: int,
     mailbox: str | None = None,
 ) -> MailFolderLevel:
-    assert 1 <= limit <= MAX_FOLDERS, f"limit must be within 1..{MAX_FOLDERS}, got {limit}"
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
     handle = _parent_folder(parent)
     reached = graph_mailbox(client, mailbox)
 
@@ -198,8 +196,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             int,
             Field(
                 ge=1,
-                le=MAX_FOLDERS,
-                description=f"How many folders to return from this level, at most {MAX_FOLDERS}.",
+                description="How many folders to return from this level.",
             ),
         ] = 50,
         mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,

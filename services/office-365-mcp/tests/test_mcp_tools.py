@@ -27,7 +27,6 @@ from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
 from office_365_mcp.shared import meetings
-from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST
 from office_365_mcp.tools import TOOL_NAMES
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
@@ -880,7 +879,7 @@ class TestTheToolsThisServerAdvertises:
         assert "Keywords to find" in description
         assert "quote a phrase for exact adjacency" in description
 
-    async def test_teams_search_messages_bounds_its_page_where_microsoft_documents_it(
+    async def test_teams_search_messages_puts_no_ceiling_on_its_page(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
@@ -888,12 +887,8 @@ class TestTheToolsThisServerAdvertises:
         size = _object(properties["size"])
         offset = _object(properties["offset"])
 
-        assert (size["type"], size["minimum"], size["maximum"], size["default"]) == (
-            "integer",
-            1,
-            50,
-            25,
-        )
+        assert (size["type"], size["minimum"], size["default"]) == ("integer", 1, 25)
+        assert "maximum" not in size
         assert (offset["type"], offset["minimum"], offset["default"]) == ("integer", 0, 0)
         assert "maximum" not in offset, (
             "Microsoft documents no offset ceiling for message search; inventing one would refuse "
@@ -1061,12 +1056,8 @@ class TestTheToolsThisServerAdvertises:
             "include_scan_completeness",
         }
         assert schema.get("required") == ["meeting_uri"]
-        assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
-            "integer",
-            1,
-            50,
-            20,
-        )
+        assert (limit["type"], limit["minimum"], limit["default"]) == ("integer", 1, 20)
+        assert "maximum" not in limit
         assert _object(properties["include_scan_completeness"])["default"] is False, (
             "the completeness of the scan is opt-in: a client that does not want it never sees it"
         )
@@ -1099,12 +1090,8 @@ class TestTheToolsThisServerAdvertises:
             "include_scan_completeness",
         }
         assert schema.get("required") == ["meeting_uri"]
-        assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
-            "integer",
-            1,
-            50,
-            20,
-        )
+        assert (limit["type"], limit["minimum"], limit["default"]) == ("integer", 1, 20)
+        assert "maximum" not in limit
         assert _object(properties["include_scan_completeness"])["default"] is False
 
     async def test_the_two_meeting_listers_answer_in_the_same_shape(
@@ -2485,7 +2472,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         message = _error_text(result)
-        assert f"newest {MAX_REPLIES_PER_POST} replies" in message, message
+        assert "replies of each post on the channel's first page" in message, message
         assert "no route to its full text" in message
         assert "a second browse returns the same window" in message
         assert "stop looking" in message

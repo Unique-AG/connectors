@@ -41,8 +41,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     + "/MSMjMCMjSYNTHETIC0002"
 }
 
-MAX_TURNS = 500
-
 MAX_TRANSCRIPT_BYTES = 100 * 1024 * 1024
 
 _DESCRIPTION = f"""\
@@ -201,7 +199,7 @@ async def teams_read_transcript(
     speaker: str | None = None,
 ) -> Transcript:
     """Matching turns from `offset`. One Graph request, or two when attribution is refused."""
-    assert 1 <= limit <= MAX_TURNS, f"limit must be within 1..{MAX_TURNS}, got {limit}"
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
     assert offset >= 0, f"offset must not be negative, got {offset}"
     assert from_seconds is None or to_seconds is None or from_seconds <= to_seconds, (
         f"from_seconds must not be after to_seconds, got {from_seconds} and {to_seconds}"
@@ -403,11 +401,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             int,
             Field(
                 ge=1,
-                le=MAX_TURNS,
                 description=(
-                    "This value is the number of turns to return. The maximum is "
-                    f"{MAX_TURNS}. This tool fetches the whole transcript for every call. One "
-                    "wide `limit` costs less than several pages."
+                    "This value is the number of turns to return. This tool fetches the whole "
+                    "transcript for every call. One wide `limit` costs less than several pages."
                 ),
             ),
         ] = 200,

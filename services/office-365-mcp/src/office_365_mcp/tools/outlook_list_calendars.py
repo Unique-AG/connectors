@@ -20,7 +20,7 @@ from msgraph.generated.users.item.calendars.calendars_request_builder import (
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.calendar import CALENDAR_FIELDS, CalendarSummary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -36,8 +36,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (
 )
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
-
-MAX_CALENDARS = 200
 
 # Bound rather than aliased with `type`. This name serves as the query parameters' constructor and
 # also as `RequestConfiguration`'s type argument, and a `TypeAliasType` is not callable.
@@ -74,10 +72,10 @@ class Calendars(BaseModel):
     )
     capped: bool = Field(
         description=(
-            f"True means that the listing stopped at {MAX_CALENDARS} calendars, with more "
-            + "calendars still available. A calendar that the user named can be missing from "
-            + "`calendars`, even when it is still in the mailbox. False means that the listing "
-            + "read every calendar, however few the mailbox holds."
+            "True means that the listing stopped early, with more calendars still available. "
+            + "A calendar that the user named can be missing from `calendars`, even when it "
+            + "is still in the mailbox. False means that the listing read every calendar, "
+            + "however few the mailbox holds."
         )
     )
 
@@ -90,14 +88,11 @@ async def list_calendars(client: GraphServiceClient) -> Calendars:
             # travels here: https://learn.microsoft.com/en-us/graph/outlook-immutable-id
             first_page = await client.me.calendars.get(
                 request_configuration=RequestConfiguration[_CalendarsQuery](
-                    query_parameters=_CalendarsQuery(
-                        select=list(CALENDAR_FIELDS),
-                        top=MAX_CALENDARS,
-                    )
+                    query_parameters=_CalendarsQuery(select=list(CALENDAR_FIELDS))
                 )
             )
             assert first_page is not None, "Graph answered a calendar listing with no collection"
-            collected = await collect_pages(first_page, client, limit=MAX_CALENDARS)
+            collected = await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)
 
     return Calendars(
         calendars=[

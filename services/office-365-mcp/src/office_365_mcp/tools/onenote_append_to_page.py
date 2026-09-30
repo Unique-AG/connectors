@@ -49,8 +49,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "body_html": "<p>Synthetic.</p>",
 }
 
-MAX_BODY_CHARACTERS = 500_000
-
 _APPEND = "append"
 _DO_NOT_APPEND = "do not append"
 _NOTHING_APPENDED = "Nothing was appended."
@@ -193,7 +191,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                max_length=MAX_BODY_CHARACTERS,
                 description=(
                     "The HTML to add after everything already on the page. A newline is not a "
                     + "line break. Write `<p>`, `<br>`, `<h1>` to `<h6>`, `<ul>`, `<ol>`, `<li>`, "

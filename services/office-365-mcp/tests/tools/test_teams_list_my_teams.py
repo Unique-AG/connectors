@@ -43,8 +43,8 @@ class TestTheQueryItSends:
             "no OData parameter is supported on this collection"
         )
 
-    @pytest.mark.parametrize("limit", [0, lister.MAX_TEAMS + 1])
-    async def test_a_limit_outside_the_window_is_a_programming_error(
+    @pytest.mark.parametrize("limit", [0, -1])
+    async def test_a_limit_below_one_is_a_programming_error(
         self, client: GraphServiceClient, limit: int
     ) -> None:
         with pytest.raises(AssertionError):

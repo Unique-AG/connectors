@@ -63,11 +63,9 @@ GRAPH_NOT_FOUND = (
     + "Retrying with the same argument will fail identically."
 )
 
-MAX_RESULTS = 50
+MAX_PAGE_SIZE = 1000
 
 DEFAULT_TIME_ZONE = "UTC"
-
-MIN_FRAGMENT_CHARACTERS = 2
 
 type OwnerResponse = Literal["accepted", "tentativelyAccepted", "declined", "notResponded"]
 
@@ -203,7 +201,7 @@ async def list_events(
     owner_response: OwnerResponse | None = None,
     limit: int,
 ) -> CalendarEvents:
-    assert 1 <= limit <= MAX_RESULTS, f"limit must be within 1..{MAX_RESULTS}, got {limit}"
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
     zone = zone_named(time_zone)
     if zone is None:
         raise ToolError(_NOT_A_ZONE)
@@ -226,7 +224,7 @@ async def list_events(
                         end_date_time=closes,
                         filter=narrowed,
                         select=list(SUMMARY_FIELDS),
-                        top=limit,
+                        top=min(limit, MAX_PAGE_SIZE),
                         orderby=[_EARLIEST_FIRST],
                     ),
                     headers=headers,
@@ -372,7 +370,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         subject_contains: Annotated[
             str | None,
             Field(
-                min_length=MIN_FRAGMENT_CHARACTERS,
+                min_length=1,
                 description=(
                     "Keep only the events whose subject contains this text. This is a match on "
                     + "a substring, and not a search on whole words. For example, `pricing` "
@@ -420,13 +418,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             int,
             Field(
                 ge=1,
-                le=MAX_RESULTS,
                 description=(
-                    f"This is how many events this call returns, at most {MAX_RESULTS}. These "
-                    + "are the earliest events of that number in the window. Paging happens "
-                    + "inside the call, so this is the full answer, and not only a first page "
-                    + "of it. Raise this value to get more events. Do not call this tool again "
-                    + "with the same arguments."
+                    "This is the most events that this call returns. These are the earliest "
+                    + "events of that number in the window. Paging happens inside the call, so "
+                    + "this is the full answer, and not only a first page of it. Raise this "
+                    + "value to get more events. Do not call this tool again with the same "
+                    + "arguments."
                 ),
             ),
         ] = 25,

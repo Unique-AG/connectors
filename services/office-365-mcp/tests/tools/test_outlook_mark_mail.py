@@ -1,5 +1,5 @@
 import json
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import cast
 
 import httpx
@@ -13,8 +13,9 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
 from fastmcp.server.dependencies import AccessToken
 from fastmcp.tools import Tool
-from mcp.types import TextContent
+from mcp.types import InputRequiredResult, TextContent
 from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
 
 from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig
@@ -26,10 +27,9 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.handles import MailMessageHandle
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT
+from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm, Confirmed
 from office_365_mcp.tools.outlook_mark_mail import (
     GRAPH_PERMISSIONS,
-    MAX_MESSAGES,
     TOOL_NAME,
     MailImportance,
     MarkChange,
@@ -66,6 +66,24 @@ _DRAFT_ONLY: tuple[str, ...] = ("subject", "body", "toRecipients", "ccRecipients
 
 _CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 _CLIENT_TOKEN = "synthetic-fastmcp-session-token"
+
+_MAILBOX = "alex@example.invalid"
+
+_NOT_CHANGED = "No message was changed."
+
+
+async def _agrees(question: str, about: str) -> Confirmed:
+    assert question and about
+    return None
+
+
+async def _declines(question: str, about: str) -> Confirmed:
+    assert question and about
+    return _NOT_CHANGED
+
+
+async def _never_asked(question: str, about: str) -> Confirmed:
+    raise AssertionError(f"a person was asked {question!r} about {about!r}")
 
 
 class _StubOboCredential:
@@ -159,6 +177,10 @@ def _every_write(graph: respx.MockRouter) -> respx.Route:
     return graph.route(method="PATCH").mock(return_value=httpx.Response(200, json=_updated()))
 
 
+def _paths(route: respx.Route) -> list[str]:
+    return [call.request.url.path for call in cast("Sequence[Call]", route.calls)]
+
+
 def _sent(route: respx.Route) -> Mapping[str, object]:
     return cast("dict[str, object]", json.loads(route.calls.last.request.content))
 
@@ -189,6 +211,11 @@ async def _registered(transport: httpx.AsyncClient) -> Tool:
     return tool
 
 
+def _narrowed(answer: MarkedMail | InputRequiredResult) -> MarkedMail:
+    assert isinstance(answer, MarkedMail), "the confirmation asked instead of answering"
+    return answer
+
+
 async def _marked(
     client: GraphServiceClient,
     *,
@@ -196,55 +223,56 @@ async def _marked(
     is_read: bool | None = None,
     flagged: bool | None = None,
     importance: MailImportance | None = None,
+    mailbox: str | None = None,
+    confirm: Confirm = _never_asked,
 ) -> MarkedMail:
-    return await mark_mail(
-        client,
-        message_refs=_REFS[:refs],
-        change=MarkChange(is_read=is_read, flagged=flagged, importance=importance),
+    return _narrowed(
+        await mark_mail(
+            client,
+            message_refs=_REFS[:refs],
+            change=MarkChange(is_read=is_read, flagged=flagged, importance=importance),
+            confirm=confirm,
+            mailbox=mailbox,
+        )
     )
 
 
-class TestTheBulkCap:
-    async def test_a_batch_over_the_cap_never_reaches_graph(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        route = _every_write(graph)
-        too_many = [MailMessageHandle(f"SYNTHETIC-{number}").uri for number in range(21)]
-
-        with pytest.raises(AssertionError):
-            _ = await mark_mail(client, message_refs=too_many, change=MarkChange(is_read=True))
-
-        assert route.call_count == 0
-
-    async def test_a_batch_of_nothing_is_refused_too(
+class TestTheBatchSize:
+    async def test_a_batch_of_nothing_is_refused(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         route = _every_write(graph)
 
         with pytest.raises(AssertionError):
-            _ = await mark_mail(client, message_refs=[], change=MarkChange(is_read=True))
+            _ = await mark_mail(
+                client, message_refs=[], change=MarkChange(is_read=True), confirm=_never_asked
+            )
 
         assert route.call_count == 0
 
-    async def test_a_batch_exactly_at_the_cap_is_written(
+    async def test_twenty_one_messages_are_all_written(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         route = _every_write(graph)
-        full = [MailMessageHandle(f"SYNTHETIC-{number}").uri for number in range(MAX_MESSAGES)]
+        many = [MailMessageHandle(f"SYNTHETIC-{number}").uri for number in range(21)]
 
-        answer = await mark_mail(client, message_refs=full, change=MarkChange(is_read=True))
+        answer = _narrowed(
+            await mark_mail(
+                client, message_refs=many, change=MarkChange(is_read=True), confirm=_never_asked
+            )
+        )
 
-        assert route.call_count == MAX_MESSAGES
-        assert len(answer.messages) == MAX_MESSAGES
+        assert route.call_count == 21
+        assert len(answer.messages) == 21
 
-    async def test_the_schema_publishes_the_cap_a_client_is_held_to(
+    async def test_the_schema_needs_one_message_and_has_no_upper_size(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
         refs = _arguments(tool)["message_refs"]
-        assert refs["maxItems"] == MAX_MESSAGES
         assert refs["minItems"] == 1
+        assert "maxItems" not in refs
 
 
 class TestEveryWriteIsItsOwnRequest:
@@ -537,7 +565,9 @@ class TestWhatItRefusesBeforeWritingAnything:
         route = _every_write(graph)
 
         with pytest.raises(ToolError):
-            _ = await mark_mail(client, message_refs=_REFS[:1], change=MarkChange())
+            _ = await mark_mail(
+                client, message_refs=_REFS[:1], change=MarkChange(), confirm=_never_asked
+            )
 
         assert route.call_count == 0
 
@@ -563,6 +593,7 @@ class TestWhatItRefusesBeforeWritingAnything:
                 client,
                 message_refs=[_REFS[0], not_a_message, _REFS[1]],
                 change=MarkChange(is_read=True),
+                confirm=_never_asked,
             )
 
         assert route.call_count == 0
@@ -577,6 +608,7 @@ class TestWhatItRefusesBeforeWritingAnything:
                 client,
                 message_refs=[_REFS[0], "Invoice 4471", _REFS[1], "not a handle either"],
                 change=MarkChange(is_read=True),
+                confirm=_never_asked,
             )
 
         assert "2, 4" in str(refused.value)
@@ -588,26 +620,181 @@ class TestMailboxTargeting:
     ) -> None:
         route = _writes(graph, 0)
 
-        _ = await mark_mail(client, message_refs=_REFS[:1], change=MarkChange(is_read=True))
+        _ = await _marked(client, is_read=True)
 
         assert route.called
 
     async def test_a_mailbox_writes_that_mailbox_instead_of_me(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        route = graph.patch(
-            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
-        ).mock(return_value=httpx.Response(200, json=_updated()))
-
-        answer = await mark_mail(
-            client,
-            message_refs=_REFS[:1],
-            change=MarkChange(is_read=True),
-            mailbox="alex@example.invalid",
+        route = graph.patch(f"/users/{_MAILBOX}/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D").mock(
+            return_value=httpx.Response(200, json=_updated())
         )
+
+        answer = await _marked(client, is_read=True, mailbox=_MAILBOX, confirm=_agrees)
 
         assert route.called
         assert answer.messages[0].changed is True
+
+
+class TestThePersonBeforeAnotherMailboxChanges:
+    async def test_the_own_mailbox_asks_nobody_and_writes(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _every_write(graph)
+
+        _ = await _marked(client, refs=3, is_read=True, confirm=_never_asked)
+
+        assert route.call_count == 3
+
+    async def test_a_delegated_mailbox_asks_once_for_the_whole_batch(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _every_write(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await _marked(client, refs=3, is_read=True, mailbox=_MAILBOX, confirm=capturing)
+
+        assert len(asked) == 1
+        assert route.call_count == 3
+        assert all(path.startswith(f"/v1.0/users/{_MAILBOX}/messages/") for path in _paths(route))
+
+    async def test_a_refusal_writes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _every_write(graph)
+
+        with pytest.raises(ToolError, match=_NOT_CHANGED):
+            _ = await _marked(client, refs=3, is_read=True, mailbox=_MAILBOX, confirm=_declines)
+
+        assert route.call_count == 0
+
+    async def test_the_question_names_the_mailbox_the_count_and_every_change(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _every_write(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await _marked(
+            client,
+            refs=3,
+            is_read=True,
+            flagged=True,
+            importance="high",
+            mailbox=_MAILBOX,
+            confirm=capturing,
+        )
+
+        assert f"Change 3 messages in the mailbox '{_MAILBOX}'?" in asked[0]
+        assert (
+            "mark them as read, flag them for follow-up and set their importance to high"
+            in (asked[0])
+        )
+        assert "belongs to someone else" in asked[0]
+
+    @pytest.mark.parametrize(
+        ("refs", "is_read", "flagged", "importance", "spoken"),
+        [
+            (1, False, None, None, "Change 1 message in the mailbox"),
+            (2, False, False, None, "mark them as unread and clear their follow-up flag"),
+            (2, None, None, "low", "This tool will set their importance to low."),
+        ],
+    )
+    async def test_the_question_speaks_of_the_change_that_was_asked_for(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        refs: int,
+        is_read: bool | None,
+        flagged: bool | None,
+        importance: MailImportance | None,
+        spoken: str,
+    ) -> None:
+        _ = _every_write(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await _marked(
+            client,
+            refs=refs,
+            is_read=is_read,
+            flagged=flagged,
+            importance=importance,
+            mailbox=_MAILBOX,
+            confirm=capturing,
+        )
+
+        assert spoken in asked[0]
+
+    async def test_a_very_long_mailbox_is_cut_in_the_question(
+        self, client: GraphServiceClient
+    ) -> None:
+        long_mailbox = "a" * 300 + "@example.invalid"
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return _NOT_CHANGED
+
+        with pytest.raises(ToolError):
+            _ = await _marked(client, is_read=True, mailbox=long_mailbox, confirm=capturing)
+
+        assert long_mailbox not in asked[0]
+        assert "…" in asked[0]
+
+    async def test_a_different_mailbox_message_or_change_binds_a_different_agreement(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _every_write(graph)
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return None
+
+        for mailbox, refs, is_read in (
+            (_MAILBOX, 2, True),
+            ("sam@example.invalid", 2, True),
+            (_MAILBOX, 1, True),
+            (_MAILBOX, 2, False),
+        ):
+            _ = await _marked(
+                client, refs=refs, is_read=is_read, mailbox=mailbox, confirm=capturing
+            )
+
+        assert len(set(bound)) == 4
+
+    async def test_the_same_request_binds_the_same_agreement(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _every_write(graph)
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return None
+
+        for _ in range(2):
+            _ = await _marked(client, refs=2, is_read=True, mailbox=_MAILBOX, confirm=capturing)
+
+        assert bound[0] == bound[1]
 
 
 class TestHowItDeclaresItself:
@@ -634,3 +821,22 @@ class TestHowItDeclaresItself:
         described = tool.description or ""
         assert "in the signed-in user's own mailbox" in described
         assert "flags them for follow-up" in described
+
+    async def test_it_says_it_asks_before_it_changes_another_mailbox_and_not_its_own(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        described = tool.description or ""
+        assert (
+            "This tool asks the user to agree before it changes a shared or delegated mailbox. "
+            "It changes the user's own mailbox without a question."
+        ) in described
+
+    async def test_the_confirmation_is_no_argument_of_the_published_schema(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        assert "ctx" not in _arguments(tool)
+        assert "confirm" not in _arguments(tool)

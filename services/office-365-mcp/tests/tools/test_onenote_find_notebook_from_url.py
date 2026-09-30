@@ -78,6 +78,16 @@ class TestWhatItAsks:
         sent = cast("dict[str, object]", json.loads(found.calls.last.request.content))
         assert sent == {"webUrl": _WEB_URL}
 
+    async def test_a_very_long_web_url_reaches_graph(
+        self, client: GraphServiceClient, found: respx.Route
+    ) -> None:
+        long_url = f"{_WEB_URL}?{'a' * 5000}"
+
+        _ = await _find(client, web_url=long_url)
+
+        sent = cast("dict[str, object]", json.loads(found.calls.last.request.content))
+        assert sent == {"webUrl": long_url}
+
     async def test_the_request_carries_no_query_parameters(
         self, client: GraphServiceClient, found: respx.Route
     ) -> None:

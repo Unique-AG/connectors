@@ -78,24 +78,13 @@ SUMMARY_FIELDS: tuple[str, ...] = (
     "webLink",
 )
 
-MAX_ATTENDEES = 20
-
-MAX_SUBJECT_CHARACTERS = 255
-
-MAX_LOCATION_CHARACTERS = 255
-
 NOBODY_INVITED_BUT_A_PLACE = (
     "Nobody is invited, and a location that names a bookable room can reach that room's mailbox."
 )
 
-MAX_TIMED_EVENT_HOURS = 24
-MAX_ALL_DAY_EVENT_DAYS = 14
-
 WALL_CLOCK = re.compile(r"\A\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\Z")
 
 ZONE_NAME = r"^[A-Za-z0-9][A-Za-z0-9 _./+-]*$"
-
-MAX_ZONE_CHARACTERS = 64
 
 _DefaultCalendarQuery = CalendarRequestBuilder.CalendarRequestBuilderGetQueryParameters
 _NamedCalendarQuery = CalendarItemRequestBuilder.CalendarItemRequestBuilderGetQueryParameters
@@ -553,6 +542,10 @@ def created_event(created: Event | None) -> Event:
 
 def invited_attendee(address: str, kind: AttendeeType) -> Attendee:
     return Attendee(email_address=EmailAddress(address=address), type=kind)
+
+
+def counted_people(addresses: Sequence[str]) -> str:
+    return "1 person" if len(addresses) == 1 else f"{len(addresses)} people"
 
 
 def invited_attendees(required: Sequence[str], optional: Sequence[str]) -> list[Attendee]:

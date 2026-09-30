@@ -56,12 +56,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "body_html": "<p>Synthetic body.</p>",
 }
 
-MAX_TITLE_CHARACTERS = 255
-
-MAX_BODY_CHARACTERS = 500_000
-
-MAX_SECTION_NAME_CHARACTERS = 50
-
 _FORBIDDEN_SECTION_NAME_CHARACTERS = "? * / : < > | & # ' % ~"
 
 GRAPH_NOT_FOUND = (
@@ -208,13 +202,9 @@ async def create_page(
     confirm: Confirm,
     answer_pending: bool = False,
 ) -> CreatedPage | InputRequiredResult:
-    assert 1 <= len(title) <= MAX_TITLE_CHARACTERS, (
-        f"title is bounded by the schema, got {len(title)}"
-    )
-    assert 1 <= len(body_html) <= MAX_BODY_CHARACTERS, (
-        f"body_html is bounded by the schema, got {len(body_html)}"
-    )
-    assert section_name is None or 1 <= len(section_name) <= MAX_SECTION_NAME_CHARACTERS, (
+    assert len(title) >= 1, f"title is bounded by the schema, got {len(title)}"
+    assert len(body_html) >= 1, f"body_html is bounded by the schema, got {len(body_html)}"
+    assert section_name is None or len(section_name) >= 1, (
         f"section_name is bounded by the schema, got {len(section_name or '')}"
     )
     if section is not None and section_name is not None:
@@ -315,7 +305,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                max_length=MAX_TITLE_CHARACTERS,
                 description=(
                     "The new page's title, as the user writes it. This tool places it in the "
                     + "page's own `<head><title>`. The answer's `title` is what Microsoft "
@@ -327,14 +316,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                max_length=MAX_BODY_CHARACTERS,
                 description=(
-                    f"The page content, as HTML, up to {MAX_BODY_CHARACTERS:,} characters "
-                    + "(Microsoft Graph refuses a request over 4 MB). A newline is not a line "
-                    + "break. Write `<p>`, `<br>`, `<h1>` to `<h6>`, `<ul>`, `<ol>`, `<li>`, "
-                    + "`<table>`, `<b>` and `<i>` for structure. Microsoft removes JavaScript, "
-                    + "CSS and forms. Escape `&`, `<` and `>` where they must read as "
-                    + "themselves."
+                    "The page content, as HTML. Microsoft Graph refuses a request over 4 MB. "
+                    + "A newline is not a line break. Write `<p>`, `<br>`, `<h1>` to `<h6>`, "
+                    + "`<ul>`, `<ol>`, `<li>`, `<table>`, `<b>` and `<i>` for structure. Microsoft "
+                    + "removes JavaScript, CSS and forms. Escape `&`, `<` and `>` where they must "
+                    + "read as themselves."
                 ),
             ),
         ],
@@ -354,14 +341,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=1,
-                max_length=MAX_SECTION_NAME_CHARACTERS,
                 description=(
                     "A name for the section, in the signed-in user's default notebook only. If "
                     + "no section matches, Microsoft creates one. A typo makes a new, almost "
                     + "empty section, with `section_uri` null in the answer. Look it up with "
                     + "onenote_list_sections, by name. Microsoft documents no naming rule, but a "
-                    + "section's own rule can apply: at most 50 characters, none of "
-                    + f"{_FORBIDDEN_SECTION_NAME_CHARACTERS}."
+                    + f"section's own rule can apply: none of {_FORBIDDEN_SECTION_NAME_CHARACTERS}."
                 ),
             ),
         ] = None,

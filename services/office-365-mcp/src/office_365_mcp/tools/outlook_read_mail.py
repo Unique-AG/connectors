@@ -50,8 +50,6 @@ _MESSAGE_FIELDS: tuple[str, ...] = (
 
 _PREFER_TEXT_BODY = ("Prefer", 'outlook.body-content-type="text"')
 
-MAX_BODY_CHARACTERS = 25000
-
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = (
@@ -105,17 +103,6 @@ class MailMessage(MailSummary):
     body_is_plain_text: bool = Field(
         description="True when `body` is plain text; false means it is HTML markup."
     )
-    body_truncated: bool = Field(
-        description=(
-            f"True when the full message exceeded {MAX_BODY_CHARACTERS} characters and `body` "
-            "holds only the first of them."
-        )
-    )
-    body_characters: int = Field(
-        description=(
-            "How many characters the full body held before truncation; 0 if Graph returned none."
-        )
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,13 +110,9 @@ class _Body:
     text: str | None
     is_the_new_part: bool
     is_plain_text: bool
-    truncated: bool
-    characters: int
 
 
-_NO_BODY = _Body(
-    text=None, is_the_new_part=False, is_plain_text=False, truncated=False, characters=0
-)
+_NO_BODY = _Body(text=None, is_the_new_part=False, is_plain_text=False)
 
 
 async def read_mail(
@@ -174,8 +157,6 @@ def _answer(message: Message, *, handle: MailMessageHandle) -> MailMessage:
         body=body.text,
         body_is_the_new_part=body.is_the_new_part,
         body_is_plain_text=body.is_plain_text,
-        body_truncated=body.truncated,
-        body_characters=body.characters,
     )
 
 
@@ -186,11 +167,9 @@ def _body_of(message: Message) -> _Body:
     if content is None or chosen is None:
         return _NO_BODY
     return _Body(
-        text=content[:MAX_BODY_CHARACTERS],
+        text=content,
         is_the_new_part=unique is not None,
         is_plain_text=chosen.content_type == BodyType.Text,
-        truncated=len(content) > MAX_BODY_CHARACTERS,
-        characters=len(content),
     )
 
 

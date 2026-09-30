@@ -385,16 +385,18 @@ class TestCriteriaThatAskForNothing:
                 client, criteria=SearchCriteria(), offset=0, size=25
             )
 
-    async def test_a_size_above_what_graph_documents_is_too(
-        self, client: GraphServiceClient
+    async def test_a_size_of_500_reaches_graph_unchanged(
+        self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        with pytest.raises(AssertionError):
-            _ = await teams_search_messages.teams_search_messages(
-                client,
-                criteria=SearchCriteria(query="release"),
-                offset=0,
-                size=teams_search_messages.MAX_RESULTS + 1,
-            )
+        route = graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([chat_hit()]))
+        )
+
+        _ = await teams_search_messages.teams_search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=500
+        )
+
+        assert _request(route)["size"] == 500
 
 
 class TestTheHandleItMints:

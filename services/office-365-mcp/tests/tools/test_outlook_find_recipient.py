@@ -9,11 +9,9 @@ from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphThrottled
-from office_365_mcp.tools.outlook_find_recipient import (
-    MAX_RESULTS,
-    RecipientCandidate,
-    find_recipient,
-)
+from office_365_mcp.tools.outlook_find_recipient import RecipientCandidate, find_recipient
+
+from .conftest import GRAPH_V1
 
 _ME: dict[str, object] = {
     "id": "00000000-0000-4000-8000-000000000001",
@@ -130,6 +128,15 @@ class TestWhatItAsksThePeopleIndexFor:
         ]
         assert params["$top"] == "7"
 
+    async def test_a_limit_above_fifty_reaches_graph_unchanged(
+        self, client: GraphServiceClient, people: respx.Route
+    ) -> None:
+        people.mock(return_value=_found(_person()))
+
+        _ = await find_recipient(client, query="Tyler", limit=51)
+
+        assert people.calls.last.request.url.params["$top"] == "51"
+
     async def test_it_names_both_query_sources_in_plain_ascii(
         self, client: GraphServiceClient, people: respx.Route
     ) -> None:
@@ -181,7 +188,7 @@ class TestWhenTheSecondIndexIsReached:
         assert messages.call_count == 1
         assert [row.source for row in results.candidates] == ["mailbox"]
 
-    async def test_the_fallback_searches_participants_over_a_fixed_window(
+    async def test_the_fallback_searches_participants(
         self, client: GraphServiceClient, people: respx.Route, messages: respx.Route
     ) -> None:
         people.mock(return_value=_found())
@@ -197,7 +204,34 @@ class TestWhenTheSecondIndexIsReached:
             "ccRecipients",
             "receivedDateTime",
         ]
-        assert params["$top"] == "50"
+
+    async def test_the_fallback_reads_the_second_page_of_messages_too(
+        self, client: GraphServiceClient, graph: respx.MockRouter, people: respx.Route
+    ) -> None:
+        people.mock(return_value=_found())
+        graph.get("/me/messages", params={"$skiptoken": "second"}).mock(
+            return_value=_found(
+                _message(sender=_recipient("Tyler Stone", "tyler.stone@example.invalid"))
+            )
+        )
+        graph.get("/me/messages").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _message(sender=_recipient("Tyler Nguyen", "tyler.nguyen@example.invalid"))
+                    ],
+                    "@odata.nextLink": f"{GRAPH_V1}/me/messages?$skiptoken=second",
+                },
+            )
+        )
+
+        results = await find_recipient(client, query="Tyler", limit=20)
+
+        assert {row.address for row in results.candidates} == {
+            "tyler.nguyen@example.invalid",
+            "tyler.stone@example.invalid",
+        }
 
     async def test_a_multiword_query_is_quoted_inside_the_participants_term(
         self, client: GraphServiceClient, people: respx.Route, messages: respx.Route
@@ -665,12 +699,9 @@ class TestWhatItRefuses:
         assert signed_in.call_count == 0
         assert people.call_count == 0
 
-    @pytest.mark.parametrize("limit", [0, MAX_RESULTS + 1])
-    async def test_a_window_outside_the_schema_is_an_assertion(
-        self, client: GraphServiceClient, limit: int
-    ) -> None:
+    async def test_a_limit_of_zero_is_an_assertion(self, client: GraphServiceClient) -> None:
         with pytest.raises(AssertionError):
-            _ = await find_recipient(client, query="Tyler", limit=limit)
+            _ = await find_recipient(client, query="Tyler", limit=0)
 
 
 class TestWhatAGraphFailureBecomes:

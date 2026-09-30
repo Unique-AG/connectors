@@ -44,8 +44,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "title": "Synthetic title",
 }
 
-MAX_TITLE_CHARACTERS = 255
-
 _RENAME = "rename"
 _DO_NOT_RENAME = "do not rename"
 _NOTHING_RENAMED = "The page was not renamed."
@@ -117,9 +115,7 @@ async def rename_page(
     confirm: Confirm,
     answer_pending: bool = False,
 ) -> RenamedPage | InputRequiredResult:
-    assert 1 <= len(title) <= MAX_TITLE_CHARACTERS, (
-        f"title is bounded by the schema, got {len(title)}"
-    )
+    assert len(title) >= 1, f"title is bounded by the schema, got {len(title)}"
     handle = onenote_page_handle(page)
     if handle is None:
         raise ToolError(_NOT_A_PAGE_HANDLE)
@@ -201,7 +197,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                max_length=MAX_TITLE_CHARACTERS,
                 description=(
                     "The page's new title, as the user writes it. The answer's `title` is what "
                     + "Microsoft stored. Read it from the answer, not from this argument."

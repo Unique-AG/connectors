@@ -9,7 +9,7 @@ from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.tools import outlook_read_mail as reader
-from office_365_mcp.tools.outlook_read_mail import MAX_BODY_CHARACTERS, MailMessage, read_mail
+from office_365_mcp.tools.outlook_read_mail import MailMessage, read_mail
 from office_365_mcp.tools.outlook_search_mail import SearchCriteria, search_mail
 
 from .conftest import ME
@@ -168,8 +168,6 @@ class TestWhichBodyItReturns:
         answer = await read_mail(client, handle=_HANDLE)
 
         assert answer.body is None
-        assert answer.body_characters == 0
-        assert answer.body_truncated is False
         assert answer.body_is_the_new_part is False
 
 
@@ -219,39 +217,16 @@ class TestWhetherGraphConvertedTheBody:
         assert answer.body_is_plain_text is False
 
 
-class TestTheCapOnTheBody:
-    async def test_a_body_over_the_cap_keeps_the_head_and_says_it_was_cut(
+class TestALongBody:
+    async def test_a_long_body_reaches_the_caller_whole(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        content = "A" * MAX_BODY_CHARACTERS + "TAIL"
-        _ = _reads(graph, _payload(body=_body(content)))
-
-        answer = await read_mail(client, handle=_HANDLE)
-
-        assert answer.body == "A" * MAX_BODY_CHARACTERS
-        assert answer.body_truncated is True
-
-    async def test_it_reports_the_length_the_message_had_before_truncation(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        content = "A" * (MAX_BODY_CHARACTERS + 4)
-        _ = _reads(graph, _payload(body=_body(content)))
-
-        answer = await read_mail(client, handle=_HANDLE)
-
-        assert answer.body_characters == MAX_BODY_CHARACTERS + 4
-
-    async def test_a_body_exactly_at_the_cap_is_whole(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        content = "A" * MAX_BODY_CHARACTERS
+        content = "A" * 100_000 + "TAIL"
         _ = _reads(graph, _payload(body=_body(content)))
 
         answer = await read_mail(client, handle=_HANDLE)
 
         assert answer.body == content
-        assert answer.body_truncated is False
-        assert answer.body_characters == MAX_BODY_CHARACTERS
 
 
 class TestWhatItAnswers:

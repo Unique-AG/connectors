@@ -1,12 +1,14 @@
+import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
 import httpx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
+from mcp.types import InputRequiredResult
 from msgraph.generated.models.followup_flag import FollowupFlag
 from msgraph.generated.models.followup_flag_status import FollowupFlagStatus
 from msgraph.generated.models.importance import Importance
@@ -15,14 +17,18 @@ from msgraph.generated.users.item.user_item_request_builder import UserItemReque
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry
+from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     WRITE_DESTRUCTIVE_IDEMPOTENT,
+    Confirm,
+    Confirmed,
     graph_client_for_caller,
     graph_mailbox,
+    person_confirms,
 )
 
 TOOL_NAME = "outlook_mark_mail"
@@ -36,8 +42,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "is_read": True,
 }
 
-MAX_MESSAGES = 20
-
 type MailImportance = Literal["low", "normal", "high"]
 
 _FLAG_STATUS: Mapping[bool, FollowupFlagStatus] = {
@@ -45,10 +49,24 @@ _FLAG_STATUS: Mapping[bool, FollowupFlagStatus] = {
     False: FollowupFlagStatus.NotFlagged,
 }
 
+_READ_TEXT: Mapping[bool, str] = {True: "mark them as read", False: "mark them as unread"}
+
+_FLAG_TEXT: Mapping[bool, str] = {
+    True: "flag them for follow-up",
+    False: "clear their follow-up flag",
+}
+
+_AGREE = "change"
+_DECLINE = "do not change"
+_NOTHING_CHANGED = "No message was changed."
+
+_SOMEONE_ELSES = "That mailbox belongs to someone else, not to the signed-in user."
+
 _DESCRIPTION = (
-    f"Marks up to {MAX_MESSAGES} messages as read or unread, flags them for follow-up, or "
-    "sets their importance, in the signed-in user's own mailbox or, with `mailbox`, a shared "
-    "or delegated one."
+    "Marks messages as read or unread, flags them for follow-up, or sets their importance, in "
+    "the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. "
+    "This tool asks the user to agree before it changes a shared or delegated mailbox. "
+    "It changes the user's own mailbox without a question."
 )
 
 _NOTHING_TO_CHANGE = (
@@ -148,19 +166,33 @@ async def mark_mail(
     *,
     message_refs: Sequence[str],
     change: MarkChange,
+    confirm: Confirm,
     mailbox: str | None = None,
-) -> MarkedMail:
-    assert 1 <= len(message_refs) <= MAX_MESSAGES, (
-        f"the batch is bounded by the schema at 1..{MAX_MESSAGES}, got {len(message_refs)}"
-    )
+) -> MarkedMail | InputRequiredResult:
+    assert len(message_refs) >= 1, "the schema admits no empty batch"
     if change.is_nothing:
         raise ToolError(_NOTHING_TO_CHANGE)
     handles = _handles(message_refs)
     reached = graph_mailbox(client, mailbox)
 
+    answer: Confirmed = None
+    attempts: list[_Attempt] = []
     with graph_errors(TOOL_NAME):
-        attempts = [await _mark_one(reached, handle=handle, change=change) for handle in handles]
-        _raise_when_nothing_changed(attempts)
+        if mailbox is not None:
+            with not_graph():
+                answer = await confirm(
+                    _question(mailbox, len(handles), change), _about(mailbox, handles, change)
+                )
+        if answer is None:
+            attempts = [
+                await _mark_one(reached, handle=handle, change=change) for handle in handles
+            ]
+            _raise_when_nothing_changed(attempts)
+
+    if isinstance(answer, InputRequiredResult):
+        return answer
+    if answer is not None:
+        raise ToolError(answer)
 
     marked = [attempt.row for attempt in attempts]
     return MarkedMail(
@@ -168,6 +200,44 @@ async def mark_mail(
         changed_count=sum(1 for row in marked if row.changed),
         failed_count=sum(1 for row in marked if not row.changed),
     )
+
+
+def _question(mailbox: str, count: int, change: MarkChange) -> str:
+    return (
+        f"Change {count} {'message' if count == 1 else 'messages'} in the mailbox "
+        + f"{cut_for_a_question(mailbox)!r}? This tool will {_changes(change)}. "
+        + _SOMEONE_ELSES
+    )
+
+
+def _changes(change: MarkChange) -> str:
+    parts = [
+        text
+        for text in (
+            None if change.is_read is None else _READ_TEXT[change.is_read],
+            None if change.flagged is None else _FLAG_TEXT[change.flagged],
+            None if change.importance is None else f"set their importance to {change.importance}",
+        )
+        if text is not None
+    ]
+    if len(parts) == 1:
+        return parts[0]
+    return f"{', '.join(parts[:-1])} and {parts[-1]}"
+
+
+def _about(mailbox: str, handles: Sequence[MailMessageHandle], change: MarkChange) -> str:
+    parts = (
+        mailbox,
+        str(change.is_read),
+        str(change.flagged),
+        str(change.importance),
+        *(handle.uri for handle in handles),
+    )
+    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
+
+
+def a_person_agrees(ctx: Context) -> Confirm:
+    return person_confirms(ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_CHANGED)
 
 
 def _handles(message_refs: Sequence[str]) -> list[MailMessageHandle]:
@@ -265,13 +335,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 min_length=1,
-                max_length=MAX_MESSAGES,
                 description=(
-                    f"The messages to change: up to {MAX_MESSAGES} `uri` values from a search, "
-                    "list, read, or thread result."
+                    "The messages to change: `uri` values from a search, list, read, or thread "
+                    "result."
                 ),
             ),
         ],
+        ctx: Context,
         is_read: Annotated[
             bool | None,
             Field(description="True marks the messages read, false marks them unread."),
@@ -286,10 +356,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ] = None,
         mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
-    ) -> MarkedMail:
+    ) -> MarkedMail | InputRequiredResult:
         return await mark_mail(
             client,
             message_refs=message_refs,
             change=MarkChange(is_read=is_read, flagged=flagged, importance=importance),
+            confirm=a_person_agrees(ctx),
             mailbox=mailbox,
         )

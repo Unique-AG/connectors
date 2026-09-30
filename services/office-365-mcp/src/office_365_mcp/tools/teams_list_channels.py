@@ -34,8 +34,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Channel.ReadBasic.All",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"team_id": "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"}
 
-MAX_CHANNELS = 200
-
 # Excludes `isArchived` (a Teams preview) and `layoutType` (Graph documents it as always null).
 _CHANNEL_FIELDS = ("id", "displayName", "description", "createdDateTime", "membershipType")
 
@@ -129,7 +127,7 @@ async def teams_list_channels(
     membership_type: ChannelMembership | None = None,
     limit: int,
 ) -> ChannelList:
-    assert 1 <= limit <= MAX_CHANNELS, f"limit must be within 1..{MAX_CHANNELS}, got {limit}"
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
 
     headers = _headers()
     configuration = RequestConfiguration[_ChannelsQuery](
@@ -211,9 +209,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             int,
             Field(
                 ge=1,
-                le=MAX_CHANNELS,
                 description=(
-                    f"How many channels to return, at most {MAX_CHANNELS}. The result is "
+                    "How many channels to return. The result is "
                     + "already the whole answer for this call. Repeating it with the same "
                     + "`limit` returns the same channels, not the next page. Raise `limit` to "
                     + "see more."

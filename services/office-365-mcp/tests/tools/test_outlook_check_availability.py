@@ -9,7 +9,6 @@ from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
-from office_365_mcp.shared.calendar import MAX_ATTENDEES
 from office_365_mcp.tools.outlook_check_availability import Availability, check_availability
 
 _SCHEDULE_PATH = "/me/calendar/getSchedule"
@@ -124,6 +123,16 @@ class TestWhatItSendsToGraph:
         assert sent["EndTime"] == {"dateTime": "2026-03-02T17:00", "timeZone": "Europe/Zurich"}
         assert sent["AvailabilityViewInterval"] == 60
 
+    async def test_twenty_one_addresses_reach_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        many = [f"guest{index}@example.invalid" for index in range(21)]
+        schedule = _gets_schedule(graph, [])
+
+        _ = await _check(client, addresses=many)
+
+        assert _sent(schedule)["Schedules"] == many
+
 
 class TestWhatItRefuses:
     @pytest.mark.parametrize(
@@ -164,16 +173,6 @@ class TestWhatItRefuses:
     ) -> None:
         with pytest.raises(ToolError, match="not after"):
             _ = await _check(client, starts_at="2026-03-02T17:00", ends_at="2026-03-02T09:00")
-
-        assert len(graph.calls) == 0
-
-    async def test_more_addresses_than_the_ceiling_never_reach_graph(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        too_many = [f"guest{index}@example.invalid" for index in range(MAX_ATTENDEES + 1)]
-
-        with pytest.raises(ToolError, match="between them|more than"):
-            _ = await _check(client, addresses=too_many)
 
         assert len(graph.calls) == 0
 

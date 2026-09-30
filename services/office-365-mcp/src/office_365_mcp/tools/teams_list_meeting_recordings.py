@@ -56,9 +56,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     + "%2F19%253ameeting_TjAwMDAwMDAwMDAwMA%2540thread.v2%2F0"
 }
 
-# Graph sets no ceiling on `$top`, so this limit is ours.
-MAX_RECORDINGS = 50
-
 # Graph-owned vocabularies (`meeting_type` here) stay `str`: Microsoft can add a member at any
 # time. Bare assignment, not `type X = ...`: a PEP 695 alias publishes as a `$ref` into `$defs`,
 # one hop away from the property a model reads.
@@ -207,9 +204,9 @@ class MeetingRecordings(BaseModel):
             + "not just one page of Microsoft's answer. Past that cap, the first entry is the "
             + "latest of what this tool read, not the meeting's latest. If as many rows as "
             + "`limit` come back, older recordings can remain. Raise `limit` to reach "
-            + "further, within that cap. Fewer rows than `limit` means none remain. Set "
-            + "`include_scan_completeness` to learn whether the read reached the end. This "
-            + "list is empty for every status other than `available`."
+            + "further, within that cap. Fewer rows than `limit` means none remain, unless the "
+            + "read reached that cap. Set `include_scan_completeness` to learn whether the read "
+            + "reached the end. This list is empty for every status other than `available`."
         )
     )
     scan_incomplete: bool | None = Field(
@@ -232,7 +229,7 @@ async def teams_list_meeting_recordings(
     Two or three Graph requests: resolve, list, and — only when something was found — the caller id
     the organizer-only rule needs.
     """
-    assert 1 <= limit <= MAX_RECORDINGS, f"limit must be within 1..{MAX_RECORDINGS}, got {limit}"
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
 
     with graph_errors(TOOL_NAME):
         meeting = await resolve_meeting(client, handle)
@@ -334,9 +331,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             int,
             Field(
                 ge=1,
-                le=MAX_RECORDINGS,
                 description=(
-                    f"How many recordings to return, at most {MAX_RECORDINGS}. This tool reads "
+                    "How many recordings to return. This tool reads "
                     + f"up to {MAX_ARTIFACT_SCAN} and sorts them before this cuts the list. If "
                     + "you raise `limit`, you get more results, but only within that read."
                 ),

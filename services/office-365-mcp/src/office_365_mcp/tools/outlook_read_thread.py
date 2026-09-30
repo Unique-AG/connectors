@@ -13,7 +13,7 @@ from msgraph.generated.users.item.messages.messages_request_builder import Messa
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import PREVIEW_CHARACTERS, SUMMARY_FIELDS, MailSummary
@@ -35,8 +35,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "Mail.Read.Shared")
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
 }
-
-MAX_MESSAGES = 100
 
 _ANCHOR_FIELDS: tuple[str, ...] = ("id", "conversationId")
 
@@ -86,8 +84,8 @@ class MailThread(BaseModel):
     )
     complete: bool = Field(
         description=(
-            "False if more of the conversation remained in this mailbox after the tool "
-            "reached the fixed cap."
+            "False if more of the conversation remained in this mailbox when the tool stopped "
+            "reading."
         )
     )
     searched_scope: str = Field(
@@ -110,14 +108,21 @@ async def read_thread(
             return _answer([], complete=True, mailbox=mailbox)
 
         with graph_step(STEP_THREAD):
-            page = await reached.messages.get(request_configuration=_thread_request(conversation))
+            first_page = await reached.messages.get(
+                request_configuration=_thread_request(conversation)
+            )
+            assert first_page is not None, "Graph answered a thread listing with no collection"
+            collected = await collect_pages(
+                first_page, client, limit=MAX_SCANNED_ITEMS, headers=immutable_id_headers()
+            )
 
-    found = list((page.value if page is not None else None) or [])
-    truncated = page is not None and page.odata_next_link is not None
     _make_sure_the_filter_was_applied(
-        found, conversation=conversation, anchor=handle.message_id, truncated=truncated
+        collected.items,
+        conversation=conversation,
+        anchor=handle.message_id,
+        truncated=collected.capped,
     )
-    return _answer(found, complete=not truncated, mailbox=mailbox)
+    return _answer(collected.items, complete=not collected.capped, mailbox=mailbox)
 
 
 def _make_sure_the_filter_was_applied(
@@ -173,7 +178,7 @@ def _thread_request(conversation: str) -> RequestConfiguration[_ThreadQuery]:
         query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
             filter=f"conversationId eq '{odata_literal(conversation)}'",
             select=list(_THREAD_FIELDS),
-            top=MAX_MESSAGES,
+            top=MAX_SCANNED_ITEMS,
         ),
         headers=immutable_id_headers(),
     )

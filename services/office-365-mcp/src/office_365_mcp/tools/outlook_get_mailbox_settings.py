@@ -24,7 +24,13 @@ from msgraph.generated.users.item.outlook.master_categories.master_categories_re
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import CollectedItems, collect_pages, graph_errors, graph_step
+from office_365_mcp.graph_client import (
+    MAX_SCANNED_ITEMS,
+    CollectedItems,
+    collect_pages,
+    graph_errors,
+    graph_step,
+)
 from office_365_mcp.shared.handles import MailRuleHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -45,9 +51,6 @@ GRAPH_NOT_FOUND = (
     + "on-premises account looks like from here. Retrying will fail identically, and no other "
     + "`include` will succeed either."
 )
-
-MAX_RULES = 200
-MAX_CATEGORIES = 500
 
 _INBOX_FOLDER = "inbox"
 
@@ -220,7 +223,7 @@ class MailboxSettingsReport(BaseModel):
         description="The Inbox rules, in Graph's order; null when `include` did not ask for them."
     )
     rules_capped: bool | None = Field(
-        description=f"True when more than {MAX_RULES} rules exist and the listing stopped short."
+        description="True when more rules exist and the listing stopped short."
     )
     automatic_reply: AutomaticReply | None = Field(
         description="The automatic reply; null only when `include` did not ask for it."
@@ -229,10 +232,7 @@ class MailboxSettingsReport(BaseModel):
         description="The category display names; null when `include` did not ask for them."
     )
     categories_capped: bool | None = Field(
-        description=(
-            f"True when more than {MAX_CATEGORIES} categories exist and the listing stopped "
-            + "short."
-        )
+        description="True when more categories exist and the listing stopped short."
     )
 
 
@@ -267,11 +267,11 @@ async def _inbox_rules(client: GraphServiceClient) -> CollectedItems[MessageRule
             _INBOX_FOLDER
         ).message_rules.get(
             request_configuration=RequestConfiguration[_RulesQuery](
-                query_parameters=_RulesQuery(select=list(_RULE_FIELDS), top=MAX_RULES)
+                query_parameters=_RulesQuery(select=list(_RULE_FIELDS))
             )
         )
         assert first_page is not None, "Graph answered a rule listing with no collection"
-        return await collect_pages(first_page, client, limit=MAX_RULES)
+        return await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)
 
 
 async def _automatic_reply(client: GraphServiceClient) -> AutomaticRepliesSetting | None:
@@ -288,11 +288,11 @@ async def _categories(client: GraphServiceClient) -> CollectedItems[OutlookCateg
     with graph_step(STEP_CATEGORIES):
         first_page = await client.me.outlook.master_categories.get(
             request_configuration=RequestConfiguration[_CategoriesQuery](
-                query_parameters=_CategoriesQuery(select=list(_CATEGORY_FIELDS), top=MAX_CATEGORIES)
+                query_parameters=_CategoriesQuery(select=list(_CATEGORY_FIELDS))
             )
         )
         assert first_page is not None, "Graph answered a category listing with no collection"
-        return await collect_pages(first_page, client, limit=MAX_CATEGORIES)
+        return await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)
 
 
 def _category_name(category: OutlookCategory) -> str:

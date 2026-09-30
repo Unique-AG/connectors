@@ -29,8 +29,6 @@ STEP_NOTEBOOK_FROM_URL = "notebook_from_url"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)
 
-MAX_WEB_URL_CHARACTERS = 2048
-
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "web_url": "https://onenote.example.invalid/notebooks/synthetic-notebook"
 }
@@ -129,9 +127,7 @@ class FoundNotebook(BaseModel):
 
 
 async def find_notebook_from_url(client: GraphServiceClient, *, web_url: str) -> FoundNotebook:
-    assert 1 <= len(web_url) <= MAX_WEB_URL_CHARACTERS, (
-        f"web_url is bounded by the schema, got {len(web_url)}"
-    )
+    assert len(web_url) >= 1, "web_url must not be empty"
     if onenote_notebook_handle(web_url) is not None:
         raise ToolError(_OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS)
     if (
@@ -182,7 +178,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                max_length=MAX_WEB_URL_CHARACTERS,
                 description=(
                     "A OneNote web address, or Microsoft's own `onenote:` client address, exactly "
                     + "as Microsoft gave it. It can be the `web_url` of an onenote_list_notebooks "

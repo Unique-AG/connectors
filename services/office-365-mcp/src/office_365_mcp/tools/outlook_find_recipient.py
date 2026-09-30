@@ -20,7 +20,7 @@ from msgraph.generated.users.item.people.people_request_builder import PeopleReq
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared import identity, kql
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -32,8 +32,6 @@ STEP_PARTICIPANTS = "mail_participants"
 GRAPH_PERMISSIONS: tuple[str, ...] = ("People.Read", "Mail.Read", identity.GRAPH_PERMISSION)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "Tyler"}
-
-MAX_RESULTS = 50
 
 _QUERY_SOURCES = ("X-PeopleQuery-QuerySources", "Mailbox,Directory")
 
@@ -47,8 +45,6 @@ _PERSON_FIELDS = (
 )
 
 _PARTICIPANT_FIELDS = ("from", "toRecipients", "ccRecipients", "receivedDateTime")
-
-_PARTICIPANT_MESSAGES = 50
 
 type MatchKind = Literal["exact", "token", "fuzzy"]
 type RecipientKind = Literal["person", "group", "room"]
@@ -152,7 +148,7 @@ class _Caller:
 async def find_recipient(
     client: GraphServiceClient, *, query: str, limit: int
 ) -> RecipientCandidates:
-    assert 1 <= limit <= MAX_RESULTS, f"limit is bounded by the schema, got {limit}"
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
     if not _tokens(query):
         raise ToolError(_NO_QUERY)
 
@@ -200,14 +196,15 @@ async def _correspondents(
         query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
             search=kql.as_search_value(f"participants:{kql.quoted(query)}"),
             select=list(_PARTICIPANT_FIELDS),
-            top=_PARTICIPANT_MESSAGES,
+            top=MAX_SCANNED_ITEMS,
         )
     )
     with graph_step(STEP_PARTICIPANTS):
-        page = await client.me.messages.get(request_configuration=configuration)
+        first_page = await client.me.messages.get(request_configuration=configuration)
+        assert first_page is not None, "Graph answered a participant search with no collection"
+        collected = await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)
 
-    messages = (page.value if page is not None else None) or []
-    return _from_messages(messages, query=query, caller=caller, limit=limit)
+    return _from_messages(collected.items, query=query, caller=caller, limit=limit)
 
 
 def _from_messages(
@@ -405,8 +402,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             int,
             Field(
                 ge=1,
-                le=MAX_RESULTS,
-                description=f"How many candidates to return, at most {MAX_RESULTS}.",
+                description="How many candidates to return.",
             ),
         ] = 20,
         client: GraphServiceClient = graph,

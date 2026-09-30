@@ -238,7 +238,17 @@ class TestWhetherGraphConvertedTheBody:
 
         assert answer.body == markup
 
-    async def test_an_event_with_no_body_answers_null_and_no_length(
+    async def test_a_long_body_reaches_the_caller_whole(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        content = "A" * 100_000 + "TAIL"
+        _ = _reads(graph, _payload(body=_body(content)))
+
+        answer = await _read(client)
+
+        assert answer.body == content
+
+    async def test_an_event_with_no_body_answers_null(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _reads(graph, _payload())
@@ -246,8 +256,6 @@ class TestWhetherGraphConvertedTheBody:
         answer = await _read(client)
 
         assert answer.body is None
-        assert answer.body_characters == 0
-        assert answer.body_truncated is False
         assert answer.body_is_plain_text is False
 
     async def test_a_body_of_nothing_but_whitespace_answers_null(
@@ -258,42 +266,6 @@ class TestWhetherGraphConvertedTheBody:
         answer = await _read(client)
 
         assert answer.body is None
-        assert answer.body_characters == 0
-
-
-class TestTheCapOnTheBody:
-    async def test_a_body_over_the_cap_keeps_the_head_and_says_it_was_cut(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        content = "A" * reader.MAX_BODY_CHARACTERS + "TAIL"
-        _ = _reads(graph, _payload(body=_body(content)))
-
-        answer = await _read(client)
-
-        assert answer.body == "A" * reader.MAX_BODY_CHARACTERS
-        assert answer.body_truncated is True
-
-    async def test_it_reports_the_length_the_body_had_before_truncation(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        content = "A" * (reader.MAX_BODY_CHARACTERS + 4)
-        _ = _reads(graph, _payload(body=_body(content)))
-
-        answer = await _read(client)
-
-        assert answer.body_characters == reader.MAX_BODY_CHARACTERS + 4
-
-    async def test_a_body_exactly_at_the_cap_is_whole(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        content = "A" * reader.MAX_BODY_CHARACTERS
-        _ = _reads(graph, _payload(body=_body(content)))
-
-        answer = await _read(client)
-
-        assert answer.body == content
-        assert answer.body_truncated is False
-        assert answer.body_characters == reader.MAX_BODY_CHARACTERS
 
 
 class TestTheAttendeesItReports:

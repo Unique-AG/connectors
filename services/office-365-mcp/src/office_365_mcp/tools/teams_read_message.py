@@ -26,7 +26,7 @@ from office_365_mcp.shared.handles import (
     MessageHandle,
     message_handle,
 )
-from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST, TeamsMessage
+from office_365_mcp.shared.messages import TeamsMessage
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narrowed_to
 
 TOOL_NAME = "teams_read_message"
@@ -72,13 +72,13 @@ GRAPH_NOT_FOUND = (
     + "channel thread is addressed under the post it answers. A search result does not identify "
     + "that post, so a search hit that is a reply cannot be read from its own handle. "
     + "teams_browse_channel is the only tool that emits a reply's own handle. It reaches the "
-    + f"newest {MAX_REPLIES_PER_POST} replies of each post on the channel's first page, and no "
-    + "further. It follows neither Microsoft's cursor into an older part of a thread, nor the "
-    + "one into older posts. This is because a given channel allows this whole connector about "
-    + "one request a second, across the whole tenant. Browse that channel once. If the reply is "
-    + "not in what comes back, there is no route to its full text, and a second browse returns "
-    + "the same window. Report the search snippet with its sender and date. Say that this tool "
-    + "did not retrieve the full text. Then stop looking."
+    + "replies of each post on the channel's first page, and no further. It follows neither "
+    + "Microsoft's cursor into an older part of a thread, nor the one into older posts. This is "
+    + "because a given channel allows this whole connector about one request a second, across "
+    + "the whole tenant. Browse that channel once. If the reply is not in what comes back, "
+    + "there is no route to its full text, and a second browse returns the same window. Report "
+    + "the search snippet with its sender and date. Say that this tool did not retrieve the "
+    + "full text. Then stop looking."
 )
 
 _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")

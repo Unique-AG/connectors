@@ -213,6 +213,16 @@ class TestTheQueryItComposes:
         assert my_view.calls.last.request.url.params["$top"] == "7"
 
     @pytest.mark.usefixtures("my_calendar")
+    async def test_a_limit_above_the_page_size_microsoft_allows_is_asked_for_in_pages(
+        self, client: GraphServiceClient, my_view: respx.Route
+    ) -> None:
+        _ = await lister.list_events(
+            client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=1500
+        )
+
+        assert my_view.calls.last.request.url.params["$top"] == "1000"
+
+    @pytest.mark.usefixtures("my_calendar")
     async def test_start_order_is_asked_for_and_is_the_order_this_tool_promises(
         self, client: GraphServiceClient, my_view: respx.Route
     ) -> None:
@@ -920,7 +930,7 @@ class TestWhatItRefuses:
                 limit=25,
             )
 
-    @pytest.mark.parametrize("limit", [0, lister.MAX_RESULTS + 1])
+    @pytest.mark.parametrize("limit", [0, -1])
     async def test_a_limit_outside_the_schema_is_a_programming_error(
         self, client: GraphServiceClient, limit: int
     ) -> None:
@@ -953,7 +963,7 @@ class TestTheSchemaItPublishes:
         assert tool is not None, "register left the tool off the server"
         assert tool.parameters["properties"]["time_zone"]["default"] == "UTC"
 
-    async def test_the_bounds_on_limit_are_published_rather_than_only_asserted(
+    async def test_the_floor_and_the_default_of_limit_are_published_and_no_ceiling(
         self, transport: httpx.AsyncClient
     ) -> None:
         mcp: FastMCP = FastMCP(name="schema-under-test")
@@ -965,10 +975,10 @@ class TestTheSchemaItPublishes:
         assert tool.parameters["properties"]["limit"]["minimum"] == 1, (
             "Microsoft refuses a calendar view with a `$top` below 1"
         )
-        assert tool.parameters["properties"]["limit"]["maximum"] == lister.MAX_RESULTS
+        assert "maximum" not in tool.parameters["properties"]["limit"]
         assert tool.parameters["properties"]["limit"]["default"] == 25
 
-    async def test_a_fragment_too_short_to_filter_anything_is_refused_by_the_schema(
+    async def test_an_empty_fragment_is_refused_by_the_schema(
         self, transport: httpx.AsyncClient
     ) -> None:
         mcp: FastMCP = FastMCP(name="schema-under-test")
@@ -977,10 +987,7 @@ class TestTheSchemaItPublishes:
         tool = await mcp.get_tool(lister.TOOL_NAME)
 
         assert tool is not None, "register left the tool off the server"
-        assert (
-            tool.parameters["properties"]["subject_contains"]["anyOf"][0]["minLength"]
-            == lister.MIN_FRAGMENT_CHARACTERS
-        )
+        assert tool.parameters["properties"]["subject_contains"]["anyOf"][0]["minLength"] == 1
 
     async def test_no_argument_is_published_that_microsoft_cannot_narrow_on(
         self, transport: httpx.AsyncClient

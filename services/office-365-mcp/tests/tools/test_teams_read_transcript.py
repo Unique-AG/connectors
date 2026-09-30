@@ -249,17 +249,24 @@ class TestReadingTheWords:
         assert read.turns == []
         assert read.next_offset is None
 
-    async def test_a_limit_above_the_ceiling_is_a_programming_error(
-        self, client: GraphServiceClient, transport: httpx.AsyncClient
+    async def test_a_limit_of_1000_reads_every_turn(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
-        with pytest.raises(AssertionError):
-            _ = await reader.teams_read_transcript(
-                client,
-                transport,
-                handle=TranscriptHandle(MEETING_ID, _TRANSCRIPT_ID),
-                offset=0,
-                limit=reader.MAX_TURNS + 1,
+        _ = graph.get(_CONTENT).mock(
+            return_value=httpx.Response(
+                200, content=TRANSCRIPT_VTT.encode(), headers={"content-type": "text/vtt"}
             )
+        )
+
+        read = await reader.teams_read_transcript(
+            client,
+            transport,
+            handle=TranscriptHandle(MEETING_ID, _TRANSCRIPT_ID),
+            offset=0,
+            limit=1000,
+        )
+
+        assert len(read.turns) == 4
 
 
 class TestNarrowingWhatComesBack:

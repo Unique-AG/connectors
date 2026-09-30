@@ -423,7 +423,7 @@ class TestWhatItAnswers:
         sections_route: respx.Route,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(lister, "MAX_SECTIONS", 3)
+        monkeypatch.setattr(lister, "MAX_SCANNED_ITEMS", 3)
         sections_route.mock(
             return_value=_page(
                 _section_payload(_SECTION_ONE, display_name="One"),
@@ -444,7 +444,7 @@ class TestWhatItAnswers:
         sections_route: respx.Route,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(lister, "MAX_SECTIONS", 3)
+        monkeypatch.setattr(lister, "MAX_SCANNED_ITEMS", 3)
         sections_route.mock(
             return_value=_page(
                 _section_payload(_SECTION_ONE, display_name="One"),

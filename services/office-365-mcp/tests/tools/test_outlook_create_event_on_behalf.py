@@ -31,9 +31,6 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.calendar import (
     CALENDAR_FIELDS,
-    MAX_ATTENDEES,
-    MAX_LOCATION_CHARACTERS,
-    MAX_ZONE_CHARACTERS,
     NOBODY_INVITED_BUT_A_PLACE,
     EventDraft,
     transaction_id_for,
@@ -643,6 +640,7 @@ class TestThePersonBetweenTheRequestAndTheCalendar:
 
         assert _ADA in asked[0]
         assert f"{_GRACE} (optional)" in asked[0]
+        assert "to 2 people" in asked[0], "the question hid how many people are mailed"
         assert "cannot be recalled" in asked[0]
 
     async def test_the_question_names_the_place_the_teams_meeting_and_the_body(
@@ -1117,30 +1115,25 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
-    async def test_a_timed_event_longer_than_a_day_never_reaches_graph(
+    async def test_a_timed_event_longer_than_a_day_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _ready(graph)
+        create = _ready(graph)
 
-        with pytest.raises(ToolError, match="timed event"):
-            _ = await _create(client, ends_at="2026-03-04T15:00")
+        _ = await _create(client, ends_at="2026-03-04T15:00")
 
-        assert len(graph.calls) == 0
+        assert create.call_count == 1
 
-    async def test_an_all_day_event_longer_than_two_weeks_never_reaches_graph(
+    async def test_an_all_day_event_longer_than_two_weeks_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _ready(graph)
+        create = _ready(graph)
 
-        with pytest.raises(ToolError, match="all-day event"):
-            _ = await _create(
-                client,
-                starts_at="2026-03-02T00:00",
-                ends_at="2026-04-02T00:00",
-                all_day=True,
-            )
+        _ = await _create(
+            client, starts_at="2026-03-02T00:00", ends_at="2026-04-02T00:00", all_day=True
+        )
 
-        assert len(graph.calls) == 0
+        assert create.call_count == 1
 
     @pytest.mark.parametrize(
         ("starts_at", "ends_at"),
@@ -1172,17 +1165,6 @@ class TestWhatItRefuses:
             _ = await _create(
                 client, starts_at="2026-03-02T14:00", ends_at="2026-03-03T15:00", all_day=True
             )
-
-    async def test_a_span_a_timed_event_refuses_is_allowed_for_an_all_day_one(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        create = _ready(graph)
-
-        _ = await _create(
-            client, starts_at="2026-03-02T00:00", ends_at="2026-03-05T00:00", all_day=True
-        )
-
-        assert create.call_count == 1
 
     @pytest.mark.parametrize(
         "address",
@@ -1255,25 +1237,21 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
-    async def test_more_addresses_than_the_two_lists_hold_together_never_reaches_graph(
+    async def test_twenty_one_attendees_reach_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _ready(graph)
-        required = [f"one{index}@example.invalid" for index in range(MAX_ATTENDEES - 5)]
-        optional = [f"two{index}@example.invalid" for index in range(6)]
+        create = _ready(graph)
+        many = [f"guest{index}@example.invalid" for index in range(21)]
 
-        with pytest.raises(ToolError, match=str(MAX_ATTENDEES)):
-            _ = await _create(client, attendees=required, optional_attendees=optional)
+        _ = await _create(client, attendees=many)
 
-        assert len(graph.calls) == 0
+        assert len(_invited(_sent(create))) == 21
 
-    @pytest.mark.parametrize("subject", ["", "x" * 256])
-    async def test_a_subject_outside_the_schema_is_a_programming_error(
-        self, client: GraphServiceClient, subject: str
+    async def test_an_empty_subject_is_a_programming_error(
+        self, client: GraphServiceClient
     ) -> None:
-        assert subject != _SUBJECT
         with pytest.raises(AssertionError):
-            _ = await _create(client, subject=subject)
+            _ = await _create(client, subject="")
 
 
 class TestTheRetryItRefuses:
@@ -1588,7 +1566,7 @@ class TestTheSchemaItPublishes:
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert not [name for name in properties if word in name.casefold()]
 
-    async def test_both_attendee_lists_are_bounded_and_the_optional_one_defaults_to_empty(
+    async def test_the_optional_list_defaults_to_empty_and_neither_list_has_a_size_bound(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
@@ -1596,14 +1574,14 @@ class TestTheSchemaItPublishes:
         properties = cast("Mapping[str, object]", parameters["properties"])
         attendees = cast("Mapping[str, object]", properties["attendees"])
         optional = cast("Mapping[str, object]", properties["optional_attendees"])
-        assert attendees["maxItems"] == MAX_ATTENDEES
-        assert optional["maxItems"] == MAX_ATTENDEES
+        assert "maxItems" not in attendees
+        assert "maxItems" not in optional
         assert optional["default"] == []
 
-    async def test_a_location_longer_than_the_ceiling_is_refused_by_the_schema(
-        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    async def test_a_location_has_a_floor_of_one_character_and_no_ceiling(
+        self, transport: httpx.AsyncClient
     ) -> None:
-        parameters, tool = await _registered(transport)
+        parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
         location = cast("Mapping[str, object]", properties["location"])
@@ -1613,16 +1591,7 @@ class TestTheSchemaItPublishes:
             if branch.get("type") == "string"
         )
         assert text["minLength"] == 1
-        assert text["maxLength"] == MAX_LOCATION_CHARACTERS
-        with pytest.raises(ValidationError, match="at most"):
-            _ = await tool.run(
-                {
-                    **creator.GRAPH_CALL_EXAMPLE,
-                    "location": "x" * (MAX_LOCATION_CHARACTERS + 1),
-                }
-            )
-
-        assert len(graph.calls) == 0, "an argument the schema refuses reached Graph"
+        assert "maxLength" not in text
 
     async def test_a_zone_that_writes_a_sentence_of_its_own_never_reaches_this_tool(
         self, transport: httpx.AsyncClient, graph: respx.MockRouter
@@ -1648,15 +1617,8 @@ class TestTheSchemaItPublishes:
 
         properties = cast("Mapping[str, object]", parameters["properties"])
         published = cast("Mapping[str, object]", properties["time_zone"])
-        assert published["maxLength"] == MAX_ZONE_CHARACTERS
         accepted: TypeAdapter[str] = TypeAdapter(
-            Annotated[
-                str,
-                Field(
-                    pattern=cast("str", published["pattern"]),
-                    max_length=cast("int", published["maxLength"]),
-                ),
-            ]
+            Annotated[str, Field(pattern=cast("str", published["pattern"]))]
         )
 
         assert accepted.validate_python(zone) == zone

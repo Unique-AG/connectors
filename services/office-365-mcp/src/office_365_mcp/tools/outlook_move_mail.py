@@ -1,12 +1,14 @@
+import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Annotated
 
 import httpx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
+from mcp.types import InputRequiredResult
 from msgraph.generated.models.mail_folder import MailFolder
 from msgraph.generated.models.mail_search_folder import MailSearchFolder
 from msgraph.generated.users.item.messages.item.move.move_post_request_body import (
@@ -16,7 +18,7 @@ from msgraph.generated.users.item.user_item_request_builder import UserItemReque
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry
+from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import (
     MailFolderHandle,
     MailMessageHandle,
@@ -25,11 +27,15 @@ from office_365_mcp.shared.handles import (
 )
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import WellKnownFolder
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     WRITE_DESTRUCTIVE,
+    Confirm,
+    Confirmed,
     graph_client_for_caller,
     graph_mailbox,
+    person_confirms,
 )
 
 TOOL_NAME = "outlook_move_mail"
@@ -61,8 +67,6 @@ GRAPH_NOT_FOUND = (
     + "If you call this tool again with the same arguments, the call will fail the same way."
 )
 
-MAX_MESSAGES = 20
-
 _SEARCH_FOLDER_ONLY: frozenset[str] = frozenset(
     MailSearchFolder().get_field_deserializers()
 ) - frozenset(MailFolder().get_field_deserializers())
@@ -74,11 +78,21 @@ assert _SEARCH_FOLDER_ONLY, (
 
 
 _DESCRIPTION = (
-    f"Moves up to {MAX_MESSAGES} messages into another folder, in the signed-in user's own "
-    "mailbox or, with `mailbox`, a shared or delegated one — moving to `deleteditems` is the "
-    "only way this connector erases mail, and the message stays recoverable in Deleted Items "
-    "because there is no permanent-erase operation."
+    "Moves messages into another folder, in the signed-in user's own mailbox or, with "
+    "`mailbox`, a shared or delegated one — moving to `deleteditems` is the only way this "
+    "connector erases mail, and the message stays recoverable in Deleted Items because there is "
+    "no permanent-erase operation. "
+    "This tool asks the user to agree before it changes a shared or delegated mailbox. "
+    "It changes the user's own mailbox without a question."
 )
+
+_AGREE = "move"
+_DECLINE = "do not move"
+_NOTHING_MOVED = "No message was moved."
+
+_DELETED_ITEMS = "deleteditems"
+
+_SOMEONE_ELSES = "That mailbox belongs to someone else, not to the signed-in user."
 
 _BOTH_DESTINATIONS = (
     "outlook_move_mail moves mail into one folder, so `destination` and `folder_ref` are "
@@ -188,29 +202,63 @@ async def move_mail(
     client: GraphServiceClient,
     *,
     message_refs: Sequence[str],
+    confirm: Confirm,
     destination: WellKnownFolder | None = None,
     folder_ref: str | None = None,
     mailbox: str | None = None,
-) -> MailMoved:
-    assert 1 <= len(message_refs) <= MAX_MESSAGES, (
-        f"message_refs is bounded by the schema at 1..{MAX_MESSAGES}, got {len(message_refs)}"
-    )
+) -> MailMoved | InputRequiredResult:
+    assert len(message_refs) >= 1, "the schema admits no empty batch"
     handles = _message_handles(message_refs)
     wanted = _destination_asked_for(destination, folder_ref)
     reached = graph_mailbox(client, mailbox)
 
+    answer: Confirmed = None
+    attempts: list[_Attempt] = []
     with graph_errors(TOOL_NAME):
         target = await _destination(reached, wanted)
-        attempts = (
-            []
-            if isinstance(target, _Unusable)
-            else [await _move_one(reached, handle=handle, into=target) for handle in handles]
-        )
-        _raise_when_nothing_moved(attempts)
+        if not isinstance(target, _Unusable):
+            if mailbox is not None:
+                with not_graph():
+                    answer = await confirm(
+                        _question(mailbox, len(handles), target), _about(mailbox, handles, target)
+                    )
+            if answer is None:
+                attempts = [
+                    await _move_one(reached, handle=handle, into=target) for handle in handles
+                ]
+                _raise_when_nothing_moved(attempts)
 
     if isinstance(target, _Unusable):
         raise ToolError(target.refusal)
+    if isinstance(answer, InputRequiredResult):
+        return answer
+    if answer is not None:
+        raise ToolError(answer)
     return _answer(target, attempts)
+
+
+def _question(mailbox: str, count: int, target: _Destination) -> str:
+    messages = f"{count} {'message' if count == 1 else 'messages'}"
+    if target.folder_id == _DELETED_ITEMS:
+        return (
+            f"Delete {messages} in the mailbox {cut_for_a_question(mailbox)!r}? "
+            + "This tool moves them to Deleted Items. They stay recoverable in Deleted Items. "
+            + _SOMEONE_ELSES
+        )
+    return (
+        f"Move {messages} in the mailbox {cut_for_a_question(mailbox)!r} to the folder "
+        + f"{cut_for_a_question(target.name)!r}? "
+        + _SOMEONE_ELSES
+    )
+
+
+def _about(mailbox: str, handles: Sequence[MailMessageHandle], target: _Destination) -> str:
+    parts = (mailbox, target.folder_id, *(handle.uri for handle in handles))
+    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
+
+
+def a_person_agrees(ctx: Context) -> Confirm:
+    return person_confirms(ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_MOVED)
 
 
 def _message_handles(message_refs: Sequence[str]) -> tuple[MailMessageHandle, ...]:
@@ -320,13 +368,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 min_length=1,
-                max_length=MAX_MESSAGES,
                 description=(
-                    f"The messages to move: up to {MAX_MESSAGES} `uri` values from a search, "
-                    "list, or thread result."
+                    "The messages to move: `uri` values from a search, list, or thread result."
                 ),
             ),
         ],
+        ctx: Context,
         destination: Annotated[
             WellKnownFolder | None,
             Field(
@@ -349,10 +396,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ] = None,
         mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
-    ) -> MailMoved:
+    ) -> MailMoved | InputRequiredResult:
         return await move_mail(
             client,
             message_refs=message_refs,
+            confirm=a_person_agrees(ctx),
             destination=destination,
             folder_ref=folder_ref,
             mailbox=mailbox,

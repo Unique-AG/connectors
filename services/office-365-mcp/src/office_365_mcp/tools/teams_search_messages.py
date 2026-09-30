@@ -41,8 +41,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "release"}
 
-MAX_RESULTS = 50
-
 _HYDRATION_CONCURRENCY = 3
 
 _DESCRIPTION = (
@@ -203,7 +201,7 @@ async def teams_search_messages(
     assert query, (
         "teams_search_messages needs at least one criterion. The tool refuses an empty set."
     )
-    assert 1 <= size <= MAX_RESULTS, f"size must be within 1..{MAX_RESULTS}, got {size}"
+    assert size >= 1, f"size must be at least 1, got {size}"
     assert offset >= 0, f"offset must not be negative, got {offset}"
 
     body = QueryPostRequestBody(
@@ -356,8 +354,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             int,
             Field(
                 ge=1,
-                le=MAX_RESULTS,
-                description=f"Results per page, at most {MAX_RESULTS}.",
+                description="Results per page.",
             ),
         ] = 25,
         include_body: Annotated[

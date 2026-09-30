@@ -249,6 +249,20 @@ class TestWhatItSendsToGraph:
         sent = route.calls.last.request.content.decode("utf-8")
         assert f"<body>{written}</body>" in sent
 
+    async def test_a_long_title_section_name_and_body_reach_graph_whole(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _no_default_notebook(graph)
+        route = _creates(graph, _DEFAULT_ROUTE, _page_payload())
+        title, section_name, body = "t" * 300, "s" * 60, "<p>" + "b" * 600_000 + "</p>"
+
+        _ = await _create(client, title=title, section_name=section_name, body_html=body)
+
+        sent = route.calls.last.request.content.decode("utf-8")
+        assert f"<title>{title}</title>" in sent
+        assert f"<body>{body}</body>" in sent
+        assert route.calls.last.request.url.params["sectionName"] == section_name
+
     async def test_it_creates_exactly_one_page_per_call(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
