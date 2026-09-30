@@ -11,6 +11,8 @@ on:
       - ".github/workflows/ci-services.yaml"
       - ".github/workflows/_template-ci.yaml"
       - ".github/workflows/_template-containerize.yaml"
+      - ".github/workflows/_template-helm.yaml"
+      - ".github/workflows/_template-terraform.yaml"
   workflow_dispatch:
     inputs:
       services:
@@ -57,6 +59,8 @@ jobs:
               - '.github/workflows/ci-services.yaml'
               - '.github/workflows/_template-ci.yaml'
               - '.github/workflows/_template-containerize.yaml'
+              - '.github/workflows/_template-helm.yaml'
+              - '.github/workflows/_template-terraform.yaml'
 
       - name: Build service matrix
         id: build-matrix

@@ -8,6 +8,8 @@ on:
       - "services/**"
       - ".github/workflows/ci-python.yaml"
       - ".github/workflows/_template-containerize.yaml"
+      - ".github/workflows/_template-helm.yaml"
+      - ".github/workflows/_template-terraform.yaml"
   workflow_dispatch:
     inputs:
       packages:
@@ -50,6 +52,8 @@ jobs:
             workflow:
               - '.github/workflows/ci-python.yaml'
               - '.github/workflows/_template-containerize.yaml'
+              - '.github/workflows/_template-helm.yaml'
+              - '.github/workflows/_template-terraform.yaml'
 
       - name: Build package matrix
         id: build-matrix
@@ -218,46 +222,10 @@ jobs:
     permissions:
       contents: read
       packages: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      SERVICE_PATH: services/${{ matrix.package }}
-      SERVICE_NAME: ${{ matrix.package }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Check if Helm charts exist
-        id: check-helm
-        run: |
-          if [ -d "$SERVICE_PATH/deploy/helm-charts" ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-        if: steps.check-helm.outputs.exists == 'true'
-        with:
-          version: v3.19.0
-
-      - name: Login to GHCR (for OCI chart dependencies)
-        if: steps.check-helm.outputs.exists == 'true'
-        env:
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "$REGISTRY_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-
-      - name: Render chart
-        if: steps.check-helm.outputs.exists == 'true'
-        working-directory: ${{ env.SERVICE_PATH }}/deploy/helm-charts/${{ env.SERVICE_NAME }}
-        run: |
-          helm dependency update
-          if [ -f ci-values.yaml ]; then
-            helm template . --values ci-values.yaml
-          else
-            helm template .
-          fi
+    uses: ./.github/workflows/_template-helm.yaml
+    with:
+      service-name: ${{ matrix.package }}
+      service-path: services/${{ matrix.package }}
 
   validate-terraform:
     name: Terraform ${{ matrix.package }}
@@ -269,39 +237,9 @@ jobs:
         package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
     permissions:
       contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      SERVICE_PATH: services/${{ matrix.package }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Check if Terraform exists
-        id: check-terraform
-        run: |
-          if [ -d "$SERVICE_PATH/deploy/terraform" ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
-        if: steps.check-terraform.outputs.exists == 'true'
-        with:
-          terraform_version: 1.13.4
-
-      - name: Validate Terraform modules
-        if: steps.check-terraform.outputs.exists == 'true'
-        run: |
-          while IFS= read -r -d '' dir; do
-            echo "Validating: $dir"
-            terraform fmt -check -recursive "$dir"
-            terraform -chdir="$dir" init -backend=false
-            terraform -chdir="$dir" validate
-            terraform -chdir="$dir" test
-          done < <(find "$SERVICE_PATH/deploy/terraform" -mindepth 2 -maxdepth 2 -type d -print0)
+    uses: ./.github/workflows/_template-terraform.yaml
+    with:
+      service-path: services/${{ matrix.package }}
 
   containerize:
     name: Containerize ${{ matrix.package }}

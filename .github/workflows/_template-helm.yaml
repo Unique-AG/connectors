@@ -1,0 +1,59 @@
+name: "[Template] Helm"
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: "Name of the service (e.g., sharepoint-connector)"
+        required: true
+        type: string
+      service-path:
+        description: "Path to the service directory (e.g., services/sharepoint-connector)"
+        required: true
+        type: string
+
+jobs:
+  validate:
+    permissions:
+      contents: read
+      packages: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SERVICE_PATH: ${{ inputs.service-path }}
+      SERVICE_NAME: ${{ inputs.service-name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check if Helm charts exist
+        id: check-helm
+        run: |
+          if [ -d "$SERVICE_PATH/deploy/helm-charts" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        if: steps.check-helm.outputs.exists == 'true'
+        with:
+          version: v3.19.0
+
+      - name: Login to GHCR (for OCI chart dependencies)
+        if: steps.check-helm.outputs.exists == 'true'
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$REGISTRY_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Render chart
+        if: steps.check-helm.outputs.exists == 'true'
+        working-directory: ${{ env.SERVICE_PATH }}/deploy/helm-charts/${{ env.SERVICE_NAME }}
+        run: |
+          helm dependency update
+          if [ -f ci-values.yaml ]; then
+            helm template . --values ci-values.yaml
+          else
+            helm template .
+          fi
