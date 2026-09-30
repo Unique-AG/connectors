@@ -20,7 +20,7 @@ concurrency:
 jobs:
   detect-services:
     name: Detect services
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     outputs:
       services: ${{ steps.build-matrix.outputs.services }}
@@ -67,7 +67,7 @@ jobs:
       contents: read
       packages: read
       security-events: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       IMAGE: ghcr.io/unique-ag/connectors/services/${{ matrix.service.service }}

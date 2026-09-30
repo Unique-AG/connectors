@@ -32,7 +32,7 @@ jobs:
       id-token: write
     outputs:
       digest: ${{ steps.existing.outputs.digest || steps.build-and-push.outputs.digest }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       GHCR_REGISTRY: ghcr.io
@@ -228,7 +228,7 @@ jobs:
       contents: read
       packages: read
       security-events: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       GHCR_REGISTRY: ghcr.io
@@ -284,7 +284,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       GHCR_REGISTRY: ghcr.io

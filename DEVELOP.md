@@ -49,6 +49,14 @@ To publish docs before a release, run `[Docs] Publish to Confluence` from `main`
 
 Both manual workflows list the services in a dropdown. When you add a service, add it to `release-rerun.yaml`, and to `docs-confluence.yaml` if it has docs.
 
+## Runners
+
+Jobs run on `ubuntu-24.04`, not on `ubuntu-latest`. A change of the default image by GitHub cannot change a build.
+
+Short jobs that need no Docker run on `ubuntu-slim`. This runner has one vCPU and stops a job after 15 minutes. It has no Docker daemon. GitHub gives it no version label, so GitHub can update its image.
+
+Jobs that build images, scan images, or run Docker stay on `ubuntu-24.04`.
+
 ## Python Services
 
 Services that carry a `pyproject.toml` (`services/office-365-mcp`, ...) sit outside the pnpm/turbo
