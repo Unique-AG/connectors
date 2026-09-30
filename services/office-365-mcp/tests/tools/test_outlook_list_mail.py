@@ -9,7 +9,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle
-from office_365_mcp.shared.mail import WellKnownFolder
+from office_365_mcp.shared.mail import SUMMARY_FIELDS, FlagMoment, MailFlag, WellKnownFolder
 from office_365_mcp.tools import outlook_list_mail as lister
 
 from .conftest import GRAPH_V1
@@ -104,6 +104,16 @@ class TestTheQueryItComposes:
         params = inbox_messages.calls.last.request.url.params
         assert params["$top"] == "7"
         assert "bodyPreview" in params["$select"]
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_it_selects_every_shared_summary_field_and_never_the_headers(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        _ = await lister.list_mail(client, limit=25)
+
+        selected = inbox_messages.calls.last.request.url.params["$select"].split(",")
+        assert [field for field in SUMMARY_FIELDS if field not in selected] == []
+        assert "internetMessageHeaders" not in selected
 
     @pytest.mark.usefixtures("inbox")
     async def test_receipt_order_is_asked_for_with_no_other_argument_given(
@@ -613,6 +623,62 @@ class TestWhatItAnswers:
         assert row.received_at is not None
         assert row.is_read is False
         assert row.has_attachments is True
+
+    @pytest.mark.usefixtures("inbox")
+    async def test_it_reports_importance_flag_categories_draft_state_and_reply_to(
+        self, client: GraphServiceClient, inbox_messages: respx.Route
+    ) -> None:
+        inbox_messages.mock(
+            return_value=_page(
+                _message_payload(_FIRST_ID)
+                | {
+                    "importance": "low",
+                    "flag": {
+                        "flagStatus": "flagged",
+                        "dueDateTime": {
+                            "dateTime": "2026-03-06T16:00:00.0000000",
+                            "timeZone": "UTC",
+                        },
+                    },
+                    "categories": ["Invoices"],
+                    "isDraft": False,
+                    "sender": {
+                        "emailAddress": {"name": "Sam Assistant", "address": "sam@vance.invalid"}
+                    },
+                    "replyTo": [
+                        {"emailAddress": {"name": "Billing", "address": "billing@vance.invalid"}}
+                    ],
+                }
+            )
+        )
+
+        row = (await lister.list_mail(client, limit=25)).messages[0]
+
+        assert row.importance == "low"
+        assert row.flag == MailFlag(
+            status="flagged",
+            start=None,
+            due=FlagMoment(date_time="2026-03-06T16:00:00.0000000", time_zone="UTC"),
+            completed=None,
+        )
+        assert row.categories == ["Invoices"]
+        assert row.is_draft is False
+        assert row.sent_by is not None
+        assert row.sent_by.address == "sam@vance.invalid"
+        assert [address.address for address in row.reply_to] == ["billing@vance.invalid"]
+
+    @pytest.mark.usefixtures("inbox", "inbox_messages")
+    async def test_a_row_with_none_of_those_fields_answers_null_and_empty(
+        self, client: GraphServiceClient
+    ) -> None:
+        row = (await lister.list_mail(client, limit=25)).messages[0]
+
+        assert row.importance is None
+        assert row.flag is None
+        assert row.categories == []
+        assert row.is_draft is None
+        assert row.sent_by is None
+        assert row.reply_to == []
 
     @pytest.mark.usefixtures("inbox")
     async def test_the_order_graph_returned_is_the_order_answered(

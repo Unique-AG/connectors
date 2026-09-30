@@ -8,7 +8,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.mail import PREVIEW_CHARACTERS
+from office_365_mcp.shared.mail import PREVIEW_CHARACTERS, SUMMARY_FIELDS, MailFlag
 from office_365_mcp.tools import outlook_read_thread as reader
 from office_365_mcp.tools.outlook_read_thread import read_thread
 
@@ -96,6 +96,18 @@ class TestWhatItAsksGraphFor:
         await read_thread(client, handle=_HANDLE)
 
         assert "$orderby" not in thread.calls.last.request.url.params
+
+    async def test_the_thread_request_selects_every_shared_summary_field_and_never_the_headers(
+        self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
+    ) -> None:
+        anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
+        thread.mock(return_value=httpx.Response(200, json={"value": [_message(_ANCHOR_ID)]}))
+
+        await read_thread(client, handle=_HANDLE)
+
+        selected = thread.calls.last.request.url.params["$select"].split(",")
+        assert [field for field in SUMMARY_FIELDS if field not in selected] == []
+        assert "internetMessageHeaders" not in selected
 
     async def test_both_requests_declare_the_immutable_id_space(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
@@ -190,6 +202,41 @@ class TestWhatItAnswers:
             MailMessageHandle(_OLDER_ID).uri,
             MailMessageHandle(_ANCHOR_ID).uri,
         ]
+
+    async def test_each_message_reports_importance_flag_categories_draft_state_and_reply_to(
+        self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
+    ) -> None:
+        reply = _message(_ANCHOR_ID) | {
+            "importance": "normal",
+            "flag": {"flagStatus": "complete"},
+            "categories": ["Contracts"],
+            "isDraft": False,
+            "sender": {"emailAddress": {"name": "Sam Assistant", "address": "sam@contoso.invalid"}},
+            "replyTo": [
+                {"emailAddress": {"name": "Legal", "address": "legal-team@contoso.invalid"}}
+            ],
+        }
+        anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
+        thread.mock(return_value=httpx.Response(200, json={"value": [reply, _message(_OLDER_ID)]}))
+
+        result = await read_thread(client, handle=_HANDLE)
+
+        by_uri = {message.uri: message for message in result.messages}
+        full = by_uri[MailMessageHandle(_ANCHOR_ID).uri]
+        bare = by_uri[MailMessageHandle(_OLDER_ID).uri]
+        assert full.importance == "normal"
+        assert full.flag == MailFlag(status="complete", start=None, due=None, completed=None)
+        assert full.categories == ["Contracts"]
+        assert full.is_draft is False
+        assert full.sent_by is not None
+        assert full.sent_by.address == "sam@contoso.invalid"
+        assert [address.address for address in full.reply_to] == ["legal-team@contoso.invalid"]
+        assert bare.importance is None
+        assert bare.flag is None
+        assert bare.categories == []
+        assert bare.is_draft is None
+        assert bare.sent_by is None
+        assert bare.reply_to == []
 
     async def test_a_message_with_no_received_time_does_not_break_the_order(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route

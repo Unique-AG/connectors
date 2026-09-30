@@ -12,6 +12,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphThrottled
 from office_365_mcp.shared.handles import MailMessageHandle
+from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailFlag
 from office_365_mcp.tools import outlook_search_mail as searcher
 from office_365_mcp.tools.outlook_search_mail import (
     CRITERIA,
@@ -174,6 +175,18 @@ class TestWhatItAsksGraphFor:
         params = searched.calls.last.request.url.params
         assert params["$top"] == "7"
         assert "bodyPreview" in params["$select"]
+
+    async def test_it_selects_every_shared_summary_field_and_never_the_headers(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(client, SearchCriteria(query="invoice"), limit=25)
+
+        selected = searched.calls.last.request.url.params["$select"].split(",")
+        assert [field for field in SUMMARY_FIELDS if field not in selected] == []
+        assert "internetMessageHeaders" not in selected
 
     async def test_it_never_sends_an_order_or_a_filter_beside_the_search(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
@@ -470,6 +483,45 @@ class TestWhatItAnswers:
         assert hit.is_read is False
         assert hit.has_attachments is True
         assert hit.web_link == "https://outlook.office365.invalid/owa/?ItemID=synthetic"
+
+    async def test_it_reports_importance_flag_categories_draft_state_and_reply_to(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        hit = _message(_REST_ID) | {
+            "importance": "high",
+            "flag": {"flagStatus": "notFlagged"},
+            "categories": ["Invoices", "Red category"],
+            "isDraft": False,
+            "sender": {"emailAddress": {"name": "Sam Assistant", "address": "sam@vance.invalid"}},
+            "replyTo": [{"emailAddress": {"name": "Billing", "address": "billing@vance.invalid"}}],
+        }
+        searched.mock(return_value=httpx.Response(200, json={"value": [hit]}))
+        translated.mock(return_value=httpx.Response(200, json=_translation({_REST_ID: _STABLE_ID})))
+
+        row = (await search_mail(client, SearchCriteria(query="invoice"), limit=25)).messages[0]
+
+        assert row.importance == "high"
+        assert row.flag == MailFlag(status="notFlagged", start=None, due=None, completed=None)
+        assert row.categories == ["Invoices", "Red category"]
+        assert row.is_draft is False
+        assert row.sent_by is not None
+        assert row.sent_by.address == "sam@vance.invalid"
+        assert [address.address for address in row.reply_to] == ["billing@vance.invalid"]
+
+    async def test_a_hit_with_none_of_those_fields_answers_null_and_empty(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": [_message(_REST_ID)]}))
+        translated.mock(return_value=httpx.Response(200, json=_translation({_REST_ID: _STABLE_ID})))
+
+        row = (await search_mail(client, SearchCriteria(query="invoice"), limit=25)).messages[0]
+
+        assert row.importance is None
+        assert row.flag is None
+        assert row.categories == []
+        assert row.is_draft is None
+        assert row.sent_by is None
+        assert row.reply_to == []
 
     async def test_a_full_window_says_more_may_exist(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
