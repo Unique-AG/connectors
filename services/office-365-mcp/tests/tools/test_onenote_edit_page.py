@@ -1142,6 +1142,19 @@ class TestHowItDeclaresItself:
         assert "belongs to somebody else" in description
         assert "own unshared notebook" in description
 
+    async def test_the_description_shows_how_to_set_a_note_tag(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert (
+            "To show a check box, a star or another built-in note tag, use the `data-tag` "
+            + "attribute. Put it on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, "
+            + '`<p data-tag="to-do">` shows an empty check box, and '
+            + '`data-tag="to-do:completed"` shows a ticked one. Microsoft Graph does not '
+            + "support custom tags."
+        ) in (tool.description or "")
+
     def test_the_element_action_matrix_lives_on_target_and_action(self) -> None:
         target_described = EditCommand.model_fields["target"].description
         action_described = EditCommand.model_fields["action"].description

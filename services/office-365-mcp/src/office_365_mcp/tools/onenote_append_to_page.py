@@ -67,6 +67,10 @@ people or belongs to somebody else. A page in the user's own unshared notebook i
 without a question.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 onenote_read_page does not already show the block.
+- To show a check box, a star or another built-in note tag, use the `data-tag` attribute. Put it \
+on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, `<p data-tag="to-do">` shows an \
+empty check box, and `data-tag="to-do:completed"` shows a ticked one. Microsoft Graph does not \
+support custom tags.
 """
 
 _NOT_A_PAGE_HANDLE = (

@@ -87,6 +87,10 @@ one. For other sets, it asks before it writes into a notebook that is shared wit
 belongs to somebody else. A set in the user's own unshared notebook runs without a question.
 - Microsoft reports one result for the whole set. A failure can mean a partly applied set: read \
 the page with onenote_read_page and resend only the missing commands.
+- To show a check box, a star or another built-in note tag, use the `data-tag` attribute. Put it \
+on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, `<p data-tag="to-do">` shows an \
+empty check box, and `data-tag="to-do:completed"` shows a ticked one. Microsoft Graph does not \
+support custom tags.
 """
 
 _NOT_A_PAGE_HANDLE = (
