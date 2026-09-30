@@ -11,7 +11,6 @@ on:
       - ".github/workflows/ci-services.yaml"
       - ".github/workflows/_template-ci.yaml"
       - ".github/workflows/_template-containerize.yaml"
-      - "scripts/render-values-schema.sh"
   workflow_dispatch:
     inputs:
       services:
@@ -58,7 +57,6 @@ jobs:
               - '.github/workflows/ci-services.yaml'
               - '.github/workflows/_template-ci.yaml'
               - '.github/workflows/_template-containerize.yaml'
-              - 'scripts/render-values-schema.sh'
 
       - name: Build service matrix
         id: build-matrix

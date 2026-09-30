@@ -1,0 +1,37 @@
+name: "[CI] Helm Schema"
+
+on:
+  pull_request:
+    paths:
+      - "services/*/deploy/helm-charts/**"
+      - "scripts/render-values-schema.sh"
+      - ".github/workflows/ci-helm-schema.yaml"
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ci-helm-schema-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  helm-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.19.0
+
+      - name: Login to GHCR (for the OCI base chart)
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$REGISTRY_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Check values.schema.json drift
+        run: scripts/render-values-schema.sh --check

@@ -128,43 +128,6 @@ jobs:
             helm template .
           fi
 
-  helm-schema-check:
-    permissions:
-      contents: read
-      packages: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      SERVICE_PATH: ${{ inputs.service-path }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Check if Helm charts exist
-        id: check-helm
-        run: |
-          if [ -d "$SERVICE_PATH/deploy/helm-charts" ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-        if: steps.check-helm.outputs.exists == 'true'
-        with:
-          version: v3.19.0
-
-      - name: Login to GHCR (for OCI base chart schema pull)
-        if: steps.check-helm.outputs.exists == 'true'
-        env:
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "$REGISTRY_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-
-      - name: Check values.schema.json drift
-        if: steps.check-helm.outputs.exists == 'true'
-        run: scripts/render-values-schema.sh --check
-
   validate-terraform:
     permissions:
       contents: read

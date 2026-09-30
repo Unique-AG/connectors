@@ -8,7 +8,6 @@ on:
       - "services/**"
       - ".github/workflows/ci-python.yaml"
       - ".github/workflows/_template-containerize.yaml"
-      - "scripts/render-values-schema.sh"
   workflow_dispatch:
     inputs:
       packages:
@@ -51,7 +50,6 @@ jobs:
             workflow:
               - '.github/workflows/ci-python.yaml'
               - '.github/workflows/_template-containerize.yaml'
-              - 'scripts/render-values-schema.sh'
 
       - name: Build package matrix
         id: build-matrix
@@ -260,10 +258,6 @@ jobs:
           else
             helm template .
           fi
-
-      - name: Check values.schema.json drift
-        if: steps.check-helm.outputs.exists == 'true'
-        run: scripts/render-values-schema.sh --check
 
   validate-terraform:
     name: Terraform ${{ matrix.package }}
