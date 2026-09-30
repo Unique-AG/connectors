@@ -15,9 +15,7 @@ describe('KongIdentityGuard', () => {
     const guard = new KongIdentityGuard({ authMode: 'kong' } as GatewayConfig);
 
     expect(() =>
-      guard.canActivate(
-        context({ 'x-user-id': 'user', 'x-company-id': 'company', 'x-user-roles': 'role' }),
-      ),
+      guard.canActivate(context({ 'x-user-id': 'user', 'x-user-roles': 'role' })),
     ).toThrow(UnauthorizedException);
   });
 
@@ -26,14 +24,9 @@ describe('KongIdentityGuard', () => {
     const headers = {
       'x-user-id': 'user',
       'x-company-id': 'company',
-      'x-client-id': 'client',
     };
     expect(guard.canActivate(context(headers))).toBe(true);
-    for (const patch of [
-      { 'x-service-id': 'service' },
-      { 'x-user-id': ' ' },
-      { 'x-client-id': '' },
-    ]) {
+    for (const patch of [{ 'x-service-id': 'service' }, { 'x-user-id': ' ' }]) {
       expect(() => guard.canActivate(context({ ...headers, ...patch }))).toThrow(
         UnauthorizedException,
       );

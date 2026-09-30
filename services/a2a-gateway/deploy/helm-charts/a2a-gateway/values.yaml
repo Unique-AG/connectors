@@ -213,7 +213,7 @@ extraRoutes:
   protected:
     enabled: false
     annotations:
-      konghq.com/plugins: unique-jwt-auth,a2a-gateway-client-id,a2a-gateway-request-size,unique-route-metrics
+      konghq.com/plugins: unique-jwt-auth,a2a-gateway-strip-client,a2a-gateway-request-size,unique-route-metrics
       konghq.com/read-timeout: "3600000"
       konghq.com/response-buffering: "false"
     hostnames:

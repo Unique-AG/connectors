@@ -1,6 +1,6 @@
 # Identity and trust
 
-Rule: **the gateway never validates JWTs**. Every JWT-authenticated surface is reached through Kong, which validates the Zitadel token and stamps `x-user-id`, `x-company-id`, `x-user-roles` and `x-client-id` (OAuth client, from `azp`). `AUTH_MODE=development` allows unauthenticated local requests; in any other mode a request without identity headers is rejected.
+Rule: **the gateway never validates JWTs**. Every JWT-authenticated surface is reached through Kong, which validates the Zitadel token and stamps `x-user-id`, `x-company-id` and `x-user-roles`; caller-supplied `x-client-id`/`x-service-id` are stripped. `AUTH_MODE=development` allows unauthenticated local requests; in any other mode a request without identity headers is rejected.
 
 ## Inbound: external client → published space
 
@@ -20,7 +20,7 @@ sequenceDiagram
     Zitadel-->>Agent: access token (human user)
     Agent->>Kong: POST /a2a/agents/{pub} · Bearer token · A2A-Version 1.0
     Kong->>Kong: validate JWT, strip inbound x-user-*, stamp identity headers
-    Kong->>GW: request · x-user-id, x-company-id, x-user-roles, x-client-id
+    Kong->>GW: request · x-user-id, x-company-id, x-user-roles
     GW->>GW: KongIdentityGuard: x-user-id + x-company-id present
     GW->>Chat: space use access(assistantId) · x-user-id, x-company-id
     Chat-->>GW: allowed / denied
@@ -28,7 +28,7 @@ sequenceDiagram
 ```
 
 - Principal = the human Kong identified. Never taken from the request body, A2A metadata or query parameters.
-- **Existing user OAuth flow** (D-18): reuse normal Zitadel login and Kong token validation without custom principal claims or changes to Zitadel. Caller-supplied identity headers must not be trusted; use only Kong-stamped identity. Machine-to-machine onboarding is out of scope. `x-client-id` is stored on tasks for attribution.
+- **Existing user OAuth flow** (D-18): reuse normal Zitadel login and Kong token validation without custom principal claims or changes to Zitadel. Caller-supplied identity headers must not be trusted; use only Kong-stamped identity. Machine-to-machine onboarding is out of scope. Tasks record `x-client-id` for attribution only; Kong does not forward the OAuth client yet, so they are `unattributed` (no Lua or plugin changes).
 - A valid token is required per **request** (`SendMessage`, `GetTask`, SSE open). A running task continues when the token expires because core calls use the header identity. Reconnect requires a fresh token for the **same user**.
 - Gateway → core calls omit role headers, so core resolves current roles from scope-management instead of trusting stale token roles.
 - Push-notification webhooks: outbound only, credentials from `TaskPushNotificationConfig.authentication`, URL passes egress policy, payload = task id + state (no content).

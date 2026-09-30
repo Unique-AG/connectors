@@ -1,0 +1,16 @@
+{{- if include "chart.kong.enabled" . }}
+# JWT routes: unique-jwt-auth stamps the user identity but leaves caller-supplied client and
+# service headers untouched, so drop them. Client attribution waits for Kong to forward azp.
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ include "base.fullname" . }}-strip-client
+  labels:
+    {{- include "base.labels.common" . | nindent 4 }}
+plugin: request-transformer
+config:
+  remove:
+    headers:
+      - x-client-id
+      - x-service-id
+{{- end }}

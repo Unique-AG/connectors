@@ -26,6 +26,8 @@ interface PageCursor {
   id: string;
 }
 
+export const UNATTRIBUTED_CLIENT = 'unattributed';
+
 function identity(context: ServerCallContext): {
   companyId: string;
   userId: string;
@@ -36,19 +38,15 @@ function identity(context: ServerCallContext): {
   const companyId = context.tenant;
   const userId = context.user?.isAuthenticated ? context.user.userName : undefined;
   const headers = context.state.get('headers');
-  const clientId =
+  const header =
     typeof headers === 'object' && headers !== null && 'x-client-id' in headers
       ? Reflect.get(headers, 'x-client-id')
       : undefined;
+  // Attribution only, never authorization: Kong strips caller-sent values and does not yet forward
+  // the OAuth client, so production tasks are recorded as unattributed.
+  const clientId = typeof header === 'string' && header ? header : UNATTRIBUTED_CLIENT;
   const publicationId = context.state.get('publicationId');
-  if (
-    !companyId ||
-    !userId ||
-    typeof clientId !== 'string' ||
-    !clientId ||
-    typeof publicationId !== 'string' ||
-    !publicationId
-  ) {
+  if (!companyId || !userId || typeof publicationId !== 'string' || !publicationId) {
     throw new UnauthorizedException('authenticated tenant and user required');
   }
   return { companyId, userId, clientId, publicationId, roles: [] };

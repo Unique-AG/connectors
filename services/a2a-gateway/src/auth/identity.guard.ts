@@ -38,7 +38,6 @@ function applyDevelopmentIdentity(
   request: Request,
   fallback: GatewayConfig['developmentIdentity'],
 ): void {
-  request.headers['x-client-id'] ??= 'development';
   if (request.headers['x-user-id'] && request.headers['x-company-id']) {
     return;
   }
@@ -106,7 +105,7 @@ abstract class IdentityGuard implements CanActivate {
 @Injectable()
 export class KongIdentityGuard extends IdentityGuard {
   public constructor(@Inject(GATEWAY_CONFIG) config: GatewayConfig) {
-    super(config, [...commonIdentityHeaders, 'x-client-id']);
+    super(config, commonIdentityHeaders);
   }
 }
 

@@ -47,7 +47,7 @@ erDiagram
         text id PK "A2A taskId"
         text company_id
         text user_id
-        text client_id "Kong x-client-id"
+        text client_id "x-client-id or unattributed"
         text context_id FK
         text state
         text user_message_id UK

@@ -31,7 +31,7 @@ flowchart LR
     Client -.->|auth code + PKCE| Zitadel
     Client -->|"Bearer (human OAuth)"| Kong
     FE -->|Bearer| Kong
-    Kong -->|"x-user-id / x-company-id / x-user-roles / x-client-id"| Pub & Mgmt
+    Kong -->|"x-user-id / x-company-id / x-user-roles"| Pub & Mgmt
     Chat -->|"effective user headers"| Int
     Pub & Mgmt & Int --> Core
     Core --> DB

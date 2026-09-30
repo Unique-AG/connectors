@@ -19,7 +19,7 @@ services/a2a-gateway/
 │   ├── config/                 # zod configs: app, auth-mode, database, amqp, unique (core URLs), egress, limits, worker
 │   ├── drizzle/                # module + schema/{publications,connections,contexts,tasks,artifacts,push-configs,executions,remote-contexts}.table.ts
 │   ├── health/                 # terminus: db, amqp, core reachability (readiness)
-│   ├── auth/                   # KongIdentityGuard (x-user-id/x-company-id/x-user-roles/x-client-id from Kong), ClusterIdentityGuard (internal), AUTH_MODE=development bypass
+│   ├── auth/                   # KongIdentityGuard (x-user-id/x-company-id/x-user-roles from Kong), ClusterIdentityGuard (internal), AUTH_MODE=development bypass
 │   ├── unique/                 # UniqueInternalClient: spaces, messages, elicitations, content; normalised errors
 │   ├── event-bus/              # @golevelup/nestjs-rabbitmq: per-replica queue on EVENT_BUS, typed event parsing, dispatch to task/execution handlers
 │   ├── credentials/            # CredentialVault (aes-gcm-encryption), credential types
@@ -68,6 +68,6 @@ KRA-13 (native publication): cards, caller-filtered catalog, extended card, JSON
 
 ## Outside this service
 
-- **Kong** (P-02): routes for card (no auth), `/a2a/*`, `/management/*` (JWT → identity headers + `x-client-id` from `azp`, strip inbound identity headers), CORS for the frontend; NetworkPolicy for `/internal/*`.
+- **Kong** (P-02): routes for card (no auth), `/a2a/*`, `/management/*` (JWT → identity headers, strip inbound identity and client headers), CORS for the frontend; NetworkPolicy for `/internal/*`.
 - **Core** (P-03): KRA-30 (`executionProvider`, `a2aConnectionId`, dispatch, cancel, elicitation-response callback), KRA-25 (`A2A_GATEWAY_URL`, rollout flag, `a2aCapabilities`), KRA-27 (space settings UI → management surface), elicitation events on `EVENT_BUS`.
 - **RabbitMQ** (P-04): gateway user with rights to declare its own queues and bind to `EVENT_BUS`.

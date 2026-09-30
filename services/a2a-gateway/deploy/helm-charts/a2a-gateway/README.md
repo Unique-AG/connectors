@@ -67,7 +67,7 @@ Enable `extraRoutes.public`, `extraRoutes.callbacks` and `extraRoutes.protected`
 The chart ships three `KongPlugin`s, named after `fullnameOverride`:
 
 - `a2a-gateway-strip-identity` (`request-transformer`) drops caller-supplied `x-user-*`, `x-company-*`, `x-client-id` and `x-service-id` on the unauthenticated routes.
-- `a2a-gateway-client-id` (`post-function`) runs after `unique-jwt-auth`. That plugin overwrites `x-user-id`/`x-company-id` and clears `x-user-roles`, but neither clears `x-client-id`/`x-service-id` nor forwards the OAuth client. The function drops both headers and sets `x-client-id` from the verified token's `azp` (fallback `client_id`). Kong must allow serverless functions (`untrusted_lua` not `off`).
+- `a2a-gateway-strip-client` (`request-transformer`) drops caller-supplied `x-client-id`/`x-service-id` on the JWT routes. `unique-jwt-auth` stamps the user identity but does not forward the OAuth client, so tasks are recorded as unattributed until it does.
 - `a2a-gateway-request-size` (`request-size-limiting`) enforces `a2aConfig.limits.maxRequestBytes`.
 
 The `protected` route disables response buffering and sets a one-hour read timeout for SSE; keep `konghq.com/read-timeout` in line with `a2aConfig.limits.streamTimeoutMs`.
@@ -105,7 +105,7 @@ PostgreSQL and RabbitMQ egress is derived from `connection.host`; in URL mode ke
 | extraRoutes.callbacks.matches[0].method | string | `"POST"` |  |
 | extraRoutes.callbacks.matches[0].path.type | string | `"PathPrefix"` |  |
 | extraRoutes.callbacks.matches[0].path.value | string | `"/a2a/callbacks"` |  |
-| extraRoutes.protected.annotations."konghq.com/plugins" | string | `"unique-jwt-auth,a2a-gateway-client-id,a2a-gateway-request-size,unique-route-metrics"` |  |
+| extraRoutes.protected.annotations."konghq.com/plugins" | string | `"unique-jwt-auth,a2a-gateway-strip-client,a2a-gateway-request-size,unique-route-metrics"` |  |
 | extraRoutes.protected.annotations."konghq.com/read-timeout" | string | `"3600000"` |  |
 | extraRoutes.protected.annotations."konghq.com/response-buffering" | string | `"false"` |  |
 | extraRoutes.protected.enabled | bool | `false` |  |
