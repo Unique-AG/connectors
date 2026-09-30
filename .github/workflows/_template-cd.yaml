@@ -253,10 +253,24 @@ jobs:
           scan-type: image
           image-ref: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}@${{ needs.containerize.outputs.digest }}
           scanners: license
+          format: json
+          output: trivy-license.json
           severity: UNKNOWN,HIGH,CRITICAL
           exit-code: "0"
           timeout: 15m
           cache: true
+
+      - name: Write license summary
+        if: always() && hashFiles('trivy-license.json') != ''
+        run: |
+          jq -r '
+            [.Results[]?.Licenses[]?]
+            | group_by([.Severity, .Name])
+            | map({severity: .[0].Severity, license: (.[0].Name | gsub("[|\n]"; " ")), packages: length})
+            | sort_by(.severity, .license)
+            | ["| Severity | License | Packages |", "| --- | --- | --- |"] + map("| \(.severity) | \(.license) | \(.packages) |")
+            | .[]
+          ' trivy-license.json >> "$GITHUB_STEP_SUMMARY"
 
   publish-docs:
     if: inputs.docs-path != ''
