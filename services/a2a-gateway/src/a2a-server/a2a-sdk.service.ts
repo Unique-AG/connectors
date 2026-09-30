@@ -1,3 +1,4 @@
+import type { SendMessageRequest } from '@a2a-js/sdk';
 import { ClientFactory, JsonRpcTransportFactory } from '@a2a-js/sdk/client';
 import {
   DefaultExecutionEventBusManager,
@@ -6,8 +7,9 @@ import {
   ServerCallContext,
 } from '@a2a-js/sdk/server';
 import { Injectable } from '@nestjs/common';
-import { typeid } from 'typeid-js';
 import type { RequestIdentity } from '../auth/identity.guard.js';
+import { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
+import { InboundAdmissionService } from './inbound-admission.service.js';
 import { InboundAgentExecutor } from './inbound-agent.executor.js';
 import { PgTaskStore } from './pg-task.store.js';
 import { PublicationService } from './publication.service.js';
@@ -20,29 +22,21 @@ interface JsonRpcCall {
   requestedVersion?: string;
 }
 
-function withServerIds(body: unknown): unknown {
-  if (typeof body !== 'object' || body === null) {
-    return body;
+class AdmittingRequestHandler extends DefaultRequestHandler {
+  public constructor(
+    private readonly admission: InboundAdmissionService,
+    ...handler: ConstructorParameters<typeof DefaultRequestHandler>
+  ) {
+    super(...handler);
   }
-  const request = structuredClone(body) as Record<string, unknown>;
-  if (!['SendMessage', 'SendStreamingMessage'].includes(String(request.method))) {
-    return request;
+
+  public override async sendMessage(params: SendMessageRequest, context: ServerCallContext) {
+    return super.sendMessage(await this.admission.admit(params, context), context);
   }
-  const params = request.params;
-  if (typeof params !== 'object' || params === null) {
-    return request;
+
+  public override async *sendMessageStream(params: SendMessageRequest, context: ServerCallContext) {
+    yield* super.sendMessageStream(await this.admission.admit(params, context), context);
   }
-  const message = Reflect.get(params, 'message');
-  if (typeof message !== 'object' || message === null) {
-    return request;
-  }
-  if (!Reflect.get(message, 'contextId')) {
-    Reflect.set(message, 'contextId', typeid('ctx').toString());
-  }
-  if (!Reflect.get(message, 'taskId')) {
-    Reflect.set(message, 'taskId', typeid('task').toString());
-  }
-  return request;
 }
 
 @Injectable()
@@ -54,14 +48,20 @@ export class A2aSdkService {
   private readonly buses = new DefaultExecutionEventBusManager();
 
   public constructor(
+    private readonly admission: InboundAdmissionService,
+    private readonly authorization: ResourceAuthorizationService,
     private readonly executor: InboundAgentExecutor,
     private readonly publications: PublicationService,
     private readonly taskStore: PgTaskStore,
   ) {}
 
   public async handleJsonRpc(call: JsonRpcCall) {
-    const card = await this.publications.getAgentCard(call.publicationId);
-    const requestHandler = new DefaultRequestHandler(
+    const card = await this.publications.getTenantAgentCard(
+      call.identity.companyId,
+      call.publicationId,
+    );
+    const requestHandler = new AdmittingRequestHandler(
+      this.admission,
       card,
       this.taskStore,
       this.executor,
@@ -69,8 +69,8 @@ export class A2aSdkService {
       undefined,
       undefined,
       async () => {
-        await this.publications.catalog(call.identity);
-        return this.publications.getAgentCard(call.publicationId);
+        await this.authorization.publication(call.identity, call.publicationId);
+        return card;
       },
     );
     const context = new ServerCallContext({
@@ -83,13 +83,10 @@ export class A2aSdkService {
         ['roles', call.identity.roles],
       ]),
     });
-    const body = withServerIds(call.body);
-    if (typeof body !== 'string' && (typeof body !== 'object' || body === null)) {
-      return new JsonRpcTransportHandler(requestHandler).handle({}, context);
-    }
-    return new JsonRpcTransportHandler(requestHandler).handle(
-      body as string | Record<string, unknown>,
-      context,
-    );
+    const body =
+      typeof call.body === 'string' || (typeof call.body === 'object' && call.body !== null)
+        ? (call.body as string | Record<string, unknown>)
+        : {};
+    return new JsonRpcTransportHandler(requestHandler).handle(body, context);
   }
 }

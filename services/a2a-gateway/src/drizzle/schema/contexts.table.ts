@@ -9,7 +9,7 @@ export const contexts = pgTable(
     companyId: text().notNull(),
     userId: text().notNull(),
     publicationId: text().notNull(),
-    chatId: text().notNull(),
+    chatId: text(),
     ...timestamps,
   },
   (table) => [

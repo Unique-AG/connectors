@@ -14,15 +14,30 @@ export class ContextRepository {
     principal: TenantPrincipal,
     publicationId: string,
     contextId: string,
-    chatId: string,
   ): Promise<void> {
     await this.database.insert(contexts).values({
       id: contextId,
       companyId: principal.companyId,
       userId: principal.userId,
       publicationId,
-      chatId,
     });
+  }
+
+  public async attachChat(
+    principal: TenantPrincipal,
+    contextId: string,
+    chatId: string,
+  ): Promise<void> {
+    await this.database
+      .update(contexts)
+      .set({ chatId, updatedAt: new Date() })
+      .where(
+        and(
+          eq(contexts.id, contextId),
+          eq(contexts.companyId, principal.companyId),
+          eq(contexts.userId, principal.userId),
+        ),
+      );
   }
 
   public async findOwned(principal: TenantPrincipal, publicationId: string, contextId: string) {

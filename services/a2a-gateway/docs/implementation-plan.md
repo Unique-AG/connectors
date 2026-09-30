@@ -64,7 +64,7 @@ Missing required config → readiness fails; no surface is mounted without its g
 
 Implemented on current surfaces: human-identity guard/bootstrap, publication/connection management authorization, encrypted shared credentials, tenant/owner/publication-scoped task storage and core deployment/rollout capability contract. See [OAuth onboarding](./oauth-onboarding.md).
 
-Pending later epics: real cards/catalog/RPC/task/artifact handlers, connection test/delete, UI, and core external-space model/dispatch/clone/import paths. KRA-30 must add `executionProvider`/`a2aConnectionId` to the core assistant queries before credential-provider invocation can succeed (it currently fails closed). Wire the shared authorization services into those paths and test active-run completion/reconnect/cancellation there. External-space publication prevention cannot be validated end-to-end until that core model exists.
+KRA-13 (native publication): cards, caller-filtered catalog, extended card, JSON-RPC send/get/list/cancel/subscribe and deletion reconcile are implemented. Pending: file artifacts, push notifications, recovery of tasks left `WORKING` by a replica restart, connection test/delete and core external-space clone/import paths. KRA-30 must add `executionProvider`/`a2aConnectionId` to the core assistant queries before credential-provider invocation can succeed (it currently fails closed). Wire the shared authorization services into those paths and test active-run completion/reconnect/cancellation there. External-space publication prevention cannot be validated end-to-end until that core model exists.
 
 ## Outside this service
 

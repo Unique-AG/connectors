@@ -10,6 +10,8 @@ import {
 } from '../management/publication-configuration.js';
 import { UniqueInternalError } from '../unique/unique-internal.error.js';
 
+type Publication = NonNullable<Awaited<ReturnType<PublicationRepository['findById']>>>;
+
 export interface CatalogAgent {
   publicationId: string;
   name: string;
@@ -34,7 +36,49 @@ export class PublicationService {
   ) {}
 
   public async getAgentCard(publicationId: string): Promise<AgentCard> {
-    const publication = await this.publications.findEnabledById(publicationId);
+    return this.buildCard(await this.publications.findEnabledById(publicationId));
+  }
+
+  /** Includes disabled publications so existing tasks stay readable and cancelable (D-11). */
+  public async getTenantAgentCard(companyId: string, publicationId: string): Promise<AgentCard> {
+    return this.buildCard(await this.publications.findById(companyId, publicationId));
+  }
+
+  public async catalog(identity: RequestIdentity): Promise<CatalogAgent[]> {
+    const publications = await this.publications.listEnabled(identity.companyId);
+    const visible = await Promise.all(
+      publications.map(async (publication): Promise<CatalogAgent | undefined> => {
+        try {
+          await this.authorization.useSpace(identity, publication.assistantId);
+        } catch (error) {
+          if (
+            error instanceof ForbiddenException ||
+            error instanceof NotFoundException ||
+            (error instanceof UniqueInternalError &&
+              ['NOT_FOUND', 'UNAUTHORIZED'].includes(error.code))
+          ) {
+            return undefined;
+          }
+          throw error;
+        }
+        const card = publicationCardSchema.safeParse(publication.cardOverrides);
+        if (!card.success) {
+          return undefined;
+        }
+        const endpoint = agentUrl(this.config.publicBaseUrl, publication.id);
+        return {
+          publicationId: publication.id,
+          name: card.data.name,
+          description: card.data.description,
+          cardUrl: new URL(`${endpoint.toString()}/.well-known/agent-card.json`).toString(),
+          agentUrl: endpoint.toString(),
+        };
+      }),
+    );
+    return visible.filter((agent): agent is CatalogAgent => agent !== undefined);
+  }
+
+  private buildCard(publication: Publication | undefined): AgentCard {
     if (!publication) {
       throw new NotFoundException('publication not found');
     }
@@ -92,39 +136,5 @@ export class PublicationService {
       })),
       signatures: [],
     };
-  }
-
-  public async catalog(identity: RequestIdentity): Promise<CatalogAgent[]> {
-    const publications = await this.publications.listEnabled(identity.companyId);
-    const visible = await Promise.all(
-      publications.map(async (publication): Promise<CatalogAgent | undefined> => {
-        try {
-          await this.authorization.useSpace(identity, publication.assistantId);
-        } catch (error) {
-          if (
-            error instanceof ForbiddenException ||
-            error instanceof NotFoundException ||
-            (error instanceof UniqueInternalError &&
-              ['NOT_FOUND', 'UNAUTHORIZED'].includes(error.code))
-          ) {
-            return undefined;
-          }
-          throw error;
-        }
-        const card = publicationCardSchema.safeParse(publication.cardOverrides);
-        if (!card.success) {
-          return undefined;
-        }
-        const endpoint = agentUrl(this.config.publicBaseUrl, publication.id);
-        return {
-          publicationId: publication.id,
-          name: card.data.name,
-          description: card.data.description,
-          cardUrl: new URL(`${endpoint.toString()}/.well-known/agent-card.json`).toString(),
-          agentUrl: endpoint.toString(),
-        };
-      }),
-    );
-    return visible.filter((agent): agent is CatalogAgent => agent !== undefined);
   }
 }

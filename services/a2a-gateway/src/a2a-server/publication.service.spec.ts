@@ -33,6 +33,7 @@ const publication = {
 
 function service(
   publications: {
+    findById?: ReturnType<typeof vi.fn>;
     findEnabledById?: ReturnType<typeof vi.fn>;
     listEnabled?: ReturnType<typeof vi.fn>;
   },
@@ -64,6 +65,16 @@ describe('PublicationService', () => {
     expect(result.skills).toEqual([expect.objectContaining({ id: 'research' })]);
     expect(JSON.stringify(result)).not.toContain('assistant-1');
     expect(JSON.stringify(result)).not.toContain('company-1');
+  });
+
+  it('keeps the tenant card of a disabled publication for existing tasks', async () => {
+    const findById = vi.fn().mockResolvedValue({ ...publication, enabled: false });
+    const subject = service({ findById });
+
+    await expect(subject.getTenantAgentCard('company-1', 'pub-1')).resolves.toMatchObject({
+      name: 'Research agent',
+    });
+    expect(findById).toHaveBeenCalledWith('company-1', 'pub-1');
   });
 
   it('returns only publications the current user may use', async () => {

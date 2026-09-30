@@ -24,7 +24,8 @@ Mapping:
 | `taskId` | one user message + its assistant turn (`userMessageId`) |
 | `Message` (ROLE_USER) with new `contextId`/no `taskId` | `messageCreate` in that chat |
 | `Message` with `taskId` of a task in `INPUT_REQUIRED`/`AUTH_REQUIRED` | `elicitationRespond` (never a new run) |
-| `Message` with `taskId` of a task in a terminal state | error `-32602` — "task is terminal, send a new message in the same context" |
+| `Message` with `taskId` of a task that is not `INPUT_REQUIRED`/`AUTH_REQUIRED` | `UnsupportedOperationError` — send a new message in the same context |
+| `Message` with an unknown or foreign `contextId` | `-32602` (`INVALID_PARAMS`) |
 | `TASK_STATE_WORKING` | assistant message streaming |
 | `TASK_STATE_INPUT_REQUIRED` | pending `Elicitation` mode `FORM` (schema in status message `data` part) |
 | `TASK_STATE_AUTH_REQUIRED` | pending `Elicitation` mode `URL` (url in status message) |
@@ -33,7 +34,9 @@ Mapping:
 | `TASK_STATE_FAILED` | run error, elicitation declined/expired |
 | final `Artifact` | assistant text (`text`), references (`data`, `metadata.kind = "unique.references"`), generated chat files (`file` with gateway download URI) |
 
-Concurrency: one active task per `contextId`. A `SendMessage` while a task is active returns `-32602` with `ErrorInfo.reason = CONTEXT_BUSY`.
+Concurrency: one active task per `contextId`. A `SendMessage` while a task is active returns `-32602` with `ErrorInfo.reason = CONTEXT_BUSY`. Sends are validated and reserved as `SUBMITTED` before any native run starts, so rejected requests never create a Unique message.
+
+`PUT` of a configuration identical to the stored one succeeds without a version bump, so retries after a lost response are safe.
 
 Never exposed: internal tool traces, prompts, `debugInfo`, model names, assistant ids, other users' tasks.
 
@@ -45,7 +48,7 @@ Caller: Unique frontend directly (not via core) through Kong (JWT → identity h
 | --- | --- | --- |
 | `GET` | `/management/publications?assistantId=` | caller has read access to the space |
 | `PUT` | `/management/publications/{assistantId}` | caller manages the space; space is native (`executionProvider != A2A`); body: `enabled`, `card` (allowed fields), `skills` |
-| `DELETE` | `/management/publications/{assistantId}` | same; running tasks finish, new sends rejected |
+| `DELETE` | `/management/publications/{assistantId}` | same; running tasks finish and stay readable/cancelable, new sends rejected, public card 404 |
 | `GET/POST/PUT/DELETE` | `/management/connections[/{id}]` | roles `ADMIN_SPACE_WRITE` or `SPACE_MANAGER`; credentials write-only (never returned) |
 | `POST` | `/management/connections/{id}/test` | fetch + validate remote Agent Card, store negotiated capabilities, return supported interaction matrix (pending) |
 | `DELETE` | `/management/connections/{id}/credentials` | revoke credentials and disable the connection; requires `If-Match`; retains configuration |
@@ -63,7 +66,7 @@ Cluster-local only. Caller: `node-chat` with effective-user headers (`x-user-id`
 | `POST` | `/internal/executions/{executionId}/cancel` | User stopped the message in Unique → `CancelTask` on the remote |
 | `POST` | `/internal/executions/{executionId}/elicitation-response` | Core-side elicitation answered/declined/expired → `{ elicitationId, action, content? }`; gateway emits the workflow event, the suspended run continues with a follow-up message carrying the remote `taskId` (D-08) |
 | `GET` | `/internal/connections/{connectionId}` | Redacted connection summary + negotiated capabilities for the space settings UI |
-| `POST` | `/internal/publications/reconcile` | Core notifies space deletion/type change; gateway disables the publication |
+| `POST` | `/internal/publications/reconcile` | node-chat calls it best effort after space deletion; gateway disables the publication. Invocation fails closed on the live space check even if the call is missed. |
 
 ## 4. Core operations the gateway consumes (identity-preserving client, KRA-21)
 

@@ -8,6 +8,13 @@
       "when": 1790092175760,
       "tag": "0000_first_screwball",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790761990842,
+      "tag": "0001_context_chat_after_admission",
+      "breakpoints": true
     }
   ]
 }

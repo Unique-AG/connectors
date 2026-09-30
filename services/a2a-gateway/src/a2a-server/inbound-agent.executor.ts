@@ -1,19 +1,21 @@
-import { type Message, Role, type Task, TaskState, type TaskStatus } from '@a2a-js/sdk';
+import assert from 'node:assert';
+import { Role, type Task, TaskState, type TaskStatus } from '@a2a-js/sdk';
 import {
   AgentEvent,
   type AgentExecutor,
   type ExecutionEventBus,
   type RequestContext,
 } from '@a2a-js/sdk/server';
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import type { RequestIdentity } from '../auth/identity.guard.js';
-import { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { ContextRepository } from '../drizzle/context.repository.js';
 import { PublicationRepository } from '../drizzle/publication.repository.js';
 import { ChatEventConsumer } from '../event-bus/chat-event.consumer.js';
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
+import { UniqueInternalError } from '../unique/unique-internal.error.js';
+import { awaitsInput, callIdentity, callPublicationId, messageText } from './call-context.js';
 import { PgTaskStore } from './pg-task.store.js';
 
 const createdMessageSchema = z.object({
@@ -37,65 +39,38 @@ type ExecutionOutcome =
   | { kind: 'completed'; message: z.infer<typeof completedMessageSchema> }
   | { kind: 'elicitation'; elicitation: z.infer<typeof elicitationSchema> };
 
-function requestIdentity(context: RequestContext['context']): RequestIdentity {
-  const userId = context.user?.isAuthenticated ? context.user.userName : undefined;
-  const roles = context.state.get('roles');
-  if (!context.tenant || !userId) {
-    throw new NotFoundException('publication not found');
-  }
-  return {
-    companyId: context.tenant,
-    userId,
-    roles: Array.isArray(roles)
-      ? roles.filter((role): role is string => typeof role === 'string')
-      : [],
-  };
-}
-
-function publicationId(context: RequestContext['context']): string {
-  const value = context.state.get('publicationId');
-  if (typeof value !== 'string' || !value) {
-    throw new NotFoundException('publication not found');
-  }
-  return value;
-}
-
-function messageText(message: Message): string {
-  const values = message.parts.map((part) => {
-    if (part.content?.$case === 'text') {
-      return part.content.value;
-    }
-    if (part.content?.$case === 'data') {
-      return `\n\n\`\`\`json\n${JSON.stringify(part.content.value, null, 2)}\n\`\`\``;
-    }
-    throw new BadRequestException('only text and data message parts are supported');
-  });
-  const text = values.join('').trim();
-  if (!text) {
-    throw new BadRequestException('message content is required');
-  }
-  return text;
-}
-
 function status(state: TaskState): TaskStatus {
   return { state, message: undefined, timestamp: new Date().toISOString() };
 }
 
-function task(request: RequestContext, state: TaskState): Task {
+function failedStatus(request: RequestContext): TaskStatus {
   return {
-    id: request.taskId,
-    contextId: request.contextId,
-    status: status(state),
-    artifacts: [],
-    history: [request.userMessage],
-    metadata: undefined,
+    ...status(TaskState.TASK_STATE_FAILED),
+    message: {
+      messageId: `failure-${request.taskId}`,
+      contextId: request.contextId,
+      taskId: request.taskId,
+      role: Role.ROLE_AGENT,
+      parts: [
+        {
+          content: { $case: 'text', value: 'The space could not complete this request.' },
+          metadata: undefined,
+          filename: '',
+          mediaType: 'text/plain',
+        },
+      ],
+      metadata: undefined,
+      extensions: [],
+      referenceTaskIds: [],
+    },
   };
 }
 
 @Injectable()
 export class InboundAgentExecutor implements AgentExecutor {
+  private readonly logger = new Logger(InboundAgentExecutor.name);
+
   public constructor(
-    private readonly authorization: ResourceAuthorizationService,
     private readonly contexts: ContextRepository,
     private readonly events: ChatEventConsumer,
     private readonly publications: PublicationRepository,
@@ -105,84 +80,32 @@ export class InboundAgentExecutor implements AgentExecutor {
   ) {}
 
   public async execute(request: RequestContext, eventBus: ExecutionEventBus): Promise<void> {
-    const identity = requestIdentity(request.context);
-    const currentPublicationId = publicationId(request.context);
-    await this.authorization.publication(identity, currentPublicationId, true);
-    const publication = await this.publications.findEnabledById(currentPublicationId);
-    if (!publication) {
-      throw new NotFoundException('publication not found');
-    }
-
-    if (request.task) {
-      if (
-        request.task.status?.state !== TaskState.TASK_STATE_INPUT_REQUIRED &&
-        request.task.status?.state !== TaskState.TASK_STATE_AUTH_REQUIRED
-      ) {
-        throw new BadRequestException('task is terminal; send a new message in the same context');
-      }
-      const storedTask = await this.contexts.findTask(request.taskId);
-      if (!storedTask?.assistantMessageId) {
-        throw new NotFoundException('task not found');
-      }
-      const elicitation = z
-        .object({ id: z.string().min(1) })
-        .parse(await this.unique.getPendingElicitation(identity, storedTask.assistantMessageId));
-      await this.unique.respondToElicitation(
-        identity,
-        elicitation.id,
-        'ACCEPT',
-        messageText(request.userMessage),
-      );
+    const current = request.task;
+    assert.ok(current, 'task was not admitted');
+    try {
+      const identity = callIdentity(request.context);
+      const outcome = awaitsInput(current)
+        ? await this.resume(request, current, identity, eventBus)
+        : await this.start(request, current, identity, eventBus);
+      this.publishOutcome(request, eventBus, outcome);
+    } catch (error) {
+      this.logger.error({ msg: 'native execution failed', taskId: request.taskId, err: error });
+      const failed: Task = { ...current, status: failedStatus(request) };
+      eventBus.publish(AgentEvent.task(failed));
       eventBus.publish(
-        AgentEvent.task({
-          ...request.task,
-          status: status(TaskState.TASK_STATE_WORKING),
-          history: [...request.task.history, request.userMessage],
+        AgentEvent.statusUpdate({
+          taskId: request.taskId,
+          contextId: request.contextId,
+          status: failed.status,
+          metadata: undefined,
         }),
       );
-      const outcome = await this.waitForOutcome(
-        identity,
-        storedTask.chatId,
-        storedTask.assistantMessageId,
-      );
-      this.publishOutcome(request, eventBus, outcome);
-      return;
     }
-
-    const existingContext = await this.contexts.findOwned(
-      identity,
-      currentPublicationId,
-      request.contextId,
-    );
-    const created = createdMessageSchema.parse(
-      await this.unique.createMessage(
-        identity,
-        publication.assistantId,
-        existingContext?.chatId,
-        messageText(request.userMessage),
-      ),
-    );
-    if (!existingContext) {
-      await this.contexts.create(identity, currentPublicationId, request.contextId, created.chatId);
-    }
-
-    const [assistantMessage] = created.messages;
-    if (!assistantMessage) {
-      throw new Error('assistant message was not created');
-    }
-    const assistantMessageId = assistantMessage.id;
-    const workingTask = task(request, TaskState.TASK_STATE_WORKING);
-    await this.taskStore.save(workingTask, request.context);
-    await this.contexts.attachMessages(identity, request.taskId, created.id, assistantMessageId);
-    eventBus.publish(AgentEvent.task(workingTask));
-
-    const outcome = await this.waitForOutcome(identity, created.chatId, assistantMessageId);
-    this.publishOutcome(request, eventBus, outcome);
   }
 
   public async cancelTask(taskId: string, eventBus: ExecutionEventBus): Promise<void> {
     const storedTask = await this.contexts.findTask(taskId);
-    if (!storedTask?.assistantMessageId) {
+    if (!storedTask?.assistantMessageId || !storedTask.chatId) {
       throw new NotFoundException('task not found');
     }
     await this.unique.stopMessage(
@@ -198,6 +121,61 @@ export class InboundAgentExecutor implements AgentExecutor {
         metadata: undefined,
       }),
     );
+  }
+
+  private async start(
+    request: RequestContext,
+    current: Task,
+    identity: RequestIdentity,
+    eventBus: ExecutionEventBus,
+  ): Promise<ExecutionOutcome> {
+    const publicationId = callPublicationId(request.context);
+    const publication = await this.publications.findById(identity.companyId, publicationId);
+    const context = await this.contexts.findOwned(identity, publicationId, request.contextId);
+    if (!publication?.enabled || !context) {
+      throw new NotFoundException('publication not found');
+    }
+    const created = createdMessageSchema.parse(
+      await this.unique.createMessage(
+        identity,
+        publication.assistantId,
+        context.chatId ?? undefined,
+        messageText(request.userMessage),
+      ),
+    );
+    if (!context.chatId) {
+      await this.contexts.attachChat(identity, request.contextId, created.chatId);
+    }
+    const assistantMessageId = created.messages[0]?.id;
+    assert.ok(assistantMessageId, 'assistant message was not created');
+    const working: Task = { ...current, status: status(TaskState.TASK_STATE_WORKING) };
+    await this.taskStore.save(working, request.context);
+    await this.contexts.attachMessages(identity, request.taskId, created.id, assistantMessageId);
+    eventBus.publish(AgentEvent.task(working));
+    return this.waitForOutcome(identity, created.chatId, assistantMessageId);
+  }
+
+  private async resume(
+    request: RequestContext,
+    current: Task,
+    identity: RequestIdentity,
+    eventBus: ExecutionEventBus,
+  ): Promise<ExecutionOutcome> {
+    const storedTask = await this.contexts.findTask(request.taskId);
+    if (!storedTask?.assistantMessageId || !storedTask.chatId) {
+      throw new NotFoundException('task not found');
+    }
+    const elicitation = z
+      .object({ id: z.string().min(1) })
+      .parse(await this.unique.getPendingElicitation(identity, storedTask.assistantMessageId));
+    await this.unique.respondToElicitation(
+      identity,
+      elicitation.id,
+      'ACCEPT',
+      messageText(request.userMessage),
+    );
+    eventBus.publish(AgentEvent.task({ ...current, status: status(TaskState.TASK_STATE_WORKING) }));
+    return this.waitForOutcome(identity, storedTask.chatId, storedTask.assistantMessageId);
   }
 
   private publishOutcome(
@@ -287,52 +265,81 @@ export class InboundAgentExecutor implements AgentExecutor {
     );
   }
 
-  private async waitForOutcome(
+  private waitForOutcome(
     identity: RequestIdentity,
     chatId: string,
     assistantMessageId: string,
   ): Promise<ExecutionOutcome> {
-    const deadline = Date.now() + this.config.streamTimeoutMs;
     return new Promise((resolve, reject) => {
-      let timer: NodeJS.Timeout | undefined;
-      const unsubscribe = this.events.subscribe(
-        identity.companyId,
-        assistantMessageId,
-        async (event) => {
-          if (event.type === 'unique.chat.elicitation.created') {
-            const elicitation = elicitationSchema.parse(event.payload);
-            cleanup();
-            resolve({ kind: 'elicitation', elicitation });
-            return;
-          }
-          if (event.type !== 'unique.chat.assistant-message.finished') {
-            return;
-          }
-          try {
-            const message = completedMessageSchema.parse(
+      let settled = false;
+      const settle = (outcome: () => Promise<ExecutionOutcome | undefined>): void => {
+        outcome().then(
+          (result) => {
+            if (result && !settled) {
+              settled = true;
+              cleanup();
+              resolve(result);
+            }
+          },
+          (error: unknown) => {
+            if (!settled) {
+              settled = true;
+              cleanup();
+              reject(error);
+            }
+          },
+        );
+      };
+      const unsubscribe = this.events.subscribe(identity.companyId, assistantMessageId, (event) => {
+        if (event.type === 'unique.chat.elicitation.created') {
+          settle(async () => ({
+            kind: 'elicitation',
+            elicitation: elicitationSchema.parse(event.payload),
+          }));
+        } else if (event.type === 'unique.chat.assistant-message.finished') {
+          settle(async () => ({
+            kind: 'completed',
+            message: completedMessageSchema.parse(
               await this.unique.getMessage(identity, chatId, assistantMessageId),
-            );
-            cleanup();
-            resolve({ kind: 'completed', message });
-          } catch (error) {
-            cleanup();
-            reject(error);
-          }
-        },
-      );
+            ),
+          }));
+        }
+      });
+      const timer = setTimeout(() => {
+        settle(() => Promise.reject(new Error('native execution timed out')));
+      }, this.config.streamTimeoutMs);
       const cleanup = (): void => {
         unsubscribe();
-        if (timer) {
-          clearTimeout(timer);
-        }
+        clearTimeout(timer);
       };
-      timer = setTimeout(
-        () => {
-          cleanup();
-          reject(new Error('native execution timed out'));
-        },
-        Math.max(1, deadline - Date.now()),
-      );
+      // The run may already have finished or paused before the subscription existed.
+      settle(() => this.currentOutcome(identity, chatId, assistantMessageId));
     });
+  }
+
+  private async currentOutcome(
+    identity: RequestIdentity,
+    chatId: string,
+    assistantMessageId: string,
+  ): Promise<ExecutionOutcome | undefined> {
+    const message = completedMessageSchema.parse(
+      await this.unique.getMessage(identity, chatId, assistantMessageId),
+    );
+    if (message.completedAt || message.stoppedStreamingAt) {
+      return { kind: 'completed', message };
+    }
+    try {
+      return {
+        kind: 'elicitation',
+        elicitation: elicitationSchema.parse(
+          await this.unique.getPendingElicitation(identity, assistantMessageId),
+        ),
+      };
+    } catch (error) {
+      if (error instanceof UniqueInternalError && error.code === 'NOT_FOUND') {
+        return undefined;
+      }
+      throw error;
+    }
   }
 }
