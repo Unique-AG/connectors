@@ -8,6 +8,6 @@ import { EgressService } from './egress.service.js';
 @Module({
   imports: [PersistenceModule, UniqueModule],
   providers: [ConnectionService, CredentialProviderService, EgressService],
-  exports: [ConnectionService, CredentialProviderService],
+  exports: [ConnectionService, CredentialProviderService, EgressService],
 })
 export class CredentialsModule {}

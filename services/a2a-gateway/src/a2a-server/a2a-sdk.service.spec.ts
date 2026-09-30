@@ -75,6 +75,7 @@ function subject() {
     authorization as unknown as ResourceAuthorizationService,
     contexts as unknown as ContextRepository,
     taskStore as unknown as PgTaskStore,
+    config,
   );
   return {
     service: new A2aSdkService(

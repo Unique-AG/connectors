@@ -1,10 +1,12 @@
 import { type Task, TaskState } from '@a2a-js/sdk';
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type { JsonObject, TaskContext } from 'absurd-sdk';
+import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { MaintenanceService } from '../workflow/maintenance.service.js';
 import { WorkflowService } from '../workflow/workflow.service.js';
 import {
   failedStatus,
+  fileUrlFor,
   isTerminal,
   outcomeArtifacts,
   outcomeStatus,
@@ -25,6 +27,7 @@ interface InboundWatchParams extends JsonObject {
   chatId: string;
   userMessageId: string;
   messageId: string;
+  publicationId: string;
 }
 
 const UNKNOWN_STATE =
@@ -44,6 +47,7 @@ export class InboundRecovery implements OnModuleInit {
     private readonly observer: NativeRunObserver,
     private readonly taskStore: PgTaskStore,
     private readonly workflow: WorkflowService,
+    @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
   public onModuleInit(): void {
@@ -77,6 +81,7 @@ export class InboundRecovery implements OnModuleInit {
         chatId: orphan.chatId,
         userMessageId: orphan.userMessageId,
         messageId: orphan.assistantMessageId,
+        publicationId: orphan.publicationId,
       };
       await this.workflow.spawn(INBOUND_WATCH_TASK, params, {
         idempotencyKey: `${orphan.id}:watch:${Math.floor(Date.now() / ORPHANED_AFTER_MS)}`,
@@ -119,7 +124,11 @@ export class InboundRecovery implements OnModuleInit {
     await this.taskStore.systemSave(params.companyId, {
       ...snapshot,
       status: outcomeStatus(snapshot, outcome),
-      artifacts: outcomeArtifacts(snapshot.id, outcome),
+      artifacts: outcomeArtifacts(
+        snapshot.id,
+        outcome,
+        fileUrlFor(this.config.publicBaseUrl, params.publicationId, snapshot.id),
+      ),
     });
     return { state: outcome.kind };
   }

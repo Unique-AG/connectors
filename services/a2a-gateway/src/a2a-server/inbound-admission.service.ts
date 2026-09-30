@@ -1,12 +1,13 @@
 import { type SendMessageRequest, type Task, TaskState } from '@a2a-js/sdk';
 import { RequestMalformedError, UnsupportedOperationError } from '@a2a-js/sdk/errors';
 import type { ServerCallContext } from '@a2a-js/sdk/server';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { typeid } from 'typeid-js';
 import { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
+import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { ContextRepository } from '../drizzle/context.repository.js';
 import { isUniqueViolation } from '../drizzle/unique-violation.js';
-import { awaitsInput, callIdentity, callPublicationId, messageText } from './call-context.js';
+import { awaitsInput, callIdentity, callPublicationId, messageContent } from './call-context.js';
 import { PgTaskStore } from './pg-task.store.js';
 
 function contextBusy(): RequestMalformedError {
@@ -28,6 +29,7 @@ export class InboundAdmissionService {
     private readonly authorization: ResourceAuthorizationService,
     private readonly contexts: ContextRepository,
     private readonly taskStore: PgTaskStore,
+    @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
   public async admit(params: SendMessageRequest, context: ServerCallContext): Promise<Admission> {
@@ -38,7 +40,7 @@ export class InboundAdmissionService {
     const identity = callIdentity(context);
     const publicationId = callPublicationId(context);
     await this.authorization.publication(identity, publicationId, true);
-    messageText(message);
+    messageContent(message, this.config.maxRemoteFileBytes);
 
     if (message.taskId) {
       const task = await this.taskStore.load(message.taskId, context);

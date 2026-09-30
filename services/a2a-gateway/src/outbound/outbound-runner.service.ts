@@ -20,8 +20,16 @@ import {
 import type { JsonValue, TaskContext } from 'absurd-sdk';
 import { z } from 'zod';
 import type { RequestIdentity } from '../auth/identity.guard.js';
+import { type ChatFile, ChatFilesService } from '../bridge/chat-files.service.js';
+import {
+  acceptsMediaType,
+  isAllowedMediaType,
+  normalizeMediaType,
+  safeFilename,
+} from '../bridge/file-policy.js';
 import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { CredentialProviderService } from '../credentials/credential-provider.service.js';
+import { EgressService } from '../credentials/egress.service.js';
 import { ConnectionRepository } from '../drizzle/connection.repository.js';
 import {
   ACTIVE_EXECUTION_STATES,
@@ -32,7 +40,7 @@ import {
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
 import { UniqueInternalError } from '../unique/unique-internal.error.js';
 import { WorkflowService } from '../workflow/workflow.service.js';
-import { ChatWriter } from './chat-writer.js';
+import { type ChatReference, ChatWriter } from './chat-writer.js';
 import { OUTBOUND_RUN_TASK, type OutboundRunParams } from './outbound-execution.service.js';
 import { RemoteTurn, renderParts } from './remote-turn.js';
 
@@ -42,6 +50,8 @@ const MAX_CONSECUTIVE_POLL_FAILURES = 12;
 const OUTPUT_MODES = ['text/plain', 'text/markdown', 'application/json'];
 
 const userMessage = z.object({ text: z.string().nullish() });
+
+const fileSelection = z.object({ fileIds: z.array(z.string()).optional() });
 
 const abortState = z.object({ userAbortedAt: z.string().nullish() });
 
@@ -55,7 +65,19 @@ class Outcome {
     public readonly state: OutcomeState,
     public readonly text: string,
     public readonly reason?: string,
+    public readonly references: ChatReference[] = [],
   ) {}
+}
+
+interface MaterializedFile {
+  markdown: string;
+  reference?: ChatReference;
+}
+
+interface RemoteSession {
+  client: Client;
+  card: AgentCard;
+  fetchImpl: typeof fetch;
 }
 
 class Interrupted extends Error {
@@ -81,6 +103,8 @@ const MESSAGES = {
   interaction:
     'The external agent needs additional input or authorization, which this space does not support yet.',
   empty: 'The external agent returned no answer.',
+  fileType: 'The external agent does not accept the attached file type',
+  fileTooLarge: 'An attached file exceeds the size limit for external agents.',
 } as const;
 
 function textPart(value: string): Part {
@@ -123,6 +147,8 @@ export class OutboundRunner implements OnModuleInit {
     private readonly executions: ExecutionRepository,
     private readonly unique: UniqueInternalClient,
     private readonly workflow: WorkflowService,
+    private readonly chatFiles: ChatFilesService,
+    private readonly egress: EgressService,
     @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
@@ -188,7 +214,8 @@ export class OutboundRunner implements OnModuleInit {
     writer: ChatWriter,
     context: TaskContext,
   ): Promise<Outcome> {
-    const { client, card } = await this.connect(execution, identity);
+    const session = await this.connect(execution, identity);
+    const { client, card } = session;
     const deadlineAt = execution.deadlineAt ?? new Date(Date.now() + this.config.streamTimeoutMs);
     if (!execution.deadlineAt) {
       await this.executions.transition(identity, execution.id, execution.state as ExecutionState, {
@@ -220,7 +247,7 @@ export class OutboundRunner implements OnModuleInit {
     try {
       await this.watch(execution, identity, deadlineAt, context, async (signal) => {
         if (!execution.remoteTaskId) {
-          await this.send(execution, identity, client, streaming, turn, onUpdate, signal);
+          await this.send(execution, identity, session, streaming, turn, onUpdate, signal);
         } else {
           turn.taskId = execution.remoteTaskId;
           await this.resume(client, streaming, turn, onUpdate, signal);
@@ -233,13 +260,13 @@ export class OutboundRunner implements OnModuleInit {
       }
       throw peerFailure(error) ?? error;
     }
-    return this.settle(turn);
+    const outcome = this.settle(turn);
+    return outcome.state === 'completed'
+      ? this.withFiles(turn, execution, identity, session, context)
+      : outcome;
   }
 
-  private async connect(
-    execution: Execution,
-    identity: RequestIdentity,
-  ): Promise<{ client: Client; card: AgentCard }> {
+  private async connect(execution: Execution, identity: RequestIdentity): Promise<RemoteSession> {
     const connection = await this.connections.find(identity.companyId, execution.connectionId);
     if (!connection || connection.disabledAt || !connection.agentCardSnapshot) {
       throw new Outcome('failed', MESSAGES.connection, 'connection');
@@ -269,23 +296,24 @@ export class OutboundRunner implements OnModuleInit {
     if (client.protocolVersion !== '1.0') {
       throw new Outcome('failed', MESSAGES.version, 'version');
     }
-    return { client, card };
+    return { client, card, fetchImpl };
   }
 
   /** Sends the turn at most once: a crash after `sending` is reported, never re-sent. */
   private async send(
     execution: Execution,
     identity: RequestIdentity,
-    client: Client,
+    session: RemoteSession,
     streaming: boolean,
     turn: RemoteTurn,
     onUpdate: () => Promise<void>,
     signal: AbortSignal,
   ): Promise<void> {
+    const { client } = session;
     if (execution.state === 'sending') {
       throw new Outcome('unknown', MESSAGES.unknown, 'ambiguous-send');
     }
-    const message = await this.remoteMessage(execution, identity);
+    const message = await this.remoteMessage(execution, identity, session.card);
     await this.executions.transition(identity, execution.id, 'sending');
     const request = {
       tenant: '',
@@ -504,7 +532,7 @@ export class OutboundRunner implements OnModuleInit {
     try {
       if (!(await writer.isClosed())) {
         if (outcome.state === 'completed') {
-          await writer.complete(outcome.text);
+          await writer.complete(outcome.text, outcome.references);
         } else {
           await writer.fail(outcome.text);
         }
@@ -527,7 +555,11 @@ export class OutboundRunner implements OnModuleInit {
     });
   }
 
-  private async remoteMessage(execution: Execution, identity: RequestIdentity): Promise<Message> {
+  private async remoteMessage(
+    execution: Execution,
+    identity: RequestIdentity,
+    card: AgentCard,
+  ): Promise<Message> {
     const turn = userMessage.parse(
       await this.unique.getMessage(identity, execution.chatId, execution.userMessageId),
     );
@@ -545,7 +577,7 @@ export class OutboundRunner implements OnModuleInit {
       contextId: remoteContext?.remoteContextId ?? '',
       taskId: '',
       role: Role.ROLE_USER,
-      parts: [textPart(turn.text)],
+      parts: [textPart(turn.text), ...(await this.inputFiles(execution, identity, card))],
       metadata: undefined,
       extensions: [],
       referenceTaskIds: [],
@@ -553,5 +585,158 @@ export class OutboundRunner implements OnModuleInit {
   }
 
   private readonly renderFile = (part: Part): string =>
-    `_The external agent returned a file (${part.filename || part.mediaType || 'unnamed'}) that cannot be displayed yet._`;
+    `_Receiving ${safeFilename(part.filename, 'a file')}..._`;
+
+  /** Sends the turn's chat uploads as file parts, or refuses the turn if the peer cannot take them. */
+  private async inputFiles(
+    execution: Execution,
+    identity: RequestIdentity,
+    card: AgentCard,
+  ): Promise<Part[]> {
+    const fileIds = fileSelection.safeParse(execution.correlation).data?.fileIds ?? [];
+    const parts: Part[] = [];
+    for (const fileId of fileIds) {
+      let file: ChatFile;
+      try {
+        file = await this.chatFiles.download(identity, execution.chatId, fileId);
+      } catch (error) {
+        if (error instanceof UniqueInternalError && error.code === 'TOO_LARGE') {
+          throw new Outcome('failed', MESSAGES.fileTooLarge, 'input-file-size');
+        }
+        throw error;
+      }
+      const mediaType = normalizeMediaType(file.mimeType);
+      if (
+        !isAllowedMediaType(mediaType) ||
+        !acceptsMediaType(card.defaultInputModes ?? [], mediaType)
+      ) {
+        throw new Outcome('failed', `${MESSAGES.fileType} (${mediaType})`, 'input-file-type');
+      }
+      parts.push({
+        content: { $case: 'raw', value: file.bytes },
+        metadata: undefined,
+        filename: safeFilename(file.filename, fileId),
+        mediaType,
+      });
+    }
+    return parts;
+  }
+
+  /**
+   * Stores the remote files of a completed answer in the chat and links them as references. The
+   * upload runs as one absurd step, so a retried run never uploads the same files twice.
+   */
+  private async withFiles(
+    turn: RemoteTurn,
+    execution: Execution,
+    identity: RequestIdentity,
+    session: RemoteSession,
+    context: TaskContext,
+  ): Promise<Outcome> {
+    const parts = turn.answerParts();
+    const files = parts.filter(
+      (part) => part.content?.$case === 'raw' || part.content?.$case === 'url',
+    );
+    if (!files.length) {
+      return this.settle(turn);
+    }
+    const materialized = await context.step('answer-files', () =>
+      Promise.all(
+        files.map((part, index) => this.materialize(part, index + 1, execution, identity, session)),
+      ),
+    );
+    const rendered = new Map(files.map((part, index) => [part, materialized[index]]));
+    const text = renderParts(parts, (part) => rendered.get(part)?.markdown ?? '');
+    const references = materialized.flatMap((file) => (file.reference ? [file.reference] : []));
+    return new Outcome('completed', text || MESSAGES.empty, undefined, references);
+  }
+
+  private async materialize(
+    part: Part,
+    number: number,
+    execution: Execution,
+    identity: RequestIdentity,
+    session: RemoteSession,
+  ): Promise<MaterializedFile> {
+    const filename = safeFilename(part.filename, `file-${number}`);
+    let mediaType = normalizeMediaType(part.mediaType);
+    let bytes: Buffer | undefined;
+    const content = part.content;
+    if (content?.$case === 'raw') {
+      bytes = Buffer.from(content.value);
+    } else if (content?.$case === 'url') {
+      const downloaded = await this.downloadRemote(content.value, session);
+      if (!downloaded) {
+        return {
+          markdown: /^https:\/\//.test(content.value)
+            ? `[${filename}](${content.value}) _(not downloaded: host not approved)_`
+            : `_${filename} was not downloaded: its location is not allowed._`,
+        };
+      }
+      bytes = downloaded.bytes;
+      if (!part.mediaType) {
+        mediaType = normalizeMediaType(downloaded.mediaType);
+      }
+    }
+    if (!bytes || !isAllowedMediaType(mediaType)) {
+      return {
+        markdown: `_${filename} was not accepted: files of type ${mediaType} are not supported._`,
+      };
+    }
+    if (bytes.byteLength > this.config.maxRemoteFileBytes) {
+      return { markdown: `_${filename} was not accepted: it exceeds the size limit._` };
+    }
+    const contentId = await this.chatFiles.upload(identity, execution.chatId, {
+      bytes,
+      mimeType: mediaType,
+      filename,
+    });
+    return {
+      markdown: `**${filename}** <sup>${number}</sup>`,
+      reference: {
+        name: filename,
+        url: `unique://content/${contentId}`,
+        sequenceNumber: number,
+        sourceId: contentId,
+        source: 'a2a-artifact',
+      },
+    };
+  }
+
+  /**
+   * The connection credential is only sent to the connection's own origin; other hosts must be
+   * approved by the egress policy and are fetched without credentials.
+   */
+  private async downloadRemote(
+    value: string,
+    session: RemoteSession,
+  ): Promise<{ bytes: Buffer; mediaType: string } | undefined> {
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      return undefined;
+    }
+    const connectionOrigin = new URL(session.card.supportedInterfaces[0]?.url ?? url).origin;
+    let response: Response;
+    try {
+      response =
+        url.origin === connectionOrigin
+          ? await session.fetchImpl(url, { method: 'GET' })
+          : await this.egress.fetch(url, { method: 'GET' }, this.config.maxRemoteFileBytes);
+    } catch {
+      return undefined;
+    }
+    if (!response.ok) {
+      return undefined;
+    }
+    try {
+      return {
+        bytes: Buffer.from(await response.arrayBuffer()),
+        mediaType: response.headers.get('content-type') ?? '',
+      };
+    } catch {
+      return undefined;
+    }
+  }
 }

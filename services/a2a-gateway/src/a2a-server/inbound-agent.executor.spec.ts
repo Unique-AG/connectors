@@ -1,6 +1,7 @@
 import { TaskState } from '@a2a-js/sdk';
 import { type ExecutionEventBus, type RequestContext, ServerCallContext } from '@a2a-js/sdk/server';
 import { describe, expect, it, vi } from 'vitest';
+import type { ChatFilesService } from '../bridge/chat-files.service.js';
 import type { GatewayConfig } from '../config/config.js';
 import type { ContextRepository } from '../drizzle/context.repository.js';
 import type { PublicationRepository } from '../drizzle/publication.repository.js';
@@ -80,6 +81,8 @@ function subject(unique: Record<string, ReturnType<typeof vi.fn>>) {
     } as unknown as PublicationRepository,
     { save: vi.fn(), heartbeat: vi.fn() } as unknown as PgTaskStore,
     client,
+    { upload: vi.fn() } as unknown as ChatFilesService,
+    { maxRemoteFileBytes: 1024 } as GatewayConfig,
   );
   return {
     executor,

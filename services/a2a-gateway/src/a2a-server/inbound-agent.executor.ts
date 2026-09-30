@@ -7,15 +7,24 @@ import {
   type ExecutionEventBus,
   type RequestContext,
 } from '@a2a-js/sdk/server';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import type { RequestIdentity } from '../auth/identity.guard.js';
+import { ChatFilesService } from '../bridge/chat-files.service.js';
+import { GATEWAY_CONFIG, type GatewayConfig } from '../config/config.js';
 import { ContextRepository } from '../drizzle/context.repository.js';
 import { PublicationRepository } from '../drizzle/publication.repository.js';
 import { UniqueInternalClient } from '../unique/unique-internal.client.js';
-import { awaitsInput, callIdentity, callPublicationId, messageText } from './call-context.js';
+import {
+  awaitsInput,
+  callIdentity,
+  callPublicationId,
+  messageContent,
+  messageText,
+} from './call-context.js';
 import {
   failedStatus,
+  fileUrlFor,
   outcomeArtifacts,
   outcomeStatus,
   taskStatus,
@@ -44,6 +53,8 @@ export class InboundAgentExecutor implements AgentExecutor {
     private readonly publications: PublicationRepository,
     private readonly taskStore: PgTaskStore,
     private readonly unique: UniqueInternalClient,
+    private readonly chatFiles: ChatFilesService,
+    @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
   ) {}
 
   public async execute(request: RequestContext, eventBus: ExecutionEventBus): Promise<void> {
@@ -125,15 +136,29 @@ export class InboundAgentExecutor implements AgentExecutor {
     if (!publication?.enabled || !context) {
       throw new NotFoundException('publication not found');
     }
+    const content = messageContent(request.userMessage, this.config.maxRemoteFileBytes);
+    let chatId = context.chatId ?? undefined;
+    if (!chatId && content.files.length) {
+      // Files are owned by a chat, so the chat has to exist before they are uploaded.
+      chatId = z
+        .object({ id: z.string() })
+        .parse(await this.unique.createChat(identity, publication.assistantId)).id;
+      await this.contexts.attachChat(identity, request.contextId, chatId);
+    }
+    const fileIds: string[] = [];
+    for (const file of content.files) {
+      fileIds.push(await this.chatFiles.upload(identity, chatId ?? '', file));
+    }
     const created = createdMessageSchema.parse(
       await this.unique.createMessage(
         identity,
         publication.assistantId,
-        context.chatId ?? undefined,
-        messageText(request.userMessage),
+        chatId,
+        content.text,
+        fileIds,
       ),
     );
-    if (!context.chatId) {
+    if (!chatId) {
       await this.contexts.attachChat(identity, request.contextId, created.chatId);
     }
     // The mutation returns the user message as persisted before its assistant shell.
@@ -181,7 +206,12 @@ export class InboundAgentExecutor implements AgentExecutor {
     eventBus: ExecutionEventBus,
     outcome: RunOutcome,
   ): void {
-    for (const artifact of outcomeArtifacts(request.taskId, outcome)) {
+    const fileUrl = fileUrlFor(
+      this.config.publicBaseUrl,
+      callPublicationId(request.context),
+      request.taskId,
+    );
+    for (const artifact of outcomeArtifacts(request.taskId, outcome, fileUrl)) {
       eventBus.publish(
         AgentEvent.artifactUpdate({
           taskId: request.taskId,

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ClusterIdentityGuard } from '../auth/identity.guard.js';
+import { ChatFilesService } from '../bridge/chat-files.service.js';
 import { CredentialsModule } from '../credentials/credentials.module.js';
 import { PersistenceModule } from '../drizzle/persistence.module.js';
 import { EventBusModule } from '../event-bus/event-bus.module.js';
@@ -16,6 +17,7 @@ import { OutboundRunner } from './outbound-runner.service.js';
   controllers: [OutboundController],
   providers: [
     ClusterIdentityGuard,
+    ChatFilesService,
     OutboundCancellationListener,
     OutboundExecutionService,
     OutboundRecovery,

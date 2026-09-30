@@ -61,6 +61,7 @@ export class ContextRepository {
         userMessageId: tasks.userMessageId,
         assistantMessageId: tasks.assistantMessageId,
         chatId: contexts.chatId,
+        publicationId: contexts.publicationId,
       })
       .from(tasks)
       .innerJoin(

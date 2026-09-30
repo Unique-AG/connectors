@@ -86,6 +86,20 @@ function terminalGuard(nextState: string): SQL {
   return or(notInArray(tasks.state, TERMINAL_STATES), eq(tasks.state, nextState)) as SQL;
 }
 
+/**
+ * File bytes sent by clients already live in the chat; they are not duplicated into the
+ * snapshot (and would not survive the JSON round trip as bytes).
+ */
+function persistable(task: Task): Record<string, unknown> {
+  return {
+    ...task,
+    history: task.history.map((message) => ({
+      ...message,
+      parts: message.parts.filter((part) => part.content?.$case !== 'raw'),
+    })),
+  } as unknown as Record<string, unknown>;
+}
+
 function projectTask(task: Task, params: ListTasksRequest): Task {
   const historyLength = params.historyLength;
   return {
@@ -122,7 +136,7 @@ export class PgTaskStore implements TaskStore {
         contextId: task.contextId,
         state: String(task.status?.state ?? 0),
         userMessageId,
-        taskSnapshot: task as unknown as Record<string, unknown>,
+        taskSnapshot: persistable(task),
         statusTimestamp,
         expiresAt,
       })
@@ -130,7 +144,7 @@ export class PgTaskStore implements TaskStore {
         target: tasks.id,
         set: {
           state: String(task.status?.state ?? 0),
-          taskSnapshot: task as unknown as Record<string, unknown>,
+          taskSnapshot: persistable(task),
           statusTimestamp,
           expiresAt,
           updatedAt: new Date(),
@@ -177,7 +191,7 @@ export class PgTaskStore implements TaskStore {
       state: String(task.status?.state ?? 0),
       userMessageId: task.id,
       clientMessageId,
-      taskSnapshot: task as unknown as Record<string, unknown>,
+      taskSnapshot: persistable(task),
       statusTimestamp,
       expiresAt: new Date(statusTimestamp.getTime() + this.config.taskRetentionDays * 86_400_000),
     });
@@ -189,7 +203,7 @@ export class PgTaskStore implements TaskStore {
       .update(tasks)
       .set({
         state: String(task.status?.state ?? 0),
-        taskSnapshot: task as unknown as Record<string, unknown>,
+        taskSnapshot: persistable(task),
         statusTimestamp: new Date(task.status?.timestamp ?? Date.now()),
         heartbeatAt: new Date(),
         updatedAt: new Date(),
@@ -229,6 +243,7 @@ export class PgTaskStore implements TaskStore {
         userMessageId: tasks.userMessageId,
         assistantMessageId: tasks.assistantMessageId,
         chatId: contexts.chatId,
+        publicationId: contexts.publicationId,
         snapshot: tasks.taskSnapshot,
       })
       .from(tasks)

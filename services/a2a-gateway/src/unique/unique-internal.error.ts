@@ -6,7 +6,8 @@ export class UniqueInternalError extends Error {
       | 'NOT_FOUND'
       | 'CONFLICT'
       | 'UNAVAILABLE'
-      | 'INVALID_RESPONSE',
+      | 'INVALID_RESPONSE'
+      | 'TOO_LARGE',
     public readonly retryable: boolean,
   ) {
     super(message);

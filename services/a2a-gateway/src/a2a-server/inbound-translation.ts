@@ -92,13 +92,77 @@ function referencesArtifact(taskId: string, message: NativeMessage): Artifact | 
   };
 }
 
-export function outcomeArtifacts(taskId: string, outcome: RunOutcome): Artifact[] {
+const CONTENT_URL = /unique:\/\/content\/([A-Za-z0-9_]+)/g;
+
+export type FileUrl = (contentId: string) => string;
+
+export function fileUrlFor(publicBaseUrl: URL, publicationId: string, taskId: string): FileUrl {
+  return (contentId) => {
+    const url = new URL(
+      `a2a/agents/${encodeURIComponent(publicationId)}/files/${encodeURIComponent(contentId)}`,
+      publicBaseUrl.toString().endsWith('/') ? publicBaseUrl : `${publicBaseUrl.toString()}/`,
+    );
+    url.searchParams.set('taskId', taskId);
+    return url.toString();
+  };
+}
+
+/**
+ * Files the answer links (generated or cited chat content) as URL parts pointing at the
+ * gateway's authorized download route; core content ids never leave as bare references.
+ */
+function filesArtifact(taskId: string, message: NativeMessage, fileUrl: FileUrl) {
+  const names = new Map<string, string>();
+  for (const reference of message.references ?? []) {
+    const id = /^unique:\/\/content\/([A-Za-z0-9_]+)$/.exec(reference.url ?? '')?.[1];
+    if (id) {
+      names.set(id, reference.name);
+    }
+  }
+  for (const match of (message.text ?? '').matchAll(CONTENT_URL)) {
+    if (match[1] && !names.has(match[1])) {
+      names.set(match[1], match[1]);
+    }
+  }
+  if (!names.size) {
+    return undefined;
+  }
+  return {
+    artifactId: `files-${taskId}`,
+    name: 'Files',
+    description: 'Files referenced by the response',
+    parts: [...names].map(([id, name]) => ({
+      content: { $case: 'url' as const, value: fileUrl(id) },
+      metadata: undefined,
+      filename: name,
+      mediaType: '',
+    })),
+    metadata: undefined,
+    extensions: [],
+  };
+}
+
+export function outcomeArtifacts(
+  taskId: string,
+  outcome: RunOutcome,
+  fileUrl: FileUrl,
+): Artifact[] {
   if (outcome.kind !== 'completed') {
     return [];
   }
-  const artifacts = [textArtifact(taskId, outcome.message.text ?? '')];
-  const references = referencesArtifact(taskId, outcome.message);
-  return references ? [...artifacts, references] : artifacts;
+  return [
+    textArtifact(taskId, outcome.message.text ?? ''),
+    referencesArtifact(taskId, outcome.message),
+    filesArtifact(taskId, outcome.message, fileUrl),
+  ].filter((artifact): artifact is Artifact => artifact !== undefined);
+}
+
+/** The artifact file URL a task exposes for a content id, if any. */
+export function taskFileUrl(task: Task, contentId: string): string | undefined {
+  return task.artifacts
+    .flatMap((artifact) => artifact.parts)
+    .map((part) => (part.content?.$case === 'url' ? part.content.value : ''))
+    .find((url) => url.includes(`/files/${encodeURIComponent(contentId)}?`));
 }
 
 export function outcomeStatus(

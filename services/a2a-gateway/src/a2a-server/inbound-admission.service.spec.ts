@@ -3,6 +3,7 @@ import { type SendMessageRequest, TaskState } from '@a2a-js/sdk';
 import { ServerCallContext } from '@a2a-js/sdk/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { ResourceAuthorizationService } from '../auth/resource-authorization.service.js';
+import type { GatewayConfig } from '../config/config.js';
 import type { ContextRepository } from '../drizzle/context.repository.js';
 import { InboundAdmissionService } from './inbound-admission.service.js';
 import type { PgTaskStore } from './pg-task.store.js';
@@ -45,6 +46,7 @@ function subject() {
       authorization as unknown as ResourceAuthorizationService,
       contexts as unknown as ContextRepository,
       taskStore as unknown as PgTaskStore,
+      { maxRemoteFileBytes: 1024 } as GatewayConfig,
     ),
     authorization,
     contexts,
@@ -132,6 +134,26 @@ describe('InboundAdmissionService', () => {
 
     await expect(service.admit(request({ taskId: 'task_1' }), context)).rejects.toMatchObject({
       name: 'UnsupportedOperationError',
+    });
+  });
+
+  it('accepts inline files of an allowed type and refuses active content', async () => {
+    const { service } = subject();
+    const file = (mediaType: string) =>
+      request({
+        parts: [
+          {
+            content: { $case: 'raw', value: Buffer.from('a,b') },
+            metadata: undefined,
+            filename: '../data.csv',
+            mediaType,
+          },
+        ],
+      } as never);
+
+    await expect(service.admit(file('text/csv'), context)).resolves.toHaveProperty('params');
+    await expect(service.admit(file('text/html'), context)).rejects.toMatchObject({
+      name: 'ContentTypeNotSupportedError',
     });
   });
 

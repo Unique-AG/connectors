@@ -6,8 +6,10 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
@@ -15,6 +17,7 @@ import {
 import type { Request, Response } from 'express';
 import { KongIdentityGuard, requestIdentity } from '../auth/identity.guard.js';
 import { A2aSdkService } from './a2a-sdk.service.js';
+import { InboundFilesService } from './inbound-files.service.js';
 import { PublicationService } from './publication.service.js';
 
 const KEEP_ALIVE_MS = 15_000;
@@ -33,6 +36,7 @@ export class A2aController {
   public constructor(
     private readonly a2a: A2aSdkService,
     private readonly publications: PublicationService,
+    private readonly files: InboundFilesService,
   ) {}
 
   @Get(':publicationId/.well-known/agent-card.json')
@@ -50,6 +54,35 @@ export class A2aController {
       return;
     }
     response.json(card);
+  }
+
+  @Get(':publicationId/files/:contentId')
+  @UseGuards(KongIdentityGuard)
+  public async file(
+    @Param('publicationId') publicationId: string,
+    @Param('contentId') contentId: string,
+    @Query('taskId') taskId: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<void> {
+    if (!taskId) {
+      throw new NotFoundException('file not found');
+    }
+    const file = await this.files.download(
+      requestIdentity(request),
+      publicationId,
+      taskId,
+      contentId,
+    );
+    response.setHeader('Content-Type', file.mimeType);
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+    );
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.send(file.bytes);
   }
 
   @Get()

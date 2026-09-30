@@ -84,17 +84,33 @@ export class UniqueInternalClient {
     assistantId: string,
     chatId: string | undefined,
     text: string,
+    selectedUploadedFileIds?: string[],
   ): Promise<unknown> {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `mutation A2aMessageCreate($assistantId: String, $chatId: String, $input: MessageCreateInput!) {
-        messageCreate(assistantId: $assistantId, chatId: $chatId, input: $input) {
+      `mutation A2aMessageCreate($assistantId: String, $chatId: String, $input: MessageCreateInput!, $fileIds: [String!]) {
+        messageCreate(assistantId: $assistantId, chatId: $chatId, input: $input, selectedUploadedFileIds: $fileIds) {
           id chatId messages { id }
         }
       }`,
-      { assistantId, chatId, input: { role: 'USER', text } },
+      {
+        assistantId,
+        chatId,
+        input: { role: 'USER', text },
+        ...(selectedUploadedFileIds?.length ? { fileIds: selectedUploadedFileIds } : {}),
+      },
       'messageCreate',
+    );
+  }
+
+  public createChat(identity: EffectiveIdentity, assistantId: string): Promise<unknown> {
+    return this.graphql(
+      this.config.uniqueChatUrl,
+      identity,
+      `mutation A2aChatCreate($assistantId: String) { chatCreate(assistantId: $assistantId) { id } }`,
+      { assistantId },
+      'chatCreate',
     );
   }
 
@@ -274,17 +290,72 @@ export class UniqueInternalClient {
     );
   }
 
+  /** Creates or finalises chat-owned content; the first call returns the blob write URL. */
   public upsertChatContent(
     identity: EffectiveIdentity,
+    chatId: string,
     input: Record<string, unknown>,
+    fileUrl?: string,
   ): Promise<unknown> {
     return this.graphql(
       this.config.uniqueIngestionUrl,
       identity,
-      `mutation A2aContentUpsert($input: ContentUpsertByChatInput!) { contentUpsertByChat(input: $input) { id } }`,
-      { input },
+      `mutation A2aContentUpsert($chatId: String!, $input: ContentCreateInput!, $fileUrl: String) {
+        contentUpsertByChat(chatId: $chatId, input: $input, fileUrl: $fileUrl) {
+          id ownerId ownerType internallyStoredAt versioningEnabled currentVersion writeUrl readUrl
+        }
+      }`,
+      { chatId, input, ...(fileUrl ? { fileUrl } : {}) },
       'contentUpsertByChat',
     );
+  }
+
+  /** Streams chat content under the user's own content permissions, bounded to `maxBytes`. */
+  public async downloadContent(
+    identity: EffectiveIdentity,
+    contentId: string,
+    chatId: string,
+    maxBytes: number,
+  ): Promise<{ bytes: Buffer; mimeType: string; filename: string }> {
+    const url = new URL(
+      `v1/content/${encodeURIComponent(contentId)}/file`,
+      this.config.uniqueIngestionUrl.toString().endsWith('/')
+        ? this.config.uniqueIngestionUrl
+        : `${this.config.uniqueIngestionUrl.toString()}/`,
+    );
+    url.searchParams.set('chatId', chatId);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: { 'x-company-id': identity.companyId, 'x-user-id': identity.userId },
+        signal: AbortSignal.timeout(this.config.streamTimeoutMs),
+        redirect: 'error',
+      });
+    } catch {
+      throw new UniqueInternalError('Unique content download failed', 'UNAVAILABLE', true);
+    }
+    if (!response.ok) {
+      const code = errorCode(response.status);
+      throw new UniqueInternalError(`content download returned ${response.status}`, code, false);
+    }
+    const length = Number(response.headers.get('content-length') ?? 0);
+    if (length > maxBytes) {
+      throw new UniqueInternalError('content exceeds the size limit', 'TOO_LARGE', false);
+    }
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.byteLength > maxBytes) {
+      throw new UniqueInternalError('content exceeds the size limit', 'TOO_LARGE', false);
+    }
+    const disposition = response.headers.get('content-disposition') ?? '';
+    const filename =
+      decodeURIComponent(/filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1] ?? '') ||
+      /filename="?([^";]+)"?/i.exec(disposition)?.[1] ||
+      contentId;
+    return {
+      bytes,
+      mimeType: response.headers.get('content-type')?.split(';')[0] ?? 'application/octet-stream',
+      filename,
+    };
   }
 
   private async graphql(
