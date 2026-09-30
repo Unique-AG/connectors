@@ -10,8 +10,9 @@ Each tool also carries an admin configuration, normally set from inside the Uniq
 than an environment variable; see
 [Configuration: Admin Configuration](../operator/configuration.md#Admin-Configuration) for where
 that setting actually lives. Only the admin `metadata_filter` and folder allowlist are a floor a
-caller can't widen, see [Permissions](./permissions.md). Numeric ones, `limit`, `score_threshold`,
-`max_tokens_per_call`, are defaults: a caller may raise or lower them per call.
+caller can't widen, see [Permissions](./permissions.md). Numeric ones are usually defaults a
+caller may raise or lower per call (`limit`, `score_threshold`, `max_tokens_per_call`);
+`content_metadata`'s `limit` is the exception, clamped to the admin ceiling `max_values_per_field`.
 
 ## How the Calling LLM Picks Arguments
 
@@ -99,13 +100,16 @@ or with `counts_only`, just the count of distinct values per field.
 | `folder_paths` | Same, by exact path (e.g. `Contracts/2024`) instead of an id; mutually exclusive with `folder_ids` |
 | `include_subfolders` | Whether the catalog includes files in subfolders (default `true`) |
 | `fields` | Only return these fields, by exact case-sensitive name; omit for every field, `[]` for none |
-| `counts_only` | Return each field's distinct-value count instead of the values themselves, e.g. `[{"department": 12}]` |
+| `counts_only` | Return each field's distinct-value count instead of the values themselves, e.g. `[{"department": 12}]`; ignores `limit` |
+| `limit` | Maximum distinct values per field, most common first. Omit for 50, clamped to the admin ceiling `max_values_per_field` |
 | `refresh` | Drop this caller's cached snapshot and rescan (~20s) |
 | `timeout` | Seconds to wait before returning a partial catalog |
 
-Exhaustive by design: every known field (or every requested one) and every distinct value in scope,
-not a sample, with no pagination yet. On a large knowledge base, call `counts_only=true` first to
-see what fields exist and how big each is, then `fields` to fetch only the ones needed.
+Fields are exhaustive, every known one or every requested one, but each field's own value list is
+capped: 50 by default, raisable with `limit` up to the admin ceiling (default `1000`). A shortened
+field is named in the response, e.g. `department: showing 50 of 4497 values`. On a large knowledge
+base, call `counts_only=true` first to see what fields exist and how big each is, then `fields` to
+fetch only the ones needed.
 
 Ten platform-stamped fields (`key`, `url`, `title`, `folderId`, `mimeType`, `companyId`,
 `contentId`, `validAsOf`, `folderIdPath`, `externalFileOwner`) are excluded from the catalog by

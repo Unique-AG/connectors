@@ -59,7 +59,7 @@ Defaults:
 Defaults:
 
 ```json
-{"metadata_filter": null, "excluded_fields": ["key", "url", "title", "folderId", "mimeType", "companyId", "contentId", "validAsOf", "folderIdPath", "externalFileOwner"], "max_concurrent_scope_lookups": 25}
+{"metadata_filter": null, "excluded_fields": ["key", "url", "title", "folderId", "mimeType", "companyId", "contentId", "validAsOf", "folderIdPath", "externalFileOwner"], "max_values_per_field": 1000, "max_concurrent_scope_lookups": 25}
 ```
 
 `excluded_fields` replaces this list rather than adding to it: repeat the entries above alongside
