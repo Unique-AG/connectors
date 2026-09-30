@@ -39,6 +39,14 @@ export class PublicationService {
     return this.buildCard(await this.publications.findEnabledById(publicationId));
   }
 
+  /** The public card with the time it last changed, for HTTP caching. */
+  public async getPublicAgentCard(
+    publicationId: string,
+  ): Promise<{ card: AgentCard; updatedAt: Date }> {
+    const publication = await this.publications.findEnabledById(publicationId);
+    return { card: this.buildCard(publication), updatedAt: publication?.updatedAt ?? new Date(0) };
+  }
+
   /** Includes disabled publications so existing tasks stay readable and cancelable (D-11). */
   public async getTenantAgentCard(companyId: string, publicationId: string): Promise<AgentCard> {
     return this.buildCard(await this.publications.findById(companyId, publicationId));

@@ -39,5 +39,17 @@ Not designed for up front (D-09). When a real peer is onboarded, the connection 
 
 ## Conformance
 
-- Server: [a2a-tck](https://github.com/a2aproject/a2a-tck) mandatory suite in CI against a local gateway with a stubbed core; [a2a-inspector](https://github.com/a2aproject/a2a-inspector) for manual checks.
-- Client: contract tests against `@a2a-js/sdk` sample servers; fixtures per onboarded peer added in KRA-44.
+- **Server**: the official [a2a-tck](https://github.com/a2aproject/a2a-tck) (pinned commit, JSON-RPC, A2A 1.0) runs in CI (`a2a-gateway.tck.yaml`) against the gateway backed by a stub core (`test/fixtures/stub-core.ts`). Run it locally with `test/tck/run-tck.sh`; reports land in `test/tck/reports/`.
+- **Client**: `test/contract/` drives the outbound runner through the production SDK client against the fixture agents (`test/fixtures/fixture-agent.ts`): streaming and polling peers, direct messages, failure, JSON, files, input-required, auth-required, cancellation, unknown send outcome and mode negotiation.
+
+### TCK
+
+All MUST requirements pass except these intentional deviations, which the script deselects:
+
+| Test | Reason |
+| --- | --- |
+| `test_artifacts.py` | Needs a scripted agent that returns specific artifact kinds or a direct Message per `messageId`; the gateway fronts real spaces. Covered by the gateway's translation unit tests. |
+| `CORE-SEND-003` | The gateway returns `-32005 ContentTypeNotSupportedError`, but the requirement has no `expected_error`, so the TCK fails on any error. |
+| `CORE-MULTI-002a` | The gateway rejects unknown client `contextId`s with `-32602`; same missing `expected_error` in the TCK. |
+
+Optional transports (gRPC, HTTP+JSON) and push notifications (disabled in the TCK run) are skipped.

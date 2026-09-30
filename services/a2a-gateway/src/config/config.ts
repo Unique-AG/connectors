@@ -9,6 +9,15 @@ const configSchema = z
     NODE_ENV: z.enum(['development', 'production', 'test']).default('production'),
     PORT: z.coerce.number().int().min(0).max(65_535).default(9560),
     AUTH_MODE: z.enum(['kong', 'development']).default('kong'),
+    // `companyId:userId` used in development auth mode when a request carries no token.
+    DEVELOPMENT_IDENTITY: z
+      .string()
+      .regex(/^[^:\s]+:[^:\s]+$/)
+      .optional()
+      .transform((value) => {
+        const [companyId, userId] = value?.split(':') ?? [];
+        return companyId && userId ? { companyId, userId } : undefined;
+      }),
     DATABASE_URL: url.refine((value) => value.protocol === 'postgresql:', {
       message: 'DATABASE_URL must use postgresql:',
     }),
@@ -135,6 +144,8 @@ const configSchema = z
     nodeEnv: config.NODE_ENV,
     port: config.PORT,
     authMode: config.AUTH_MODE,
+    developmentIdentity:
+      config.AUTH_MODE === 'development' ? config.DEVELOPMENT_IDENTITY : undefined,
     databaseUrl: config.DATABASE_URL,
     amqpUrl: config.AMQP_URL,
     publicBaseUrl: config.PUBLIC_BASE_URL,

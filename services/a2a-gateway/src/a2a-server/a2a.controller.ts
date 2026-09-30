@@ -1,4 +1,5 @@
 import { formatSSEEvent } from '@a2a-js/sdk';
+import { A2AError, toJsonRpcError } from '@a2a-js/sdk/errors';
 import {
   Body,
   Controller,
@@ -21,6 +22,20 @@ import { InboundFilesService } from './inbound-files.service.js';
 import { PublicationService } from './publication.service.js';
 
 const KEEP_ALIVE_MS = 15_000;
+const SUPPORTED_VERSION = /^1(\.0)?$/;
+
+function jsonRpcId(body: unknown): string | number | null {
+  const id = typeof body === 'object' && body !== null ? Reflect.get(body, 'id') : undefined;
+  return typeof id === 'string' || typeof id === 'number' ? id : null;
+}
+
+function jsonRpcError(id: string | number | null, code: number, message: string) {
+  return { jsonrpc: '2.0', id, error: { code, message } };
+}
+
+function isJsonRpcError(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && 'error' in value;
+}
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
   return (
@@ -45,10 +60,11 @@ export class A2aController {
     @Headers('if-none-match') ifNoneMatch: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
-    const card = await this.publications.getAgentCard(publicationId);
+    const { card, updatedAt } = await this.publications.getPublicAgentCard(publicationId);
     const etag = `"${publicationId}-${card.version}"`;
     response.setHeader('Cache-Control', 'public, max-age=60, must-revalidate');
     response.setHeader('ETag', etag);
+    response.setHeader('Last-Modified', updatedAt.toUTCString());
     if (ifNoneMatch === etag) {
       response.status(HttpStatus.NOT_MODIFIED).end();
       return;
@@ -101,6 +117,18 @@ export class A2aController {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
+    response.setHeader('A2A-Version', '1.0');
+    const id = jsonRpcId(body);
+    if (!request.is(['application/json', 'application/*+json'])) {
+      response.json(jsonRpcError(id, -32005, 'Content-Type must be application/json'));
+      return;
+    }
+    if (requestedVersion !== undefined && !SUPPORTED_VERSION.test(requestedVersion.trim())) {
+      response.json(
+        jsonRpcError(id, -32009, `A2A version ${requestedVersion} is not supported; use 1.0`),
+      );
+      return;
+    }
     const result = await this.a2a.handleJsonRpc({
       body,
       headers: request.headers,
@@ -108,9 +136,24 @@ export class A2aController {
       publicationId,
       requestedVersion,
     });
-    response.setHeader('A2A-Version', '1.0');
     if (!isAsyncIterable(result)) {
       response.json(result);
+      return;
+    }
+    // An error before the first event (e.g. unknown task) is a plain JSON-RPC error, not a stream.
+    const events = result[Symbol.asyncIterator]();
+    let first: IteratorResult<unknown>;
+    try {
+      first = await events.next();
+    } catch (error) {
+      if (!(error instanceof A2AError)) {
+        throw error;
+      }
+      response.json({ jsonrpc: '2.0', id, error: toJsonRpcError(error) });
+      return;
+    }
+    if (!first.done && isJsonRpcError(first.value)) {
+      response.json(first.value);
       return;
     }
     response.setHeader('Content-Type', 'text/event-stream');
@@ -125,11 +168,11 @@ export class A2aController {
     });
     const keepAlive = setInterval(() => response.write(': keep-alive\n\n'), KEEP_ALIVE_MS);
     try {
-      for await (const event of result) {
-        if (closed) {
-          break;
-        }
-        response.write(formatSSEEvent(event));
+      for (let next = first; !next.done && !closed; next = await events.next()) {
+        response.write(formatSSEEvent(next.value));
+      }
+      if (closed) {
+        await events.return?.(undefined);
       }
     } finally {
       clearInterval(keepAlive);

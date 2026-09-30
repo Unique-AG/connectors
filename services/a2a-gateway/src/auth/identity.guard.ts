@@ -30,10 +30,26 @@ export function requestIdentity(request: Request): RequestIdentity {
   };
 }
 
-function applyDevelopmentIdentity(request: Request): void {
+/**
+ * Local development only (refused in production): identity from an unverified JWT's claims, or
+ * the configured default identity for clients that send no token (e.g. the conformance suite).
+ */
+function applyDevelopmentIdentity(
+  request: Request,
+  fallback: GatewayConfig['developmentIdentity'],
+): void {
+  request.headers['x-client-id'] ??= 'development';
+  if (request.headers['x-user-id'] && request.headers['x-company-id']) {
+    return;
+  }
   const authorization = request.headers.authorization;
   const token =
     typeof authorization === 'string' ? authorization.match(/^Bearer (\S+)$/)?.[1] : null;
+  if (!token && fallback) {
+    request.headers['x-user-id'] = fallback.userId;
+    request.headers['x-company-id'] = fallback.companyId;
+    return;
+  }
   if (!token) {
     throw new UnauthorizedException('bearer token is required');
   }
@@ -72,7 +88,7 @@ abstract class IdentityGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     if (this.config.authMode === 'development') {
       if (!hasHeaders(request, this.requiredHeaders)) {
-        applyDevelopmentIdentity(request);
+        applyDevelopmentIdentity(request, this.config.developmentIdentity);
       }
       return true;
     }
