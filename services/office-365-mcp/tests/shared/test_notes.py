@@ -1,10 +1,13 @@
 import json
 from datetime import UTC, datetime
+from typing import get_args
 
 import httpx
 import pytest
 import respx
 from msgraph.generated.models.external_link import ExternalLink
+from msgraph.generated.models.identity import Identity
+from msgraph.generated.models.identity_set import IdentitySet
 from msgraph.generated.models.notebook import Notebook
 from msgraph.generated.models.onenote_operation import OnenoteOperation
 from msgraph.generated.models.onenote_operation_error import OnenoteOperationError
@@ -12,6 +15,7 @@ from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_section import OnenoteSection
 from msgraph.generated.models.operation_status import OperationStatus
 from msgraph.generated.models.page_links import PageLinks
+from msgraph.generated.models.section_group import SectionGroup
 from msgraph.generated.models.section_links import SectionLinks
 from msgraph.graph_service_client import GraphServiceClient
 
@@ -154,6 +158,80 @@ class TestTheLinksProtocol:
 
         assert notes.web_url_of(links) is None
         assert notes.client_url_of(links) is None
+
+
+class TestContainerOrderClauses:
+    def test_every_order_the_tools_offer_has_a_clause(self) -> None:
+        assert set(notes.CONTAINER_ORDER_CLAUSES) == set(get_args(notes.ContainerOrderBy))
+
+    @pytest.mark.parametrize(
+        ("order_by", "clause"),
+        [
+            ("name_asc", "displayName asc"),
+            ("name_desc", "displayName desc"),
+            ("created_desc", "createdDateTime desc"),
+            ("created_asc", "createdDateTime asc"),
+            ("last_modified_desc", "lastModifiedDateTime desc"),
+            ("last_modified_asc", "lastModifiedDateTime asc"),
+        ],
+    )
+    def test_an_order_maps_to_the_graph_property_and_direction(
+        self, order_by: notes.ContainerOrderBy, clause: str
+    ) -> None:
+        assert notes.CONTAINER_ORDER_CLAUSES[order_by] == clause
+
+
+def _created_by(*, user: str | None = None, application: str | None = None) -> IdentitySet:
+    return IdentitySet(
+        user=None if user is None else Identity(display_name=user),
+        application=None if application is None else Identity(display_name=application),
+    )
+
+
+class TestCreatorNameOf:
+    def test_no_identity_set_has_no_name(self) -> None:
+        assert notes.creator_name_of(None) is None
+
+    def test_it_reads_the_display_name_of_the_user(self) -> None:
+        assert notes.creator_name_of(_created_by(user="Ada Lovelace")) == "Ada Lovelace"
+
+    def test_an_identity_set_with_no_user_has_no_name(self) -> None:
+        assert notes.creator_name_of(_created_by(application="Import Bot")) is None
+
+    def test_a_user_with_no_display_name_has_no_name(self) -> None:
+        assert notes.creator_name_of(IdentitySet(user=Identity(display_name=None))) is None
+
+
+class TestCreatedByContains:
+    def test_it_matches_a_fragment_of_the_creator_name(self) -> None:
+        keeps = notes.created_by_contains("lovelace")
+
+        assert keeps(Notebook(created_by=_created_by(user="Ada Lovelace"))) is True
+
+    def test_it_compares_without_regard_to_case(self) -> None:
+        keeps = notes.created_by_contains("ADA LOVE")
+
+        assert keeps(OnenoteSection(created_by=_created_by(user="ada lovelace"))) is True
+
+    def test_it_uses_casefold_so_a_sharp_s_matches_a_double_s(self) -> None:
+        keeps = notes.created_by_contains("strasse")
+
+        assert keeps(SectionGroup(created_by=_created_by(user="Hans Straße"))) is True
+
+    def test_a_fragment_the_name_lacks_does_not_match(self) -> None:
+        keeps = notes.created_by_contains("turing")
+
+        assert keeps(Notebook(created_by=_created_by(user="Ada Lovelace"))) is False
+
+    def test_an_item_with_no_creator_never_matches(self) -> None:
+        keeps = notes.created_by_contains("a")
+
+        assert keeps(Notebook(created_by=None)) is False
+
+    def test_an_item_made_by_an_application_never_matches(self) -> None:
+        keeps = notes.created_by_contains("bot")
+
+        assert keeps(Notebook(created_by=_created_by(application="Import Bot"))) is False
 
 
 _AUDIENCE_NOTEBOOK_ID = "1-99999999-9999-4999-8999-999999999999!100"

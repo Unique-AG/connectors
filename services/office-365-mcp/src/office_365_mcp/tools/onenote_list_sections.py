@@ -29,14 +29,20 @@ from msgraph.generated.users.item.onenote.section_groups.item.sections import (
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
     onenote_container_handle,
 )
-from office_365_mcp.shared.notes import web_url_of
+from office_365_mcp.shared.notes import (
+    CONTAINER_ORDER_CLAUSES,
+    ContainerOrderBy,
+    created_by_contains,
+    creator_name_of,
+    web_url_of,
+)
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -59,10 +65,11 @@ _SECTION_FIELDS: tuple[str, ...] = (
     "id",
     "displayName",
     "isDefault",
+    "createdBy",
     "lastModifiedDateTime",
     "links",
 )
-_SECTION_GROUP_FIELDS: tuple[str, ...] = ("id", "displayName", "lastModifiedDateTime")
+_SECTION_GROUP_FIELDS: tuple[str, ...] = ("id", "displayName", "createdBy", "lastModifiedDateTime")
 _SECTION_EXPANSIONS: tuple[str, ...] = ("parentNotebook($select=id,displayName)",)
 
 _NotebookSectionsBuilder = _notebook_sections_module.SectionsRequestBuilder
@@ -82,7 +89,8 @@ level at a time. Both lists always come back. To walk deeper, call again with a 
 one call.
 
 Notes:
-- Both lists come in Microsoft's default order: ascending by name.
+- Both lists come in Microsoft's default order, ascending by name, unless `order_by` picks a \
+different order.
 - Microsoft can refuse to list under a section group with error 403. Then list the notebook \
 itself.
 """
@@ -132,6 +140,12 @@ class SectionRow(BaseModel):
             + "This connector cannot read a page from it."
         )
     )
+    created_by: str | None = Field(
+        description=(
+            "The display name of the person who created this section, as Graph reported it. "
+            + "Null when Graph named no person."
+        )
+    )
     last_modified_at: datetime | None = Field(
         description=(
             "When this section last changed, as Graph reported it. Null when Graph recorded none."
@@ -150,6 +164,12 @@ class SectionGroupRow(BaseModel):
     )
     name: str | None = Field(
         description="The section group's display name. Null when Graph did not report one."
+    )
+    created_by: str | None = Field(
+        description=(
+            "The display name of the person who created this section group, as Graph reported "
+            + "it. Null when Graph named no person."
+        )
     )
     last_modified_at: datetime | None = Field(
         description=(
@@ -172,7 +192,7 @@ class Sections(BaseModel):
     )
     sections: list[SectionRow] = Field(
         description=(
-            "The sections that sit directly under `parent`, in Microsoft's default order. "
+            "The sections that sit directly under `parent`, in the order this call asked for. "
             + "`capped` true can leave this list incomplete. A section with no id from "
             + "Microsoft is left out. An empty list means `parent` holds no section directly. "
             + "It can still hold section groups."
@@ -180,18 +200,19 @@ class Sections(BaseModel):
     )
     section_groups: list[SectionGroupRow] = Field(
         description=(
-            "The section groups that sit directly under `parent`, in Microsoft's default "
-            + "order. `capped` true can leave this list incomplete. A section group with no "
-            + "id from Microsoft is left out. An empty list means `parent` holds no section "
-            + "group directly."
+            "The section groups that sit directly under `parent`, in the order this call "
+            + "asked for. `capped` true can leave this list incomplete. A section group with "
+            + "no id from Microsoft is left out. An empty list means `parent` holds no "
+            + "section group directly."
         )
     )
     capped: bool = Field(
         description=(
             "True when `limit` stopped either the section listing or the section group listing "
-            + f"while more rows remained. Raise `limit` while it is below {MAX_SECTIONS}, or "
-            + "narrow the listing with `name_contains`. False when both listings ended on their "
-            + "own."
+            + "while more rows remained. With `created_by`, it is also true when the tool read "
+            + f"{MAX_SCANNED_ITEMS} rows and more remained. Raise `limit` while it is below "
+            + f"{MAX_SECTIONS}, or narrow the listing with `name_contains`. False when both "
+            + "listings ended on their own."
         )
     )
 
@@ -201,6 +222,8 @@ async def list_sections(
     *,
     parent: str,
     name_contains: str | None = None,
+    created_by: str | None = None,
+    order_by: ContainerOrderBy | None = None,
     limit: int,
 ) -> Sections:
     assert 1 <= limit <= MAX_SECTIONS, f"limit must be within 1..{MAX_SECTIONS}, got {limit}"
@@ -208,25 +231,29 @@ async def list_sections(
     if handle is None:
         raise ToolError(_NOT_A_PARENT_HANDLE)
     query_filter = _name_filter(name_contains)
+    orderby = None if order_by is None else [CONTAINER_ORDER_CLAUSES[order_by]]
+    matches = None if created_by is None else created_by_contains(created_by)
+    top = limit if created_by is None else MAX_SECTIONS
+    max_scanned = limit if created_by is None else MAX_SCANNED_ITEMS
 
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_SECTIONS):
             first_sections = await _first_sections(
-                client, handle, limit=limit, query_filter=query_filter
+                client, handle, top=top, query_filter=query_filter, orderby=orderby
             )
             assert first_sections is not None, "Graph answered a section listing with no collection"
             sections_collected = await collect_pages(
-                first_sections, client, limit=limit, max_scanned=limit
+                first_sections, client, limit=limit, matches=matches, max_scanned=max_scanned
             )
         with graph_step(STEP_SECTION_GROUPS):
             first_groups = await _first_section_groups(
-                client, handle, limit=limit, query_filter=query_filter
+                client, handle, top=top, query_filter=query_filter, orderby=orderby
             )
             assert first_groups is not None, (
                 "Graph answered a section group listing with no collection"
             )
             groups_collected = await collect_pages(
-                first_groups, client, limit=limit, max_scanned=limit
+                first_groups, client, limit=limit, matches=matches, max_scanned=max_scanned
             )
 
     return Sections(
@@ -265,8 +292,9 @@ async def _first_sections(
     client: GraphServiceClient,
     handle: OnenoteNotebookHandle | OnenoteSectionGroupHandle,
     *,
-    limit: int,
+    top: int,
     query_filter: str | None,
+    orderby: list[str] | None,
 ) -> OnenoteSectionCollectionResponse | None:
     if isinstance(handle, OnenoteNotebookHandle):
         return await client.me.onenote.notebooks.by_notebook_id(handle.notebook_id).sections.get(
@@ -274,8 +302,9 @@ async def _first_sections(
                 query_parameters=_NotebookSectionsQuery(
                     select=list(_SECTION_FIELDS),
                     expand=list(_SECTION_EXPANSIONS),
-                    top=limit,
+                    top=top,
                     filter=query_filter,
+                    orderby=orderby,
                 )
             )
         )
@@ -286,8 +315,9 @@ async def _first_sections(
             query_parameters=_GroupSectionsQuery(
                 select=list(_SECTION_FIELDS),
                 expand=list(_SECTION_EXPANSIONS),
-                top=limit,
+                top=top,
                 filter=query_filter,
+                orderby=orderby,
             )
         )
     )
@@ -297,8 +327,9 @@ async def _first_section_groups(
     client: GraphServiceClient,
     handle: OnenoteNotebookHandle | OnenoteSectionGroupHandle,
     *,
-    limit: int,
+    top: int,
     query_filter: str | None,
+    orderby: list[str] | None,
 ) -> SectionGroupCollectionResponse | None:
     if isinstance(handle, OnenoteNotebookHandle):
         return await client.me.onenote.notebooks.by_notebook_id(
@@ -306,7 +337,10 @@ async def _first_section_groups(
         ).section_groups.get(
             request_configuration=RequestConfiguration[_NotebookGroupsQuery](
                 query_parameters=_NotebookGroupsQuery(
-                    select=list(_SECTION_GROUP_FIELDS), top=limit, filter=query_filter
+                    select=list(_SECTION_GROUP_FIELDS),
+                    top=top,
+                    filter=query_filter,
+                    orderby=orderby,
                 )
             )
         )
@@ -315,7 +349,7 @@ async def _first_section_groups(
     ).section_groups.get(
         request_configuration=RequestConfiguration[_GroupGroupsQuery](
             query_parameters=_GroupGroupsQuery(
-                select=list(_SECTION_GROUP_FIELDS), top=limit, filter=query_filter
+                select=list(_SECTION_GROUP_FIELDS), top=top, filter=query_filter, orderby=orderby
             )
         )
     )
@@ -329,6 +363,7 @@ def _section_row(section: OnenoteSection) -> SectionRow | None:
         name=section.display_name,
         is_default=section.is_default,
         web_url=web_url_of(section.links),
+        created_by=creator_name_of(section.created_by),
         last_modified_at=section.last_modified_date_time,
     )
 
@@ -339,6 +374,7 @@ def _section_group_row(group: SectionGroup) -> SectionGroupRow | None:
     return SectionGroupRow(
         uri=OnenoteSectionGroupHandle(group.id).uri,
         name=group.display_name,
+        created_by=creator_name_of(group.created_by),
         last_modified_at=group.last_modified_date_time,
     )
 
@@ -379,6 +415,29 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
+        created_by: Annotated[
+            str | None,
+            Field(
+                min_length=_MIN_NAME_FRAGMENT_CHARACTERS,
+                description=(
+                    "Keep only the sections and section groups whose `created_by` value "
+                    + "contains this text, compared without regard to case. Applies to both "
+                    + "lists. A row with a null `created_by` is left out. Omit it to list "
+                    + "everything directly under `parent`."
+                ),
+            ),
+        ] = None,
+        order_by: Annotated[
+            ContainerOrderBy | None,
+            Field(
+                description=(
+                    "Sort the sections and the section groups, instead of the default order. "
+                    + "`name_asc`/`name_desc` sorts by display name. `created_desc`/`created_asc` "
+                    + "sorts by when a row was created. `last_modified_desc`/`last_modified_asc` "
+                    + "sorts by when it last changed. Omit it to keep the default order."
+                ),
+            ),
+        ] = None,
         limit: Annotated[
             int,
             Field(
@@ -394,4 +453,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ] = 50,
         client: GraphServiceClient = graph,
     ) -> Sections:
-        return await list_sections(client, parent=parent, name_contains=name_contains, limit=limit)
+        return await list_sections(
+            client,
+            parent=parent,
+            name_contains=name_contains,
+            created_by=created_by,
+            order_by=order_by,
+            limit=limit,
+        )

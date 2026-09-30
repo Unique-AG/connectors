@@ -1,5 +1,5 @@
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
@@ -9,6 +9,7 @@ from urllib.parse import unquote, urlsplit
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_serialization_json.json_parse_node_factory import JsonParseNodeFactory
 from msgraph.generated.models.external_link import ExternalLink
+from msgraph.generated.models.identity_set import IdentitySet
 from msgraph.generated.models.notebook import Notebook
 from msgraph.generated.models.onenote_operation import OnenoteOperation
 from msgraph.generated.models.onenote_page import OnenotePage
@@ -84,6 +85,46 @@ def client_url_of(links: _Links | None) -> str | None:
     if links is None or links.one_note_client_url is None:
         return None
     return links.one_note_client_url.href
+
+
+ContainerOrderBy = Literal[
+    "name_asc",
+    "name_desc",
+    "created_desc",
+    "created_asc",
+    "last_modified_desc",
+    "last_modified_asc",
+]
+
+CONTAINER_ORDER_CLAUSES: Mapping[ContainerOrderBy, str] = {
+    "name_asc": "displayName asc",
+    "name_desc": "displayName desc",
+    "created_desc": "createdDateTime desc",
+    "created_asc": "createdDateTime asc",
+    "last_modified_desc": "lastModifiedDateTime desc",
+    "last_modified_asc": "lastModifiedDateTime asc",
+}
+
+
+class _Created(Protocol):
+    @property
+    def created_by(self) -> IdentitySet | None: ...
+
+
+def creator_name_of(identity: IdentitySet | None) -> str | None:
+    if identity is None or identity.user is None:
+        return None
+    return identity.user.display_name
+
+
+def created_by_contains(fragment: str) -> Callable[[_Created], bool]:
+    wanted = fragment.casefold()
+
+    def created_by_matches(item: _Created) -> bool:
+        name = creator_name_of(item.created_by)
+        return name is not None and wanted in name.casefold()
+
+    return created_by_matches
 
 
 class PageSummary(BaseModel):

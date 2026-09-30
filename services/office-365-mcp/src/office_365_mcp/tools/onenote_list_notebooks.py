@@ -26,7 +26,13 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
 )
-from office_365_mcp.shared.notes import web_url_of
+from office_365_mcp.shared.notes import (
+    CONTAINER_ORDER_CLAUSES,
+    ContainerOrderBy,
+    created_by_contains,
+    creator_name_of,
+    web_url_of,
+)
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -46,6 +52,7 @@ _NOTEBOOK_FIELDS: tuple[str, ...] = (
     "isDefault",
     "isShared",
     "userRole",
+    "createdBy",
     "createdDateTime",
     "lastModifiedDateTime",
     "links",
@@ -54,6 +61,7 @@ _SECTION_FIELDS: tuple[str, ...] = (
     "id",
     "displayName",
     "isDefault",
+    "createdBy",
     "lastModifiedDateTime",
     "links",
 )
@@ -119,6 +127,12 @@ class NotebookSection(BaseModel):
             + "This connector cannot read a page from it."
         )
     )
+    created_by: str | None = Field(
+        description=(
+            "The display name of the person who created this section, as Graph reported it. "
+            + "Null when Graph named no person."
+        )
+    )
     last_modified_at: datetime | None = Field(
         description=(
             "When this section last changed, as Graph reported it. Null when Graph recorded none."
@@ -168,6 +182,12 @@ class Notebook(BaseModel):
             "When the notebook was created, as Graph reported it. Null when Graph recorded none."
         )
     )
+    created_by: str | None = Field(
+        description=(
+            "The display name of the person who created this notebook, as Graph reported it. "
+            + "Null when Graph named no person."
+        )
+    )
     last_modified_at: datetime | None = Field(
         description=(
             "When the notebook last changed, as Graph reported it. Null when Graph recorded none."
@@ -196,8 +216,8 @@ class Notebooks(BaseModel):
         description=(
             "True when a safety cap stopped the notebook, section, or section-group listing "
             + "behind this answer, not a `limit` this tool exposes to raise. `name_contains`, "
-            + "`shared`, and `role` narrow only the notebook listing, so an excluded "
-            + "notebook's own listing can still trigger this. False means every listing "
+            + "`created_by`, `shared`, and `role` narrow only the notebook listing, so an "
+            + "excluded notebook's own listing can still trigger this. False means every listing "
             + "finished on its own."
         )
     )
@@ -207,28 +227,36 @@ async def list_notebooks(
     client: GraphServiceClient,
     *,
     name_contains: str | None = None,
+    created_by: str | None = None,
     shared: bool | None = None,
     role: _Role | None = None,
+    order_by: ContainerOrderBy | None = None,
 ) -> Notebooks:
     notebook_filter = _notebook_filter(name_contains, shared, role)
+    orderby = None if order_by is None else [CONTAINER_ORDER_CLAUSES[order_by]]
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_NOTEBOOKS):
             first_notebooks = await client.me.onenote.notebooks.get(
                 request_configuration=RequestConfiguration[_NotebooksQuery](
                     query_parameters=_NotebooksQuery(
-                        select=list(_NOTEBOOK_FIELDS), filter=notebook_filter
+                        select=list(_NOTEBOOK_FIELDS), filter=notebook_filter, orderby=orderby
                     )
                 )
             )
             assert first_notebooks is not None, "Graph answered notebooks with no collection"
             notebooks_collected = await collect_pages(
-                first_notebooks, client, limit=MAX_SCANNED_ITEMS
+                first_notebooks,
+                client,
+                limit=MAX_SCANNED_ITEMS,
+                matches=None if created_by is None else created_by_contains(created_by),
             )
         with graph_step(STEP_SECTIONS):
             first_sections = await client.me.onenote.sections.get(
                 request_configuration=RequestConfiguration[_SectionsQuery](
                     query_parameters=_SectionsQuery(
-                        select=list(_SECTION_FIELDS), expand=list(_HIERARCHY_EXPANSIONS)
+                        select=list(_SECTION_FIELDS),
+                        expand=list(_HIERARCHY_EXPANSIONS),
+                        orderby=orderby,
                     )
                 )
             )
@@ -306,6 +334,7 @@ def _notebook_row(
         ),
         web_url=web_url_of(notebook.links),
         created_at=notebook.created_date_time,
+        created_by=creator_name_of(notebook.created_by),
         last_modified_at=notebook.last_modified_date_time,
         sections=sections_by_notebook.get(notebook.id, []),
     )
@@ -333,6 +362,7 @@ def _sections_by_notebook(
             group_path=_group_path(group_id, groups_by_id),
             is_default=section.is_default,
             web_url=web_url_of(section.links),
+            created_by=creator_name_of(section.created_by),
             last_modified_at=section.last_modified_date_time,
         )
         by_notebook.setdefault(notebook_id, []).append(row)
@@ -375,6 +405,18 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
+        created_by: Annotated[
+            str | None,
+            Field(
+                min_length=_MIN_NAME_FRAGMENT_CHARACTERS,
+                description=(
+                    "Keep only the notebooks whose `created_by` value contains this text, "
+                    + "compared without regard to case. A notebook with a null `created_by` is "
+                    + "left out. A kept notebook still carries every one of its sections. Omit "
+                    + "it to list every notebook."
+                ),
+            ),
+        ] = None,
         shared: Annotated[
             bool | None,
             Field(
@@ -394,6 +436,25 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
+        order_by: Annotated[
+            ContainerOrderBy | None,
+            Field(
+                description=(
+                    "Sort the notebooks, and the sections inside each notebook, instead of the "
+                    + "default order. `name_asc`/`name_desc` sorts by display name. "
+                    + "`created_desc`/`created_asc` sorts by when an item was created. "
+                    + "`last_modified_desc`/`last_modified_asc` sorts by when it last changed. "
+                    + "Omit it to keep the default order."
+                ),
+            ),
+        ] = None,
         client: GraphServiceClient = graph,
     ) -> Notebooks:
-        return await list_notebooks(client, name_contains=name_contains, shared=shared, role=role)
+        return await list_notebooks(
+            client,
+            name_contains=name_contains,
+            created_by=created_by,
+            shared=shared,
+            role=role,
+            order_by=order_by,
+        )

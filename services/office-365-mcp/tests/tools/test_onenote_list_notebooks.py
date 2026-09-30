@@ -1,6 +1,11 @@
+import json
+from collections.abc import Mapping
+from typing import cast
+
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
@@ -9,6 +14,7 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
 )
+from office_365_mcp.shared.notes import ContainerOrderBy
 from office_365_mcp.tools import onenote_list_notebooks as lister
 
 from .conftest import GRAPH_V1
@@ -18,11 +24,21 @@ _SECTIONS = "/me/onenote/sections"
 _SECTION_GROUPS = "/me/onenote/sectionGroups"
 
 _NOTEBOOK_SELECT = (
-    "id,displayName,isDefault,isShared,userRole,createdDateTime,lastModifiedDateTime,links"
+    "id,displayName,isDefault,isShared,userRole,createdBy,createdDateTime,"
+    + "lastModifiedDateTime,links"
 )
-_SECTION_SELECT = "id,displayName,isDefault,lastModifiedDateTime,links"
+_SECTION_SELECT = "id,displayName,isDefault,createdBy,lastModifiedDateTime,links"
 _SECTION_GROUP_SELECT = "id,displayName"
 _HIERARCHY_EXPAND = "parentNotebook,parentSectionGroup"
+
+_ORDERS = (
+    "name_asc",
+    "name_desc",
+    "created_desc",
+    "created_asc",
+    "last_modified_desc",
+    "last_modified_asc",
+)
 
 _ENGINEERING = "1-SYNTHETICENGINEERING000000000000000000!100"
 _PERSONAL = "1-SYNTHETICPERSONAL0000000000000000000000!100"
@@ -43,6 +59,10 @@ _SECTION_THREE = "1-SYNTHETICSECTIONTHREE0000000000000000!303"
 _SECTION_FOUR = "1-SYNTHETICSECTIONFOUR00000000000000000!304"
 
 
+def _creator(name: str | None) -> dict[str, object] | None:
+    return None if name is None else {"user": {"displayName": name}}
+
+
 def _notebook_payload(
     notebook_id: str | None,
     *,
@@ -51,6 +71,7 @@ def _notebook_payload(
     is_shared: bool | None = False,
     user_role: str | None = "Owner",
     created: str | None = "2026-01-01T00:00:00Z",
+    created_by: str | None = None,
     modified: str | None = "2026-02-01T00:00:00Z",
     web_url: str | None = "https://onenote.invalid/notebooks/engineering",
 ) -> dict[str, object]:
@@ -61,6 +82,7 @@ def _notebook_payload(
         "isShared": is_shared,
         "userRole": user_role,
         "createdDateTime": created,
+        "createdBy": _creator(created_by),
         "lastModifiedDateTime": modified,
         "links": None if web_url is None else {"oneNoteWebUrl": {"href": web_url}},
     }
@@ -71,6 +93,7 @@ def _section_payload(
     *,
     display_name: str | None = "Standups",
     is_default: bool | None = False,
+    created_by: str | None = None,
     modified: str | None = "2026-02-10T00:00:00Z",
     web_url: str | None = "https://onenote.invalid/sections/standups",
     notebook_id: str | None = _ENGINEERING,
@@ -80,6 +103,7 @@ def _section_payload(
         "id": section_id,
         "displayName": display_name,
         "isDefault": is_default,
+        "createdBy": _creator(created_by),
         "lastModifiedDateTime": modified,
         "links": None if web_url is None else {"oneNoteWebUrl": {"href": web_url}},
         "parentNotebook": None if notebook_id is None else {"id": notebook_id},
@@ -595,3 +619,293 @@ class TestNotebookAndSectionGroupHandles:
         assert result.notebooks[0].sections[0].group_uri == (
             OnenoteSectionGroupHandle(_OUTER_GROUP).uri
         )
+
+
+class TestTheCreator:
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_a_notebook_reports_the_display_name_of_its_creator(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        notebooks_route.mock(
+            return_value=_page(_notebook_payload(_ENGINEERING, created_by="Ada Lovelace"))
+        )
+
+        result = await lister.list_notebooks(client)
+
+        assert result.notebooks[0].created_by == "Ada Lovelace"
+
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_a_notebook_with_no_creator_reports_null(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        notebooks_route.mock(return_value=_page(_notebook_payload(_ENGINEERING, created_by=None)))
+
+        result = await lister.list_notebooks(client)
+
+        assert result.notebooks[0].created_by is None
+
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_a_notebook_made_by_an_application_reports_null(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        payload = _notebook_payload(_ENGINEERING)
+        payload["createdBy"] = {"application": {"displayName": "Import Bot"}}
+        notebooks_route.mock(return_value=_page(payload))
+
+        result = await lister.list_notebooks(client)
+
+        assert result.notebooks[0].created_by is None
+
+    @pytest.mark.usefixtures("groups_route", "notebooks_route")
+    async def test_a_section_reports_the_display_name_of_its_creator(
+        self, client: GraphServiceClient, sections_route: respx.Route
+    ) -> None:
+        sections_route.mock(
+            return_value=_page(_section_payload(_STANDUPS, created_by="Grace Hopper"))
+        )
+
+        result = await lister.list_notebooks(client)
+
+        assert result.notebooks[0].sections[0].created_by == "Grace Hopper"
+
+    @pytest.mark.usefixtures("groups_route", "notebooks_route")
+    async def test_a_section_with_no_creator_reports_null(
+        self, client: GraphServiceClient, sections_route: respx.Route
+    ) -> None:
+        sections_route.mock(return_value=_page(_section_payload(_STANDUPS, created_by=None)))
+
+        result = await lister.list_notebooks(client)
+
+        assert result.notebooks[0].sections[0].created_by is None
+
+
+class TestTheCreatorFilter:
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_created_by_keeps_a_match_whatever_the_case(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        notebooks_route.mock(
+            return_value=_page(
+                _notebook_payload(_ENGINEERING, display_name="Mine", created_by="Ada Lovelace"),
+                _notebook_payload(_PERSONAL, display_name="Theirs", created_by="Grace Hopper"),
+            )
+        )
+
+        result = await lister.list_notebooks(client, created_by="LOVELACE")
+
+        assert [notebook.name for notebook in result.notebooks] == ["Mine"]
+
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_created_by_leaves_out_a_notebook_with_no_creator(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        notebooks_route.mock(
+            return_value=_page(
+                _notebook_payload(_ENGINEERING, display_name="Named", created_by="Ada Lovelace"),
+                _notebook_payload(_PERSONAL, display_name="Nameless", created_by=None),
+            )
+        )
+
+        result = await lister.list_notebooks(client, created_by="a")
+
+        assert [notebook.name for notebook in result.notebooks] == ["Named"]
+
+    @pytest.mark.usefixtures("groups_route")
+    async def test_a_kept_notebook_keeps_every_section_whoever_made_it(
+        self,
+        client: GraphServiceClient,
+        notebooks_route: respx.Route,
+        sections_route: respx.Route,
+    ) -> None:
+        notebooks_route.mock(
+            return_value=_page(_notebook_payload(_ENGINEERING, created_by="Ada Lovelace"))
+        )
+        sections_route.mock(
+            return_value=_page(
+                _section_payload(_STANDUPS, display_name="By Ada", created_by="Ada Lovelace"),
+                _section_payload(_ROADMAP, display_name="By Grace", created_by="Grace Hopper"),
+                _section_payload(_SECTION_ONE, display_name="By nobody", created_by=None),
+            )
+        )
+
+        result = await lister.list_notebooks(client, created_by="ada")
+
+        assert [s.name for s in result.notebooks[0].sections] == ["By Ada", "By Grace", "By nobody"]
+
+    @pytest.mark.usefixtures("groups_route")
+    async def test_the_sections_of_a_notebook_it_left_out_are_not_listed(
+        self,
+        client: GraphServiceClient,
+        notebooks_route: respx.Route,
+        sections_route: respx.Route,
+    ) -> None:
+        notebooks_route.mock(
+            return_value=_page(
+                _notebook_payload(_ENGINEERING, created_by="Ada Lovelace"),
+                _notebook_payload(_PERSONAL, created_by="Grace Hopper"),
+            )
+        )
+        sections_route.mock(
+            return_value=_page(
+                _section_payload(_STANDUPS, notebook_id=_ENGINEERING),
+                _section_payload(_ROADMAP, notebook_id=_PERSONAL),
+            )
+        )
+
+        result = await lister.list_notebooks(client, created_by="grace")
+
+        assert [notebook.uri for notebook in result.notebooks] == [
+            OnenoteNotebookHandle(_PERSONAL).uri
+        ]
+        assert [s.uri for s in result.notebooks[0].sections] == [OnenoteSectionHandle(_ROADMAP).uri]
+
+    @pytest.mark.usefixtures("groups_route", "sections_route")
+    async def test_created_by_reads_past_the_first_page_of_notebooks(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get(_NOTEBOOKS, params={"$skiptoken": "second"}).mock(
+            return_value=_page(_notebook_payload(_PERSONAL, display_name="Late", created_by="Ada"))
+        )
+        graph.get(_NOTEBOOKS).mock(
+            return_value=_page(
+                _notebook_payload(_ENGINEERING, display_name="Early", created_by="Grace"),
+                next_link=f"{GRAPH_V1}{_NOTEBOOKS}?$skiptoken=second",
+            )
+        )
+
+        result = await lister.list_notebooks(client, created_by="ada")
+
+        assert [notebook.name for notebook in result.notebooks] == ["Late"]
+
+    async def test_created_by_sends_no_filter_and_no_extra_request(
+        self,
+        client: GraphServiceClient,
+        notebooks_route: respx.Route,
+        sections_route: respx.Route,
+        groups_route: respx.Route,
+    ) -> None:
+        _ = await lister.list_notebooks(client, created_by="ada")
+
+        assert "$filter" not in notebooks_route.calls.last.request.url.params
+        assert "$filter" not in sections_route.calls.last.request.url.params
+        assert "$filter" not in groups_route.calls.last.request.url.params
+        assert notebooks_route.call_count == 1
+        assert sections_route.call_count == 1
+        assert groups_route.call_count == 1
+
+    @pytest.mark.usefixtures("sections_route", "groups_route")
+    async def test_created_by_joins_the_server_side_filters_without_adding_a_clause(
+        self, client: GraphServiceClient, notebooks_route: respx.Route
+    ) -> None:
+        _ = await lister.list_notebooks(client, name_contains="Eng", created_by="ada", shared=True)
+
+        assert notebooks_route.calls.last.request.url.params["$filter"] == (
+            "contains(tolower(displayName),'eng') and isShared eq true"
+        )
+
+
+class TestTheOrder:
+    @pytest.mark.parametrize(
+        ("order_by", "clause"),
+        [
+            ("name_asc", "displayName asc"),
+            ("name_desc", "displayName desc"),
+            ("created_desc", "createdDateTime desc"),
+            ("created_asc", "createdDateTime asc"),
+            ("last_modified_desc", "lastModifiedDateTime desc"),
+            ("last_modified_asc", "lastModifiedDateTime asc"),
+        ],
+    )
+    async def test_order_by_becomes_the_matching_orderby_on_notebooks_and_sections(
+        self,
+        client: GraphServiceClient,
+        notebooks_route: respx.Route,
+        sections_route: respx.Route,
+        groups_route: respx.Route,
+        order_by: ContainerOrderBy,
+        clause: str,
+    ) -> None:
+        _ = await lister.list_notebooks(client, order_by=order_by)
+
+        assert notebooks_route.calls.last.request.url.params["$orderby"] == clause
+        assert sections_route.calls.last.request.url.params["$orderby"] == clause
+        assert "$orderby" not in groups_route.calls.last.request.url.params
+
+    async def test_no_order_by_sends_no_orderby_on_any_call(
+        self,
+        client: GraphServiceClient,
+        notebooks_route: respx.Route,
+        sections_route: respx.Route,
+        groups_route: respx.Route,
+    ) -> None:
+        _ = await lister.list_notebooks(client)
+
+        assert "$orderby" not in notebooks_route.calls.last.request.url.params
+        assert "$orderby" not in sections_route.calls.last.request.url.params
+        assert "$orderby" not in groups_route.calls.last.request.url.params
+
+    @pytest.mark.usefixtures("groups_route")
+    async def test_the_sections_of_each_notebook_keep_the_order_graph_listed_them_in(
+        self,
+        client: GraphServiceClient,
+        notebooks_route: respx.Route,
+        sections_route: respx.Route,
+    ) -> None:
+        notebooks_route.mock(
+            return_value=_page(
+                _notebook_payload(_PERSONAL, display_name="Personal"),
+                _notebook_payload(_ENGINEERING, display_name="Engineering"),
+            )
+        )
+        sections_route.mock(
+            return_value=_page(
+                _section_payload(_SECTION_ONE, display_name="Zulu", notebook_id=_ENGINEERING),
+                _section_payload(_SECTION_TWO, display_name="Yankee", notebook_id=_PERSONAL),
+                _section_payload(_SECTION_THREE, display_name="Alpha", notebook_id=_ENGINEERING),
+            )
+        )
+
+        result = await lister.list_notebooks(client, order_by="name_desc")
+
+        assert [notebook.name for notebook in result.notebooks] == ["Personal", "Engineering"]
+        assert [s.name for s in result.notebooks[1].sections] == ["Zulu", "Alpha"]
+
+
+class TestHowItDescribesItself:
+    async def _properties(self, transport: httpx.AsyncClient) -> Mapping[str, Mapping[str, object]]:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        lister.register(mcp, transport)
+        tool = await mcp.get_tool(lister.TOOL_NAME)
+        assert tool is not None, "register left the tool off the server"
+        return cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+
+    async def test_it_takes_the_five_narrowing_and_ordering_arguments(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        properties = await self._properties(transport)
+
+        assert set(properties) == {"name_contains", "created_by", "shared", "role", "order_by"}
+
+    async def test_order_by_offers_the_six_orders(self, transport: httpx.AsyncClient) -> None:
+        properties = await self._properties(transport)
+
+        offered = json.dumps(properties["order_by"])
+        for order in _ORDERS:
+            assert f'"{order}"' in offered
+
+    async def test_created_by_says_a_notebook_keeps_every_section(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        properties = await self._properties(transport)
+
+        described = cast("str", properties["created_by"]["description"])
+        assert "every one of its sections" in described
+        assert "left out" in described
+
+    def test_the_capped_answer_names_created_by_among_the_notebook_only_narrowing_arguments(
+        self,
+    ) -> None:
+        described = lister.Notebooks.model_fields["capped"].description or ""
+
+        assert "`created_by`" in described
+        assert "narrow only the notebook listing" in described
