@@ -104,12 +104,18 @@ export class UniqueInternalClient {
     );
   }
 
-  public createChat(identity: EffectiveIdentity, assistantId: string): Promise<unknown> {
+  public createChat(
+    identity: EffectiveIdentity,
+    assistantId: string,
+    title: string,
+  ): Promise<unknown> {
     return this.graphql(
       this.config.uniqueChatUrl,
       identity,
-      `mutation A2aChatCreate($assistantId: String) { chatCreate(assistantId: $assistantId) { id } }`,
-      { assistantId },
+      `mutation A2aChatCreate($assistantId: String, $title: String) {
+        chatCreate(assistantId: $assistantId, title: $title, hasProvisionalTitle: true) { id }
+      }`,
+      { assistantId, title },
       'chatCreate',
     );
   }

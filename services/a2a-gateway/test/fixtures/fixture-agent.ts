@@ -100,7 +100,12 @@ function answer(parts: Part[], artifactId = 'answer'): Artifact {
 
 function textOf(message: Message): string {
   return message.parts
-    .map((part) => (part.content?.$case === 'text' ? part.content.value : ''))
+    .map((part) => {
+      if (part.content?.$case === 'text') {
+        return part.content.value;
+      }
+      return part.content?.$case === 'data' ? JSON.stringify(part.content.value) : '';
+    })
     .join('')
     .trim();
 }

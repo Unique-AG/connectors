@@ -65,6 +65,7 @@ const configSchema = z
       .int()
       .positive()
       .default(50 * 1024 * 1024),
+    ELICITATION_TIMEOUT_SECONDS: z.coerce.number().int().min(60).max(86_400).default(600),
     SYNC_WAIT_MAX_MS: z.coerce.number().int().positive().default(30_000),
     STREAM_TIMEOUT_MS: z.coerce
       .number()
@@ -127,6 +128,7 @@ const configSchema = z
     egressAllowedHosts: config.EGRESS_ALLOWED_HOSTS,
     egressAllowInsecure: config.EGRESS_ALLOW_INSECURE,
     maxRemoteFileBytes: config.MAX_REMOTE_FILE_BYTES,
+    elicitationTimeoutSeconds: config.ELICITATION_TIMEOUT_SECONDS,
     syncWaitMaxMs: config.SYNC_WAIT_MAX_MS,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
     taskRetentionDays: config.TASK_RETENTION_DAYS,

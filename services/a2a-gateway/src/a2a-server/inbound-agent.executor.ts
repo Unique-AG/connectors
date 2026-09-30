@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { type Task, TaskState } from '@a2a-js/sdk';
+import { type Message, type Task, TaskState } from '@a2a-js/sdk';
 import { TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import {
   AgentEvent,
@@ -42,6 +42,25 @@ const createdMessageSchema = z.object({
 const repliesSchema = z.object({ messages: z.array(z.object({ id: z.string().min(1) })) });
 
 const stoppedSchema = z.object({ stoppedStreamingAt: z.string().nullish() });
+
+/**
+ * A client answers a native question with a data part matching the form, or with text that
+ * fills a single-field form; the answer is always given by the same authenticated user.
+ */
+function elicitationContent(message: Message, schema: unknown): Record<string, unknown> {
+  const data = message.parts.find((part) => part.content?.$case === 'data')?.content;
+  if (data?.$case === 'data' && typeof data.value === 'object' && data.value !== null) {
+    return data.value as Record<string, unknown>;
+  }
+  const parsed = typeof schema === 'string' ? JSON.parse(schema) : schema;
+  const properties = Object.keys(
+    z.object({ properties: z.record(z.string(), z.unknown()) }).safeParse(parsed).data
+      ?.properties ?? {},
+  );
+  return {
+    [properties.length === 1 ? (properties[0] ?? 'answer') : 'answer']: messageText(message),
+  };
+}
 
 @Injectable()
 export class InboundAgentExecutor implements AgentExecutor {
@@ -142,7 +161,13 @@ export class InboundAgentExecutor implements AgentExecutor {
       // Files are owned by a chat, so the chat has to exist before they are uploaded.
       chatId = z
         .object({ id: z.string() })
-        .parse(await this.unique.createChat(identity, publication.assistantId)).id;
+        .parse(
+          await this.unique.createChat(
+            identity,
+            publication.assistantId,
+            content.text.slice(0, 80),
+          ),
+        ).id;
       await this.contexts.attachChat(identity, request.contextId, chatId);
     }
     const fileIds: string[] = [];
@@ -188,9 +213,12 @@ export class InboundAgentExecutor implements AgentExecutor {
     if (!elicitation) {
       throw new NotFoundException('no pending elicitation');
     }
-    await this.unique.respondToElicitation(identity, elicitation.id, 'ACCEPT', {
-      answer: messageText(request.userMessage),
-    });
+    await this.unique.respondToElicitation(
+      identity,
+      elicitation.id,
+      'ACCEPT',
+      elicitationContent(request.userMessage, elicitation.schema),
+    );
     eventBus.publish(
       AgentEvent.task({ ...current, status: taskStatus(TaskState.TASK_STATE_WORKING) }),
     );

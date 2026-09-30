@@ -21,6 +21,7 @@ import type { JsonValue, TaskContext } from 'absurd-sdk';
 import { z } from 'zod';
 import type { RequestIdentity } from '../auth/identity.guard.js';
 import { type ChatFile, ChatFilesService } from '../bridge/chat-files.service.js';
+import { answerParts, elicitationRequest } from '../bridge/elicitation-bridge.js';
 import {
   acceptsMediaType,
   isAllowedMediaType,
@@ -56,6 +57,20 @@ const fileSelection = z.object({ fileIds: z.array(z.string()).optional() });
 const abortState = z.object({ userAbortedAt: z.string().nullish() });
 
 const parentTurn = z.object({ parentChatId: z.string(), parentMessageId: z.string() });
+
+const elicitationState = z.object({
+  status: z.string(),
+  responseContent: z.unknown().optional(),
+  schema: z
+    .preprocess(
+      (value) => (typeof value === 'string' ? JSON.parse(value) : value),
+      z.record(z.string(), z.unknown()),
+    )
+    .nullish(),
+});
+
+const MAX_INTERACTION_ROUNDS = 10;
+const ELICITATION_POLL_MS = 2_000;
 
 type OutcomeState = Extract<ExecutionState, 'completed' | 'failed' | 'canceled' | 'unknown'>;
 
@@ -104,6 +119,12 @@ const MESSAGES = {
     'The external agent needs additional input or authorization, which this space does not support yet.',
   empty: 'The external agent returned no answer.',
   fileType: 'The external agent does not accept the attached file type',
+  authRequired:
+    "The external agent requires additional authorization that this space's shared connection does not provide. Ask a space administrator to update the connection's credentials.",
+  tooManyQuestions: 'The external agent asked for more input too many times and was stopped.',
+  noAnswer: 'No answer was provided in time, so the external agent was stopped.',
+  declined: 'The request to the external agent was declined.',
+  waitingForAnswer: 'The external agent needs more information. Please answer the question below.',
   fileTooLarge: 'An attached file exceeds the size limit for external agents.',
 } as const;
 
@@ -244,26 +265,194 @@ export class OutboundRunner implements OnModuleInit {
       await writer.progress(renderParts(turn.answerParts(), this.renderFile));
     };
     const streaming = card.capabilities?.streaming === true;
-    try {
-      await this.watch(execution, identity, deadlineAt, context, async (signal) => {
-        if (!execution.remoteTaskId) {
-          await this.send(execution, identity, session, streaming, turn, onUpdate, signal);
-        } else {
-          turn.taskId = execution.remoteTaskId;
-          await this.resume(client, streaming, turn, onUpdate, signal);
+    const watched = async (work: (signal: AbortSignal) => Promise<void>): Promise<void> => {
+      try {
+        await this.watch(execution, identity, deadlineAt, context, work);
+      } catch (error) {
+        if (error instanceof Interrupted) {
+          throw await this.interrupt(client, turn, error.kind);
         }
+        throw peerFailure(error) ?? error;
+      }
+    };
+    await watched(async (signal) => {
+      if (!execution.remoteTaskId) {
+        await this.send(execution, identity, session, streaming, turn, onUpdate, signal);
+      } else {
+        turn.taskId = execution.remoteTaskId;
+        await this.resume(client, streaming, turn, onUpdate, signal);
+      }
+      await this.poll(client, turn, onUpdate, signal);
+    });
+    let elicitationId = execution.state === 'input-required' ? execution.elicitationId : null;
+    for (
+      let round = 1;
+      turn.phase === 'input-required' || turn.phase === 'auth-required';
+      round++
+    ) {
+      if (turn.phase === 'auth-required' || round > MAX_INTERACTION_ROUNDS) {
+        await this.cancelQuietly(client, turn);
+        return new Outcome(
+          'failed',
+          turn.phase === 'auth-required' ? MESSAGES.authRequired : MESSAGES.tooManyQuestions,
+          turn.phase,
+        );
+      }
+      const request = elicitationRequest(turn.prompt?.parts ?? []);
+      elicitationId ??= await this.askUser(execution, identity, writer, turn, request);
+      const answer = await this.awaitAnswer(
+        execution,
+        identity,
+        deadlineAt,
+        context,
+        elicitationId,
+      );
+      if (answer.state !== 'ACCEPTED') {
+        await this.cancelQuietly(client, turn);
+        return answer.state === 'EXPIRED'
+          ? new Outcome('failed', MESSAGES.noAnswer, 'elicitation-expired')
+          : new Outcome('canceled', MESSAGES.declined, 'elicitation-declined');
+      }
+      const followUp = this.followUp(
+        execution,
+        turn,
+        elicitationId,
+        answerParts(answer.content, answer.schema),
+      );
+      await this.executions.transition(identity, execution.id, 'working', { elicitationId: null });
+      elicitationId = null;
+      await watched(async (signal) => {
+        await this.sendFollowUp(client, streaming, followUp, turn, onUpdate, signal);
         await this.poll(client, turn, onUpdate, signal);
       });
-    } catch (error) {
-      if (error instanceof Interrupted) {
-        return this.interrupt(client, turn, error.kind);
-      }
-      throw peerFailure(error) ?? error;
     }
     const outcome = this.settle(turn);
     return outcome.state === 'completed'
       ? this.withFiles(turn, execution, identity, session, context)
       : outcome;
+  }
+
+  /** Shows the remote question in the chat, to the initiating human of a delegating agent too. */
+  private async askUser(
+    execution: Execution,
+    identity: RequestIdentity,
+    writer: ChatWriter,
+    turn: RemoteTurn,
+    request: ReturnType<typeof elicitationRequest>,
+  ): Promise<string> {
+    const parent = parentTurn.safeParse(execution.correlation);
+    const target = parent.success
+      ? { chatId: parent.data.parentChatId, messageId: parent.data.parentMessageId }
+      : { chatId: execution.chatId, messageId: execution.assistantMessageId };
+    const created = z.object({ id: z.string() }).parse(
+      await this.unique.createElicitation(identity, {
+        source: 'INTERNAL_TOOL',
+        toolName: 'a2a-external-agent',
+        mode: 'FORM',
+        message: request.message,
+        schema: request.schema,
+        ...target,
+        expiresInSeconds: this.config.elicitationTimeoutSeconds,
+        metadata: { a2aExecutionId: execution.id },
+      }),
+    );
+    await this.executions.transition(identity, execution.id, 'input-required', {
+      elicitationId: created.id,
+    });
+    const answered = renderParts(turn.answerParts(), this.renderFile);
+    await writer.progress(
+      [answered, `_${MESSAGES.waitingForAnswer}_`].filter(Boolean).join('\n\n'),
+    );
+    return created.id;
+  }
+
+  /** Waits durably for the human; the gateway never answers or approves on anyone's behalf. */
+  private async awaitAnswer(
+    execution: Execution,
+    identity: RequestIdentity,
+    deadlineAt: Date,
+    context: TaskContext,
+    elicitationId: string,
+  ): Promise<{ state: string; content?: unknown; schema?: Record<string, unknown> }> {
+    let answer: { state: string; content?: unknown; schema?: Record<string, unknown> } | undefined;
+    await this.watch(execution, identity, deadlineAt, context, async (signal) => {
+      while (!answer) {
+        const elicitation = elicitationState.parse(
+          await this.unique.getElicitation(identity, elicitationId),
+        );
+        if (elicitation.status !== 'PENDING') {
+          answer = {
+            state: elicitation.status,
+            content: elicitation.responseContent,
+            schema: elicitation.schema ?? undefined,
+          };
+          return;
+        }
+        await delay(ELICITATION_POLL_MS, undefined, { signal });
+      }
+    });
+    return answer ?? { state: 'CANCELLED' };
+  }
+
+  private followUp(
+    execution: Execution,
+    turn: RemoteTurn,
+    elicitationId: string,
+    parts: Part[],
+  ): Message {
+    return {
+      messageId: `${execution.id}:${elicitationId}`,
+      contextId: turn.contextId ?? '',
+      taskId: turn.taskId ?? '',
+      role: Role.ROLE_USER,
+      parts,
+      metadata: undefined,
+      extensions: [],
+      referenceTaskIds: [],
+    };
+  }
+
+  private async sendFollowUp(
+    client: Client,
+    streaming: boolean,
+    message: Message,
+    turn: RemoteTurn,
+    onUpdate: () => Promise<void>,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const request = {
+      tenant: '',
+      message,
+      configuration: {
+        acceptedOutputModes: OUTPUT_MODES,
+        taskPushNotificationConfig: undefined,
+        returnImmediately: true,
+      },
+      metadata: undefined,
+    };
+    if (streaming) {
+      for await (const event of client.sendMessageStream(request, { signal })) {
+        turn.apply(event);
+        await onUpdate();
+        if (turn.isSettled && turn.phase !== 'input-required') {
+          return;
+        }
+      }
+      return;
+    }
+    turn.apply(await client.sendMessage(request, { signal }));
+    await onUpdate();
+  }
+
+  private async cancelQuietly(client: Client, turn: RemoteTurn): Promise<void> {
+    if (!turn.taskId) {
+      return;
+    }
+    try {
+      await client.cancelTask({ tenant: '', id: turn.taskId, metadata: undefined });
+    } catch {
+      // The remote may not support or allow cancellation; the outcome is reported regardless.
+    }
   }
 
   private async connect(execution: Execution, identity: RequestIdentity): Promise<RemoteSession> {

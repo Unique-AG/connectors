@@ -23,7 +23,7 @@ export function normalizeMediaType(mediaType: string | undefined): string {
 export function safeFilename(name: string | undefined, fallback: string): string {
   const base = (name ?? '').split(/[\\/]/).pop() ?? '';
   const cleaned = base
-    .replace(/[\u0000-\u001f\u007f<>:"|?*]/g, '')
+    .replace(/[\p{Cc}<>:"|?*]/gu, '')
     .trim()
     .slice(0, 200);
   return cleaned || fallback;
