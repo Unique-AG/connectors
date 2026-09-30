@@ -118,6 +118,7 @@ jobs:
       service-name: kb-mcp
       service-version: ${{ needs.release-please.outputs['services/kb-mcp--version'] }}
       dockerfile: services/kb-mcp/deploy/Dockerfile
+      docs-path: services/kb-mcp/docs
 
   release-backstop-mcp:
     needs: release-please
