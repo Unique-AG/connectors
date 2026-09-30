@@ -33,6 +33,9 @@ dev = [
 testpaths = ["tests"]
 pythonpath = ["src"]
 
+[tool.uv]
+override-dependencies = ["pyjwt==2.14.0"]
+
 [tool.ruff]
 target-version = "py314"
 exclude = [".venv"]

@@ -85,7 +85,7 @@ reportUnusedFunction = false
 reportCallInDefaultInitializer = false
 
 [tool.uv]
-override-dependencies = ["fastmcp==4.0.5"]
+override-dependencies = ["fastmcp==4.0.5", "pyjwt==2.14.0"]
 
 [tool.uv.sources]
 mcp-credential-auth = { path = "../../packages/mcp-credential-auth" }

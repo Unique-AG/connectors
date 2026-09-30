@@ -88,4 +88,4 @@ reportDeprecated = "none"
 reportUnannotatedClassAttribute = "none"
 
 [tool.uv]
-override-dependencies = ["fastmcp==4.0.10"]
+override-dependencies = ["fastmcp==4.0.10", "pyjwt==2.14.0"]
