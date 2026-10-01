@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/Unique-AG/connectors/compare/with-intelligence-mcp@0.1.0...with-intelligence-mcp@0.1.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* **with-intelligence-mcp:** block metrics without gateway JWT ([#1157](https://github.com/Unique-AG/connectors/issues/1157)) ([046e55c](https://github.com/Unique-AG/connectors/commit/046e55c6e516904a0111d35408da30f4944bc9ac))
+
 ## 0.1.0 (2026-09-30)
 
 
