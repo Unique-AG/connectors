@@ -30,6 +30,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphFailure, GraphForbidden, GraphNotFound
+from office_365_mcp.shared.files import NAME_RULES
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -286,13 +287,13 @@ class TestWhatItRefuses:
         [
             (_FILE_URI, "Q1/Q2.docx", "The name contains `/`."),
             (_FILE_URI, "Plan?.docx", "The name contains `?`."),
-            (_FILE_URI, "~Plan.docx", "The name starts with `~`."),
+            (_FILE_URI, 'Plan "final".docx', 'The name contains `"`.'),
+            (_FILE_URI, "~$Plan.docx", "The name starts with `~$`."),
             (_FILE_URI, "   ", "The name is empty or has only spaces in it."),
-            (_FOLDER_URI, "Reports.", "The name ends with a period."),
         ],
-        ids=["slash", "question-mark", "leading-tilde", "blank", "folder-trailing-period"],
+        ids=["slash", "question-mark", "double-quote", "tilde-dollar", "blank"],
     )
-    async def test_a_name_onedrive_does_not_accept_never_reaches_graph(
+    async def test_a_name_microsoft_does_not_allow_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, item: str, name: str, reason: str
     ) -> None:
         with pytest.raises(ToolError, match="Nothing was changed") as refused:
@@ -310,6 +311,16 @@ class TestWhatItRefuses:
         _ = await _rename(client, name="Plan.")
 
         assert patch.call_count == 1
+
+    async def test_a_folder_name_that_ends_with_a_period_reaches_the_patch(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _pre_reads(graph, _item_payload(name="Reports", folder=True))
+        patch = _patches(graph, _item_payload(name="Reports.", folder=True))
+
+        _ = await _rename(client, item=_FOLDER_URI, name="Reports.")
+
+        assert _sent(patch)["name"] == "Reports."
 
     async def test_the_top_folder_of_a_drive_is_refused_after_the_read_and_nobody_is_asked(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -904,3 +915,11 @@ class TestHowItDeclaresItself:
 
         words = len(str(properties[argument]["description"]).split())
         assert 15 <= words <= 60, f"{argument} is described in {words} words"
+
+    async def test_the_name_description_states_the_name_rules(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+
+        assert NAME_RULES in str(properties["name"]["description"])

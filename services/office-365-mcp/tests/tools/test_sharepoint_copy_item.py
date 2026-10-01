@@ -32,6 +32,7 @@ from office_365_mcp.graph_client import (
     GraphNotFound,
     GraphUnavailable,
 )
+from office_365_mcp.shared.files import NAME_RULES
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -390,8 +391,8 @@ class TestWhatItRefuses:
 
         assert len(_made(graph)) == 0
 
-    @pytest.mark.parametrize("name", ["Q1/Q2.docx", "~Plan.docx", "Plan#2.docx", "   "])
-    async def test_a_name_that_onedrive_refuses_never_reaches_graph(
+    @pytest.mark.parametrize("name", ["Q1/Q2.docx", "~$Plan.docx", 'Plan "2".docx', "   "])
+    async def test_a_name_that_microsoft_does_not_allow_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, name: str
     ) -> None:
         with pytest.raises(ToolError, match="Nothing was changed"):
@@ -399,13 +400,16 @@ class TestWhatItRefuses:
 
         assert len(_made(graph)) == 0
 
-    async def test_a_folder_copy_refuses_a_name_that_ends_with_a_period(
+    async def test_a_folder_copy_named_with_a_trailing_period_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        with pytest.raises(ToolError, match="ends with a period"):
-            _ = await _copy(client, item=_FOLDER_URI, name="Q1.")
+        _ = _reads(graph, _FOLDER_PATH, _folder(item_id=_FOLDER_ID, name="Q1", drive_id=_DRIVE_ID))
+        _ = _reads(graph, _DESTINATION_PATH, _folder())
+        copy = _accepts(graph, f"{_FOLDER_PATH}/copy")
 
-        assert len(_made(graph)) == 0
+        _ = await _copy(client, item=_FOLDER_URI, name="Q1.")
+
+        assert _sent(copy)["name"] == "Q1."
 
     async def test_a_file_copy_takes_a_name_that_ends_with_a_period(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -905,6 +909,15 @@ class TestHowItDeclaresItself:
             for name, schema in _properties(parameters).items()
         }
         assert all(15 <= count <= 60 for count in counts.values()), counts
+
+    async def test_the_name_description_states_the_name_rules(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        described = str(_properties(parameters)["name"]["description"])
+        assert NAME_RULES in described
+        assert "do not accept" not in described
 
     def test_every_answer_field_is_described_in_15_to_60_words(self) -> None:
         counts = {

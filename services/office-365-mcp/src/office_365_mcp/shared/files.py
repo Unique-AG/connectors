@@ -193,30 +193,34 @@ async def item_for_a_question(client: GraphServiceClient, drive_id: str, item_id
     return found
 
 
-_RESERVED_CHARACTERS = "/\\*<>?:|#%"
+_RESERVED_CHARACTERS = '"*:<>?/\\|'
+
+_RESERVED_PREFIX = "~$"
 
 _EVERY_RESERVED_CHARACTER = " ".join(f"`{character}`" for character in _RESERVED_CHARACTERS)
 
-_NAME_NOT_ACCEPTED = "Nothing was changed, because OneDrive and SharePoint do not accept this name."
+NAME_RULES = (
+    f"The name must not contain any of these characters: {' '.join(_RESERVED_CHARACTERS)}. It "
+    + f"must not start with `{_RESERVED_PREFIX}`."
+)
+
+_NAME_NOT_ALLOWED = (
+    "Nothing was changed, because Microsoft does not allow this name in OneDrive and SharePoint."
+)
 
 _BLANK_NAME = (
     "The name is empty or has only spaces in it. Use a name with at least one other character."
 )
 
-_LEADING_TILDE = (
-    "The name starts with `~`. A file or folder name must not start with `~`. Remove the `~` at "
-    + "the start."
-)
-
-_TRAILING_PERIOD = (
-    "The name ends with a period. A folder name must not end with a period. Remove the period at "
-    + "the end."
+_STARTS_WITH_THE_RESERVED_PREFIX = (
+    f"The name starts with `{_RESERVED_PREFIX}`. A file or folder name must not start with "
+    + f"`{_RESERVED_PREFIX}`. Remove the `{_RESERVED_PREFIX}` at the start."
 )
 
 _SAME_NAME_FAILS = "This same value fails again, so do not retry it."
 
 
-def unusable_name(name: str, *, folder: bool) -> str | None:
+def unusable_name(name: str) -> str | None:
     if not name.strip():
         return _name_refusal(_BLANK_NAME)
     reserved = [
@@ -226,8 +230,7 @@ def unusable_name(name: str, *, folder: bool) -> str | None:
         problem
         for problem, applies in (
             (_reserved(reserved), bool(reserved)),
-            (_LEADING_TILDE, name.startswith("~")),
-            (_TRAILING_PERIOD, folder and name.endswith(".")),
+            (_STARTS_WITH_THE_RESERVED_PREFIX, name.startswith(_RESERVED_PREFIX)),
         )
         if applies
     ]
@@ -242,4 +245,4 @@ def _reserved(found: list[str]) -> str:
 
 
 def _name_refusal(*problems: str) -> str:
-    return " ".join((_NAME_NOT_ACCEPTED, *problems, _SAME_NAME_FAILS))
+    return " ".join((_NAME_NOT_ALLOWED, *problems, _SAME_NAME_FAILS))

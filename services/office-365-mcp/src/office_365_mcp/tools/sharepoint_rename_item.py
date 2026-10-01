@@ -12,7 +12,12 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.files import DriveItemSummary, item_for_a_question, unusable_name
+from office_365_mcp.shared.files import (
+    NAME_RULES,
+    DriveItemSummary,
+    item_for_a_question,
+    unusable_name,
+)
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
@@ -107,7 +112,7 @@ async def rename_item(
     handle = drive_item_handle(item)
     if handle is None:
         raise ToolError(_NOT_AN_ITEM_HANDLE)
-    unusable = unusable_name(name, folder=isinstance(handle, DriveFolderHandle))
+    unusable = unusable_name(name)
     if unusable is not None:
         raise ToolError(unusable)
 
@@ -202,9 +207,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The new name for the file or folder, as the user writes it. The answer's "
-                    + "`item.name` is what Microsoft stored. Read the new name from the answer, "
-                    + "not from this argument."
+                    "The new name for the file or folder, as the user writes it. "
+                    + NAME_RULES
+                    + " The answer's `item.name` is what Microsoft stored. Read the new name from "
+                    + "the answer, not from this argument."
                 ),
             ),
         ],

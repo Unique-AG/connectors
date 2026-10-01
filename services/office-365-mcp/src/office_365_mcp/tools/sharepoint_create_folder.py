@@ -22,6 +22,7 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
+    NAME_RULES,
     DriveItemSummary,
     item_for_a_question,
     unusable_name,
@@ -108,7 +109,7 @@ async def create_folder(
     handle = drive_folder_handle(parent)
     if handle is None:
         raise ToolError(_NOT_A_FOLDER_HANDLE)
-    unusable = unusable_name(name, folder=True)
+    unusable = unusable_name(name)
     if unusable is not None:
         raise ToolError(unusable)
 
@@ -208,9 +209,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The name of the new folder, as the user writes it. It must not contain any "
-                    + "of these characters: / \\ * < > ? : | # %. It must not start with `~` or "
-                    + "end with a period. The answer's `name` is what Microsoft stored."
+                    "The name of the new folder, as the user writes it. "
+                    + NAME_RULES
+                    + " The answer's `name` is what Microsoft stored."
                 ),
             ),
         ],

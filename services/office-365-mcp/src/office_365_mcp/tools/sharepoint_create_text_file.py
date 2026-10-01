@@ -23,6 +23,7 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
+    NAME_RULES,
     DriveItemSummary,
     item_for_a_question,
     unusable_name,
@@ -150,7 +151,7 @@ async def create_text_file(
     handle = drive_folder_handle(folder)
     if handle is None:
         raise ToolError(_NOT_A_FOLDER_HANDLE)
-    refused_name = unusable_name(name, folder=False) or _not_text(name)
+    refused_name = unusable_name(name) or _not_text(name)
     if refused_name is not None:
         raise ToolError(refused_name)
 
@@ -274,8 +275,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The name of the new file, with its extension. The extension must be one of "
-                    + f"{_EVERY_TEXT_EXTENSION}. The name must not contain any of these "
-                    + "characters: / \\ * < > ? : | # %. It must not start with `~`."
+                    + f"{_EVERY_TEXT_EXTENSION}. {NAME_RULES}"
                 ),
             ),
         ],

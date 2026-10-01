@@ -30,7 +30,7 @@ from office_365_mcp.graph_client import (
     GraphNotFound,
     GraphUnavailable,
 )
-from office_365_mcp.shared.files import DriveItemSummary
+from office_365_mcp.shared.files import NAME_RULES, DriveItemSummary
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
@@ -245,6 +245,21 @@ class TestWhatItSendsToGraph:
             + f"?{_CONFLICT_FAILS}"
         )
 
+    @pytest.mark.parametrize(
+        ("name", "encoded"), [("a#b.txt", "a%23b.txt"), ("50%.txt", "50%25.txt")]
+    )
+    async def test_a_hash_or_a_percent_sign_in_the_name_is_percent_encoded_on_the_wire(
+        self, client: GraphServiceClient, graph: respx.MockRouter, name: str, encoded: str
+    ) -> None:
+        _ = _reads_folder(graph)
+        route = _writes(graph, _created_payload(name=name))
+
+        _ = await _create(client, name=name)
+
+        assert _sent_path(route) == (
+            f"/v1.0/drives/{_DRIVE_ID}/items/{_FOLDER_ID}:/{encoded}:/content?{_CONFLICT_FAILS}"
+        )
+
     async def test_the_ids_of_the_handle_are_percent_encoded_on_the_wire(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -361,11 +376,11 @@ class TestWhatItRefusesBeforeGraph:
         assert "`parent_uri`" in str(refused.value)
         assert "`root_uri`" in str(refused.value)
 
-    @pytest.mark.parametrize("name", ["a/b.txt", "a#b.txt", "50%.txt", "~notes.txt", "   "])
-    async def test_a_name_onedrive_does_not_accept_never_reaches_graph(
+    @pytest.mark.parametrize("name", ["a/b.txt", "a:b.txt", 'a"b.txt', "~$notes.txt", "   "])
+    async def test_a_name_microsoft_does_not_allow_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, name: str
     ) -> None:
-        with pytest.raises(ToolError, match="do not accept this name"):
+        with pytest.raises(ToolError, match="does not allow this name"):
             _ = await _create(client, name=name)
 
         assert _calls(graph) == []
@@ -819,6 +834,7 @@ class TestHowItDeclaresItself:
 
         description = cast("str", _properties(parameters)["name"]["description"])
         assert all(f"`.{extension}`" in description for extension in creator.TEXT_EXTENSIONS)
+        assert NAME_RULES in description
 
     async def test_the_description_carries_the_canonical_sentences(
         self, transport: httpx.AsyncClient

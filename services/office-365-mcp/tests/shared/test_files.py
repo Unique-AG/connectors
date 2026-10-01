@@ -13,6 +13,7 @@ from office_365_mcp.graph_client import GraphNotFound, request_with_query
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
     ITEM_FIELDS,
+    NAME_RULES,
     DriveItemSummary,
     item_for_a_question,
     unusable_name,
@@ -23,7 +24,7 @@ _FOLDER_ID = "01SYNTHETICFOLDER0001"
 
 _FOLDER_PATH = "/drives/b%21SYNTHETICDRIVE0001/items/01SYNTHETICFOLDER0001"
 
-_RESERVED = "/\\*<>?:|#%"
+_RESERVED = '"*:<>?/\\|'
 
 
 def _item(created_by: IdentitySet | None) -> DriveItem:
@@ -62,45 +63,40 @@ class TestDriveItemSummaryCreatedBy:
 
 
 class TestUnusableName:
-    @pytest.mark.parametrize("folder", [True, False])
     @pytest.mark.parametrize("character", list(_RESERVED))
-    def test_a_reserved_character_is_refused_and_named(self, character: str, folder: bool) -> None:
-        refusal = unusable_name(f"Q1{character}Q2", folder=folder)
+    def test_a_reserved_character_is_refused_and_named(self, character: str) -> None:
+        refusal = unusable_name(f"Q1{character}Q2")
 
         assert refusal is not None
         assert f"The name contains `{character}`." in refusal
 
-    def test_the_refusal_lists_every_reserved_character(self) -> None:
-        refusal = unusable_name("Q1/Q2", folder=False)
+    def test_the_refusal_lists_every_reserved_character_in_order(self) -> None:
+        refusal = unusable_name("Q1/Q2")
 
         assert refusal is not None
-        assert "`/` `\\` `*` `<` `>` `?` `:` `|` `#` `%`" in refusal
+        assert '`"` `*` `:` `<` `>` `?` `/` `\\` `|`' in refusal
 
-    @pytest.mark.parametrize("folder", [True, False])
-    def test_a_leading_tilde_is_refused(self, folder: bool) -> None:
-        refusal = unusable_name("~draft.docx", folder=folder)
+    def test_the_name_rules_list_every_reserved_character_and_the_reserved_start(self) -> None:
+        assert '" * : < > ? / \\ |.' in NAME_RULES
+        assert "It must not start with `~$`." in NAME_RULES
 
-        assert refusal is not None
-        assert "The name starts with `~`." in refusal
-
-    def test_a_folder_name_that_ends_with_a_period_is_refused(self) -> None:
-        refusal = unusable_name("Reports.", folder=True)
+    def test_a_name_that_starts_with_a_tilde_and_a_dollar_sign_is_refused(self) -> None:
+        refusal = unusable_name("~$draft.docx")
 
         assert refusal is not None
-        assert "The name ends with a period." in refusal
+        assert "The name starts with `~$`." in refusal
 
-    def test_a_file_name_that_ends_with_a_period_is_usable(self) -> None:
-        assert unusable_name("Reports.", folder=False) is None
+    @pytest.mark.parametrize("name", ["~draft", "Q3 #1", "50%", "Reports."])
+    def test_hash_percent_a_lone_tilde_and_a_trailing_period_are_usable(self, name: str) -> None:
+        assert unusable_name(name) is None
 
-    @pytest.mark.parametrize("folder", [True, False])
     @pytest.mark.parametrize("name", ["", " ", "\t\n"])
-    def test_a_blank_name_is_refused(self, name: str, folder: bool) -> None:
-        refusal = unusable_name(name, folder=folder)
+    def test_a_blank_name_is_refused(self, name: str) -> None:
+        refusal = unusable_name(name)
 
         assert refusal is not None
         assert "The name is empty or has only spaces in it." in refusal
 
-    @pytest.mark.parametrize("folder", [True, False])
     @pytest.mark.parametrize(
         "name",
         [
@@ -111,25 +107,27 @@ class TestUnusableName:
             "v1.2 notes",
         ],
     )
-    def test_spaces_non_ascii_letters_and_inner_marks_are_usable(
-        self, name: str, folder: bool
-    ) -> None:
-        assert unusable_name(name, folder=folder) is None
+    def test_spaces_non_ascii_letters_and_inner_marks_are_usable(self, name: str) -> None:
+        assert unusable_name(name) is None
 
     def test_one_refusal_names_every_problem(self) -> None:
-        refusal = unusable_name("~Q1/Q2#3/Q4.", folder=True)
+        refusal = unusable_name('~$Q1/Q2"3')
 
         assert refusal is not None
-        assert "The name contains `/` and `#`." in refusal
-        assert "The name starts with `~`." in refusal
-        assert "The name ends with a period." in refusal
+        assert 'The name contains `/` and `"`.' in refusal
+        assert "The name starts with `~$`." in refusal
 
-    def test_a_refusal_says_that_nothing_changed_and_not_to_retry(self) -> None:
-        refusal = unusable_name("Q1|Q2", folder=False)
+    @pytest.mark.parametrize("name", ["Q1|Q2", "~$Q1", "   "])
+    def test_a_refusal_says_that_nothing_changed_and_not_to_retry(self, name: str) -> None:
+        refusal = unusable_name(name)
 
         assert refusal is not None
-        assert refusal.startswith("Nothing was changed")
+        assert refusal.startswith(
+            "Nothing was changed, because Microsoft does not allow this name in OneDrive and "
+            + "SharePoint."
+        )
         assert refusal.endswith("This same value fails again, so do not retry it.")
+        assert "do not accept" not in refusal
 
 
 class TestItemForAQuestion:

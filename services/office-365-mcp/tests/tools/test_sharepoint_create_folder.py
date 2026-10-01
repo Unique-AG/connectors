@@ -32,7 +32,7 @@ from office_365_mcp.graph_client import (
     GraphNotFound,
     GraphUnavailable,
 )
-from office_365_mcp.shared.files import DriveItemSummary
+from office_365_mcp.shared.files import NAME_RULES, DriveItemSummary
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -293,14 +293,26 @@ class TestWhatItRefuses:
         with pytest.raises(ToolError, match="A file handle"):
             _ = await _create(client, parent=DriveFileHandle(_DRIVE_ID, _PARENT_ID).uri)
 
-    @pytest.mark.parametrize("name", ["Q1/Q2", "Q1:Q2", "~draft", "Reports.", " "])
-    async def test_a_name_onedrive_does_not_accept_never_reaches_graph(
+    @pytest.mark.parametrize("name", ["Q1/Q2", "Q1:Q2", 'Q1"Q2', "~$draft", " "])
+    async def test_a_name_microsoft_does_not_allow_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, name: str
     ) -> None:
-        with pytest.raises(ToolError, match="do not accept this name"):
+        with pytest.raises(ToolError, match="does not allow this name"):
             _ = await _create(client, name=name)
 
         assert len(graph.calls) == 0
+
+    @pytest.mark.parametrize("name", ["Q3 #1", "50%", "~draft", "Reports."])
+    async def test_a_name_microsoft_can_accept_reaches_the_create(
+        self, client: GraphServiceClient, graph: respx.MockRouter, name: str
+    ) -> None:
+        _ = _reads(graph)
+        post = _creates(graph, _created_payload(name=name))
+
+        _ = await _create(client, name=name)
+
+        body = cast("Mapping[str, object]", json.loads(_made(post)[0].request.content))
+        assert body["name"] == name
 
     async def test_an_item_that_is_not_a_folder_is_refused_before_anything_is_asked(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -730,6 +742,14 @@ class TestHowItDeclaresItself:
         ):
             assert tool in described
         assert "`root_uri` of a drive" in described
+
+    async def test_the_name_description_states_the_name_rules(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        assert NAME_RULES in cast("str", properties["name"]["description"])
 
     @pytest.mark.parametrize("word", ["client", "ctx", "context", "token", "graph"])
     async def test_no_wiring_of_this_server_is_published_as_an_argument(

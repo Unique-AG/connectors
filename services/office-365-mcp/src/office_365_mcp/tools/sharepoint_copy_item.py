@@ -23,7 +23,12 @@ from office_365_mcp.graph_client import (
     not_graph,
     request_with_query,
 )
-from office_365_mcp.shared.files import FAIL_ON_CONFLICT, item_for_a_question, unusable_name
+from office_365_mcp.shared.files import (
+    FAIL_ON_CONFLICT,
+    NAME_RULES,
+    item_for_a_question,
+    unusable_name,
+)
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -159,7 +164,7 @@ async def copy_item(
     if destination is None:
         raise ToolError(_NOT_A_FOLDER_HANDLE)
     if name is not None:
-        unusable = unusable_name(name, folder=isinstance(source, DriveFolderHandle))
+        unusable = unusable_name(name)
         if unusable is not None:
             raise ToolError(unusable)
 
@@ -297,8 +302,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "A new name for the copy, with the extension for a file. Omit it to keep the "
-                    + "name of the original. This tool refuses a name that OneDrive and SharePoint "
-                    + "do not accept, and then nothing is copied."
+                    + f"name of the original. {NAME_RULES} If the name does not obey these rules, "
+                    + "this tool copies nothing."
                 ),
             ),
         ] = None,
