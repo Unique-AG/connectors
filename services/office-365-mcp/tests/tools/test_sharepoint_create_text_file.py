@@ -30,7 +30,7 @@ from office_365_mcp.graph_client import (
     GraphNotFound,
     GraphUnavailable,
 )
-from office_365_mcp.shared.files import NAME_RULES, DriveItemSummary
+from office_365_mcp.shared.files import FOLDER_HANDLE_SOURCES, NAME_RULES, DriveItemSummary
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
@@ -76,12 +76,16 @@ def _folder_payload(
     is_folder: bool = True,
     is_root: bool = False,
     drive_type: str = "business",
+    parent_path: str | None = None,
 ) -> dict[str, object]:
+    parent: dict[str, object] = {"driveId": _DRIVE_ID, "driveType": drive_type, "id": _ROOT_ID}
+    if parent_path is not None:
+        parent["path"] = parent_path
     payload: dict[str, object] = {
         "id": item_id,
         "name": name,
         "webUrl": f"https://contoso.sharepoint.invalid/items/{item_id}",
-        "parentReference": {"driveId": _DRIVE_ID, "driveType": drive_type, "id": _ROOT_ID},
+        "parentReference": parent,
     }
     if is_folder:
         payload["folder"] = {"childCount": 2}
@@ -375,6 +379,7 @@ class TestWhatItRefusesBeforeGraph:
         assert "sharepoint_browse_folder" in str(refused.value)
         assert "`parent_uri`" in str(refused.value)
         assert "`root_uri`" in str(refused.value)
+        assert FOLDER_HANDLE_SOURCES in str(refused.value)
 
     @pytest.mark.parametrize("name", ["a/b.txt", "a:b.txt", 'a"b.txt', "~$notes.txt", "   "])
     async def test_a_name_microsoft_does_not_allow_never_reaches_graph(
@@ -485,6 +490,20 @@ class TestThePersonBetweenTheRequestAndTheFile:
         assert asked == [
             "Create the text file 'notes.txt' (12 characters) in the folder 'Reports'? "
             + "It starts: 'Ship it now.'"
+        ]
+
+    async def test_the_question_names_the_folder_by_its_path_from_the_top(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads_folder(graph, _folder_payload(parent_path="/drive/root:/Finance%20Team"))
+        _ = _writes(graph)
+        asked: list[str] = []
+
+        _ = await _create(client, confirm=_asking(asked))
+
+        assert asked == [
+            "Create the text file 'notes.txt' (12 characters) in the folder "
+            + "'/Finance Team/Reports'? It starts: 'Ship it now.'"
         ]
 
     async def test_the_top_folder_of_a_drive_is_named_as_such(
@@ -827,6 +846,7 @@ class TestHowItDeclaresItself:
         for tool in (
             "sharepoint_browse_folder",
             "sharepoint_search_files",
+            "sharepoint_resolve_url",
             "sharepoint_list_drives",
         ):
             assert tool in described

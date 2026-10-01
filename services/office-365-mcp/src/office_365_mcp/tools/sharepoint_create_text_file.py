@@ -22,10 +22,10 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
+    FOLDER_HANDLE_SOURCES,
     NAME_RULES,
-    TOP_FOLDER_LABEL,
-    UNNAMED_FOLDER_LABEL,
     DriveItemSummary,
+    folder_label,
     item_for_a_question,
     summary_after_write,
     unusable_name,
@@ -93,11 +93,10 @@ sharepoint_browse_folder does not show a file named `name`.
 
 _NOT_A_FOLDER_HANDLE = (
     "No file was created. sharepoint_create_text_file takes a folder handle in `folder`. It looks "
-    + "like sharepoint:///folders/{drive_id}/{item_id}. Take it from the `uri` of a folder, or "
-    + "from the `parent_uri` of an item, in a sharepoint_browse_folder or sharepoint_search_files "
-    + "result. The `root_uri` of a drive from sharepoint_list_drives is a folder handle too. Copy "
-    + "it word for word. A file handle, a folder name, a path and a web address are not folder "
-    + "handles. This same value fails again, so do not retry it."
+    + "like sharepoint:///folders/{drive_id}/{item_id}. "
+    + FOLDER_HANDLE_SOURCES
+    + " A file handle, a folder name, a path and a web address are not folder handles. This same "
+    + "value fails again, so do not retry it."
 )
 
 _NOT_TEXT = (
@@ -218,17 +217,9 @@ def _put_request(
 
 def _question(name: str, content: str, folder: DriveItem) -> str:
     return (
-        f"Create the text file {name!r} ({len(content)} characters) in {_folder_label(folder)}? "
+        f"Create the text file {name!r} ({len(content)} characters) in {folder_label(folder)}? "
         + f"It starts: {cut_for_a_question(content)!r}"
     )
-
-
-def _folder_label(folder: DriveItem) -> str:
-    if folder.root is not None:
-        return TOP_FOLDER_LABEL
-    if not folder.name:
-        return UNNAMED_FOLDER_LABEL
-    return f"the folder {folder.name!r}"
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -246,12 +237,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The folder that gets the new file: "
-                    + "sharepoint:///folders/{drive_id}/{item_id}. "
-                    + "Take the `uri` of a folder, or the `parent_uri` of an item, from "
-                    + "sharepoint_browse_folder or sharepoint_search_files. The `root_uri` of a "
-                    + "drive from sharepoint_list_drives is a folder handle too. A file handle, a "
-                    + "path, a folder name and a web address are not valid here."
+                    "The folder that gets the new file. "
+                    + FOLDER_HANDLE_SOURCES
+                    + " A file handle, a path and a web address are not folder handles."
                 ),
             ),
         ],
