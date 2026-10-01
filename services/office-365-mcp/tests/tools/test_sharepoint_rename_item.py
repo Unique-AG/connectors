@@ -923,7 +923,7 @@ class TestHowItDeclaresItself:
         )
         assert "This call is safe to repeat after a timeout." in description
 
-    async def test_the_description_says_what_it_changes_and_where_the_handle_comes_from(
+    async def test_the_description_says_what_it_changes_and_names_the_move_tool(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
@@ -931,10 +931,21 @@ class TestHowItDeclaresItself:
         description = tool.description or ""
         assert "Changes the name of one file or folder" in description
         assert "stays in the same folder" in description
-        assert "sharepoint_search_files" in description
-        assert "sharepoint_browse_folder" in description
+        assert "To move the item to another folder, use sharepoint_move_item." in " ".join(
+            description.split()
+        )
         assert "Write the extension in `name`, for example `Plan.docx`." in description
         assert "A name without it changes how the file opens." in description
+
+    async def test_the_lead_leaves_the_handle_sources_to_the_item_argument(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        lead = (tool.description or "").split("\n\nNotes:")[0]
+        assert "sharepoint_search_files" not in lead
+        assert "sharepoint_browse_folder" not in lead
+        assert "sharepoint_resolve_url" not in lead
 
     async def test_the_description_keeps_the_house_shape(
         self, transport: httpx.AsyncClient

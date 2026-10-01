@@ -48,8 +48,8 @@ _NOTHING_RENAMED = "The item was not renamed."
 
 _DESCRIPTION = """\
 Changes the name of one file or folder in OneDrive or SharePoint for the signed-in user. The item \
-stays in the same folder. Get its handle from sharepoint_search_files or sharepoint_browse_folder. \
-OneDrive and SharePoint can show the change to everyone who can open the folder.
+stays in the same folder. To move the item to another folder, use sharepoint_move_item. OneDrive \
+and SharePoint can show the change to everyone who can open the folder.
 
 Notes:
 - This tool asks the user to agree before it changes anything, every time.

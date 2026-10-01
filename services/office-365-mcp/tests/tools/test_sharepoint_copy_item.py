@@ -925,6 +925,16 @@ class TestHowItDeclaresItself:
         lead, _notes = (tool.description or "").split("\n\nNotes:\n")
         assert lead.endswith(_SHOWN_TO_OTHERS)
 
+    async def test_the_lead_leaves_the_handle_sources_to_the_arguments(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        lead = (tool.description or "").split("\n\nNotes:")[0]
+        assert "sharepoint_search_files" not in lead
+        assert "sharepoint_browse_folder" not in lead
+        assert "sharepoint_resolve_url" not in lead
+
     async def test_the_description_does_not_offer_a_way_to_follow_the_copy(
         self, transport: httpx.AsyncClient
     ) -> None:

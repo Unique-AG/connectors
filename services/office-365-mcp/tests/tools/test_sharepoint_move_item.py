@@ -1162,13 +1162,22 @@ class TestHowItDeclaresItself:
             _DELETE_AFTER_THE_COPY_SHOWS,
             "This call is safe to repeat after a timeout.",
             "To change the name, use sharepoint_rename_item.",
-            "Get both handles from sharepoint_search_files or sharepoint_browse_folder.",
         ],
     )
     async def test_the_description_says(self, transport: httpx.AsyncClient, sentence: str) -> None:
         _parameters, tool = await _registered(transport)
 
         assert sentence in " ".join((tool.description or "").split())
+
+    async def test_the_lead_leaves_the_handle_sources_to_the_arguments(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        lead = (tool.description or "").split("\n\nNotes:")[0]
+        assert "sharepoint_search_files" not in lead
+        assert "sharepoint_browse_folder" not in lead
+        assert "sharepoint_resolve_url" not in lead
 
     async def test_the_lead_paragraph_ends_with_who_can_see_the_change(
         self, transport: httpx.AsyncClient

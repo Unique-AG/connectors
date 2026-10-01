@@ -60,9 +60,8 @@ _TO_A_DIFFERENT_DRIVE = (
 
 _DESCRIPTION = f"""\
 Moves one file or folder into a different folder of the same drive, in OneDrive or SharePoint, \
-for the signed-in user. Get both handles from sharepoint_search_files or sharepoint_browse_folder. \
-The item keeps its name. To change the name, use sharepoint_rename_item. OneDrive and SharePoint \
-can show the change to everyone who can open the folder.
+for the signed-in user. The item keeps its name. To change the name, use sharepoint_rename_item. \
+OneDrive and SharePoint can show the change to everyone who can open the folder.
 
 Notes:
 - This tool asks the user to agree before it changes anything, every time.

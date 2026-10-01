@@ -64,7 +64,7 @@ _NO_EXPIRY = "The link does not expire unless your organization sets a limit."
 _DESCRIPTION = """\
 Creates a sharing link to one file or folder in OneDrive or SharePoint, and returns the web \
 address of the link. The user can then give the link to other people. This tool sends the link \
-to nobody. The item comes from sharepoint_search_files or sharepoint_browse_folder.
+to nobody. To share the item with named people, use sharepoint_invite.
 
 Notes:
 - This tool asks the user to agree before it creates anything, every time.

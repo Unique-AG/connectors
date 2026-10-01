@@ -774,8 +774,16 @@ class TestHowItDeclaresItself:
             description.casefold()
         )
         assert "top folder of a drive" in description
-        assert "sharepoint_browse_folder" in description
-        assert "sharepoint_search_files" in description
+
+    async def test_the_lead_leaves_the_handle_sources_to_the_item_argument(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        lead = (tool.description or "").split("\n\nNotes:")[0]
+        assert "sharepoint_search_files" not in lead
+        assert "sharepoint_browse_folder" not in lead
+        assert "sharepoint_resolve_url" not in lead
 
     async def test_the_description_keeps_the_house_shape(
         self, transport: httpx.AsyncClient
