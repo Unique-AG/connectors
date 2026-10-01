@@ -54,6 +54,7 @@ from office_365_mcp.tools import (
     outlook_suggest_meeting_times,
     outlook_update_event,
     sharepoint_browse_folder,
+    sharepoint_list_drives,
     sharepoint_read_file,
     sharepoint_search_files,
     teams_browse_channel,
@@ -153,6 +154,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_respond_to_invite,
     sharepoint_search_files,
     sharepoint_browse_folder,
+    sharepoint_list_drives,
     sharepoint_read_file,
     onenote_list_notebooks,
     onenote_list_pages,
@@ -283,10 +285,15 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_respond_to_invite",
         "outlook_create_event_on_behalf",
     ),
-    "sharepoint-search": ("sharepoint_search_files", "sharepoint_browse_folder"),
+    "sharepoint-search": (
+        "sharepoint_search_files",
+        "sharepoint_browse_folder",
+        "sharepoint_list_drives",
+    ),
     "sharepoint-read": (
         "sharepoint_search_files",
         "sharepoint_browse_folder",
+        "sharepoint_list_drives",
         "sharepoint_read_file",
     ),
     "onenote-read": (

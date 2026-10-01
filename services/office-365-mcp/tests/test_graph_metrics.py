@@ -686,6 +686,7 @@ GRAPH_STEPS = frozenset(
         "signed_in_user",
         "file_search",
         "my_drive",
+        "my_drives",
         "folder_children",
         "drive_item",
         "drive_content",

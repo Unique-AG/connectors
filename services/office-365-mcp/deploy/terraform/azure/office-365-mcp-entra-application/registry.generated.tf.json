@@ -263,6 +263,12 @@
           ]
         },
         {
+          "name": "sharepoint_list_drives",
+          "permissions": [
+            "Files.Read.All"
+          ]
+        },
+        {
           "name": "sharepoint_read_file",
           "permissions": [
             "Files.Read.All"
@@ -430,6 +436,7 @@
         "outlook_respond_to_invite",
         "sharepoint_search_files",
         "sharepoint_browse_folder",
+        "sharepoint_list_drives",
         "sharepoint_read_file",
         "onenote_list_notebooks",
         "onenote_list_pages",
@@ -574,11 +581,13 @@
         ],
         "sharepoint-search": [
           "sharepoint_search_files",
-          "sharepoint_browse_folder"
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives"
         ],
         "sharepoint-read": [
           "sharepoint_search_files",
           "sharepoint_browse_folder",
+          "sharepoint_list_drives",
           "sharepoint_read_file"
         ],
         "onenote-read": [
