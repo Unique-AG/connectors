@@ -20,6 +20,36 @@ from typing import get_args, get_origin
 import pytest
 from pydantic import BaseModel
 
+from with_intelligence_mcp.features.articles.api_responses import (
+    ArticleAuthorAttributes,
+    ArticleDocumentAttributes,
+    ArticleExtendedAttributes,
+    ArticleFirmAttributes,
+    ArticleListItemAttributes,
+)
+from with_intelligence_mcp.features.consultants.api_responses import (
+    ConsultantAddressAttributes,
+    ConsultantExtendedAttributes,
+    ConsultantListItemAttributes,
+    ConsultantStateAttributes,
+)
+from with_intelligence_mcp.features.funds.api_responses import (
+    FundAssetClassAttributes,
+    FundExtendedAttributes,
+    FundListItemAttributes,
+    FundStatusAttributes,
+    FundStatusLabelAttributes,
+)
+from with_intelligence_mcp.features.intentions.api_responses import (
+    IntentionAmountAttributes,
+    IntentionExtendedAttributes,
+    IntentionListItemAttributes,
+    IntentionPreferenceAttributes,
+    IntentionSegmentsAttributes,
+    IntentionStatusAttributes,
+    IntentionStatusLabelAttributes,
+    IntentionStrategyAttributes,
+)
 from with_intelligence_mcp.features.investments.api_responses import (
     CurrencyAmountAttributes,
     InvestmentAmountAttributes,
@@ -39,6 +69,12 @@ from with_intelligence_mcp.features.investors.api_responses import (
     LatestAumAttributes,
     StateAttributes,
     StrategyGroupAttributes,
+)
+from with_intelligence_mcp.features.managers.api_responses import (
+    ManagerAumAttributes,
+    ManagerContactAttributes,
+    ManagerExtendedAttributes,
+    ManagerListItemAttributes,
 )
 from with_intelligence_mcp.features.mandates.api_responses import (
     MandateAmountAttributes,
@@ -67,7 +103,7 @@ MODELS: dict[type[BaseModel], str | tuple[str, ...]] = {
     InvestorExtendedAttributes: "InvestorExtended",
     ClassificationAttributes: "Classification",
     EntityAttributes: "Entity",
-    CurrencyAttributes: "InvestorCurrency",
+    CurrencyAttributes: ("InvestorCurrency", "FundCurrency"),
     StateAttributes: "InvestorAddressState",
     LatestAumAttributes: "InvestorLatestAum",
     AddressAttributes: "InvestorAddress",
@@ -92,6 +128,32 @@ MODELS: dict[type[BaseModel], str | tuple[str, ...]] = {
     MandateInvestorAttributes: "MandateInstitutionalInvestor",
     MandateNoteAttributes: "MandateNote",
     PageInfo: "PaginatedResponsePagination",
+    FundListItemAttributes: "Fund",
+    FundExtendedAttributes: "FundExtended",
+    FundAssetClassAttributes: "FundAssetClass",
+    FundStatusAttributes: "FundStatus",
+    FundStatusLabelAttributes: "Classification",
+    ManagerListItemAttributes: "Manager",
+    ManagerExtendedAttributes: "ManagerExtended",
+    ManagerAumAttributes: "ManagerAum",
+    ManagerContactAttributes: "ManagerContact",
+    ConsultantListItemAttributes: "Consultant",
+    ConsultantExtendedAttributes: "ConsultantExtended",
+    ConsultantAddressAttributes: "ConsultantAddress",
+    ConsultantStateAttributes: "ConsultantAddressState",
+    ArticleListItemAttributes: "Article",
+    ArticleExtendedAttributes: "ArticleExtended",
+    ArticleFirmAttributes: "ArticleFirm",
+    ArticleAuthorAttributes: "ArticleAuthor",
+    ArticleDocumentAttributes: "ArticleDocument",
+    IntentionListItemAttributes: "Intention",
+    IntentionExtendedAttributes: "IntentionExtended",
+    IntentionAmountAttributes: ("IntentionAllocationAmount", "IntentionTicketSize"),
+    IntentionStatusAttributes: "IntentionStatus",
+    IntentionStatusLabelAttributes: "Classification",
+    IntentionStrategyAttributes: "IntentionStrategy",
+    IntentionSegmentsAttributes: "IntentionClassificationSegments",
+    IntentionPreferenceAttributes: "IntentionPreference",
 }
 
 # Places we knowingly differ, with the reason. A deviation that is not listed is a bug.
@@ -119,6 +181,30 @@ DELIBERATE: dict[tuple[type[BaseModel], str], str] = {
     (
         PersonRoleAttributes,
         "specialisms",
+    ): "declared a single Classification, delivered as a list of them",
+    (
+        FundExtendedAttributes,
+        "investment_regions",
+    ): "declared a single Classification, delivered as a list of them",
+    (
+        ManagerExtendedAttributes,
+        "administrator",
+    ): "declared a single Classification, delivered as a list of them",
+    (
+        ManagerExtendedAttributes,
+        "auditor",
+    ): "declared a single Classification, delivered as a list of them",
+    (
+        ManagerExtendedAttributes,
+        "custodian",
+    ): "declared a single Classification, delivered as a list of them",
+    (
+        ManagerExtendedAttributes,
+        "legal_advisor",
+    ): "declared a single Classification, delivered as a list of them",
+    (
+        ManagerExtendedAttributes,
+        "prime_broker",
     ): "declared a single Classification, delivered as a list of them",
 }
 

@@ -1,6 +1,6 @@
 {
   "_source": "https://api.withintelligence.com/v3/docs/json",
-  "_fetched": "2026-09-01",
+  "_fetched": "2026-09-30",
   "_roots": [
     "Investor",
     "InvestorExtended",
@@ -14,7 +14,17 @@
     "Mandate",
     "MandateExtended",
     "PaginatedMandate",
-    "Auth"
+    "Auth",
+    "Fund",
+    "FundExtended",
+    "Manager",
+    "ManagerExtended",
+    "Consultant",
+    "ConsultantExtended",
+    "Article",
+    "ArticleExtended",
+    "Intention",
+    "IntentionExtended"
   ],
   "schemas": {
     "AssetAllocation": {
@@ -1822,6 +1832,1573 @@
         "postcode",
         "state"
       ],
+      "additionalProperties": false
+    },
+    "Fund": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name", "updated_at"],
+      "additionalProperties": false
+    },
+    "FundExtended": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "accounting_method": {
+          "type": "string"
+        },
+        "agree_to_look_through": {
+          "type": "boolean"
+        },
+        "annualized_target_return": {
+          "type": "number"
+        },
+        "annualized_target_volatility": {
+          "type": "number",
+          "description": "Targeted annualised volatility (range) around performance targets"
+        },
+        "approaches": {
+          "description": "Management approach of fund",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_contacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fundraising_stage": {
+          "description": "Current fundraising stage of an open-end fund",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Classification"
+            }
+          ]
+        },
+        "fund_status": {
+          "description": "Current status of an open-end fund",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/FundStatus"
+            }
+          ]
+        },
+        "asset_classes": {
+          "description": "Classification of investments within a fund based on typical characteristics",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FundAssetClass"
+          }
+        },
+        "asset_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "attributes": {
+          "description": "Investment policy of fund",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "capital_structures": {
+          "description": "Terms of debt issued by companies alongside any equity used within the fund",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "closed_end_fund_date_reported": {
+          "$ref": "#/components/schemas/FundClosedEndFundDateReported"
+        },
+        "closed_end_fund_lifecycle": {
+          "$ref": "#/components/schemas/FundClosedEndFundLifecycle"
+        },
+        "closed_end_fund_management_fee": {
+          "$ref": "#/components/schemas/FundClosedEndFundManagementFee"
+        },
+        "closed_end_fund_performance_fee": {
+          "$ref": "#/components/schemas/FundClosedEndFundPerformanceFee"
+        },
+        "closed_end_fund_series": {
+          "$ref": "#/components/schemas/FundClosedEndFundSeries"
+        },
+        "closed_end_fund_series_item": {
+          "$ref": "#/components/schemas/FundClosedEndFundSeriesItem"
+        },
+        "closed_end_fund_series_previous": {
+          "$ref": "#/components/schemas/FundClosedEndFundSeriesPrevious"
+        },
+        "company_size_focuses": {
+          "description": "A company\u2019s market capitalisation (the price per share multiplied by the number of shares outstanding, i.e. how much the company is worth)",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "continents": {
+          "description": "Geographic continent of fund",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "countries": {
+          "description": "Geographic country of fund",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "created_on": {
+          "type": "string"
+        },
+        "currency": {
+          "description": "Currency of fund",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/FundCurrency"
+            }
+          ]
+        },
+        "domiciles_offshore": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "domiciles_onshore": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "dossier_link": {
+          "type": "string"
+        },
+        "ekh_fund_id": {
+          "type": "number",
+          "description": "Legacy Eurekahedge Id"
+        },
+        "exchange": {
+          "description": "Stock exchange Fund is listed on / references",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/FundExchange"
+            }
+          ]
+        },
+        "first_data_date": {
+          "type": "string"
+        },
+        "fund_details": {
+          "$ref": "#/components/schemas/FundFundDetails"
+        },
+        "fund_industries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FundFundIndustry"
+          }
+        },
+        "fund_sectors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FundFundSector"
+          }
+        },
+        "fund_structures": {
+          "description": "Structure used within the fund to manage tax and legal issues",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_type": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "high_water_mark": {
+          "type": "number"
+        },
+        "high_water_mark_value": {
+          "type": "string"
+        },
+        "hurdle_rate": {
+          "type": "number"
+        },
+        "hurdle_rate_value": {
+          "type": "string"
+        },
+        "inception_date": {
+          "type": "string",
+          "description": "The date at which a fund started trading"
+        },
+        "inferred": {
+          "type": "boolean"
+        },
+        "invest_in_private_placement": {
+          "type": "boolean"
+        },
+        "investment_min_currency": {
+          "type": "string"
+        },
+        "investment_min_size": {
+          "type": "number"
+        },
+        "investment_open": {
+          "type": "number",
+          "description": "Is the investment still open"
+        },
+        "investment_open_value": {
+          "type": "string"
+        },
+        "investment_regions": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "is_liquidated": {
+          "type": "boolean"
+        },
+        "key_man_clause": {
+          "type": "boolean"
+        },
+        "latest_aum": {
+          "type": "number"
+        },
+        "latest_aum_date": {
+          "type": "string"
+        },
+        "latest_strategy_aum": {
+          "type": "number"
+        },
+        "latest_strategy_aum_date": {
+          "type": "string"
+        },
+        "leverage": {
+          "type": "string",
+          "description": "Hedge Fund manager is borrowing money in order to purchase (or short) more of a given security with aim of magnifying their returns."
+        },
+        "lifecycle": {
+          "description": "Lifecycle stage of Fund",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Classification"
+            }
+          ]
+        },
+        "listing_exchange": {
+          "type": "string"
+        },
+        "lock_up": {
+          "type": "string"
+        },
+        "lock_up_new": {
+          "type": "string",
+          "description": "Does Fund lock up new investments"
+        },
+        "managed_account_offered": {
+          "type": "boolean"
+        },
+        "management_company": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "management_fee": {
+          "type": "string"
+        },
+        "management_fee_number": {
+          "type": "number"
+        },
+        "market_caps": {
+          "description": "Measure of company worth - the price per share multiplied by the number of shares outstanding",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "market_focuses": {
+          "description": "Geographic market focussed by investment",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "master_shareclass": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "max_gross_exposure": {
+          "type": "number"
+        },
+        "max_net_exposure": {
+          "type": "number"
+        },
+        "min_gross_exposure": {
+          "type": "number"
+        },
+        "min_net_exposure": {
+          "type": "number"
+        },
+        "open_end_fund_performance": {
+          "$ref": "#/components/schemas/FundOpenEndFundPerformance"
+        },
+        "penalty": {
+          "type": "boolean"
+        },
+        "penalty_comment": {
+          "type": "string"
+        },
+        "performance_fee": {
+          "type": "string",
+          "description": "Performance Fee"
+        },
+        "performance_fee_number": {
+          "type": "number"
+        },
+        "planned_launch_date": {
+          "type": "string"
+        },
+        "primary_continent": {
+          "description": "Main geographic continent focus of the fund",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Classification"
+            }
+          ]
+        },
+        "primary_country": {
+          "description": "Main country of focus of fund",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Classification"
+            }
+          ]
+        },
+        "primary_investment_region": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "primary_region": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "primary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "primary_sub_region": {
+          "description": "Primary With.Intelligence defined Geographic Sub Region of focus for the Fund",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Classification"
+            }
+          ]
+        },
+        "provide_dividend_policy": {
+          "type": "boolean",
+          "description": "Does Fund provide dividend policy"
+        },
+        "redemption_frequency": {
+          "description": "The frequency with which an investor can withdraw their capital from a fund",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Classification"
+            }
+          ]
+        },
+        "redemption_gate": {
+          "type": "boolean"
+        },
+        "redemption_notification_period": {
+          "type": "string"
+        },
+        "redemption_terms": {
+          "type": "string"
+        },
+        "ref_code": {
+          "type": "string"
+        },
+        "regions": {
+          "description": "With.Intelligence defined Geographic Region that fund operates in",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "secondary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "service_providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FundServiceProvider"
+          }
+        },
+        "strategy_description": {
+          "type": "string",
+          "description": "Summary of the investment strategy employed by the fund"
+        },
+        "sub_markets": {
+          "description": "Sub market that fund operates in",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "sub_regions": {
+          "description": "With.Intelligence defined Sub Region that fund operates in",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "subscription_frequency": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "subscription_notification_period": {
+          "type": "string"
+        },
+        "subscription_terms": {
+          "type": "string"
+        },
+        "subsequent_investment_currency": {
+          "type": "string",
+          "description": "Currency of subsequent investment in fund"
+        },
+        "subsequent_investment_value": {
+          "type": "number"
+        },
+        "three_months_compound": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "updated_at",
+        "accounting_method",
+        "agree_to_look_through",
+        "annualized_target_return",
+        "annualized_target_volatility",
+        "approaches",
+        "fund_contacts",
+        "fundraising_stage",
+        "fund_status",
+        "asset_classes",
+        "asset_types",
+        "attributes",
+        "capital_structures",
+        "closed_end_fund_date_reported",
+        "closed_end_fund_lifecycle",
+        "closed_end_fund_management_fee",
+        "closed_end_fund_performance_fee",
+        "closed_end_fund_series",
+        "closed_end_fund_series_item",
+        "closed_end_fund_series_previous",
+        "company_size_focuses",
+        "continents",
+        "countries",
+        "created_on",
+        "currency",
+        "domiciles_offshore",
+        "domiciles_onshore",
+        "dossier_link",
+        "ekh_fund_id",
+        "exchange",
+        "first_data_date",
+        "fund_details",
+        "fund_industries",
+        "fund_sectors",
+        "fund_structures",
+        "fund_type",
+        "high_water_mark",
+        "high_water_mark_value",
+        "hurdle_rate",
+        "hurdle_rate_value",
+        "inception_date",
+        "inferred",
+        "invest_in_private_placement",
+        "investment_min_currency",
+        "investment_min_size",
+        "investment_open",
+        "investment_open_value",
+        "investment_regions",
+        "is_liquidated",
+        "key_man_clause",
+        "latest_aum",
+        "latest_aum_date",
+        "latest_strategy_aum",
+        "latest_strategy_aum_date",
+        "leverage",
+        "lifecycle",
+        "listing_exchange",
+        "lock_up",
+        "lock_up_new",
+        "managed_account_offered",
+        "management_company",
+        "management_fee",
+        "management_fee_number",
+        "market_caps",
+        "market_focuses",
+        "master_shareclass",
+        "max_gross_exposure",
+        "max_net_exposure",
+        "min_gross_exposure",
+        "min_net_exposure",
+        "open_end_fund_performance",
+        "penalty",
+        "penalty_comment",
+        "performance_fee",
+        "performance_fee_number",
+        "planned_launch_date",
+        "primary_continent",
+        "primary_country",
+        "primary_investment_region",
+        "primary_region",
+        "primary_strategies",
+        "primary_sub_region",
+        "provide_dividend_policy",
+        "redemption_frequency",
+        "redemption_gate",
+        "redemption_notification_period",
+        "redemption_terms",
+        "ref_code",
+        "regions",
+        "secondary_strategies",
+        "service_providers",
+        "strategy_description",
+        "sub_markets",
+        "sub_regions",
+        "subscription_frequency",
+        "subscription_notification_period",
+        "subscription_terms",
+        "subsequent_investment_currency",
+        "subsequent_investment_value",
+        "three_months_compound"
+      ],
+      "additionalProperties": false
+    },
+    "FundAssetClass": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parent": {
+          "$ref": "#/components/schemas/Classification"
+        }
+      },
+      "required": ["id", "name", "parent"],
+      "additionalProperties": false
+    },
+    "FundCurrency": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "short_name": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "short_name"],
+      "additionalProperties": false
+    },
+    "FundStatus": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sub_status": {
+          "$ref": "#/components/schemas/Classification"
+        }
+      },
+      "required": ["id", "name", "sub_status"],
+      "additionalProperties": false
+    },
+    "Manager": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name", "updated_at"],
+      "additionalProperties": false
+    },
+    "ManagerExtended": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "central_index_key": {
+          "type": "string"
+        },
+        "sec_number": {
+          "type": "string"
+        },
+        "sec_registered_firm": {
+          "type": "boolean"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "sec_exemption": {
+          "type": "string"
+        },
+        "website": {
+          "type": "string"
+        },
+        "address1": {
+          "type": "string"
+        },
+        "address2": {
+          "type": "string"
+        },
+        "address3": {
+          "type": "string"
+        },
+        "postcode": {
+          "type": "string"
+        },
+        "ranking": {
+          "$ref": "#/components/schemas/ManagerRanking"
+        },
+        "city": {
+          "type": "string"
+        },
+        "city_id": {
+          "type": "number"
+        },
+        "country": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "continent": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "secondary_addresses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ManagerSecondaryAddress"
+          }
+        },
+        "administrator": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "auditor": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "custodian": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "legal_advisor": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "prime_broker": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ManagerContact"
+          }
+        },
+        "aums": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ManagerAum"
+          }
+        },
+        "primary_aum": {
+          "$ref": "#/components/schemas/ManagerPrimaryAum"
+        },
+        "types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_asset_classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_approaches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_capital_structures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_company_size_focuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_investment_regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_market_caps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_market_focuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_primary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_secondary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_sectors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ManagerFundsSector"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "updated_at",
+        "central_index_key",
+        "sec_number",
+        "sec_registered_firm",
+        "summary",
+        "email",
+        "phone",
+        "sec_exemption",
+        "website",
+        "address1",
+        "address2",
+        "address3",
+        "postcode",
+        "ranking",
+        "city",
+        "city_id",
+        "country",
+        "continent",
+        "secondary_addresses",
+        "administrator",
+        "auditor",
+        "custodian",
+        "legal_advisor",
+        "prime_broker",
+        "contacts",
+        "aums",
+        "primary_aum",
+        "types",
+        "fund_asset_classes",
+        "funds_approaches",
+        "funds_capital_structures",
+        "funds_company_size_focuses",
+        "funds_investment_regions",
+        "funds_market_caps",
+        "funds_market_focuses",
+        "funds_primary_strategies",
+        "funds_secondary_strategies",
+        "funds_sectors"
+      ],
+      "additionalProperties": false
+    },
+    "ManagerAum": {
+      "type": "object",
+      "properties": {
+        "as_of": {
+          "type": "string"
+        },
+        "aum": {
+          "type": "number"
+        },
+        "aum_type": {
+          "type": "number"
+        },
+        "is_estimate": {
+          "type": "boolean"
+        },
+        "type_name": {
+          "type": "string"
+        }
+      },
+      "required": ["as_of", "aum", "aum_type", "is_estimate", "type_name"],
+      "additionalProperties": false
+    },
+    "ManagerContact": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "contact_name": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "contact_name"],
+      "additionalProperties": false
+    },
+    "Consultant": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name", "updated_at"],
+      "additionalProperties": false
+    },
+    "ConsultantExtended": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "address": {
+          "$ref": "#/components/schemas/ConsultantAddress"
+        },
+        "funds_approaches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_asset_classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_asset_attributes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_asset_structures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_company_size_focuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_continents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_countries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_fund_structures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_industries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ConsultantFundsIndustryGroup"
+          }
+        },
+        "funds_investment_regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_market_caps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_market_focuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_primary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_secondary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "funds_sectors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ConsultantFundsSector"
+          }
+        },
+        "secondary_addresses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ConsultantAddress"
+          }
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "website": {
+          "type": "string",
+          "nullable": true
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "updated_at",
+        "address",
+        "funds_approaches",
+        "funds_asset_classes",
+        "funds_asset_attributes",
+        "funds_asset_structures",
+        "funds_company_size_focuses",
+        "funds_continents",
+        "funds_countries",
+        "funds_fund_structures",
+        "funds_industries",
+        "funds_investment_regions",
+        "funds_market_caps",
+        "funds_market_focuses",
+        "funds_primary_strategies",
+        "funds_regions",
+        "funds_secondary_strategies",
+        "funds_sectors",
+        "secondary_addresses",
+        "services",
+        "website"
+      ],
+      "additionalProperties": false
+    },
+    "ConsultantAddress": {
+      "type": "object",
+      "properties": {
+        "address1": {
+          "type": "string"
+        },
+        "address2": {
+          "type": "string"
+        },
+        "address3": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "city_id": {
+          "type": "number"
+        },
+        "continent": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "country": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "postcode": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/components/schemas/ConsultantAddressState"
+        }
+      },
+      "required": [
+        "address1",
+        "address2",
+        "address3",
+        "city",
+        "city_id",
+        "continent",
+        "country",
+        "email",
+        "phone",
+        "postcode",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "ConsultantAddressState": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "abbreviation": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name", "abbreviation"],
+      "additionalProperties": false
+    },
+    "Article": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "post_title": {
+          "type": "string"
+        },
+        "post_date": {
+          "type": "string"
+        },
+        "super_tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        }
+      },
+      "required": ["id", "post_title", "post_date", "super_tags"],
+      "additionalProperties": false
+    },
+    "ArticleExtended": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "post_title": {
+          "type": "string"
+        },
+        "post_date": {
+          "type": "string"
+        },
+        "ID": {
+          "type": "number"
+        },
+        "post_content": {
+          "type": "string"
+        },
+        "post_content_analyzer": {
+          "type": "string"
+        },
+        "post_content_filtered": {
+          "type": "string"
+        },
+        "post_date_gmt": {
+          "type": "string"
+        },
+        "post_excerpt": {
+          "type": "string"
+        },
+        "post_excerpt_analyzer": {
+          "type": "string"
+        },
+        "post_id": {
+          "type": "number"
+        },
+        "post_modified": {
+          "type": "string"
+        },
+        "post_modified_gmt": {
+          "type": "string"
+        },
+        "post_name": {
+          "type": "string"
+        },
+        "post_title_analyzer": {
+          "type": "string"
+        },
+        "article_type": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "classification": {
+          "$ref": "#/components/schemas/ArticleClassification"
+        },
+        "document": {
+          "$ref": "#/components/schemas/ArticleDocument"
+        },
+        "document_type": {
+          "$ref": "#/components/schemas/ArticleDocumentType"
+        },
+        "co_authors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ArticleAuthor"
+          }
+        },
+        "post_author": {
+          "$ref": "#/components/schemas/ArticleAuthor"
+        },
+        "post_firms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ArticleFirm"
+          }
+        },
+        "post_mandates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ArticleMandate"
+          }
+        },
+        "post_persons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ArticlePerson"
+          }
+        },
+        "related_articles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ArticleRelatedArticle"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "post_title",
+        "post_date",
+        "ID",
+        "post_content",
+        "post_content_analyzer",
+        "post_content_filtered",
+        "post_date_gmt",
+        "post_excerpt",
+        "post_excerpt_analyzer",
+        "post_id",
+        "post_modified",
+        "post_modified_gmt",
+        "post_name",
+        "post_title_analyzer",
+        "article_type",
+        "classification",
+        "document",
+        "document_type",
+        "co_authors",
+        "post_author",
+        "post_firms",
+        "post_mandates",
+        "post_persons",
+        "related_articles"
+      ],
+      "additionalProperties": false
+    },
+    "ArticleFirm": {
+      "type": "object",
+      "properties": {
+        "entity_id": {
+          "type": "number"
+        },
+        "is_primary": {
+          "type": "boolean"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": ["entity_id", "is_primary", "type"],
+      "additionalProperties": false
+    },
+    "ArticleAuthor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "display_name": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "display_name"],
+      "additionalProperties": false
+    },
+    "ArticleDocument": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "filesize": {
+          "type": "number"
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "modified": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "date",
+        "filename",
+        "filesize",
+        "mime_type",
+        "modified",
+        "title",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "Intention": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the investment intention"
+        }
+      },
+      "required": ["id", "updated_at", "date"],
+      "additionalProperties": false
+    },
+    "IntentionExtended": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the investment intention"
+        },
+        "allocation_amount": {
+          "$ref": "#/components/schemas/IntentionAllocationAmount"
+        },
+        "asset_class": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "classification_segments": {
+          "$ref": "#/components/schemas/IntentionClassificationSegments"
+        },
+        "fund_count": {
+          "$ref": "#/components/schemas/IntentionFundCount"
+        },
+        "fund_size": {
+          "$ref": "#/components/schemas/IntentionFundSize"
+        },
+        "institutional_investor": {
+          "$ref": "#/components/schemas/IntentionInstitutionalInvestor"
+        },
+        "note": {
+          "type": "string"
+        },
+        "preference_only": {
+          "type": "boolean"
+        },
+        "preferences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/IntentionPreference"
+          }
+        },
+        "search_consultant": {
+          "type": "boolean"
+        },
+        "status": {
+          "$ref": "#/components/schemas/IntentionStatus"
+        },
+        "structures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "themes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "ticket_size": {
+          "$ref": "#/components/schemas/IntentionTicketSize"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at",
+        "date",
+        "allocation_amount",
+        "asset_class",
+        "classification_segments",
+        "fund_count",
+        "fund_size",
+        "institutional_investor",
+        "note",
+        "preference_only",
+        "preferences",
+        "search_consultant",
+        "status",
+        "structures",
+        "themes",
+        "ticket_size"
+      ],
+      "additionalProperties": false
+    },
+    "IntentionAllocationAmount": {
+      "type": "object",
+      "properties": {
+        "value_lower_usd": {
+          "type": "number"
+        },
+        "value_upper_usd": {
+          "type": "number"
+        }
+      },
+      "required": ["value_lower_usd", "value_upper_usd"],
+      "additionalProperties": false
+    },
+    "IntentionTicketSize": {
+      "type": "object",
+      "properties": {
+        "value_lower_usd": {
+          "type": "number"
+        },
+        "value_upper_usd": {
+          "type": "number"
+        }
+      },
+      "required": ["value_lower_usd", "value_upper_usd"],
+      "additionalProperties": false
+    },
+    "IntentionStatus": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sub_status": {
+          "$ref": "#/components/schemas/Classification"
+        }
+      },
+      "required": ["id", "name", "sub_status"],
+      "additionalProperties": false
+    },
+    "IntentionStrategy": {
+      "type": "object",
+      "properties": {
+        "primary_strategy": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "secondary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        }
+      },
+      "required": ["primary_strategy", "secondary_strategies"],
+      "additionalProperties": false
+    },
+    "IntentionClassificationSegments": {
+      "type": "object",
+      "properties": {
+        "continents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "countries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "industries": {
+          "$ref": "#/components/schemas/IntentionIndustry"
+        },
+        "investment_regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "sectors": {
+          "$ref": "#/components/schemas/IntentionSector"
+        },
+        "strategies": {
+          "$ref": "#/components/schemas/IntentionStrategy"
+        },
+        "sub_regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        }
+      },
+      "required": [
+        "continents",
+        "countries",
+        "industries",
+        "investment_regions",
+        "regions",
+        "sectors",
+        "strategies",
+        "sub_regions"
+      ],
+      "additionalProperties": false
+    },
+    "IntentionPreference": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sentiment": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name", "sentiment", "type"],
       "additionalProperties": false
     }
   }
