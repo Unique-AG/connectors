@@ -1,12 +1,11 @@
 """The handle grammar: every shape this connector mints, the parser, and the speller.
 
-Four schemes, one per product. `teams:///` addresses Microsoft Teams, `outlook:///` addresses a
-mailbox, `sharepoint:///` addresses a file or a folder in OneDrive or SharePoint, and `onenote:///`
+Four schemes, one per product. `teams:///` addresses Microsoft Teams, and `outlook:///` addresses a
+mailbox. `sharepoint:///` addresses a file or a folder in OneDrive or SharePoint. `onenote:///`
 addresses a OneNote notebook, section group, section, page or long-running operation. If a mail
-shape used the Teams scheme, it has to answer
-`MessageHandle.permission` below, and that answer reaches `teams_read_message`'s declared
-permissions and, from there, the consent screen of every `teams` deployment. The scheme is the
-cheapest place to keep the products apart.
+shape used the Teams scheme, it must answer `MessageHandle.permission` below. That answer reaches
+the declared permissions of `teams_read_message`. From there, it reaches the consent screen of every
+`teams` deployment. The scheme is the cheapest place to keep the products apart.
 
 This is the only module that spells or parses these URIs. tests/test_layering.py enforces that.
 A second speller does not look like a disagreement. It looks like a handle that one tool produced
@@ -42,10 +41,9 @@ A calendar is one segment: Graph says container types such as `calendar` support
 "but their regular IDs were already constant"
 (https://learn.microsoft.com/en-us/graph/outlook-immutable-id).
 
-An event is two segments, the calendar id first: the read route is
-`/me/calendars/{calendar_id}/events/{event_id}`, and Microsoft says an id from another mailbox
-"would return an error"
-(https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars).
+An event is two segments, and the calendar id comes first. The read route is
+`/me/calendars/{calendar_id}/events/{event_id}`. Microsoft says that an id from another mailbox
+returns an error (https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars).
 """
 
 import re
