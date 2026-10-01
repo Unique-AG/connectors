@@ -248,6 +248,19 @@ class TestWhatItSendsToGraph:
             "parentReference": {"driveId": _OTHER_DRIVE_ID, "id": _DESTINATION_ID},
         }
 
+    async def test_a_folder_copy_body_carries_the_destination_and_nothing_else(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _FOLDER_PATH, _folder(item_id=_FOLDER_ID, name="Q1", drive_id=_DRIVE_ID))
+        _ = _reads(graph, _DESTINATION_PATH, _folder())
+        copy = _accepts(graph, f"{_FOLDER_PATH}/copy")
+
+        _ = await _copy(client, item=_FOLDER_URI)
+
+        assert _sent(copy) == {
+            "parentReference": {"driveId": _OTHER_DRIVE_ID, "id": _DESTINATION_ID}
+        }
+
     async def test_the_copy_asks_graph_to_fail_on_a_name_that_is_taken(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

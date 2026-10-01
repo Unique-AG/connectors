@@ -1,11 +1,11 @@
 from collections.abc import Mapping
-from typing import Annotated
+from typing import Annotated, override
 
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.method import Method
-from kiota_serialization_json.json_serialization_writer import JsonSerializationWriter
+from kiota_abstractions.serialization.serialization_writer import SerializationWriter
 from mcp.types import InputRequiredResult
 from msgraph.generated.drives.item.items.item.copy.copy_post_request_body import (
     CopyPostRequestBody,
@@ -233,25 +233,22 @@ async def _start_copy(
         Method.POST, copy.url_template, copy.path_parameters, query=FAIL_ON_CONFLICT
     )
     request.headers.try_add("Accept", "application/json")
-    request.set_stream_content(_copy_body(parent, name), "application/json")
+    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
+        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+        "application/json",
+        _DestinationAndNameOnly(parent_reference=parent, name=name),
+    )
     request.add_request_options(no_retry())
     await client.request_adapter.send_no_response_content_async(  # pyright: ignore[reportUnknownMemberType]
         request, {"XXX": ODataError}
     )
 
 
-def _copy_body(parent: ItemReference, name: str | None) -> bytes:
-    writer = JsonSerializationWriter()
-    writer.write_object_value(
-        None,
-        CopyPostRequestBody(
-            parent_reference=parent,
-            name=name,
-            children_only=None,
-            include_all_version_history=None,
-        ),
-    )
-    return writer.get_serialized_content()
+class _DestinationAndNameOnly(CopyPostRequestBody):
+    @override
+    def serialize(self, writer: SerializationWriter) -> None:
+        writer.write_object_value("parentReference", self.parent_reference)
+        writer.write_str_value("name", self.name)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
