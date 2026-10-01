@@ -67,9 +67,10 @@ async def send_chat_message(
     confirm: Confirm,
     mentions: Sequence[Mention] = (),
     importance: ChatImportance | None = None,
+    subject: str | None = None,
 ) -> TeamsMessage | InputRequiredResult:
-    question = _question(message, chat_id, mentions, importance=importance)
-    about = _about(message, chat_id, mentions, importance=importance)
+    question = _question(message, chat_id, mentions, subject=subject, importance=importance)
+    about = _about(message, chat_id, mentions, subject=subject, importance=importance)
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME, step=STEP_SEND):
@@ -83,6 +84,7 @@ async def send_chat_message(
                     message,
                     mentions=mentions,
                     importance=None if importance is None else ChatMessageImportance(importance),
+                    subject=subject,
                 ),
                 request_configuration=_send_request(),
             )
@@ -97,11 +99,24 @@ async def send_chat_message(
 
 
 def _question(
-    message: str, chat_id: str, mentions: Sequence[Mention], *, importance: ChatImportance | None
+    message: str,
+    chat_id: str,
+    mentions: Sequence[Mention],
+    *,
+    subject: str | None,
+    importance: ChatImportance | None,
 ) -> str:
     named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
     mentioned = f" It mentions {named}." if mentions else ""
-    marked = "" if importance is None else f" with {importance} importance"
+    details = [
+        text
+        for text in (
+            None if subject is None else f"the subject {cut_for_a_question(subject)!r}",
+            None if importance is None else f"{importance} importance",
+        )
+        if text is not None
+    ]
+    marked = f" with {' and '.join(details)}" if details else ""
     return (
         f"Send {cut_for_a_question(message)!r}{marked} to chat {chat_id!r} now?{mentioned} "
         + _CANNOT_BE_RECALLED
@@ -109,11 +124,16 @@ def _question(
 
 
 def _about(
-    message: str, chat_id: str, mentions: Sequence[Mention], *, importance: ChatImportance | None
+    message: str,
+    chat_id: str,
+    mentions: Sequence[Mention],
+    *,
+    subject: str | None,
+    importance: ChatImportance | None,
 ) -> str:
     mentioned = [[mention.user_id, mention.name] for mention in mentions]
     return hashlib.sha256(
-        json.dumps([chat_id, message, mentioned, importance]).encode()
+        json.dumps([chat_id, message, mentioned, subject, importance]).encode()
     ).hexdigest()
 
 
@@ -167,6 +187,16 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
+        subject: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The subject of the new chat message, as plain text. Omit this parameter to "
+                    + "send the message with no subject."
+                ),
+            ),
+        ] = None,
         client: GraphServiceClient = graph,
     ) -> TeamsMessage | InputRequiredResult:
         return await send_chat_message(
@@ -176,4 +206,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             confirm=a_person_agrees(ctx),
             mentions=mentions,
             importance=importance,
+            subject=subject,
         )

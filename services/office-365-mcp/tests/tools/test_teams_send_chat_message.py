@@ -36,6 +36,7 @@ _CHAT_ID = "19:release@thread.v2"
 _SEND_PATH = "/chats/19%3Arelease%40thread.v2/messages"
 
 _MESSAGE = "Ship it Friday."
+_SUBJECT = "Release plan"
 _SENT_MESSAGE_ID = "1770000000001"
 
 _JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
@@ -182,41 +183,126 @@ class TestThePersonBeforeTheSend:
         assert len(asked) == 1
         assert "importance" not in asked[0]
 
+    async def test_the_question_names_the_subject_and_the_importance(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await send_chat_message(
+            client,
+            chat_id=_CHAT_ID,
+            message=_MESSAGE,
+            confirm=capturing,
+            importance="high",
+            subject=_SUBJECT,
+        )
+
+        assert len(asked) == 1
+        assert (
+            f"Send {_MESSAGE!r} with the subject {_SUBJECT!r} and high importance to chat "
+            + f"{_CHAT_ID!r} now?"
+        ) in asked[0]
+
+    async def test_the_question_names_a_subject_that_comes_alone(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await send_chat_message(
+            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing, subject=_SUBJECT
+        )
+
+        expected = f"Send {_MESSAGE!r} with the subject {_SUBJECT!r} to chat {_CHAT_ID!r} now?"
+        assert len(asked) == 1
+        assert expected in asked[0]
+        assert "importance" not in asked[0]
+
+    async def test_the_question_names_no_subject_when_none_is_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await send_chat_message(
+            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing, importance="normal"
+        )
+
+        assert len(asked) == 1
+        assert "subject" not in asked[0]
+
     def test_the_binding_differs_for_two_messages_with_the_same_120_char_preview(self) -> None:
         common_prefix = "x" * 120
 
         first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            common_prefix + " short tail", _CHAT_ID, (), importance=None
+            common_prefix + " short tail", _CHAT_ID, (), subject=None, importance=None
         )
         second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            common_prefix + " a very different, much longer tail", _CHAT_ID, (), importance=None
+            common_prefix + " a very different, much longer tail",
+            _CHAT_ID,
+            (),
+            subject=None,
+            importance=None,
         )
 
         assert first != second
 
     def test_the_binding_differs_for_the_same_message_to_a_different_chat(self) -> None:
         first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            _MESSAGE, _CHAT_ID, (), importance=None
+            _MESSAGE, _CHAT_ID, (), subject=None, importance=None
         )
         second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            _MESSAGE, "19:other@thread.v2", (), importance=None
+            _MESSAGE, "19:other@thread.v2", (), subject=None, importance=None
         )
         assert first != second
 
     def test_the_binding_differs_when_only_the_importance_differs(self) -> None:
         bindings = {
             sender._about(  # pyright: ignore[reportPrivateUsage]
-                _MESSAGE, _CHAT_ID, (), importance=importance
+                _MESSAGE, _CHAT_ID, (), subject=None, importance=importance
             )
             for importance in (None, "normal", "high", "urgent")
         }
 
         assert len(bindings) == 4
 
+    def test_the_binding_differs_when_only_the_subject_differs(self) -> None:
+        bindings = {
+            sender._about(  # pyright: ignore[reportPrivateUsage]
+                _MESSAGE, _CHAT_ID, (), subject=subject, importance=None
+            )
+            for subject in (None, _SUBJECT, "Release plan, revised")
+        }
+
+        assert len(bindings) == 3
+
+    def test_the_binding_keeps_the_subject_and_the_message_apart(self) -> None:
+        first = sender._about(  # pyright: ignore[reportPrivateUsage]
+            "Ship it", _CHAT_ID, (), subject="Friday", importance=None
+        )
+        second = sender._about(  # pyright: ignore[reportPrivateUsage]
+            "Ship it Friday", _CHAT_ID, (), subject=None, importance=None
+        )
+
+        assert first != second
+
     def test_the_binding_differs_when_only_the_mentions_differ(self) -> None:
         bindings = {
             sender._about(  # pyright: ignore[reportPrivateUsage]
-                _MESSAGE, _CHAT_ID, mentions, importance=None
+                _MESSAGE, _CHAT_ID, mentions, subject=None, importance=None
             )
             for mentions in (
                 (),
@@ -485,6 +571,38 @@ class TestTheEraWithNoBackChannel:
 
         assert post.call_count == 0, "an urgent message went out on an accept for a plain one"
 
+    async def test_an_accept_for_one_subject_cannot_send_another(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+        key, state, agrees_with = _the_question(
+            await send_chat_message(
+                client,
+                chat_id=_CHAT_ID,
+                message=_MESSAGE,
+                confirm=a_person_agrees(_modern_context()),
+                subject=_SUBJECT,
+            )
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await send_chat_message(
+                client,
+                chat_id=_CHAT_ID,
+                message=_MESSAGE,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+                subject="Release cancelled",
+            )
+
+        assert post.call_count == 0, "a message went out under a subject nobody agreed to"
+
 
 class TestWhatItAsksGraphFor:
     async def test_it_makes_exactly_one_call(
@@ -511,6 +629,18 @@ class TestWhatItAsksGraphFor:
         assert sent["content"] == _MESSAGE
         assert sent["contentType"] == "text"
         assert "mentions" not in body
+
+    async def test_the_post_body_carries_the_subject_as_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+
+        _ = await send_chat_message(
+            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees, subject=_SUBJECT
+        )
+
+        body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
+        assert body["subject"] == _SUBJECT
 
     @pytest.mark.parametrize("importance", ["normal", "high", "urgent"])
     async def test_the_post_body_carries_the_importance(
@@ -687,14 +817,34 @@ class TestHowItDeclaresItself:
 
         assert "nothing here can recall it" in (tool.description or "")
 
-    async def test_the_arguments_are_chat_id_message_mentions_and_importance_and_nothing_else(
+    async def test_the_arguments_are_chat_id_message_and_the_optional_rest(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"chat_id", "message", "mentions", "importance"}
+        assert set(properties) == {"chat_id", "message", "mentions", "importance", "subject"}
         assert set(cast("Sequence[str]", parameters["required"])) == {"chat_id", "message"}
+
+    async def test_the_subject_is_never_empty_and_has_no_ceiling(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        subject = (await _listed(transport))["subject"]
+
+        options = cast("Sequence[Mapping[str, object]]", subject["anyOf"])
+        assert [option.get("type") for option in options] == ["string", "null"]
+        assert options[0]["minLength"] == 1
+        assert "maxLength" not in options[0], "Microsoft documents no subject limit for a chat"
+
+    async def test_an_empty_subject_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError, match="subject"):
+            _ = await tool.run({**sender.GRAPH_CALL_EXAMPLE, "subject": ""})
+
+        assert len(graph.calls) == 0, "a subject the schema refuses reached Graph"
 
     async def test_the_importance_is_normal_high_or_urgent_and_nothing_else(
         self, transport: httpx.AsyncClient
