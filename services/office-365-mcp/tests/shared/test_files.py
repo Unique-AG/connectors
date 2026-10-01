@@ -1,31 +1,39 @@
 import ast
 import pathlib
+import re
 
 import httpx
 import pytest
 import respx
 from kiota_abstractions.method import Method
 from msgraph.generated.models.drive_item import DriveItem
+from msgraph.generated.models.folder import Folder
 from msgraph.generated.models.identity import Identity
 from msgraph.generated.models.identity_set import IdentitySet
 from msgraph.generated.models.item_reference import ItemReference
 from msgraph.generated.models.o_data_errors.o_data_error import ODataError
+from msgraph.generated.models.root import Root
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphNotFound, request_with_query
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
+    FOLDER_HANDLE_SOURCES,
     ITEM_FIELDS,
+    ITEM_HANDLE_SOURCES,
     NAME_RULES,
     TOP_FOLDER_LABEL,
     UNNAMED_FOLDER_LABEL,
     UNNAMED_ITEM_LABEL,
     DriveItemSummary,
+    folder_label,
     item_for_a_question,
+    parent_folder_label,
     summary_after_write,
     unusable_name,
 )
 from office_365_mcp.shared.handles import DriveFileHandle
+from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import Advised
 
 _SRC = pathlib.Path(__file__).parent.parent.parent / "src" / "office_365_mcp"
@@ -298,6 +306,125 @@ class TestFailOnConflict:
         assert isinstance(created, DriveItem)
         assert created.id == "01SYNTHETICNEW0001"
         assert route.calls.last.request.url.params["@microsoft.graph.conflictBehavior"] == "fail"
+
+
+def _folder(name: str | None, parent_path: str | None) -> DriveItem:
+    return DriveItem(
+        id=_FOLDER_ID,
+        name=name,
+        folder=Folder(child_count=0),
+        parent_reference=ItemReference(drive_id=_DRIVE_ID, path=parent_path),
+    )
+
+
+class TestFolderLabel:
+    def test_the_root_is_the_top_folder(self) -> None:
+        root = DriveItem(id=_FOLDER_ID, name="root", root=Root(), folder=Folder(child_count=2))
+
+        assert folder_label(root) == TOP_FOLDER_LABEL
+
+    @pytest.mark.parametrize("name", [None, ""])
+    def test_a_folder_with_no_name_is_unnamed(self, name: str | None) -> None:
+        assert folder_label(_folder(name, "/drive/root:/Finance%20Team")) == UNNAMED_FOLDER_LABEL
+
+    def test_the_decoded_parent_path_comes_before_the_name(self) -> None:
+        label = folder_label(_folder("Reports", "/drive/root:/Finance%20Team"))
+
+        assert label == "the folder '/Finance Team/Reports'"
+
+    @pytest.mark.parametrize("parent_path", ["/drive/root:", "/drive/root:/"])
+    def test_a_folder_under_the_root_starts_with_one_slash(self, parent_path: str) -> None:
+        assert folder_label(_folder("Reports", parent_path)) == "the folder '/Reports'"
+
+    @pytest.mark.parametrize("parent_path", [None, "/drives/b%21X/items/01SYNTHETICPARENT0001"])
+    def test_a_parent_with_no_breadcrumb_gives_the_name_only(self, parent_path: str | None) -> None:
+        assert folder_label(_folder("Reports", parent_path)) == "the folder 'Reports'"
+
+    def test_a_folder_with_no_parent_reference_gives_the_name_only(self) -> None:
+        folder = DriveItem(id=_FOLDER_ID, name="Reports", folder=Folder(child_count=0))
+
+        assert folder_label(folder) == "the folder 'Reports'"
+
+    def test_a_long_name_is_cut_for_the_question(self) -> None:
+        label = folder_label(_folder("A" * 200, None))
+
+        assert label == f"the folder '{'A' * PREVIEW_CHARACTERS}…'"
+
+
+def _child(parent: ItemReference | None) -> DriveItem:
+    return DriveItem(id=_ITEM_ID, name="Budget 2026.xlsx", parent_reference=parent)
+
+
+class TestParentFolderLabel:
+    def test_the_decoded_path_is_the_folder(self) -> None:
+        item = _child(ItemReference(drive_id=_DRIVE_ID, path="/drive/root:/Reports/Q1%202026"))
+
+        assert parent_folder_label(item) == "the folder '/Reports/Q1 2026'"
+
+    @pytest.mark.parametrize("path", ["/drive/root:", "/drive/root:/"])
+    def test_an_item_at_the_root_is_in_the_top_folder(self, path: str) -> None:
+        item = _child(ItemReference(drive_id=_DRIVE_ID, path=path, name="root"))
+
+        assert parent_folder_label(item) == TOP_FOLDER_LABEL
+
+    def test_a_path_with_no_name_gives_the_path(self) -> None:
+        item = _child(ItemReference(drive_id=_DRIVE_ID, path="/drive/root:/Reports"))
+
+        assert parent_folder_label(item) == "the folder '/Reports'"
+
+    def test_the_path_wins_over_the_name(self) -> None:
+        item = _child(ItemReference(drive_id=_DRIVE_ID, path="/drive/root:/A/Reports", name="X"))
+
+        assert parent_folder_label(item) == "the folder '/A/Reports'"
+
+    @pytest.mark.parametrize("path", [None, "/drives/b%21X/items/01SYNTHETICPARENT0001"])
+    def test_a_name_with_no_breadcrumb_gives_the_name(self, path: str | None) -> None:
+        item = _child(ItemReference(drive_id=_DRIVE_ID, path=path, name="Reports"))
+
+        assert parent_folder_label(item) == "the folder 'Reports'"
+
+    @pytest.mark.parametrize(
+        "parent", [None, ItemReference(drive_id=_DRIVE_ID)], ids=["no-reference", "no-path-no-name"]
+    )
+    def test_a_parent_with_no_path_and_no_name_is_unnamed(
+        self, parent: ItemReference | None
+    ) -> None:
+        assert parent_folder_label(_child(parent)) == UNNAMED_FOLDER_LABEL
+
+    def test_a_path_by_drive_id_drops_everything_up_to_the_first_colon(self) -> None:
+        item = _child(ItemReference(drive_id=_DRIVE_ID, path="/drives/b%21X/root:/A"))
+
+        assert parent_folder_label(item) == "the folder '/A'"
+
+
+_SENTENCE_END = re.compile(r"(?<=\.)\s+")
+
+
+class TestHandleSources:
+    @pytest.mark.parametrize(
+        "sources", [ITEM_HANDLE_SOURCES, FOLDER_HANDLE_SOURCES], ids=["item", "folder"]
+    )
+    def test_every_sentence_has_20_words_or_fewer(self, sources: str) -> None:
+        assert max(len(sentence.split()) for sentence in _SENTENCE_END.split(sources)) <= 20
+
+    def test_the_item_sources_name_the_three_tools_that_give_an_item_handle(self) -> None:
+        for tool in (
+            "sharepoint_search_files",
+            "sharepoint_browse_folder",
+            "sharepoint_resolve_url",
+        ):
+            assert tool in ITEM_HANDLE_SOURCES
+
+    def test_the_folder_sources_name_the_four_tools_and_both_handle_fields(self) -> None:
+        for source in (
+            "sharepoint_browse_folder",
+            "sharepoint_search_files",
+            "sharepoint_resolve_url",
+            "sharepoint_list_drives",
+            "`parent_uri`",
+            "`root_uri` of a drive",
+        ):
+            assert source in FOLDER_HANDLE_SOURCES
 
 
 def _label_spellings(source: pathlib.Path) -> list[tuple[int, str]]:

@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Self
+from urllib.parse import unquote
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.drives.item.items.item.drive_item_item_request_builder import (
@@ -8,11 +9,13 @@ from msgraph.generated.drives.item.items.item.drive_item_item_request_builder im
 )
 from msgraph.generated.models.drive_item import DriveItem
 from msgraph.generated.models.identity_set import IdentitySet
+from msgraph.generated.models.item_reference import ItemReference
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_step
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import Advised
 
 ITEM_FIELDS: tuple[str, ...] = (
@@ -36,6 +39,17 @@ FAIL_ON_CONFLICT: Mapping[str, str] = {"@microsoft.graph.conflictBehavior": "fai
 TOP_FOLDER_LABEL = "the top folder of the drive"
 UNNAMED_FOLDER_LABEL = "an unnamed folder"
 UNNAMED_ITEM_LABEL = "an unnamed item"
+
+ITEM_HANDLE_SOURCES = (
+    "Take the `uri` of a sharepoint_search_files hit, a sharepoint_browse_folder row or a "
+    + "sharepoint_resolve_url answer, and copy it word for word."
+)
+
+FOLDER_HANDLE_SOURCES = (
+    "Take the `uri` of a folder from sharepoint_browse_folder, sharepoint_search_files or "
+    + "sharepoint_resolve_url, or a `parent_uri` from an earlier result. The `root_uri` of a "
+    + "drive from sharepoint_list_drives is a folder handle too. Copy it word for word."
+)
 
 _ITEM_FOR_A_QUESTION_FIELDS: tuple[str, ...] = (*ITEM_FIELDS, "root")
 
@@ -181,6 +195,36 @@ def display_name(identity: IdentitySet | None) -> str | None:
     if identity is None or identity.user is None:
         return None
     return identity.user.display_name
+
+
+def folder_label(folder: DriveItem) -> str:
+    if folder.root is not None:
+        return TOP_FOLDER_LABEL
+    if not folder.name:
+        return UNNAMED_FOLDER_LABEL
+    crumb = _breadcrumb(folder.parent_reference)
+    return _the_folder(folder.name if crumb is None else f"{crumb}/{folder.name}")
+
+
+def parent_folder_label(item: DriveItem) -> str:
+    reference = item.parent_reference
+    crumb = _breadcrumb(reference)
+    if crumb is not None:
+        return _the_folder(crumb) if crumb else TOP_FOLDER_LABEL
+    if reference is not None and reference.name:
+        return _the_folder(reference.name)
+    return UNNAMED_FOLDER_LABEL
+
+
+def _breadcrumb(reference: ItemReference | None) -> str | None:
+    path = None if reference is None else reference.path
+    if path is None or ":" not in path:
+        return None
+    return unquote(path.split(":", 1)[1]).rstrip("/")
+
+
+def _the_folder(where: str) -> str:
+    return f"the folder {cut_for_a_question(where)!r}"
 
 
 async def item_for_a_question(client: GraphServiceClient, drive_id: str, item_id: str) -> DriveItem:
