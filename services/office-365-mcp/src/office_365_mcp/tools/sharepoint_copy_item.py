@@ -68,7 +68,8 @@ Starts a copy of one file or folder in OneDrive or SharePoint, for the signed-in
 goes into a folder in the same drive or in another drive. The copy of a folder includes everything \
 inside it. Microsoft makes the copy after this call returns, so the copy can take some time to \
 show. Get both handles from sharepoint_search_files or sharepoint_browse_folder. To move an item \
-instead, use sharepoint_move_item.
+instead, use sharepoint_move_item. OneDrive and SharePoint can show the change to everyone who can \
+open the folder.
 
 Notes:
 - This tool asks the user to agree before it creates anything, every time.

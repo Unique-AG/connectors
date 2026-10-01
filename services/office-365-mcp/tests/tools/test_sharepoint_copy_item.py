@@ -67,6 +67,9 @@ _NOT_FOUND = {"error": {"code": "itemNotFound", "message": "not found"}}
 _CONFLICT_BEHAVIOR = "@microsoft.graph.conflictBehavior"
 
 _AGREE_EVERY_TIME = "This tool asks the user to agree before it creates anything, every time."
+_SHOWN_TO_OTHERS = (
+    "OneDrive and SharePoint can show the change to everyone who can open the folder."
+)
 _PERMISSIONS = (
     "The copy gets the permissions of the destination folder, not the permissions of the original."
 )
@@ -877,13 +880,23 @@ class TestHowItDeclaresItself:
 
         assert tool.title == "Copy an Item"
 
-    @pytest.mark.parametrize("sentence", [_AGREE_EVERY_TIME, _PERMISSIONS, _NAME_CLASH, _RETRY])
+    @pytest.mark.parametrize(
+        "sentence", [_AGREE_EVERY_TIME, _SHOWN_TO_OTHERS, _PERMISSIONS, _NAME_CLASH, _RETRY]
+    )
     async def test_the_description_keeps_its_guarantees(
         self, transport: httpx.AsyncClient, sentence: str
     ) -> None:
         _parameters, tool = await _registered(transport)
 
         assert sentence in (tool.description or "")
+
+    async def test_the_lead_paragraph_ends_by_saying_who_can_see_the_change(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        lead, _notes = (tool.description or "").split("\n\nNotes:\n")
+        assert lead.endswith(_SHOWN_TO_OTHERS)
 
     async def test_the_description_does_not_offer_a_way_to_follow_the_copy(
         self, transport: httpx.AsyncClient
