@@ -216,7 +216,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         access: Annotated[
-            Literal["view", "edit"],
+            Access,
             Field(
                 description=(
                     "What people can do with the link. `view` lets them open and read the item. "
@@ -227,7 +227,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ],
         ctx: Context,
         audience: Annotated[
-            Literal["organization", "anonymous"],
+            Audience,
             Field(
                 description=(
                     "Who can use the link. `organization`, the default, lets anyone who signs in "

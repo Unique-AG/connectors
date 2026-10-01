@@ -151,6 +151,12 @@ def _properties(parameters: Mapping[str, object]) -> Mapping[str, Mapping[str, o
     return cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
 
 
+def _choices(parameters: Mapping[str, object], name: str) -> object:
+    reference = str(_properties(parameters)[name]["$ref"])
+    definitions = cast("Mapping[str, Mapping[str, object]]", parameters["$defs"])
+    return definitions[reference.removeprefix("#/$defs/")]["enum"]
+
+
 class TestWhatItSendsToGraph:
     async def test_it_reads_the_item_then_asks_for_one_link_and_nothing_else(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -759,10 +765,9 @@ class TestHowItDeclaresItself:
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
-        properties = _properties(parameters)
 
-        assert properties["access"]["enum"] == ["view", "edit"]
-        assert properties["audience"]["enum"] == ["organization", "anonymous"]
+        assert _choices(parameters, "access") == ["view", "edit"]
+        assert _choices(parameters, "audience") == ["organization", "anonymous"]
 
     async def test_the_default_audience_is_the_organization(
         self, transport: httpx.AsyncClient
