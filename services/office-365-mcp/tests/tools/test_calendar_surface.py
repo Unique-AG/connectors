@@ -230,6 +230,17 @@ _INVITING: Mapping[str, object] = {
     "attendees": [_ONE_ATTENDEE],
 }
 
+_ROOM = "room-3@example.invalid"
+
+_BOOKING: Mapping[str, object] = {
+    **outlook_create_event.GRAPH_CALL_EXAMPLE,
+    "room_addresses": [_ROOM],
+    "show_as": "oof",
+    "categories": ["Budget"],
+    "reminder_minutes_before_start": 15,
+    "hide_attendees": True,
+}
+
 _NEWER_CALENDAR_TOOLS: frozenset[str] = frozenset(
     {
         "outlook_check_availability",
@@ -316,6 +327,50 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
         )
         assert sent["transactionId"], "nothing told Microsoft what to dedupe a retry on"
         assert _ONE_ATTENDEE in json.dumps(sent), "the address the call named never reached Graph"
+
+    async def test_an_agreed_room_booking_posts_the_room_as_a_resource_with_its_options(
+        self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        result = await every_calendar_tool.call_tool(outlook_create_event.TOOL_NAME, dict(_BOOKING))
+
+        assert result.structured_content is not None, "the confirmed booking answered nothing"
+        posted = [call for call in _made(graph) if call.request.method == "POST"]
+        sent = cast("Mapping[str, object]", json.loads(posted[0].request.content))
+        attendees = cast("Sequence[Mapping[str, object]]", sent["attendees"])
+
+        assert [(one["emailAddress"], one["type"]) for one in attendees] == [
+            ({"address": _ROOM}, "resource")
+        ]
+        assert (sent["showAs"], sent["categories"]) == ("oof", ["Budget"])
+        assert (sent["reminderMinutesBeforeStart"], sent["hideAttendees"]) == (15, True)
+
+    async def test_a_room_booking_the_person_declined_posts_nothing(
+        self, a_declining_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError):
+            _ = await a_declining_client.call_tool(outlook_create_event.TOOL_NAME, dict(_BOOKING))
+
+        posted = [call.request.url.path for call in _made(graph) if call.request.method == "POST"]
+
+        assert posted == [], f"a declined room booking posted {posted}"
+
+    @pytest.mark.parametrize(
+        "name", [outlook_create_event.TOOL_NAME, outlook_create_event_on_behalf.TOOL_NAME]
+    )
+    async def test_the_listed_show_as_offers_every_status_but_the_one_only_microsoft_sets(
+        self, every_calendar_tool: Client[FastMCPTransport], name: str
+    ) -> None:
+        listed = {tool.name: tool for tool in await every_calendar_tool.list_tools()}
+
+        schema = _object(listed[name].input_schema)
+        show_as = _object(_object(schema["properties"])["show_as"])
+        branches = cast("Sequence[Mapping[str, object]]", show_as["anyOf"])
+
+        assert {"type": "null"} in branches
+        assert {
+            "type": "string",
+            "enum": ["free", "tentative", "busy", "oof", "workingElsewhere"],
+        } in branches
 
     async def test_an_accept_that_omits_the_request_state_creates_nothing(
         self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter

@@ -29,12 +29,34 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import (
+    ALLOW_NEW_TIME_PROPOSALS_FIELD,
+    CATEGORIES_FIELD,
+    HIDE_ATTENDEES_FIELD,
+    IMPORTANCE_FIELD,
+    IS_REMINDER_ON_FIELD,
     NOBODY_INVITED_BUT_A_PLACE,
+    REMINDER_MINUTES_FIELD,
+    RESPONSE_REQUESTED_FIELD,
+    ROOM_ADDRESSES_FIELD,
+    SENSITIVITY_FIELD,
+    SHOW_AS_FIELD,
+    STORED_ALLOW_NEW_TIME_PROPOSALS_FIELD,
+    STORED_CATEGORIES_FIELD,
+    STORED_HIDE_ATTENDEES_FIELD,
+    STORED_IMPORTANCE_FIELD,
+    STORED_IS_REMINDER_ON_FIELD,
+    STORED_REMINDER_MINUTES_FIELD,
+    STORED_RESPONSE_REQUESTED_FIELD,
+    STORED_SENSITIVITY_FIELD,
+    STORED_SHOW_AS_FIELD,
     ZONE_NAME,
     CalendarSummary,
     EventAttendee,
     EventDraft,
+    EventImportance,
+    EventSensitivity,
     EventTime,
+    ShowAs,
     calendar_of,
     counted_people,
     created_event,
@@ -45,6 +67,7 @@ from office_365_mcp.shared.calendar import (
     is_midnight,
     providers_without_teams,
     repeated_address,
+    spelled,
     transaction_id_for,
     wall_clock,
     zone_named,
@@ -153,6 +176,13 @@ _ADDRESS_IN_BOTH_LISTS = (
     + "lists will fail identically."
 )
 
+_ROOM_ALSO_INVITED = (
+    "outlook_create_event_on_behalf was given an address in `room_addresses` that is also in "
+    + "`attendees` or `optional_attendees`, and this tool takes each address once. NO EVENT WAS "
+    + "CREATED and nobody was invited. Put a room in `room_addresses` only, and put a person in "
+    + "one of the two attendee lists. Retrying the same lists will fail identically."
+)
+
 
 def _not_midnight(starts_at: str, ends_at: str) -> str:
     return (
@@ -244,9 +274,10 @@ class CreatedEventOnBehalf(BaseModel):
             "These are the attendees as MICROSOFT STORED THEM, read from the response and NOT "
             + "from the arguments. Exchange composes this list itself. Exchange adds the "
             + "calendar owner as an attendee of the owner's own meeting. Microsoft books a room "
-            + "only as an attendee of type `resource` that the caller adds. This tool adds no "
-            + "`resource` attendee, and it sends the location as text. Whether Exchange books a "
-            + "room from that text alone is not documented. This list says whether a room is "
+            + "only as an attendee of type `resource` that the caller adds. This tool adds one "
+            + "for each entry of `room_addresses`, and it sends the location as text. Whether "
+            + "Exchange books a room from that text alone is not documented. This list says "
+            + "whether a room is "
             + "on the event. This is the record of who was actually invited under the owner's "
             + "name. Every one of them already has the invitation. Repeat this record to the "
             + "user in full. This list is empty when Microsoft stored none. A private "
@@ -283,6 +314,15 @@ class CreatedEventOnBehalf(BaseModel):
             + "when the event carries none."
         )
     )
+    show_as: str | None = Field(description=STORED_SHOW_AS_FIELD)
+    categories: list[str] = Field(description=STORED_CATEGORIES_FIELD)
+    importance: str | None = Field(description=STORED_IMPORTANCE_FIELD)
+    sensitivity: str | None = Field(description=STORED_SENSITIVITY_FIELD)
+    is_reminder_on: bool | None = Field(description=STORED_IS_REMINDER_ON_FIELD)
+    reminder_minutes_before_start: int | None = Field(description=STORED_REMINDER_MINUTES_FIELD)
+    hide_attendees: bool | None = Field(description=STORED_HIDE_ATTENDEES_FIELD)
+    response_requested: bool | None = Field(description=STORED_RESPONSE_REQUESTED_FIELD)
+    allow_new_time_proposals: bool | None = Field(description=STORED_ALLOW_NEW_TIME_PROPOSALS_FIELD)
     web_link: str | None = Field(
         description=(
             "This is Graph's own link that opens the event in Outlook on the web, exactly as "
@@ -340,6 +380,16 @@ async def create_event_on_behalf(
     location: str | None = None,
     all_day: bool = False,
     online_meeting: bool = False,
+    room_addresses: Sequence[str] = (),
+    categories: Sequence[str] = (),
+    show_as: ShowAs | None = None,
+    importance: EventImportance | None = None,
+    sensitivity: EventSensitivity | None = None,
+    is_reminder_on: bool | None = None,
+    reminder_minutes_before_start: int | None = None,
+    hide_attendees: bool | None = None,
+    response_requested: bool | None = None,
+    allow_new_time_proposals: bool | None = None,
     confirm: Confirm,
 ) -> CreatedEventOnBehalf | InputRequiredResult:
     """Read the calendar `calendar_ref` addresses, put the create to a person, then create it.
@@ -362,6 +412,16 @@ async def create_event_on_behalf(
         location=location,
         all_day=all_day,
         online_meeting=online_meeting,
+        room_addresses=room_addresses,
+        categories=categories,
+        show_as=show_as,
+        importance=importance,
+        sensitivity=sensitivity,
+        is_reminder_on=is_reminder_on,
+        reminder_minutes_before_start=reminder_minutes_before_start,
+        hide_attendees=hide_attendees,
+        response_requested=response_requested,
+        allow_new_time_proposals=allow_new_time_proposals,
     )
 
     created: Event | None = None
@@ -405,6 +465,16 @@ def _composed(
     location: str | None,
     all_day: bool,
     online_meeting: bool,
+    room_addresses: Sequence[str],
+    categories: Sequence[str],
+    show_as: ShowAs | None,
+    importance: EventImportance | None,
+    sensitivity: EventSensitivity | None,
+    is_reminder_on: bool | None,
+    reminder_minutes_before_start: int | None,
+    hide_attendees: bool | None,
+    response_requested: bool | None,
+    allow_new_time_proposals: bool | None,
 ) -> EventDraft:
     opens = _moment("starts_at", starts_at)
     closes = _moment("ends_at", ends_at)
@@ -414,8 +484,11 @@ def _composed(
         raise ToolError(_not_midnight(starts_at, ends_at))
     required = _addresses(attendees, argument="attendees")
     optional = _addresses(optional_attendees, argument="optional_attendees")
+    rooms = _addresses(room_addresses, argument="room_addresses")
     if repeated_address([*required, *optional]) is not None:
         raise ToolError(_ADDRESS_IN_BOTH_LISTS)
+    if repeated_address([*required, *optional, *rooms]) is not None:
+        raise ToolError(_ROOM_ALSO_INVITED)
     return EventDraft(
         subject=subject,
         starts_at=starts_at,
@@ -427,6 +500,16 @@ def _composed(
         location=_placed(location),
         all_day=all_day,
         online_meeting=online_meeting,
+        room_addresses=rooms,
+        categories=tuple(categories),
+        show_as=show_as,
+        importance=importance,
+        sensitivity=sensitivity,
+        is_reminder_on=is_reminder_on,
+        reminder_minutes_before_start=reminder_minutes_before_start,
+        hide_attendees=hide_attendees,
+        response_requested=response_requested,
+        allow_new_time_proposals=allow_new_time_proposals,
     )
 
 
@@ -479,7 +562,7 @@ def _question(calendar: Calendar, draft: EventDraft) -> str:
             + "and cannot be recalled: "
             + f"{', '.join(invited)}."
         )
-    elif draft.location:
+    elif draft.location or draft.room_addresses:
         invitations = NOBODY_INVITED_BUT_A_PLACE
     else:
         invitations = "There are no invitations: nobody else is told about it."
@@ -545,6 +628,15 @@ def _answer(created: Event, *, calendar: Calendar, draft: EventDraft) -> Created
         is_online_meeting=created.is_online_meeting,
         join_url=None if online is None else online.join_url,
         location=None if created.location is None else created.location.display_name,
+        show_as=None if created.show_as is None else spelled(created.show_as),
+        categories=list(created.categories or []),
+        importance=None if created.importance is None else spelled(created.importance),
+        sensitivity=None if created.sensitivity is None else spelled(created.sensitivity),
+        is_reminder_on=created.is_reminder_on,
+        reminder_minutes_before_start=created.reminder_minutes_before_start,
+        hide_attendees=created.hide_attendees,
+        response_requested=created.response_requested,
+        allow_new_time_proposals=created.allow_new_time_proposals,
         web_link=created.web_link,
         transaction_id=created.transaction_id,
         invitations_sent=bool(stored),
@@ -657,6 +749,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
+        room_addresses: Annotated[list[str], Field(default=[], description=ROOM_ADDRESSES_FIELD)],
+        categories: Annotated[list[str], Field(default=[], description=CATEGORIES_FIELD)],
         ctx: Context,
         body_html: Annotated[
             str | None,
@@ -709,6 +803,22 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = False,
+        show_as: Annotated[ShowAs | None, Field(description=SHOW_AS_FIELD)] = None,
+        importance: Annotated[EventImportance | None, Field(description=IMPORTANCE_FIELD)] = None,
+        sensitivity: Annotated[
+            EventSensitivity | None, Field(description=SENSITIVITY_FIELD)
+        ] = None,
+        is_reminder_on: Annotated[bool | None, Field(description=IS_REMINDER_ON_FIELD)] = None,
+        reminder_minutes_before_start: Annotated[
+            int | None, Field(ge=0, description=REMINDER_MINUTES_FIELD)
+        ] = None,
+        hide_attendees: Annotated[bool | None, Field(description=HIDE_ATTENDEES_FIELD)] = None,
+        response_requested: Annotated[
+            bool | None, Field(description=RESPONSE_REQUESTED_FIELD)
+        ] = None,
+        allow_new_time_proposals: Annotated[
+            bool | None, Field(description=ALLOW_NEW_TIME_PROPOSALS_FIELD)
+        ] = None,
         client: GraphServiceClient = graph,
     ) -> CreatedEventOnBehalf | InputRequiredResult:
         return await create_event_on_behalf(
@@ -724,5 +834,15 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             location=location,
             all_day=all_day,
             online_meeting=online_meeting,
+            room_addresses=room_addresses,
+            categories=categories,
+            show_as=show_as,
+            importance=importance,
+            sensitivity=sensitivity,
+            is_reminder_on=is_reminder_on,
+            reminder_minutes_before_start=reminder_minutes_before_start,
+            hide_attendees=hide_attendees,
+            response_requested=response_requested,
+            allow_new_time_proposals=allow_new_time_proposals,
             confirm=a_person_agrees(ctx),
         )

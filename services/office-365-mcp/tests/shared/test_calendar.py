@@ -39,7 +39,10 @@ from office_365_mcp.shared.calendar import (
     CalendarSummary,
     EventAttendee,
     EventDraft,
+    EventImportance,
+    EventSensitivity,
     EventSummary,
+    ShowAs,
     calendar_of,
     created_event,
     draft_details,
@@ -86,6 +89,16 @@ def _draft(
     location: str | None = None,
     all_day: bool = False,
     online_meeting: bool = False,
+    room_addresses: tuple[str, ...] = (),
+    categories: tuple[str, ...] = (),
+    show_as: ShowAs | None = None,
+    importance: EventImportance | None = None,
+    sensitivity: EventSensitivity | None = None,
+    is_reminder_on: bool | None = None,
+    reminder_minutes_before_start: int | None = None,
+    hide_attendees: bool | None = None,
+    response_requested: bool | None = None,
+    allow_new_time_proposals: bool | None = None,
 ) -> EventDraft:
     return EventDraft(
         subject=subject,
@@ -98,6 +111,16 @@ def _draft(
         location=location,
         all_day=all_day,
         online_meeting=online_meeting,
+        room_addresses=room_addresses,
+        categories=categories,
+        show_as=show_as,
+        importance=importance,
+        sensitivity=sensitivity,
+        is_reminder_on=is_reminder_on,
+        reminder_minutes_before_start=reminder_minutes_before_start,
+        hide_attendees=hide_attendees,
+        response_requested=response_requested,
+        allow_new_time_proposals=allow_new_time_proposals,
     )
 
 
@@ -658,16 +681,7 @@ class TestTheCreateBody:
         assert "location" not in body
         assert "attendees" not in body
 
-    @pytest.mark.parametrize(
-        "property_name",
-        [
-            "hideAttendees",
-            "recurrence",
-            "responseRequested",
-            "allowNewTimeProposals",
-            "attachments",
-        ],
-    )
+    @pytest.mark.parametrize("property_name", ["recurrence", "attachments"])
     def test_it_never_names_a_property_no_tool_here_offers(self, property_name: str) -> None:
         draft = _draft(
             attendees=(_SOMEBODY_ELSE,),
@@ -679,6 +693,88 @@ class TestTheCreateBody:
         body = _payload(event_body(draft, transaction_id="synthetic-transaction"))
 
         assert property_name not in body
+
+    @pytest.mark.parametrize(
+        "property_name",
+        [
+            "showAs",
+            "categories",
+            "importance",
+            "sensitivity",
+            "isReminderOn",
+            "reminderMinutesBeforeStart",
+            "hideAttendees",
+            "responseRequested",
+            "allowNewTimeProposals",
+        ],
+    )
+    def test_it_never_names_an_option_the_draft_left_unset(self, property_name: str) -> None:
+        draft = _draft(
+            attendees=(_SOMEBODY_ELSE,),
+            body_html="<p>Agenda attached.</p>",
+            location="Zurich HQ",
+            online_meeting=True,
+        )
+
+        body = _payload(event_body(draft, transaction_id="synthetic-transaction"))
+
+        assert property_name not in body
+
+    @pytest.mark.parametrize(
+        ("draft", "property_name", "value"),
+        [
+            (_draft(show_as="free"), "showAs", "free"),
+            (_draft(show_as="oof"), "showAs", "oof"),
+            (
+                _draft(categories=("Budget", "Blue category")),
+                "categories",
+                ["Budget", "Blue category"],
+            ),
+            (_draft(importance="low"), "importance", "low"),
+            (_draft(sensitivity="confidential"), "sensitivity", "confidential"),
+            (_draft(is_reminder_on=True), "isReminderOn", True),
+            (_draft(reminder_minutes_before_start=45), "reminderMinutesBeforeStart", 45),
+            (_draft(hide_attendees=False), "hideAttendees", False),
+            (_draft(response_requested=True), "responseRequested", True),
+            (_draft(allow_new_time_proposals=True), "allowNewTimeProposals", True),
+        ],
+        ids=[
+            "free",
+            "out-of-office",
+            "categories",
+            "importance",
+            "sensitivity",
+            "reminder-on",
+            "reminder-minutes",
+            "hide-attendees-false",
+            "response-requested",
+            "new-time-proposals",
+        ],
+    )
+    def test_each_option_the_draft_sets_is_sent_in_microsofts_spelling(
+        self, draft: EventDraft, property_name: str, value: object
+    ) -> None:
+        body = _payload(event_body(draft, transaction_id="synthetic"))
+
+        assert body[property_name] == value
+
+    def test_each_room_is_a_resource_attendee_after_the_people(self) -> None:
+        draft = _draft(attendees=(_SOMEBODY_ELSE,), room_addresses=("room-3@example.invalid",))
+
+        body = _payload(event_body(draft, transaction_id="synthetic"))
+
+        assert body["attendees"] == [
+            {
+                "emailAddress": {"address": _SOMEBODY_ELSE},
+                "@odata.type": "#microsoft.graph.attendee",
+                "type": "required",
+            },
+            {
+                "emailAddress": {"address": "room-3@example.invalid"},
+                "@odata.type": "#microsoft.graph.attendee",
+                "type": "resource",
+            },
+        ]
 
     def test_the_subject_the_bounds_and_the_transaction_id_are_always_sent(self) -> None:
         body = _payload(event_body(_draft(), transaction_id="synthetic-transaction"))
@@ -800,6 +896,113 @@ class TestWhatADraftSaysBeyondItsFirstClause:
 
     def test_a_draft_that_names_none_of_the_four_says_nothing_at_all(self) -> None:
         assert draft_details(_draft(attendees=(_SOMEBODY_ELSE,))) == ""
+
+    @pytest.mark.parametrize(
+        ("draft", "said"),
+        [
+            (
+                _draft(room_addresses=("room-3@example.invalid",)),
+                "booking the room room-3@example.invalid",
+            ),
+            (
+                _draft(room_addresses=("room-3@example.invalid", "room-4@example.invalid")),
+                "booking the rooms room-3@example.invalid, room-4@example.invalid",
+            ),
+            (_draft(show_as="free"), "shown as free"),
+            (_draft(show_as="tentative"), "shown as tentative"),
+            (_draft(show_as="busy"), "shown as busy"),
+            (_draft(show_as="oof"), "shown as out of office"),
+            (_draft(show_as="workingElsewhere"), "shown as working elsewhere"),
+            (_draft(importance="normal"), "with normal importance"),
+            (_draft(sensitivity="confidential"), "marked as confidential"),
+            (_draft(categories=("Budget", "Blue category")), "tagged 'Budget, Blue category'"),
+            (_draft(is_reminder_on=True), "with a reminder"),
+            (_draft(is_reminder_on=False), "with no reminder"),
+            (
+                _draft(reminder_minutes_before_start=15),
+                "with a reminder 15 minutes before the start",
+            ),
+            (
+                _draft(is_reminder_on=True, reminder_minutes_before_start=1),
+                "with a reminder 1 minute before the start",
+            ),
+            (
+                _draft(is_reminder_on=False, reminder_minutes_before_start=15),
+                "with no reminder, and a reminder time of 15 minutes before the start",
+            ),
+            (_draft(hide_attendees=True), "with the attendee list hidden"),
+            (_draft(hide_attendees=False), "with the attendee list visible to every attendee"),
+            (_draft(response_requested=True), "with a response requested"),
+            (_draft(response_requested=False), "with no response requested"),
+            (_draft(allow_new_time_proposals=True), "with new time proposals allowed"),
+            (_draft(allow_new_time_proposals=False), "with no new time proposals allowed"),
+        ],
+        ids=[
+            "one-room",
+            "two-rooms",
+            "free",
+            "tentative",
+            "busy",
+            "out-of-office",
+            "working-elsewhere",
+            "importance",
+            "sensitivity",
+            "categories",
+            "reminder-on",
+            "reminder-off",
+            "reminder-minutes",
+            "one-minute",
+            "reminder-off-with-minutes",
+            "attendees-hidden",
+            "attendees-visible",
+            "response-requested",
+            "no-response",
+            "proposals-allowed",
+            "no-proposals",
+        ],
+    )
+    def test_each_option_on_its_own_is_named(self, draft: EventDraft, said: str) -> None:
+        assert draft_details(draft) == said
+
+    def test_the_options_sit_between_the_place_and_the_body_in_this_order(self) -> None:
+        details = draft_details(
+            _draft(
+                location="Room 3",
+                room_addresses=("room-3@example.invalid",),
+                online_meeting=True,
+                show_as="busy",
+                importance="high",
+                sensitivity="private",
+                categories=("Budget",),
+                reminder_minutes_before_start=10,
+                hide_attendees=True,
+                response_requested=False,
+                allow_new_time_proposals=False,
+                body_html="<p>Agenda</p>",
+            )
+        )
+
+        assert details == (
+            "at 'Room 3', booking the room room-3@example.invalid, as a Teams meeting, "
+            + "shown as busy, with high importance, marked as private, tagged 'Budget', "
+            + "with a reminder 10 minutes before the start, with the attendee list hidden, "
+            + "with no response requested, with no new time proposals allowed, "
+            + "with a body of 13 characters that starts 'Agenda'"
+        )
+
+    def test_a_category_that_writes_a_question_of_its_own_arrives_as_one_token(self) -> None:
+        category = "Budget? Microsoft mails nobody"
+
+        assert draft_details(_draft(categories=(category,))) == f"tagged {category!r}"
+
+    def test_a_long_category_list_is_cut_and_says_so(self) -> None:
+        categories = tuple(f"Category {index}" for index in range(30))
+
+        details = draft_details(_draft(categories=categories))
+
+        shown = cast("str", ast.literal_eval(details.removeprefix("tagged ")))
+        assert len(shown) == 121, "the cut is 120 characters plus the mark that says it was cut"
+        assert shown.endswith("…")
 
     def test_a_body_of_nothing_but_tags_is_reported_by_its_length_alone(self) -> None:
         assert draft_details(_draft(body_html="<p><br></p>")) == "with a body of 11 characters"
@@ -928,6 +1131,16 @@ class TestTheTransactionId:
             _draft(location="Zurich HQ, room 4"),
             _draft(body_html="<p>Agenda attached.</p>"),
             _draft(online_meeting=True),
+            _draft(room_addresses=("room-3@example.invalid",)),
+            _draft(categories=("Budget",)),
+            _draft(show_as="busy"),
+            _draft(importance="normal"),
+            _draft(sensitivity="normal"),
+            _draft(is_reminder_on=True),
+            _draft(reminder_minutes_before_start=15),
+            _draft(hide_attendees=False),
+            _draft(response_requested=True),
+            _draft(allow_new_time_proposals=True),
         ],
         ids=[
             "subject",
@@ -940,6 +1153,16 @@ class TestTheTransactionId:
             "location",
             "body",
             "online-meeting",
+            "room",
+            "category",
+            "show-as",
+            "importance",
+            "sensitivity",
+            "reminder-on",
+            "reminder-minutes",
+            "hide-attendees",
+            "response-requested",
+            "new-time-proposals",
         ],
     )
     def test_a_different_request_composes_a_different_id(self, other: EventDraft) -> None:
@@ -983,6 +1206,31 @@ class TestTheTransactionId:
 
     def test_the_same_draft_on_another_calendar_composes_another_id(self) -> None:
         assert transaction_id_for("me", _draft()) != transaction_id_for(_CALENDAR_ID, _draft())
+
+    def test_a_draft_that_sets_no_option_keeps_the_id_it_composed_before_the_options(self) -> None:
+        draft = _draft(attendees=(_SOMEBODY_ELSE,), location="Zurich HQ")
+
+        assert transaction_id_for("me", draft) == "8a963a07-4075-51b1-b5e9-2ba7a29e0d43"
+
+    def test_reordering_the_rooms_or_the_categories_composes_the_same_id(self) -> None:
+        one = _draft(room_addresses=("room-3@example.invalid", "room-4@example.invalid"))
+        other = _draft(room_addresses=("room-4@example.invalid", "room-3@example.invalid"))
+        tagged = _draft(categories=("Budget", "Blue category"))
+        retagged = _draft(categories=("Blue category", "Budget"))
+
+        assert transaction_id_for("me", one) == transaction_id_for("me", other)
+        assert transaction_id_for("me", tagged) == transaction_id_for("me", retagged)
+
+    def test_moving_a_room_into_the_attendee_list_composes_another_id(self) -> None:
+        booked = _draft(room_addresses=("room-3@example.invalid",))
+        invited = _draft(attendees=("room-3@example.invalid",))
+
+        assert transaction_id_for("me", booked) != transaction_id_for("me", invited)
+
+    def test_a_reminder_switched_off_and_one_left_unset_are_two_ids(self) -> None:
+        off = _draft(is_reminder_on=False)
+
+        assert transaction_id_for("me", off) != transaction_id_for("me", _draft())
 
     def test_it_is_a_uuid_string_because_that_is_what_goes_on_the_wire(self) -> None:
         composed = transaction_id_for("me", _draft())

@@ -1,6 +1,6 @@
 import re
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Literal, Self
@@ -12,7 +12,6 @@ from msgraph.generated.models.attendee_type import AttendeeType
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.calendar import Calendar
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
-from msgraph.generated.models.day_of_week import DayOfWeek
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.event import Event
 from msgraph.generated.models.event_type import EventType
@@ -21,15 +20,9 @@ from msgraph.generated.models.importance import Importance
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.location import Location
 from msgraph.generated.models.online_meeting_provider_type import OnlineMeetingProviderType
-from msgraph.generated.models.patterned_recurrence import PatternedRecurrence
-from msgraph.generated.models.recurrence_pattern import RecurrencePattern
-from msgraph.generated.models.recurrence_pattern_type import RecurrencePatternType
-from msgraph.generated.models.recurrence_range import RecurrenceRange
-from msgraph.generated.models.recurrence_range_type import RecurrenceRangeType
 from msgraph.generated.models.response_type import ResponseType
 from msgraph.generated.models.sensitivity import Sensitivity
 from msgraph.generated.models.user import User
-from msgraph.generated.models.week_index import WeekIndex
 from msgraph.generated.users.item.calendar.calendar_request_builder import CalendarRequestBuilder
 from msgraph.generated.users.item.calendars.item.calendar_item_request_builder import (
     CalendarItemRequestBuilder,
@@ -90,7 +83,107 @@ SUMMARY_FIELDS: tuple[str, ...] = (
 )
 
 NOBODY_INVITED_BUT_A_PLACE = (
-    "Nobody is invited, and a location that names a bookable room can reach that room's mailbox."
+    "No person is invited. But Microsoft can send the meeting request to the mailbox of a room, "
+    + "or of a bookable room that the location names."
+)
+
+SHOW_AS_FIELD = (
+    "How the event shows in the free-busy view of the calendar: `free`, `tentative`, `busy`, "
+    + "`oof` for out of office, or `workingElsewhere`. Null sends nothing, and Microsoft then "
+    + "applies its own default."
+)
+
+CATEGORIES_FIELD = (
+    "One category name for each entry, exactly as the user names it or as outlook_list_categories "
+    + "reports it. An empty list adds no category to the event."
+)
+
+IMPORTANCE_FIELD = (
+    "The importance of the event: `low`, `normal`, or `high`. Null sends nothing, and Microsoft "
+    + "then applies its own default."
+)
+
+SENSITIVITY_FIELD = (
+    "The sensitivity of the event: `normal`, `personal`, `private`, or `confidential`. Null "
+    + "sends nothing, and Microsoft then applies its own default."
+)
+
+ROOM_ADDRESSES_FIELD = (
+    "The rooms to book, one SMTP address of a room mailbox for each entry and nothing else in the "
+    + "entry. Take each address from the user. This tool adds each room as a `resource` attendee, "
+    + "and the mailbox of each room gets the meeting request. An address must not repeat, and "
+    + "must not also be in `attendees` or `optional_attendees`."
+)
+
+IS_REMINDER_ON_FIELD = (
+    "Set this parameter to true for a reminder alert before the event starts, or to false for no "
+    + "reminder. Null sends nothing, and Microsoft then applies its own default."
+)
+
+REMINDER_MINUTES_FIELD = (
+    "How many minutes before the start the reminder alert comes, as a whole number of 0 or more. "
+    + "Null sends nothing, and Microsoft then applies its own default."
+)
+
+HIDE_ATTENDEES_FIELD = (
+    "Set this parameter to true to hide the attendee list. Each attendee then sees only "
+    + "themselves in the meeting request and in the tracking list. Null sends nothing, and "
+    + "Microsoft then uses false, so every attendee sees the full list."
+)
+
+RESPONSE_REQUESTED_FIELD = (
+    "Set this parameter to false to ask the attendees for no response to the invitation. Null "
+    + "sends nothing, and Microsoft then uses true, so each attendee is asked for a response."
+)
+
+ALLOW_NEW_TIME_PROPOSALS_FIELD = (
+    "Set this parameter to false so that attendees cannot propose a new time when they respond. "
+    + "Null sends nothing, and Microsoft then uses true, so attendees can propose a new time."
+)
+
+STORED_SHOW_AS_FIELD = (
+    "The free-busy status as Microsoft stored it, read from the response and not from the "
+    + "arguments. Microsoft can also report `unknown`. This field is null when Graph did not say."
+)
+
+STORED_CATEGORIES_FIELD = (
+    "The categories as Microsoft stored them, read from the response and not from the "
+    + "arguments. The list is empty when the event has no category."
+)
+
+STORED_IMPORTANCE_FIELD = (
+    "The importance as Microsoft stored it: `low`, `normal`, or `high`. This field is null when "
+    + "Graph returned no importance."
+)
+
+STORED_SENSITIVITY_FIELD = (
+    "The sensitivity as Microsoft stored it: `normal`, `personal`, `private`, or `confidential`. "
+    + "This field is null when Graph returned no sensitivity."
+)
+
+STORED_IS_REMINDER_ON_FIELD = (
+    "Whether Microsoft stored a reminder alert for the event, read from the response and not from "
+    + "the arguments. This field is null when Graph did not say."
+)
+
+STORED_REMINDER_MINUTES_FIELD = (
+    "How many minutes before the start the reminder alert comes, as Microsoft stored it. This "
+    + "field is null when Graph did not say."
+)
+
+STORED_HIDE_ATTENDEES_FIELD = (
+    "Whether each attendee sees only themselves in the meeting request, as Microsoft stored it. "
+    + "This field is null when Graph did not say."
+)
+
+STORED_RESPONSE_REQUESTED_FIELD = (
+    "Whether the invitation asks each attendee for a response, as Microsoft stored it. This field "
+    + "is null when Graph did not say."
+)
+
+STORED_ALLOW_NEW_TIME_PROPOSALS_FIELD = (
+    "Whether the attendees can propose a new time, as Microsoft stored it. This field is null "
+    + "when Graph did not say."
 )
 
 WALL_CLOCK = re.compile(r"\A\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\Z")
@@ -113,13 +206,25 @@ type PatternType = Literal[
     "daily", "weekly", "absoluteMonthly", "relativeMonthly", "absoluteYearly", "relativeYearly"
 ]
 
-type DayName = Literal[
-    "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"
-]
+type DayName = Literal["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
 
 type WeekIndexName = Literal["first", "second", "third", "fourth", "last"]
 
 type RangeType = Literal["endDate", "noEnd", "numbered"]
+
+type ShowAs = Literal["free", "tentative", "busy", "oof", "workingElsewhere"]
+
+type EventImportance = Literal["low", "normal", "high"]
+
+type EventSensitivity = Literal["normal", "personal", "private", "confidential"]
+
+_SHOWN_AS: Mapping[ShowAs, str] = {
+    "free": "free",
+    "tentative": "tentative",
+    "busy": "busy",
+    "oof": "out of office",
+    "workingElsewhere": "working elsewhere",
+}
 
 
 class EventTime(BaseModel):
@@ -341,6 +446,7 @@ def spelled(
     | EventType
     | FreeBusyStatus
     | Sensitivity
+    | Importance
     | OnlineMeetingProviderType,
 ) -> str:
     return str.__str__(value)
@@ -425,6 +531,16 @@ class EventDraft:
     location: str | None
     all_day: bool
     online_meeting: bool
+    room_addresses: tuple[str, ...] = ()
+    categories: tuple[str, ...] = ()
+    show_as: ShowAs | None = None
+    importance: EventImportance | None = None
+    sensitivity: EventSensitivity | None = None
+    is_reminder_on: bool | None = None
+    reminder_minutes_before_start: int | None = None
+    hide_attendees: bool | None = None
+    response_requested: bool | None = None
+    allow_new_time_proposals: bool | None = None
 
 
 def draft_details(draft: EventDraft) -> str:
@@ -433,11 +549,57 @@ def draft_details(draft: EventDraft) -> str:
         for detail in (
             _whole_days(draft) if draft.all_day else "",
             f"at {cut_for_a_question(draft.location)!r}" if draft.location else "",
+            _rooms_booked(draft.room_addresses),
             "as a Teams meeting" if draft.online_meeting else "",
+            "" if draft.show_as is None else f"shown as {_SHOWN_AS[draft.show_as]}",
+            "" if draft.importance is None else f"with {draft.importance} importance",
+            "" if draft.sensitivity is None else f"marked as {draft.sensitivity}",
+            (
+                f"tagged {cut_for_a_question(', '.join(draft.categories))!r}"
+                if draft.categories
+                else ""
+            ),
+            _reminder(draft.is_reminder_on, draft.reminder_minutes_before_start),
+            _either(
+                draft.hide_attendees,
+                yes="with the attendee list hidden",
+                no="with the attendee list visible to every attendee",
+            ),
+            _either(
+                draft.response_requested,
+                yes="with a response requested",
+                no="with no response requested",
+            ),
+            _either(
+                draft.allow_new_time_proposals,
+                yes="with new time proposals allowed",
+                no="with no new time proposals allowed",
+            ),
             _body_described(draft.body_html) if draft.body_html else "",
         )
         if detail
     )
+
+
+def _rooms_booked(rooms: tuple[str, ...]) -> str:
+    if not rooms:
+        return ""
+    return f"booking the {'room' if len(rooms) == 1 else 'rooms'} {', '.join(rooms)}"
+
+
+def _reminder(on: bool | None, minutes: int | None) -> str:
+    if minutes is None:
+        return _either(on, yes="with a reminder", no="with no reminder")
+    before = f"{minutes} {'minute' if minutes == 1 else 'minutes'} before the start"
+    if on is False:
+        return f"with no reminder, and a reminder time of {before}"
+    return f"with a reminder {before}"
+
+
+def _either(value: bool | None, *, yes: str, no: str) -> str:
+    if value is None:
+        return ""
+    return yes if value else no
 
 
 def _whole_days(draft: EventDraft) -> str:
@@ -472,11 +634,24 @@ def event_body(draft: EventDraft, *, transaction_id: str) -> Event:
         end=DateTimeTimeZone(date_time=draft.ends_at, time_zone=draft.time_zone),
         is_all_day=draft.all_day,
         location=None if draft.location is None else Location(display_name=draft.location),
-        attendees=invited_attendees(draft.attendees, draft.optional_attendees) or None,
+        attendees=[
+            *invited_attendees(draft.attendees, draft.optional_attendees),
+            *(invited_attendee(room, AttendeeType.Resource) for room in draft.room_addresses),
+        ]
+        or None,
         is_online_meeting=True if draft.online_meeting else None,
         online_meeting_provider=(
             OnlineMeetingProviderType.TeamsForBusiness if draft.online_meeting else None
         ),
+        categories=list(draft.categories) or None,
+        show_as=None if draft.show_as is None else FreeBusyStatus(draft.show_as),
+        importance=None if draft.importance is None else Importance(draft.importance),
+        sensitivity=None if draft.sensitivity is None else Sensitivity(draft.sensitivity),
+        is_reminder_on=draft.is_reminder_on,
+        reminder_minutes_before_start=draft.reminder_minutes_before_start,
+        hide_attendees=draft.hide_attendees,
+        response_requested=draft.response_requested,
+        allow_new_time_proposals=draft.allow_new_time_proposals,
         transaction_id=transaction_id,
     )
 
@@ -535,7 +710,28 @@ def transaction_id_for(target: str, draft: EventDraft) -> str:
         draft.location or "",
         draft.body_html or "",
         "online" if draft.online_meeting else "offline",
+        *_options(draft),
     )
+
+
+def _options(draft: EventDraft) -> list[str]:
+    chosen = (
+        draft.show_as,
+        draft.importance,
+        draft.sensitivity,
+        draft.is_reminder_on,
+        draft.reminder_minutes_before_start,
+        draft.hide_attendees,
+        draft.response_requested,
+        draft.allow_new_time_proposals,
+    )
+    if all(one is None for one in chosen) and not draft.categories and not draft.room_addresses:
+        return []
+    return [
+        *(repr(one) for one in chosen),
+        *_listed(draft.categories),
+        *_listed(draft.room_addresses),
+    ]
 
 
 def _canonical(*fields: str) -> str:
