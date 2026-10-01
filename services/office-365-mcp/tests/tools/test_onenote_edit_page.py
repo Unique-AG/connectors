@@ -283,7 +283,9 @@ class TestWhatItSendsToGraph:
         _ = await _edit(client)
 
         query = reread.calls.last.request.url.params
-        assert query["$select"] == "id,title,createdDateTime,lastModifiedDateTime,links"
+        assert (
+            query["$select"] == "id,title,createdDateTime,lastModifiedDateTime,links,createdByAppId"
+        )
         assert query["$expand"] == "parentSection,parentNotebook"
 
     async def test_the_pre_read_asks_for_id_title_the_parent_notebook_and_section(

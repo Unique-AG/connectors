@@ -132,6 +132,7 @@ async def list_pages(
     *,
     section: str | None = None,
     title_contains: str | None = None,
+    created_by_app_id: str | None = None,
     order_by: OrderBy | None = None,
     modified_after: date | datetime | None = None,
     modified_before: date | datetime | None = None,
@@ -148,7 +149,12 @@ async def list_pages(
         raise ToolError(_PAGELEVEL_NEEDS_A_SECTION)
     _refuse_backwards_windows(modified_after, modified_before, created_after, created_before)
     query_filter = _filter(
-        title_contains, modified_after, modified_before, created_after, created_before
+        title_contains,
+        created_by_app_id,
+        modified_after,
+        modified_before,
+        created_after,
+        created_before,
     )
     order_clause = _ORDER_BY_CLAUSES[order_by] if order_by is not None else None
 
@@ -217,6 +223,7 @@ def _wire(instant: datetime) -> str:
 
 def _filter(
     title_contains: str | None,
+    created_by_app_id: str | None,
     modified_after: date | datetime | None,
     modified_before: date | datetime | None,
     created_after: date | datetime | None,
@@ -234,6 +241,8 @@ def _filter(
     title_clause = _title_filter(title_contains)
     if title_clause is not None:
         clauses.append(title_clause)
+    if created_by_app_id is not None:
+        clauses.append(f"createdByAppId eq '{odata_literal(created_by_app_id)}'")
     return " and ".join(clauses) if clauses else None
 
 
@@ -300,6 +309,17 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "Keep only the pages whose title contains this text, compared without "
                     + "regard to case. Omit it to list every page. Pass it to search for one "
                     + "page instead."
+                ),
+            ),
+        ] = None,
+        created_by_app_id: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Keep only the pages that one app created. Pass the `created_by_app_id` of "
+                    + "a row from an earlier result. The match is exact and case-sensitive, so "
+                    + "copy it word for word. Omit it to list pages from every app."
                 ),
             ),
         ] = None,
@@ -401,6 +421,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             client,
             section=section,
             title_contains=title_contains,
+            created_by_app_id=created_by_app_id,
             order_by=order_by,
             modified_after=modified_after,
             modified_before=modified_before,

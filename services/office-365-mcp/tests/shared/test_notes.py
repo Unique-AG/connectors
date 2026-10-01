@@ -34,6 +34,8 @@ from .conftest import GRAPH_V1
 _PAGE_ID = "0-33333333-3333-4333-8333-333333333333!101-44444444-4444-4444-8444-444444444444"
 _SECTION_ID = "1-11111111-1111-4111-8111-111111111111!100-22222222-2222-4222-8222-222222222222"
 
+_APP_ID = "WLID-000000004C12821A"
+
 _CREATED_AT = datetime(2026, 1, 5, 9, 30, tzinfo=UTC)
 _MODIFIED_AT = datetime(2026, 3, 12, 14, 45, tzinfo=UTC)
 
@@ -56,6 +58,7 @@ def _page(
     notebook: Notebook | None = _NOTEBOOK,
     level: int | None = None,
     order: int | None = None,
+    created_by_app_id: str | None = _APP_ID,
 ) -> OnenotePage:
     return OnenotePage(
         id=page_id,
@@ -67,6 +70,7 @@ def _page(
         parent_notebook=notebook,
         level=level,
         order=order,
+        created_by_app_id=created_by_app_id,
     )
 
 
@@ -89,6 +93,13 @@ class TestFromPage:
         assert summary.client_url == "onenote:https://onenote.invalid/client/page"
         assert summary.section_name == "Team Standups"
         assert summary.notebook_name == "Engineering"
+        assert summary.created_by_app_id == _APP_ID
+
+    def test_a_page_with_no_creating_app_answers_a_null_app_id(self) -> None:
+        summary = notes.PageSummary.from_page(_page(created_by_app_id=None))
+
+        assert summary is not None
+        assert summary.created_by_app_id is None
 
     def test_a_page_with_no_id_answers_none(self) -> None:
         assert notes.PageSummary.from_page(_page(page_id=None)) is None

@@ -46,7 +46,14 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionHandle,
 )
 
-PAGE_FIELDS: tuple[str, ...] = ("id", "title", "createdDateTime", "lastModifiedDateTime", "links")
+PAGE_FIELDS: tuple[str, ...] = (
+    "id",
+    "title",
+    "createdDateTime",
+    "lastModifiedDateTime",
+    "links",
+    "createdByAppId",
+)
 PAGE_EXPANSIONS: tuple[str, ...] = ("parentSection", "parentNotebook")
 
 NOTEBOOK_AUDIENCE_FIELDS: tuple[str, ...] = ("id", "displayName", "isShared", "userRole")
@@ -198,6 +205,13 @@ class PageSummary(BaseModel):
             + "This is null unless onenote_list_pages sets include_level_and_order=true."
         )
     )
+    created_by_app_id: str | None = Field(
+        description=(
+            "The identifier of the app that created this page, as Graph reported it. Pass it as "
+            + "`created_by_app_id` to onenote_list_pages to find the other pages that app "
+            + "created. Null when Graph recorded none."
+        )
+    )
 
     @classmethod
     def from_page(cls, page: OnenotePage) -> Self | None:
@@ -218,6 +232,7 @@ class PageSummary(BaseModel):
             notebook_name=notebook.display_name if notebook is not None else None,
             level=page.level,
             order=page.order,
+            created_by_app_id=page.created_by_app_id,
         )
 
 

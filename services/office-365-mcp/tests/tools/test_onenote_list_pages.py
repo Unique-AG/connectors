@@ -24,6 +24,8 @@ _SECTION_PAGES_PATH = "/me/onenote/sections/0-SYNTHETICSECTION0001%210001/pages"
 
 _SECTION = OnenoteSectionHandle(_SECTION_ID).uri
 
+_APP_ID = "WLID-000000004C12821A"
+
 
 def _page_payload(
     page_id: str | None,
@@ -36,12 +38,14 @@ def _page_payload(
     section_id: str | None = _SECTION_ID,
     section_name: str | None = "Planning",
     notebook_name: str | None = "Team Notebook",
+    created_by_app_id: str | None = _APP_ID,
 ) -> dict[str, object]:
     return {
         "id": page_id,
         "title": title,
         "createdDateTime": created_at,
         "lastModifiedDateTime": last_modified_at,
+        "createdByAppId": created_by_app_id,
         "links": {
             "oneNoteWebUrl": {"href": web_url} if web_url is not None else None,
             "oneNoteClientUrl": {"href": client_url} if client_url is not None else None,
@@ -185,6 +189,49 @@ class TestWhatItAsks:
             "contains(tolower(title),'o''brien''s notes')"
         )
 
+    @pytest.mark.usefixtures("section_pages")
+    async def test_a_creating_app_becomes_an_exact_created_by_app_id_filter(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, created_by_app_id=_APP_ID, limit=25)
+
+        assert pages.calls.last.request.url.params["$filter"] == (
+            "createdByAppId eq 'WLID-000000004C12821A'"
+        )
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_the_app_id_keeps_its_case_for_graph(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, created_by_app_id="Wlid-AbC", limit=25)
+
+        assert pages.calls.last.request.url.params["$filter"] == "createdByAppId eq 'Wlid-AbC'"
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_an_apostrophe_in_an_app_id_cannot_end_the_odata_literal(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, created_by_app_id="app'id", limit=25)
+
+        assert pages.calls.last.request.url.params["$filter"] == "createdByAppId eq 'app''id'"
+
+    async def test_the_app_filter_reaches_the_section_route_too(
+        self, client: GraphServiceClient, section_pages: respx.Route
+    ) -> None:
+        section_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, section=_SECTION, created_by_app_id=_APP_ID, limit=25)
+
+        assert section_pages.calls.last.request.url.params["$filter"] == (
+            "createdByAppId eq 'WLID-000000004C12821A'"
+        )
+
     @pytest.mark.parametrize("limit", [0, lister.MAX_PAGES + 1])
     async def test_a_limit_outside_the_window_is_a_programming_error(
         self, client: GraphServiceClient, limit: int
@@ -221,6 +268,17 @@ class TestWhatItAnswers:
         assert row.notebook_name == "Team Notebook"
         assert row.web_url == "https://onenote.example.invalid/pages/q3-roadmap"
         assert row.client_url == "onenote:https://onenote.example.invalid/pages/q3-roadmap"
+        assert row.created_by_app_id == _APP_ID
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_a_page_graph_gave_no_creating_app_has_a_null_created_by_app_id(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID, created_by_app_id=None)))
+
+        answer = await lister.list_pages(client, limit=25)
+
+        assert answer.pages[0].created_by_app_id is None
 
     @pytest.mark.usefixtures("section_pages")
     async def test_a_page_with_no_parent_section_has_no_section_uri(
@@ -520,6 +578,25 @@ class TestTheTimeWindows:
 
         assert pages.calls.last.request.url.params["$filter"] == (
             "lastModifiedDateTime ge 2026-03-04T00:00:00Z and contains(tolower(title),'roadmap')"
+        )
+
+    @pytest.mark.usefixtures("section_pages")
+    async def test_a_window_a_title_and_an_app_are_all_joined_with_and(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(
+            client,
+            modified_after=date(2026, 3, 4),
+            title_contains="Roadmap",
+            created_by_app_id=_APP_ID,
+            limit=25,
+        )
+
+        assert pages.calls.last.request.url.params["$filter"] == (
+            "lastModifiedDateTime ge 2026-03-04T00:00:00Z and contains(tolower(title),'roadmap') "
+            + "and createdByAppId eq 'WLID-000000004C12821A'"
         )
 
     async def test_a_backwards_modified_window_never_reaches_graph(

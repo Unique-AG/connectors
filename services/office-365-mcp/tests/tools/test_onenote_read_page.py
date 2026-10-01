@@ -29,6 +29,7 @@ _SECTION = OnenoteSectionHandle(SECTION_ID).uri
 
 _WEB_URL = "https://onenote.example.invalid/pages/sprint-notes"
 _CLIENT_URL = "onenote:https://onenote.example.invalid/pages/sprint-notes"
+_APP_ID = "WLID-000000004C12821A"
 
 _HTML = b"<html><head><title>Sprint notes</title></head><body><div>hi</div></body></html>"
 
@@ -45,12 +46,14 @@ def _page_payload(
     section_name: str | None = "Engineering",
     notebook_name: str | None = "Team Notebook",
     links: bool = True,
+    created_by_app_id: str | None = _APP_ID,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "id": page_id,
         "title": title,
         "createdDateTime": created,
         "lastModifiedDateTime": modified,
+        "createdByAppId": created_by_app_id,
     }
     if links:
         payload["links"] = {
@@ -105,6 +108,7 @@ class TestWhatItAsks:
             "createdDateTime",
             "lastModifiedDateTime",
             "links",
+            "createdByAppId",
         ]
         assert params["$expand"].split(",") == ["parentSection", "parentNotebook"]
 
@@ -154,6 +158,7 @@ class TestWhatItAnswers:
         assert summary.section_uri == OnenoteSectionHandle(SECTION_ID).uri
         assert summary.section_name == "Engineering"
         assert summary.notebook_name == "Team Notebook"
+        assert summary.created_by_app_id == _APP_ID
         assert (page.call_count, content.call_count) == (1, 1)
 
     async def test_the_html_comes_back_decoded_exactly_as_graph_sent_it(
