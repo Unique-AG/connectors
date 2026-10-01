@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.calendar import (
     EventTime,
+    WorkingHoursSummary,
     event_time,
     repeated_address,
     spelled,
@@ -46,10 +47,16 @@ DEFAULT_INTERVAL_MINUTES = 30
 
 _FALLBACK_ZONE = ZoneInfo("UTC")
 
-_DESCRIPTION = (
-    "Reads free/busy status for one or more mailboxes over a time window; read-only, it does "
-    "not book, invite, or change anything."
-)
+_DESCRIPTION = """\
+Reads the free/busy status and the working hours of one or more mailboxes over a time window. \
+This tool only reads, and nothing here books, invites, or changes anything. \
+outlook_suggest_meeting_times is the tool that asks Microsoft to suggest meeting times.
+
+Notes:
+- `working_hours` holds the standing weekly hours of the owner. It does not depend on the \
+window, and it does not mark any slot as free or busy.
+- Before you offer a free slot to the user, compare the slot with `working_hours`.
+"""
 
 _ENDS_BEFORE_STARTS = (
     "outlook_check_availability read nothing, because `ends_at` is not after `starts_at`. Both "
@@ -140,6 +147,13 @@ class MailboxSchedule(BaseModel):
             + "empty."
         )
     )
+    working_hours: WorkingHoursSummary | None = Field(
+        description=(
+            "The standing weekly working hours of the mailbox owner. The times use the zone in "
+            + "`working_hours.time_zone`, and not the zone of the window. This field is null "
+            + "when Graph gives none."
+        )
+    )
 
     @classmethod
     def from_information(cls, info: ScheduleInformation, *, zone: ZoneInfo) -> MailboxSchedule:
@@ -153,6 +167,7 @@ class MailboxSchedule(BaseModel):
                 if error is None
                 else ScheduleError(response_code=error.response_code, message=error.message)
             ),
+            working_hours=WorkingHoursSummary.from_working_hours(info.working_hours),
         )
 
 

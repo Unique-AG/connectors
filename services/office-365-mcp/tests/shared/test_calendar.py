@@ -8,7 +8,7 @@ read the serialized JSON rather than the object.
 import ast
 import json
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from typing import cast
 from zoneinfo import ZoneInfo
 
@@ -20,6 +20,7 @@ from msgraph.generated.models.attendee import Attendee
 from msgraph.generated.models.attendee_type import AttendeeType
 from msgraph.generated.models.calendar import Calendar
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
+from msgraph.generated.models.day_of_week import DayOfWeek
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.event import Event
 from msgraph.generated.models.event_type import EventType
@@ -31,7 +32,9 @@ from msgraph.generated.models.recipient import Recipient
 from msgraph.generated.models.response_status import ResponseStatus
 from msgraph.generated.models.response_type import ResponseType
 from msgraph.generated.models.sensitivity import Sensitivity
+from msgraph.generated.models.time_zone_base import TimeZoneBase
 from msgraph.generated.models.user import User
+from msgraph.generated.models.working_hours import WorkingHours
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.shared.calendar import (
@@ -43,6 +46,7 @@ from office_365_mcp.shared.calendar import (
     EventSensitivity,
     EventSummary,
     ShowAs,
+    WorkingHoursSummary,
     calendar_of,
     created_event,
     draft_details,
@@ -669,6 +673,65 @@ class TestOneAttendee:
 
     def test_a_list_graph_did_not_send_is_no_attendees(self) -> None:
         assert EventAttendee.each_of(None) == []
+
+
+class TestOneWorkingHoursRow:
+    def test_it_reports_the_days_the_times_and_the_zone_as_graph_holds_them(self) -> None:
+        hours = WorkingHours(
+            days_of_week=[DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Friday],
+            start_time=time(8, 0),
+            end_time=time(17, 30),
+            time_zone=TimeZoneBase(name=_WINDOWS_ZONE),
+        )
+
+        summary = WorkingHoursSummary.from_working_hours(hours)
+
+        assert summary is not None
+        assert summary.days == ["monday", "tuesday", "friday"]
+        assert summary.starts_at == "08:00:00"
+        assert summary.ends_at == "17:30:00"
+        assert summary.time_zone == _WINDOWS_ZONE
+
+    def test_the_zone_is_reported_by_name_and_never_resolved(self) -> None:
+        hours = WorkingHours(time_zone=TimeZoneBase(name="Customized Time Zone"))
+
+        summary = WorkingHoursSummary.from_working_hours(hours)
+
+        assert summary is not None
+        assert summary.time_zone == "Customized Time Zone"
+
+    def test_no_working_hours_is_no_summary(self) -> None:
+        assert WorkingHoursSummary.from_working_hours(None) is None
+
+    def test_a_working_hours_object_with_nothing_in_it_is_no_days_and_all_nulls(self) -> None:
+        summary = WorkingHoursSummary.from_working_hours(WorkingHours())
+
+        assert summary is not None
+        assert summary.days == []
+        assert (summary.starts_at, summary.ends_at, summary.time_zone) == (None, None, None)
+
+    def test_a_zone_with_no_name_is_a_null_zone(self) -> None:
+        summary = WorkingHoursSummary.from_working_hours(
+            WorkingHours(time_zone=TimeZoneBase(), start_time=time(9, 0))
+        )
+
+        assert summary is not None
+        assert summary.time_zone is None
+        assert summary.starts_at == "09:00:00"
+
+    def test_a_day_this_sdk_cannot_name_is_left_out_of_the_row(self) -> None:
+        hours = WorkingHours(days_of_week=cast("list[DayOfWeek]", [None, DayOfWeek.Saturday]))
+
+        summary = WorkingHoursSummary.from_working_hours(hours)
+
+        assert summary is not None
+        assert summary.days == ["saturday"]
+
+    @pytest.mark.parametrize("name", list(WorkingHoursSummary.model_fields))
+    def test_every_field_says_what_it_is_in_15_to_60_words(self, name: str) -> None:
+        description = WorkingHoursSummary.model_fields[name].description or ""
+
+        assert 15 <= len(description.split()) <= 60
 
 
 class TestTheCreateBody:

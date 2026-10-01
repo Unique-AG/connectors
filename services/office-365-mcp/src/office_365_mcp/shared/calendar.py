@@ -12,6 +12,7 @@ from msgraph.generated.models.attendee_type import AttendeeType
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.calendar import Calendar
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
+from msgraph.generated.models.day_of_week import DayOfWeek
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.event import Event
 from msgraph.generated.models.event_type import EventType
@@ -23,6 +24,7 @@ from msgraph.generated.models.online_meeting_provider_type import OnlineMeetingP
 from msgraph.generated.models.response_type import ResponseType
 from msgraph.generated.models.sensitivity import Sensitivity
 from msgraph.generated.models.user import User
+from msgraph.generated.models.working_hours import WorkingHours
 from msgraph.generated.users.item.calendar.calendar_request_builder import CalendarRequestBuilder
 from msgraph.generated.users.item.calendars.item.calendar_item_request_builder import (
     CalendarItemRequestBuilder,
@@ -440,8 +442,51 @@ class EventSummary(BaseModel):
         )
 
 
+class WorkingHoursSummary(BaseModel):
+    days: list[str] = Field(
+        description=(
+            "The weekdays on which the owner works, in lowercase English, for example "
+            + "`monday`. This list is empty when Graph names no day."
+        )
+    )
+    starts_at: str | None = Field(
+        description=(
+            "The time of day at which the owner starts work, for example `08:00:00`. It has no "
+            + "offset and is a wall-clock time in `time_zone`. This field is null when Graph "
+            + "gives no time."
+        )
+    )
+    ends_at: str | None = Field(
+        description=(
+            "The time of day at which the owner stops work. It has the same form and zone as "
+            + "`starts_at`. This field is null when Graph gives no time."
+        )
+    )
+    time_zone: str | None = Field(
+        description=(
+            "The name of the zone that `starts_at` and `ends_at` use, as Microsoft spells it. "
+            + "It is a standard zone name such as `Pacific Standard Time`, or `Customized Time "
+            + "Zone` for a custom zone. This field is null when Graph gives no name."
+        )
+    )
+
+    @classmethod
+    def from_working_hours(cls, hours: WorkingHours | None) -> Self | None:
+        if hours is None:
+            return None
+        days: Sequence[DayOfWeek | None] = hours.days_of_week or []
+        zone = hours.time_zone
+        return cls(
+            days=[spelled(day) for day in days if day is not None],
+            starts_at=None if hours.start_time is None else hours.start_time.isoformat(),
+            ends_at=None if hours.end_time is None else hours.end_time.isoformat(),
+            time_zone=None if zone is None else zone.name,
+        )
+
+
 def spelled(
     value: AttendeeType
+    | DayOfWeek
     | ResponseType
     | EventType
     | FreeBusyStatus
