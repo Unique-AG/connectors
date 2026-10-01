@@ -1,0 +1,297 @@
+from collections.abc import Mapping
+from datetime import date, datetime
+from typing import Annotated, Self
+from zoneinfo import ZoneInfo
+
+import httpx
+from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
+from kiota_abstractions.base_request_configuration import RequestConfiguration
+from msgraph.generated.groups.item.calendar_view.calendar_view_request_builder import (
+    CalendarViewRequestBuilder,
+)
+from msgraph.generated.models.event import Event
+from msgraph.graph_service_client import GraphServiceClient
+from pydantic import BaseModel, Field
+
+from office_365_mcp.graph_client import collect_pages, graph_errors
+from office_365_mcp.shared.calendar import EventTime, event_time, spelled, window_bounds, zone_named
+from office_365_mcp.shared.mail import MailAddress
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.window import runs_backwards
+
+TOOL_NAME = "outlook_list_group_events"
+
+STEP = "calendar_events"
+
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.Read",)
+
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
+    "group_id": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
+    "starts_on": "2026-03-02",
+    "ends_on": "2026-03-08",
+}
+
+GRAPH_NOT_FOUND = (
+    "Microsoft 365 reports no calendar for this `group_id`, so this tool cannot list any event. "
+    + "A team name, a channel id, and a chat id are not group ids. Call teams_list_my_teams again "
+    + "and copy the `team_id` of the team exactly as it reports it. Retrying with the same "
+    + "`group_id` will fail identically."
+)
+
+DEFAULT_TIME_ZONE = "UTC"
+
+_EVENT_FIELDS: tuple[str, ...] = (
+    "subject",
+    "bodyPreview",
+    "start",
+    "end",
+    "isAllDay",
+    "isCancelled",
+    "type",
+    "seriesMasterId",
+    "location",
+    "onlineMeeting",
+    "organizer",
+    "webLink",
+)
+
+_EventsQuery = CalendarViewRequestBuilder.CalendarViewRequestBuilderGetQueryParameters
+
+_DESCRIPTION = """\
+Lists the events on the calendar of ONE Microsoft 365 group within a date window. Each \
+recurring series becomes one row for each occurrence. Every team is a group, so this lists the \
+events of a team. For the calendars of a person, use outlook_list_events.
+
+Notes:
+- `group_id` is the `team_id` of a team, from teams_list_my_teams. A team and its group have the \
+same id.
+- A row has no `uri`. outlook_read_event reads only the calendars of the signed-in user, so it \
+cannot open a group event.
+- This tool does not sort the rows. It keeps them in the order that Microsoft 365 returns them.
+"""
+
+_ENDS_BEFORE_STARTS = (
+    "This tool made no request, because `ends_on` falls before `starts_on`, and no calendar holds "
+    + "a window that runs backwards. Both bounds are inside the window, and a date covers its "
+    + "whole day. The same date in both lists that one day. Put the earlier bound in `starts_on` "
+    + "and the later bound in `ends_on`. Then call the tool again. Retrying with the same two "
+    + "values will fail identically."
+)
+
+_NOT_A_ZONE = (
+    "This tool made no request, because it cannot resolve the name in `time_zone`. This argument "
+    + "takes an IANA zone name, such as `Europe/Zurich`, `America/New_York`, or `UTC`. A Windows "
+    + "zone name, a city, a country, a numeric offset such as `+02:00`, and an abbreviation "
+    + "such as `CEST` are not accepted. `Etc/GMT+2` does resolve, but it is two hours BEHIND UTC. "
+    + "`UTC` is the default. If the question is not about a time of day, omit the argument. "
+    + "Retrying with the same name will fail identically."
+)
+
+
+class GroupEventWindow(BaseModel):
+    starts_at: str = Field(
+        description=(
+            "The first instant of the window, in ISO-8601 format with an offset. It is the exact "
+            + "bound that this call sent to Microsoft 365."
+        )
+    )
+    ends_at: str = Field(
+        description=(
+            "The last instant of the window, in ISO-8601 format with an offset. For a date in "
+            + "`ends_on`, it is midnight at the start of the next day. An event that starts at "
+            + "exactly this instant belongs to the next window."
+        )
+    )
+    time_zone: str = Field(
+        description=(
+            "The zone that the caller named. Both bounds and every `iso` value use it. Quote it "
+            + "beside any time in this answer."
+        )
+    )
+
+
+class GroupEventSummary(BaseModel):
+    subject: str | None = Field(description="The subject line, or null if none.")
+    preview: str | None = Field(
+        description="A short plain-text preview of the event body, or null if none."
+    )
+    start: EventTime | None = Field(description="When the event starts, or null if unstated.")
+    end: EventTime | None = Field(description="When the event ends, or null if unstated.")
+    all_day: bool | None = Field(description="Whether this is an all-day event.")
+    cancelled: bool | None = Field(description="Whether the organizer cancelled the event.")
+    kind: str | None = Field(
+        description=(
+            "The row kind, such as `singleInstance`, `occurrence`, or `exception`. Null if "
+            + "unknown."
+        )
+    )
+    in_series: bool = Field(description="Whether this row belongs to a recurring series.")
+    location: str | None = Field(description="The location as one line of text, or null if none.")
+    join_url: str | None = Field(
+        description="The link that joins the online meeting, or null if none."
+    )
+    organizer: MailAddress | None = Field(description="Who organized the event, or null if none.")
+    web_link: str | None = Field(
+        description="The web link that Microsoft 365 reports for the event, or null if none."
+    )
+
+    @classmethod
+    def from_event(cls, event: Event, *, zone: ZoneInfo) -> Self:
+        online = event.online_meeting
+        return cls(
+            subject=event.subject,
+            preview=event.body_preview,
+            start=event_time(event.start, zone=zone),
+            end=event_time(event.end, zone=zone),
+            all_day=event.is_all_day,
+            cancelled=event.is_cancelled,
+            kind=None if event.type is None else spelled(event.type),
+            in_series=event.series_master_id is not None,
+            location=None if event.location is None else event.location.display_name,
+            join_url=None if online is None else online.join_url,
+            organizer=MailAddress.from_recipient(event.organizer),
+            web_link=event.web_link,
+        )
+
+
+class GroupEvents(BaseModel):
+    window: GroupEventWindow = Field(
+        description=(
+            "The exact range that this call sent to Microsoft 365. Report this range whenever "
+            + "you use the answer to say what a team has planned. A window in the wrong zone "
+            + "gives a correct answer to the wrong question."
+        )
+    )
+    events: list[GroupEventSummary] = Field(
+        description=(
+            "The occurrences inside the window. One row shows one date of a recurring series, "
+            + "and never the whole series. A cancelled event still appears, with `cancelled` set "
+            + "to true. An empty list means that nothing matched inside the window. Read "
+            + "`capped` before you treat an empty list as nothing planned."
+        )
+    )
+    capped: bool = Field(
+        description=(
+            "True means that this call stopped with more of the window still available, because "
+            + "`limit` filled up. To get more rows, raise `limit` or narrow the window. False "
+            + "means that this call returned everything in the window, however few rows that is."
+        )
+    )
+
+
+async def list_group_events(
+    client: GraphServiceClient,
+    *,
+    group_id: str,
+    starts_on: date | datetime,
+    ends_on: date | datetime,
+    time_zone: str = DEFAULT_TIME_ZONE,
+    limit: int,
+) -> GroupEvents:
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
+    zone = zone_named(time_zone)
+    if zone is None:
+        raise ToolError(_NOT_A_ZONE)
+    if runs_backwards(starts_on, ends_on, zone=zone):
+        raise ToolError(_ENDS_BEFORE_STARTS)
+    opens, closes = window_bounds(starts_on, ends_on, zone=zone)
+
+    with graph_errors(TOOL_NAME, step=STEP):
+        first_page = await client.groups.by_group_id(group_id).calendar_view.get(
+            request_configuration=RequestConfiguration[_EventsQuery](
+                query_parameters=_EventsQuery(
+                    start_date_time=opens,
+                    end_date_time=closes,
+                    select=list(_EVENT_FIELDS),
+                )
+            )
+        )
+        assert first_page is not None, "Graph answered a group calendar view with no collection"
+        collected = await collect_pages(first_page, client, limit=limit)
+
+    return GroupEvents(
+        window=GroupEventWindow(starts_at=opens, ends_at=closes, time_zone=time_zone),
+        events=[GroupEventSummary.from_event(event, zone=zone) for event in collected.items],
+        capped=collected.capped,
+    )
+
+
+def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
+
+    @mcp.tool(
+        name=TOOL_NAME,
+        title="List Group Calendar Events",
+        description=_DESCRIPTION,
+        annotations=READ_ONLY,
+    )
+    async def outlook_list_group_events(
+        group_id: Annotated[
+            str,
+            Field(
+                min_length=1,
+                description=(
+                    "The group whose calendar to list. Pass the `team_id` of a team, exactly as "
+                    + "teams_list_my_teams reports it. A team and its Microsoft 365 group have "
+                    + "the same id. A team name is not an id. Copy the id, and never build one."
+                ),
+            ),
+        ],
+        starts_on: Annotated[
+            date | datetime,
+            Field(
+                description=(
+                    "Where the window opens. This bound is inside the window. A date, such as "
+                    + "`2026-03-02`, opens at midnight of that day in `time_zone`. A moment, "
+                    + "such as `2026-03-02T13:00:00`, opens at that time. A moment with no "
+                    + "offset is read in `time_zone`. A moment with an offset keeps that offset."
+                )
+            ),
+        ],
+        ends_on: Annotated[
+            date | datetime,
+            Field(
+                description=(
+                    "Where the window closes. This bound is inside the window, in the same forms "
+                    + "as `starts_on`. A date covers the whole of that day. A moment closes at "
+                    + "the second that it names. A window much wider than `limit` returns only "
+                    + "part of its rows, and `capped` says when this happens."
+                )
+            ),
+        ],
+        time_zone: Annotated[
+            str,
+            Field(
+                min_length=1,
+                description=(
+                    "The zone for the window and for every time in this answer, as an IANA name "
+                    + "such as `Europe/Zurich` or `UTC`. Name a place, such as `Europe/Berlin`. "
+                    + "If the question is about a time of day, pass the zone of the user. The "
+                    + "default zone is UTC, and it reports the correct events at the wrong hour "
+                    + "of day."
+                ),
+            ),
+        ] = DEFAULT_TIME_ZONE,
+        limit: Annotated[
+            int,
+            Field(
+                ge=1,
+                description=(
+                    "This is the most events that this call returns. Paging happens inside the "
+                    + "call, so this is the full answer, and not only a first page of it. Raise "
+                    + "this value to get more events. Do not call this tool again with the same "
+                    + "arguments."
+                ),
+            ),
+        ] = 25,
+        client: GraphServiceClient = graph,
+    ) -> GroupEvents:
+        return await list_group_events(
+            client,
+            group_id=group_id,
+            starts_on=starts_on,
+            ends_on=ends_on,
+            time_zone=time_zone,
+            limit=limit,
+        )
