@@ -4,10 +4,10 @@ from typing import Annotated
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.method import Method
 from kiota_abstractions.request_information import RequestInformation
 from mcp.types import InputRequiredResult
+from msgraph.generated.models.onenote_section import OnenoteSection
 from msgraph.generated.users.item.onenote.sections.item import (
     onenote_section_item_request_builder,
 )
@@ -32,6 +32,7 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
+    OnenoteSectionHandle,
     onenote_notebook_handle,
     onenote_section_group_handle,
     onenote_section_handle,
@@ -40,8 +41,9 @@ from office_365_mcp.shared.notes import (
     NotebookAudience,
     OperationSummary,
     accepted_operation,
-    notebook_audience,
-    section_group_container,
+    container_audience,
+    get_with_query,
+    onenote_root,
     write_state_for,
 )
 from office_365_mcp.shared.seam import (
@@ -132,7 +134,8 @@ GRAPH_NOT_FOUND = (
 )
 
 _DESCRIPTION = """\
-Starts a copy of one section into another notebook or section group. This call does not copy the \
+Starts a copy of one section into another notebook or section group. The section and the \
+destination can each be in a notebook of a Microsoft 365 group. This call does not copy the \
 section itself: Microsoft runs the copy, and the answer is the operation that tracks it. Pass the \
 answer's `uri` to onenote_get_operation until `status` reads Completed or Failed.
 
@@ -164,21 +167,12 @@ def _destination(
     raise ToolError(_NEED_EXACTLY_ONE_DESTINATION)
 
 
-async def _destination_container(
-    client: GraphServiceClient, destination: OnenoteNotebookHandle | OnenoteSectionGroupHandle
-) -> tuple[str | None, NotebookAudience]:
-    if isinstance(destination, OnenoteNotebookHandle):
-        audience = await notebook_audience(client, destination.notebook_id)
-        return audience.name, audience
-    container = await section_group_container(client, destination.section_group_id)
-    return container.name, container.notebook
-
-
-async def _section_name(client: GraphServiceClient, section_id: str) -> str | None:
-    found = await client.me.onenote.sections.by_onenote_section_id(section_id).get(
-        request_configuration=RequestConfiguration[_SectionQuery](
-            query_parameters=_SectionQuery(select=list(_SECTION_NAME_FIELDS))
-        )
+async def _section_name(client: GraphServiceClient, handle: OnenoteSectionHandle) -> str | None:
+    found = await get_with_query(
+        client,
+        onenote_root(client, handle.group_id).sections.by_onenote_section_id(handle.section_id),
+        _SectionQuery(select=list(_SECTION_NAME_FIELDS)),
+        OnenoteSection,
     )
     assert found is not None, "Graph answered a section read with no section"
     return found.display_name
@@ -221,32 +215,33 @@ async def copy_section(
         raise ToolError(_NOT_A_SECTION_HANDLE)
     destination = _destination(to_notebook, to_section_group)
 
-    about = write_state_for("copy_section", handle.section_id, destination.uri, new_name or "")
+    about = write_state_for("copy_section", handle.uri, destination.uri, new_name or "")
     fetched: FetchedResponse | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        destination_name, audience = await _destination_container(client, destination)
+        container = await container_audience(client, destination)
+        audience = container.notebook
         if answer_pending or audience.reaches_others:
             with graph_step(STEP_SECTION):
-                section_name = await _section_name(client, handle.section_id)
+                section_name = await _section_name(client, handle)
             with not_graph():
                 answer = await confirm(
-                    _question(destination, destination_name, audience, section_name, new_name),
+                    _question(destination, container.name, audience, section_name, new_name),
                     about,
                 )
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with graph_step(STEP_COPY_SECTION):
-                fetched = await _copy(client, handle.section_id, destination, new_name)
+                fetched = await _copy(client, handle, destination, new_name)
 
     if asked is not None:
         return asked
     if refused is not None:
         raise ToolError(refused)
     assert fetched is not None, "a copy neither asked about nor refused sent nothing"
-    summary = accepted_operation(fetched)
+    summary = accepted_operation(fetched, group_id=handle.group_id)
     if summary is None:
         raise ToolError(_NO_OPERATION_NAMED)
     return summary
@@ -254,41 +249,51 @@ async def copy_section(
 
 async def _copy(
     client: GraphServiceClient,
-    section_id: str,
+    handle: OnenoteSectionHandle,
     destination: OnenoteNotebookHandle | OnenoteSectionGroupHandle,
     new_name: str | None,
 ) -> FetchedResponse:
     if isinstance(destination, OnenoteNotebookHandle):
-        return await _copy_to_notebook(client, section_id, destination.notebook_id, new_name)
-    return await _copy_to_section_group(client, section_id, destination.section_group_id, new_name)
+        return await _copy_to_notebook(client, handle, destination, new_name)
+    return await _copy_to_section_group(client, handle, destination, new_name)
 
 
 async def _copy_to_notebook(
-    client: GraphServiceClient, section_id: str, notebook_id: str, new_name: str | None
+    client: GraphServiceClient,
+    handle: OnenoteSectionHandle,
+    destination: OnenoteNotebookHandle,
+    new_name: str | None,
 ) -> FetchedResponse:
-    builder = client.me.onenote.sections.by_onenote_section_id(section_id).copy_to_notebook
+    root = onenote_root(client, handle.group_id)
+    builder = root.sections.by_onenote_section_id(handle.section_id).copy_to_notebook
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
     request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
         "application/json",
-        _copy_to_notebook_body.CopyToNotebookPostRequestBody(id=notebook_id, rename_as=new_name),
+        _copy_to_notebook_body.CopyToNotebookPostRequestBody(
+            id=destination.notebook_id, group_id=destination.group_id, rename_as=new_name
+        ),
     )
     request.add_request_options([*no_retry(), *native_response()])
     return await fetch_response(client, request)
 
 
 async def _copy_to_section_group(
-    client: GraphServiceClient, section_id: str, section_group_id: str, new_name: str | None
+    client: GraphServiceClient,
+    handle: OnenoteSectionHandle,
+    destination: OnenoteSectionGroupHandle,
+    new_name: str | None,
 ) -> FetchedResponse:
-    builder = client.me.onenote.sections.by_onenote_section_id(section_id).copy_to_section_group
+    root = onenote_root(client, handle.group_id)
+    builder = root.sections.by_onenote_section_id(handle.section_id).copy_to_section_group
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
     request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
         "application/json",
         _copy_to_section_group_body.CopyToSectionGroupPostRequestBody(
-            id=section_group_id, rename_as=new_name
+            id=destination.section_group_id, group_id=destination.group_id, rename_as=new_name
         ),
     )
     request.add_request_options([*no_retry(), *native_response()])
@@ -312,7 +317,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The section to copy: the `uri` of a section in a onenote_list_notebooks or "
                     + "onenote_list_sections result, copied word for word. The shape is "
-                    + "onenote:///sections/{id}."
+                    + "onenote:///sections/{id}. A handle from a group notebook starts with "
+                    + "onenote:///groups/{group}/ instead."
                 ),
             ),
         ],
@@ -324,7 +330,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The destination notebook, as the `uri` of a onenote_list_notebooks or "
                     + "onenote_find_notebook_from_url result, or a onenote_create_notebook answer. "
-                    + "The shape is onenote:///notebooks/{id}."
+                    + "The shape is onenote:///notebooks/{id}. A handle from a group notebook "
+                    + "starts with onenote:///groups/{group}/ instead."
                 ),
             ),
         ] = None,
@@ -335,7 +342,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The destination section group, as the `uri` of a section group in a "
                     + "onenote_list_sections result, or a onenote_create_section_group answer. The "
-                    + "shape is onenote:///sectiongroups/{id}."
+                    + "shape is onenote:///sectiongroups/{id}. A handle from a group notebook "
+                    + "starts with onenote:///groups/{group}/ instead."
                 ),
             ),
         ] = None,
