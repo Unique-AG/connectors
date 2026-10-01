@@ -11,18 +11,18 @@ from msgraph.generated.models.drive_item import DriveItem
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.files import (
     NAME_RULES,
     DriveItemSummary,
     item_for_a_question,
+    summary_after_write,
     unusable_name,
 )
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
-    Advised,
     Confirm,
     graph_client_for_caller,
     person_confirms,
@@ -167,17 +167,9 @@ async def _renamed(
                 request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
             )
         )
-    summary = None if patched is None else DriveItemSummary.from_item(patched)
-    if summary is not None:
-        return summary
-    try:
-        reread = await item_for_a_question(client, handle.drive_id, handle.item_id)
-    except GraphFailure as failure:
-        raise Advised(_WRITTEN_BUT_UNREAD) from failure
-    summary = DriveItemSummary.from_item(reread)
-    if summary is None:
-        raise Advised(_WRITTEN_BUT_UNREAD)
-    return summary
+    return await summary_after_write(
+        client, handle.drive_id, patched, item_id=handle.item_id, unread=_WRITTEN_BUT_UNREAD
+    )
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

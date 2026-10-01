@@ -54,6 +54,7 @@ _PARENT_URI = DriveFolderHandle(_DRIVE_ID, _PARENT_ID).uri
 _DRIVE_PATH = "/drives/b%21SYNTHETICDRIVE0000"
 _PARENT_PATH = f"{_DRIVE_PATH}/items/{_PARENT_ID}"
 _CHILDREN_PATH = f"{_PARENT_PATH}/children"
+_NEW_PATH = f"{_DRIVE_PATH}/items/{_NEW_ID}"
 
 _NAME = "Q3"
 
@@ -359,16 +360,46 @@ class TestWhatItAnswers:
 
         assert answer.name == "Q3 (stored)"
 
-    @pytest.mark.parametrize(
-        "payload",
-        [_created_payload(drive_id=None), _created_payload(item_id=None)],
-        ids=["no-drive", "no-id"],
-    )
-    async def test_a_create_answer_with_no_handle_says_that_the_folder_was_created(
-        self, client: GraphServiceClient, graph: respx.MockRouter, payload: Mapping[str, object]
+    async def test_a_create_answer_with_no_drive_is_read_again_by_the_new_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _reads(graph)
-        post = _creates(graph, payload)
+        post = _creates(graph, _created_payload(drive_id=None))
+        reread = graph.get(_NEW_PATH).mock(
+            return_value=httpx.Response(200, json=_created_payload())
+        )
+
+        answer = await _create(client)
+
+        assert post.call_count == 1
+        assert reread.call_count == 1
+        assert answer.uri == DriveFolderHandle(_DRIVE_ID, _NEW_ID).uri
+        assert answer.parent_uri == _PARENT_URI
+
+    async def test_a_failed_second_read_says_that_the_folder_was_created(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        post = _creates(graph, _created_payload(drive_id=None))
+        _ = graph.get(_NEW_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+            )
+        )
+
+        with pytest.raises(Advised, match="Microsoft 365 created the folder") as advised:
+            _ = await _create(client)
+
+        assert isinstance(advised.value.__cause__, GraphFailure)
+        assert "Do not call sharepoint_create_folder again" in str(advised.value)
+        assert "sharepoint_browse_folder" in str(advised.value)
+        assert post.call_count == 1
+
+    async def test_a_create_answer_with_no_id_says_that_the_folder_was_created_and_reads_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        post = _creates(graph, _created_payload(item_id=None))
 
         with pytest.raises(Advised, match="Microsoft 365 created the folder") as advised:
             _ = await _create(client)

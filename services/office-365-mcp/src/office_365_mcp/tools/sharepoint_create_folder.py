@@ -25,13 +25,13 @@ from office_365_mcp.shared.files import (
     NAME_RULES,
     DriveItemSummary,
     item_for_a_question,
+    summary_after_write,
     unusable_name,
 )
 from office_365_mcp.shared.handles import drive_folder_handle
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
-    Advised,
     Confirm,
     graph_client_for_caller,
     person_confirms,
@@ -114,7 +114,7 @@ async def create_folder(
         raise ToolError(unusable)
 
     about = write_state_for(TOOL_NAME, handle.drive_id, handle.item_id, name)
-    posted: DriveItem | None = None
+    created: DriveItemSummary | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
@@ -130,15 +130,19 @@ async def create_folder(
         if refused is None and asked is None:
             with graph_step(STEP_CREATE_FOLDER):
                 posted = await _post_folder(client, handle.drive_id, found.id, name=name)
+            created = await summary_after_write(
+                client,
+                handle.drive_id,
+                posted,
+                item_id=None if posted is None else posted.id,
+                unread=_WRITTEN_BUT_UNREAD,
+            )
 
     if asked is not None:
         return asked
     if refused is not None:
         raise ToolError(refused)
-    assert posted is not None, "Graph answered a folder create with no item"
-    created = DriveItemSummary.from_item(posted)
-    if created is None:
-        raise Advised(_WRITTEN_BUT_UNREAD)
+    assert created is not None, "a create neither asked about nor refused created nothing"
     return created
 
 

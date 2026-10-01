@@ -14,7 +14,6 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import (
-    GraphFailure,
     graph_errors,
     graph_step,
     no_retry,
@@ -26,6 +25,7 @@ from office_365_mcp.shared.files import (
     NAME_RULES,
     DriveItemSummary,
     item_for_a_question,
+    summary_after_write,
     unusable_name,
 )
 from office_365_mcp.shared.handles import drive_folder_handle
@@ -33,7 +33,6 @@ from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
-    Advised,
     Confirm,
     graph_client_for_caller,
     person_confirms,
@@ -181,7 +180,13 @@ async def create_text_file(
                 written = await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
                     request, DriveItem, {"XXX": ODataError}
                 )
-            created = await _summary(client, handle.drive_id, written)
+            created = await summary_after_write(
+                client,
+                handle.drive_id,
+                written,
+                item_id=None if written is None else written.id,
+                unread=_WRITTEN_BUT_UNREAD,
+            )
 
     if asked is not None:
         return asked
@@ -225,24 +230,6 @@ def _folder_label(folder: DriveItem) -> str:
     if not folder.name:
         return _UNNAMED_FOLDER
     return f"the folder {folder.name!r}"
-
-
-async def _summary(
-    client: GraphServiceClient, drive_id: str, written: DriveItem | None
-) -> DriveItemSummary:
-    summary = None if written is None else DriveItemSummary.from_item(written)
-    if summary is not None:
-        return summary
-    if written is None or written.id is None:
-        raise Advised(_WRITTEN_BUT_UNREAD)
-    try:
-        reread = await item_for_a_question(client, drive_id, written.id)
-    except GraphFailure as failure:
-        raise Advised(_WRITTEN_BUT_UNREAD) from failure
-    summary = DriveItemSummary.from_item(reread)
-    if summary is None:
-        raise Advised(_WRITTEN_BUT_UNREAD)
-    return summary
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

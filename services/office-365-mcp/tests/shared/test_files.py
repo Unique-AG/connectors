@@ -16,20 +16,27 @@ from office_365_mcp.shared.files import (
     NAME_RULES,
     DriveItemSummary,
     item_for_a_question,
+    summary_after_write,
     unusable_name,
 )
+from office_365_mcp.shared.handles import DriveFileHandle
+from office_365_mcp.shared.seam import Advised
 
 _DRIVE_ID = "b!SYNTHETICDRIVE0001"
 _FOLDER_ID = "01SYNTHETICFOLDER0001"
+_ITEM_ID = "01SYNTHETICITEM0001"
 
 _FOLDER_PATH = "/drives/b%21SYNTHETICDRIVE0001/items/01SYNTHETICFOLDER0001"
+_ITEM_PATH = "/drives/b%21SYNTHETICDRIVE0001/items/01SYNTHETICITEM0001"
+
+_UNREAD = "Microsoft 365 made the synthetic change. Then this connector did not receive the item."
 
 _RESERVED = '"*:<>?/\\|'
 
 
 def _item(created_by: IdentitySet | None) -> DriveItem:
     return DriveItem(
-        id="01SYNTHETICITEM0001",
+        id=_ITEM_ID,
         name="Budget 2026.xlsx",
         parent_reference=ItemReference(drive_id=_DRIVE_ID),
         created_by=created_by,
@@ -165,6 +172,84 @@ class TestItemForAQuestion:
 
         with pytest.raises(GraphNotFound):
             _ = await item_for_a_question(client, _DRIVE_ID, _FOLDER_ID)
+
+
+def _reread_payload(*, with_drive: bool = True) -> dict[str, object]:
+    payload: dict[str, object] = {"id": _ITEM_ID, "name": "Budget 2026.xlsx", "file": {}}
+    if with_drive:
+        payload["parentReference"] = {"driveId": _DRIVE_ID, "id": _FOLDER_ID}
+    return payload
+
+
+class TestSummaryAfterWrite:
+    async def test_an_answer_with_a_drive_is_the_summary_and_is_not_read_again(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        reread = graph.get(_ITEM_PATH).mock(
+            return_value=httpx.Response(200, json=_reread_payload())
+        )
+
+        summary = await summary_after_write(
+            client, _DRIVE_ID, _item(None), item_id=_ITEM_ID, unread=_UNREAD
+        )
+
+        assert summary.uri == DriveFileHandle(_DRIVE_ID, _ITEM_ID).uri
+        assert reread.call_count == 0
+
+    async def test_an_answer_with_no_drive_is_read_again_once_by_the_given_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        reread = graph.get(_ITEM_PATH).mock(
+            return_value=httpx.Response(200, json=_reread_payload())
+        )
+
+        summary = await summary_after_write(
+            client, _DRIVE_ID, DriveItem(id=_ITEM_ID), item_id=_ITEM_ID, unread=_UNREAD
+        )
+
+        assert reread.call_count == 1
+        assert summary.uri == DriveFileHandle(_DRIVE_ID, _ITEM_ID).uri
+        assert summary.parent_uri is not None
+
+    async def test_a_failed_read_again_raises_the_given_advice_from_the_failure(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        reread = graph.get(_ITEM_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "Not Found"}}
+            )
+        )
+
+        with pytest.raises(Advised) as raised:
+            _ = await summary_after_write(client, _DRIVE_ID, None, item_id=_ITEM_ID, unread=_UNREAD)
+
+        assert str(raised.value) == _UNREAD
+        assert isinstance(raised.value.__cause__, GraphNotFound)
+        assert reread.call_count == 1
+
+    async def test_no_answer_and_no_id_raises_the_given_advice_and_reads_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(Advised) as raised:
+            _ = await summary_after_write(client, _DRIVE_ID, None, item_id=None, unread=_UNREAD)
+
+        assert str(raised.value) == _UNREAD
+        assert len(graph.calls) == 0
+
+    async def test_a_read_again_with_no_drive_raises_the_given_advice(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        reread = graph.get(_ITEM_PATH).mock(
+            return_value=httpx.Response(200, json=_reread_payload(with_drive=False))
+        )
+
+        with pytest.raises(Advised) as raised:
+            _ = await summary_after_write(
+                client, _DRIVE_ID, DriveItem(id=_ITEM_ID), item_id=_ITEM_ID, unread=_UNREAD
+            )
+
+        assert str(raised.value) == _UNREAD
+        assert reread.call_count == 1
 
 
 class TestFailOnConflict:

@@ -13,8 +13,8 @@ from msgraph.generated.models.item_reference import ItemReference
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.files import DriveItemSummary, item_for_a_question
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.files import DriveItemSummary, item_for_a_question, summary_after_write
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -25,7 +25,6 @@ from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
-    Advised,
     Confirm,
     graph_client_for_caller,
     person_confirms,
@@ -255,23 +254,10 @@ async def _move(
                 request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
             )
         )
-    summary = None if answered is None else DriveItemSummary.from_item(answered)
-    if summary is None:
-        summary = await _reread(client, moving)
+    summary = await summary_after_write(
+        client, moving.drive_id, answered, item_id=moving.item_id, unread=_MOVED_BUT_UNREAD
+    )
     return MovedItem(item=summary, previous_parent_uri=_previous_parent_uri(moving, found))
-
-
-async def _reread(
-    client: GraphServiceClient, moving: DriveFileHandle | DriveFolderHandle
-) -> DriveItemSummary:
-    try:
-        reread = await item_for_a_question(client, moving.drive_id, moving.item_id)
-    except GraphFailure as failure:
-        raise Advised(_MOVED_BUT_UNREAD) from failure
-    summary = DriveItemSummary.from_item(reread)
-    if summary is None:
-        raise Advised(_MOVED_BUT_UNREAD)
-    return summary
 
 
 def _previous_parent_uri(

@@ -11,8 +11,9 @@ from msgraph.generated.models.identity_set import IdentitySet
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_step
+from office_365_mcp.graph_client import GraphFailure, graph_step
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
+from office_365_mcp.shared.seam import Advised
 
 ITEM_FIELDS: tuple[str, ...] = (
     "id",
@@ -191,6 +192,29 @@ async def item_for_a_question(client: GraphServiceClient, drive_id: str, item_id
         )
     assert found is not None, "Graph answered a drive item read with no item"
     return found
+
+
+async def summary_after_write(
+    client: GraphServiceClient,
+    drive_id: str,
+    answered: DriveItem | None,
+    *,
+    item_id: str | None,
+    unread: str,
+) -> DriveItemSummary:
+    summary = None if answered is None else DriveItemSummary.from_item(answered)
+    if summary is not None:
+        return summary
+    if item_id is None:
+        raise Advised(unread)
+    try:
+        reread = await item_for_a_question(client, drive_id, item_id)
+    except GraphFailure as failure:
+        raise Advised(unread) from failure
+    summary = DriveItemSummary.from_item(reread)
+    if summary is None:
+        raise Advised(unread)
+    return summary
 
 
 _RESERVED_CHARACTERS = '"*:<>?/\\|'
