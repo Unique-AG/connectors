@@ -361,6 +361,13 @@ def drive_folder_handle(uri: str) -> DriveFolderHandle | None:
     return None if ids is None else DriveFolderHandle(*ids)
 
 
+def drive_item_handle(uri: str) -> DriveFileHandle | DriveFolderHandle | None:
+    file = drive_file_handle(uri)
+    if file is not None:
+        return file
+    return drive_folder_handle(uri)
+
+
 def onenote_section_handle(uri: str) -> OnenoteSectionHandle | None:
     section_id = _single_id(_ONENOTE_SECTION_HANDLE, uri)
     return None if section_id is None else OnenoteSectionHandle(section_id)

@@ -1,10 +1,17 @@
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Self
 
+from kiota_abstractions.base_request_configuration import RequestConfiguration
+from msgraph.generated.drives.item.items.item.drive_item_item_request_builder import (
+    DriveItemItemRequestBuilder,
+)
 from msgraph.generated.models.drive_item import DriveItem
 from msgraph.generated.models.identity_set import IdentitySet
+from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
 
 ITEM_FIELDS: tuple[str, ...] = (
@@ -20,6 +27,14 @@ ITEM_FIELDS: tuple[str, ...] = (
     "folder",
     "parentReference",
 )
+
+STEP_ITEM = "drive_item"
+
+FAIL_ON_CONFLICT: Mapping[str, str] = {"@microsoft.graph.conflictBehavior": "fail"}
+
+_ITEM_FOR_A_QUESTION_FIELDS: tuple[str, ...] = (*ITEM_FIELDS, "root")
+
+_ItemQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryParameters
 
 
 class DriveItemSummary(BaseModel):
@@ -161,3 +176,70 @@ def display_name(identity: IdentitySet | None) -> str | None:
     if identity is None or identity.user is None:
         return None
     return identity.user.display_name
+
+
+async def item_for_a_question(client: GraphServiceClient, drive_id: str, item_id: str) -> DriveItem:
+    with graph_step(STEP_ITEM):
+        found = await (
+            client.drives.by_drive_id(drive_id)
+            .items.by_drive_item_id(item_id)
+            .get(
+                request_configuration=RequestConfiguration[_ItemQuery](
+                    query_parameters=_ItemQuery(select=list(_ITEM_FOR_A_QUESTION_FIELDS))
+                )
+            )
+        )
+    assert found is not None, "Graph answered a drive item read with no item"
+    return found
+
+
+_RESERVED_CHARACTERS = "/\\*<>?:|#%"
+
+_EVERY_RESERVED_CHARACTER = " ".join(f"`{character}`" for character in _RESERVED_CHARACTERS)
+
+_NAME_NOT_ACCEPTED = "Nothing was changed, because OneDrive and SharePoint do not accept this name."
+
+_BLANK_NAME = (
+    "The name is empty or has only spaces in it. Use a name with at least one other character."
+)
+
+_LEADING_TILDE = (
+    "The name starts with `~`. A file or folder name must not start with `~`. Remove the `~` at "
+    + "the start."
+)
+
+_TRAILING_PERIOD = (
+    "The name ends with a period. A folder name must not end with a period. Remove the period at "
+    + "the end."
+)
+
+_SAME_NAME_FAILS = "This same value fails again, so do not retry it."
+
+
+def unusable_name(name: str, *, folder: bool) -> str | None:
+    if not name.strip():
+        return _name_refusal(_BLANK_NAME)
+    reserved = [
+        f"`{character}`" for character in dict.fromkeys(name) if character in _RESERVED_CHARACTERS
+    ]
+    problems = [
+        problem
+        for problem, applies in (
+            (_reserved(reserved), bool(reserved)),
+            (_LEADING_TILDE, name.startswith("~")),
+            (_TRAILING_PERIOD, folder and name.endswith(".")),
+        )
+        if applies
+    ]
+    return _name_refusal(*problems) if problems else None
+
+
+def _reserved(found: list[str]) -> str:
+    return (
+        f"The name contains {' and '.join(found)}. A file or folder name must not contain any of "
+        + f"these characters: {_EVERY_RESERVED_CHARACTER}. Remove or replace these characters."
+    )
+
+
+def _name_refusal(*problems: str) -> str:
+    return " ".join((_NAME_NOT_ACCEPTED, *problems, _SAME_NAME_FAILS))

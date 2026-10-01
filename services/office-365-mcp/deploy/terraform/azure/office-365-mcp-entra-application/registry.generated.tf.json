@@ -673,7 +673,8 @@
         "Files.Read.All",
         "Notes.Read",
         "Notes.Create",
-        "Notes.ReadWrite"
+        "Notes.ReadWrite",
+        "Files.ReadWrite.All"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -702,6 +703,7 @@
         "Calendars.ReadWrite": false,
         "Calendars.ReadWrite.Shared": false,
         "Files.Read.All": true,
+        "Files.ReadWrite.All": true,
         "Notes.Read": false,
         "Notes.Create": false,
         "Notes.ReadWrite": false
