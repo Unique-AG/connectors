@@ -775,6 +775,14 @@ class TestHowItDeclaresItself:
         )
         assert "top folder of a drive" in description
 
+    async def test_the_lead_names_the_tool_that_moves_the_item_instead(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        lead = " ".join((tool.description or "").split("\n\nNotes:")[0].split())
+        assert "To move the item to a different folder instead, use sharepoint_move_item." in lead
+
     async def test_the_lead_leaves_the_handle_sources_to_the_item_argument(
         self, transport: httpx.AsyncClient
     ) -> None:

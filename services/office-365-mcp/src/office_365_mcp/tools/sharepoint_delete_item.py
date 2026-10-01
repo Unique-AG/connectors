@@ -46,8 +46,9 @@ _NOTHING_DELETED = "The item was not moved to the recycle bin."
 _DESCRIPTION = """\
 Moves one file or one folder in OneDrive or SharePoint to the recycle bin, for the signed-in \
 user. A folder goes to the recycle bin together with everything inside it. This connector never \
-erases a file or a folder permanently. OneDrive and SharePoint can show the change to everyone \
-who can open the folder.
+erases a file or a folder permanently. To move the item to a different folder instead, use \
+sharepoint_move_item. OneDrive and SharePoint can show the change to everyone who can open the \
+folder.
 
 Notes:
 - This tool asks the user to agree before it changes anything, every time.
