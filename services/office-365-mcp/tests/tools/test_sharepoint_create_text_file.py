@@ -496,7 +496,10 @@ class TestThePersonBetweenTheRequestAndTheFile:
 
         _ = await _create(client, confirm=_asking(asked))
 
-        assert "in the top folder of its drive?" in asked[0]
+        assert asked == [
+            "Create the text file 'notes.txt' (12 characters) in the top folder of the drive? "
+            + "It starts: 'Ship it now.'"
+        ]
         assert "'root'" not in asked[0]
 
     async def test_a_folder_graph_named_nothing_falls_back_to_an_unnamed_folder(
@@ -508,7 +511,10 @@ class TestThePersonBetweenTheRequestAndTheFile:
 
         _ = await _create(client, confirm=_asking(asked))
 
-        assert "in an unnamed folder?" in asked[0]
+        assert asked == [
+            "Create the text file 'notes.txt' (12 characters) in an unnamed folder? "
+            + "It starts: 'Ship it now.'"
+        ]
 
     async def test_a_long_text_is_counted_whole_and_cut_in_the_question(
         self, client: GraphServiceClient, graph: respx.MockRouter

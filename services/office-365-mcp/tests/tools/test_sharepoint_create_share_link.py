@@ -399,7 +399,10 @@ class TestThePersonBeforeTheLink:
 
         _ = await _share(client, confirm=_asking(asked))
 
-        assert "an unnamed item" in asked[0]
+        assert asked == [
+            "Create a view-only link to an unnamed item? Anyone in your organization who signs "
+            + "in can use the link. The link does not expire unless your organization sets a limit."
+        ]
 
     async def test_the_answer_is_bound_to_the_item_the_kind_and_the_audience(
         self, client: GraphServiceClient, graph: respx.MockRouter

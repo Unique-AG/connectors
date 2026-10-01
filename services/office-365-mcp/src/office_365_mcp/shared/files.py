@@ -33,6 +33,10 @@ STEP_ITEM = "drive_item"
 
 FAIL_ON_CONFLICT: Mapping[str, str] = {"@microsoft.graph.conflictBehavior": "fail"}
 
+TOP_FOLDER_LABEL = "the top folder of the drive"
+UNNAMED_FOLDER_LABEL = "an unnamed folder"
+UNNAMED_ITEM_LABEL = "an unnamed item"
+
 _ITEM_FOR_A_QUESTION_FIELDS: tuple[str, ...] = (*ITEM_FIELDS, "root")
 
 _ItemQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryParameters

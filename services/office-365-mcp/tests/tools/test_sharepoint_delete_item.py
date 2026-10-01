@@ -430,7 +430,9 @@ class TestConfirmationIsAlwaysAsked:
 
         asked = await _asked(client)
 
-        assert asked == [f"Move the file {_NAME!r} from the top of the drive to the recycle bin?"]
+        assert asked == [
+            f"Move the file {_NAME!r} from the top folder of the drive to the recycle bin?"
+        ]
 
     async def test_the_question_names_no_item_or_folder_that_graph_left_unnamed(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -440,7 +442,20 @@ class TestConfirmationIsAlwaysAsked:
 
         asked = await _asked(client)
 
-        assert asked == ["Move the file 'an item with no name' from its folder to the recycle bin?"]
+        assert asked == ["Move an unnamed item from its folder to the recycle bin?"]
+
+    async def test_a_folder_that_graph_left_unnamed_is_asked_about_as_an_unnamed_folder(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _item_payload(name=None, a_folder=True, child_count=0))
+        _ = _deletes(graph)
+
+        asked = await _asked(client, item=_FOLDER_URI)
+
+        assert asked == [
+            "Move an unnamed folder from 'Reports/Q1 2026' to the recycle bin, together with "
+            + "everything inside it? The folder is empty."
+        ]
 
     @pytest.mark.parametrize(
         "answer",

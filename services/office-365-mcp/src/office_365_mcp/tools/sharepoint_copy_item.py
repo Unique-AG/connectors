@@ -26,6 +26,9 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
     NAME_RULES,
+    TOP_FOLDER_LABEL,
+    UNNAMED_FOLDER_LABEL,
+    UNNAMED_ITEM_LABEL,
     item_for_a_question,
     unusable_name,
 )
@@ -59,10 +62,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _COPY = "copy"
 _DO_NOT_COPY = "do not copy"
 _NOTHING_COPIED = "Nothing was copied."
-
-_UNNAMED_ITEM = "an unnamed item"
-_UNNAMED_FOLDER = "an unnamed folder"
-_TOP_OF_A_DRIVE = "the top of the drive"
 
 _DESCRIPTION = """\
 Starts a copy of one file or folder in OneDrive or SharePoint, for the signed-in user. The copy \
@@ -217,15 +216,15 @@ def _cannot_copy(original: DriveItem, target: DriveItem) -> str | None:
 
 
 def _question(original: DriveItem, target: DriveItem, name: str | None) -> str:
-    item_label = repr(original.name) if original.name else _UNNAMED_ITEM
+    item_label = repr(original.name) if original.name else UNNAMED_ITEM_LABEL
     renamed = f" as {name!r}" if name is not None else ""
     return f"Copy {item_label} into {_destination_label(target)}{renamed}?"
 
 
 def _destination_label(target: DriveItem) -> str:
     if target.root is not None:
-        return _TOP_OF_A_DRIVE
-    return f"the folder {target.name!r}" if target.name else _UNNAMED_FOLDER
+        return TOP_FOLDER_LABEL
+    return f"the folder {target.name!r}" if target.name else UNNAMED_FOLDER_LABEL
 
 
 async def _start_copy(

@@ -1,3 +1,6 @@
+import ast
+import pathlib
+
 import httpx
 import pytest
 import respx
@@ -14,6 +17,9 @@ from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
     ITEM_FIELDS,
     NAME_RULES,
+    TOP_FOLDER_LABEL,
+    UNNAMED_FOLDER_LABEL,
+    UNNAMED_ITEM_LABEL,
     DriveItemSummary,
     item_for_a_question,
     summary_after_write,
@@ -21,6 +27,20 @@ from office_365_mcp.shared.files import (
 )
 from office_365_mcp.shared.handles import DriveFileHandle
 from office_365_mcp.shared.seam import Advised
+
+_SRC = pathlib.Path(__file__).parent.parent.parent / "src" / "office_365_mcp"
+_OWNER = _SRC / "shared" / "files.py"
+_SHAREPOINT_TOOLS = sorted((_SRC / "tools").glob("sharepoint_*.py"))
+
+_LABELS = frozenset({TOP_FOLDER_LABEL, UNNAMED_FOLDER_LABEL, UNNAMED_ITEM_LABEL})
+_RETIRED_LABELS = frozenset(
+    {
+        "the top folder of its drive",
+        "the top of the drive",
+        "the top folder of a drive",
+        "an item with no name",
+    }
+)
 
 _DRIVE_ID = "b!SYNTHETICDRIVE0001"
 _FOLDER_ID = "01SYNTHETICFOLDER0001"
@@ -278,3 +298,42 @@ class TestFailOnConflict:
         assert isinstance(created, DriveItem)
         assert created.id == "01SYNTHETICNEW0001"
         assert route.calls.last.request.url.params["@microsoft.graph.conflictBehavior"] == "fail"
+
+
+def _label_spellings(source: pathlib.Path) -> list[tuple[int, str]]:
+    return [
+        (node.lineno, node.value)
+        for node in ast.walk(ast.parse(source.read_text()))
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and node.value in _LABELS | _RETIRED_LABELS
+    ]
+
+
+def _tool_id(source: pathlib.Path) -> str:
+    return source.stem
+
+
+class TestOnlyTheOwnerSpellsTheQuestionLabels:
+    def test_the_owner_spells_each_label_once(self) -> None:
+        assert sorted(value for _line, value in _label_spellings(_OWNER)) == sorted(_LABELS)
+
+    def test_the_scan_finds_the_tools_that_ask_about_a_drive_item(self) -> None:
+        assert {source.stem for source in _SHAREPOINT_TOOLS} >= {
+            "sharepoint_copy_item",
+            "sharepoint_create_folder",
+            "sharepoint_create_share_link",
+            "sharepoint_create_text_file",
+            "sharepoint_delete_item",
+            "sharepoint_invite",
+            "sharepoint_move_item",
+            "sharepoint_rename_item",
+        }
+
+    @pytest.mark.parametrize("source", _SHAREPOINT_TOOLS, ids=_tool_id)
+    def test_no_sharepoint_tool_spells_a_label(self, source: pathlib.Path) -> None:
+        found = _label_spellings(source)
+        assert not found, (
+            f"{source.name} spells a drive item label: {found}. Import the label from "
+            + "shared/files.py."
+        )

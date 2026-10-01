@@ -14,7 +14,14 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.files import DriveItemSummary, item_for_a_question, summary_after_write
+from office_365_mcp.shared.files import (
+    TOP_FOLDER_LABEL,
+    UNNAMED_FOLDER_LABEL,
+    UNNAMED_ITEM_LABEL,
+    DriveItemSummary,
+    item_for_a_question,
+    summary_after_write,
+)
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -44,10 +51,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _MOVE = "move"
 _DO_NOT_MOVE = "do not move"
 _NOTHING_MOVED = "Nothing was moved."
-
-_AN_UNNAMED_ITEM = "an unnamed item"
-_AN_UNNAMED_FOLDER = "an unnamed folder"
-_THE_TOP_FOLDER = "the top folder of the drive"
 
 _DESCRIPTION = """\
 Moves one file or folder into a different folder of the same drive, in OneDrive or SharePoint, \
@@ -207,7 +210,7 @@ def _id_of(item: DriveItem) -> str:
 
 
 def _question(found: DriveItem, folder: DriveItem) -> str:
-    name = _quoted(found.name) if found.name else _AN_UNNAMED_ITEM
+    name = _quoted(found.name) if found.name else UNNAMED_ITEM_LABEL
     return f"Move {name} from {_current_folder(found)} to {_destination(folder)}?"
 
 
@@ -215,15 +218,15 @@ def _current_folder(found: DriveItem) -> str:
     parent = found.parent_reference
     path = _breadcrumb(parent.path if parent is not None else None)
     if path is None:
-        return _quoted(parent.name) if parent is not None and parent.name else _AN_UNNAMED_FOLDER
-    return _quoted(path) if path else _THE_TOP_FOLDER
+        return _quoted(parent.name) if parent is not None and parent.name else UNNAMED_FOLDER_LABEL
+    return _quoted(path) if path else TOP_FOLDER_LABEL
 
 
 def _destination(folder: DriveItem) -> str:
     if folder.root is not None:
-        return _THE_TOP_FOLDER
+        return TOP_FOLDER_LABEL
     if not folder.name:
-        return _AN_UNNAMED_FOLDER
+        return UNNAMED_FOLDER_LABEL
     parent = folder.parent_reference
     path = _breadcrumb(parent.path if parent is not None else None)
     return _quoted(folder.name if path is None else f"{path}/{folder.name}")

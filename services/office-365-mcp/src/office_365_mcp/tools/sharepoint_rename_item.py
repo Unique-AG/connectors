@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.files import (
     NAME_RULES,
+    UNNAMED_FOLDER_LABEL,
+    UNNAMED_ITEM_LABEL,
     DriveItemSummary,
     item_for_a_question,
     summary_after_write,
@@ -42,9 +44,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _RENAME = "rename"
 _DO_NOT_RENAME = "do not rename"
 _NOTHING_RENAMED = "The item was not renamed."
-
-_UNNAMED_ITEM = "an unnamed item"
-_UNNAMED_FOLDER = "an unnamed folder"
 
 _DESCRIPTION = """\
 Changes the name of one file or folder in OneDrive or SharePoint for the signed-in user. The item \
@@ -143,10 +142,11 @@ async def rename_item(
 
 
 def _question(item: DriveItem, name: str) -> str:
-    old = item.name or _UNNAMED_ITEM
+    old = repr(item.name) if item.name else UNNAMED_ITEM_LABEL
     parent = item.parent_reference
-    folder = (parent.name if parent is not None else None) or _UNNAMED_FOLDER
-    return f"Rename {old!r} to {name!r} in the folder {folder!r}?"
+    parent_name = parent.name if parent is not None else None
+    folder = f"the folder {parent_name!r}" if parent_name else UNNAMED_FOLDER_LABEL
+    return f"Rename {old} to {name!r} in {folder}?"
 
 
 def a_person_agrees(ctx: Context) -> Confirm:

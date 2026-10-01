@@ -23,6 +23,8 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
     NAME_RULES,
+    TOP_FOLDER_LABEL,
+    UNNAMED_FOLDER_LABEL,
     DriveItemSummary,
     item_for_a_question,
     summary_after_write,
@@ -53,9 +55,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _CREATE = "create"
 _DO_NOT_CREATE = "do not create"
 _NOTHING_CREATED = "No folder was created."
-
-_TOP_OF_THE_DRIVE = "the top folder of the drive"
-_UNNAMED_FOLDER = "an unnamed folder"
 
 _DESCRIPTION = """\
 This tool creates one new, empty folder inside `parent`, for the signed-in user. `parent` is a \
@@ -152,8 +151,8 @@ def _question(name: str, parent: DriveItem) -> str:
 
 def _label(parent: DriveItem) -> str:
     if parent.root is not None:
-        return _TOP_OF_THE_DRIVE
-    folder = f"the folder {parent.name!r}" if parent.name else _UNNAMED_FOLDER
+        return TOP_FOLDER_LABEL
+    folder = f"the folder {parent.name!r}" if parent.name else UNNAMED_FOLDER_LABEL
     reference = parent.parent_reference
     path = reference.path if reference is not None else None
     return folder if path is None else f"{folder} in {unquote(path)!r}"

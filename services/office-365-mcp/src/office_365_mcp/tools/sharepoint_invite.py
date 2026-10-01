@@ -16,14 +16,18 @@ from msgraph.generated.drives.item.items.item.invite.invite_post_response import
 )
 from msgraph.generated.models.drive_item import DriveItem
 from msgraph.generated.models.drive_recipient import DriveRecipient
-from msgraph.generated.models.identity_set import IdentitySet
 from msgraph.generated.models.permission import Permission
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import repeated_address
-from office_365_mcp.shared.files import item_for_a_question
+from office_365_mcp.shared.files import (
+    TOP_FOLDER_LABEL,
+    UNNAMED_ITEM_LABEL,
+    display_name,
+    item_for_a_question,
+)
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.mail import ONE_ADDRESS
 from office_365_mcp.shared.notes import write_state_for
@@ -66,9 +70,6 @@ _NOTIFIED = "notify"
 _NOT_NOTIFIED = "do not notify"
 
 _NO_MAIL = "Microsoft sends them no mail about it."
-
-_UNNAMED_ITEM = "an item with no name"
-_TOP_FOLDER = "the top folder of a drive"
 
 _NO_REASON_FROM_GRAPH = "Microsoft reported an error for this person and gave no reason."
 
@@ -156,8 +157,8 @@ class InvitedRecipient(BaseModel):
         invitation = permission.invitation
         return cls(
             email=None if invitation is None else invitation.email,
-            display_name=_display_name(permission.granted_to_v2)
-            or _display_name(permission.granted_to),
+            display_name=display_name(permission.granted_to_v2)
+            or display_name(permission.granted_to),
             roles=list(permission.roles or []),
             error=_error_of(permission),
         )
@@ -253,8 +254,8 @@ def _question(
 
 def _named(item: DriveItem) -> str:
     if item.root is not None:
-        return _TOP_FOLDER
-    return repr(item.name) if item.name else _UNNAMED_ITEM
+        return TOP_FOLDER_LABEL
+    return repr(item.name) if item.name else UNNAMED_ITEM_LABEL
 
 
 async def _invite(
@@ -282,12 +283,6 @@ async def _invite(
                 request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
             )
         )
-
-
-def _display_name(identity: IdentitySet | None) -> str | None:
-    if identity is None or identity.user is None:
-        return None
-    return identity.user.display_name
 
 
 def _error_of(permission: Permission) -> str | None:

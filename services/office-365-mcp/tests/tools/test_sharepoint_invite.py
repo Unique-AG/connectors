@@ -496,7 +496,10 @@ class TestThePersonBeforeTheInvite:
 
         question = await _asked(client, _Call())
 
-        assert "an item with no name" in question
+        assert question == (
+            f"Give {_ADA} read access to an unnamed item and email each of them an invitation? "
+            + "This cannot be recalled once sent."
+        )
         assert "None" not in question
 
     async def test_the_top_folder_of_a_drive_is_named_as_such(
@@ -507,7 +510,10 @@ class TestThePersonBeforeTheInvite:
 
         question = await _asked(client, _Call())
 
-        assert "the top folder of a drive" in question
+        assert question == (
+            f"Give {_ADA} read access to the top folder of the drive and email each of them an "
+            + "invitation? This cannot be recalled once sent."
+        )
         assert "'root'" not in question
 
     async def test_the_binding_is_the_same_for_two_identical_calls(

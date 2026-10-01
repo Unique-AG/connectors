@@ -14,7 +14,12 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.files import item_for_a_question
+from office_365_mcp.shared.files import (
+    TOP_FOLDER_LABEL,
+    UNNAMED_FOLDER_LABEL,
+    UNNAMED_ITEM_LABEL,
+    item_for_a_question,
+)
 from office_365_mcp.shared.handles import DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
@@ -38,9 +43,7 @@ _DELETE = "delete"
 _KEEP_THE_ITEM = "keep the item"
 _NOTHING_DELETED = "The item was not moved to the recycle bin."
 
-_UNNAMED_ITEM = "an item with no name"
 _ITS_FOLDER = "its folder"
-_THE_TOP_OF_THE_DRIVE = "the top of the drive"
 
 _DESCRIPTION = """\
 Moves one file or one folder in OneDrive or SharePoint to the recycle bin, for the signed-in \
@@ -151,12 +154,13 @@ async def delete_item(
 
 
 def _question(item: DriveItem) -> str:
-    name = item.name or _UNNAMED_ITEM
     where = _where(item)
     if item.folder is None:
-        return f"Move the file {name!r} from {where} to the recycle bin?"
+        file = f"the file {item.name!r}" if item.name else UNNAMED_ITEM_LABEL
+        return f"Move {file} from {where} to the recycle bin?"
+    folder = f"the folder {item.name!r}" if item.name else UNNAMED_FOLDER_LABEL
     return (
-        f"Move the folder {name!r} from {where} to the recycle bin, together with everything "
+        f"Move {folder} from {where} to the recycle bin, together with everything "
         + f"inside it?{_how_full(item.folder.child_count)}"
     )
 
@@ -167,7 +171,7 @@ def _where(item: DriveItem) -> str:
     if path is None or ":" not in path:
         return _ITS_FOLDER
     inside = unquote(path.split(":", 1)[1]).strip("/")
-    return repr(inside) if inside else _THE_TOP_OF_THE_DRIVE
+    return repr(inside) if inside else TOP_FOLDER_LABEL
 
 
 def _how_full(child_count: int | None) -> str:

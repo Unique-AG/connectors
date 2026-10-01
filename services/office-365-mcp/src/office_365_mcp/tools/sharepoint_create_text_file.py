@@ -23,6 +23,8 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
     NAME_RULES,
+    TOP_FOLDER_LABEL,
+    UNNAMED_FOLDER_LABEL,
     DriveItemSummary,
     item_for_a_question,
     summary_after_write,
@@ -73,9 +75,6 @@ _NEW_FILE_TEMPLATE = "{+baseurl}/drives/{drive%2Did}/items/{driveItem%2Did}:/{fi
 _CREATE = "create"
 _DO_NOT_CREATE = "do not create"
 _NOTHING_CREATED = "No file was created."
-
-_TOP_OF_THE_DRIVE = "the top folder of its drive"
-_UNNAMED_FOLDER = "an unnamed folder"
 
 _EVERY_TEXT_EXTENSION = ", ".join(f"`.{extension}`" for extension in TEXT_EXTENSIONS)
 
@@ -226,9 +225,9 @@ def _question(name: str, content: str, folder: DriveItem) -> str:
 
 def _folder_label(folder: DriveItem) -> str:
     if folder.root is not None:
-        return _TOP_OF_THE_DRIVE
+        return TOP_FOLDER_LABEL
     if not folder.name:
-        return _UNNAMED_FOLDER
+        return UNNAMED_FOLDER_LABEL
     return f"the folder {folder.name!r}"
 
 

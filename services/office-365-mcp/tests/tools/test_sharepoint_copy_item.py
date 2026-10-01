@@ -579,7 +579,7 @@ class TestThePersonBetweenTheCopyAndTheDestination:
 
         _ = await _copy(client, confirm=_asking(asked))
 
-        assert asked == ["Copy 'Plan.docx' into the top of the drive?"]
+        assert asked == ["Copy 'Plan.docx' into the top folder of the drive?"]
 
     async def test_the_question_names_nothing_that_graph_did_not_report(
         self, client: GraphServiceClient, graph: respx.MockRouter

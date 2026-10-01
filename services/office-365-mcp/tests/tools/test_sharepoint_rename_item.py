@@ -590,8 +590,7 @@ class TestThePersonBetweenTheRenameAndTheFolder:
 
         _ = await _rename(client, confirm=capturing)
 
-        assert "an unnamed item" in asked[0]
-        assert "an unnamed folder" in asked[0]
+        assert asked == ["Rename an unnamed item to 'Plan final.docx' in an unnamed folder?"]
 
     async def test_about_is_the_same_for_two_identical_calls_and_different_for_another_name(
         self, client: GraphServiceClient, graph: respx.MockRouter
