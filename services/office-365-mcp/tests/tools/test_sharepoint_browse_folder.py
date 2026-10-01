@@ -51,6 +51,7 @@ def _item_payload(
         "webUrl": f"https://contoso.sharepoint.invalid/items/{item_id}",
         "createdDateTime": created,
         "lastModifiedDateTime": modified,
+        "createdBy": {"user": {"displayName": "Grace Hopper"}},
         "lastModifiedBy": {"user": {"displayName": "Ada Lovelace"}},
         "parentReference": {
             "driveType": "business",
@@ -227,6 +228,34 @@ class TestTheLevelItAnswers:
             DriveFileHandle(_DRIVE_ID, _BUDGET_ID).uri,
             DriveFolderHandle(_DRIVE_ID, _REPORTS_ID).uri,
         ]
+
+    @pytest.mark.usefixtures("my_drive")
+    async def test_a_row_names_who_created_the_item_apart_from_who_last_changed_it(
+        self, client: GraphServiceClient, root_children: respx.Route
+    ) -> None:
+        root_children.mock(return_value=_page(_item_payload(_BUDGET_ID)))
+
+        row = (await browser.browse_folder(client, limit=25)).items[0]
+
+        assert row.created_by == "Grace Hopper"
+        assert row.last_modified_by == "Ada Lovelace"
+
+    @pytest.mark.usefixtures("my_drive")
+    async def test_an_item_that_an_application_created_names_no_creator(
+        self, client: GraphServiceClient, root_children: respx.Route
+    ) -> None:
+        root_children.mock(
+            return_value=_page(
+                {
+                    **_item_payload(_BUDGET_ID),
+                    "createdBy": {"application": {"displayName": "Contoso Sync"}},
+                }
+            )
+        )
+
+        row = (await browser.browse_folder(client, limit=25)).items[0]
+
+        assert row.created_by is None
 
     @pytest.mark.usefixtures("my_drive")
     async def test_a_folder_handle_it_minted_browses_that_folder(

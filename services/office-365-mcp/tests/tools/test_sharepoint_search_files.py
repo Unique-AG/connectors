@@ -37,6 +37,7 @@ def _file_hit(
         "webUrl": f"{_SITE}/Shared%20Documents/{item_id}",
         "createdDateTime": "2026-02-01T08:00:00Z",
         "lastModifiedDateTime": "2026-03-04T16:12:41Z",
+        "createdBy": {"user": {"displayName": "Grace Hopper"}},
         "lastModifiedBy": {"user": {"displayName": "Ada Lovelace"}},
     }
     if is_folder:
@@ -612,10 +613,27 @@ class TestTheHandleItMints:
         item = found.files[0]
         assert item.name == "Budget 2026.xlsx"
         assert item.size == 20481
+        assert item.created_by == "Grace Hopper"
         assert item.last_modified_by == "Ada Lovelace"
         assert item.last_modified_at is not None and item.last_modified_at.year == 2026
         assert item.parent_path == "/drive/root:/Reports/2026"
         assert item.drive_type == "documentLibrary"
+
+    async def test_a_hit_that_an_application_created_names_no_creator(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        hit = _file_hit()
+        resource = {
+            **cast("dict[str, object]", hit["resource"]),
+            "createdBy": {"application": {"displayName": "Contoso Sync"}},
+        }
+        _ = _matching(graph, {**hit, "resource": resource})
+
+        found = await sharepoint_search_files.sharepoint_search_files(
+            client, query="budget", offset=0, limit=25
+        )
+
+        assert found.files[0].created_by is None
 
 
 class TestHitsThisToolCannotUse:
