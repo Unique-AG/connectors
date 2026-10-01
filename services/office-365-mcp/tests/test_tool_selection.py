@@ -414,6 +414,7 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "outlook_check_availability": frozenset({"addresses", "starts_at", "ends_at", "time_zone"}),
     "outlook_suggest_meeting_times": frozenset({"attendees", "starts_at", "ends_at", "time_zone"}),
     "sharepoint_search_files": frozenset({"query"}),
+    "sharepoint_search_sites": frozenset({"query"}),
     "sharepoint_resolve_url": frozenset({"url"}),
     "sharepoint_create_folder": frozenset({"name"}),
     "sharepoint_create_text_file": frozenset({"name", "content"}),
@@ -702,6 +703,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 5),
     (ToolsPreset.SHAREPOINT_WRITE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 12),
     (ToolsPreset.SHAREPOINT_SHARE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 14),
+    (ToolsPreset.SHAREPOINT_SITES, ("User.Read", "Files.Read.All", "Sites.Read.All"), 2, 6),
     (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read"), 0, 9),
     (
         ToolsPreset.ONENOTE_WRITE,

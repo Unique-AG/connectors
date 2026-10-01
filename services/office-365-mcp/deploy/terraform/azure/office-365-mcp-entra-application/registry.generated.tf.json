@@ -329,6 +329,12 @@
           ]
         },
         {
+          "name": "sharepoint_search_sites",
+          "permissions": [
+            "Sites.Read.All"
+          ]
+        },
+        {
           "name": "onenote_list_notebooks",
           "permissions": [
             "Notes.Read"
@@ -501,6 +507,7 @@
         "sharepoint_delete_item",
         "sharepoint_create_share_link",
         "sharepoint_invite",
+        "sharepoint_search_sites",
         "onenote_list_notebooks",
         "onenote_list_pages",
         "onenote_read_page",
@@ -681,6 +688,13 @@
           "sharepoint_create_share_link",
           "sharepoint_invite"
         ],
+        "sharepoint-sites": [
+          "sharepoint_search_files",
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives",
+          "sharepoint_read_file",
+          "sharepoint_search_sites"
+        ],
         "onenote-read": [
           "onenote_list_notebooks",
           "onenote_list_pages",
@@ -763,6 +777,7 @@
         "Calendars.ReadWrite.Shared",
         "Files.Read.All",
         "Files.ReadWrite.All",
+        "Sites.Read.All",
         "Notes.Read",
         "Notes.Create",
         "Notes.ReadWrite"
@@ -795,6 +810,7 @@
         "Calendars.ReadWrite.Shared": false,
         "Files.Read.All": true,
         "Files.ReadWrite.All": true,
+        "Sites.Read.All": true,
         "Notes.Read": false,
         "Notes.Create": false,
         "Notes.ReadWrite": false

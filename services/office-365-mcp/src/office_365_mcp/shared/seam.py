@@ -100,6 +100,7 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "Calendars.ReadWrite.Shared",
         "Files.Read.All",
         "Files.ReadWrite.All",
+        "Sites.Read.All",
         "Notes.Read",
         "Notes.Create",
         "Notes.ReadWrite",

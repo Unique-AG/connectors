@@ -70,6 +70,7 @@
                 "sharepoint-read",
                 "sharepoint-write",
                 "sharepoint-share",
+                "sharepoint-sites",
                 "onenote-read",
                 "onenote-write",
                 "onenote-delete"

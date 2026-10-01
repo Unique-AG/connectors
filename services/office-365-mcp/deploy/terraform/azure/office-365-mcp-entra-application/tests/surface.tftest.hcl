@@ -39,6 +39,7 @@ mock_provider "azuread" {
         "Calendars.ReadWrite.Shared"       = "b4444444-4444-4444-4444-444444444444"
         "Files.Read.All"                   = "c1111111-1111-1111-1111-111111111111"
         "Files.ReadWrite.All"              = "c2222222-2222-2222-2222-222222222222"
+        "Sites.Read.All"                   = "c3333333-3333-3333-3333-333333333333"
         "Notes.Read"                       = "d1111111-1111-1111-1111-111111111111"
         "Notes.Create"                     = "d2222222-2222-2222-2222-222222222222"
         "Notes.ReadWrite"                  = "d3333333-3333-3333-3333-333333333333"
@@ -391,6 +392,22 @@ run "preset_sharepoint_share" {
   assert {
     condition     = local.admin_consent == ["Files.Read.All", "Files.ReadWrite.All"]
     error_message = "A sharing link and an invitation need no permission that sharepoint-write does not have. This composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_sites" {
+  variables {
+    tools_preset = "sharepoint-sites"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Files.Read.All,Sites.Read.All"
+    error_message = "sharepoint-sites composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All", "Sites.Read.All"]
+    error_message = "Sites.Read.All is marked as needing an administrator, as Files.Read.All is. This composed ${join(",", local.admin_consent)}"
   }
 }
 
