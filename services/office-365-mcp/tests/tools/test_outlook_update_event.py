@@ -635,3 +635,35 @@ class TestWhatItAnswers:
 
         assert [a.address for a in answer.attendees] == [_GRACE]
         assert answer.uri == _URI
+
+    async def test_the_answer_reports_the_categories_importance_and_series_from_the_response(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        master_id = "AAMkAGI2SYNTHETIC-series-0001="
+        _ = _ready(
+            graph,
+            _event()
+            | {
+                "type": "occurrence",
+                "seriesMasterId": master_id,
+                "categories": ["Budget"],
+                "importance": "high",
+            },
+        )
+
+        answer = await _update(client, subject="Renamed")
+
+        assert answer.categories == ["Budget"]
+        assert answer.importance == "high"
+        assert answer.series_master_uri == EventHandle(_CALENDAR_ID, master_id).uri
+
+    async def test_a_single_event_answers_no_series_master_and_no_category(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        answer = await _update(client, subject="Renamed")
+
+        assert answer.series_master_uri is None
+        assert answer.categories == []
+        assert answer.importance is None

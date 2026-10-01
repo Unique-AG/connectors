@@ -25,26 +25,38 @@ from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.event import Event
 from msgraph.generated.models.event_type import EventType
 from msgraph.generated.models.free_busy_status import FreeBusyStatus
+from msgraph.generated.models.importance import Importance
 from msgraph.generated.models.location import Location
 from msgraph.generated.models.online_meeting_info import OnlineMeetingInfo
 from msgraph.generated.models.online_meeting_provider_type import OnlineMeetingProviderType
+from msgraph.generated.models.patterned_recurrence import PatternedRecurrence
 from msgraph.generated.models.recipient import Recipient
+from msgraph.generated.models.recurrence_pattern import RecurrencePattern
+from msgraph.generated.models.recurrence_pattern_type import RecurrencePatternType
+from msgraph.generated.models.recurrence_range import RecurrenceRange
+from msgraph.generated.models.recurrence_range_type import RecurrenceRangeType
 from msgraph.generated.models.response_status import ResponseStatus
 from msgraph.generated.models.response_type import ResponseType
 from msgraph.generated.models.sensitivity import Sensitivity
 from msgraph.generated.models.time_zone_base import TimeZoneBase
 from msgraph.generated.models.user import User
+from msgraph.generated.models.week_index import WeekIndex
 from msgraph.generated.models.working_hours import WorkingHours
 from msgraph.graph_service_client import GraphServiceClient
+from pydantic import BaseModel
 
 from office_365_mcp.shared.calendar import (
     CALENDAR_FIELDS,
+    SUMMARY_FIELDS,
     CalendarSummary,
     EventAttendee,
     EventDraft,
     EventImportance,
     EventSensitivity,
     EventSummary,
+    RecurrencePatternSummary,
+    RecurrenceRangeSummary,
+    RecurrenceSummary,
     ShowAs,
     WorkingHoursSummary,
     calendar_of,
@@ -561,6 +573,40 @@ class TestOneEventRow:
 
         assert not EventSummary.from_event(event, calendar_id=_CALENDAR_ID, zone=_UTC).in_series
 
+    def test_one_date_of_a_recurring_series_names_the_handle_of_its_series_master(self) -> None:
+        event = Event(id=_EVENT_ID, type=EventType.Occurrence, series_master_id="AAMkSYNTHETIC-m1=")
+
+        row = EventSummary.from_event(event, calendar_id=_CALENDAR_ID, zone=_UTC)
+
+        assert row.series_master_uri == EventHandle(_CALENDAR_ID, "AAMkSYNTHETIC-m1=").uri
+
+    def test_a_single_meeting_names_no_series_master(self) -> None:
+        event = Event(id=_EVENT_ID, type=EventType.SingleInstance)
+
+        row = EventSummary.from_event(event, calendar_id=_CALENDAR_ID, zone=_UTC)
+
+        assert row.series_master_uri is None
+
+    def test_it_reports_the_categories_and_the_importance_in_microsofts_spelling(self) -> None:
+        event = Event(
+            id=_EVENT_ID, categories=["Budget", "Blue category"], importance=Importance.High
+        )
+
+        row = EventSummary.from_event(event, calendar_id=_CALENDAR_ID, zone=_UTC)
+
+        assert (row.categories, row.importance) == (["Budget", "Blue category"], "high")
+
+    def test_no_category_and_no_importance_are_an_empty_list_and_null(self) -> None:
+        row = EventSummary.from_event(Event(id=_EVENT_ID), calendar_id=_CALENDAR_ID, zone=_UTC)
+
+        assert (row.categories, row.importance) == ([], None)
+
+    @pytest.mark.parametrize("name", ["series_master_uri", "categories", "importance"])
+    def test_the_series_and_tag_fields_say_what_they_are_in_15_to_60_words(self, name: str) -> None:
+        description = EventSummary.model_fields[name].description or ""
+
+        assert 15 <= len(description.split()) <= 60
+
     def test_the_join_link_comes_from_the_online_meeting_and_not_the_older_property(
         self,
     ) -> None:
@@ -730,6 +776,148 @@ class TestOneWorkingHoursRow:
     @pytest.mark.parametrize("name", list(WorkingHoursSummary.model_fields))
     def test_every_field_says_what_it_is_in_15_to_60_words(self, name: str) -> None:
         description = WorkingHoursSummary.model_fields[name].description or ""
+
+        assert 15 <= len(description.split()) <= 60
+
+
+class TestTheListingProjection:
+    def test_it_never_names_a_recurrence_rule(self) -> None:
+        assert "recurrence" not in SUMMARY_FIELDS
+
+    def test_it_names_the_categories_the_importance_and_the_series_master(self) -> None:
+        assert {"categories", "importance", "seriesMasterId"} <= set(SUMMARY_FIELDS)
+
+
+class TestOneRecurrenceRule:
+    def test_a_weekly_rule_until_a_date_reports_its_days_and_both_dates(self) -> None:
+        recurrence = PatternedRecurrence(
+            pattern=RecurrencePattern(
+                type=RecurrencePatternType.Weekly,
+                interval=2,
+                days_of_week=[DayOfWeek.Monday, DayOfWeek.Thursday],
+                first_day_of_week=DayOfWeek.Monday,
+            ),
+            range=RecurrenceRange(
+                type=RecurrenceRangeType.EndDate,
+                start_date=date(2026, 3, 2),
+                end_date=date(2026, 6, 29),
+                recurrence_time_zone=_WINDOWS_ZONE,
+            ),
+        )
+
+        rule = RecurrenceSummary.from_recurrence(recurrence)
+
+        assert rule == RecurrenceSummary(
+            pattern=RecurrencePatternSummary(
+                kind="weekly",
+                interval=2,
+                days_of_week=["monday", "thursday"],
+                day_of_month=None,
+                month=None,
+                index=None,
+                first_day_of_week="monday",
+            ),
+            range=RecurrenceRangeSummary(
+                kind="endDate",
+                start_date="2026-03-02",
+                end_date="2026-06-29",
+                number_of_occurrences=None,
+                recurrence_time_zone=_WINDOWS_ZONE,
+            ),
+        )
+
+    def test_a_relative_yearly_rule_of_a_set_count_reports_its_position_and_month(self) -> None:
+        recurrence = PatternedRecurrence(
+            pattern=RecurrencePattern(
+                type=RecurrencePatternType.RelativeYearly,
+                interval=1,
+                days_of_week=[DayOfWeek.Wednesday],
+                index=WeekIndex.Last,
+                month=11,
+            ),
+            range=RecurrenceRange(
+                type=RecurrenceRangeType.Numbered,
+                start_date=date(2026, 11, 25),
+                number_of_occurrences=10,
+            ),
+        )
+
+        rule = RecurrenceSummary.from_recurrence(recurrence)
+
+        assert rule is not None and rule.pattern is not None and rule.range is not None
+        assert (rule.pattern.kind, rule.pattern.index, rule.pattern.month) == (
+            "relativeYearly",
+            "last",
+            11,
+        )
+        assert (rule.range.kind, rule.range.number_of_occurrences, rule.range.end_date) == (
+            "numbered",
+            10,
+            None,
+        )
+
+    def test_an_absolute_monthly_rule_with_no_end_reports_its_day_of_the_month(self) -> None:
+        recurrence = PatternedRecurrence(
+            pattern=RecurrencePattern(
+                type=RecurrencePatternType.AbsoluteMonthly, interval=3, day_of_month=15
+            ),
+            range=RecurrenceRange(type=RecurrenceRangeType.NoEnd, start_date=date(2026, 3, 15)),
+        )
+
+        rule = RecurrenceSummary.from_recurrence(recurrence)
+
+        assert rule is not None and rule.pattern is not None and rule.range is not None
+        assert (rule.pattern.kind, rule.pattern.interval, rule.pattern.day_of_month) == (
+            "absoluteMonthly",
+            3,
+            15,
+        )
+        assert rule.pattern.days_of_week == []
+        assert (rule.range.kind, rule.range.start_date) == ("noEnd", "2026-03-15")
+
+    def test_no_recurrence_is_no_rule(self) -> None:
+        assert RecurrenceSummary.from_recurrence(None) is None
+
+    def test_a_rule_with_neither_part_reports_both_as_null(self) -> None:
+        rule = RecurrenceSummary.from_recurrence(PatternedRecurrence())
+
+        assert rule == RecurrenceSummary(pattern=None, range=None)
+
+    def test_parts_graph_said_nothing_about_are_null_and_no_day(self) -> None:
+        rule = RecurrenceSummary.from_recurrence(
+            PatternedRecurrence(pattern=RecurrencePattern(), range=RecurrenceRange())
+        )
+
+        assert rule is not None and rule.pattern is not None and rule.range is not None
+        assert rule.pattern.days_of_week == []
+        assert rule.pattern.model_dump(exclude={"days_of_week"}) == dict.fromkeys(
+            set(RecurrencePatternSummary.model_fields) - {"days_of_week"}
+        )
+        assert rule.range.model_dump() == dict.fromkeys(RecurrenceRangeSummary.model_fields)
+
+    def test_a_day_this_sdk_cannot_name_is_left_out_of_the_rule(self) -> None:
+        pattern = RecurrencePattern(
+            type=RecurrencePatternType.Weekly,
+            days_of_week=cast("list[DayOfWeek]", [None, DayOfWeek.Friday]),
+        )
+
+        rule = RecurrenceSummary.from_recurrence(PatternedRecurrence(pattern=pattern))
+
+        assert rule is not None and rule.pattern is not None
+        assert rule.pattern.days_of_week == ["friday"]
+
+    @pytest.mark.parametrize(
+        ("model", "name"),
+        [
+            (model, name)
+            for model in (RecurrenceSummary, RecurrencePatternSummary, RecurrenceRangeSummary)
+            for name in model.model_fields
+        ],
+    )
+    def test_every_field_says_what_it_is_in_15_to_60_words(
+        self, model: type[BaseModel], name: str
+    ) -> None:
+        description = model.model_fields[name].description or ""
 
         assert 15 <= len(description.split()) <= 60
 

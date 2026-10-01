@@ -32,6 +32,7 @@ from office_365_mcp.shared.calendar import (
     SUMMARY_FIELDS,
     EventAttendee,
     EventSummary,
+    RecurrenceSummary,
     zone_named,
 )
 from office_365_mcp.shared.handles import event_handle
@@ -69,6 +70,7 @@ _EVENT_FIELDS: tuple[str, ...] = (
     "hideAttendees",
     "originalStartTimeZone",
     "originalEndTimeZone",
+    "recurrence",
 )
 
 _PREFER_TEXT_BODY = ("Prefer", 'outlook.body-content-type="text"')
@@ -76,9 +78,10 @@ _PREFER_TEXT_BODY = ("Prefer", 'outlook.body-content-type="text"')
 _EventQuery = EventItemRequestBuilder.EventItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Reads one event of the signed-in user's mailbox in full, given the `uri` of an \
-outlook_list_events row. The answer holds the invitation body, every attendee and what each \
-answered, and the two zones in which the event was created.
+Reads one event of the signed-in user's mailbox in full, given the `uri` or the \
+`series_master_uri` of an outlook_list_events row. The answer holds the invitation body, every \
+attendee and what each answered, and the two zones in which the event was created. For a series \
+master, the answer also holds the recurrence rule.
 
 Notes:
 - On a calendar that the signed-in user does not own, an event whose `sensitivity` is \
@@ -204,6 +207,14 @@ class CalendarEvent(EventSummary):
             + "none."
         )
     )
+    recurrence: RecurrenceSummary | None = Field(
+        description=(
+            "This is the recurrence rule of a series master: how often the series repeats, and "
+            + "over which dates. This field is null when Graph returned no rule. For an "
+            + "occurrence or an exception, pass its `series_master_uri` to this tool to read the "
+            + "rule."
+        )
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -258,8 +269,11 @@ def _answer(event: Event, *, calendar_id: str, zone: ZoneInfo) -> CalendarEvent:
         cancelled=summary.cancelled,
         kind=summary.kind,
         in_series=summary.in_series,
+        series_master_uri=summary.series_master_uri,
         sensitivity=summary.sensitivity,
         show_as=summary.show_as,
+        categories=summary.categories,
+        importance=summary.importance,
         location=summary.location,
         is_online_meeting=summary.is_online_meeting,
         join_url=summary.join_url,
@@ -277,6 +291,7 @@ def _answer(event: Event, *, calendar_id: str, zone: ZoneInfo) -> CalendarEvent:
         hide_attendees=event.hide_attendees,
         original_start_time_zone=event.original_start_time_zone,
         original_end_time_zone=event.original_end_time_zone,
+        recurrence=RecurrenceSummary.from_recurrence(event.recurrence),
     )
 
 

@@ -21,9 +21,15 @@ from msgraph.generated.models.importance import Importance
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.location import Location
 from msgraph.generated.models.online_meeting_provider_type import OnlineMeetingProviderType
+from msgraph.generated.models.patterned_recurrence import PatternedRecurrence
+from msgraph.generated.models.recurrence_pattern import RecurrencePattern
+from msgraph.generated.models.recurrence_pattern_type import RecurrencePatternType
+from msgraph.generated.models.recurrence_range import RecurrenceRange
+from msgraph.generated.models.recurrence_range_type import RecurrenceRangeType
 from msgraph.generated.models.response_type import ResponseType
 from msgraph.generated.models.sensitivity import Sensitivity
 from msgraph.generated.models.user import User
+from msgraph.generated.models.week_index import WeekIndex
 from msgraph.generated.models.working_hours import WorkingHours
 from msgraph.generated.users.item.calendar.calendar_request_builder import CalendarRequestBuilder
 from msgraph.generated.users.item.calendars.item.calendar_item_request_builder import (
@@ -81,7 +87,6 @@ SUMMARY_FIELDS: tuple[str, ...] = (
     "webLink",
     "categories",
     "importance",
-    "recurrence",
 )
 
 NOBODY_INVITED_BUT_A_PLACE = (
@@ -227,6 +232,144 @@ _SHOWN_AS: Mapping[ShowAs, str] = {
     "oof": "out of office",
     "workingElsewhere": "working elsewhere",
 }
+
+
+class RecurrencePatternSummary(BaseModel):
+    kind: str | None = Field(
+        description=(
+            "How the series repeats: `daily`, `weekly`, `absoluteMonthly`, `relativeMonthly`, "
+            + "`absoluteYearly`, or `relativeYearly`. An absolute pattern names a day of the "
+            + "month. A relative pattern names a weekday and its position in the month. This "
+            + "field is null when Graph did not say."
+        )
+    )
+    interval: int | None = Field(
+        description=(
+            "The number of units between two occurrences. The unit is days for `daily`, weeks "
+            + "for `weekly`, months for a monthly pattern, and years for a yearly pattern. For "
+            + "example, 2 on a `weekly` pattern means every other week. This field is null when "
+            + "Graph did not say."
+        )
+    )
+    days_of_week: list[str] = Field(
+        description=(
+            "The weekdays on which the series occurs, in lowercase English, for example "
+            + "`monday`. A `weekly` pattern and a relative pattern use this list. This list is "
+            + "empty when Graph names no day."
+        )
+    )
+    day_of_month: int | None = Field(
+        description=(
+            "The day of the month on which the series occurs. Only an `absoluteMonthly` or an "
+            + "`absoluteYearly` pattern uses this value. This field is null when Graph did not "
+            + "say."
+        )
+    )
+    month: int | None = Field(
+        description=(
+            "The month in which the series occurs, as a number from 1 to 12. Only an "
+            + "`absoluteYearly` or a `relativeYearly` pattern uses this value. This field is null "
+            + "when Graph did not say."
+        )
+    )
+    index: str | None = Field(
+        description=(
+            "The position in the month of the weekday that the series occurs on: `first`, "
+            + "`second`, `third`, `fourth`, or `last`. Only a relative pattern uses this value. "
+            + "This field is null when Graph did not say."
+        )
+    )
+    first_day_of_week: str | None = Field(
+        description=(
+            "The day that Microsoft counts as the start of the week, in lowercase English, for "
+            + "example `sunday`. Only a `weekly` pattern uses this value. This field is null when "
+            + "Graph did not say."
+        )
+    )
+
+    @classmethod
+    def from_pattern(cls, pattern: RecurrencePattern) -> Self:
+        days: Sequence[DayOfWeek | None] = pattern.days_of_week or []
+        first = pattern.first_day_of_week
+        return cls(
+            kind=None if pattern.type is None else spelled(pattern.type),
+            interval=pattern.interval,
+            days_of_week=[spelled(day) for day in days if day is not None],
+            day_of_month=pattern.day_of_month,
+            month=pattern.month,
+            index=None if pattern.index is None else spelled(pattern.index),
+            first_day_of_week=None if first is None else spelled(first),
+        )
+
+
+class RecurrenceRangeSummary(BaseModel):
+    kind: str | None = Field(
+        description=(
+            "How the series ends: `endDate` on a date, `numbered` after a set number of "
+            + "occurrences, or `noEnd` for no end. This field is null when Graph did not say."
+        )
+    )
+    start_date: str | None = Field(
+        description=(
+            "The date on which the pattern starts, as `YYYY-MM-DD`. The first occurrence is on "
+            + "this date or later, as the pattern sets. This field is null when Graph did not say."
+        )
+    )
+    end_date: str | None = Field(
+        description=(
+            "The last date on which the pattern applies, as `YYYY-MM-DD`. Only an `endDate` "
+            + "range uses this value. The last occurrence can fall before this date. This field "
+            + "is null when Graph did not say."
+        )
+    )
+    number_of_occurrences: int | None = Field(
+        description=(
+            "How many times the series occurs. Only a `numbered` range uses this value. This "
+            + "field is null when Graph did not say."
+        )
+    )
+    recurrence_time_zone: str | None = Field(
+        description=(
+            "The zone for `start_date` and `end_date`, exactly as Graph wrote it. This field is "
+            + "null when Graph named no zone. In that case, the zone of the event applies."
+        )
+    )
+
+    @classmethod
+    def from_range(cls, dates: RecurrenceRange) -> Self:
+        return cls(
+            kind=None if dates.type is None else spelled(dates.type),
+            start_date=None if dates.start_date is None else dates.start_date.isoformat(),
+            end_date=None if dates.end_date is None else dates.end_date.isoformat(),
+            number_of_occurrences=dates.number_of_occurrences,
+            recurrence_time_zone=dates.recurrence_time_zone,
+        )
+
+
+class RecurrenceSummary(BaseModel):
+    pattern: RecurrencePatternSummary | None = Field(
+        description=(
+            "How often the series repeats. Read `kind` first, because it decides which of the "
+            + "other fields apply. This field is null when Graph returned no pattern."
+        )
+    )
+    range: RecurrenceRangeSummary | None = Field(
+        description=(
+            "The dates over which the series repeats, and how the series ends. This field is "
+            + "null when Graph returned no range."
+        )
+    )
+
+    @classmethod
+    def from_recurrence(cls, recurrence: PatternedRecurrence | None) -> Self | None:
+        if recurrence is None:
+            return None
+        pattern = recurrence.pattern
+        dates = recurrence.range
+        return cls(
+            pattern=None if pattern is None else RecurrencePatternSummary.from_pattern(pattern),
+            range=None if dates is None else RecurrenceRangeSummary.from_range(dates),
+        )
 
 
 class EventTime(BaseModel):
@@ -387,12 +530,22 @@ class EventSummary(BaseModel):
         description="The row kind: `singleInstance`, `occurrence`, or `exception`; null if unknown."
     )
     in_series: bool = Field(description="Whether this row belongs to a recurring series.")
+    series_master_uri: str | None = Field(
+        description=(
+            "A handle for the series master of the recurring series of this row, in the same "
+            + "shape as `uri`. outlook_read_event reads the master from this handle "
+            + "and returns the recurrence rule. This field is null when Graph names no series "
+            + "master, as on a single event."
+        )
+    )
     sensitivity: str | None = Field(
         description="How the owner classified the event, or null if unknown."
     )
     show_as: str | None = Field(
         description="How the event shows in the owner's free-busy view, or null if unknown."
     )
+    categories: list[str] = Field(description=STORED_CATEGORIES_FIELD)
+    importance: str | None = Field(description=STORED_IMPORTANCE_FIELD)
     location: str | None = Field(description="The location as one line of text, or null if none.")
     is_online_meeting: bool | None = Field(
         description="Whether the event carries an online meeting, or null if unknown."
@@ -417,6 +570,7 @@ class EventSummary(BaseModel):
         assert event.id is not None, "Graph answered a calendar read with an event with no id"
         status = event.response_status
         online = event.online_meeting
+        master = event.series_master_id
         return cls(
             uri=EventHandle(calendar_id, event.id).uri,
             subject=event.subject,
@@ -426,9 +580,12 @@ class EventSummary(BaseModel):
             all_day=event.is_all_day,
             cancelled=event.is_cancelled,
             kind=None if event.type is None else spelled(event.type),
-            in_series=event.series_master_id is not None,
+            in_series=master is not None,
+            series_master_uri=None if master is None else EventHandle(calendar_id, master).uri,
             sensitivity=None if event.sensitivity is None else spelled(event.sensitivity),
             show_as=None if event.show_as is None else spelled(event.show_as),
+            categories=list(event.categories or []),
+            importance=None if event.importance is None else spelled(event.importance),
             location=None if event.location is None else event.location.display_name,
             is_online_meeting=event.is_online_meeting,
             join_url=None if online is None else online.join_url,
@@ -492,7 +649,10 @@ def spelled(
     | FreeBusyStatus
     | Sensitivity
     | Importance
-    | OnlineMeetingProviderType,
+    | OnlineMeetingProviderType
+    | RecurrencePatternType
+    | RecurrenceRangeType
+    | WeekIndex,
 ) -> str:
     return str.__str__(value)
 
