@@ -83,6 +83,9 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "outlook_respond_to_invite",
         "outlook_send_draft",
         "outlook_update_event",
+        "sharepoint_copy_item",
+        "sharepoint_create_folder",
+        "sharepoint_create_text_file",
         "teams_send_channel_message",
         "teams_send_chat_message",
     }

@@ -362,6 +362,22 @@ run "preset_sharepoint_read" {
   }
 }
 
+run "preset_sharepoint_write" {
+  variables {
+    tools_preset = "sharepoint-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Files.Read.All,Files.ReadWrite.All"
+    error_message = "sharepoint-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All", "Files.ReadWrite.All"]
+    error_message = "Files.ReadWrite.All needs an administrator, as Files.Read.All does. This composed ${join(",", local.admin_consent)}"
+  }
+}
+
 run "preset_onenote_read" {
   variables {
     tools_preset = "onenote-read"

@@ -68,6 +68,7 @@
                 "outlook-calendar-delegate",
                 "sharepoint-search",
                 "sharepoint-read",
+                "sharepoint-write",
                 "onenote-read",
                 "onenote-write",
                 "onenote-delete"

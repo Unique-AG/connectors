@@ -275,6 +275,48 @@
           ]
         },
         {
+          "name": "sharepoint_resolve_url",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_create_folder",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_create_text_file",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_rename_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_move_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_copy_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_delete_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
           "name": "onenote_list_notebooks",
           "permissions": [
             "Notes.Read"
@@ -438,6 +480,13 @@
         "sharepoint_browse_folder",
         "sharepoint_list_drives",
         "sharepoint_read_file",
+        "sharepoint_resolve_url",
+        "sharepoint_create_folder",
+        "sharepoint_create_text_file",
+        "sharepoint_rename_item",
+        "sharepoint_move_item",
+        "sharepoint_copy_item",
+        "sharepoint_delete_item",
         "onenote_list_notebooks",
         "onenote_list_pages",
         "onenote_read_page",
@@ -590,6 +639,19 @@
           "sharepoint_list_drives",
           "sharepoint_read_file"
         ],
+        "sharepoint-write": [
+          "sharepoint_search_files",
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives",
+          "sharepoint_read_file",
+          "sharepoint_resolve_url",
+          "sharepoint_create_folder",
+          "sharepoint_create_text_file",
+          "sharepoint_rename_item",
+          "sharepoint_move_item",
+          "sharepoint_copy_item",
+          "sharepoint_delete_item"
+        ],
         "onenote-read": [
           "onenote_list_notebooks",
           "onenote_list_pages",
@@ -671,10 +733,10 @@
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
         "Files.Read.All",
+        "Files.ReadWrite.All",
         "Notes.Read",
         "Notes.Create",
-        "Notes.ReadWrite",
-        "Files.ReadWrite.All"
+        "Notes.ReadWrite"
       ],
       "needs_admin_consent": {
         "User.Read": false,
