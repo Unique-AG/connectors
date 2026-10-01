@@ -19,6 +19,8 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "OnlineMeetings.Read": False,
     "OnlineMeetingTranscript.Read.All": True,
     "OnlineMeetingRecording.Read.All": True,
+    "ChannelMessage.ReadWrite": True,
+    "Chat.ReadWrite": False,
     "Mail.Read": False,
     "Mail.Read.Shared": False,
     "People.Read": False,

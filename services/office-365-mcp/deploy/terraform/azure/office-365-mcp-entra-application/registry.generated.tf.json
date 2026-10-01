@@ -750,7 +750,9 @@
         "Calendars.ReadWrite.Shared",
         "Notes.Read",
         "Notes.Create",
-        "Notes.ReadWrite"
+        "Notes.ReadWrite",
+        "ChannelMessage.ReadWrite",
+        "Chat.ReadWrite"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -763,6 +765,8 @@
         "OnlineMeetings.Read": false,
         "OnlineMeetingTranscript.Read.All": true,
         "OnlineMeetingRecording.Read.All": true,
+        "ChannelMessage.ReadWrite": true,
+        "Chat.ReadWrite": false,
         "Mail.Read": false,
         "Mail.Read.Shared": false,
         "People.Read": false,
