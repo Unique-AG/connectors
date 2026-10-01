@@ -1,6 +1,7 @@
 import html
 import json
 import re
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Self, cast
 
@@ -9,9 +10,14 @@ from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.generated.models.chat_message_attachment import ChatMessageAttachment
 from msgraph.generated.models.chat_message_from_identity_set import ChatMessageFromIdentitySet
 from msgraph.generated.models.chat_message_mention import ChatMessageMention
+from msgraph.generated.models.chat_message_mentioned_identity_set import (
+    ChatMessageMentionedIdentitySet,
+)
 from msgraph.generated.models.chat_message_reaction import ChatMessageReaction
 from msgraph.generated.models.chat_message_type import ChatMessageType
 from msgraph.generated.models.identity import Identity
+from msgraph.generated.models.item_body import ItemBody
+from msgraph.generated.models.teamwork_user_identity_type import TeamworkUserIdentityType
 from pydantic import BaseModel, Field
 
 from office_365_mcp.shared.handles import MessageHandle
@@ -320,3 +326,52 @@ def _json(value: str | None) -> object | None:
         return cast("object", json.loads(value))
     except ValueError:
         return None
+
+
+class Mention(BaseModel, frozen=True):
+    user_id: str = Field(
+        pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+        description=(
+            "The Microsoft Entra object id of the person to mention, as a GUID. Copy it from the "
+            + "`user_id` of get_me, of a teams_list_chats member, or of a message `sender`. "
+            + "Never build it from a name or an email address."
+        ),
+    )
+    name: str = Field(
+        min_length=1,
+        description=(
+            "The text that Teams shows for the mention, usually the display name of the person. "
+            + "Use the `display_name` that comes from the same result as the `user_id`."
+        ),
+    )
+
+
+def outgoing_message(text: str, *, mentions: Sequence[Mention] = ()) -> ChatMessage:
+    if not mentions:
+        return ChatMessage(body=ItemBody(content=text, content_type=BodyType.Text))
+    tags = " ".join(
+        f'<at id="{index}">{html.escape(mention.name)}</at>'
+        for index, mention in enumerate(mentions)
+    )
+    return ChatMessage(
+        body=ItemBody(
+            content=f"{tags} {html.escape(text).replace('\n', '<br>')}",
+            content_type=BodyType.Html,
+        ),
+        mentions=[
+            ChatMessageMention(
+                id=index,
+                mention_text=mention.name,
+                mentioned=ChatMessageMentionedIdentitySet(
+                    user=Identity(
+                        id=mention.user_id,
+                        display_name=mention.name,
+                        additional_data={
+                            "userIdentityType": TeamworkUserIdentityType.AadUser.value
+                        },
+                    )
+                ),
+            )
+            for index, mention in enumerate(mentions)
+        ],
+    )

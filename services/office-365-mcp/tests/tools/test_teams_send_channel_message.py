@@ -6,7 +6,7 @@ import httpx
 import pytest
 import respx
 from fastmcp import Context, FastMCP
-from fastmcp.exceptions import ToolError
+from fastmcp.exceptions import ToolError, ValidationError
 from fastmcp.server.elicitation import AcceptedElicitation, DeclinedElicitation
 from fastmcp.tools import Tool
 from mcp.types import (
@@ -21,7 +21,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared.messages import TeamsMessage
+from office_365_mcp.shared.messages import Mention, TeamsMessage
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import teams_send_channel_message as sender
 from office_365_mcp.tools.teams_send_channel_message import a_person_agrees, send_channel_message
@@ -37,6 +37,9 @@ _SENT_MESSAGE_ID = "1770000000002"
 _SENT_WEB_URL = f"https://teams.microsoft.invalid/l/message/{_CHANNEL_ID}/{_SENT_MESSAGE_ID}"
 
 _NOTHING_SENT = "Nothing was posted."
+
+_JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
+_ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelace")
 
 
 async def _agrees(question: str, about: str) -> Confirmed:
@@ -76,10 +79,19 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
 
 
 async def _send(
-    client: GraphServiceClient, *, message: str = _MESSAGE, confirm: Confirm
+    client: GraphServiceClient,
+    *,
+    message: str = _MESSAGE,
+    confirm: Confirm,
+    mentions: Sequence[Mention] = (),
 ) -> TeamsMessage | InputRequiredResult:
     return await send_channel_message(
-        client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, message=message, confirm=confirm
+        client,
+        team_id=_TEAM_ID,
+        channel_id=_CHANNEL_ID,
+        message=message,
+        confirm=confirm,
+        mentions=mentions,
     )
 
 
@@ -127,26 +139,59 @@ class TestThePersonBeforeThePost:
         assert _TEAM_ID in asked[0]
         assert _CHANNEL_ID in asked[0]
 
+    async def test_the_question_names_the_people_it_mentions(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _send(client, confirm=capturing, mentions=[_JANE, _ADA])
+
+        assert len(asked) == 1
+        assert "It mentions 'Jane Smith', 'Ada Lovelace'." in asked[0]
+        assert "cannot be recalled" in asked[0]
+
     def test_the_binding_differs_for_two_messages_with_the_same_120_char_preview(self) -> None:
         common_prefix = "x" * 120
 
         first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            common_prefix + " short tail", _TEAM_ID, _CHANNEL_ID
+            common_prefix + " short tail", _TEAM_ID, _CHANNEL_ID, ()
         )
         second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            common_prefix + " a very different, much longer tail", _TEAM_ID, _CHANNEL_ID
+            common_prefix + " a very different, much longer tail", _TEAM_ID, _CHANNEL_ID, ()
         )
 
         assert first != second
 
     def test_the_binding_differs_for_the_same_message_to_a_different_channel(self) -> None:
         first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            _MESSAGE, _TEAM_ID, _CHANNEL_ID
+            _MESSAGE, _TEAM_ID, _CHANNEL_ID, ()
         )
         second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            _MESSAGE, _TEAM_ID, "19:other@thread.tacv2"
+            _MESSAGE, _TEAM_ID, "19:other@thread.tacv2", ()
         )
         assert first != second
+
+    def test_the_binding_differs_when_only_the_mentions_differ(self) -> None:
+        bindings = {
+            sender._about(  # pyright: ignore[reportPrivateUsage]
+                _MESSAGE, _TEAM_ID, _CHANNEL_ID, mentions
+            )
+            for mentions in (
+                (),
+                (_JANE,),
+                (_ADA,),
+                (_JANE, _ADA),
+                (_ADA, _JANE),
+                (Mention(user_id=_JANE.user_id, name="Ada Lovelace"),),
+            )
+        }
+
+        assert len(bindings) == 6
 
     async def test_the_confirmation_happens_before_the_post(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -318,6 +363,30 @@ class TestTheEraWithNoBackChannel:
 
         assert post.call_count == 0, "message B went out on an accept given for message A"
 
+    async def test_an_accept_for_one_set_of_mentions_cannot_post_another(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+        key, state, agrees_with = _the_question(
+            await _send(client, confirm=a_person_agrees(_modern_context()), mentions=[_JANE])
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _send(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+                mentions=[_ADA],
+            )
+
+        assert post.call_count == 0, "a mention of Ada went out on an accept given for Jane"
+
 
 class TestWhatItAsksGraphFor:
     async def test_it_makes_exactly_one_call(
@@ -343,6 +412,30 @@ class TestWhatItAsksGraphFor:
         sent = cast("Mapping[str, object]", body["body"])
         assert sent["content"] == _MESSAGE
         assert sent["contentType"] == "text"
+        assert "mentions" not in body
+
+    async def test_a_mention_goes_out_as_html_with_its_person(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+
+        _ = await _send(client, confirm=_agrees, mentions=[_JANE])
+
+        body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
+        assert body["body"] == {
+            "content": '<at id="0">Jane Smith</at> Ship it Friday.',
+            "contentType": "html",
+        }
+        mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
+        assert len(mentions) == 1
+        assert mentions[0]["id"] == 0
+        assert mentions[0]["mentionText"] == "Jane Smith"
+        mentioned = cast("Mapping[str, object]", mentions[0]["mentioned"])
+        assert mentioned["user"] == {
+            "id": _JANE.user_id,
+            "displayName": "Jane Smith",
+            "userIdentityType": "aadUser",
+        }
 
     async def test_the_channel_id_is_only_ever_read_together_with_its_team_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -467,18 +560,43 @@ class TestHowItDeclaresItself:
     ) -> None:
         _parameters, tool = await _registered(transport)
 
-        lowered = (tool.description or "").casefold()
-        assert "after the user approves it" in lowered
+        description = tool.description or ""
+        assert (
+            "This tool asks the user to agree before it posts anything, every time. This tool "
+            + "posts nothing unless the user agrees."
+        ) in " ".join(description.split())
 
-    async def test_the_three_arguments_are_team_id_channel_id_and_message(
+    async def test_the_description_says_a_posted_message_cannot_be_recalled(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert "nothing here can recall it" in (tool.description or "")
+
+    async def test_the_arguments_are_team_id_channel_id_message_and_mentions(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"team_id", "channel_id", "message"}
+        assert set(properties) == {"team_id", "channel_id", "message", "mentions"}
         assert set(cast("Sequence[str]", parameters["required"])) == {
             "team_id",
             "channel_id",
             "message",
         }
+
+    async def test_a_mention_by_email_address_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError, match="match pattern"):
+            _ = await tool.run(
+                {
+                    **sender.GRAPH_CALL_EXAMPLE,
+                    "mentions": [{"user_id": "jane@example.invalid", "name": "Jane Smith"}],
+                }
+            )
+
+        assert len(graph.calls) == 0, "a mention the schema refuses reached Graph"

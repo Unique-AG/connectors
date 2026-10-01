@@ -1,5 +1,6 @@
 import hashlib
-from collections.abc import Mapping
+import json
+from collections.abc import Mapping, Sequence
 from typing import Annotated
 
 import httpx
@@ -8,15 +9,13 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.chat_message import ChatMessage
-from msgraph.generated.models.item_body import ItemBody
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
 from office_365_mcp.shared.handles import MessageHandle
-from office_365_mcp.shared.messages import TeamsMessage
+from office_365_mcp.shared.messages import Mention, TeamsMessage, outgoing_message
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -44,16 +43,31 @@ _DECLINE = "do not post"
 _NOTHING_SENT = "Nothing was posted."
 _CANNOT_BE_RECALLED = "This cannot be recalled once posted."
 
-_DESCRIPTION = (
-    "Posts one plain-text message to an existing Teams channel, after the user approves it."
-)
+_DESCRIPTION = """\
+Posts one new message as the signed-in user to an existing channel of a Teams team. The message \
+can @mention people. The mentions come first, in the order given, and the text of `message` \
+follows them. This tool posts the message immediately, and nothing here can recall it. \
+teams_send_chat_message is the tool for a chat.
+
+Notes:
+- This tool asks the user to agree before it posts anything, every time. This tool posts \
+nothing unless the user agrees.
+- If a call times out, do not call this tool again first. Before you call again, make sure that \
+teams_browse_channel does not already show the message.
+"""
 
 
 async def send_channel_message(
-    client: GraphServiceClient, *, team_id: str, channel_id: str, message: str, confirm: Confirm
+    client: GraphServiceClient,
+    *,
+    team_id: str,
+    channel_id: str,
+    message: str,
+    confirm: Confirm,
+    mentions: Sequence[Mention] = (),
 ) -> TeamsMessage | InputRequiredResult:
-    question = _question(message, team_id, channel_id)
-    about = _about(message, team_id, channel_id)
+    question = _question(message, team_id, channel_id, mentions)
+    about = _about(message, team_id, channel_id, mentions)
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME, step=STEP_SEND):
@@ -65,7 +79,10 @@ async def send_channel_message(
             sent = await (
                 client.teams.by_team_id(team_id)
                 .channels.by_channel_id(channel_id)
-                .messages.post(_posted(message), request_configuration=_send_request())
+                .messages.post(
+                    outgoing_message(message, mentions=mentions),
+                    request_configuration=_send_request(),
+                )
             )
 
     if asked is not None:
@@ -79,19 +96,20 @@ async def send_channel_message(
     )
 
 
-def _question(message: str, team_id: str, channel_id: str) -> str:
+def _question(message: str, team_id: str, channel_id: str, mentions: Sequence[Mention]) -> str:
+    named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
+    mentioned = f" It mentions {named}." if mentions else ""
     return (
         f"Post {cut_for_a_question(message)!r} to channel {channel_id!r} in team {team_id!r} "
-        f"now? {_CANNOT_BE_RECALLED}"
+        + f"now?{mentioned} {_CANNOT_BE_RECALLED}"
     )
 
 
-def _about(message: str, team_id: str, channel_id: str) -> str:
-    return f"{team_id}:{channel_id}:{hashlib.sha256(message.encode()).hexdigest()}"
-
-
-def _posted(message: str) -> ChatMessage:
-    return ChatMessage(body=ItemBody(content=message, content_type=BodyType.Text))
+def _about(message: str, team_id: str, channel_id: str, mentions: Sequence[Mention]) -> str:
+    mentioned = [[mention.user_id, mention.name] for mention in mentions]
+    return hashlib.sha256(
+        json.dumps([team_id, channel_id, message, mentioned]).encode()
+    ).hexdigest()
 
 
 def _send_request() -> RequestConfiguration[QueryParameters]:
@@ -130,6 +148,17 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(min_length=1, description="The message to send, as plain text."),
         ],
+        mentions: Annotated[
+            list[Mention],
+            Field(
+                default=[],
+                description=(
+                    "The people to @mention, one entry for each person. This tool writes the "
+                    + "mention markup itself, so `message` stays plain text. An empty list posts "
+                    + "a message with no mention."
+                ),
+            ),
+        ],
         ctx: Context,
         client: GraphServiceClient = graph,
     ) -> TeamsMessage | InputRequiredResult:
@@ -139,4 +168,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             channel_id=channel_id,
             message=message,
             confirm=a_person_agrees(ctx),
+            mentions=mentions,
         )
