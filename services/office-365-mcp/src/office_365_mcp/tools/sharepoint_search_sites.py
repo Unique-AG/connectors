@@ -76,8 +76,9 @@ class SiteList(BaseModel):
     )
     capped: bool = Field(
         description=(
-            "True when `limit` stopped this search while more sites matched. Raise `limit`, or "
-            + "make `query` more specific. False when the search ended on its own."
+            "True when `limit` or the cap of 1000 sites stopped this search while more sites "
+            + "matched. To get more sites, raise `limit` up to 1000, or make `query` more "
+            + "specific. False when the search ended on its own."
         )
     )
 
@@ -135,8 +136,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 ge=1,
                 description=(
-                    "How many sites to return, at most. The field `capped` says if this limit "
-                    + "stopped the search early. The default value is 25."
+                    "How many sites to return, at most. The field `capped` says if the search "
+                    + "stopped early. The default value is 25."
                 ),
             ),
         ] = 25,

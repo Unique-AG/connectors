@@ -7,7 +7,7 @@ from fastmcp import FastMCP
 from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_365_mcp.graph_client import GraphForbidden
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, GraphForbidden
 from office_365_mcp.server.manifest import NEEDS_ADMIN_CONSENT
 from office_365_mcp.shared.seam import READ_ONLY, REQUESTABLE_PERMISSIONS
 from office_365_mcp.tools import sharepoint_search_files
@@ -42,6 +42,18 @@ def _page(*sites: dict[str, object], next_link: str | None = None) -> httpx.Resp
     if next_link is not None:
         body["@odata.nextLink"] = next_link
     return httpx.Response(200, json=body)
+
+
+def _numbered_sites(count: int) -> httpx.Response:
+    return _page(
+        *(
+            _site_payload(
+                web_url=f"https://contoso.sharepoint.invalid/sites/S{number:04d}",
+                display_name=f"S{number:04d}",
+            )
+            for number in range(count)
+        )
+    )
 
 
 @pytest.fixture
@@ -227,6 +239,26 @@ class TestWhatItAnswers:
         assert [row.display_name for row in answer.sites] == ["Finance"]
         assert answer.capped is True
 
+    async def test_a_search_past_1000_sites_stops_at_1000_and_says_capped(
+        self, client: GraphServiceClient, sites: respx.Route
+    ) -> None:
+        sites.mock(return_value=_numbered_sites(1001))
+
+        answer = await finder.search_sites(client, query="team", limit=5000)
+
+        assert len(answer.sites) == 1000
+        assert answer.capped is True
+
+    async def test_a_search_of_exactly_1000_sites_ends_on_its_own(
+        self, client: GraphServiceClient, sites: respx.Route
+    ) -> None:
+        sites.mock(return_value=_numbered_sites(1000))
+
+        answer = await finder.search_sites(client, query="team", limit=5000)
+
+        assert len(answer.sites) == 1000
+        assert answer.capped is False
+
 
 class TestGraphFailures:
     async def test_a_refused_search_arrives_classified_for_the_tool_to_explain(
@@ -289,6 +321,13 @@ class TestHowItDeclaresItself:
         tool = await _tool_of(transport)
 
         assert 45 <= len((tool.description or "").split()) <= 210
+
+    def test_the_capped_description_names_the_scan_cap(self) -> None:
+        described = finder.SiteList.model_fields["capped"].description or ""
+
+        assert str(MAX_SCANNED_ITEMS) in described
+        assert "raise `limit` up to 1000" in described
+        assert "Raise `limit`, or make" not in described
 
     def test_the_address_field_says_what_to_do_with_it(self) -> None:
         described = finder.SiteSummary.model_fields["web_url"].description or ""
