@@ -11,6 +11,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.files import ITEM_FIELDS
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
+from office_365_mcp.tools import PRESETS, TOOL_NAMES
 from office_365_mcp.tools import sharepoint_browse_folder as browser
 
 from .conftest import GRAPH_V1
@@ -550,6 +551,14 @@ class TestWhatItRefuses:
         with pytest.raises(ToolError, match="Omit `folder`"):
             _ = await browser.browse_folder(client, folder="Reports", limit=25)
 
+    async def test_the_refusal_shows_the_same_handle_shape_as_the_argument(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as raised:
+            _ = await browser.browse_folder(client, folder="Reports", limit=25)
+
+        assert "sharepoint:///folders/{drive_id}/{item_id}" in str(raised.value)
+
 
 class TestGraphFailures:
     @pytest.mark.usefixtures("my_drive")
@@ -592,12 +601,28 @@ class TestTheSchemaItPublishes:
         assert "`root_uri` of a drive" in description
         assert "`parent_uri`" in description
 
-    async def test_the_folder_argument_does_not_name_a_tool_of_a_later_commit(
+    async def test_the_folder_argument_names_no_tool_that_a_preset_with_this_tool_lacks(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        description = await _folder_description(transport)
+        named = {name for name in TOOL_NAMES if name in description}
+        serving = {
+            preset: set(tools) for preset, tools in PRESETS.items() if browser.TOOL_NAME in tools
+        }
+
+        assert "sharepoint_resolve_url" not in description
+        assert "sharepoint-search" in serving
+        lacking = {
+            preset: sorted(named - tools) for preset, tools in serving.items() if named - tools
+        }
+        assert not lacking, f"the folder argument names tools these presets do not serve: {lacking}"
+
+    async def test_the_folder_argument_shows_the_shape_of_a_folder_handle(
         self, transport: httpx.AsyncClient
     ) -> None:
         description = await _folder_description(transport)
 
-        assert "sharepoint_resolve_url" not in description
+        assert "sharepoint:///folders/{drive_id}/{item_id}" in description
 
     async def test_the_folder_argument_is_described_in_15_to_60_words(
         self, transport: httpx.AsyncClient

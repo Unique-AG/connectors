@@ -64,7 +64,7 @@ to the first 1000 items that Microsoft returned and not to the whole level.
 
 _NOT_A_FOLDER_HANDLE = (
     "sharepoint_browse_folder takes a folder handle. It looks like "
-    + "sharepoint:///folders/{driveId}/{itemId}, and it comes from the `uri` of an earlier "
+    + "sharepoint:///folders/{drive_id}/{item_id}, and it comes from the `uri` of an earlier "
     + "result. Copy it exactly. A folder name is not a handle. Nor is a path, nor a web address, "
     + "nor a bare item id. A file handle is not one either, because a file holds nothing to "
     + "browse. Omit `folder` to browse the top of the user's own OneDrive."
@@ -203,7 +203,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The folder to look inside. Take the `uri` of a folder or the `parent_uri` "
+                    "The folder to look inside, as sharepoint:///folders/{drive_id}/{item_id}. "
+                    + "Take the `uri` of a folder or the `parent_uri` "
                     + "of an item from sharepoint_browse_folder or sharepoint_search_files. The "
                     + "`root_uri` of a drive from sharepoint_list_drives is a folder handle too. "
                     + "A name, a path and a web address are not handles. Omit it to browse the "
