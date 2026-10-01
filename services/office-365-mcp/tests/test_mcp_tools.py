@@ -651,6 +651,8 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "teams_send_chat_message_with_files",
         "teams_send_channel_message_with_files",
         "teams_react_to_message",
+        "teams_edit_message",
+        "teams_delete_message",
     }
 )
 

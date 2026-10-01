@@ -229,6 +229,27 @@ run "preset_teams_write_files" {
   }
 }
 
+run "preset_teams_edit" {
+  variables {
+    tools_preset = "teams-edit"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Team.ReadBasic.All,Channel.ReadBasic.All,ChannelMessage.Read.All,ChatMessage.Send,ChannelMessage.Send,Chat.ReadWrite,ChannelMessage.ReadWrite"
+    error_message = "teams-edit composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 13
+    error_message = "teams-edit resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 2
+    error_message = "teams-edit needs an administrator for ChannelMessage.Read.All and ChannelMessage.ReadWrite only, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
 run "preset_teams_files" {
   variables {
     tools_preset = "teams-files"

@@ -706,6 +706,8 @@ GRAPH_STEPS = frozenset(
         "send_channel_message",
         "reply_channel_message",
         "react_to_message",
+        "edit_message",
+        "delete_message",
         "search_query",
         "resolve_meeting",
         "transcripts",

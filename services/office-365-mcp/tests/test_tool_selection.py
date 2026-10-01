@@ -301,6 +301,25 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
         "attachments": _FILE_SOURCES,
     },
     "teams_react_to_message": {"uri": ("teams_list_chat_messages",)},
+    "teams_edit_message": {
+        "uri": (
+            "teams_list_chat_messages",
+            "teams_browse_channel",
+            "teams_list_message_replies",
+            "teams_search_messages",
+            "teams_read_message",
+        ),
+        "user_id": _MENTION_SOURCES,
+    },
+    "teams_delete_message": {
+        "uri": (
+            "teams_list_chat_messages",
+            "teams_browse_channel",
+            "teams_list_message_replies",
+            "teams_search_messages",
+            "teams_read_message",
+        )
+    },
     "teams_search_messages": {"mentions": ("get_me",)},
     "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
@@ -399,6 +418,7 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "teams_send_chat_message_with_files": frozenset({"message", "name"}),
     "teams_send_channel_message_with_files": frozenset({"message", "name"}),
     "teams_react_to_message": frozenset({"reaction"}),
+    "teams_edit_message": frozenset({"message", "name"}),
     "teams_search_messages": frozenset(
         {
             "query",
@@ -715,6 +735,22 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Files.Read.All",
         ),
         1,
+        13,
+    ),
+    (
+        ToolsPreset.TEAMS_EDIT,
+        (
+            "User.Read",
+            "Chat.Read",
+            "Team.ReadBasic.All",
+            "Channel.ReadBasic.All",
+            "ChannelMessage.Read.All",
+            "ChatMessage.Send",
+            "ChannelMessage.Send",
+            "Chat.ReadWrite",
+            "ChannelMessage.ReadWrite",
+        ),
+        2,
         13,
     ),
     (
