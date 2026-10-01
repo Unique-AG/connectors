@@ -13,11 +13,12 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.files import (
+    ITEM_HANDLE_SOURCES,
     NAME_RULES,
-    UNNAMED_FOLDER_LABEL,
     UNNAMED_ITEM_LABEL,
     DriveItemSummary,
     item_for_a_question,
+    parent_folder_label,
     summary_after_write,
     unusable_name,
 )
@@ -61,9 +62,9 @@ _NOT_AN_ITEM_HANDLE = (
     "sharepoint_rename_item takes a file handle or a folder handle. A file handle looks like "
     + "sharepoint:///files/{drive_id}/{item_id}. A folder handle looks like "
     + "sharepoint:///folders/{drive_id}/{item_id}. Both ids are percent-encoded. A web address, "
-    + "a path, a file name and a bare item id are not handles. Take the `uri` of a "
-    + "sharepoint_search_files hit or of a sharepoint_browse_folder row, and copy it word for "
-    + "word. This same value fails again, so do not retry it."
+    + "a path, a file name and a bare item id are not handles. "
+    + ITEM_HANDLE_SOURCES
+    + " This same value fails again, so do not retry it."
 )
 
 _THE_DRIVE_ROOT = (
@@ -143,10 +144,7 @@ async def rename_item(
 
 def _question(item: DriveItem, name: str) -> str:
     old = repr(item.name) if item.name else UNNAMED_ITEM_LABEL
-    parent = item.parent_reference
-    parent_name = parent.name if parent is not None else None
-    folder = f"the folder {parent_name!r}" if parent_name else UNNAMED_FOLDER_LABEL
-    return f"Rename {old} to {name!r} in {folder}?"
+    return f"Rename {old} to {name!r} in {parent_folder_label(item)}?"
 
 
 def a_person_agrees(ctx: Context) -> Confirm:
@@ -187,10 +185,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The file or folder to rename: the `uri` of a sharepoint_search_files hit or "
-                    + "of a sharepoint_browse_folder row, copied word for word. A file handle is "
-                    + "sharepoint:///files/{drive_id}/{item_id}, and a folder handle is "
-                    + "sharepoint:///folders/{drive_id}/{item_id}. A web address is not a handle."
+                    "The file or folder to rename. A file handle and a folder handle both work. "
+                    + ITEM_HANDLE_SOURCES
+                    + " A web address, a path and a name are not handles."
                 ),
             ),
         ],

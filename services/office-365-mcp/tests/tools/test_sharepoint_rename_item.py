@@ -30,7 +30,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphFailure, GraphForbidden, GraphNotFound
-from office_365_mcp.shared.files import NAME_RULES
+from office_365_mcp.shared.files import ITEM_HANDLE_SOURCES, NAME_RULES
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -281,6 +281,14 @@ class TestWhatItRefuses:
         assert "sharepoint_search_files" in refusal
         assert "sharepoint_browse_folder" in refusal
         assert refusal.endswith("This same value fails again, so do not retry it.")
+
+    async def test_the_handle_refusal_carries_the_shared_handle_sources(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _rename(client, item="Plan.docx")
+
+        assert ITEM_HANDLE_SOURCES in str(refused.value)
 
     @pytest.mark.parametrize(
         ("item", "name", "reason"),
@@ -573,7 +581,7 @@ class TestThePersonBetweenTheRenameAndTheFolder:
 
         _ = await _rename(client, confirm=capturing)
 
-        assert asked == ["Rename 'Plan.docx' to 'Plan final.docx' in the folder 'Reports'?"]
+        assert asked == ["Rename 'Plan.docx' to 'Plan final.docx' in the folder '/Reports'?"]
         assert bound == [write_state_for(renamer.TOOL_NAME, _DRIVE_ID, _FILE_ID, _NEW_NAME)]
 
     async def test_the_question_names_no_item_or_folder_graph_left_unnamed(
@@ -591,6 +599,35 @@ class TestThePersonBetweenTheRenameAndTheFolder:
         _ = await _rename(client, confirm=capturing)
 
         assert asked == ["Rename an unnamed item to 'Plan final.docx' in an unnamed folder?"]
+
+    @pytest.mark.parametrize(
+        ("parent", "folder"),
+        [
+            ({"driveId": _DRIVE_ID, "path": "/drive/root:/Reports"}, "the folder '/Reports'"),
+            ({"driveId": _DRIVE_ID, "name": "Reports"}, "the folder 'Reports'"),
+            ({"driveId": _DRIVE_ID, "path": "/drive/root:"}, "the top folder of the drive"),
+        ],
+        ids=["path-without-name", "name-without-path", "path-of-the-top-folder"],
+    )
+    async def test_the_question_names_the_folder_from_the_path_first_and_the_name_second(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        parent: Mapping[str, object],
+        folder: str,
+    ) -> None:
+        _ = _pre_reads(graph, _item_payload(parent=parent))
+        _ = _patches(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _rename(client, confirm=capturing)
+
+        assert asked == [f"Rename 'Plan.docx' to 'Plan final.docx' in {folder}?"]
 
     async def test_about_is_the_same_for_two_identical_calls_and_different_for_another_name(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -714,7 +751,7 @@ class TestTheEraWithNoBackChannel:
         assert isinstance(request, ElicitRequest)
         params = request.params
         assert isinstance(params, ElicitRequestFormParams)
-        assert params.message == "Rename 'Plan.docx' to 'Plan final.docx' in the folder 'Reports'?"
+        assert params.message == "Rename 'Plan.docx' to 'Plan final.docx' in the folder '/Reports'?"
 
     async def test_the_second_round_renames_under_the_state_it_was_agreed_to_by(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -842,6 +879,14 @@ class TestHowItDeclaresItself:
         parameters, _tool = await _registered(transport)
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert not [name for name in properties if word in name.casefold()]
+
+    async def test_the_item_description_carries_the_shared_handle_sources(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+
+        assert ITEM_HANDLE_SOURCES in str(properties["item"]["description"])
 
     async def test_it_announces_itself_as_a_destructive_idempotent_write(
         self, transport: httpx.AsyncClient
