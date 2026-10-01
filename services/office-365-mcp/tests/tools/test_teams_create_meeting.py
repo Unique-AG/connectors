@@ -127,15 +127,19 @@ class TestThePersonBeforeTheCreate:
         assert post.call_count == 0, "a declined meeting still reached Graph"
 
     @pytest.mark.parametrize(
-        ("attendees", "counted"),
-        [([], "0 attendees"), ([_GRACE], "1 attendee"), ([OTHER_USER_ID, _GRACE], "2 attendees")],
+        ("attendees", "named"),
+        [
+            ([_GRACE], f"1 person: {_GRACE}"),
+            ([_GRACE.upper(), OTHER_USER_ID], f"2 people: {OTHER_USER_ID}, {_GRACE}"),
+        ],
+        ids=["one", "two"],
     )
-    async def test_the_question_names_the_subject_the_times_and_the_attendee_count(
+    async def test_the_question_names_the_subject_the_times_and_every_attendee(
         self,
         client: GraphServiceClient,
         graph: respx.MockRouter,
         attendees: list[str],
-        counted: str,
+        named: str,
     ) -> None:
         _ = _posts(graph)
         asked: list[str] = []
@@ -148,7 +152,24 @@ class TestThePersonBeforeTheCreate:
 
         assert asked == [
             f"Create the Teams meeting {_SUBJECT!r} from {_STARTS_AT} to {_ENDS_AT} with "
-            + f"{counted}? The meeting is on no calendar, and this tool sends no invitation."
+            + f"{named}? The meeting is on no calendar, and this tool sends no invitation."
+        ]
+
+    async def test_the_question_says_when_the_meeting_has_no_attendee(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _create(client, attendees=[], confirm=capturing)
+
+        assert asked == [
+            f"Create the Teams meeting {_SUBJECT!r} from {_STARTS_AT} to {_ENDS_AT} with no "
+            + "attendee? The meeting is on no calendar, and this tool sends no invitation."
         ]
 
     async def test_the_question_is_bound_to_the_external_id_that_graph_receives(
@@ -594,6 +615,17 @@ class TestHowItDeclaresItself:
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert set(properties) == {"subject", "starts_at", "ends_at", "attendees"}
         assert set(cast("Sequence[str]", parameters["required"])) == set(properties)
+
+    async def test_the_attendees_name_every_tool_that_reports_an_id(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        assert (
+            "Copy each id from the `user_id` of get_me, of a teams_list_chats member, or of a "
+            + "teams_list_chat_members row."
+        ) in " ".join(str(properties["attendees"]["description"]).split())
 
     async def test_an_attendee_by_email_address_never_reaches_graph(
         self, transport: httpx.AsyncClient, graph: respx.MockRouter

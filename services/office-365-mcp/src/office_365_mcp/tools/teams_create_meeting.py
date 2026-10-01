@@ -23,7 +23,9 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
+from office_365_mcp.shared.calendar import counted_people
 from office_365_mcp.shared.handles import meeting_uri_for
+from office_365_mcp.shared.identity import ENTRA_OBJECT_ID_PATTERN
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_IDEMPOTENT,
@@ -44,8 +46,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "ends_at": "2026-03-02T15:00:00Z",
     "attendees": ["00000000-0000-4000-8000-000000000002"],
 }
-
-_ENTRA_ID = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 
 _EXTERNAL_ID_NAMESPACE = uuid.UUID("e0f61b25-5f82-4ac9-846f-8df11567971a")
 
@@ -216,12 +216,15 @@ def _external_id(draft: _Draft) -> str:
 
 
 def _question(draft: _Draft) -> str:
-    counted = len(draft.attendees)
+    attendees = (
+        f"{counted_people(draft.attendees)}: {', '.join(draft.attendees)}"
+        if draft.attendees
+        else "no attendee"
+    )
     return (
         f"Create the Teams meeting {cut_for_a_question(draft.subject)!r} from "
-        + f"{draft.starts_at.isoformat()} to {draft.ends_at.isoformat()} with {counted} "
-        + f"{'attendee' if counted == 1 else 'attendees'}? The meeting is on no calendar, and "
-        + "this tool sends no invitation."
+        + f"{draft.starts_at.isoformat()} to {draft.ends_at.isoformat()} with {attendees}? The "
+        + "meeting is on no calendar, and this tool sends no invitation."
     )
 
 
@@ -311,13 +314,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         attendees: Annotated[
-            list[Annotated[str, Field(pattern=_ENTRA_ID)]],
+            list[Annotated[str, Field(pattern=ENTRA_OBJECT_ID_PATTERN)]],
             Field(
                 description=(
                     "These are the Microsoft Entra object ids of the people to add as attendees, "
-                    + "one GUID for each entry. Copy each id from the `user_id` of get_me or of a "
-                    + "teams_list_chat_members member. Never build an id from a name or an email "
-                    + "address. Pass an empty list for a meeting with no attendee."
+                    + "one GUID for each entry. Copy each id from the `user_id` of get_me, of a "
+                    + "teams_list_chats member, or of a teams_list_chat_members row. Never build "
+                    + "an id from a name or an email address. Pass an empty list for a meeting "
+                    + "with no attendee."
                 ),
             ),
         ],

@@ -718,6 +718,17 @@ class TestHowItDeclaresItself:
         }
         assert all(15 <= length <= 60 for length in lengths.values()), lengths
 
+    async def test_the_attendees_name_every_tool_that_reports_an_id(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+        assert (
+            "Copy each id from the `user_id` of get_me, of a teams_list_chats member, or of a "
+            + "teams_list_chat_members row."
+        ) in " ".join(str(properties["attendees"]["description"]).split())
+
     async def test_an_attendee_by_email_address_never_reaches_graph(
         self, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:

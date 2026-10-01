@@ -261,7 +261,7 @@ run "preset_teams_meetings_write" {
   }
 
   assert {
-    condition     = length(local.tools) == 6
+    condition     = length(local.tools) == 7
     error_message = "teams-meetings-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 

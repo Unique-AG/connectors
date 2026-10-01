@@ -44,8 +44,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "subject": "Pricing review (moved)",
 }
 
-_ENTRA_ID = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-
 _AGREE = "change"
 _DECLINE = "do not change"
 _NOTHING_CHANGED = "No meeting was changed."
@@ -392,13 +390,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         attendees: Annotated[
-            list[Annotated[str, Field(pattern=_ENTRA_ID)]] | None,
+            list[Annotated[str, Field(pattern=identity.ENTRA_OBJECT_ID_PATTERN)]] | None,
             Field(
                 description=(
                     "The full new attendee list, as the Microsoft Entra object id of each person. "
                     + "This list replaces the current attendee list. Copy each id from the "
-                    + "`user_id` of get_me or of a teams_list_chat_members member. Never build an "
-                    + "id from a name or an email address. Omit it to keep the current attendees."
+                    + "`user_id` of get_me, of a teams_list_chats member, or of a "
+                    + "teams_list_chat_members row. Never build an id from a name or an email "
+                    + "address. Omit it to keep the current attendees."
                 ),
             ),
         ] = None,

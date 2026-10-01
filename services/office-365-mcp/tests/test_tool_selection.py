@@ -328,7 +328,10 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_create_meeting": {
         "attendees": ("get_me", "teams_list_chats", "teams_list_chat_members")
     },
-    "teams_update_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
+    "teams_update_meeting": {
+        "meeting_uri": ("teams_list_chats", "teams_create_meeting"),
+        "attendees": ("get_me", "teams_list_chats", "teams_list_chat_members"),
+    },
     "teams_delete_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
     "teams_create_chat": {"members": ("teams_list_chat_members", "teams_list_chats")},
     "teams_add_chat_member": {
@@ -782,7 +785,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "OnlineMeetings.ReadWrite",
         ),
         0,
-        6,
+        7,
     ),
     (
         ToolsPreset.TEAMS_CHAT_ADMIN,

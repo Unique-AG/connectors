@@ -483,9 +483,16 @@ class TestHowItDeclaresItself:
             _ = cast("reader.MeetingAttendance", await tool.fn(meeting_uri=uri, client=client))
 
         message = str(refused.value)
-        assert "teams_read_meeting takes teams:///meetings/{join_web_url}" in message
-        assert "Call teams_list_chats and use its `meeting_uri`." in message
-        assert "Retrying this value will fail identically." in message
+        assert (
+            "teams_read_meeting takes the `meeting_uri` handle from teams_list_chats or "
+            + "teams_create_meeting, and this value is not one."
+        ) in message
+        assert "A meeting handle looks like teams:///meetings/{join_web_url}." in message
+        assert "A `teams:///transcripts/...` handle belongs to teams_read_transcript." in message
+        assert "Copy the `meeting_uri` word for word." in message
+        assert (
+            "If you call this tool again with this value, the call will fail the same way."
+        ) in message
         assert not graph.calls
 
     async def test_the_description_names_its_siblings_and_the_organizer_rule(

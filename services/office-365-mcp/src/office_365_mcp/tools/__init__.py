@@ -295,6 +295,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
     ),
     "teams-meetings-write": (
         "teams_list_chats",
+        "teams_list_chat_members",
         "teams_read_meeting",
         "teams_create_meeting",
         "teams_update_meeting",

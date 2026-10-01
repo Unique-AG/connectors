@@ -49,9 +49,11 @@ same records.\
 """
 
 _NOT_A_MEETING_HANDLE = (
-    "teams_read_meeting takes teams:///meetings/{join_web_url} from teams_list_chats, not this. "
-    + "Call teams_list_chats and use its `meeting_uri`. A `teams:///transcripts/...` handle is "
-    + "teams_read_transcript's. Retrying this value will fail identically."
+    "teams_read_meeting takes the `meeting_uri` handle from teams_list_chats or "
+    + "teams_create_meeting, and this value is not one. A meeting handle looks like "
+    + "teams:///meetings/{join_web_url}. A `teams:///transcripts/...` handle belongs to "
+    + "teams_read_transcript. Copy the `meeting_uri` word for word. If you call this tool again "
+    + "with this value, the call will fail the same way."
 )
 
 
