@@ -32,7 +32,7 @@ from office_365_mcp.graph_client import (
     GraphNotFound,
     GraphUnavailable,
 )
-from office_365_mcp.shared.files import NAME_RULES, DriveItemSummary
+from office_365_mcp.shared.files import FOLDER_HANDLE_SOURCES, NAME_RULES, DriveItemSummary
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -288,6 +288,7 @@ class TestWhatItRefuses:
         ):
             assert tool in message
         assert "`root_uri` of a drive" in message
+        assert FOLDER_HANDLE_SOURCES in message
         assert "do not retry it" in message
 
     async def test_a_file_handle_is_refused_by_name(self, client: GraphServiceClient) -> None:
@@ -487,10 +488,42 @@ class TestThePersonBeforeTheCreate:
 
         _ = await _create(client, confirm=capturing)
 
-        assert asked == [
-            "Create the folder 'Q3' inside the folder 'Reports' in '/drive/root:/Finance Team'?"
-        ]
+        assert asked == ["Create the folder 'Q3' inside the folder '/Finance Team/Reports'?"]
         assert bound == [write_state_for(creator.TOOL_NAME, _DRIVE_ID, _PARENT_ID, _NAME)]
+
+    async def test_the_question_shows_no_part_of_the_graph_path_prefix(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _creates(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, confirm=capturing)
+
+        assert asked
+        assert "/drive/" not in asked[0]
+        assert "root:" not in asked[0]
+
+    async def test_the_question_names_a_parent_with_no_parent_path_by_its_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _parent_payload(path=None))
+        _ = _creates(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, confirm=capturing)
+
+        assert asked == ["Create the folder 'Q3' inside the folder 'Reports'?"]
 
     async def test_the_question_names_the_top_of_the_drive_for_a_drive_root(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -651,7 +684,7 @@ class TestTheEraWithNoBackChannel:
         params = request.params
         assert isinstance(params, ElicitRequestFormParams)
         assert "'Q3'" in params.message
-        assert "'Reports'" in params.message
+        assert "'/Finance Team/Reports'" in params.message
 
     async def test_the_second_round_creates_the_folder_the_answer_was_bound_to(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -773,6 +806,15 @@ class TestHowItDeclaresItself:
         ):
             assert tool in described
         assert "`root_uri` of a drive" in described
+        assert FOLDER_HANDLE_SOURCES in described
+
+    async def test_the_parent_argument_is_described_in_15_to_60_words(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        assert 15 <= len(cast("str", properties["parent"]["description"]).split()) <= 60
 
     async def test_the_name_description_states_the_name_rules(
         self, transport: httpx.AsyncClient

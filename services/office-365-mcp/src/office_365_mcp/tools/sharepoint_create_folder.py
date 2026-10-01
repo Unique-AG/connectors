@@ -1,6 +1,5 @@
 from collections.abc import Mapping
 from typing import Annotated
-from urllib.parse import unquote
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -22,10 +21,10 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
+    FOLDER_HANDLE_SOURCES,
     NAME_RULES,
-    TOP_FOLDER_LABEL,
-    UNNAMED_FOLDER_LABEL,
     DriveItemSummary,
+    folder_label,
     item_for_a_question,
     summary_after_write,
     unusable_name,
@@ -74,10 +73,9 @@ _NOT_A_FOLDER_HANDLE = (
     + "sharepoint:///folders/{drive_id}/{item_id}, with both ids percent-encoded, for example "
     + "sharepoint:///folders/b%21SYNTHETICDRIVE0000/01SYNTHETICFOLDER000. A file handle "
     + "(sharepoint:///files/...) is not a folder handle, because a file cannot hold a folder. A "
-    + "folder name, a path, a web address and a bare item id are not handles either. Take the "
-    + "`uri` of a folder from sharepoint_browse_folder, sharepoint_search_files or "
-    + "sharepoint_resolve_url, or the `root_uri` of a drive from sharepoint_list_drives. Copy it "
-    + "word for word. This same value fails again, so do not retry it."
+    + "folder name, a path, a web address and a bare item id are not handles either. "
+    + FOLDER_HANDLE_SOURCES
+    + " This same value fails again, so do not retry it."
 )
 
 _NOT_A_FOLDER = (
@@ -146,16 +144,7 @@ async def create_folder(
 
 
 def _question(name: str, parent: DriveItem) -> str:
-    return f"Create the folder {name!r} inside {_label(parent)}?"
-
-
-def _label(parent: DriveItem) -> str:
-    if parent.root is not None:
-        return TOP_FOLDER_LABEL
-    folder = f"the folder {parent.name!r}" if parent.name else UNNAMED_FOLDER_LABEL
-    reference = parent.parent_reference
-    path = reference.path if reference is not None else None
-    return folder if path is None else f"{folder} in {unquote(path)!r}"
+    return f"Create the folder {name!r} inside {folder_label(parent)}?"
 
 
 def a_person_agrees(ctx: Context) -> Confirm:
@@ -198,12 +187,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The folder that gets the new folder, as a folder handle: "
-                    + "sharepoint:///folders/{drive_id}/{item_id}. Take the `uri` of a folder "
-                    + "from sharepoint_browse_folder, sharepoint_search_files or "
-                    + "sharepoint_resolve_url, or the `root_uri` of a drive from "
-                    + "sharepoint_list_drives. Copy it word for word. A file handle, a path, a "
-                    + "folder name and a web address are not valid here."
+                    "The folder that gets the new folder. "
+                    + FOLDER_HANDLE_SOURCES
+                    + " A file handle, a path and a web address are not folder handles."
                 ),
             ),
         ],
