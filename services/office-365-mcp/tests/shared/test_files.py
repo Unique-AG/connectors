@@ -47,6 +47,7 @@ _RETIRED_LABELS = frozenset(
         "the top of the drive",
         "the top folder of a drive",
         "an item with no name",
+        "its folder",
     }
 )
 
@@ -463,4 +464,25 @@ class TestOnlyTheOwnerSpellsTheQuestionLabels:
         assert not found, (
             f"{source.name} spells a drive item label: {found}. Import the label from "
             + "shared/files.py."
+        )
+
+
+def _imports_unquote(source: pathlib.Path) -> bool:
+    return any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "urllib.parse"
+        and any(alias.name == "unquote" for alias in node.names)
+        for node in ast.walk(ast.parse(source.read_text()))
+    )
+
+
+class TestOnlyTheOwnerDecodesAGraphPath:
+    def test_the_owner_imports_unquote(self) -> None:
+        assert _imports_unquote(_OWNER)
+
+    @pytest.mark.parametrize("source", _SHAREPOINT_TOOLS, ids=_tool_id)
+    def test_no_sharepoint_tool_imports_unquote(self, source: pathlib.Path) -> None:
+        assert not _imports_unquote(source), (
+            f"{source.name} decodes a path with unquote. Use folder_label or "
+            + "parent_folder_label from shared/files.py."
         )
