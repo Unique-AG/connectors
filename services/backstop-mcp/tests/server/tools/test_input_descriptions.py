@@ -53,7 +53,9 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "delete_organization",
         "end_employment",
         "search_activities",
+        "get_last_activity_for_parties",
         "search_opportunities",
+        "search_organizations",
         "build_backstop_links",
         "parse_backstop_link",
     }
@@ -186,7 +188,15 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         "rejected",
     ),
     "search_activities": ("meeting_call", "party_id", "search_type"),
+    "get_last_activity_for_parties": ('"parties"', '"party_id"', '"search_type"', "unknown"),
     "search_opportunities": ("representative", "get_opportunities"),
+    "search_organizations": (
+        "definition_id",
+        "list_custom_fields",
+        "get_organization",
+        '"values"',
+        "custom_field_columns",
+    ),
     "build_backstop_links": (
         '"kind"',
         '"party_id"',

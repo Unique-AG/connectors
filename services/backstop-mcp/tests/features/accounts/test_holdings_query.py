@@ -977,10 +977,10 @@ class TestDocumentedWalk:
                     "1",
                     owner_id=_OWNER_ID,
                     product_id=_PRODUCT_ID,
-                    name="PSP NGUP",
+                    name="Tailspin NGUP",
                 ),
                 included=[
-                    _owner(_OWNER_ID, name="PSP Investments"),
+                    _owner(_OWNER_ID, name="Tailspin Investments"),
                     resource(
                         _PRODUCT_ID,
                         "products",
@@ -1016,10 +1016,10 @@ class TestDocumentedWalk:
                 _account(
                     "2",
                     owner_id=_OTHER_OWNER_ID,
-                    name="PSP Investments",
+                    name="Tailspin Investments",
                 ),
                 included=[
-                    _owner(_OWNER_ID, name="PSP Investments"),
+                    _owner(_OWNER_ID, name="Tailspin Investments"),
                     _owner(_OTHER_OWNER_ID, name="Someone Else"),
                 ],
             )
@@ -1044,7 +1044,7 @@ class TestDocumentedWalk:
                 ),
                 _account("other-closed", owner_id=_OTHER_OWNER_ID, closedDate="2019-01-01"),
                 included=[
-                    _owner(_OWNER_ID, name="PSP Investments"),
+                    _owner(_OWNER_ID, name="Tailspin Investments"),
                     _owner(_OTHER_OWNER_ID, name="Someone Else"),
                 ],
             )
@@ -1066,7 +1066,7 @@ class TestDocumentedWalk:
                 _account("1", owner_id="contact-1", name="Vehicle A"),
                 _account("2", owner_id=_OTHER_OWNER_ID, name="Not Theirs"),
                 included=[
-                    _owner("contact-1", name="PSP Investments", specific_id=_OWNER_ID),
+                    _owner("contact-1", name="Tailspin Investments", specific_id=_OWNER_ID),
                     _owner(_OTHER_OWNER_ID, name="Someone Else"),
                 ],
             )

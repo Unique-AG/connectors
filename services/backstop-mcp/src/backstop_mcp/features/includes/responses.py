@@ -394,30 +394,15 @@ class ActivityTagChipResponse(OmitNoneModel):
     name: _CleanStr = Field(default=None, description="Tag name as Backstop publishes it.")
 
 
-class ActivityAttendeeResponse(OmitNoneModel):
-    """A person listed on a meeting or call, side-loaded from `include=attendees`."""
-
-    model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
-
-    id: _CleanStr = Field(
-        default=None,
-        description=(
-            "Backstop people id. Pass it as party_id to get_person for the full record. "
-            "Omitted when the side-load has no id."
-        ),
-    )
-    name: _CleanStr = Field(default=None, description="Display name as Backstop stores it.")
-
-
-type ActivityInclude = Literal["activity_tags", "attendees"]
+type ActivityInclude = Literal["activity_tags"]
 
 
 class ActivityIncludesResponse(OmitNoneModel):
     """Related records side-loaded with an activity row, one field per include.
 
     Always requested on get_activity_history's meeting/call/note/document pages. `/activities`
-    rejects `include=attendees` (400), so this plan only asks for tags. Attendees stay empty
-    on history rows; emails do not support includes and are not projected through this model.
+    rejects `include=attendees` (400), so attendees are joined from
+    `/meeting-or-calls/{id}/attendees` instead of side-loaded here.
     """
 
     activity_tags: Annotated[
@@ -428,15 +413,5 @@ class ActivityIncludesResponse(OmitNoneModel):
         description=(
             "Tags on this activity, from include=activityTags. Omitted when that include was "
             "not asked for; [] when it was and the activity has no tags."
-        ),
-    )
-    attendees: Annotated[
-        list[ActivityAttendeeResponse] | None,
-        Include(relationship="attendees", resource_type="people"),
-    ] = Field(
-        default=None,
-        description=(
-            "People listed on a meeting or call. Omitted when that include was not asked for; "
-            "[] when it was. `/activities` cannot side-load attendees, so history rows are []."
         ),
     )

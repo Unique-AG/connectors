@@ -184,6 +184,9 @@ class TestFirstCallByTrustedPartyId:
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(200, json=_org_document())
         )
+        respx.get(f"{BASE_URL}/meeting-or-calls/76280387/attendees").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
         _activities_route("organizations", "o42", "meetings").mock(
             return_value=httpx.Response(
                 200,

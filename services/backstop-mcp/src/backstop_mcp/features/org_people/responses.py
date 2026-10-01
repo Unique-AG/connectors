@@ -6,6 +6,7 @@ from typing import ClassVar, Literal, Self
 from pydantic import ConfigDict, Field
 from pydantic.json_schema import SkipJsonSchema
 
+from backstop_mcp.features.collection_scan import ScanCoverageResponse, project_fields
 from backstop_mcp.features.custom_fields import (
     RegularCustomFieldValues,
     ResolvedCustomFieldValueResponse,
@@ -28,9 +29,12 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.models import OmitNoneModel
 
 __all__ = [
+    "MatchedCustomFieldResponse",
     "OrgPeopleResolvedResponse",
     "OrganizationRecordResponse",
     "OrganizationResolvedResponse",
+    "SearchOrganizationRowResponse",
+    "SearchOrganizationsResolvedResponse",
     "PartyOrgPeopleResponse",
     "PartyOrganizationResponse",
     "PartyPersonResponse",
@@ -531,3 +535,133 @@ class OrgPeopleResolvedResponse(OmitNoneModel):
             people_omitted=people_omitted,
             include_former_hint=hint,
         )
+
+
+class MatchedCustomFieldResponse(OmitNoneModel):
+    """One custom-field value that satisfied a `search_organizations` predicate."""
+
+    definition_id: str = Field(
+        description=(
+            "Backstop custom-field definition id this value belongs to. The same id "
+            "list_custom_fields returns. Match on this, not on `name`: two definitions "
+            "can share a label."
+        )
+    )
+    name: str | None = Field(
+        default=None,
+        description="Field label as stored on the organization. Not unique.",
+    )
+    value: str = Field(
+        description=(
+            "The stored text that matched the predicate, compared case-insensitively. "
+            "A list value is the element that matched, not the whole list."
+        )
+    )
+
+
+class OrganizationCustomFieldColumnResponse(OmitNoneModel):
+    """One custom-field value published because `custom_field_columns` asked for it."""
+
+    definition_id: str = Field(
+        description=(
+            "Custom-field definition id from `custom_field_columns`. Group on this, not on "
+            "`name`: two definitions can share a label."
+        )
+    )
+    name: str | None = Field(
+        default=None,
+        description="Field label as stored on the organization. Not unique.",
+    )
+    value: str = Field(
+        description=(
+            "The stored value as text. A multi-select value is its elements joined with '; '."
+        )
+    )
+
+
+class SearchOrganizationRowResponse(OmitNoneModel):
+    """One organization from a firm-wide search, limited to the fields the caller asked for."""
+
+    id: str = Field(
+        description=(
+            "Backstop organization id. Always present. Pass it to get_organization as "
+            "`party_id` with `search_type` `organizations`. Never invent one."
+        )
+    )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "CRM link for this organization. Omitted unless `fields` includes `url`. "
+            "Absent when this deployment has no UI origin."
+        ),
+    )
+    name: str | None = Field(default=None, description="Organization name.")
+    legal_name: str | None = Field(default=None, description="Legal name, when Backstop has one.")
+    email: str | None = Field(default=None, description="Primary email. Not email2 or email3.")
+    city: str | None = Field(default=None, description="City on the organization record.")
+    country: str | None = Field(default=None, description="Country on the organization record.")
+    state: str | None = Field(
+        default=None, description="State or region on the organization record."
+    )
+    website: str | None = Field(default=None, description="Website on the organization record.")
+    other_id: str | None = Field(
+        default=None, description="Backstop `otherId`, when the organization has one."
+    )
+    matching_domains: tuple[str, ...] | None = Field(
+        default=None,
+        description="Email domains Backstop matches to this organization.",
+    )
+    ria: bool | None = Field(
+        default=None, description="True when Backstop marks the organization as an RIA."
+    )
+    internal_organization: bool | None = Field(
+        default=None, description="True when Backstop marks this as an internal organization."
+    )
+    custom_field_values: tuple[MatchedCustomFieldResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Custom-field values that matched this call's `custom_fields` predicates. "
+            "Present only when `custom_fields` was set. For other fields to group or "
+            "label rows by, pass their ids as `custom_field_columns`."
+        ),
+    )
+    custom_field_columns: tuple[OrganizationCustomFieldColumnResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Values of the definitions named in `custom_field_columns`, in that order. A "
+            "requested definition missing here has no value on this organization — group "
+            "it as blank, do not look it up again."
+        ),
+    )
+
+    def project(self, *, fields: frozenset[str], url: str | None) -> Self:
+        overrides: dict[str, object] = {"url": url} if "url" in fields else {}
+        return project_fields(self, fields=fields, into=type(self), overrides=overrides)
+
+
+class SearchOrganizationsResolvedResponse(OmitNoneModel):
+    """A completed firm-wide organization search: matching rows plus how much was read."""
+
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description=(
+            "Always 'resolved': the walk ran. An empty `rows` list means nothing matched "
+            "the filters, not that the collection is empty."
+        ),
+    )
+    coverage: ScanCoverageResponse = Field(
+        description=(
+            "How much of the Backstop result was read. `visible_count` is Backstop's total "
+            "for the server-side filters, before city, legal name, website, RIA, internal "
+            "organization, and custom-field predicates. A custom-field-only call therefore "
+            "reports the whole collection here."
+        )
+    )
+    rows: tuple[SearchOrganizationRowResponse, ...] = Field(
+        default=(),
+        description=(
+            "Organizations matching every filter, capped at `max_rows`. `id` is always "
+            "present so the next call is get_organization. Default fields are id, name, "
+            "legal_name, email, city, and country."
+        ),
+    )

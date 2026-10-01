@@ -13,10 +13,7 @@ from backstop_mcp.features.activity_history import (
     SearchActivitiesResolvedResponse,
     SearchActivitiesUnavailableResponse,
 )
-from backstop_mcp.features.activity_history.tools.search_activities import (
-    _date_window,  # pyright: ignore[reportPrivateUsage]
-    search_activities,
-)
+from backstop_mcp.features.activity_history.tools.search_activities import search_activities
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.features.activity_history.conftest import make_search_activities_query
@@ -99,9 +96,15 @@ class TestSearchActivities:
         assert route.call_count == 1
         envelope = object_dict(recorded_json_bodies(route)[0]["data"])
         attributes = object_dict(envelope["attributes"])
-        filters = object_dict(attributes["filters"])
-        assert filters["associatedWiths"] == [f"PartyBean_{_PARTY_ID}"]
-        assert filters["activityTags"] == ["474963", "455289"]
+        filters = object_dict(attributes["newFilters"])
+        assert "filters" not in attributes
+        assert attributes["entityId"] == int(_PARTY_ID)
+        assert attributes["resourceType"] == "people"
+        tag_filter = object_dict(object_list(filters["activityTags"])[0])
+        assert [object_dict(item)["value"] for item in object_list(tag_filter["searchValues"])] == [
+            "474963",
+            "455289",
+        ]
         effective = object_dict(filters["effectiveDate"])
         assert effective["startTimestamp"] == "2024-01-01T00:00:00"
         assert effective["endTimestamp"] == "2026-08-20T23:59:59"
@@ -241,7 +244,7 @@ class TestSearchActivities:
     async def test_a_reverified_401_names_the_documented_fallback(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Credential still works; the undocumented search refused us — same as a 404."""
+        """Credential still works; the activity search refused us — same as a 404."""
 
         async def instant_sleep(_delay: float) -> None:
             return None
@@ -426,22 +429,6 @@ class TestSearchActivities:
         assert "<p>" not in str(row.get("description", ""))
         assert "dispersion" in str(row.get("description", ""))
 
-    def test_omitted_start_date_is_one_year_before_end_date(self) -> None:
-        since, until = _date_window(None, date(2024, 12, 31), today=date(2026, 8, 21))
-        assert (since, until) == (date(2023, 12, 31), date(2024, 12, 31))
-
-    def test_leap_day_minus_one_year_lands_on_february_28(self) -> None:
-        since, until = _date_window(None, date(2024, 2, 29), today=date(2026, 8, 21))
-        assert (since, until) == (date(2023, 2, 28), date(2024, 2, 29))
-
-    def test_omitted_end_date_is_today(self) -> None:
-        since, until = _date_window(date(2025, 8, 21), None, today=date(2026, 8, 21))
-        assert (since, until) == (date(2025, 8, 21), date(2026, 8, 21))
-
-    def test_both_dates_omitted_are_the_year_ending_today(self) -> None:
-        since, until = _date_window(None, None, today=date(2026, 8, 21))
-        assert (since, until) == (date(2025, 8, 21), date(2026, 8, 21))
-
     @pytest.mark.asyncio
     @respx.mock
     async def test_end_date_without_start_date_still_searches(self, client: BackstopClient) -> None:
@@ -456,7 +443,7 @@ class TestSearchActivities:
         )
 
         filters = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
-        effective = object_dict(object_dict(filters["filters"])["effectiveDate"])
+        effective = object_dict(object_dict(filters["newFilters"])["effectiveDate"])
         assert effective["startTimestamp"] == "2023-12-31T00:00:00"
         assert effective["endTimestamp"] == "2024-12-31T23:59:59"
 

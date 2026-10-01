@@ -46,7 +46,7 @@ class TestCapitalFlowsAttribution:
                 _subscription(),
                 included=[
                     {
-                        **resource("a1", "accounts", name="Koch acct"),
+                        **resource("a1", "accounts", name="Litware acct"),
                         "relationships": None,
                     },
                 ],
@@ -63,4 +63,4 @@ class TestCapitalFlowsAttribution:
         assert result.unattributed_count == 0
         assert result.flows[0].account is not None
         assert result.flows[0].account.id == "a1"
-        assert result.flows[0].account.name == "Koch acct"
+        assert result.flows[0].account.name == "Litware acct"

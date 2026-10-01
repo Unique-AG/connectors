@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from typing import cast
 
@@ -10,6 +11,7 @@ from backstop_mcp.features.activity_history import (
     EntityActivityType,
     SearchActivitiesQuery,
 )
+from backstop_mcp.features.entity_types import SearchType
 from tests.features.activity_history.conftest import make_search_activities_query
 from tests.helpers import BASE_URL, recorded_json_bodies
 from tests.server.tools.helpers import object_dict
@@ -72,6 +74,7 @@ def _request_body(
     end_date: date,
     types: tuple[EntityActivityType, ...] = (),
     party_id: str | None = None,
+    resource_type: SearchType | None = None,
     activity_tags: tuple[str, ...] = (),
     authors: tuple[str, ...] = (),
     include_description: bool = False,
@@ -84,6 +87,7 @@ def _request_body(
         end_date=end_date,
         types=types,
         party_id=party_id,
+        resource_type=resource_type,
         activity_tags=activity_tags,
         authors=authors,
         include_description=include_description,
@@ -99,6 +103,7 @@ class TestEntityActivitiesRequestBody:
             end_date=date(2026, 8, 20),
             types=("meeting_call", "email"),
             party_id="354566359",
+            resource_type="organizations",
             activity_tags=("474963", "455289"),
             authors=("achandrinou@deepcapitalgroup.com",),
             include_description=False,
@@ -111,16 +116,22 @@ class TestEntityActivitiesRequestBody:
         assert "shouldIncludeDescription" not in attributes
         assert attributes["includeFields"] == ["associatedWith"]
         assert attributes["sorts"] == [{"columnName": "effectiveDate", "ascending": False}]
-        filters = object_dict(attributes["filters"])
-        assert filters["effectiveDate"] == {
+        assert attributes["entityId"] == 354566359
+        assert attributes["resourceType"] == "organizations"
+        assert "filters" not in attributes
+        new_filters = object_dict(attributes["newFilters"])
+        assert new_filters["effectiveDate"] == {
             "startTimestamp": "2025-08-20T00:00:00",
             "endTimestamp": "2026-08-20T23:59:59",
         }
-        assert filters["types"] == ["meeting_call", "email"]
-        assert filters["associatedWiths"] == ["PartyBean_354566359"]
-        assert filters["activityTags"] == ["474963", "455289"]
-        assert filters["authors"] == [
-            {"searchValue": "achandrinou@deepcapitalgroup.com", "isEmail": True}
+        assert new_filters["types"] == [
+            {"searchValues": [{"value": "call"}, {"value": "email"}]}
+        ]
+        assert new_filters["activityTags"] == [
+            {"searchValues": [{"value": "474963"}, {"value": "455289"}]}
+        ]
+        assert new_filters["authors"] == [
+            {"searchValues": [{"value": "achandrinou@deepcapitalgroup.com", "isEmail": True}]}
         ]
 
     def test_description_flag_is_opt_in(self) -> None:
@@ -331,3 +342,184 @@ class TestFetchEntityActivities:
             )
 
         assert raised.value.status_code == 404
+
+
+def _party_row(
+    row_id: int,
+    *,
+    effective_date: str,
+    party_id: str | None,
+    activity_type: str = "Meeting",
+    attendees: list[dict[str, str]] | None = None,
+) -> dict[str, object]:
+    row: dict[str, object] = {
+        "id": row_id,
+        "type": activity_type,
+        "effectiveDate": effective_date,
+        "attendees": attendees or [],
+    }
+    if party_id is not None:
+        row["associatedWith"] = [{"resourceType": "organizations", "resourceId": party_id}]
+        row["primaryEntity"] = {"resourceType": "organizations", "resourceId": party_id}
+    else:
+        row["associatedWith"] = [{"resourceType": "people", "resourceId": "357918383"}]
+        row["inheritedFrom"] = [{"name": "Kent Voss"}]
+    return row
+
+
+class TestIgnoredEntityActivityFilters:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_out_of_window_rows_are_dropped_and_flagged(
+        self,
+        client: BackstopClient,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        respx.post(_URL).mock(
+            return_value=_page(
+                _party_row(1, effective_date="10/2/2026", party_id=None),
+                _party_row(2, effective_date="9/22/2026", party_id=None),
+                total=2,
+            )
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = await make_search_activities_query(client).run(
+                start_date=date(2026, 6, 1),
+                end_date=date(2026, 9, 30),
+            )
+
+        assert [row.id for row in result.rows] == ["2"]
+        assert result.server_filter_ignored == ("effective_date",)
+        ignored_logs = [
+            record
+            for record in caplog.records
+            if record.message == "activity_history.entity_activities.filter_ignored"
+        ]
+        assert len(ignored_logs) == 1
+        assert ignored_logs[0].__dict__["filter"] == "effective_date"
+        assert ignored_logs[0].__dict__["endpoint"] == "entity-activities"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_party_page_with_a_partial_miss_does_not_fire(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """One row names the party and one does not.
+
+        Trimmed from an entity-activities page on a client-obtained tenant.
+        """
+        route = respx.post(_URL).mock(
+            return_value=_page(
+                _party_row(
+                    1,
+                    effective_date="9/22/2026",
+                    party_id="341764767",
+                    attendees=[{"name": "Jane Doe"}, {"name": "Sam Roe"}],
+                ),
+                _party_row(
+                    2, effective_date="8/24/2026", party_id=None, activity_type="Email Blast"
+                ),
+                total=21,
+            )
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = await make_search_activities_query(client).run(
+                start_date=date(2026, 6, 1),
+                end_date=date(2026, 9, 30),
+                party_id="341764767",
+                resource_type="organizations",
+            )
+
+        body = _body_attributes(recorded_json_bodies(route)[0])
+        assert body["entityId"] == 341764767
+        assert body["resourceType"] == "organizations"
+        assert "filters" not in body
+        assert [row.id for row in result.rows] == ["1", "2"]
+        assert result.rows[0].attendees == ("Jane Doe", "Sam Roe")
+        assert result.server_filter_ignored == ()
+        assert not any(
+            record.message == "activity_history.entity_activities.filter_ignored"
+            for record in caplog.records
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_party_page_where_no_row_names_the_party_is_dropped_and_flagged(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.post(_URL).mock(
+            return_value=_page(
+                _party_row(1, effective_date="9/22/2026", party_id=None),
+                _party_row(2, effective_date="9/21/2026", party_id=None),
+                total=900,
+            )
+        )
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            party_id="341764767",
+            resource_type="organizations",
+        )
+
+        assert result.rows == ()
+        assert result.server_filter_ignored == ("party",)
+        assert route.call_count == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_row_of_an_unrequested_type_is_dropped_and_flagged(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(
+            return_value=_page(
+                _party_row(1, effective_date="9/22/2026", party_id=None, activity_type="Note"),
+                _party_row(2, effective_date="9/22/2026", party_id=None, activity_type="Meeting"),
+                total=2,
+            )
+        )
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            types=("note",),
+        )
+
+        assert [row.id for row in result.rows] == ["1"]
+        assert result.server_filter_ignored == ("types",)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_row_without_a_requested_tag_is_dropped_and_flagged(
+        self, client: BackstopClient
+    ) -> None:
+        tagged = _meeting(1)
+        untagged: dict[str, object] = {**_meeting(2), "activityTags": []}
+        respx.post(_URL).mock(return_value=_page(tagged, untagged, total=2))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            activity_tags=("474963",),
+        )
+
+        assert [row.id for row in result.rows] == ["1"]
+        assert result.server_filter_ignored == ("activity_tags",)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_scoped_search_saturating_the_total_is_flagged(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(return_value=_page(_meeting(1), total=10_000))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            activity_tags=("474963",),
+        )
+
+        assert [row.id for row in result.rows] == ["1"]
+        assert result.server_filter_ignored == ("total_count",)

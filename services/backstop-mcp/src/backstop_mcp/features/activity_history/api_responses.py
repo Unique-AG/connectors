@@ -16,6 +16,7 @@ __all__ = [
     "EntityActivityAssociatedWithAttributes",
     "EntityActivityAttributes",
     "EntityActivityNamedAttributes",
+    "EntityActivityPartyRefAttributes",
     "EntityActivityTagAttributes",
     "MeetingSpecificAttributes",
     "SpecificResourceAttributes",
@@ -44,6 +45,10 @@ def _dict_rows(value: object) -> tuple[dict[str, object], ...]:
         typed = {str(key): inner for key, inner in cast("dict[object, object]", item).items()}
         rows.append(typed)
     return tuple(rows)
+
+
+def _dict_or_none(value: object) -> object:
+    return cast("dict[object, object]", value) if isinstance(value, dict) else None
 
 
 WireId = Annotated[str | None, BeforeValidator(_wire_id)]
@@ -131,6 +136,8 @@ class AttendeeAttributes(BaseModel):
     name: str | None = None
     first_name: str | None = Field(default=None, validation_alias="firstName")
     last_name: str | None = Field(default=None, validation_alias="lastName")
+    company_name: str | None = Field(default=None, validation_alias="companyName")
+    job_title: str | None = Field(default=None, validation_alias="jobTitle")
 
     def display_name(self) -> str | None:
         if self.name:
@@ -161,6 +168,21 @@ class EntityActivityAssociatedWithAttributes(BaseModel):
     resource_id: WireId = Field(default=None, alias="resourceId")
     resource_type: str | None = Field(default=None, alias="resourceType")
     resource_link: str | None = Field(default=None, alias="resourceLink")
+
+
+class EntityActivityPartyRefAttributes(BaseModel):
+    """`inheritedFrom[]` / `primaryEntity` on a search row: only the id is read.
+
+    Read only to check a party search; a junk entry is dropped rather than failing the row.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    resource_id: WireId = Field(default=None, alias="resourceId")
+
+
+_PartyRefs = Annotated[tuple[EntityActivityPartyRefAttributes, ...], BeforeValidator(_dict_rows)]
+_PartyRef = Annotated[EntityActivityPartyRefAttributes | None, BeforeValidator(_dict_or_none)]
 
 
 class EntityActivityAddressAttributes(BaseModel):
@@ -200,6 +222,8 @@ class EntityActivityAttributes(BaseModel):
     associated_with: tuple[EntityActivityAssociatedWithAttributes, ...] = Field(
         default=(), alias="associatedWith"
     )
+    inherited_from: _PartyRefs = Field(default=(), alias="inheritedFrom")
+    primary_entity: _PartyRef = Field(default=None, alias="primaryEntity")
     from_address: EntityActivityAddressAttributes | None = Field(default=None, alias="fromAddress")
     to_addresses: tuple[EntityActivityAddressAttributes, ...] = Field(
         default=(), alias="toAddresses"

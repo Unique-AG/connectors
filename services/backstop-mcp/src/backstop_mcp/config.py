@@ -210,8 +210,9 @@ class BackstopConfig(BaseSettings):
     # a host from the shared `api.backstopsolutions.com` API. See `effective_ui_base_url`.
     ui_base_url: HttpUrlStr | None = None
 
-    # httpx's undocumented default is ~5s; ordinary CRUD calls get a saner explicit timeout.
-    default_timeout_seconds: float = Field(default=30.0, gt=0)
+    # httpx's undocumented default is ~5s. Ordinary CRUD calls use the same 2-minute
+    # budget as /reports and analytics.
+    default_timeout_seconds: float = Field(default=120.0, gt=0)
     # /reports and /{entity}/{id}/analytics can legitimately take up to ~30s per 500 records.
     reports_timeout_seconds: float = Field(default=120.0, gt=0)
 

@@ -339,7 +339,6 @@ class TestTheIncludesModelsAreTheAllowlist:
             for name, include in _includes(ActivityIncludesResponse).items()
         } == {
             "activity_tags": ("activityTags", "activity-tags"),
-            "attendees": ("attendees", "people"),
         }
 
     def test_every_organization_field_asks_backstop_for_one_named_relationship(self) -> None:

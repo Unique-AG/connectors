@@ -97,7 +97,7 @@ class TestGetAccountsForProductQuery:
                     name="Open",
                 ),
                 included=[
-                    _owner(_OWNER_ID, name="PSP Investments"),
+                    _owner(_OWNER_ID, name="Tailspin Investments"),
                     resource("10", "investor-types", name="Fund of Funds"),
                 ],
             )
@@ -117,6 +117,7 @@ class TestGetAccountsForProductQuery:
         assert listing.accounts[0].investor_type is not None
         assert listing.accounts[0].investor_type.name == "Fund of Funds"
         assert listing.product.id == _PRODUCT_ID
+        assert listing.product.short_name == "NGUP"
 
     @pytest.mark.asyncio
     @respx.mock

@@ -42,6 +42,7 @@ from backstop_mcp.features.activity_history.internal_dto import (
     EntityActivitiesFetchDto,
     EntityActivityDto,
     MeetingSpecificsDto,
+    PartyLastActivityDto,
 )
 from backstop_mcp.features.collection_scan import (
     AggregateBucketDto,
@@ -63,6 +64,12 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
 
+FILTER_IGNORED_DISCLAIMER = (
+    "Backstop paged over a different set than the filters asked for, so the kept rows "
+    "are not the full answer. Coverage is unreliable. Do not treat these rows, or an "
+    "empty list, as complete."
+)
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -78,7 +85,11 @@ __all__ = [
     "DateRangeResponse",
     "EmailRecordResponse",
     "GetActivityHistoryResponse",
+    "GetLastActivityForPartiesResponse",
     "GetSearchActivitiesResponse",
+    "LastActivityForPartiesResolvedResponse",
+    "LastActivityResponse",
+    "PartyLastActivityResponse",
     "ResolvedPartyAsOfResponse",
     "SearchActivitiesResolvedResponse",
     "SearchActivitiesRowResponse",
@@ -286,11 +297,22 @@ class AttendeeResponse(OmitNoneModel):
     id: str | None = Field(
         default=None,
         description=(
-            "Backstop people id when side-loaded on the timeline. Pass it as party_id to "
-            "get_person. Omitted on get_activity_detail, which does not receive people ids."
+            "Backstop people id. Pass it as party_id with search_type people to get_person. "
+            "Present on get_activity_detail and on get_activity_history meeting and call rows."
         ),
     )
     name: str | None = Field(default=None, description="Display name of the attendee.")
+    company: str | None = Field(
+        default=None,
+        description=(
+            "The attendee's firm; separate our own staff from investor attendees by comparing "
+            "it to our firm's name."
+        ),
+    )
+    job_title: str | None = Field(
+        default=None,
+        description="Job title as Backstop stores it on the attendee.",
+    )
 
 
 class ActivityAttachmentResponse(OmitNoneModel):
@@ -381,11 +403,12 @@ class ActivityRecordResponse(OmitNoneModel):
             "into activity_tag_ids; never invent one. Look up names with list_activity_tags."
         ),
     )
-    attendees: tuple[AttendeeResponse, ...] = Field(
-        default=(),
+    attendees: tuple[AttendeeResponse, ...] | None = Field(
+        default=None,
         description=(
-            "People listed on a meeting or call. Empty for a note or document, and when a "
-            "meeting has no attendees."
+            "Structured attendees on a meeting or call. Absent when this row is not a "
+            "meeting or call, or when the attendee lookup failed. Empty when the record "
+            "has no attendees. Never take attendee names from the title, gist, or description."
         ),
     )
 
@@ -397,7 +420,7 @@ class ActivityRecordResponse(OmitNoneModel):
         attributes: ActivityAttributes,
         *,
         tags: tuple[ActivityTagChipResponse, ...],
-        attendees: tuple[AttendeeResponse, ...],
+        attendees: tuple[AttendeeResponse, ...] | None,
         gist_max_chars: int,
         url: str | None,
     ) -> Self:
@@ -680,7 +703,15 @@ class ActivityDetailResponse(OmitNoneModel):
             stop=None if specifics is None else specifics.stop,
             location=None if specifics is None else specifics.location,
             time_zone=None if specifics is None else specifics.time_zone,
-            attendees=[AttendeeResponse(name=attendee.name) for attendee in attendees],
+            attendees=[
+                AttendeeResponse(
+                    id=attendee.id,
+                    name=attendee.name,
+                    company=attendee.company_name,
+                    job_title=attendee.job_title,
+                )
+                for attendee in attendees
+            ],
             attachments=tuple(
                 ActivityAttachmentResponse(id=item.id, name=item.name)
                 for item in detail.attachments
@@ -690,7 +721,7 @@ class ActivityDetailResponse(OmitNoneModel):
 
 
 class SearchActivitiesUnavailableResponse(OmitNoneModel):
-    """The undocumented search endpoint did not answer. Not 'there is no activity'."""
+    """POST /entity-activities did not answer. Not 'there is no activity'."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
@@ -698,7 +729,7 @@ class SearchActivitiesUnavailableResponse(OmitNoneModel):
         default="unavailable",
         description=(
             "Always 'unavailable': POST /entity-activities failed. This is not an empty "
-            "result — the primary path is undocumented and may 404 on another tenant."
+            "result — the search may 404 or refuse the credential on another tenant."
         ),
     )
     fallback_tool: Literal["get_activity_history"] = Field(
@@ -809,7 +840,7 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         default=None,
         description=(
             "How many files are attached. A count only — pass `activity_id` to "
-            "`get_activity_detail` for the file list."
+            "`get_activity_detail` for the names. Do not assume what the files are."
         ),
     )
     author: AttendeeResponse | None = Field(
@@ -817,7 +848,10 @@ class SearchActivitiesRowResponse(OmitNoneModel):
     )
     attendees: tuple[str, ...] | None = Field(
         default=None,
-        description="Attendee display names on a meeting or call. No people ids on this path.",
+        description=(
+            "Full display names from the structured Attendees field. Use these for attendee "
+            "columns in a table — not names read out of the title, gist, or description."
+        ),
     )
     tags: tuple[ActivityTagChipResponse, ...] | None = Field(
         default=None,
@@ -901,6 +935,14 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
         default=(),
         description="Count buckets in aggregate mode. Empty in rows mode.",
     )
+    server_filter_ignored: tuple[str, ...] | None = Field(
+        default=None,
+        description=(
+            "Filters Backstop accepted and then did not apply: effective_date, types, "
+            "activity_tags, party, or total_count (the 10000 ceiling on a scoped search). "
+            f"{FILTER_IGNORED_DISCLAIMER}"
+        ),
+    )
 
     @classmethod
     def from_fetch(
@@ -916,6 +958,8 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
         description_row_capped: bool = False,
     ) -> Self:
         extra = (_DESCRIPTION_ROW_CAP_DISCLAIMER,) if description_row_capped else ()
+        if any(name != "total_count" for name in fetch.server_filter_ignored):
+            extra = (*extra, FILTER_IGNORED_DISCLAIMER)
         coverage = scan_coverage(
             rows_scanned=fetch.rows_received,
             visible_count=fetch.total_count,
@@ -938,6 +982,7 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
             coverage=coverage,
             rows=rows,
             aggregates=tuple(AggregateBucketResponse.from_dto(bucket) for bucket in aggregates),
+            server_filter_ignored=fetch.server_filter_ignored or None,
         )
 
 
@@ -946,4 +991,132 @@ type GetSearchActivitiesResponse = (
     | NotFoundResponse
     | SearchActivitiesUnavailableResponse
     | SearchActivitiesResolvedResponse
+)
+
+
+class LastActivityResponse(OmitNoneModel):
+    """The newest activity found for one party in the window."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str = Field(
+        description="Pass to get_activity_detail as `activity_id` for the body. Never invent one."
+    )
+    type: str | None = Field(
+        default=None, description="Activity type as Backstop labels it (meeting, call, note, ...)."
+    )
+    title: str | None = Field(default=None, description="Activity title.")
+    effective_date: date | None = Field(
+        default=None, description="Day the activity is dated. Bucket parties on this."
+    )
+
+
+class PartyLastActivityResponse(OmitNoneModel):
+    """One party's newest activity in the window, or why it cannot be told."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    party_id: str = Field(description="The `party_id` that was passed. Join back on this.")
+    search_type: SearchType = Field(description="The `search_type` that was passed.")
+    status: Literal["found", "none_in_window", "unknown"] = Field(
+        description=(
+            "`found`: `last_activity` is the newest activity in the window. `none_in_window`: "
+            "Backstop searched this party and returned nothing in the window — a definite "
+            "'no activity'. `unknown`: the search failed or Backstop ignored a filter; never "
+            "report an `unknown` party as inactive. Retry it or say it could not be checked."
+        )
+    )
+    last_activity: LastActivityResponse | None = Field(
+        default=None, description="Present when `status` is `found`."
+    )
+    days_since_last_activity: int | None = Field(
+        default=None,
+        description="Days from `last_activity.effective_date` to the window's `end_date`.",
+    )
+    activity_count: int | None = Field(
+        default=None,
+        description=(
+            "Activities of the requested types in the window that this credential can see. "
+            "Absent when `status` is `unknown`."
+        ),
+    )
+    reason: str | None = Field(
+        default=None, description="Why `status` is `unknown`: the error or the ignored filter."
+    )
+
+    @classmethod
+    def from_dto(cls, dto: PartyLastActivityDto, *, end_date: date) -> Self:
+        fetch = dto.fetch
+        if fetch is None:
+            return cls(
+                party_id=dto.party_id,
+                search_type=dto.search_type,
+                status="unknown",
+                reason=dto.error,
+            )
+        if fetch.server_filter_ignored:
+            return cls(
+                party_id=dto.party_id,
+                search_type=dto.search_type,
+                status="unknown",
+                reason=(
+                    "Backstop ignored these filters: "
+                    + ", ".join(fetch.server_filter_ignored)
+                    + ". The result is not scoped to this party and window."
+                ),
+            )
+        if not fetch.rows:
+            if fetch.partial_due_to_error or fetch.rows_dropped:
+                return cls(
+                    party_id=dto.party_id,
+                    search_type=dto.search_type,
+                    status="unknown",
+                    reason="Backstop returned rows that could not be read.",
+                )
+            return cls(
+                party_id=dto.party_id,
+                search_type=dto.search_type,
+                status="none_in_window",
+                activity_count=0,
+            )
+        row = fetch.rows[0]
+        return cls(
+            party_id=dto.party_id,
+            search_type=dto.search_type,
+            status="found",
+            last_activity=LastActivityResponse(
+                id=row.id, type=row.type, title=row.title, effective_date=row.effective_date
+            ),
+            days_since_last_activity=(
+                None if row.effective_date is None else (end_date - row.effective_date).days
+            ),
+            activity_count=fetch.total_count,
+        )
+
+
+class LastActivityForPartiesResolvedResponse(OmitNoneModel):
+    """Each requested party's newest activity in one window."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description="Always 'resolved': every party was searched. Read each party's `status`.",
+    )
+    start_date: date = Field(description="Inclusive start of the window searched.")
+    end_date: date = Field(description="Inclusive end of the window searched.")
+    types: tuple[str, ...] = Field(description="Activity types that counted as activity.")
+    parties: tuple[PartyLastActivityResponse, ...] = Field(
+        description="One entry per distinct party passed, in the order passed."
+    )
+    unknown_count: int = Field(
+        description=(
+            "Parties whose `status` is `unknown`. When non-zero, say those could not be "
+            "checked — do not fold them into the inactive list."
+        )
+    )
+
+
+type GetLastActivityForPartiesResponse = (
+    SearchActivitiesUnavailableResponse | LastActivityForPartiesResolvedResponse
 )

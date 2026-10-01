@@ -168,3 +168,17 @@ networkPolicy:
       namespace: system
     ephemeralPorts:
       enabled: false
+
+# Alert when Backstop ignores a filter we sent (search_activities row check).
+prometheus:
+  additionalAlerts:
+    BackstopFilterIgnored:
+      alert: BackstopFilterIgnored
+      annotations:
+        summary: "Backstop ignored a filter the connector sent"
+        description: "backstop_filter_ignored_total increased. A scoped activity search may be paging the wrong set. Increase over 15m: {{ $value }}."
+      expr: increase(backstop_filter_ignored_total[15m]) > 0
+      for: 1m
+      labels:
+        severity: warning
+        alertGroup: backstop-mcp

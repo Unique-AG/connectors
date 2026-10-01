@@ -84,6 +84,15 @@ BACKSTOP_CONCURRENCY_WAIT = _meter.create_histogram(
     unit="s",
     description="Time spent waiting on the per-user concurrency gate before a request ran.",
 )
+# Alert when Backstop starts ignoring a search filter it accepted, and the evidence to take to
+# Backstop support when it does (which endpoint, which filter, how often).
+BACKSTOP_FILTER_IGNORED = _meter.create_counter(
+    "backstop_filter_ignored_total",
+    description=(
+        "Search responses whose rows show Backstop ignored a filter it accepted. "
+        "Labels: endpoint, filter."
+    ),
+)
 CUSTOM_FIELD_SCHEMA_LOADS = _meter.create_counter(
     "custom_field_schema_loads_total",
     description="Custom-field schema loads, by source (backstop refresh, stale reuse).",
