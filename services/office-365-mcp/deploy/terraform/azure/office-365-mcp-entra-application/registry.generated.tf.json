@@ -752,7 +752,9 @@
         "Notes.Create",
         "Notes.ReadWrite",
         "ChannelMessage.ReadWrite",
+        "Chat.Create",
         "Chat.ReadWrite",
+        "ChatMember.ReadWrite",
         "OnlineMeetingArtifact.Read.All",
         "OnlineMeetings.ReadWrite"
       ],
@@ -769,6 +771,8 @@
         "OnlineMeetingRecording.Read.All": true,
         "ChannelMessage.ReadWrite": true,
         "Chat.ReadWrite": false,
+        "Chat.Create": false,
+        "ChatMember.ReadWrite": true,
         "OnlineMeetings.ReadWrite": false,
         "OnlineMeetingArtifact.Read.All": false,
         "Mail.Read": false,

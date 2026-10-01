@@ -24,6 +24,8 @@ mock_provider "azuread" {
         "OnlineMeetingRecording.Read.All"  = "88888888-8888-8888-8888-888888888888"
         "ChannelMessage.ReadWrite"         = "e3333333-3333-3333-3333-333333333333"
         "Chat.ReadWrite"                   = "e4444444-4444-4444-4444-444444444444"
+        "Chat.Create"                      = "e5555555-5555-5555-5555-555555555555"
+        "ChatMember.ReadWrite"             = "e6666666-6666-6666-6666-666666666666"
         "OnlineMeetings.ReadWrite"         = "e7777777-7777-7777-7777-777777777777"
         "OnlineMeetingArtifact.Read.All"   = "e8888888-8888-8888-8888-888888888888"
         "Mail.Read"                        = "a1111111-1111-1111-1111-111111111111"
