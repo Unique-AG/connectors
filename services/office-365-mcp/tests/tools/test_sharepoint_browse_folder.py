@@ -1,6 +1,10 @@
+from collections.abc import Mapping
+from typing import cast
+
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
@@ -567,3 +571,37 @@ class TestGraphFailures:
     def test_a_stale_folder_handle_is_answered_with_the_recovery_that_works(self) -> None:
         assert "deleted" in browser.GRAPH_NOT_FOUND
         assert "fails in the same way" in browser.GRAPH_NOT_FOUND
+
+
+async def _folder_description(transport: httpx.AsyncClient) -> str:
+    mcp: FastMCP = FastMCP(name="schema-under-test")
+    browser.register(mcp, transport)
+    tool = await mcp.get_tool(browser.TOOL_NAME)
+    assert tool is not None, "register left the tool off the server"
+    properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+    return str(properties["folder"].get("description", ""))
+
+
+class TestTheSchemaItPublishes:
+    async def test_the_folder_argument_names_where_each_kind_of_folder_handle_comes_from(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        description = await _folder_description(transport)
+
+        assert "sharepoint_list_drives" in description
+        assert "`root_uri` of a drive" in description
+        assert "`parent_uri`" in description
+
+    async def test_the_folder_argument_does_not_name_a_tool_of_a_later_commit(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        description = await _folder_description(transport)
+
+        assert "sharepoint_resolve_url" not in description
+
+    async def test_the_folder_argument_is_described_in_15_to_60_words(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        description = await _folder_description(transport)
+
+        assert 15 <= len(description.split()) <= 60

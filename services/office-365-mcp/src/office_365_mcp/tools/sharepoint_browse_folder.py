@@ -203,11 +203,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "This is the folder to look inside, as the `uri` value that an earlier "
-                    + "sharepoint_browse_folder or sharepoint_search_files result reported: "
-                    + "sharepoint:///folders/{drive_id}/{item_id}. Omit it to browse the top of "
-                    + "the signed-in user's own OneDrive. A folder's display name, a path, and a "
-                    + "web address are not valid here."
+                    "The folder to look inside. Take the `uri` of a folder or the `parent_uri` "
+                    + "of an item from sharepoint_browse_folder or sharepoint_search_files. The "
+                    + "`root_uri` of a drive from sharepoint_list_drives is a folder handle too. "
+                    + "A name, a path and a web address are not handles. Omit it to browse the "
+                    + "top of the signed-in user's own OneDrive."
                 ),
             ),
         ] = None,
