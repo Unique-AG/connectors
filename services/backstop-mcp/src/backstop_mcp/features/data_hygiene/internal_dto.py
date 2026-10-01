@@ -145,15 +145,12 @@ class EmploymentRulesDto(BaseModel):
     decides which person→org types concern employment at all; `former` decides which of those
     describe employment that has ended.
 
-    `former` is the half that does the work. A tenant models a departure as a *different
-    relationship type*, not as an end date — the instance this was built against carries
-    `is employee of` and `is a former employee of` side by side against the same organization
-    and fills in `endDate` on well under one percent of records. An empty `former` therefore
-    leaves `endDate` as the only signal and detects almost nothing.
+    `former` is the half that does the work. A tenant may model a departure as a different
+    relationship type, not as an end date, and `endDate` is often unset. An empty `former`
+    therefore leaves `endDate` as the only signal and detects almost nothing.
 
-    An empty `employment` admits every person→org type, which over-reports in the one direction
-    that matters: `has portal access to` would count as employment and could clear a departure
-    that `is a former employee of` had correctly raised.
+    An empty `employment` admits every person→org type, which over-reports: a non-employment
+    link would count as employment and could clear a departure a former-type marker had raised.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)

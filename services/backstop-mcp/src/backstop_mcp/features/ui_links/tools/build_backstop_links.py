@@ -29,11 +29,10 @@ async def build_backstop_links(
         BackstopLinkTarget,
         Field(
             description=(
-                "Discriminated target: `kind` plus that kind's id (`party_id`, `entity_id`, "
-                "`task_id`, or `entity_activity_details_id`). Echo ids from prior tools; never "
-                "invent one. An account id is not a party id. Email uses "
-                "`entity_activity_details_id` from search_activities / get_activity_detail, "
-                "never a get_activity_history email `activity_id`."
+                "Discriminated target: `kind` plus that kind's id. Activity kinds take the "
+                "bare `id` of a `search_activities` row — never a `meeting-or-calls_…` "
+                "handle. Rows already carry `url` when that field is selected. An account "
+                "id is not a party id."
             ),
         ),
     ],
@@ -51,9 +50,10 @@ async def build_backstop_links(
         str | None,
         Field(
             description=(
-                "Optional layout name from list_custom_fields (`layout_name`). Adds a layout "
-                "URL only when `view_entity_type` is also set. Never invent or hardcode a "
-                "layout name."
+                "Optional layout name from list_custom_fields (`layout_name`). A layout URL "
+                "is built for organization, person, account, product, and opportunity only, "
+                "and only when `view_entity_type` is also set. Email, task, and activity "
+                "drop it. Never invent or hardcode a layout name."
             ),
         ),
     ] = None,
@@ -71,14 +71,14 @@ async def build_backstop_links(
     """Build labeled Backstop CRM UI URLs for one already-resolved record.
 
     `target` is a discriminated union (`kind` plus that kind's id). Echo ids from prior tools;
-    never invent one. An account id is not a party id. Email uses `entity_activity_details_id`
-    from `search_activities` or `get_activity_detail` — never a `get_activity_history` email
-    `activity_id`.
+    never invent one. An account id is not a party id. Activity links take the bare `id` of
+    a `search_activities` row. Never a `meeting-or-calls_…` handle.
 
-    Omit `tabs` to receive every allowed tab for the page plus the canonical no-tab URL
-    (product summary is omission, never `viewType=summary`). Pass `tabs=[]` for the canonical
-    URL only. Pass both `layout_name` and `view_entity_type` from `list_custom_fields` to add
-    a layout link; never fetch or invent those names.
+    Omit `tabs` to receive every allowed tab for the page plus the canonical no-tab URL.
+    Product summary is the no-tab URL; do not request `summary`. Pass `tabs=[]` for the
+    canonical URL only. A layout URL is organization, person, account, product, and
+    opportunity only — also dropped for email, task, and activity. Pass both `layout_name`
+    and `view_entity_type` from `list_custom_fields` for those five; never invent them.
 
     When this deployment has no UI origin the status is `not_configured` — do not invent a host.
 

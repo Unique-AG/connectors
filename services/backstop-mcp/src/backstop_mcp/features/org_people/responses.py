@@ -83,7 +83,10 @@ class _PartyRecordFields(OmitNoneModel):
     )
     categories: tuple[str, ...] | None = Field(
         default=None,
-        description="CRM categories on this record — investor type, role, or similar labels.",
+        description=(
+            "Category names. Writes need ids from `list_contact_categories`. "
+            "`replace_category_ids` replaces the set and can drop a category."
+        ),
     )
     categories_as_string: str | None = Field(
         default=None,
@@ -151,11 +154,8 @@ class PersonRecordResponse(_PartyRecordFields, ProvenanceAttributes):
     is_key_employee: bool | None = Field(
         default=None,
         description=(
-            "Unreliable on this record: `GET /people` omits `isKeyEmployee` even when "
-            "the organization roster is true. Read it on `get_people_for_party`. "
-            "Cannot be written through these tools — personal API tokens do not persist "
-            "`isKeyRelationship`; set Key employee in the CRM UI. Distinct from "
-            "`is_employee`, which means employee of our firm."
+            "Present here but unreliable. The roster (`get_people_for_party`) is the source. "
+            "Read-only: set Key employee in the CRM UI. Distinct from `is_employee`."
         ),
     )
     job_title: str | None = Field(default=None, description="Job title.")
@@ -249,11 +249,8 @@ class PersonAtOrganizationResponse(OmitNoneModel):
     is_key_employee: bool | None = Field(
         default=None,
         description=(
-            "Key employee at *this* organization, from "
-            "`GET /organizations/{id}/employees`. Not a person attribute, custom "
-            "field, or category. Absent when the row has no `/employees` card. "
-            "Cannot be written through these tools — personal API tokens do not persist "
-            "`isKeyRelationship`; set Key employee in the CRM UI."
+            "Key employee at this organization. This roster is the source. Absent when the "
+            "row has no employee card. Read-only; set it in the CRM UI."
         ),
     )
     employment: EmploymentLinkResponse = Field(
@@ -494,8 +491,8 @@ class OrgPeopleResolvedResponse(OmitNoneModel):
     people_omitted: int = Field(
         default=0,
         description=(
-            "How many matching people were listed but dropped because this organization "
-            "exceeds the per-call cap. Greater than zero means `people` is a partial list."
+            "How many matching people were dropped because this organization exceeds the "
+            "per-call cap of 500. Greater than zero means `people` is a partial list."
         ),
     )
     include_former_hint: str | None = Field(
@@ -645,16 +642,16 @@ class SearchOrganizationsResolvedResponse(OmitNoneModel):
     status: Literal["resolved"] = Field(
         default="resolved",
         description=(
-            "Always 'resolved': the walk ran. An empty `rows` list means nothing matched "
-            "the filters, not that the collection is empty."
+            "Always 'resolved': the walk ran. An empty `rows` list is not 'nothing matched' "
+            "when `coverage` says the scan ceiling clamped the walk."
         ),
     )
     coverage: ScanCoverageResponse = Field(
         description=(
             "How much of the Backstop result was read. `visible_count` is Backstop's total "
-            "for the server-side filters, before city, legal name, website, RIA, internal "
-            "organization, and custom-field predicates. A custom-field-only call therefore "
-            "reports the whole collection here."
+            "for the server-side filters, before city, country, state, legal name, website, "
+            "RIA, internal organization, and custom-field predicates. A custom-field-only "
+            "call therefore reports the whole collection here."
         )
     )
     rows: tuple[SearchOrganizationRowResponse, ...] = Field(

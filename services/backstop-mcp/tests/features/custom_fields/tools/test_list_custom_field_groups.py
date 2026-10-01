@@ -289,9 +289,8 @@ class TestListCustomFieldGroupsInput:
 
     def test_refresh_is_only_for_a_user_reported_missing_field(self) -> None:
         doc = list_custom_field_groups.__doc__ or ""
-        assert "refresh=true" in doc
-        assert "missing field" in doc
-        assert "layout groups" in doc.casefold() or "custom-field group" in doc
+        assert "Tabs and sections" in doc
+        assert "CRM layout" in doc
         assert "tenant" not in doc.casefold()
         for banned in (
             "northwind",

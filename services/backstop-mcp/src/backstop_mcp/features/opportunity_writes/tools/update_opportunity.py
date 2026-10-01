@@ -42,8 +42,8 @@ async def update_opportunity(
     `stage` is a **name** resolved against this instance's vocabulary, not an id. `probability`
     is a fraction (0.3 is 30%) and is **not** changed by setting a stage — pass it explicitly
     if the deal's probability should move. A `closed` stage closes the deal automatically.
-    Custom fields go through `update_custom_field_values`; writing them here skips picklist and
-    time-series validation. Omit a field to leave it unchanged. Never invent an id.
+    `update_custom_field_values` is the only writer of custom fields. Omit a field to leave
+    it unchanged. Never invent an id.
 
     Moving several deals means calling this once per deal. There is no bulk stage-move tool.
     `backfill_opportunity_stage_history` appends historical rows and does not move anything.

@@ -25,33 +25,41 @@ from backstop_mcp.features.resolution import (
 )
 from backstop_mcp.models import OmitNoneModel
 
-# Published party-selector contract. Party-scoped tools that require `search_type` reuse
-# these strings so the model sees the same pairing on the way in and on the resolve echo.
+# Published party-selector contract. Tools whose `search_type` is required reuse the
+# `*_REQUIRES_SEARCH_TYPE_*` strings; tools that default `search_type` use the
+# `*_DEFAULT_SEARCH_TYPE_*` ones, so neither tells the model something the schema contradicts.
 RESOLVED_PARTY_ECHO_DESCRIPTION = (
     "The identity this call settled on. Echo `id` as `party_id` and `search_type` as "
     "`search_type` on the next party-scoped tool — two separate arguments. "
-    "`party_id` alone is rejected. Never invent them."
+    "Never invent them."
 )
 REQUIRED_SEARCH_TYPE_DESCRIPTION = (
     "Required. Never omit, including when you already have a `party_id`. "
-    "The argument is `search_type`. "
     "Which Backstop collection to resolve the party against — fold the caller's "
     "wording to one of the four. A company, firm, fund, institution, or manager is "
     "`organizations`; any human is `people`. Pick `contacts` or `employees` only "
-    "when a prior resolve echoed one (echo it back — a contact or employee id is "
-    "not a people id) or the caller clearly means an internal staff member."
+    "when a prior tool returned one with the id (echo it back — a contact or employee "
+    "id is not a people id)."
 )
 PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION = (
-    "Trusted Backstop Party ID from a prior resolve echo. The argument is `party_id` "
-    "(not `entity_id` — that name is only on `get_activity_history` `request.type=next`). "
-    "Always pass together with that echo's `search_type` as a separate argument — "
-    "`party_id` alone is rejected. "
+    "Trusted Backstop Party ID — an id returned by any tool on this server. "
+    "Always pass together with the `search_type` that came with it, as a "
+    "separate argument — `party_id` alone is rejected. "
     "Never invent or guess. Exactly one of `party_id` or `search` must be provided."
 )
 SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION = (
-    "Name or email to resolve when no trusted `party_id` is available. The argument "
-    "is `search`. Always pass together with `search_type`. Exactly one of `party_id` "
+    "Name or email to resolve when no trusted `party_id` is available. "
+    "Always pass together with `search_type`. Exactly one of `party_id` "
     "or `search` must be provided."
+)
+PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION = (
+    "Trusted Backstop Party ID — an id returned by any tool on this server. "
+    "Echo the `search_type` that came with it when it is not this tool's "
+    "default. Never invent or guess. Exactly one of `party_id` or `search` must be provided."
+)
+SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION = (
+    "Name or email to resolve when no trusted `party_id` is available. "
+    "Exactly one of `party_id` or `search` must be provided."
 )
 
 
@@ -75,8 +83,7 @@ class PartyCandidateResponse(CandidateResponse):
     id: str = Field(
         description=(
             "Backstop id of this candidate. Pass it as `party_id` together with this "
-            "candidate's `search_type` as a separate argument — never invent one. "
-            "`party_id` alone is rejected."
+            "candidate's `search_type` as a separate argument — never invent one."
         )
     )
     search_type: SearchType = Field(
@@ -115,8 +122,7 @@ class ResolvedPartyResponse(OmitNoneModel):
     id: str = Field(
         description=(
             "Backstop id of this party. Pass it as `party_id` together with this object's "
-            "`search_type` as a separate `search_type` argument — never invent one. "
-            "`party_id` alone is rejected on party-scoped tools."
+            "`search_type` as a separate `search_type` argument — never invent one."
         )
     )
     search_type: SearchType = Field(
@@ -181,6 +187,7 @@ def unresolved_parties_response(
 
 
 __all__ = [
+    "PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION",
     "PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION",
     "PartyAmbiguousResponse",
     "PartyBatchAmbiguousResponse",
@@ -190,6 +197,7 @@ __all__ = [
     "REQUIRED_SEARCH_TYPE_DESCRIPTION",
     "RESOLVED_PARTY_ECHO_DESCRIPTION",
     "ResolvedPartyResponse",
+    "SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION",
     "SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION",
     "unresolved_parties_response",
     "unresolved_party_response",

@@ -18,9 +18,8 @@ logger = logging.getLogger(__name__)
 
 type TaskFilter = Literal["open", "completed", "all"]
 
-# Scan ceiling. `status` is not filterable, so one party's whole task sub-collection is read;
-# 540 tasks exist across the *whole* instance, so this is a wide margin for one party and still
-# a stated limit rather than "however many there are".
+# Scan ceiling. `status` is not filterable, so one party's whole task sub-collection is read.
+# `scan_coverage` reports when this ceiling is hit.
 MAX_TASK_SCAN_RECORDS = 5_000
 
 

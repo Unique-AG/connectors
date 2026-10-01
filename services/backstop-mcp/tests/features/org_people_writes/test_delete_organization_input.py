@@ -1,4 +1,4 @@
-"""`DeleteOrganizationInput`: same identity as `update_organization`."""
+"""`DeleteOrganizationInput`: a trusted organization id."""
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
@@ -13,7 +13,6 @@ def test_accepts_party_id_with_search_type() -> None:
 
     assert parsed.party_id == "org-1"
     assert parsed.search_type == "organizations"
-    assert parsed.search is None
 
 
 def test_defaults_search_type_to_organizations() -> None:
@@ -22,6 +21,6 @@ def test_defaults_search_type_to_organizations() -> None:
     assert parsed.search_type == "organizations"
 
 
-def test_rejects_both_selectors() -> None:
-    with pytest.raises(ValidationError, match="Exactly one"):
-        _ADAPTER.validate_python({"party_id": "org-1", "search": "Acme"})
+def test_rejects_missing_party_id() -> None:
+    with pytest.raises(ValidationError):
+        _ADAPTER.validate_python({"search_type": "organizations"})

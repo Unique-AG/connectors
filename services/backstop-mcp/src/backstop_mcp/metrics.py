@@ -14,8 +14,8 @@ _provider: MeterProvider | None = None
 # identical, so one View defines them for both rather than each instrument carrying its own copy.
 #
 # A catalog walk is not one HTTP call: activity tags and system users are small, but the
-# custom-field schema is 3,274 definitions / 2.77 MiB / 6.15 s (measured; `page[limit]` is
-# ignored on that endpoint, so the cost is server-side work in one request). The default OTel
+# custom-field schema is large — thousands of definitions and a multi-second walk (`page[limit]`
+# is ignored on that endpoint, so the cost is server-side work in one request). The default OTel
 # boundaries are shaped for milliseconds-as-integers and would put every one of these in the
 # first bucket, hence sub-second resolution for the short catalogs and headroom past 30s for
 # the schema walk, which is the one this exists to size. A cache-served `get` lands in the

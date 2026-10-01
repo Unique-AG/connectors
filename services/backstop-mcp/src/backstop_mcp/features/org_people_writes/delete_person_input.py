@@ -1,16 +1,11 @@
-"""`delete_person` input: the same identity as `update_person`. Delete is permanent."""
+"""`delete_person` input: a trusted person id. Delete is permanent."""
 
-from typing import Literal, Self
+from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 from backstop_mcp.features.elicitation_utils import REFUSE_BULK_DELETE
-from backstop_mcp.features.party_resolver import (
-    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
-    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
-    blank_to_none,
-    require_exactly_one_party_selector,
-)
+from backstop_mcp.features.party_resolver import blank_to_none
 from backstop_mcp.models import NonEmptyStr
 
 __all__ = [
@@ -19,39 +14,33 @@ __all__ = [
 ]
 
 DELETE_PERSON_INPUT_DESCRIPTION = (
-    "Required. The person to hard-delete. Needs exactly one of `party_id` or `search`, "
-    + "plus `search_type` (defaults to people). Deletion is permanent: Backstop has no "
-    + "recycle bin, and contact-locations are deleted first (`include=contactLocations`, "
-    + "never `include=locations`). The tool reads the record and asks the user to confirm "
-    + "when the client can elicit; otherwise it deletes immediately. Never invent an id. "
-    + REFUSE_BULK_DELETE
+    "Required. The person to hard-delete. Needs a trusted `party_id` "
+    "(search_type defaults to people). Deletion is permanent: Backstop has no "
+    "recycle bin. The tool removes the person's locations, then the person. It reads "
+    "the record and asks the user to confirm when the client can elicit; otherwise it "
+    "deletes immediately. Never invent an id. " + REFUSE_BULK_DELETE
 )
 
 _PERSON_SEARCH_TYPE_DESCRIPTION = (
-    "Collection to resolve against. Echo `search_type` from a prior resolve when retrying "
-    "with `party_id` — a contact or employee id is not a people id. Defaults to people."
+    "Collection the id belongs to. Echo `search_type` from a prior resolve when it is "
+    "not people — a contact or employee id is not a people id. Defaults to people."
 )
 
 
 class DeletePersonInput(BaseModel):
-    """Hard-delete a CRM person after removing their contact-locations."""
+    """Hard-delete a CRM person after removing their locations."""
 
     search_type: Literal["people", "contacts", "employees"] = Field(
         default="people", description=_PERSON_SEARCH_TYPE_DESCRIPTION
     )
-    party_id: NonEmptyStr | None = Field(
-        default=None, description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION
-    )
-    search: NonEmptyStr | None = Field(
-        default=None, description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION
+    party_id: NonEmptyStr = Field(
+        description=(
+            "Trusted Backstop person id from a prior tool. Echo `search_type` when it "
+            "is not people. Never invent or guess."
+        )
     )
 
-    @field_validator("party_id", "search", mode="before")
+    @field_validator("party_id", mode="before")
     @classmethod
     def _blank_to_none(cls, value: object) -> object:
         return blank_to_none(value)
-
-    @model_validator(mode="after")
-    def _exactly_one_selector(self) -> Self:
-        require_exactly_one_party_selector(party_id=self.party_id, search=self.search)
-        return self

@@ -1,9 +1,8 @@
-"""Cached Backstop time-zone catalog.
+"""Cached Backstop time zones.
 
-A meeting's `timeZone` is a `/time-zones` `shortName` (e.g. `US/Eastern`), not the catalog
-`id` and not the display `name` — `name` is ambiguous. `TimeZonesService` is the TTL-cached
-instance catalog; `resolve_short_name` matches shortName, then id, then name and returns the
-canonical shortName (`None` if the caller omitted a zone).
+A meeting's time zone is a short name (for example `US/Eastern`). A unique display name
+also resolves. Caching is off by default. `resolve_short_name` matches short name, then id,
+then a unique display name, and returns the canonical short name.
 """
 
 from backstop_mcp.features.time_zones.api_responses import TimeZoneAttributes

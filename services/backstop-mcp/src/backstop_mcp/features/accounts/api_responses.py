@@ -99,8 +99,7 @@ class AccountAttributes(BaseModel):
 #
 # `closedDate` has to stay in this fieldset and stay meaningful: open is *the key was absent on
 # the wire*, so a `fields=` set that materialized it as null would report every account closed.
-# It does not — of 200 rows fetched this way the key was absent on 8 and null on 0, matching
-# what the same accounts return unfiltered.
+# Verified: `fields=` leaves `closedDate` absent on open accounts rather than null.
 ACCOUNT_LISTING_FIELDS = ",".join(
     (
         "name",
@@ -160,7 +159,7 @@ class SeriesPointAttributes(BaseModel):
 def _scalar_str(value: object) -> str | None:
     """A scalar as a non-empty string, or `None`.
 
-    An id or label that arrives as `90007828` rather than `"90007828"` is the same id, so it is
+    An id or label that arrives as `12345` rather than `"12345"` is the same id, so it is
     coerced instead of failing the row. `bool` is excluded deliberately — `True` is not a label.
     """
     if isinstance(value, str):
@@ -240,7 +239,7 @@ class TableDataShareAttributes(BaseModel):
 class TableDataProductAttributes(BaseModel):
     """The `product` object on a table-data row: a `ResourceRef` plus `shortName` inline.
 
-    `shortName` is the tenant's own label (`FUND2`, `NGUP`, `Dispersion`) and is the only name on
+    `shortName` is the tenant's own label (`NGUP`) and is the only name on
     the row — there is no full product name here, so a caller who needs one resolves the id.
     """
 

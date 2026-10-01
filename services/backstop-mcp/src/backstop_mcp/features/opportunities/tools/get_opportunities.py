@@ -6,9 +6,9 @@ Resolves the party the same way `get_activity_history` does (`search_type` plus 
 vocabulary. Filtering by `status` and ordering by `dateEnteredCurrentStage` happen in memory:
 Backstop 400s `filter[isOpen]` and silently ignores `sort=` on this sub-collection.
 
-There is no cursor. Paging outward would let a party whose open deals sit on page 3 receive an
-authoritative-looking empty answer for `status="open"`. No party in the instance exceeds 50
-opportunities, so the whole sub-collection is walked.
+There is no cursor. Paging outward would let a party whose open deals sit on a later page
+receive an authoritative-looking empty answer for `status="open"`. One party's pipeline is
+small enough that the whole sub-collection is walked.
 """
 
 import logging
@@ -128,11 +128,11 @@ async def get_opportunities(
     names are this instance's vocabulary, returned on each deal. `weighted_value` /
     `weighted_allocated_value` are Backstop's own products of amount and probability.
     `probability` is the standard attribute; a rep-entered probability custom field stays in
-    `custom_field_values` under its own name. Master Pipeline fields are those custom-field
-    entries, joined to list_custom_fields (field_type included). Slice with
-    `custom_field_names` / `custom_field_definition_ids` — filters AND together. When
-    `custom_fields_unavailable` is true, an empty list means the catalog could not be loaded,
-    not that the deal has no Master Pipeline data.
+    `custom_field_values` under its own name. Opportunity custom fields are those entries,
+    joined to list_custom_fields (field_type included). Slice with `custom_field_names` /
+    `custom_field_definition_ids` — filters AND together. When `custom_fields_unavailable`
+    is true, an empty list means the catalog could not be loaded, not that the deal has no
+    custom-field data.
     """
     result = await resolve_party_query.run(
         search_type=search_type,

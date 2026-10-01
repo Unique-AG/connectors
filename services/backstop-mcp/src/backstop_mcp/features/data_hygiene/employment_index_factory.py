@@ -237,7 +237,7 @@ class EmploymentIndexFactory:
             return EmploymentStatus.FORMER
         if rules.employment.is_empty:
             # No employment vocabulary configured, so every person→org type is admitted. See
-            # `EmploymentRules` for what that costs.
+            # `EmploymentRulesDto` for what that costs.
             return EmploymentStatus.CURRENT
         if rules.employment.matches(type_id=type_id, type_name=type_name):
             return EmploymentStatus.CURRENT

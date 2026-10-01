@@ -43,7 +43,11 @@ class CustomFieldDefinitionResponse(BaseModel):
         )
     )
     field_type: str | None = Field(
-        default=None, description="Machine type of the field, as Backstop stores it."
+        default=None,
+        description=(
+            "Machine type, for example text, date, money, select, multi-select, or entity. "
+            "The write `value` follows this type."
+        ),
     )
     field_type_display: str | None = Field(
         default=None, description="Human-readable type label, when Backstop publishes one."
@@ -53,7 +57,10 @@ class CustomFieldDefinitionResponse(BaseModel):
     )
     select_options: list[object] = Field(
         default_factory=list,
-        description="Picklist options when this is a select field; empty otherwise.",
+        description=(
+            "Allowed values for a select or multi-select. Write one option's text as "
+            "`value`. Empty when the field is not a list."
+        ),
     )
     tab_name: str | None = Field(
         default=None, description="Backstop layout tab this field sits on, when published."
@@ -79,7 +86,11 @@ class CustomFieldDefinitionResponse(BaseModel):
         default=None, description="Whether Backstop marks this field as required."
     )
     client_required: bool | None = Field(
-        default=None, description="Whether Backstop marks this field as client-required."
+        default=None,
+        description=(
+            "When true, supply a value before you leave the record — the CRM treats this "
+            "field as required for the client."
+        ),
     )
     system_defined: bool | None = Field(
         default=None,
@@ -149,7 +160,11 @@ class CustomFieldGroupMemberResponse(BaseModel):
         )
     )
     field_type: str | None = Field(
-        default=None, description="Machine type of the field, as Backstop stores it."
+        default=None,
+        description=(
+            "Machine type, for example text, date, money, select, multi-select, or entity. "
+            "The write `value` follows this type."
+        ),
     )
 
     @classmethod
@@ -256,7 +271,11 @@ class ResolvedCustomFieldValueResponse(OmitNoneModel):
         description="Name of the Backstop layout group this field sits in, when available.",
     )
     field_type: str | None = Field(
-        default=None, description="Machine type of the field, as Backstop stores it."
+        default=None,
+        description=(
+            "Machine type, for example text, date, money, select, multi-select, or entity. "
+            "The write `value` follows this type."
+        ),
     )
     tab_name: str | None = Field(
         default=None,
@@ -353,13 +372,13 @@ class ListCustomFieldGroupsResponse(BaseModel):
 
 
 class UpdateCustomFieldValuesResponse(OmitNoneModel):
-    """Per-record outcomes of a custom-field bulk write. A `201` is not success."""
+    """Per-record outcomes of a custom-field bulk write."""
 
     total_count: int = Field(description="How many values were sent.")
     applied_count: int = Field(
         description=(
-            "How many request rows came back with `status` `applied`. A `201` is not success; "
-            "compare this with `total_count`."
+            "How many request rows came back with `status` `applied`. Success is "
+            "`applied_count == total_count` and each `records[].status`."
         )
     )
     records: tuple[RecordOutcomeResponse, ...] = Field(

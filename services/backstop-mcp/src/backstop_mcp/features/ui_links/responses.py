@@ -43,7 +43,7 @@ class UiBaseUrlNotConfiguredResponse(BaseModel):
     status: Literal["not_configured"] = Field(
         default="not_configured",
         description=(
-            "Always 'not_configured': BACKSTOP_UI_BASE_URL is unset and no fallback applies."
+            "Always 'not_configured'. No CRM UI host is configured; never build a URL yourself."
         ),
     )
     message: str = Field(
@@ -72,8 +72,8 @@ class ParsedBackstopLinkResponse(BaseModel):
     tab: str | None = Field(
         default=None,
         description=(
-            "Tab query value (`viewType` or `acctViewType`). Omitted when the URL has no tab. "
-            "Product summary is omission — this is None, not 'summary'."
+            "Tab query value. Omitted when the URL has no tab. Product summary is the "
+            "no-tab URL; do not request `summary`."
         ),
     )
     layout_name: str | None = Field(

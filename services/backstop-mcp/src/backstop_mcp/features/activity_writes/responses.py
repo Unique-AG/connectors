@@ -1,7 +1,7 @@
 """Published activity-write response models.
 
 `LoggedActivityResponse` is a discriminated union on `kind`, matching the input: a note
-does not carry `time_zone` or `send_notification`. `LogActivityResponse` is the later
+does not carry `time_zone` or `send_notification`. `LogActivityResponse` is the
 `log_activity` return (success or unresolved party). There is no logged-email member —
 `POST /emails` requires the message blob, so email creates are `attach_file` only.
 """

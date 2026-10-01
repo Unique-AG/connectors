@@ -8,11 +8,11 @@
 convert a query-string value into `RegularCustomFieldValueDto`. Those predicates run
 after the fetch. `filter[email][eq]` is the primary email only.
 
-A custom-field-only call reads the collection. On a client-obtained tenant that was
-5,129 organizations: a sparse page of 500 carrying `regularCustomFieldValues` took a
-few seconds, and the per-user gate allows five concurrent requests, so the in-memory
-walk requests later pages in parallel instead of chaining all eleven. `parallel` stays
-off when every predicate is a server filter — that walk stops at `max_rows`.
+A custom-field-only call reads the collection. Large tenants have thousands of
+organizations; a sparse page carrying `regularCustomFieldValues` takes seconds, and the
+per-user gate allows five concurrent requests, so the in-memory walk requests later
+pages in parallel. `parallel` stays off when every predicate is a server filter — that
+walk stops at `max_rows`.
 """
 
 import logging
@@ -39,8 +39,8 @@ from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLink
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
 
-# Headroom over the 5,129 organizations measured on a client-obtained tenant. A larger
-# collection stops here and says so in `coverage` rather than reading without a bound.
+# Scan ceiling. A larger collection stops here and says so in `coverage` rather than
+# reading without a bound.
 MAX_ORGANIZATION_SCAN_RECORDS = 10_000
 
 _PAGE_SIZE = 500

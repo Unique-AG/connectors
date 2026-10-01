@@ -1,39 +1,14 @@
 """A party's holdings: the undocumented UI table first, the documented walk when it fails.
 
-`_holdings_table` is one request and carries figures. It is also an unsupported endpoint that
-can disappear on another tenant, so this query owns the decision of when to stop trusting it
-and what the documented path can honestly produce instead.
+`GET /bsg-account-table-data?entityId={partyId}` is one request with figures, but unsupported.
+Any HTTP error (including a 401 that re-verified), timeout, unparseable body, or count/row
+contradiction falls back to the documented walk: every `/accounts` page (`filter[owner]` is 400)
+filtered to the owner, plus two series requests per owned account. Not a fallback trigger: an
+empty table (a successful "owns nothing" — though table-data fails open on a bad id), a dead
+credential (`BackstopAuthError`), or a rate limit.
 
-**What triggers the fallback.** Any HTTP error, timeout, or unparseable body from table-data,
-including a mid-session 401 that re-verified (`BackstopTransientAuthError`): the credential still
-works, this unsupported endpoint did not — same as a 404. Deliberately *not*:
-
-- **An empty table.** `accounts: []` is a successful "owns nothing" and walking 815 accounts to
-  confirm it would be pure cost. The catch is that table-data **fails open** — a nonexistent id
-  and a wrong-typed id return the same empty `200`. `owner_id` should therefore be a resolved
-  party id, but nothing here can verify that; see the fail-open note on `_holdings_table`.
-- **`BackstopAuthError`.** The credential is dead; the documented walk would fail the same way,
-  slower.
-
-**What the fallback cannot produce.** The documented `/accounts` walk has no commitment, no
-share-of-master, no account-term reference, and no `otherId` in the listing fieldset; the series
-endpoints give a number with no currency rendering. Those fields are **omitted, never zeroed**,
-and are named in `omitted_fields` so the answer cannot be read as "this party has no commitment".
-`funded_date` falls back to `accountStartDate`, which is a near neighbour of table-data's
-`fundedDate` rather than the same field.
-
-**Cost.** Table-data is 1 request. The fallback is ~9 parallel pages (measured: 9.1s/4.3 MiB for
-this instance's 815 accounts) plus 2 series requests per *owned* account — which is affordable
-only because a party owns a handful of them. It is never run product-wide.
-
-The table endpoint itself is undocumented. It was found by watching the Backstop web app: one
-`GET /bsg-account-table-data?entityId={partyId}` serves the account table a user looks at.
-Paging params are ignored; row order is not stable; a product id fails open as an empty table.
-Keep the documented fallback working. The counts checked in `_reject_contradictory_counts` are
-the tripwire for a silent shape change.
-
-By-party listing on the fallback walks `/accounts` because `filter[owner]` is 400 and neither
-party collection exposes an `accounts` subcollection. Open means the `closedDate` key is absent.
+The fallback cannot produce commitment, share of master, account term, or `otherId`; those are
+omitted, never zeroed, and named in `omitted_fields`. Its `funded_date` is `accountStartDate`.
 """
 
 import asyncio
@@ -110,8 +85,8 @@ class GetHoldingsQuery:
             return await self._holdings_table(owner_id=owner_id, include_closed=include_closed)
         except BackstopAuthError, BackstopRateLimitError:
             # Neither is "this endpoint is unavailable". A dead credential fails the walk the same
-            # way, slower. A rate limit is worse: the fallback is ~9 pages plus two requests per
-            # account, so falling back would answer a "slow down" with an order of magnitude more
+            # way, slower. A rate limit is worse: the fallback is a full /accounts walk plus two
+            # requests per account, so falling back would answer a "slow down" with far more
             # load — and a rate limit is the likeliest transient failure of an unbounded payload.
             raise
         except Exception as exc:

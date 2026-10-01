@@ -50,7 +50,10 @@ class MoneyResponse(OmitNoneModel):
 
     amount: float | None = Field(
         default=None,
-        description="The figure. A published 0.0 is a real zero, not 'unknown'.",
+        description=(
+            "The figure. Check `formatted` before reading 0.0 as zero: with `formatted` `-` "
+            "nothing is recorded."
+        ),
     )
     currency: str | None = Field(default=None, description="ISO currency code, e.g. `USD`.")
     formatted: str | None = Field(
@@ -109,7 +112,7 @@ class HoldingRowResponse(OmitNoneModel):
     product_short_name: str | None = Field(
         default=None,
         description=(
-            "The tenant's own label for the product, e.g. `FUND2`. This is what the IR team says "
+            "The tenant's own label for the product, e.g. `NGUP`. This is what the IR team says "
             "out loud; there is no full product name on this row."
         ),
     )
@@ -119,7 +122,10 @@ class HoldingRowResponse(OmitNoneModel):
     )
     investor_resource_type: str | None = Field(
         default=None,
-        description="Which collection `investor_id` belongs to: `organizations` or `people`.",
+        description=(
+            "Which collection `investor_id` belongs to: `organizations` or `people`, or "
+            "`contacts` when Backstop did not say which."
+        ),
     )
     account_term_id: str | None = Field(
         default=None,
@@ -142,8 +148,9 @@ class HoldingRowResponse(OmitNoneModel):
     balance: MoneyResponse | None = Field(
         default=None,
         description=(
-            "Current value of this holding. Omitted, never zeroed, when no figure is available — "
-            "check `figure_errors` to tell a failed request from a genuinely unpublished number."
+            "Current value of this holding. Omitted when no figure is available — check "
+            "`figure_errors` to tell a failed request from a genuinely unpublished number. "
+            "0.0 with `formatted` `-` is also 'not recorded'."
         ),
     )
     balance_as_of: date | None = Field(

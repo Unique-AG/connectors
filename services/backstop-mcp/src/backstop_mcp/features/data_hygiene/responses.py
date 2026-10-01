@@ -71,17 +71,18 @@ class DepartedContactResponse(BaseModel):
         description="Collection of that organization, typically 'organizations'."
     )
     end_date: date | None = Field(
-        default=None, description="Employment end date as YYYY-MM-DD, when the CRM records one"
+        default=None,
+        description=(
+            "Set only on former links. A future-dated `end_employment` is not visible "
+            "on `get_person` until that date has passed."
+        ),
     )
     relationship_type_id: str | None = Field(
         default=None, description="Backstop id of the relationship type, when known."
     )
     relationship_type_name: str | None = Field(
         default=None,
-        description=(
-            "Name of the relationship type as this instance labels it, e.g. "
-            "'is a former employee of'."
-        ),
+        description=("Name of the relationship type as this instance labels it."),
     )
 
     @classmethod
@@ -132,7 +133,11 @@ class EmploymentLinkResponse(OmitNoneModel):
         ),
     )
     end_date: date | None = Field(
-        default=None, description="Employment end date as YYYY-MM-DD, when the CRM records one"
+        default=None,
+        description=(
+            "Set only on former links. A future-dated `end_employment` is not visible "
+            "on `get_person` until that date has passed."
+        ),
     )
     relationship_type_id: str | None = Field(
         default=None, description="Backstop id of the relationship type, when known."

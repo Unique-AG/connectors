@@ -5,15 +5,14 @@ These are the entity documentation. Every model carries a docstring and every fi
 
 Every model leads with `id`, the JSON:API resource id of the record it projects. That is a
 top-level member of a resource object rather than one of its attributes, which is why
-`resolve._project` folds it in explicitly. Without it a projection is a dead end:
+`include_plan._project` folds it in explicitly. Without it a projection is a dead end:
 `ContactCardResponse` and `CompanyRefResponse` both tell the reader to call `get_person` /
-`get_organization` for the full record, and both of those refuse a `party_id` they did not hand
-out ("never invent or guess"), leaving only a name to search by and the ambiguity that comes with
-it. The ids are in the right space for that — `primary_contact` side-loads `people` and `company`
-side-loads `organizations`, which is what those two tools resolve against.
+`get_organization` for the full record. A trusted id can be passed directly; a name search
+is what remains when the projection omitted the id. The ids are in the right space for that —
+`primary_contact` side-loads `people` and `company` side-loads `organizations`.
 
-`extra="ignore"` does the trimming: a `contact-locations` resource ships 17 attributes and
-`ContactLocationResponse` keeps 8; a person ships 31 and `ContactCardResponse` keeps 6. Where
+`extra="ignore"` does the trimming: a side-loaded resource carries more attributes than the
+projection keeps. Where
 Backstop stores one fact twice — `city`/`cityResolvedName`, `state`/`stateResolvedName`,
 `country`/`countryResolvedName`, `isPrimaryLocation`/`primaryLocation` — only the plain name is
 bound and the twin is dropped, so a reader is never left deciding which of two spellings to
@@ -28,9 +27,9 @@ model is what the tools type their `include` parameter as, so an invalid name is
 MCP boundary and the input schema lists the options.
 
 Include names are ours, not Backstop's, wherever Backstop's would mislead. Backstop's `emails`
-relationship is email *messages* (488 on one organization); the address book is `contactEmails`.
-An include literally named `emails` would invite a model to pull hundreds of messages while
-looking for an address, so it is exposed as `email_addresses`.
+relationship is email messages, and one organization can have hundreds of them; the address
+book is `contactEmails`. An include literally named `emails` would invite a model to pull
+those messages while looking for an address, so it is exposed as `email_addresses`.
 """
 
 from collections.abc import Mapping, Sequence
@@ -256,10 +255,7 @@ class InternalOwnerResponse(OmitNoneModel):
     )
     disabled: bool | None = Field(
         default=None,
-        description=(
-            "True when this colleague's login is disabled. Do not treat their empty pipeline "
-            "as 'no coverage' — the filter matched a departed login."
-        ),
+        description=("True when this colleague's login is disabled."),
     )
 
 

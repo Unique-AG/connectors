@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 class ListContactSourcesQuery:
     """Walk `GET /contact-sources` and project the instance vocabulary.
 
-    Thirteen rows on the instance this was built against. Caching is off unless the factory
-    turns it on — the walk is small enough that a TTL is not the default. `CachedValue`
-    still coalesces concurrent callers onto one fetch.
+    The collection is small. Caching is off unless the factory turns it on — the walk is
+    small enough that a TTL is not the default. `CachedValue` still coalesces concurrent
+    callers onto one fetch.
     """
 
     def __init__(

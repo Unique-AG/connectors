@@ -57,7 +57,7 @@ class OrganizationCustomFieldFilter(BaseModel):
     definition_id: CoercedId = Field(
         description=(
             "Custom-field definition id from list_custom_fields. Not the field label: "
-            "two definitions can share a name, and a label sent as a filter is 400."
+            "two definitions can share a name."
         )
     )
     values: list[NonEmptyStr] = Field(
@@ -95,41 +95,27 @@ def _predicates(
 async def search_organizations(
     name: Annotated[
         str | None,
-        Field(
-            description=(
-                "Substring of the organization name. Sent as filter[name][like]. "
-                "Not a prefix-only quick search."
-            )
-        ),
+        Field(description=("Substring of the organization name. Not a prefix-only quick search.")),
     ] = None,
     email: Annotated[
         str | None,
-        Field(
-            description=(
-                "Primary email, exact. Sent as filter[email][eq]. email2 and email3 "
-                "are not filterable on this collection."
-            )
-        ),
+        Field(description=("Primary email, exact. email2 and email3 are not matched.")),
     ] = None,
     other_id: Annotated[
         str | None,
-        Field(description="Backstop otherId, exact. Sent as filter[otherId][eq]."),
+        Field(description="otherId, exact."),
     ] = None,
     matching_domain: Annotated[
         str | None,
-        Field(description=("One email domain, exact. Sent as filter[matchingDomains][eq].")),
+        Field(description="One email domain, exact."),
     ] = None,
     legal_name: Annotated[
         str | None,
-        Field(
-            description=(
-                "Substring of the legal name. Applied after the walk — filter[legalName] is 400."
-            )
-        ),
+        Field(description=("Substring of the legal name. Applied after the server-side read.")),
     ] = None,
     city: Annotated[
         str | None,
-        Field(description=("Substring of the city. Applied after the walk — filter[city] is 400.")),
+        Field(description="Substring of the city. Applied after the server-side read."),
     ] = None,
     country: Annotated[
         str | None,
@@ -137,38 +123,28 @@ async def search_organizations(
             description=(
                 "Substring of the country as stored, which is the full name ('United Arab "
                 "Emirates', 'United States of America') — an abbreviation like 'UAE' or "
-                "'USA' matches nothing. Applied after the walk — filter[country] is 400."
+                "'USA' matches nothing. Applied after the server-side read."
             )
         ),
     ] = None,
     state: Annotated[
         str | None,
         Field(
-            description=(
-                "Substring of the state or region. Applied after the walk — "
-                "filter[state] is not a collection filter."
-            )
+            description=("Substring of the state or region. Applied after the server-side read.")
         ),
     ] = None,
     website: Annotated[
         str | None,
-        Field(
-            description=(
-                "Substring of the website. Applied after the walk — filter[website] is 400."
-            )
-        ),
+        Field(description=("Substring of the website. Applied after the server-side read.")),
     ] = None,
     ria: Annotated[
         bool | None,
-        Field(description=("Exact RIA flag. Applied after the walk — filter[ria] is 400.")),
+        Field(description="Exact RIA flag. Applied after the server-side read."),
     ] = None,
     internal_organization: Annotated[
         bool | None,
         Field(
-            description=(
-                "Exact internal-organization flag. Applied after the walk — "
-                "filter[internalOrganization] is 400."
-            )
+            description=("Exact internal-organization flag. Applied after the server-side read.")
         ),
     ] = None,
     custom_fields: Annotated[
@@ -176,9 +152,8 @@ async def search_organizations(
         Field(
             description=(
                 "Custom-field predicates, AND. Each is a definition id from "
-                "list_custom_fields plus the stored value. Applied after the walk: "
-                "a custom-field name, a definition id used as the filter field, and "
-                "filter[regularCustomFieldValues] are all 400. A call that sets only "
+                "list_custom_fields plus the stored value. Applied after the "
+                "server-side read. A call that sets only "
                 "these reads the collection (up to "
                 f"{MAX_ORGANIZATION_SCAN_RECORDS} rows) and says so in `coverage`."
             )
@@ -247,8 +222,10 @@ async def search_organizations(
     the in-memory predicates. An empty `rows` list means nothing matched.
 
     Call like: {"country": "Finland",
-    "custom_fields": [{"definition_id": "261621", "values": ["Prospect"]}],
-    "custom_field_columns": ["261623", "8646227"], "fields": ["name", "city", "country"]}
+    "custom_fields": [{"definition_id": "<definition id from list_custom_fields>",
+    "values": ["Prospect"]}],
+    "custom_field_columns": ["<definition id from list_custom_fields>"],
+    "fields": ["name", "city", "country"]}
     """
     predicates = _predicates(custom_fields)
     chosen = frozenset(fields) if fields is not None else _DEFAULT_FIELDS

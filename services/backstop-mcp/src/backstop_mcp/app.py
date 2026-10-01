@@ -39,11 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_app() -> Starlette:
-    """Assemble the ASGI app.
-
-    Logging, metrics, FastMCP, TOOLS, setup_ops, /ready /login, middleware, lifespan
-    `close_singletons()`.
-    """
+    """Build the ASGI app: logging, metrics, the MCP server and its tools, login, and readiness."""
     config = get_app_config()
     auth_config = get_auth_config()
 

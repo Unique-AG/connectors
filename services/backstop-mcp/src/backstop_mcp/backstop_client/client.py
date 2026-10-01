@@ -255,7 +255,7 @@ class BackstopClient:
         """Issue a request without deserializing the body.
 
         Same transport stack as the typed verbs (auth, gate, timeouts, retries, error mapping),
-        but returns the raw `httpx.Response`.         Do **not** use this for tool/feature code that
+        but returns the raw `httpx.Response`. Do **not** use this for tool/feature code that
         should be type-safe — pass a `schema` to `.get`/`.post`/`.patch`/`.paginate`, or call
         `.delete` without one when the body is empty. Intended for status-only checks such as
         credential verification.
@@ -412,7 +412,7 @@ class BackstopClient:
         if not confirmed_rejection(outcomes):
             self._raise_transient_auth(session, trigger_path, clock, attempts=len(outcomes))
         try:
-            # Notify the auth failed an that we need to revoke credentials
+            # Confirmed rejection: revoke the stored credential.
             await on_auth_failure()
         except Exception:
             logger.exception("backstop.auth_failure_hook.failed")

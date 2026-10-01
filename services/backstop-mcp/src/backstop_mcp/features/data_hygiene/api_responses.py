@@ -33,8 +33,9 @@ def _clean_or_none(value: object) -> object:
 CleanStr = Annotated[str | None, BeforeValidator(_clean_or_none)]
 
 # Which resource types can hold an employment relationship, as the canonical plurals that
-# `entity_types.normalize_entity_type` maps to — `employment.py` compares through it. Backstop
-# emits the API path segment (`people`, `organizations`) and an admin cannot rename those, so
+# `entity_types.normalize_entity_type` maps to. `employment_index_factory` compares through
+# that helper. Backstop emits the API path segment (`people`, `organizations`) and an admin
+# cannot rename those, so
 # this is product schema rather than tenant vocabulary and has no business being configurable:
 # a deployment cannot know the strings, and a typo would silently disable detection.
 PERSON_SIDE_TYPES: frozenset[str] = frozenset({"people", "contacts", "employees"})

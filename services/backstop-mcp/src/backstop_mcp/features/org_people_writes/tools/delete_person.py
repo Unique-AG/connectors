@@ -54,14 +54,11 @@ async def delete_person(
         get_delete_party_with_locations_command_factory
     ),
 ) -> DeletePersonResponse | InputRequiredResult:
-    """Permanently delete a CRM person and their contact-locations.
+    """Permanently delete one CRM person and their locations.
 
-    `search_type` plus exactly one of `party_id` or `search` — same identity as
-    `update_person`. Never invent an id. Deletion is permanent: Backstop has no recycle
-    bin. Refuse bulk wipes, "all test records", and any search-then-delete sweep.
-    Locations are removed first (`include=contactLocations`, never
-    `include=locations`); deleting the person without that cascade strands those
-    addresses. `destructive_hint` is true because this hard-deletes the record.
+    Needs a trusted `party_id` (`search_type` defaults to people). Never invent an id.
+    Deletion is permanent: Backstop has no recycle bin. Locations are removed first.
+    Refuse bulk wipes, "all test records", and any search-then-delete sweep.
 
     When the client supports elicitation, this tool reads the person first and asks the
     user to confirm before deleting. When the client cannot elicit, it deletes immediately.
@@ -71,7 +68,6 @@ async def delete_person(
     result = await resolve_party_query.run(
         search_type=person.search_type,
         party_id=person.party_id,
-        search=person.search,
     )
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)

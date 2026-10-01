@@ -249,23 +249,12 @@ async def elicit_from_client[T](
     message: str,
     response_type: type[T] | list[str],
 ) -> AcceptedElicitation[T] | AcceptedElicitation[str] | DeclinedElicitation | CancelledElicitation:
-    """Handshake mid-call elicit. On Streamable HTTP, send it on GET, not the open POST.
+    """Handshake mid-call elicit. On `/mcp`, send it on the GET stream.
 
-    Handshake (`2025-11-25`) still uses `elicitation/create`. The bug was which HTTP
-    stream that request rode. `ctx.elicit()` always sets `related_request_id` to the
-    current `tools/call`. On Streamable HTTP (`/mcp`) that puts the form on the open
-    POST SSE. Inspector and Cursor wait for that POST to finish before they render
-    anything on it, so the picker only appeared after the 45s timeout — then as a
-    cancelled form.
-
-    Classic SSE never had this problem: its GET stays live, so a mid-call elicit is
-    visible immediately. We do not mount SSE; `/mcp` is the only transport.
-
-    On `/mcp` this does not call `ctx.elicit()`. It calls `session.elicit_form`
-    with no `related_request_id`. FastMCP then sends `elicitation/create` on the
-    standalone GET stream. The POST stays open waiting for the answer; the form
-    can show while the tool is still running. Tests and non-`/mcp` requests keep
-    `ctx.elicit()`.
+    `ctx.elicit()` sets `related_request_id` and lands the form on the open POST, which
+    clients do not render until that POST finishes. `/mcp` calls `session.elicit_form`
+    with no `related_request_id` so the form rides the standalone GET. Other transports
+    keep `ctx.elicit()`.
     """
     if not _on_streamable_http():
         return await ctx.elicit(message=message, response_type=response_type)
@@ -546,8 +535,9 @@ class AmbiguousResponse[CandidateT: CandidateResponse](BaseModel):
     candidates: list[CandidateT] = Field(
         default_factory=list,
         description=(
-            "The matching records. Show `label` to the user, then retry with that candidate's "
-            "`id` (and `search_type` when the candidate has one) — never invent an id."
+            "The matching records. Quick-search returns at most 10. Show `label` to the user, "
+            "then retry with that candidate's `id` (and `search_type` when the candidate has "
+            "one) — never invent an id."
         ),
     )
 

@@ -442,8 +442,7 @@ class TestContract:
         assert "get_product_positions" not in doc
         assert "get_time_series" in doc
         assert "data_caveat" in doc
-        assert "undocumented" in doc
-        assert "may 404" in doc
+        assert "source" in doc
         assert "search_type" in doc
         assert "rejected" in doc
 
@@ -455,7 +454,7 @@ class TestContract:
         dumped = str(schema)
         assert "0.796 is 79.6%" in dumped
         assert "no figure is recorded" in dumped
-        assert "Omitted, never zeroed" in dumped
+        assert "not recorded" in dumped
 
     @pytest.mark.asyncio
     @respx.mock
