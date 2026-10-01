@@ -82,6 +82,9 @@ _OTHER_FOLDER = DriveFolderHandle(DRIVE_ID, OTHER_FOLDER_ID).uri
 _ROOT_BY_ALIAS = DriveFolderHandle(DRIVE_ID, "root").uri
 _ELSEWHERE = DriveFolderHandle(OTHER_DRIVE_ID, FOLDER_ID).uri
 
+_LATEST_VERSION_BEFORE_THE_DELETE = (
+    "The copy has only the latest version of a file, so tell the user before the delete."
+)
 _DELETE_AFTER_THE_COPY_SHOWS = (
     "Use sharepoint_delete_item on the original only after sharepoint_browse_folder shows the copy."
 )
@@ -759,6 +762,7 @@ class TestWhatItRefusesBeforeGraph:
             _ = await _move(client, to_folder=_ELSEWHERE)
 
         assert "sharepoint_copy_item" in str(refused.value)
+        assert _LATEST_VERSION_BEFORE_THE_DELETE in str(refused.value)
         assert _DELETE_AFTER_THE_COPY_SHOWS in str(refused.value)
         assert len(graph.calls) == 0
 
@@ -1181,6 +1185,7 @@ class TestHowItDeclaresItself:
             "This tool asks the user to agree before it changes anything, every time.",
             "OneDrive and SharePoint can show the change to everyone who can open the folder.",
             "This tool moves an item inside one drive only.",
+            _LATEST_VERSION_BEFORE_THE_DELETE,
             _DELETE_AFTER_THE_COPY_SHOWS,
             "This call is safe to repeat after a timeout.",
             "To change the name, use sharepoint_rename_item.",

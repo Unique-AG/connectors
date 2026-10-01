@@ -74,6 +74,10 @@ _SHOWN_TO_OTHERS = (
 _PERMISSIONS = (
     "The copy gets the permissions of the destination folder, not the permissions of the original."
 )
+_LATEST_VERSION_ONLY = (
+    "It has only the latest version of a file, and Microsoft does not copy the metadata of the "
+    + "original."
+)
 _NAME_CLASH = (
     "If the destination already holds an item with the same name, the copy fails. This failure "
     + "can come after this call returns, and then this tool cannot show it. To copy an item into "
@@ -948,7 +952,15 @@ class TestHowItDeclaresItself:
         assert tool.title == "Copy an Item"
 
     @pytest.mark.parametrize(
-        "sentence", [_AGREE_EVERY_TIME, _SHOWN_TO_OTHERS, _PERMISSIONS, _NAME_CLASH, _RETRY]
+        "sentence",
+        [
+            _AGREE_EVERY_TIME,
+            _SHOWN_TO_OTHERS,
+            _PERMISSIONS,
+            _LATEST_VERSION_ONLY,
+            _NAME_CLASH,
+            _RETRY,
+        ],
     )
     async def test_the_description_keeps_its_guarantees(
         self, transport: httpx.AsyncClient, sentence: str

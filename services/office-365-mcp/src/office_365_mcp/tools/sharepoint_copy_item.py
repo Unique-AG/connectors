@@ -73,7 +73,8 @@ change to everyone who can open the folder.
 
 Notes:
 - This tool asks the user to agree before it creates anything, every time.
-- The copy gets the permissions of the destination folder, not the permissions of the original.
+- The copy gets the permissions of the destination folder, not the permissions of the original. \
+It has only the latest version of a file, and Microsoft does not copy the metadata of the original.
 - If the destination already holds an item with the same name, the copy fails. This failure can \
 come after this call returns, and then this tool cannot show it. To copy an item into its own \
 folder, give the copy a new `name`.

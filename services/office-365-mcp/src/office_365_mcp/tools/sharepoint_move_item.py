@@ -53,7 +53,8 @@ _DO_NOT_MOVE = "do not move"
 _NOTHING_MOVED = "Nothing was moved."
 
 _TO_A_DIFFERENT_DRIVE = (
-    "To move an item to a different drive, copy it with sharepoint_copy_item. Use "
+    "To move an item to a different drive, copy it with sharepoint_copy_item. The copy has only "
+    + "the latest version of a file, so tell the user before the delete. Use "
     + "sharepoint_delete_item on the original only after sharepoint_browse_folder shows the copy."
 )
 
