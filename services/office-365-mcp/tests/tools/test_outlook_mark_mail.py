@@ -26,11 +26,14 @@ from office_365_mcp.graph_client import (
     GraphUnavailable,
 )
 from office_365_mcp.shared import identity
+from office_365_mcp.shared.calendar import ZONE_NAME
 from office_365_mcp.shared.handles import MailMessageHandle
+from office_365_mcp.shared.mail import FlagMoment
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm, Confirmed
 from office_365_mcp.tools.outlook_mark_mail import (
     GRAPH_PERMISSIONS,
     TOOL_NAME,
+    FlagStatus,
     MailImportance,
     MarkChange,
     MarkedMail,
@@ -70,6 +73,12 @@ _CLIENT_TOKEN = "synthetic-fastmcp-session-token"
 _MAILBOX = "alex@example.invalid"
 
 _NOT_CHANGED = "No message was changed."
+
+_START = "2026-03-02T09:00"
+_DUE = "2026-03-06T17:00"
+_ZONE = "Europe/Berlin"
+
+_DATED = MarkChange(flag_starts_at=_START, flag_due_at=_DUE, flag_time_zone=_ZONE)
 
 
 async def _agrees(question: str, about: str) -> Confirmed:
@@ -136,12 +145,15 @@ def _updated(
     is_read: bool | None = True,
     flag_status: str | None = "notFlagged",
     importance: str | None = "normal",
+    flag: Mapping[str, object] | None = None,
+    categories: list[str] | None = None,
 ) -> dict[str, object]:
     return {
         "id": message_id,
         "isRead": is_read,
         "importance": importance,
-        "flag": None if flag_status is None else {"flagStatus": flag_status},
+        "flag": flag or (None if flag_status is None else {"flagStatus": flag_status}),
+        "categories": categories,
     }
 
 
@@ -152,6 +164,8 @@ def _writes(
     is_read: bool | None = True,
     flag_status: str | None = "notFlagged",
     importance: str | None = "normal",
+    flag: Mapping[str, object] | None = None,
+    categories: list[str] | None = None,
 ) -> respx.Route:
     return graph.patch(_PATHS[index]).mock(
         return_value=httpx.Response(
@@ -161,8 +175,22 @@ def _writes(
                 is_read=is_read,
                 flag_status=flag_status,
                 importance=importance,
+                flag=flag,
+                categories=categories,
             ),
         )
+    )
+
+
+def _reads(graph: respx.MockRouter, index: int, categories: list[str]) -> respx.Route:
+    return graph.get(_PATHS[index]).mock(
+        return_value=httpx.Response(200, json={"id": _IDS[index], "categories": categories})
+    )
+
+
+def _every_read(graph: respx.MockRouter) -> respx.Route:
+    return graph.route(method="GET").mock(
+        return_value=httpx.Response(200, json={"id": _IDS[0], "categories": []})
     )
 
 
@@ -216,6 +244,21 @@ def _narrowed(answer: MarkedMail | InputRequiredResult) -> MarkedMail:
     return answer
 
 
+async def _changed(
+    client: GraphServiceClient,
+    change: MarkChange,
+    *,
+    refs: int = 1,
+    mailbox: str | None = None,
+    confirm: Confirm = _never_asked,
+) -> MarkedMail:
+    return _narrowed(
+        await mark_mail(
+            client, message_refs=_REFS[:refs], change=change, confirm=confirm, mailbox=mailbox
+        )
+    )
+
+
 async def _marked(
     client: GraphServiceClient,
     *,
@@ -226,15 +269,27 @@ async def _marked(
     mailbox: str | None = None,
     confirm: Confirm = _never_asked,
 ) -> MarkedMail:
-    return _narrowed(
-        await mark_mail(
-            client,
-            message_refs=_REFS[:refs],
-            change=MarkChange(is_read=is_read, flagged=flagged, importance=importance),
-            confirm=confirm,
-            mailbox=mailbox,
-        )
+    return await _changed(
+        client,
+        MarkChange(is_read=is_read, flagged=flagged, importance=importance),
+        refs=refs,
+        mailbox=mailbox,
+        confirm=confirm,
     )
+
+
+async def _asked(client: GraphServiceClient, change: MarkChange) -> tuple[str, str]:
+    asked: list[tuple[str, str]] = []
+
+    async def capturing(question: str, about: str) -> Confirmed:
+        asked.append((question, about))
+        return _NOT_CHANGED
+
+    with pytest.raises(ToolError, match=_NOT_CHANGED):
+        _ = await _changed(client, change, refs=2, mailbox=_MAILBOX, confirm=capturing)
+
+    (only,) = asked
+    return only
 
 
 class TestTheBatchSize:
@@ -416,6 +471,54 @@ class TestWhatTheModelIsTold:
         assert [row.changed for row in answer.messages] == [True, False]
         assert (answer.changed_count, answer.failed_count) == (1, 1)
 
+    async def test_a_zone_with_a_character_no_zone_name_has_is_refused_before_graph(
+        self, server_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        route = graph.route().mock(return_value=httpx.Response(200, json=_updated()))
+
+        result = await server_client.call_tool(
+            TOOL_NAME,
+            {
+                "message_refs": list(_REFS[:1]),
+                "flag_starts_at": _START,
+                "flag_time_zone": "Europe/Berlin; DROP",
+            },
+            raise_on_error=False,
+        )
+
+        assert result.is_error, _text(result)
+        assert route.call_count == 0
+
+    async def test_the_new_arguments_reach_graph_through_the_published_schema(
+        self, server_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, 0, ["Red"])
+        write = _writes(graph, 0)
+
+        result = await server_client.call_tool(
+            TOOL_NAME,
+            {
+                "message_refs": list(_REFS[:1]),
+                "flag_starts_at": _START,
+                "flag_due_at": _DUE,
+                "flag_time_zone": _ZONE,
+                "add_categories": ["Blue"],
+                "remove_categories": ["red"],
+            },
+            raise_on_error=False,
+        )
+
+        assert not result.is_error, _text(result)
+        assert _sent(write) == {
+            "@odata.type": "#microsoft.graph.message",
+            "flag": {
+                "flagStatus": "flagged",
+                "startDateTime": {"dateTime": _START, "timeZone": _ZONE},
+                "dueDateTime": {"dateTime": _DUE, "timeZone": _ZONE},
+            },
+            "categories": ["Blue"],
+        }
+
     async def test_every_write_accepted_answers_row_by_row(
         self, server_client: Client[FastMCPTransport], graph: respx.MockRouter
     ) -> None:
@@ -544,6 +647,286 @@ class TestWhatItSendsToGraph:
         assert "prefer" not in profile.calls.last.request.headers
 
 
+class TestTheFollowUpFlag:
+    async def test_the_flagged_argument_alone_writes_only_the_status(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _writes(graph, 0)
+
+        _ = await _marked(client, flagged=True)
+
+        assert _sent(route) == {
+            "@odata.type": "#microsoft.graph.message",
+            "flag": {"flagStatus": "flagged"},
+        }
+
+    @pytest.mark.parametrize("status", ["flagged", "complete", "notFlagged"])
+    async def test_the_status_argument_is_written_as_a_followup_flag(
+        self, client: GraphServiceClient, graph: respx.MockRouter, status: FlagStatus
+    ) -> None:
+        route = _writes(graph, 0)
+
+        _ = await _changed(client, MarkChange(flag_status=status))
+
+        assert _sent(route)["flag"] == {"flagStatus": status}
+
+    async def test_a_start_and_a_due_date_are_written_in_the_zone_named(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _writes(graph, 0)
+
+        _ = await _changed(client, _DATED)
+
+        assert _sent(route)["flag"] == {
+            "flagStatus": "flagged",
+            "startDateTime": {"dateTime": _START, "timeZone": _ZONE},
+            "dueDateTime": {"dateTime": _DUE, "timeZone": _ZONE},
+        }
+
+    async def test_a_start_date_alone_is_written_with_no_due_date(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _writes(graph, 0)
+
+        _ = await _changed(client, MarkChange(flag_starts_at=_START, flag_time_zone=_ZONE))
+
+        assert _sent(route)["flag"] == {
+            "flagStatus": "flagged",
+            "startDateTime": {"dateTime": _START, "timeZone": _ZONE},
+        }
+
+    @pytest.mark.parametrize(
+        "status",
+        [
+            pytest.param(MarkChange(flagged=True), id="flagged"),
+            pytest.param(MarkChange(flag_status="flagged"), id="flag_status"),
+        ],
+    )
+    async def test_dates_go_with_a_status_that_flags_the_message(
+        self, client: GraphServiceClient, graph: respx.MockRouter, status: MarkChange
+    ) -> None:
+        route = _writes(graph, 0)
+        change = MarkChange(
+            flagged=status.flagged,
+            flag_status=status.flag_status,
+            flag_starts_at=_START,
+            flag_due_at=_START,
+            flag_time_zone="UTC",
+        )
+
+        _ = await _changed(client, change)
+
+        assert _sent(route)["flag"] == {
+            "flagStatus": "flagged",
+            "startDateTime": {"dateTime": _START, "timeZone": "UTC"},
+            "dueDateTime": {"dateTime": _START, "timeZone": "UTC"},
+        }
+
+    async def test_the_dates_reported_are_the_ones_microsoft_answered_with(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _writes(
+            graph,
+            0,
+            flag={
+                "flagStatus": "flagged",
+                "startDateTime": {"dateTime": "2026-03-02T08:00:00.0000000", "timeZone": "UTC"},
+                "dueDateTime": {"dateTime": "2026-03-06T16:00:00.0000000", "timeZone": "UTC"},
+            },
+        )
+
+        answer = await _changed(client, _DATED)
+
+        row = answer.messages[0]
+        assert row.flag_status == "flagged"
+        assert row.flag_start == FlagMoment(
+            date_time="2026-03-02T08:00:00.0000000", time_zone="UTC"
+        )
+        assert row.flag_due == FlagMoment(date_time="2026-03-06T16:00:00.0000000", time_zone="UTC")
+
+    async def test_a_flag_with_no_dates_reports_no_dates(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _writes(graph, 0, flag_status="complete")
+
+        answer = await _changed(client, MarkChange(flag_status="complete"))
+
+        row = answer.messages[0]
+        assert (row.flag_status, row.flag_start, row.flag_due) == ("complete", None, None)
+
+
+class TestTheCategories:
+    async def test_it_reads_the_categories_before_it_writes_the_merged_list(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, 0, ["Red", "Blue"])
+        write = _writes(graph, 0)
+
+        _ = await _changed(client, MarkChange(add_categories=("Green",)))
+
+        assert read.call_count == 1
+        assert _sent(write) == {
+            "@odata.type": "#microsoft.graph.message",
+            "categories": ["Red", "Blue", "Green"],
+        }
+
+    async def test_the_read_asks_only_for_the_categories_in_the_immutable_id_space(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, 0, [])
+        _ = _writes(graph, 0)
+
+        _ = await _changed(client, MarkChange(remove_categories=("Red",)))
+
+        request = read.calls.last.request
+        assert request.url.params["$select"] == "categories"
+        assert 'IdType="ImmutableId"' in request.headers["prefer"]
+
+    @pytest.mark.parametrize(
+        ("current", "add", "remove", "written"),
+        [
+            pytest.param(["Red", "Blue"], ("Green",), (), ["Red", "Blue", "Green"], id="append"),
+            pytest.param(["Red", "Blue"], ("red", "Green"), (), ["Red", "Blue", "Green"], id="had"),
+            pytest.param([], ("Green", "GREEN"), (), ["Green"], id="added-twice"),
+            pytest.param(["Red", "Blue"], (), ("BLUE",), ["Red"], id="remove-any-case"),
+            pytest.param(["Red"], (), ("Red",), [], id="remove-the-last"),
+            pytest.param(["Red"], (), ("Yellow",), ["Red"], id="remove-absent"),
+            pytest.param(["Red", "Blue"], ("Green",), ("Red",), ["Blue", "Green"], id="both"),
+        ],
+    )
+    async def test_the_merged_list_keeps_the_order_and_ignores_case(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        current: list[str],
+        add: tuple[str, ...],
+        remove: tuple[str, ...],
+        written: list[str],
+    ) -> None:
+        _ = _reads(graph, 0, current)
+        write = _writes(graph, 0)
+
+        _ = await _changed(client, MarkChange(add_categories=add, remove_categories=remove))
+
+        assert _sent(write)["categories"] == written
+
+    async def test_no_category_argument_reads_nothing_and_writes_no_categories(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _every_read(graph)
+        write = _writes(graph, 0)
+
+        _ = await _marked(client, is_read=True)
+
+        assert read.call_count == 0
+        assert "categories" not in _sent(write)
+
+    async def test_each_message_is_read_and_merged_on_its_own(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, 0, ["Red"])
+        _ = _reads(graph, 1, ["Blue"])
+        writes = [_writes(graph, index) for index in range(2)]
+
+        _ = await _changed(client, MarkChange(add_categories=("Green",)), refs=2)
+
+        assert [_sent(write)["categories"] for write in writes] == [
+            ["Red", "Green"],
+            ["Blue", "Green"],
+        ]
+
+    async def test_every_other_change_goes_in_the_same_patch(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, 0, ["Red"])
+        write = _writes(graph, 0)
+
+        _ = await _changed(
+            client,
+            MarkChange(
+                is_read=True, flag_status="complete", importance="low", add_categories=("Blue",)
+            ),
+        )
+
+        assert write.call_count == 1
+        assert _sent(write) == {
+            "@odata.type": "#microsoft.graph.message",
+            "isRead": True,
+            "flag": {"flagStatus": "complete"},
+            "importance": "low",
+            "categories": ["Red", "Blue"],
+        }
+
+    async def test_a_failed_read_fails_that_row_and_writes_nothing_to_that_message(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_PATHS[0]).mock(
+            return_value=httpx.Response(404, headers={"request-id": _REQUEST_ID}, json=_NOT_FOUND)
+        )
+        refused = _writes(graph, 0)
+        _ = _reads(graph, 1, [])
+        _ = _writes(graph, 1)
+
+        answer = await _changed(client, MarkChange(add_categories=("Green",)), refs=2)
+
+        assert refused.call_count == 0
+        assert [row.changed for row in answer.messages] == [False, True]
+        failure = answer.messages[0].failure
+        assert failure is not None
+        assert "ErrorItemNotFound" in failure
+        assert _REQUEST_ID in failure
+
+    async def test_a_failed_write_after_the_read_fails_that_row(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, 0, ["Red"])
+        _ = _refuses(graph, 0, 403)
+        _ = _reads(graph, 1, [])
+        _ = _writes(graph, 1)
+
+        answer = await _changed(client, MarkChange(add_categories=("Green",)), refs=2)
+
+        assert [row.changed for row in answer.messages] == [False, True]
+        assert answer.messages[0].categories is None
+
+    async def test_a_read_refused_on_every_message_raises_instead_of_answering(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route(method="GET").mock(return_value=httpx.Response(404, json=_NOT_FOUND))
+        write = _every_write(graph)
+
+        with pytest.raises(GraphNotFound):
+            _ = await _changed(client, MarkChange(add_categories=("Green",)), refs=2)
+
+        assert write.call_count == 0
+
+    async def test_the_categories_reported_are_the_ones_microsoft_answered_with(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, 0, [])
+        _ = _writes(graph, 0, categories=["Purple"])
+
+        answer = await _changed(client, MarkChange(add_categories=("Green",)))
+
+        assert answer.messages[0].categories == ["Purple"]
+
+    async def test_a_mailbox_reads_that_mailbox_instead_of_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        path = f"/users/{_MAILBOX}/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+        read = graph.get(path).mock(
+            return_value=httpx.Response(200, json={"id": _IDS[0], "categories": ["Red"]})
+        )
+        write = graph.patch(path).mock(return_value=httpx.Response(200, json=_updated()))
+
+        _ = await _changed(
+            client, MarkChange(add_categories=("Blue",)), mailbox=_MAILBOX, confirm=_agrees
+        )
+
+        assert read.call_count == 1
+        assert _sent(write)["categories"] == ["Red", "Blue"]
+
+
 class TestAWriteIsNotRetried:
     @pytest.mark.usefixtures("retry_sleeps")
     async def test_a_patch_microsoft_answered_503_to_is_sent_exactly_once(
@@ -570,6 +953,94 @@ class TestWhatItRefusesBeforeWritingAnything:
             )
 
         assert route.call_count == 0
+
+    @pytest.mark.parametrize(
+        ("change", "named"),
+        [
+            pytest.param(
+                MarkChange(add_categories=(), remove_categories=()), "`is_read`", id="none"
+            ),
+            pytest.param(
+                MarkChange(flagged=True, flag_status="complete"), "`flag_status`", id="two-forms"
+            ),
+            pytest.param(MarkChange(flag_due_at=_DUE), "`flag_starts_at`", id="due-alone"),
+            pytest.param(MarkChange(flag_starts_at=_START), "`flag_time_zone`", id="no-zone"),
+            pytest.param(
+                MarkChange(flag_starts_at=_START, flag_due_at=_DUE),
+                "`flag_time_zone`",
+                id="dates-with-no-zone",
+            ),
+            pytest.param(MarkChange(flag_time_zone=_ZONE), "`flag_starts_at`", id="zone-alone"),
+            pytest.param(
+                MarkChange(flag_starts_at=_DUE, flag_due_at=_START, flag_time_zone=_ZONE),
+                "`flag_due_at`",
+                id="due-before-start",
+            ),
+            pytest.param(
+                MarkChange(flagged=False, flag_starts_at=_START, flag_time_zone=_ZONE),
+                "`flag_status`",
+                id="dates-with-flag-cleared",
+            ),
+            pytest.param(
+                MarkChange(flag_status="complete", flag_starts_at=_START, flag_time_zone=_ZONE),
+                "`flag_status`",
+                id="dates-with-complete",
+            ),
+            pytest.param(
+                MarkChange(flag_status="notFlagged", flag_starts_at=_START, flag_time_zone=_ZONE),
+                "`flag_status`",
+                id="dates-with-not-flagged",
+            ),
+            pytest.param(
+                MarkChange(flag_starts_at="tomorrow at 9", flag_time_zone=_ZONE),
+                "'tomorrow at 9' in `flag_starts_at`",
+                id="start-not-a-time",
+            ),
+            pytest.param(
+                MarkChange(flag_starts_at="2026-03-02T09:00Z", flag_time_zone=_ZONE),
+                "`flag_starts_at`",
+                id="start-with-an-offset",
+            ),
+            pytest.param(
+                MarkChange(flag_starts_at=_START, flag_due_at="2026-03-06", flag_time_zone=_ZONE),
+                "'2026-03-06' in `flag_due_at`",
+                id="due-with-no-time",
+            ),
+            pytest.param(
+                MarkChange(add_categories=("Red", "Blue"), remove_categories=("BLUE",)),
+                "'Blue' is in both `add_categories` and `remove_categories`",
+                id="category-in-both-lists",
+            ),
+        ],
+    )
+    async def test_a_refused_change_says_what_to_change_and_asks_nobody_and_writes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter, change: MarkChange, named: str
+    ) -> None:
+        route = graph.route().mock(return_value=httpx.Response(200, json=_updated()))
+
+        with pytest.raises(ToolError) as refused:
+            _ = await mark_mail(
+                client,
+                message_refs=_REFS[:1],
+                change=change,
+                confirm=_never_asked,
+                mailbox=_MAILBOX,
+            )
+
+        assert route.call_count == 0
+        assert named in str(refused.value)
+        assert _NOT_CHANGED in str(refused.value)
+
+    async def test_a_due_date_equal_to_the_start_date_is_accepted(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _writes(graph, 0)
+
+        _ = await _changed(
+            client, MarkChange(flag_starts_at=_START, flag_due_at=_START, flag_time_zone=_ZONE)
+        )
+
+        assert route.call_count == 1
 
     @pytest.mark.parametrize(
         "not_a_message",
@@ -740,6 +1211,70 @@ class TestThePersonBeforeAnotherMailboxChanges:
 
         assert spoken in asked[0]
 
+    @pytest.mark.parametrize(
+        ("change", "spoken"),
+        [
+            pytest.param(
+                MarkChange(flag_status="complete"),
+                "This tool will mark their follow-up complete.",
+                id="complete",
+            ),
+            pytest.param(
+                MarkChange(flag_status="notFlagged"),
+                "This tool will clear their follow-up flag.",
+                id="not-flagged",
+            ),
+            pytest.param(
+                _DATED,
+                f"This tool will flag them for follow-up from {_START} to {_DUE} in {_ZONE}.",
+                id="start-and-due",
+            ),
+            pytest.param(
+                MarkChange(flag_starts_at=_START, flag_time_zone=_ZONE),
+                f"This tool will flag them for follow-up from {_START} in {_ZONE}.",
+                id="start-alone",
+            ),
+            pytest.param(
+                MarkChange(add_categories=("Red", "Blue")),
+                "This tool will add the categories 'Red, Blue'.",
+                id="add",
+            ),
+            pytest.param(
+                MarkChange(is_read=True, add_categories=("Red",), remove_categories=("Blue",)),
+                "mark them as read, add the category 'Red' and remove the category 'Blue'.",
+                id="read-add-and-remove",
+            ),
+        ],
+    )
+    @pytest.mark.usefixtures("graph")
+    async def test_the_question_speaks_of_the_flag_and_the_categories(
+        self, client: GraphServiceClient, change: MarkChange, spoken: str
+    ) -> None:
+        question, _ = await _asked(client, change)
+
+        assert spoken in question
+
+    @pytest.mark.usefixtures("graph")
+    async def test_every_kind_of_change_binds_an_agreement_of_its_own(
+        self, client: GraphServiceClient
+    ) -> None:
+        changes = (
+            MarkChange(flagged=True),
+            MarkChange(flag_status="flagged"),
+            MarkChange(flag_status="complete"),
+            MarkChange(flag_starts_at=_START, flag_time_zone=_ZONE),
+            MarkChange(flag_starts_at=_START, flag_time_zone="UTC"),
+            MarkChange(flag_starts_at=_DUE, flag_time_zone=_ZONE),
+            _DATED,
+            MarkChange(add_categories=("Red",)),
+            MarkChange(add_categories=("Red", "Blue")),
+            MarkChange(remove_categories=("Red",)),
+        )
+
+        bound = [(await _asked(client, change))[1] for change in changes]
+
+        assert len(set(bound)) == len(changes)
+
     async def test_a_very_long_mailbox_is_cut_in_the_question(
         self, client: GraphServiceClient
     ) -> None:
@@ -832,6 +1367,52 @@ class TestHowItDeclaresItself:
             "This tool asks the user to agree before it changes a shared or delegated mailbox. "
             "It changes the user's own mailbox without a question."
         ) in described
+
+    async def test_it_names_the_tool_that_moves_mail_and_says_each_message_changes_alone(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        described = tool.description or ""
+        assert "mark a follow-up complete, or give a flag a start date and a due date" in described
+        assert "adds or removes their categories" in described
+        assert "outlook_move_mail is the tool that moves messages to another folder." in described
+        assert "This tool changes each message separately." in described
+
+    async def test_the_category_arguments_name_the_tool_that_lists_the_names(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        arguments = _arguments(tool)
+        assert "outlook_list_categories" in str(arguments["add_categories"]["description"])
+        assert arguments["add_categories"]["default"] == []
+        assert arguments["remove_categories"]["default"] == []
+        assert cast("list[str]", tool.parameters["required"]) == ["message_refs"]
+
+    async def test_the_zone_is_held_to_the_zone_name_pattern(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        assert f'"pattern": "{ZONE_NAME}"' in json.dumps(_arguments(tool)["flag_time_zone"])
+
+    @pytest.mark.parametrize("argument", ["flag_starts_at", "flag_due_at"])
+    async def test_a_flag_date_is_a_plain_string_and_not_a_date_format(
+        self, transport: httpx.AsyncClient, argument: str
+    ) -> None:
+        tool = await _registered(transport)
+
+        assert '"format"' not in json.dumps(_arguments(tool)[argument])
+
+    async def test_the_status_admits_exactly_the_three_that_microsoft_names(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        defined = cast("Mapping[str, Mapping[str, object]]", tool.parameters["$defs"])
+        assert '"#/$defs/FlagStatus"' in json.dumps(_arguments(tool)["flag_status"])
+        assert defined["FlagStatus"]["enum"] == ["flagged", "complete", "notFlagged"]
 
     async def test_the_confirmation_is_no_argument_of_the_published_schema(
         self, transport: httpx.AsyncClient

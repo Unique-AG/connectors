@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncGenerator, Iterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -55,6 +56,23 @@ _MOVE = _Tool(move.TOOL_NAME, {"destination": "archive"}, "move", "POST")
 
 _EITHER_TOOL = pytest.mark.parametrize(
     "tool", [pytest.param(_MARK, id="mark"), pytest.param(_MOVE, id="move")]
+)
+
+_MARKS: Sequence[Mapping[str, object]] = (
+    {"is_read": True},
+    {"flagged": True},
+    {"flag_status": "flagged"},
+    {"flag_status": "complete"},
+    {"flag_starts_at": "2026-03-02T09:00", "flag_time_zone": "Europe/Berlin"},
+    {"flag_starts_at": "2026-03-02T09:00", "flag_time_zone": "UTC"},
+    {
+        "flag_starts_at": "2026-03-02T09:00",
+        "flag_due_at": "2026-03-06T17:00",
+        "flag_time_zone": "Europe/Berlin",
+    },
+    {"add_categories": ["Red"]},
+    {"add_categories": ["Red", "Blue"]},
+    {"remove_categories": ["Red"]},
 )
 
 
@@ -263,3 +281,46 @@ class TestTheWholeConfirmationOverARealClient:
         assert _writes(graph, tool) == [], (
             f"an accept nothing was bound to wrote {_writes(graph, tool)}"
         )
+
+    async def test_a_different_mark_binds_a_different_request_state(
+        self, app: Starlette, graph: respx.MockRouter
+    ) -> None:
+        person = _Person(agrees=True, word=_MARK.agree)
+
+        async with _connected(app, person) as client:
+            asked = [
+                await client.session.call_tool(
+                    _MARK.name,
+                    {"message_refs": list(_REFS), "mailbox": _MAILBOX, **mark},
+                    allow_input_required=True,
+                )
+                for mark in _MARKS
+            ]
+
+        states = {
+            answer.request_state for answer in asked if isinstance(answer, InputRequiredResult)
+        }
+        assert len(states) == len(_MARKS), f"{len(_MARKS)} marks bound {len(states)} states"
+        assert _writes(graph, _MARK) == []
+
+    async def test_an_agreed_category_change_reads_each_message_before_it_writes_it(
+        self, app: Starlette, graph: respx.MockRouter
+    ) -> None:
+        person = _Person(agrees=True, word=_MARK.agree)
+        read = graph.route(method="GET").mock(
+            return_value=httpx.Response(200, json={"id": "synthetic", "categories": ["Red"]})
+        )
+        arguments = {"message_refs": list(_REFS), "mailbox": _MAILBOX, "add_categories": ["Blue"]}
+
+        async with _connected(app, person) as client:
+            result = await client.call_tool(_MARK.name, arguments)
+
+        assert result.structured_content is not None, "the agreed change answered nothing"
+        assert len(person.questions) == 1
+        assert read.call_count == len(_REFS)
+        patches = [
+            cast("Mapping[str, object]", json.loads(call.request.content))
+            for call in cast("Sequence[respx.models.Call]", graph.calls)
+            if call.request.method == "PATCH"
+        ]
+        assert [patch["categories"] for patch in patches] == [["Red", "Blue"]] * len(_REFS)
