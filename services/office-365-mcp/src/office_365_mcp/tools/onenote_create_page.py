@@ -30,6 +30,7 @@ from office_365_mcp.shared.notes import (
     NotebookAudience,
     client_url_of,
     default_notebook_audience,
+    onenote_root,
     section_audience,
     web_url_of,
     write_state_for,
@@ -72,7 +73,8 @@ GRAPH_NOT_FOUND = (
 _NOT_A_SECTION_HANDLE = (
     "onenote_create_page takes a section handle in `section`, if it is given at all. It looks "
     + "like onenote:///sections/{id}, and it comes from the `uri` of a section in an "
-    + "onenote_list_notebooks result. Copy it exactly. A section name is not a handle, and "
+    + "onenote_list_notebooks result. A handle from a group notebook starts with "
+    + "onenote:///groups/{group}/ instead. Copy it exactly. A section name is not a handle, and "
     + "neither is a notebook name, a path, a web address or a bare id. Omit `section` entirely "
     + "to create the page in the default section of the default notebook instead."
 )
@@ -87,9 +89,9 @@ _BOTH_SECTION_AND_SECTION_NAME = (
 )
 
 _DESCRIPTION = """\
-Writes a new page into the signed-in user's OneNote. There is no way to attach a file or an \
-image. onenote_append_to_page adds to a page later. OneNote can show the change to everyone who \
-opens the notebook.
+Writes a new page into the signed-in user's OneNote, or into a notebook that a Microsoft 365 \
+group owns. There is no way to attach a file or an image. onenote_append_to_page adds to a page \
+later. OneNote can show the change to everyone who opens the notebook.
 
 Notes:
 - This tool asks the user to agree before it writes into a notebook that is shared with other \
@@ -110,7 +112,8 @@ support custom tags.
 class CreatedPage(BaseModel):
     uri: str = Field(
         description=(
-            "This new page's handle: onenote:///pages/{id}, with the id percent-encoded. Pass "
+            "This new page's handle: onenote:///pages/{id}, with the id percent-encoded. A "
+            + "handle from a group notebook starts with onenote:///groups/{group}/ instead. Pass "
             + "it to onenote_read_page to read the page back, or to onenote_append_to_page to "
             + "add more to it."
         )
@@ -141,6 +144,7 @@ class CreatedPage(BaseModel):
     section_uri: str | None = Field(
         description=(
             "The handle of the section this page was written into: onenote:///sections/{id}. "
+            + "A handle from a group notebook starts with onenote:///groups/{group}/ instead. "
             + "This is the `section` argument's own handle when one was given, though "
             + "Microsoft's own response can name a different section instead. Null when "
             + "`section` was omitted and `section_name` created a new section."
@@ -162,10 +166,12 @@ async def _notebook_audience_for(
 ) -> NotebookAudience:
     if handle is None:
         return await default_notebook_audience(client) or UNKNOWN_AUDIENCE
-    return await section_audience(client, handle.section_id)
+    return await section_audience(client, handle.section_id, group_id=handle.group_id)
 
 
 def _route(handle: OnenoteSectionHandle | None, section_name: str | None) -> tuple[str, ...]:
+    if handle is not None and handle.group_id is not None:
+        return ("group", handle.group_id, "section", handle.section_id)
     if handle is not None:
         return ("section", handle.section_id)
     if section_name is not None:
@@ -219,7 +225,9 @@ async def create_page(
     pages = (
         client.me.onenote.pages
         if handle is None
-        else client.me.onenote.sections.by_onenote_section_id(handle.section_id).pages
+        else onenote_root(client, handle.group_id)
+        .sections.by_onenote_section_id(handle.section_id)
+        .pages
     )
     raw_query: dict[str, str] = {"sectionName": section_name} if section_name is not None else {}
     request = request_with_query(
@@ -277,16 +285,17 @@ def _envelope(title: str, body_html: str, created_at: datetime) -> str:
 
 def _answer(page: OnenotePage, handle: OnenoteSectionHandle | None) -> CreatedPage:
     assert page.id is not None, "Graph created a page it gave no id, which cannot be addressed"
+    group_id = None if handle is None else handle.group_id
     parent = page.parent_section
     parent_id = parent.id if parent is not None else None
     if parent_id is not None:
-        section_uri = OnenoteSectionHandle(parent_id).uri
+        section_uri = OnenoteSectionHandle(parent_id, group_id=group_id).uri
     elif handle is not None:
         section_uri = handle.uri
     else:
         section_uri = None
     return CreatedPage(
-        uri=OnenotePageHandle(page.id).uri,
+        uri=OnenotePageHandle(page.id, group_id=group_id).uri,
         title=page.title,
         web_url=web_url_of(page.links),
         client_url=client_url_of(page.links),
@@ -336,8 +345,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The section to create the page in, as the `uri` of a section from an "
-                    + "onenote_list_notebooks result: onenote:///sections/{id}. A section name, "
-                    + "a notebook name and a web address are not handles."
+                    + "onenote_list_notebooks result: onenote:///sections/{id}. A handle from a "
+                    + "group notebook starts with onenote:///groups/{group}/ instead. A section "
+                    + "name, a notebook name and a web address are not handles."
                 ),
             ),
         ] = None,
