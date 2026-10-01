@@ -653,6 +653,9 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "teams_react_to_message",
         "teams_edit_message",
         "teams_delete_message",
+        "teams_create_meeting",
+        "teams_update_meeting",
+        "teams_delete_meeting",
     }
 )
 

@@ -60,6 +60,7 @@
                 "teams-write",
                 "teams-write-files",
                 "teams-edit",
+                "teams-meetings-write",
                 "teams-files",
                 "outlook-read",
                 "outlook-mailbox",

@@ -324,6 +324,12 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
     "teams_list_meeting_recordings": {"meeting_uri": ("teams_list_chats",)},
+    "teams_read_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
+    "teams_create_meeting": {
+        "attendees": ("get_me", "teams_list_chats", "teams_list_chat_members")
+    },
+    "teams_update_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
+    "teams_delete_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
     "outlook_read_mail": {"uri": ("outlook_search_mail",)},
     "outlook_browse_folders": {"parent": ("outlook_browse_folders",)},
     "outlook_read_thread": {"uri": ("outlook_search_mail",)},
@@ -419,6 +425,7 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "teams_send_channel_message_with_files": frozenset({"message", "name"}),
     "teams_react_to_message": frozenset({"reaction"}),
     "teams_edit_message": frozenset({"message", "name"}),
+    "teams_create_meeting": frozenset({"subject", "starts_at", "ends_at"}),
     "teams_search_messages": frozenset(
         {
             "query",
@@ -752,6 +759,18 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ),
         2,
         13,
+    ),
+    (
+        ToolsPreset.TEAMS_MEETINGS_WRITE,
+        (
+            "User.Read",
+            "Chat.Read",
+            "OnlineMeetings.Read",
+            "OnlineMeetingArtifact.Read.All",
+            "OnlineMeetings.ReadWrite",
+        ),
+        0,
+        6,
     ),
     (
         ToolsPreset.TEAMS_FILES,

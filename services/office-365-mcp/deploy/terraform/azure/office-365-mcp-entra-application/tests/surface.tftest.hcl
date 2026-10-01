@@ -250,6 +250,27 @@ run "preset_teams_edit" {
   }
 }
 
+run "preset_teams_meetings_write" {
+  variables {
+    tools_preset = "teams-meetings-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,OnlineMeetings.Read,OnlineMeetingArtifact.Read.All,OnlineMeetings.ReadWrite"
+    error_message = "teams-meetings-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 6
+    error_message = "teams-meetings-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "teams-meetings-write needs no administrator, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
 run "preset_teams_files" {
   variables {
     tools_preset = "teams-files"

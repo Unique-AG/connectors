@@ -57,6 +57,8 @@ from office_365_mcp.tools import (
     sharepoint_read_file,
     sharepoint_search_files,
     teams_browse_channel,
+    teams_create_meeting,
+    teams_delete_meeting,
     teams_delete_message,
     teams_edit_message,
     teams_get_channel_files_folder,
@@ -69,6 +71,7 @@ from office_365_mcp.tools import (
     teams_list_message_replies,
     teams_list_my_teams,
     teams_react_to_message,
+    teams_read_meeting,
     teams_read_message,
     teams_read_transcript,
     teams_search_messages,
@@ -76,6 +79,7 @@ from office_365_mcp.tools import (
     teams_send_channel_message_with_files,
     teams_send_chat_message,
     teams_send_chat_message_with_files,
+    teams_update_meeting,
 )
 
 __all__ = [
@@ -144,6 +148,10 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     teams_list_meeting_transcripts,
     teams_read_transcript,
     teams_list_meeting_recordings,
+    teams_read_meeting,
+    teams_create_meeting,
+    teams_update_meeting,
+    teams_delete_meeting,
     outlook_search_mail,
     outlook_read_mail,
     outlook_browse_folders,
@@ -276,6 +284,13 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_list_message_replies",
         "teams_edit_message",
         "teams_delete_message",
+    ),
+    "teams-meetings-write": (
+        "teams_list_chats",
+        "teams_read_meeting",
+        "teams_create_meeting",
+        "teams_update_meeting",
+        "teams_delete_meeting",
     ),
     "teams-files": (
         "teams_list_my_teams",

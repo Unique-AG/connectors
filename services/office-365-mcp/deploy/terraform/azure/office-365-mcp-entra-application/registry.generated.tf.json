@@ -143,6 +143,33 @@
           ]
         },
         {
+          "name": "teams_read_meeting",
+          "permissions": [
+            "OnlineMeetings.Read",
+            "OnlineMeetingArtifact.Read.All"
+          ]
+        },
+        {
+          "name": "teams_create_meeting",
+          "permissions": [
+            "OnlineMeetings.ReadWrite"
+          ]
+        },
+        {
+          "name": "teams_update_meeting",
+          "permissions": [
+            "OnlineMeetings.ReadWrite",
+            "User.Read"
+          ]
+        },
+        {
+          "name": "teams_delete_meeting",
+          "permissions": [
+            "OnlineMeetings.ReadWrite",
+            "User.Read"
+          ]
+        },
+        {
           "name": "outlook_search_mail",
           "permissions": [
             "Mail.Read",
@@ -475,6 +502,10 @@
         "teams_list_meeting_transcripts",
         "teams_read_transcript",
         "teams_list_meeting_recordings",
+        "teams_read_meeting",
+        "teams_create_meeting",
+        "teams_update_meeting",
+        "teams_delete_meeting",
         "outlook_search_mail",
         "outlook_read_mail",
         "outlook_browse_folders",
@@ -609,6 +640,13 @@
           "teams_list_message_replies",
           "teams_edit_message",
           "teams_delete_message"
+        ],
+        "teams-meetings-write": [
+          "teams_list_chats",
+          "teams_read_meeting",
+          "teams_create_meeting",
+          "teams_update_meeting",
+          "teams_delete_meeting"
         ],
         "teams-files": [
           "teams_list_my_teams",
@@ -766,6 +804,8 @@
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
         "OnlineMeetingRecording.Read.All",
+        "OnlineMeetingArtifact.Read.All",
+        "OnlineMeetings.ReadWrite",
         "Mail.Read",
         "Mail.Read.Shared",
         "People.Read",
@@ -785,9 +825,7 @@
         "Notes.Create",
         "Notes.ReadWrite",
         "Chat.Create",
-        "ChatMember.ReadWrite",
-        "OnlineMeetingArtifact.Read.All",
-        "OnlineMeetings.ReadWrite"
+        "ChatMember.ReadWrite"
       ],
       "needs_admin_consent": {
         "User.Read": false,
