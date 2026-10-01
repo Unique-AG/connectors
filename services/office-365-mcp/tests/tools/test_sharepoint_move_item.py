@@ -46,6 +46,7 @@ from office_365_mcp.graph_client import (
     GraphUnavailable,
     create_graph_transport,
 )
+from office_365_mcp.shared.files import FOLDER_HANDLE_SOURCES, ITEM_HANDLE_SOURCES
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -78,6 +79,11 @@ _ITEM = DriveFileHandle(DRIVE_ID, ITEM_ID).uri
 _FOLDER = DriveFolderHandle(DRIVE_ID, FOLDER_ID).uri
 _OTHER_FOLDER = DriveFolderHandle(DRIVE_ID, OTHER_FOLDER_ID).uri
 _ROOT_BY_ALIAS = DriveFolderHandle(DRIVE_ID, "root").uri
+_ELSEWHERE = DriveFolderHandle(OTHER_DRIVE_ID, FOLDER_ID).uri
+
+_DELETE_AFTER_THE_COPY_SHOWS = (
+    "Use sharepoint_delete_item on the original only after sharepoint_browse_folder shows the copy."
+)
 
 _DRIVE_PATH = "/drives/b%21SYNTHETICDRIVE0000/items"
 _ITEM_PATH = f"{_DRIVE_PATH}/{ITEM_ID}"
@@ -259,7 +265,7 @@ class TestThePersonBeforeTheMove:
 
         _ = await _move(client, confirm=capturing)
 
-        assert asked == ["Move 'Budget.xlsx' from '/Reports' to '/Archive'?"]
+        assert asked == ["Move 'Budget.xlsx' from the folder '/Reports' to the folder '/Archive'?"]
 
     async def test_the_question_names_the_top_folder_of_the_drive_in_words(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -280,7 +286,8 @@ class TestThePersonBeforeTheMove:
         _ = await _move(client, confirm=capturing)
 
         assert asked == [
-            "Move 'Budget.xlsx' from the top folder of the drive to '/Reports/2026/Archive'?"
+            "Move 'Budget.xlsx' from the top folder of the drive "
+            + "to the folder '/Reports/2026/Archive'?"
         ]
 
     async def test_a_move_into_the_top_folder_is_asked_in_words(
@@ -301,7 +308,9 @@ class TestThePersonBeforeTheMove:
 
         _ = await _move(client, to_folder=_ROOT_BY_ALIAS, confirm=capturing)
 
-        assert asked == ["Move 'Budget.xlsx' from '/Reports' to the top folder of the drive?"]
+        assert asked == [
+            "Move 'Budget.xlsx' from the folder '/Reports' to the top folder of the drive?"
+        ]
 
     async def test_the_question_decodes_graphs_percent_encoded_path(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -337,7 +346,27 @@ class TestThePersonBeforeTheMove:
 
         _ = await _move(client, confirm=capturing)
 
-        assert asked == ["Move 'Budget.xlsx' from 'Reports' to 'Archive'?"]
+        assert asked == ["Move 'Budget.xlsx' from the folder 'Reports' to the folder 'Archive'?"]
+
+    async def test_the_question_names_the_parent_by_its_path_when_graph_gave_no_parent_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(
+            graph, item=_file_payload(parent_path="/drive/root:/Reports/2026", parent_name=None)
+        )
+        _ = _patches(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _move(client, confirm=capturing)
+
+        assert asked == [
+            "Move 'Budget.xlsx' from the folder '/Reports/2026' to the folder '/Archive'?"
+        ]
 
     async def test_the_question_names_nothing_graph_left_unnamed(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -498,7 +527,7 @@ class TestTheEraWithNoBackChannel:
 
         _key, state, _agrees_with, message = _the_question(answer)
         assert state == write_state_for(mover.TOOL_NAME, DRIVE_ID, ITEM_ID, FOLDER_ID)
-        assert message == "Move 'Budget.xlsx' from '/Reports' to '/Archive'?"
+        assert message == "Move 'Budget.xlsx' from the folder '/Reports' to the folder '/Archive'?"
         assert patch.call_count == 0, "an unanswered question moved the item anyway"
 
     async def test_the_second_round_moves_under_the_answer_it_was_bound_to(
@@ -673,9 +702,10 @@ class TestWhatItRefusesBeforeGraph:
     async def test_a_value_that_is_not_an_item_handle_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, value: str
     ) -> None:
-        with pytest.raises(ToolError, match="sharepoint_move_item takes a file handle"):
+        with pytest.raises(ToolError, match="sharepoint_move_item takes a file handle") as refused:
             _ = await _move(client, item=value)
 
+        assert ITEM_HANDLE_SOURCES in str(refused.value)
         assert len(graph.calls) == 0, "a refused handle moved nothing, and read nothing either"
 
     @pytest.mark.parametrize(
@@ -692,21 +722,22 @@ class TestWhatItRefusesBeforeGraph:
     async def test_a_value_that_is_not_a_folder_handle_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, value: str
     ) -> None:
-        with pytest.raises(ToolError, match="sharepoint_move_item takes a folder handle"):
+        with pytest.raises(
+            ToolError, match="sharepoint_move_item takes a folder handle"
+        ) as refused:
             _ = await _move(client, to_folder=value)
 
+        assert FOLDER_HANDLE_SOURCES in str(refused.value)
         assert len(graph.calls) == 0
 
     async def test_two_drives_are_refused_with_the_copy_then_delete_route(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        elsewhere = DriveFolderHandle(OTHER_DRIVE_ID, FOLDER_ID).uri
-
         with pytest.raises(ToolError, match="two different drives") as refused:
-            _ = await _move(client, to_folder=elsewhere)
+            _ = await _move(client, to_folder=_ELSEWHERE)
 
         assert "sharepoint_copy_item" in str(refused.value)
-        assert "sharepoint_delete_item" in str(refused.value)
+        assert _DELETE_AFTER_THE_COPY_SHOWS in str(refused.value)
         assert len(graph.calls) == 0
 
     async def test_an_item_cannot_move_into_itself(
@@ -1128,7 +1159,7 @@ class TestHowItDeclaresItself:
             "This tool asks the user to agree before it changes anything, every time.",
             "OneDrive and SharePoint can show the change to everyone who can open the folder.",
             "This tool moves an item inside one drive only.",
-            "use sharepoint_copy_item. Then use sharepoint_delete_item on the original.",
+            _DELETE_AFTER_THE_COPY_SHOWS,
             "This call is safe to repeat after a timeout.",
             "To change the name, use sharepoint_rename_item.",
             "Get both handles from sharepoint_search_files or sharepoint_browse_folder.",
@@ -1158,6 +1189,31 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         assert phrase not in (tool.description or "").casefold()
+
+    @pytest.mark.parametrize(
+        "phrase", ["Then use sharepoint_delete_item", "Then remove the original"]
+    )
+    async def test_no_text_says_to_delete_the_original_before_the_copy_shows(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, phrase: str
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+        with pytest.raises(ToolError, match="two different drives") as refused:
+            _ = await _move(client, to_folder=_ELSEWHERE)
+
+        assert phrase not in " ".join((tool.description or "").split())
+        assert phrase not in str(refused.value)
+
+    @pytest.mark.parametrize(
+        ("argument", "sources"),
+        [("item", ITEM_HANDLE_SOURCES), ("to_folder", FOLDER_HANDLE_SOURCES)],
+    )
+    async def test_each_argument_names_every_source_of_its_handle(
+        self, transport: httpx.AsyncClient, argument: str, sources: str
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        assert sources in str(properties[argument].get("description", ""))
 
     @pytest.mark.parametrize("argument", ["item", "to_folder"])
     async def test_each_argument_is_described_in_15_to_60_words(

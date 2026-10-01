@@ -1,6 +1,5 @@
 from collections.abc import Mapping
 from typing import Annotated
-from urllib.parse import unquote
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -15,11 +14,13 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.files import (
-    TOP_FOLDER_LABEL,
-    UNNAMED_FOLDER_LABEL,
+    FOLDER_HANDLE_SOURCES,
+    ITEM_HANDLE_SOURCES,
     UNNAMED_ITEM_LABEL,
     DriveItemSummary,
+    folder_label,
     item_for_a_question,
+    parent_folder_label,
     summary_after_write,
 )
 from office_365_mcp.shared.handles import (
@@ -52,7 +53,12 @@ _MOVE = "move"
 _DO_NOT_MOVE = "do not move"
 _NOTHING_MOVED = "Nothing was moved."
 
-_DESCRIPTION = """\
+_TO_A_DIFFERENT_DRIVE = (
+    "To move an item to a different drive, copy it with sharepoint_copy_item. Use "
+    + "sharepoint_delete_item on the original only after sharepoint_browse_folder shows the copy."
+)
+
+_DESCRIPTION = f"""\
 Moves one file or folder into a different folder of the same drive, in OneDrive or SharePoint, \
 for the signed-in user. Get both handles from sharepoint_search_files or sharepoint_browse_folder. \
 The item keeps its name. To change the name, use sharepoint_rename_item. OneDrive and SharePoint \
@@ -60,8 +66,7 @@ can show the change to everyone who can open the folder.
 
 Notes:
 - This tool asks the user to agree before it changes anything, every time.
-- This tool moves an item inside one drive only. To move an item to a different drive, use \
-sharepoint_copy_item. Then use sharepoint_delete_item on the original.
+- This tool moves an item inside one drive only. {_TO_A_DIFFERENT_DRIVE}
 - This call is safe to repeat after a timeout.
 """
 
@@ -69,24 +74,25 @@ _NOT_AN_ITEM_HANDLE = (
     "sharepoint_move_item takes a file handle or a folder handle in `item`. A file handle looks "
     + "like sharepoint:///files/{drive_id}/{item_id}. A folder handle looks like "
     + "sharepoint:///folders/{drive_id}/{item_id}. Both ids are percent-encoded. A web address, "
-    + "a path, a name and a bare id are not handles. Take the `uri` of a sharepoint_search_files "
-    + "hit or of a sharepoint_browse_folder row, and copy it word for word. This same value fails "
-    + "again, so do not retry it."
+    + "a path, a name and a bare id are not handles. "
+    + ITEM_HANDLE_SOURCES
+    + " This same value fails again, so do not retry it."
 )
 
 _NOT_A_FOLDER_HANDLE = (
     "sharepoint_move_item takes a folder handle in `to_folder`. A folder handle looks like "
     + "sharepoint:///folders/{drive_id}/{item_id}, with both ids percent-encoded. A file handle "
     + "is not a folder handle, because a file cannot hold other items. A web address, a path and "
-    + "a folder name are not handles either. Take a folder `uri` or a `parent_uri` from an earlier "
-    + "result, and copy it word for word. This same value fails again, so do not retry it."
+    + "a folder name are not handles either. "
+    + FOLDER_HANDLE_SOURCES
+    + " This same value fails again, so do not retry it."
 )
 
 _ANOTHER_DRIVE = (
     "Nothing was moved. `item` and `to_folder` are in two different drives, and this tool moves "
-    + "an item inside one drive only. To move an item to a different drive, copy it with "
-    + "sharepoint_copy_item. Then remove the original with sharepoint_delete_item. This same pair "
-    + "of values fails again, so do not retry it."
+    + "an item inside one drive only. "
+    + _TO_A_DIFFERENT_DRIVE
+    + " This same pair of values fails again, so do not retry it."
 )
 
 _INTO_ITSELF = (
@@ -210,36 +216,8 @@ def _id_of(item: DriveItem) -> str:
 
 
 def _question(found: DriveItem, folder: DriveItem) -> str:
-    name = _quoted(found.name) if found.name else UNNAMED_ITEM_LABEL
-    return f"Move {name} from {_current_folder(found)} to {_destination(folder)}?"
-
-
-def _current_folder(found: DriveItem) -> str:
-    parent = found.parent_reference
-    path = _breadcrumb(parent.path if parent is not None else None)
-    if path is None:
-        return _quoted(parent.name) if parent is not None and parent.name else UNNAMED_FOLDER_LABEL
-    return _quoted(path) if path else TOP_FOLDER_LABEL
-
-
-def _destination(folder: DriveItem) -> str:
-    if folder.root is not None:
-        return TOP_FOLDER_LABEL
-    if not folder.name:
-        return UNNAMED_FOLDER_LABEL
-    parent = folder.parent_reference
-    path = _breadcrumb(parent.path if parent is not None else None)
-    return _quoted(folder.name if path is None else f"{path}/{folder.name}")
-
-
-def _breadcrumb(path: str | None) -> str | None:
-    if path is None or ":" not in path:
-        return None
-    return unquote(path.split(":", 1)[1])
-
-
-def _quoted(text: str) -> str:
-    return repr(cut_for_a_question(text))
+    name = repr(cut_for_a_question(found.name)) if found.name else UNNAMED_ITEM_LABEL
+    return f"Move {name} from {parent_folder_label(found)} to {folder_label(folder)}?"
 
 
 async def _move(
@@ -291,9 +269,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The file or folder to move, as the `uri` of a sharepoint_search_files hit or "
-                    + "a sharepoint_browse_folder row, copied word for word. A file handle and a "
-                    + "folder handle both work. A web address, a path and a name are not handles."
+                    "The file or folder to move. A file handle and a folder handle both work. "
+                    + ITEM_HANDLE_SOURCES
+                    + " A web address, a path and a name are not handles."
                 ),
             ),
         ],
@@ -302,9 +280,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The folder to move the item into, as a folder `uri` or a `parent_uri` from "
-                    + "an earlier result, copied word for word. For the top folder of a drive, "
-                    + "use the `root_uri` of a sharepoint_list_drives row."
+                    "The folder to move the item into. "
+                    + FOLDER_HANDLE_SOURCES
+                    + " A file handle, a path and a web address are not folder handles."
                 ),
             ),
         ],
