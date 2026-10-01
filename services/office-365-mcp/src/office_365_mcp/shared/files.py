@@ -206,6 +206,12 @@ def folder_label(folder: DriveItem) -> str:
     return _the_folder(folder.name if crumb is None else f"{crumb}/{folder.name}")
 
 
+def item_label(item: DriveItem) -> str:
+    if item.root is not None:
+        return TOP_FOLDER_LABEL
+    return repr(item.name) if item.name else UNNAMED_ITEM_LABEL
+
+
 def parent_folder_label(item: DriveItem) -> str:
     reference = item.parent_reference
     crumb = _breadcrumb(reference)

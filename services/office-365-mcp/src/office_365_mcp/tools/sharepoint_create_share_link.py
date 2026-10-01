@@ -17,11 +17,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.files import (
-    ITEM_HANDLE_SOURCES,
-    UNNAMED_ITEM_LABEL,
-    item_for_a_question,
-)
+from office_365_mcp.shared.files import ITEM_HANDLE_SOURCES, item_for_a_question, item_label
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
@@ -175,8 +171,7 @@ async def create_share_link(
 
 
 def _question(item: DriveItem, access: Access, audience: Audience) -> str:
-    name = repr(item.name) if item.name else UNNAMED_ITEM_LABEL
-    return f"Create {_KIND[access]} link to {name}? {_WHO[audience]} {_NO_EXPIRY}"
+    return f"Create {_KIND[access]} link to {item_label(item)}? {_WHO[audience]} {_NO_EXPIRY}"
 
 
 class _KindAndAudienceOnly(CreateLinkPostRequestBody):

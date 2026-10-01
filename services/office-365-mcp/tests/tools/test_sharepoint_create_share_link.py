@@ -406,6 +406,33 @@ class TestThePersonBeforeTheLink:
             + "in can use the link. The link does not expire unless your organization sets a limit."
         ]
 
+    async def test_the_top_folder_of_a_drive_is_named_as_such(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(
+            graph,
+            {
+                "id": _ITEM_ID,
+                "name": "root",
+                "root": {},
+                "folder": {"childCount": 3},
+                "parentReference": {"driveId": _DRIVE_ID},
+            },
+        )
+        _ = _links(graph)
+        asked: list[str] = []
+
+        _ = await _share(
+            client, item=_FOLDER, access="edit", audience="anonymous", confirm=_asking(asked)
+        )
+
+        assert asked == [
+            "Create an edit link to the top folder of the drive? Anyone who has the link can use "
+            + "it with no sign-in, and that can include people outside your organization. The "
+            + "link does not expire unless your organization sets a limit."
+        ]
+        assert "'root'" not in asked[0]
+
     async def test_the_answer_is_bound_to_the_item_the_kind_and_the_audience(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

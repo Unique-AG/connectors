@@ -28,6 +28,7 @@ from office_365_mcp.shared.files import (
     DriveItemSummary,
     folder_label,
     item_for_a_question,
+    item_label,
     parent_folder_label,
     summary_after_write,
     unusable_name,
@@ -350,6 +351,20 @@ class TestFolderLabel:
         label = folder_label(_folder("A" * 200, None))
 
         assert label == f"the folder '{'A' * PREVIEW_CHARACTERS}…'"
+
+
+class TestItemLabel:
+    def test_the_root_is_the_top_folder(self) -> None:
+        root = DriveItem(name="root", root=Root(), folder=Folder(child_count=2))
+
+        assert item_label(root) == TOP_FOLDER_LABEL
+
+    @pytest.mark.parametrize("name", [None, ""])
+    def test_an_item_with_no_name_is_unnamed(self, name: str | None) -> None:
+        assert item_label(DriveItem(name=name)) == UNNAMED_ITEM_LABEL
+
+    def test_a_named_item_is_its_quoted_name(self) -> None:
+        assert item_label(DriveItem(name="Budget 2026.xlsx")) == "'Budget 2026.xlsx'"
 
 
 def _child(parent: ItemReference | None) -> DriveItem:

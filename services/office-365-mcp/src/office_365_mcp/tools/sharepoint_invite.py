@@ -24,10 +24,9 @@ from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_
 from office_365_mcp.shared.calendar import repeated_address
 from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
-    TOP_FOLDER_LABEL,
-    UNNAMED_ITEM_LABEL,
     display_name,
     item_for_a_question,
+    item_label,
 )
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.mail import ONE_ADDRESS
@@ -246,17 +245,11 @@ def _digest(message: str | None) -> str:
 def _question(
     item: DriveItem, addresses: Sequence[str], role: Role, message: str | None, notify: bool
 ) -> str:
-    granted = f"Give {', '.join(addresses)} {_ACCESS[role]} access to {_named(item)}"
+    granted = f"Give {', '.join(addresses)} {_ACCESS[role]} access to {item_label(item)}"
     if not notify:
         return f"{granted}? {_NO_MAIL} {_NO_TOOL_TAKES_IT_BACK}"
     said = "" if message is None else f" The invitation says {cut_for_a_question(message)!r}."
     return f"{granted} and email each of them an invitation?{said} {_CANNOT_BE_RECALLED}"
-
-
-def _named(item: DriveItem) -> str:
-    if item.root is not None:
-        return TOP_FOLDER_LABEL
-    return repr(item.name) if item.name else UNNAMED_ITEM_LABEL
 
 
 async def _invite(
