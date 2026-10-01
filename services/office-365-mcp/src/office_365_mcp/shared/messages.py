@@ -22,6 +22,7 @@ from msgraph.generated.models.teamwork_user_identity_type import TeamworkUserIde
 from pydantic import BaseModel, Field
 
 from office_365_mcp.shared.handles import MessageHandle
+from office_365_mcp.shared.identity import ENTRA_OBJECT_ID_PATTERN
 
 
 class MessageSender(BaseModel):
@@ -331,7 +332,7 @@ def _json(value: str | None) -> object | None:
 
 class Mention(BaseModel, frozen=True):
     user_id: str = Field(
-        pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+        pattern=ENTRA_OBJECT_ID_PATTERN,
         description=(
             "The Microsoft Entra object id of the person to mention, as a GUID. Copy it from the "
             + "`user_id` of get_me, of a teams_list_chats member, or of a message `sender`. "
