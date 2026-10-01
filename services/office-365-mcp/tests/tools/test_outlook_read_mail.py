@@ -1,3 +1,4 @@
+import re
 from collections.abc import Mapping, Sequence
 
 import httpx
@@ -7,18 +8,30 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
+from office_365_mcp.shared.attachments import ATTACHMENT_FIELDS, AttachmentSummary
+from office_365_mcp.shared.handles import (
+    MailAttachmentHandle,
+    MailMessageHandle,
+    mail_attachment_handle,
+    mail_message_handle,
+)
 from office_365_mcp.shared.mail import SUMMARY_FIELDS, FlagMoment, MailFlag, MailSummary
 from office_365_mcp.tools import outlook_read_mail as reader
 from office_365_mcp.tools.outlook_read_mail import MailMessage, MessageHeader, read_mail
 from office_365_mcp.tools.outlook_search_mail import SearchCriteria, search_mail
 
-from .conftest import ME
+from .conftest import GRAPH_V1, ME
 
 _IMMUTABLE_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 _REST_ID = "AAMkAGI2SYNTHETIC-rest-0001="
 
 _PATH = "/me/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+
+_ATTACHMENTS_PATH = f"{_PATH}/attachments"
+
+_FILE_ID = "AAMkAGI2SYNTHETIC-attachment-0001="
+_INLINE_ID = "AAMkAGI2SYNTHETIC-attachment-0002="
+_CONTENT_BYTES = "U1lOVEhFVElDLWNvbnRlbnQtYnl0ZXM="
 
 _HANDLE = MailMessageHandle(_IMMUTABLE_ID)
 
@@ -54,7 +67,33 @@ def _payload(
     }
 
 
-def _reads(graph: respx.MockRouter, payload: dict[str, object]) -> respx.Route:
+def _attachment(
+    *,
+    attachment_id: str = _FILE_ID,
+    odata_type: str = "#microsoft.graph.fileAttachment",
+    name: str | None = "Invoice 4471.pdf",
+    is_inline: bool = False,
+) -> dict[str, object]:
+    return {
+        "@odata.type": odata_type,
+        "id": attachment_id,
+        "name": name,
+        "contentType": "application/pdf",
+        "size": 13068,
+        "isInline": is_inline,
+        "lastModifiedDateTime": "2026-03-04T09:12:44Z",
+    }
+
+
+def _reads(
+    graph: respx.MockRouter,
+    payload: dict[str, object],
+    *,
+    attachments: Sequence[Mapping[str, object]] = (),
+) -> respx.Route:
+    _ = graph.get(_ATTACHMENTS_PATH, name="attachments").mock(
+        return_value=httpx.Response(200, json={"value": [dict(row) for row in attachments]})
+    )
     return graph.get(_PATH).mock(return_value=httpx.Response(200, json=payload))
 
 
@@ -283,15 +322,173 @@ class TestWhatItAnswers:
         assert answer.folder_id == "AQMkADAwSYNTHETIC-folder"
         assert answer.web_link == "https://outlook.office365.invalid/owa/?ItemID=synthetic"
 
-    async def test_an_attachment_is_a_boolean_and_nothing_else(
+
+class TestTheAttachmentsItReports:
+    async def test_it_lists_the_attachments_with_a_second_request_that_never_asks_for_the_bytes(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        message = _reads(graph, _payload(body=_body("hello")), attachments=[_attachment()])
+
+        _ = await read_mail(client, handle=_HANDLE)
+
+        listing = graph["attachments"]
+        selected = listing.calls.last.request.url.params["$select"].split(",")
+        assert listing.call_count == 1
+        assert message.call_count == 1
+        assert selected == list(ATTACHMENT_FIELDS)
+        assert "contentBytes" not in selected
+
+    async def test_the_attachment_request_declares_the_immutable_id_space(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _reads(graph, _payload(body=_body("hello")))
 
+        _ = await read_mail(client, handle=_HANDLE)
+
+        preferences = graph["attachments"].calls.last.request.headers["prefer"]
+        assert 'IdType="ImmutableId"' in preferences
+        assert "outlook.body-content-type" not in preferences
+
+    async def test_a_file_attachment_reports_its_name_size_type_and_kind_and_no_bytes(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(
+            graph,
+            _payload(body=_body("hello")),
+            attachments=[_attachment() | {"contentBytes": _CONTENT_BYTES}],
+        )
+
         answer = await read_mail(client, handle=_HANDLE)
 
         assert answer.has_attachments is True
-        assert not [name for name in MailMessage.model_fields if "attachment" in name.lower()][1:]
+        assert answer.attachments == [
+            AttachmentSummary(
+                uri=MailAttachmentHandle(_IMMUTABLE_ID, _FILE_ID).uri,
+                name="Invoice 4471.pdf",
+                content_type="application/pdf",
+                size=13068,
+                is_inline=False,
+                kind="file",
+                last_modified_at="2026-03-04T09:12:44+00:00",
+            )
+        ]
+        assert _CONTENT_BYTES not in answer.model_dump_json()
+
+    async def test_an_inline_attachment_is_listed_although_graph_says_the_message_has_none(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(
+            graph,
+            _payload(body=_body("hello")) | {"hasAttachments": False},
+            attachments=[_attachment(attachment_id=_INLINE_ID, name="logo.png", is_inline=True)],
+        )
+
+        answer = await read_mail(client, handle=_HANDLE)
+
+        assert answer.has_attachments is False
+        assert [(row.name, row.is_inline) for row in answer.attachments] == [("logo.png", True)]
+
+    @pytest.mark.parametrize(
+        ("odata_type", "kind"),
+        [
+            ("#microsoft.graph.fileAttachment", "file"),
+            ("#microsoft.graph.itemAttachment", "item"),
+            ("#microsoft.graph.referenceAttachment", "reference"),
+        ],
+    )
+    async def test_each_attachment_reports_the_kind_graph_names_by_type(
+        self, client: GraphServiceClient, graph: respx.MockRouter, odata_type: str, kind: str
+    ) -> None:
+        _ = _reads(
+            graph, _payload(body=_body("hello")), attachments=[_attachment(odata_type=odata_type)]
+        )
+
+        answer = await read_mail(client, handle=_HANDLE)
+
+        assert [row.kind for row in answer.attachments] == [kind]
+
+    async def test_several_attachments_keep_graphs_order_and_each_has_its_own_handle(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(
+            graph,
+            _payload(body=_body("hello")),
+            attachments=[
+                _attachment(attachment_id=_FILE_ID, name="Invoice 4471.pdf"),
+                _attachment(attachment_id=_INLINE_ID, name="Invoice 4471.pdf", is_inline=True),
+            ],
+        )
+
+        answer = await read_mail(client, handle=_HANDLE)
+
+        handles = [mail_attachment_handle(row.uri) for row in answer.attachments]
+        assert handles == [
+            MailAttachmentHandle(_IMMUTABLE_ID, _FILE_ID),
+            MailAttachmentHandle(_IMMUTABLE_ID, _INLINE_ID),
+        ]
+
+    async def test_a_message_with_no_attachments_answers_an_empty_list(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _payload(body=_body("hello")) | {"hasAttachments": False})
+
+        answer = await read_mail(client, handle=_HANDLE)
+
+        assert answer.attachments == []
+
+    async def test_an_attachment_property_graph_leaves_out_answers_null(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(
+            graph,
+            _payload(body=_body("hello")),
+            attachments=[{"@odata.type": "#microsoft.graph.fileAttachment", "id": _FILE_ID}],
+        )
+
+        answer = await read_mail(client, handle=_HANDLE)
+
+        assert [
+            (row.name, row.content_type, row.size, row.is_inline) for row in answer.attachments
+        ] == [(None, None, None, None)]
+
+    async def test_a_second_page_of_attachments_is_read_with_the_same_id_preference(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        second = graph.get(_ATTACHMENTS_PATH, params={"$skiptoken": "second"}).mock(
+            return_value=httpx.Response(
+                200, json={"value": [_attachment(attachment_id=_INLINE_ID, name="logo.png")]}
+            )
+        )
+        _ = graph.get(_ATTACHMENTS_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [_attachment()],
+                    "@odata.nextLink": f"{GRAPH_V1}{_ATTACHMENTS_PATH}?$skiptoken=second",
+                },
+            )
+        )
+        _ = graph.get(_PATH).mock(
+            return_value=httpx.Response(200, json=_payload(body=_body("hello")))
+        )
+
+        answer = await read_mail(client, handle=_HANDLE)
+
+        assert [row.name for row in answer.attachments] == ["Invoice 4471.pdf", "logo.png"]
+        assert 'IdType="ImmutableId"' in second.calls.last.request.headers["prefer"]
+
+    def test_the_answer_says_the_list_is_metadata_and_names_the_reader_only_as_optional(
+        self,
+    ) -> None:
+        described = MailMessage.model_fields["attachments"].description
+        assert described is not None
+        assert "never its bytes" in described
+        assert "inline attachments, which `has_attachments` does not count" in described
+        sentences = re.split(r"(?<=[.!?])\s+", described)
+        naming = [sentence for sentence in sentences if "outlook_read_attachment" in sentence]
+        assert naming, "the description no longer says how to read a file"
+        for sentence in naming:
+            assert sentence.startswith("If this deployment exposes outlook_read_attachment, ")
 
 
 class TestTheInternetMessageHeaders:
@@ -525,14 +722,20 @@ class TestMailboxTargeting:
     async def test_a_mailbox_reads_that_mailbox_instead_of_me(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        route = graph.get(
-            "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
-        ).mock(return_value=httpx.Response(200, json=_payload(body=_body("hello"))))
+        shared = "/users/alex@example.invalid/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+        route = graph.get(shared).mock(
+            return_value=httpx.Response(200, json=_payload(body=_body("hello")))
+        )
+        attachments = graph.get(f"{shared}/attachments").mock(
+            return_value=httpx.Response(200, json={"value": [_attachment()]})
+        )
 
         answer = await read_mail(client, handle=_HANDLE, mailbox="alex@example.invalid")
 
         assert route.called
+        assert attachments.called
         assert answer.body == "hello"
+        assert [row.name for row in answer.attachments] == ["Invoice 4471.pdf"]
 
     def test_the_permission_is_the_one_microsoft_documents_for_a_shared_mailbox(self) -> None:
         assert reader.GRAPH_PERMISSIONS == ("Mail.Read", "Mail.Read.Shared")
@@ -549,6 +752,21 @@ class TestTheFailuresItPassesOn:
         )
 
         with pytest.raises(GraphNotFound):
+            _ = await read_mail(client, handle=_HANDLE)
+
+    async def test_a_refused_attachment_listing_is_a_forbidden(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_PATH).mock(
+            return_value=httpx.Response(200, json=_payload(body=_body("hello")))
+        )
+        _ = graph.get(_ATTACHMENTS_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "ErrorAccessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
             _ = await read_mail(client, handle=_HANDLE)
 
     async def test_a_refused_read_is_a_forbidden(
