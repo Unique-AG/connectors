@@ -40,6 +40,7 @@ from office_365_mcp.shared.handles import (
     drive_folder_handle,
 )
 from office_365_mcp.shared.notes import write_state_for
+from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
 from office_365_mcp.tools import sharepoint_copy_item as copier
 from office_365_mcp.tools.sharepoint_copy_item import CopyStarted, a_person_agrees, copy_item
@@ -586,6 +587,32 @@ class TestThePersonBetweenTheCopyAndTheDestination:
         _ = await _copy(client, name="Plan (copy).docx", confirm=_asking(asked))
 
         assert asked == ["Copy 'Plan.docx' into the folder 'Reports' as 'Plan (copy).docx'?"]
+
+    async def test_a_long_item_name_is_cut_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        long = "B" * 200 + ".xlsx"
+        _ = _reads(graph, _FILE_PATH, _file(name=long))
+        _ = _reads(graph, _DESTINATION_PATH, _folder())
+        _ = _accepts(graph)
+        asked: list[str] = []
+
+        _ = await _copy(client, confirm=_asking(asked))
+
+        assert asked == [f"Copy '{'B' * PREVIEW_CHARACTERS}…' into the folder 'Reports'?"]
+        assert long not in asked[0]
+
+    async def test_the_new_name_reaches_the_question_whole(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        new_name = "C" * 200 + ".docx"
+        _both_read(graph)
+        _ = _accepts(graph)
+        asked: list[str] = []
+
+        _ = await _copy(client, name=new_name, confirm=_asking(asked))
+
+        assert asked == [f"Copy 'Plan.docx' into the folder 'Reports' as {new_name!r}?"]
 
     async def test_the_question_names_the_path_of_the_destination_folder(
         self, client: GraphServiceClient, graph: respx.MockRouter

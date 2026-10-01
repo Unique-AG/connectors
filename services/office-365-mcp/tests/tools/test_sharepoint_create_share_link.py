@@ -35,6 +35,7 @@ from office_365_mcp.shared.handles import (
     drive_item_handle,
 )
 from office_365_mcp.shared.notes import write_state_for
+from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import (
     WRITE_IDEMPOTENT,
     Confirm,
@@ -397,6 +398,23 @@ class TestThePersonBeforeTheLink:
 
         assert kind in asked[0]
         assert repr(_NAME) in asked[0]
+
+    async def test_a_long_item_name_is_cut_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        long = "B" * 200 + ".xlsx"
+        _ = _reads(graph, _item_payload(name=long))
+        _ = _links(graph)
+        asked: list[str] = []
+
+        _ = await _share(client, confirm=_asking(asked))
+
+        assert asked == [
+            f"Create a view-only link to '{'B' * PREVIEW_CHARACTERS}…'? Anyone in your "
+            + "organization who signs in can use the link. The link does not expire unless your "
+            + "organization sets a limit."
+        ]
+        assert long not in asked[0]
 
     async def test_the_question_names_no_item_that_graph_left_unnamed(
         self, client: GraphServiceClient, graph: respx.MockRouter

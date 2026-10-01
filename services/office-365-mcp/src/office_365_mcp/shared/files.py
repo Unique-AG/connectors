@@ -209,7 +209,7 @@ def folder_label(folder: DriveItem) -> str:
 def item_label(item: DriveItem) -> str:
     if item.root is not None:
         return TOP_FOLDER_LABEL
-    return repr(item.name) if item.name else UNNAMED_ITEM_LABEL
+    return repr(cut_for_a_question(item.name)) if item.name else UNNAMED_ITEM_LABEL
 
 
 def parent_folder_label(item: DriveItem) -> str:

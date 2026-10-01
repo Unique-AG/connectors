@@ -39,6 +39,7 @@ from office_365_mcp.shared.handles import (
     drive_item_handle,
 )
 from office_365_mcp.shared.notes import write_state_for
+from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Advised,
@@ -583,6 +584,43 @@ class TestThePersonBetweenTheRenameAndTheFolder:
 
         assert asked == ["Rename 'Plan.docx' to 'Plan final.docx' in the folder '/Reports'?"]
         assert bound == [write_state_for(renamer.TOOL_NAME, _DRIVE_ID, _FILE_ID, _NEW_NAME)]
+
+    async def test_a_long_item_name_is_cut_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        long = "B" * 200 + ".xlsx"
+        _ = _pre_reads(graph, _item_payload(name=long))
+        _ = _patches(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _rename(client, confirm=capturing)
+
+        assert asked == [
+            f"Rename '{'B' * PREVIEW_CHARACTERS}…' to 'Plan final.docx' in the folder '/Reports'?"
+        ]
+        assert long not in asked[0]
+
+    async def test_the_new_name_reaches_the_question_whole(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        new_name = "C" * 200 + ".docx"
+        _ = _pre_reads(graph, _item_payload())
+        _ = _patches(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _rename(client, name=new_name, confirm=capturing)
+
+        assert asked == [f"Rename 'Plan.docx' to {new_name!r} in the folder '/Reports'?"]
 
     async def test_the_question_names_no_item_or_folder_graph_left_unnamed(
         self, client: GraphServiceClient, graph: respx.MockRouter

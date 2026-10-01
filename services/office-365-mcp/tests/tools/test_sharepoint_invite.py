@@ -37,6 +37,7 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.files import ITEM_HANDLE_SOURCES
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.notes import write_state_for
+from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
 from office_365_mcp.tools import sharepoint_invite as inviter
 from office_365_mcp.tools.sharepoint_invite import Invitation, a_person_agrees, invite
@@ -443,6 +444,21 @@ class TestThePersonBeforeTheInvite:
         assert _ADA in question
         assert _GRACE in question
         assert repr(_FILE_NAME) in question
+
+    async def test_a_long_item_name_is_cut_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        long = "B" * 200 + ".xlsx"
+        _ = _reads(graph, _item(name=long))
+        _ = _invites(graph)
+
+        question = await _asked(client, _Call())
+
+        assert question == (
+            f"Give {_ADA} read access to '{'B' * PREVIEW_CHARACTERS}…' and email each of them an "
+            + "invitation? This cannot be recalled once sent."
+        )
+        assert long not in question
 
     @pytest.mark.parametrize(
         ("role", "access"), [("read", "read access"), ("write", "edit access")]

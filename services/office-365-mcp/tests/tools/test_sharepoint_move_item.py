@@ -54,6 +54,7 @@ from office_365_mcp.shared.handles import (
     drive_item_handle,
 )
 from office_365_mcp.shared.notes import write_state_for
+from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Advised,
@@ -266,6 +267,27 @@ class TestThePersonBeforeTheMove:
         _ = await _move(client, confirm=capturing)
 
         assert asked == ["Move 'Budget.xlsx' from the folder '/Reports' to the folder '/Archive'?"]
+
+    async def test_a_long_item_name_is_cut_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        long = "B" * 200 + ".xlsx"
+        _ = _reads(graph, item=_file_payload(name=long))
+        _ = _patches(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _move(client, confirm=capturing)
+
+        assert asked == [
+            f"Move '{'B' * PREVIEW_CHARACTERS}…' from the folder '/Reports' "
+            + "to the folder '/Archive'?"
+        ]
+        assert long not in asked[0]
 
     async def test_the_question_names_the_top_folder_of_the_drive_in_words(
         self, client: GraphServiceClient, graph: respx.MockRouter

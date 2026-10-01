@@ -16,10 +16,10 @@ from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_
 from office_365_mcp.shared.files import (
     FOLDER_HANDLE_SOURCES,
     ITEM_HANDLE_SOURCES,
-    UNNAMED_ITEM_LABEL,
     DriveItemSummary,
     folder_label,
     item_for_a_question,
+    item_label,
     parent_folder_label,
     summary_after_write,
 )
@@ -30,7 +30,6 @@ from office_365_mcp.shared.handles import (
     drive_item_handle,
 )
 from office_365_mcp.shared.notes import write_state_for
-from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
@@ -215,8 +214,7 @@ def _id_of(item: DriveItem) -> str:
 
 
 def _question(found: DriveItem, folder: DriveItem) -> str:
-    name = repr(cut_for_a_question(found.name)) if found.name else UNNAMED_ITEM_LABEL
-    return f"Move {name} from {parent_folder_label(found)} to {folder_label(folder)}?"
+    return f"Move {item_label(found)} from {parent_folder_label(found)} to {folder_label(folder)}?"
 
 
 async def _move(

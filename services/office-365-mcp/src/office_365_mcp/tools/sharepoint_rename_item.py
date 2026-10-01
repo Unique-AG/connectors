@@ -15,9 +15,9 @@ from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_
 from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
     NAME_RULES,
-    UNNAMED_ITEM_LABEL,
     DriveItemSummary,
     item_for_a_question,
+    item_label,
     parent_folder_label,
     summary_after_write,
     unusable_name,
@@ -143,8 +143,7 @@ async def rename_item(
 
 
 def _question(item: DriveItem, name: str) -> str:
-    old = repr(item.name) if item.name else UNNAMED_ITEM_LABEL
-    return f"Rename {old} to {name!r} in {parent_folder_label(item)}?"
+    return f"Rename {item_label(item)} to {name!r} in {parent_folder_label(item)}?"
 
 
 def a_person_agrees(ctx: Context) -> Confirm:

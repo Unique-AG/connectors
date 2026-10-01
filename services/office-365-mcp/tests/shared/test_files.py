@@ -366,6 +366,9 @@ class TestItemLabel:
     def test_a_named_item_is_its_quoted_name(self) -> None:
         assert item_label(DriveItem(name="Budget 2026.xlsx")) == "'Budget 2026.xlsx'"
 
+    def test_a_long_name_is_cut_for_the_question(self) -> None:
+        assert item_label(DriveItem(name="A" * 200)) == f"'{'A' * PREVIEW_CHARACTERS}…'"
+
 
 def _child(parent: ItemReference | None) -> DriveItem:
     return DriveItem(id=_ITEM_ID, name="Budget 2026.xlsx", parent_reference=parent)
@@ -500,4 +503,47 @@ class TestOnlyTheOwnerDecodesAGraphPath:
         assert not _imports_unquote(source), (
             f"{source.name} decodes a path with unquote. Use folder_label or "
             + "parent_folder_label from shared/files.py."
+        )
+
+
+def _is_a_name(node: ast.expr) -> bool:
+    return isinstance(node, ast.Attribute) and node.attr == "name"
+
+
+def _quoted_names(source: str) -> list[int]:
+    return [
+        node.lineno
+        for node in ast.walk(ast.parse(source))
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "repr"
+            and len(node.args) == 1
+            and _is_a_name(node.args[0])
+        )
+        or (
+            isinstance(node, ast.FormattedValue)
+            and node.conversion == ord("r")
+            and _is_a_name(node.value)
+        )
+    ]
+
+
+class TestOnlyTheOwnerQuotesAGraphItemName:
+    def test_the_scan_finds_a_repr_call_and_an_f_string_field(self) -> None:
+        planted = 'label = repr(item.name)\nquestion = f"Move {found.name!r}?"\n'
+
+        assert _quoted_names(planted) == [1, 2]
+
+    def test_the_scan_passes_a_cut_name_and_a_name_the_call_writes(self) -> None:
+        planted = 'label = repr(cut(item.name))\nquestion = f"Rename {cut(old.name)!r} {name!r}?"\n'
+
+        assert _quoted_names(planted) == []
+
+    @pytest.mark.parametrize("source", _SHAREPOINT_TOOLS, ids=_tool_id)
+    def test_no_sharepoint_tool_quotes_a_graph_item_name(self, source: pathlib.Path) -> None:
+        found = _quoted_names(source.read_text())
+        assert not found, (
+            f"{source.name} quotes a Graph item name whole on lines {found}. A long name then "
+            + "fills the question. Use item_label or folder_label from shared/files.py."
         )

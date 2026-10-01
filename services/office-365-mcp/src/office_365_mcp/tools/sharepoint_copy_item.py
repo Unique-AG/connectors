@@ -28,9 +28,9 @@ from office_365_mcp.shared.files import (
     FOLDER_HANDLE_SOURCES,
     ITEM_HANDLE_SOURCES,
     NAME_RULES,
-    UNNAMED_ITEM_LABEL,
     folder_label,
     item_for_a_question,
+    item_label,
     unusable_name,
 )
 from office_365_mcp.shared.handles import (
@@ -218,9 +218,8 @@ def _cannot_copy(original: DriveItem, target: DriveItem) -> str | None:
 
 
 def _question(original: DriveItem, target: DriveItem, name: str | None) -> str:
-    item_label = repr(original.name) if original.name else UNNAMED_ITEM_LABEL
     renamed = f" as {name!r}" if name is not None else ""
-    return f"Copy {item_label} into {folder_label(target)}{renamed}?"
+    return f"Copy {item_label(original)} into {folder_label(target)}{renamed}?"
 
 
 async def _start_copy(

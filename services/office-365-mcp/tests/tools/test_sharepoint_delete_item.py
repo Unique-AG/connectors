@@ -35,6 +35,7 @@ from office_365_mcp.shared.handles import (
     drive_item_handle,
 )
 from office_365_mcp.shared.notes import write_state_for
+from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
 from office_365_mcp.tools import sharepoint_delete_item as deleter
 from office_365_mcp.tools.sharepoint_delete_item import DeletedItem, a_person_agrees, delete_item
@@ -431,6 +432,40 @@ class TestConfirmationIsAlwaysAsked:
             "Move the folder 'Q1' from the folder '/Reports/Q1 2026' to the recycle bin, together "
             + f"with everything inside it?{said}"
         ]
+
+    @pytest.mark.parametrize(
+        ("payload", "item", "question"),
+        [
+            (
+                _item_payload(name="B" * 200 + ".xlsx"),
+                _FILE_URI,
+                f"Move the file '{'B' * PREVIEW_CHARACTERS}…' from the folder '/Reports/Q1 2026' "
+                + "to the recycle bin?",
+            ),
+            (
+                _item_payload(name="B" * 200, a_folder=True, child_count=0),
+                _FOLDER_URI,
+                f"Move the folder '{'B' * PREVIEW_CHARACTERS}…' from the folder '/Reports/Q1 2026' "
+                + "to the recycle bin, together with everything inside it? The folder is empty.",
+            ),
+        ],
+        ids=["file", "folder"],
+    )
+    async def test_a_long_item_name_is_cut_in_the_question(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        payload: Mapping[str, object],
+        item: str,
+        question: str,
+    ) -> None:
+        _ = _reads(graph, payload)
+        _ = _deletes(graph)
+
+        asked = await _asked(client, item=item)
+
+        assert asked == [question]
+        assert "B" * 200 not in asked[0]
 
     async def test_an_item_at_the_top_of_a_drive_is_asked_about_by_that_place(
         self, client: GraphServiceClient, graph: respx.MockRouter
