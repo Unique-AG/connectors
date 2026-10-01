@@ -12,10 +12,13 @@ from fastmcp.server.elicitation import (
     CancelledElicitation,
     DeclinedElicitation,
 )
+from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import Tool
+from fastmcp.tools.base import ToolResult
 from mcp.shared.exceptions import MCPError
 from mcp.types import (
     METHOD_NOT_FOUND,
+    CallToolRequestParams,
     ElicitRequest,
     ElicitRequestFormParams,
     ElicitResult,
@@ -40,7 +43,14 @@ from office_365_mcp.shared.handles import (
     drive_folder_handle,
 )
 from office_365_mcp.shared.notes import write_state_for
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm, Confirmed
+from office_365_mcp.shared.seam import (
+    WRITE_ADDITIVE,
+    Advised,
+    Confirm,
+    Confirmed,
+    GraphAdviceMiddleware,
+)
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import sharepoint_create_folder as creator
 from office_365_mcp.tools.sharepoint_create_folder import a_person_agrees, create_folder
 
@@ -141,6 +151,21 @@ async def _create(
     answer = await create_folder(client, parent=parent, name=name, confirm=confirm)
     assert isinstance(answer, DriveItemSummary), "this call was answered with a question"
     return answer
+
+
+async def _advised_create(client: GraphServiceClient) -> str:
+    async def creating(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+        assert context.message.name == creator.TOOL_NAME
+        _ = await _create(client)
+        raise AssertionError("Graph refused the create, and the call still answered")
+
+    middleware = GraphAdviceMiddleware(
+        graph_advice(resolve(preset=None, enabled=(creator.TOOL_NAME,)))
+    )
+    context = MiddlewareContext(message=CallToolRequestParams(name=creator.TOOL_NAME, arguments={}))
+    with pytest.raises(ToolError) as raised:
+        _ = await middleware.on_call_tool(context, creating)
+    return str(raised.value)
 
 
 def _made(route: respx.Route) -> Sequence[Call]:
@@ -458,6 +483,24 @@ class TestTheFailuresItPassesOn:
 
         with pytest.raises(GraphForbidden):
             _ = await _create(client)
+
+    async def test_a_403_on_the_create_after_the_read_reaches_the_model_as_item_access(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        post = graph.post(_CHILDREN_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        message = await _advised_create(client)
+
+        assert message.startswith(creator.GRAPH_FORBIDDEN)
+        assert "HTTP 403" in message
+        assert "administrator to grant" not in message
+        assert "Files.ReadWrite.All" not in message
+        assert post.call_count == 1
 
 
 class TestThePersonBeforeTheCreate:
@@ -902,3 +945,6 @@ class TestHowItDeclaresItself:
         assert "created nothing" in creator.GRAPH_NOT_FOUND
         assert "sharepoint_browse_folder" in creator.GRAPH_NOT_FOUND
         assert "sharepoint_search_files" in creator.GRAPH_NOT_FOUND
+
+    def test_forbidden_advice_says_no_folder_was_created(self) -> None:
+        assert _NOTHING_CREATED in creator.GRAPH_FORBIDDEN

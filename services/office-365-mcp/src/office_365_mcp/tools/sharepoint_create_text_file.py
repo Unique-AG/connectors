@@ -26,6 +26,7 @@ from office_365_mcp.shared.files import (
     NAME_RULES,
     DriveItemSummary,
     folder_label,
+    item_access_refused,
     item_for_a_question,
     summary_after_write,
     unusable_name,
@@ -125,6 +126,8 @@ GRAPH_NOT_FOUND = (
     + "sharepoint_browse_folder, and take the `uri` from that result. This same handle fails the "
     + "same way, so do not retry it."
 )
+
+GRAPH_FORBIDDEN = item_access_refused(_NOTHING_CREATED)
 
 
 def a_person_agrees(ctx: Context) -> Confirm:

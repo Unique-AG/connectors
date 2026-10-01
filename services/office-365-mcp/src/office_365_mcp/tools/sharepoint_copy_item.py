@@ -29,6 +29,7 @@ from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
     NAME_RULES,
     folder_label,
+    item_access_refused,
     item_for_a_question,
     item_label,
     unusable_name,
@@ -120,6 +121,8 @@ GRAPH_NOT_FOUND = (
     + "the `uri` values from those new results. The same handles fail the same way, so do not "
     + "retry them."
 )
+
+GRAPH_FORBIDDEN = item_access_refused(_NOTHING_COPIED)
 
 
 class CopyStarted(BaseModel):

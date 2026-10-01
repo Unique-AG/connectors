@@ -12,10 +12,13 @@ from fastmcp.server.elicitation import (
     CancelledElicitation,
     DeclinedElicitation,
 )
+from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import FunctionTool, Tool
+from fastmcp.tools.base import ToolResult
 from mcp.shared.exceptions import MCPError
 from mcp.types import (
     METHOD_NOT_FOUND,
+    CallToolRequestParams,
     ElicitRequest,
     ElicitRequestFormParams,
     ElicitResult,
@@ -41,7 +44,8 @@ from office_365_mcp.shared.handles import (
 )
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, GraphAdviceMiddleware
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import sharepoint_copy_item as copier
 from office_365_mcp.tools.sharepoint_copy_item import CopyStarted, a_person_agrees, copy_item
 
@@ -158,6 +162,21 @@ async def _copy(
     answer = await copy_item(client, item=item, to_folder=to_folder, name=name, confirm=confirm)
     assert isinstance(answer, CopyStarted), "this call was answered with a question, not a copy"
     return answer
+
+
+async def _advised_copy(client: GraphServiceClient) -> str:
+    async def copying(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+        assert context.message.name == copier.TOOL_NAME
+        _ = await _copy(client)
+        raise AssertionError("Graph refused the copy, and the call still answered")
+
+    middleware = GraphAdviceMiddleware(
+        graph_advice(resolve(preset=None, enabled=(copier.TOOL_NAME,)))
+    )
+    context = MiddlewareContext(message=CallToolRequestParams(name=copier.TOOL_NAME, arguments={}))
+    with pytest.raises(ToolError) as raised:
+        _ = await middleware.on_call_tool(context, copying)
+    return str(raised.value)
 
 
 def _asking(asked: list[str]) -> Confirm:
@@ -537,6 +556,24 @@ class TestGraphFailures:
         with pytest.raises(GraphForbidden):
             _ = await _copy(client)
 
+    async def test_a_403_on_the_copy_after_the_reads_reaches_the_model_as_item_access(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _both_read(graph)
+        copy = graph.post(_COPY_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        message = await _advised_copy(client)
+
+        assert message.startswith(copier.GRAPH_FORBIDDEN)
+        assert "HTTP 403" in message
+        assert "administrator to grant" not in message
+        assert "Files.ReadWrite.All" not in message
+        assert copy.call_count == 1
+
     async def test_a_409_on_the_copy_is_a_conflict_and_is_sent_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -557,6 +594,9 @@ class TestGraphFailures:
         assert "sharepoint_search_files" in copier.GRAPH_NOT_FOUND
         assert "sharepoint_browse_folder" in copier.GRAPH_NOT_FOUND
         assert "nothing was copied" in copier.GRAPH_NOT_FOUND
+
+    def test_forbidden_advice_says_nothing_was_copied(self) -> None:
+        assert "Nothing was copied." in copier.GRAPH_FORBIDDEN
 
 
 class TestThePersonBetweenTheCopyAndTheDestination:

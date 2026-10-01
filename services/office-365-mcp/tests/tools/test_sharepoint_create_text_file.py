@@ -40,6 +40,7 @@ from office_365_mcp.shared.seam import (
     GraphAdviceMiddleware,
     ToolAdvice,
 )
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import sharepoint_create_text_file as creator
 from office_365_mcp.tools.sharepoint_create_text_file import a_person_agrees, create_text_file
 
@@ -166,6 +167,21 @@ async def _create(
     )
     assert isinstance(created, DriveItemSummary), "this call was answered with a question"
     return created
+
+
+async def _advised_create(client: GraphServiceClient) -> str:
+    async def creating(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+        assert context.message.name == creator.TOOL_NAME
+        _ = await _create(client)
+        raise AssertionError("Graph refused the write, and the call still answered")
+
+    middleware = GraphAdviceMiddleware(
+        graph_advice(resolve(preset=None, enabled=(creator.TOOL_NAME,)))
+    )
+    context = MiddlewareContext(message=CallToolRequestParams(name=creator.TOOL_NAME, arguments={}))
+    with pytest.raises(ToolError) as raised:
+        _ = await middleware.on_call_tool(context, creating)
+    return str(raised.value)
 
 
 def _calls(graph: respx.MockRouter) -> Sequence[Call]:
@@ -742,6 +758,24 @@ class TestTheFailuresItPassesOn:
         with pytest.raises(GraphForbidden):
             _ = await _create(client)
 
+    async def test_a_403_on_the_create_after_the_read_reaches_the_model_as_item_access(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads_folder(graph)
+        write = graph.route(method="PUT").mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        message = await _advised_create(client)
+
+        assert message.startswith(creator.GRAPH_FORBIDDEN)
+        assert "HTTP 403" in message
+        assert "administrator to grant" not in message
+        assert "Files.ReadWrite.All" not in message
+        assert write.call_count == 1
+
     async def test_a_missing_folder_is_a_not_found_and_nothing_is_asked_or_written(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -781,6 +815,9 @@ class TestTheFailuresItPassesOn:
         assert "created nothing" in creator.GRAPH_NOT_FOUND
         assert "sharepoint_browse_folder" in creator.GRAPH_NOT_FOUND
         assert "sharepoint_search_files" in creator.GRAPH_NOT_FOUND
+
+    def test_forbidden_advice_says_no_file_was_created(self) -> None:
+        assert "No file was created." in creator.GRAPH_FORBIDDEN
 
 
 class TestHowItDeclaresItself:

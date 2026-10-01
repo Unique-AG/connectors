@@ -25,6 +25,7 @@ from office_365_mcp.shared.files import (
     NAME_RULES,
     DriveItemSummary,
     folder_label,
+    item_access_refused,
     item_for_a_question,
     summary_after_write,
     unusable_name,
@@ -91,6 +92,8 @@ GRAPH_NOT_FOUND = (
     + "sharepoint_search_files or sharepoint_browse_folder, and take the `uri` from that result. "
     + "This same handle fails the same way, so do not retry it."
 )
+
+GRAPH_FORBIDDEN = item_access_refused(_NOTHING_CREATED)
 
 _WRITTEN_BUT_UNREAD = (
     "Microsoft 365 created the folder. Then this connector did not receive the new folder from "
