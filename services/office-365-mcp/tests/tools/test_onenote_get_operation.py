@@ -24,10 +24,13 @@ from office_365_mcp.tools import onenote_get_operation as getter
 from office_365_mcp.tools.onenote_get_operation import get_operation
 
 _OPERATION_ID = "1-SYNTHETICOPERATION0000!0-ABCDEF"
+_GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
 
 _OPERATION_URI = OnenoteOperationHandle(_OPERATION_ID).uri
+_GROUP_OPERATION_URI = OnenoteOperationHandle(_OPERATION_ID, group_id=_GROUP_ID).uri
 
 _GET_PATH = f"/me/onenote/operations/{_OPERATION_ID}"
+_GROUP_GET_PATH = f"/groups/{_GROUP_ID}/onenote/operations/{_OPERATION_ID}"
 
 
 def _operation_payload(
@@ -248,6 +251,44 @@ class TestWhatItAnswers:
             _ = await _get(client)
 
 
+class TestAGroupNotebook:
+    async def test_a_group_handle_polls_the_operation_under_the_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get(_GROUP_GET_PATH).mock(
+            return_value=httpx.Response(200, json=_operation_payload())
+        )
+
+        _ = await _get(client, operation=_GROUP_OPERATION_URI)
+
+        assert route.call_count == 1
+        assert len(graph.calls) == 1, "nothing was read from /me"
+        assert dict(route.calls.last.request.url.params) == {}
+
+    async def test_the_answer_keeps_the_group_in_its_uri(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_GET_PATH).mock(
+            return_value=httpx.Response(200, json=_operation_payload())
+        )
+
+        answer = await _get(client, operation=_GROUP_OPERATION_URI)
+
+        assert answer.uri == _GROUP_OPERATION_URI
+
+    async def test_a_404_under_the_group_is_a_not_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_GET_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _get(client, operation=_GROUP_OPERATION_URI)
+
+
 class TestWhatItRefuses:
     @pytest.mark.parametrize(
         "value",
@@ -347,6 +388,13 @@ class TestHowItDeclaresItself:
         parameters, _tool = await _registered(transport)
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert not [name for name in properties if word in name.casefold()]
+
+    async def test_the_operation_argument_names_the_group_handle_shape(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, Mapping[str, str]]", parameters["properties"])
+        assert "onenote:///groups/{group}/" in properties["operation"]["description"]
 
     async def test_it_announces_itself_as_read_only(self, transport: httpx.AsyncClient) -> None:
         _parameters, tool = await _registered(transport)

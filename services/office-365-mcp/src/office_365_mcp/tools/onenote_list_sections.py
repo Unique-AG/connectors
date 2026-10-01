@@ -5,7 +5,11 @@ from typing import Annotated
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
+from kiota_abstractions.base_request_builder import BaseRequestBuilder
+from kiota_abstractions.method import Method
+from kiota_abstractions.serialization.parsable import Parsable
+from kiota_abstractions.serialization.parsable_factory import ParsableFactory
+from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_section import OnenoteSection
 from msgraph.generated.models.onenote_section_collection_response import (
     OnenoteSectionCollectionResponse,
@@ -20,16 +24,17 @@ from msgraph.generated.users.item.onenote.notebooks.item.section_groups import (
 from msgraph.generated.users.item.onenote.notebooks.item.sections import (
     sections_request_builder as _notebook_sections_module,
 )
-from msgraph.generated.users.item.onenote.section_groups.item.section_groups import (
-    section_groups_request_builder as _group_section_groups_module,
-)
-from msgraph.generated.users.item.onenote.section_groups.item.sections import (
-    sections_request_builder as _group_sections_module,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
+from office_365_mcp.graph_client import (
+    MAX_SCANNED_ITEMS,
+    TypedQueryParameters,
+    collect_pages,
+    graph_errors,
+    graph_step,
+    request_with_query,
+)
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
@@ -41,6 +46,7 @@ from office_365_mcp.shared.notes import (
     ContainerOrderBy,
     created_by_contains,
     creator_name_of,
+    onenote_root,
     web_url_of,
 )
 from office_365_mcp.shared.odata import odata_literal
@@ -72,15 +78,11 @@ _SECTION_FIELDS: tuple[str, ...] = (
 _SECTION_GROUP_FIELDS: tuple[str, ...] = ("id", "displayName", "createdBy", "lastModifiedDateTime")
 _SECTION_EXPANSIONS: tuple[str, ...] = ("parentNotebook($select=id,displayName)",)
 
-_NotebookSectionsBuilder = _notebook_sections_module.SectionsRequestBuilder
-_NotebookGroupsBuilder = _notebook_section_groups_module.SectionGroupsRequestBuilder
-_GroupSectionsBuilder = _group_sections_module.SectionsRequestBuilder
-_GroupGroupsBuilder = _group_section_groups_module.SectionGroupsRequestBuilder
+_SectionsBuilder = _notebook_sections_module.SectionsRequestBuilder
+_SectionGroupsBuilder = _notebook_section_groups_module.SectionGroupsRequestBuilder
 
-_NotebookSectionsQuery = _NotebookSectionsBuilder.SectionsRequestBuilderGetQueryParameters
-_NotebookGroupsQuery = _NotebookGroupsBuilder.SectionGroupsRequestBuilderGetQueryParameters
-_GroupSectionsQuery = _GroupSectionsBuilder.SectionsRequestBuilderGetQueryParameters
-_GroupGroupsQuery = _GroupGroupsBuilder.SectionGroupsRequestBuilderGetQueryParameters
+_SectionsQuery = _SectionsBuilder.SectionsRequestBuilderGetQueryParameters
+_SectionGroupsQuery = _SectionGroupsBuilder.SectionGroupsRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
 Lists the sections and the section groups directly under one notebook or one section group, one \
@@ -101,7 +103,8 @@ _NOT_A_PARENT_HANDLE = (
     + "notebook in an onenote_list_notebooks result, from a onenote_find_notebook_from_url "
     + "answer, or from a onenote_create_notebook answer. A section group handle looks like "
     + "onenote:///sectiongroups/{id} and comes from the `uri` of a section group in a prior "
-    + "onenote_list_sections result, or from a onenote_create_section_group answer. A section "
+    + "onenote_list_sections result, or from a onenote_create_section_group answer. A handle "
+    + "from a group notebook starts with onenote:///groups/{group}/ instead. A section "
     + "handle (onenote:///sections/{id}), a page handle, a plain name and a web address are none "
     + "of them one of these. This same value fails again, so do not retry it."
 )
@@ -120,7 +123,8 @@ GRAPH_NOT_FOUND = (
 class SectionRow(BaseModel):
     uri: str = Field(
         description=(
-            "This section's handle: onenote:///sections/{id}, with the id percent-encoded. Pass "
+            "This section's handle: onenote:///sections/{id}, with the id percent-encoded. A "
+            + "handle from a group notebook starts with onenote:///groups/{group}/ instead. Pass "
             + "it as `section` to onenote_list_pages or onenote_create_page, or as `to_section` "
             + "to onenote_copy_page. Never build one. A section id alone reaches nothing."
         )
@@ -157,9 +161,11 @@ class SectionGroupRow(BaseModel):
     uri: str = Field(
         description=(
             "This section group's handle: onenote:///sectiongroups/{id}, with the id "
-            + "percent-encoded. Pass it to onenote_list_sections, onenote_create_section, or "
-            + "onenote_create_section_group as `parent`, or to onenote_copy_section as "
-            + "`to_section_group`. Never build one. A section group id alone reaches nothing."
+            + "percent-encoded. A handle from a group notebook starts with "
+            + "onenote:///groups/{group}/ instead. Pass it to onenote_list_sections, "
+            + "onenote_create_section, or onenote_create_section_group as `parent`, or to "
+            + "onenote_copy_section as `to_section_group`. Never build one. A section group id "
+            + "alone reaches nothing."
         )
     )
     name: str | None = Field(
@@ -262,12 +268,12 @@ async def list_sections(
         sections=[
             row
             for section in sections_collected.items
-            if (row := _section_row(section)) is not None
+            if (row := _section_row(section, handle.group_id)) is not None
         ],
         section_groups=[
             row
             for group in groups_collected.items
-            if (row := _section_group_row(group)) is not None
+            if (row := _section_group_row(group, handle.group_id)) is not None
         ],
         capped=sections_collected.capped or groups_collected.capped,
     )
@@ -288,6 +294,21 @@ def _name_filter(name_contains: str | None) -> str | None:
     return f"contains(tolower(displayName),'{literal}')"
 
 
+async def _get[M: Parsable](
+    client: GraphServiceClient,
+    builder: BaseRequestBuilder,
+    typed: TypedQueryParameters,
+    model: ParsableFactory[M],
+) -> M | None:
+    request = request_with_query(
+        Method.GET, builder.url_template, builder.path_parameters, query={}, typed=typed
+    )
+    request.headers.try_add("Accept", "application/json")
+    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
+        request, model, {"XXX": ODataError}
+    )
+
+
 async def _first_sections(
     client: GraphServiceClient,
     handle: OnenoteNotebookHandle | OnenoteSectionGroupHandle,
@@ -296,30 +317,23 @@ async def _first_sections(
     query_filter: str | None,
     orderby: list[str] | None,
 ) -> OnenoteSectionCollectionResponse | None:
-    if isinstance(handle, OnenoteNotebookHandle):
-        return await client.me.onenote.notebooks.by_notebook_id(handle.notebook_id).sections.get(
-            request_configuration=RequestConfiguration[_NotebookSectionsQuery](
-                query_parameters=_NotebookSectionsQuery(
-                    select=list(_SECTION_FIELDS),
-                    expand=list(_SECTION_EXPANSIONS),
-                    top=top,
-                    filter=query_filter,
-                    orderby=orderby,
-                )
-            )
-        )
-    return await client.me.onenote.section_groups.by_section_group_id(
-        handle.section_group_id
-    ).sections.get(
-        request_configuration=RequestConfiguration[_GroupSectionsQuery](
-            query_parameters=_GroupSectionsQuery(
-                select=list(_SECTION_FIELDS),
-                expand=list(_SECTION_EXPANSIONS),
-                top=top,
-                filter=query_filter,
-                orderby=orderby,
-            )
-        )
+    root = onenote_root(client, handle.group_id)
+    sections = (
+        root.notebooks.by_notebook_id(handle.notebook_id).sections
+        if isinstance(handle, OnenoteNotebookHandle)
+        else root.section_groups.by_section_group_id(handle.section_group_id).sections
+    )
+    return await _get(
+        client,
+        sections,
+        _SectionsQuery(
+            select=list(_SECTION_FIELDS),
+            expand=list(_SECTION_EXPANSIONS),
+            top=top,
+            filter=query_filter,
+            orderby=orderby,
+        ),
+        OnenoteSectionCollectionResponse,
     )
 
 
@@ -331,35 +345,27 @@ async def _first_section_groups(
     query_filter: str | None,
     orderby: list[str] | None,
 ) -> SectionGroupCollectionResponse | None:
-    if isinstance(handle, OnenoteNotebookHandle):
-        return await client.me.onenote.notebooks.by_notebook_id(
-            handle.notebook_id
-        ).section_groups.get(
-            request_configuration=RequestConfiguration[_NotebookGroupsQuery](
-                query_parameters=_NotebookGroupsQuery(
-                    select=list(_SECTION_GROUP_FIELDS),
-                    top=top,
-                    filter=query_filter,
-                    orderby=orderby,
-                )
-            )
-        )
-    return await client.me.onenote.section_groups.by_section_group_id(
-        handle.section_group_id
-    ).section_groups.get(
-        request_configuration=RequestConfiguration[_GroupGroupsQuery](
-            query_parameters=_GroupGroupsQuery(
-                select=list(_SECTION_GROUP_FIELDS), top=top, filter=query_filter, orderby=orderby
-            )
-        )
+    root = onenote_root(client, handle.group_id)
+    section_groups = (
+        root.notebooks.by_notebook_id(handle.notebook_id).section_groups
+        if isinstance(handle, OnenoteNotebookHandle)
+        else root.section_groups.by_section_group_id(handle.section_group_id).section_groups
+    )
+    return await _get(
+        client,
+        section_groups,
+        _SectionGroupsQuery(
+            select=list(_SECTION_GROUP_FIELDS), top=top, filter=query_filter, orderby=orderby
+        ),
+        SectionGroupCollectionResponse,
     )
 
 
-def _section_row(section: OnenoteSection) -> SectionRow | None:
+def _section_row(section: OnenoteSection, group_id: str | None) -> SectionRow | None:
     if section.id is None:
         return None
     return SectionRow(
-        uri=OnenoteSectionHandle(section.id).uri,
+        uri=OnenoteSectionHandle(section.id, group_id=group_id).uri,
         name=section.display_name,
         is_default=section.is_default,
         web_url=web_url_of(section.links),
@@ -368,11 +374,11 @@ def _section_row(section: OnenoteSection) -> SectionRow | None:
     )
 
 
-def _section_group_row(group: SectionGroup) -> SectionGroupRow | None:
+def _section_group_row(group: SectionGroup, group_id: str | None) -> SectionGroupRow | None:
     if group.id is None:
         return None
     return SectionGroupRow(
-        uri=OnenoteSectionGroupHandle(group.id).uri,
+        uri=OnenoteSectionGroupHandle(group.id, group_id=group_id).uri,
         name=group.display_name,
         created_by=creator_name_of(group.created_by),
         last_modified_at=group.last_modified_date_time,
@@ -395,12 +401,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The notebook or section group to list directly under, as a `uri`. A "
-                    + "notebook's handle, onenote:///notebooks/{id}, comes from an "
-                    + "onenote_list_notebooks row, a onenote_find_notebook_from_url answer, or "
-                    + "a onenote_create_notebook answer. A section group's handle, "
-                    + "onenote:///sectiongroups/{id}, comes from a onenote_list_sections row, "
-                    + "or a onenote_create_section_group answer. A section handle, a page "
-                    + "handle, a plain name and a web address are not accepted here."
+                    + "notebook's handle, onenote:///notebooks/{id}, comes from "
+                    + "onenote_list_notebooks, onenote_find_notebook_from_url, or "
+                    + "onenote_create_notebook. A section group's handle, "
+                    + "onenote:///sectiongroups/{id}, comes from onenote_list_sections or "
+                    + "onenote_create_section_group. A handle from a group notebook starts with "
+                    + "onenote:///groups/{group}/ instead. A section handle, a page handle, a "
+                    + "plain name and a web address are not accepted here."
                 ),
             ),
         ],

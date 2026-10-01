@@ -18,12 +18,20 @@ from office_365_mcp.tools import onenote_read_resource as reader
 
 RESOURCE_ID = "1-SYNTHETICRESOURCE0000"
 
+GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
+
 _CONTENT_PATH = f"/me/onenote/resources/{RESOURCE_ID}/content"
+_GROUP_CONTENT_PATH = f"/groups/{GROUP_ID}/onenote/resources/{RESOURCE_ID}/content"
 
 _VALUE_ADDRESS = (
     f"https://graph.microsoft.com/v1.0/users('synthetic')/onenote/resources/{RESOURCE_ID}/$value"
 )
 _CONTENT_ADDRESS = f"https://graph.microsoft.com/v1.0/me/onenote/resources/{RESOURCE_ID}/content"
+
+_GROUP_ADDRESSES = [
+    f"https://graph.microsoft.com/v1.0/groups/{GROUP_ID}/onenote/resources/{RESOURCE_ID}/$value",
+    f"https://graph.microsoft.com/v1.0/groups('{GROUP_ID}')/onenote/resources/{RESOURCE_ID}/content",
+]
 
 _BYTES = b"\x89PNG\r\nsynthetic-image-bytes"
 
@@ -72,6 +80,50 @@ class TestWhatItAsks:
         _ = await _read(client, transport, resource=_CONTENT_ADDRESS)
 
         assert content.call_count == 1
+
+
+class TestAGroupNotebook:
+    @pytest.fixture
+    def group_content(self, graph: respx.MockRouter) -> respx.Route:
+        return graph.get(_GROUP_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=_BYTES, headers={"Content-Type": "image/png"})
+        )
+
+    @pytest.mark.parametrize("address", _GROUP_ADDRESSES)
+    async def test_a_group_address_fetches_the_content_under_the_group(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        group_content: respx.Route,
+        address: str,
+    ) -> None:
+        answer = await _read(client, transport, resource=address)
+
+        assert group_content.call_count == 1
+        assert graph.calls.call_count == 1, "nothing was read from /me"
+        assert answer.data == _BYTES
+
+    async def test_the_group_request_asks_the_same_way_as_the_me_request(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, group_content: respx.Route
+    ) -> None:
+        _ = await _read(client, transport, resource=_GROUP_ADDRESSES[0])
+
+        request = group_content.calls.last.request
+        assert request.headers["accept"] == "application/octet-stream, application/json"
+        assert request.url.params == httpx.QueryParams()
+
+    async def test_a_404_under_the_group_is_a_graph_not_found(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_CONTENT_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "Not Found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _read(client, transport, resource=_GROUP_ADDRESSES[0])
 
 
 class TestWhatComesBack:
@@ -218,6 +270,11 @@ class TestGraphFailures:
     def test_the_not_found_advice_names_onenote_read_page_and_a_fresh_address(self) -> None:
         assert "onenote_read_page" in reader.GRAPH_NOT_FOUND
         assert "fails again" in reader.GRAPH_NOT_FOUND
+
+    def test_the_not_found_advice_limits_the_unreachable_notebooks_to_sites(self) -> None:
+        assert "site notebook" in reader.GRAPH_NOT_FOUND
+        assert "team" not in reader.GRAPH_NOT_FOUND
+        assert "group" not in reader.GRAPH_NOT_FOUND
 
 
 async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:

@@ -1,8 +1,11 @@
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
+from typing import cast
 
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
@@ -19,10 +22,17 @@ _OTHER_SECTION_ID = "0-SYNTHETICSECTION0002!0001"
 _PAGE_ID = "0-SYNTHETICPAGE00001!0001"
 _OTHER_PAGE_ID = "0-SYNTHETICPAGE00002!0001"
 
+_GROUP_ID = "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+
 _PAGES_PATH = "/me/onenote/pages"
 _SECTION_PAGES_PATH = "/me/onenote/sections/0-SYNTHETICSECTION0001%210001/pages"
+_GROUP_PAGES_PATH = f"/groups/{_GROUP_ID}/onenote/pages"
+_GROUP_SECTION_PAGES_PATH = (
+    f"/groups/{_GROUP_ID}/onenote/sections/0-SYNTHETICSECTION0001%210001/pages"
+)
 
 _SECTION = OnenoteSectionHandle(_SECTION_ID).uri
+_GROUP_SECTION = OnenoteSectionHandle(_SECTION_ID, group_id=_GROUP_ID).uri
 
 _APP_ID = "WLID-000000004C12821A"
 
@@ -72,6 +82,16 @@ def pages(graph: respx.MockRouter) -> respx.Route:
 @pytest.fixture
 def section_pages(graph: respx.MockRouter) -> respx.Route:
     return graph.get(_SECTION_PAGES_PATH)
+
+
+@pytest.fixture
+def group_pages(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_GROUP_PAGES_PATH)
+
+
+@pytest.fixture
+def group_section_pages(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_GROUP_SECTION_PAGES_PATH)
 
 
 class TestWhatItAsks:
@@ -238,6 +258,174 @@ class TestWhatItAsks:
     ) -> None:
         with pytest.raises(AssertionError):
             _ = await lister.list_pages(client, limit=limit)
+
+
+class TestTheGroupRoute:
+    async def test_a_group_asks_that_groups_pages_and_nothing_else(
+        self,
+        client: GraphServiceClient,
+        group_pages: respx.Route,
+        pages: respx.Route,
+        section_pages: respx.Route,
+        group_section_pages: respx.Route,
+    ) -> None:
+        group_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, group=_GROUP_ID, limit=25)
+
+        assert group_pages.call_count == 1
+        assert pages.call_count == 0
+        assert section_pages.call_count == 0
+        assert group_section_pages.call_count == 0
+
+    async def test_the_group_route_sends_the_query_strings_of_the_user_route(
+        self, client: GraphServiceClient, group_pages: respx.Route, pages: respx.Route
+    ) -> None:
+        group_pages.mock(return_value=_page())
+        pages.mock(return_value=_page())
+
+        for group in (None, _GROUP_ID):
+            _ = await lister.list_pages(
+                client,
+                group=group,
+                title_contains="Roadmap",
+                order_by="title_asc",
+                modified_after=date(2026, 3, 4),
+                created_before=date(2026, 4, 1),
+                skip=10,
+                limit=7,
+            )
+
+        assert group_pages.calls.last.request.url.params == pages.calls.last.request.url.params
+        assert group_pages.calls.last.request.url.params["$top"] == "7"
+
+    async def test_a_group_row_carries_the_group_in_both_of_its_handles(
+        self, client: GraphServiceClient, group_pages: respx.Route
+    ) -> None:
+        group_pages.mock(return_value=_page(_page_payload(_PAGE_ID, section_id=_SECTION_ID)))
+
+        answer = await lister.list_pages(client, group=_GROUP_ID, limit=25)
+
+        row = answer.pages[0]
+        assert row.uri == OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
+        assert row.section_uri == OnenoteSectionHandle(_SECTION_ID, group_id=_GROUP_ID).uri
+        assert row.uri.startswith(f"onenote:///groups/{_GROUP_ID}/pages/")
+
+    async def test_a_row_of_a_call_with_no_group_names_no_group(
+        self, client: GraphServiceClient, pages: respx.Route
+    ) -> None:
+        pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        answer = await lister.list_pages(client, limit=25)
+
+        assert "/groups/" not in answer.pages[0].uri
+        assert "/groups/" not in (answer.pages[0].section_uri or "")
+
+    async def test_a_group_search_follows_a_next_link(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get(_GROUP_PAGES_PATH, params={"$skiptoken": "second"}).mock(
+            return_value=_page(_page_payload(_OTHER_PAGE_ID, title="Second"))
+        )
+        graph.get(_GROUP_PAGES_PATH).mock(
+            return_value=_page(
+                _page_payload(_PAGE_ID, title="First"),
+                next_link=f"{GRAPH_V1}{_GROUP_PAGES_PATH}?$skiptoken=second",
+            )
+        )
+
+        answer = await lister.list_pages(client, group=_GROUP_ID, limit=25)
+
+        assert [row.title for row in answer.pages] == ["First", "Second"]
+        assert [row.uri for row in answer.pages] == [
+            OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri,
+            OnenotePageHandle(_OTHER_PAGE_ID, group_id=_GROUP_ID).uri,
+        ]
+
+    async def test_a_section_handle_of_a_group_asks_that_groups_section_route(
+        self,
+        client: GraphServiceClient,
+        group_section_pages: respx.Route,
+        group_pages: respx.Route,
+        section_pages: respx.Route,
+        pages: respx.Route,
+    ) -> None:
+        group_section_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, section=_GROUP_SECTION, limit=25)
+
+        assert group_section_pages.call_count == 1
+        assert group_pages.call_count == 0
+        assert section_pages.call_count == 0
+        assert pages.call_count == 0
+
+    async def test_a_section_handle_of_a_group_makes_rows_that_carry_the_group(
+        self, client: GraphServiceClient, group_section_pages: respx.Route
+    ) -> None:
+        group_section_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        answer = await lister.list_pages(client, section=_GROUP_SECTION, limit=25)
+
+        row = answer.pages[0]
+        assert row.uri == OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
+        assert row.section_uri == OnenoteSectionHandle(_SECTION_ID, group_id=_GROUP_ID).uri
+
+    async def test_level_and_order_go_out_on_the_group_section_route(
+        self, client: GraphServiceClient, group_section_pages: respx.Route
+    ) -> None:
+        group_section_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(
+            client, section=_GROUP_SECTION, include_level_and_order=True, limit=7
+        )
+
+        params = group_section_pages.calls.last.request.url.params
+        assert params["pagelevel"] == "true"
+        assert params["$select"].split(",") == [*PAGE_FIELDS, "level", "order"]
+        assert params["$top"] == "7"
+
+    @pytest.mark.parametrize("section", [_SECTION, _GROUP_SECTION])
+    async def test_a_group_together_with_a_section_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter, section: str
+    ) -> None:
+        with pytest.raises(ToolError, match="`group` only when `section` is omitted"):
+            _ = await lister.list_pages(client, section=section, group=_GROUP_ID, limit=25)
+
+        assert len(graph.calls) == 0
+
+    async def test_the_refusal_of_both_says_a_section_handle_carries_its_group(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError, match="already carries its group") as excinfo:
+            _ = await lister.list_pages(client, section=_SECTION, group=_GROUP_ID, limit=25)
+
+        assert "fails again" in str(excinfo.value)
+
+    async def test_a_group_with_level_and_order_but_no_section_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="section"):
+            _ = await lister.list_pages(
+                client, group=_GROUP_ID, include_level_and_order=True, limit=25
+            )
+
+        assert len(graph.calls) == 0
+
+    async def test_a_404_on_the_group_route_is_a_not_found(
+        self, client: GraphServiceClient, group_pages: respx.Route
+    ) -> None:
+        group_pages.mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await lister.list_pages(client, group=_GROUP_ID, limit=25)
+
+    def test_the_not_found_advice_covers_a_group_id(self) -> None:
+        assert "`group`" in lister.GRAPH_NOT_FOUND
+        assert "teams_list_my_teams" in lister.GRAPH_NOT_FOUND
 
 
 class TestWhatItAnswers:
@@ -716,3 +904,38 @@ class TestIncludeLevelAndOrder:
 
         assert answer.pages[0].level is None
         assert answer.pages[0].order is None
+
+
+class TestItsArguments:
+    async def _properties(self, transport: httpx.AsyncClient) -> Mapping[str, Mapping[str, object]]:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        lister.register(mcp, transport)
+        tool = await mcp.get_tool(lister.TOOL_NAME)
+        assert tool is not None, "register left the tool off the server"
+        return cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+
+    async def test_it_takes_a_group_beside_the_section(self, transport: httpx.AsyncClient) -> None:
+        properties = await self._properties(transport)
+
+        assert {"section", "group"} <= set(properties)
+
+    async def test_the_group_argument_says_whose_pages_it_searches_and_excludes_the_section(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        properties = await self._properties(transport)
+
+        described = cast("str", properties["group"]["description"])
+        assert "whose pages this call searches" in described
+        assert "teams_list_my_teams" in described
+        assert "only without `section`" in described
+
+    async def test_the_section_argument_says_how_a_group_section_handle_starts(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        properties = await self._properties(transport)
+
+        described = cast("str", properties["section"]["description"])
+        assert "starts with onenote:///groups/{group}/" in described
+
+    def test_the_description_names_the_group_search(self) -> None:
+        assert "notebooks of one group" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]

@@ -14,17 +14,22 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionHandle,
     onenote_page_handle,
 )
+from office_365_mcp.shared.notes import PAGE_EXPANSIONS, PAGE_FIELDS, STEP_PAGE
 from office_365_mcp.tools import onenote_read_page as reader
 
 from .conftest import GRAPH_V1
 
 PAGE_ID = "0-SYNTHETICPAGE0000!0001"
 SECTION_ID = "0-SYNTHETICSECTION00!0001"
+GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
 
 _PAGE_PATH = "/me/onenote/pages/0-SYNTHETICPAGE0000%210001"
 _CONTENT_PATH = f"{_PAGE_PATH}/content"
+_GROUP_PAGE_PATH = f"/groups/{GROUP_ID}/onenote/pages/0-SYNTHETICPAGE0000%210001"
+_GROUP_CONTENT_PATH = f"{_GROUP_PAGE_PATH}/content"
 
 _PAGE = OnenotePageHandle(PAGE_ID).uri
+_GROUP_PAGE = OnenotePageHandle(PAGE_ID, group_id=GROUP_ID).uri
 _SECTION = OnenoteSectionHandle(SECTION_ID).uri
 
 _WEB_URL = "https://onenote.example.invalid/pages/sprint-notes"
@@ -195,6 +200,108 @@ class TestWhatItAnswers:
         assert answer.page.web_url is None
         assert answer.page.client_url is None
         assert content.call_count == 1
+
+
+class TestAGroupNotebook:
+    @pytest.fixture
+    def group_page(self, graph: respx.MockRouter) -> respx.Route:
+        return graph.get(_GROUP_PAGE_PATH).mock(
+            return_value=httpx.Response(200, json=_page_payload())
+        )
+
+    @pytest.fixture
+    def group_content(self, graph: respx.MockRouter) -> respx.Route:
+        return graph.get(_GROUP_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=_HTML, headers={"content-type": "text/html"})
+        )
+
+    async def test_a_group_handle_reads_the_page_and_its_content_under_the_group(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        group_page: respx.Route,
+        group_content: respx.Route,
+    ) -> None:
+        answer = await _read(client, transport, page=_GROUP_PAGE)
+
+        assert (group_page.call_count, group_content.call_count) == (1, 1)
+        assert graph.calls.call_count == 2, "nothing was read from /me"
+        assert answer.html == _HTML.decode("utf-8")
+
+    @pytest.mark.usefixtures("group_content")
+    async def test_the_group_page_read_selects_and_expands_the_same_fields_as_the_me_read(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, group_page: respx.Route
+    ) -> None:
+        _ = await _read(client, transport, page=_GROUP_PAGE)
+
+        params = group_page.calls.last.request.url.params
+        assert params["$select"].split(",") == list(PAGE_FIELDS)
+        assert params["$expand"].split(",") == list(PAGE_EXPANSIONS)
+
+    @pytest.mark.usefixtures("group_page")
+    async def test_the_group_content_read_carries_no_query_parameters_by_default(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, group_content: respx.Route
+    ) -> None:
+        _ = await _read(client, transport, page=_GROUP_PAGE)
+
+        assert group_content.calls.last.request.url.params == httpx.QueryParams()
+
+    @pytest.mark.usefixtures("group_page")
+    async def test_include_ids_reaches_the_group_content_read(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, group_content: respx.Route
+    ) -> None:
+        _ = await _read(client, transport, page=_GROUP_PAGE, include_ids=True)
+
+        assert group_content.calls.last.request.url.params["includeIDs"] == "true"
+
+    @pytest.mark.usefixtures("group_page", "group_content")
+    async def test_the_page_summary_keeps_the_group_in_its_handles(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient
+    ) -> None:
+        answer = await _read(client, transport, page=_GROUP_PAGE)
+
+        assert answer.page.uri == _GROUP_PAGE
+        assert answer.page.section_uri == OnenoteSectionHandle(SECTION_ID, group_id=GROUP_ID).uri
+
+    @pytest.mark.usefixtures("group_content")
+    async def test_a_404_on_the_group_page_is_a_graph_not_found(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_PAGE_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "Not Found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _read(client, transport, page=_GROUP_PAGE)
+
+    @pytest.mark.usefixtures("group_content")
+    async def test_a_403_on_the_group_page_is_a_graph_forbidden(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_PAGE_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await _read(client, transport, page=_GROUP_PAGE)
+
+    @pytest.mark.usefixtures("group_page")
+    async def test_a_404_on_the_group_content_is_a_graph_not_found(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_CONTENT_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "Not Found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _read(client, transport, page=_GROUP_PAGE)
 
 
 class TestTheSizeCap:
@@ -392,7 +499,7 @@ class TestHowItDeclaresItself:
         assert reader.GRAPH_PERMISSIONS == ("Notes.Read",)
 
     def test_each_graph_call_has_a_step_of_its_own(self) -> None:
-        assert (reader.STEP_PAGE, reader.STEP_PAGE_CONTENT) == ("page", "page_content")
+        assert (STEP_PAGE, reader.STEP_PAGE_CONTENT) == ("page", "page_content")
 
     def test_the_refusable_call_is_a_handle_this_tool_accepts(self) -> None:
         assert set(reader.GRAPH_CALL_EXAMPLE) == {"page"}
@@ -431,6 +538,7 @@ class TestHowItDeclaresItself:
 
         assert "onenote_list_pages" in page_described
         assert "onenote_create_page" in page_described
+        assert "onenote:///groups/{group}/" in page_described
         assert "onenote_append_to_page" in described
         assert "1 MB" in described
         assert "opens only with this connector's own sign-in token" in described

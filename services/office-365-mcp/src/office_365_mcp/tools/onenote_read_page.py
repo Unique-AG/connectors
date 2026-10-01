@@ -6,13 +6,8 @@ from typing import Annotated
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.method import Method
 from kiota_abstractions.request_information import RequestInformation
-from msgraph.generated.models.onenote_page import OnenotePage
-from msgraph.generated.users.item.onenote.pages.item.onenote_page_item_request_builder import (
-    OnenotePageItemRequestBuilder,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -24,12 +19,11 @@ from office_365_mcp.graph_client import (
     request_with_query,
 )
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
-from office_365_mcp.shared.notes import PAGE_EXPANSIONS, PAGE_FIELDS, PageSummary, web_url_of
+from office_365_mcp.shared.notes import PageSummary, onenote_root, page_summary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "onenote_read_page"
 
-STEP_PAGE = "page"
 STEP_PAGE_CONTENT = "page_content"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)
@@ -78,8 +72,6 @@ _NOTHING_CAME_BACK = (
     + "the user to open the page in OneNote directly."
 )
 
-_PageQuery = OnenotePageItemRequestBuilder.OnenotePageItemRequestBuilderGetQueryParameters
-
 
 class PageContent(BaseModel):
     page: PageSummary = Field(
@@ -110,39 +102,26 @@ async def onenote_read_page(
     refused: str | None = None
     content: bytes | None = None
     with graph_errors(TOOL_NAME):
-        with graph_step(STEP_PAGE):
-            fetched = await _page(client, handle)
-        assert fetched is not None, "Graph answered a page read with no page"
+        summary = await page_summary(client, handle.page_id, group_id=handle.group_id)
 
         try:
             with graph_step(STEP_PAGE_CONTENT):
                 content = await _content(client, transport, handle, include_ids=include_ids)
         except GraphResponseTooLarge as refusal:
-            refused = _too_large(size=_counted(refusal), web_url=web_url_of(fetched.links))
+            refused = _too_large(size=_counted(refusal), web_url=summary.web_url)
 
     if refused is not None:
         raise ToolError(refused)
     assert content is not None, "content is set whenever refused is None"
 
-    web_url = web_url_of(fetched.links)
     if content == b"":
         raise ToolError(_NOTHING_CAME_BACK)
     try:
         html = content.decode("utf-8")
     except UnicodeDecodeError as error:
-        raise ToolError(_cannot_decode(web_url)) from error
+        raise ToolError(_cannot_decode(summary.web_url)) from error
 
-    summary = PageSummary.from_page(fetched)
-    assert summary is not None, "Graph answered a page read with no id"
     return PageContent(page=summary, html=html)
-
-
-async def _page(client: GraphServiceClient, handle: OnenotePageHandle) -> OnenotePage | None:
-    return await client.me.onenote.pages.by_onenote_page_id(handle.page_id).get(
-        request_configuration=RequestConfiguration[_PageQuery](
-            query_parameters=_PageQuery(select=list(PAGE_FIELDS), expand=list(PAGE_EXPANSIONS))
-        )
-    )
 
 
 async def _content(
@@ -165,7 +144,7 @@ async def _content(
 def _content_request(
     client: GraphServiceClient, handle: OnenotePageHandle, *, include_ids: bool
 ) -> RequestInformation:
-    content = client.me.onenote.pages.by_onenote_page_id(handle.page_id).content
+    content = onenote_root(client, handle.group_id).pages.by_onenote_page_id(handle.page_id).content
     raw_query: dict[str, str] = {"includeIDs": "true"} if include_ids else {}
     request = request_with_query(
         Method.GET, content.url_template, content.path_parameters, query=raw_query
@@ -225,7 +204,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The page to read: the `uri` of a onenote_list_pages row or a "
                     + "onenote_create_page answer, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle is not a page handle."
+                    + "onenote:///pages/{id}. A handle from a group notebook starts with "
+                    + "onenote:///groups/{group}/ instead. A section handle is not a page handle."
                 ),
             ),
         ],

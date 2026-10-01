@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import onenote_page_handle
+from office_365_mcp.shared.notes import onenote_root
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "onenote_preview_page"
@@ -52,8 +53,9 @@ class PagePreview(BaseModel):
     page_uri: str = Field(
         description=(
             "The handle of the page this preview belongs to: onenote:///pages/{id}, echoed "
-            + "back from the `page` argument. Pass it to onenote_read_page to read the whole "
-            + "page."
+            + "back from the `page` argument. A handle from a group notebook starts with "
+            + "onenote:///groups/{group}/ instead. Pass it to onenote_read_page to read the "
+            + "whole page."
         )
     )
     preview_text: str | None = Field(
@@ -77,7 +79,11 @@ async def preview_page(client: GraphServiceClient, *, page: str) -> PagePreview:
         raise ToolError(_NOT_A_PAGE_HANDLE)
 
     with graph_errors(TOOL_NAME, step=STEP_PREVIEW):
-        fetched = await client.me.onenote.pages.by_onenote_page_id(handle.page_id).preview.get()
+        fetched = await (
+            onenote_root(client, handle.group_id)
+            .pages.by_onenote_page_id(handle.page_id)
+            .preview.get()
+        )
 
     assert fetched is not None, "Graph answered a page preview with no preview"
     return PagePreview(
@@ -111,7 +117,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The page to preview: the `uri` of a onenote_list_pages row or a "
                     + "onenote_create_page answer, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle is not a page handle."
+                    + "onenote:///pages/{id}. A handle from a group notebook starts with "
+                    + "onenote:///groups/{group}/ instead. A section handle is not a page handle."
                 ),
             ),
         ],

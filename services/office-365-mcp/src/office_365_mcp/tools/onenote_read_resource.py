@@ -13,7 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import GraphResponseTooLarge, download_to_file, graph_errors
-from office_365_mcp.shared.notes import resource_id_in
+from office_365_mcp.shared.notes import group_of_graph_url, onenote_root, resource_id_in
 from office_365_mcp.shared.seam import READ_ONLY, FileFromGraph, graph_client_for_caller
 
 TOOL_NAME = "onenote_read_resource"
@@ -64,10 +64,9 @@ _NOTHING_CAME_BACK = (
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 has no such resource. It was most likely deleted along with the page that "
-    + "held it, or it sits outside what this account's own OneNote reaches — an image embedded "
-    + "in a team or site notebook is not always reachable through this connector's own sign-in. "
-    + "Re-read the page that holds it with onenote_read_page and take a fresh address from its "
-    + "`html`. This same address fails again, so do not retry it."
+    + "held it. An image in a site notebook is also not always reachable through the sign-in of "
+    + "this connector. Re-read the page that holds it with onenote_read_page and take a fresh "
+    + "address from its `html`. This same address fails again, so do not retry it."
 )
 
 
@@ -79,7 +78,9 @@ async def read_resource(
         raise ToolError(_NOT_A_RESOURCE_ADDRESS)
 
     try:
-        content, media_type = await _fetch(client, transport, resource_id)
+        content, media_type = await _fetch(
+            client, transport, resource_id, group_id=group_of_graph_url(resource)
+        )
     except GraphResponseTooLarge as refusal:
         refused = _too_large(refusal)
     else:
@@ -90,21 +91,27 @@ async def read_resource(
 
 
 async def _fetch(
-    client: GraphServiceClient, transport: httpx.AsyncClient, resource_id: str
+    client: GraphServiceClient,
+    transport: httpx.AsyncClient,
+    resource_id: str,
+    *,
+    group_id: str | None,
 ) -> tuple[bytes, str]:
     with graph_errors(TOOL_NAME, step=STEP_RESOURCE_CONTENT):
         async with download_to_file(
             client,
             transport,
-            _content_request(client, resource_id),
+            _content_request(client, resource_id, group_id=group_id),
             directory=Path(gettempdir()),
             max_bytes=MAX_BYTES,
         ) as downloaded:
             return downloaded.path.read_bytes(), _media_type(downloaded.content_type)
 
 
-def _content_request(client: GraphServiceClient, resource_id: str) -> RequestInformation:
-    builder = client.me.onenote.resources.by_onenote_resource_id(resource_id).content
+def _content_request(
+    client: GraphServiceClient, resource_id: str, *, group_id: str | None
+) -> RequestInformation:
+    builder = onenote_root(client, group_id).resources.by_onenote_resource_id(resource_id).content
     request = RequestInformation(Method.GET, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/octet-stream, application/json")
     return request

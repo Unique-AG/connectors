@@ -9,7 +9,7 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import onenote_operation_handle
-from office_365_mcp.shared.notes import OperationSummary
+from office_365_mcp.shared.notes import OperationSummary, onenote_root
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "onenote_get_operation"
@@ -63,12 +63,14 @@ async def get_operation(client: GraphServiceClient, *, operation: str) -> Operat
         raise ToolError(_NOT_AN_OPERATION_HANDLE)
 
     with graph_errors(TOOL_NAME, step=STEP_OPERATION):
-        found = await client.me.onenote.operations.by_onenote_operation_id(
-            handle.operation_id
-        ).get()
+        found = await (
+            onenote_root(client, handle.group_id)
+            .operations.by_onenote_operation_id(handle.operation_id)
+            .get()
+        )
 
     assert found is not None, "Graph answered an operation read with no operation"
-    return OperationSummary.from_operation(found)
+    return OperationSummary.from_operation(found, group_id=handle.group_id)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -88,8 +90,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The copy to poll: the `uri` of a onenote_copy_page, onenote_copy_section or "
                     + "onenote_copy_notebook answer, copied word for word. The shape is "
-                    + "onenote:///operations/{id}. An operation id alone, with no connector scheme "
-                    + "around it, reaches nothing."
+                    + "onenote:///operations/{id}. A handle from a group notebook starts with "
+                    + "onenote:///groups/{group}/ instead. An operation id alone, with no "
+                    + "connector scheme around it, reaches nothing."
                 ),
             ),
         ],

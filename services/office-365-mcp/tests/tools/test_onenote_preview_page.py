@@ -16,10 +16,13 @@ from office_365_mcp.tools import onenote_preview_page as previewer
 
 PAGE_ID = "0-SYNTHETICPAGE0000!0001"
 SECTION_ID = "0-SYNTHETICSECTION00!0001"
+GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
 
 _PREVIEW_PATH = "/me/onenote/pages/0-SYNTHETICPAGE0000%210001/preview()"
+_GROUP_PREVIEW_PATH = f"/groups/{GROUP_ID}/onenote/pages/0-SYNTHETICPAGE0000%210001/preview()"
 
 _PAGE = OnenotePageHandle(PAGE_ID).uri
+_GROUP_PAGE = OnenotePageHandle(PAGE_ID, group_id=GROUP_ID).uri
 _SECTION = OnenoteSectionHandle(SECTION_ID).uri
 
 _IMAGE_URL = "https://graph.microsoft.com/v1.0/me/onenote/resources/res-1/content"
@@ -115,6 +118,49 @@ class TestWhatItAnswers:
         assert answer.preview_image_url is None
 
 
+class TestAGroupNotebook:
+    @pytest.fixture
+    def group_preview(self, graph: respx.MockRouter) -> respx.Route:
+        return graph.get(_GROUP_PREVIEW_PATH).mock(
+            return_value=httpx.Response(200, json=_preview_payload())
+        )
+
+    async def test_a_group_handle_reads_the_preview_under_the_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter, group_preview: respx.Route
+    ) -> None:
+        answer = await _preview(client, page=_GROUP_PAGE)
+
+        assert group_preview.call_count == 1
+        assert graph.calls.call_count == 1, "nothing was read from /me"
+        assert b"%21" in group_preview.calls.last.request.url.raw_path
+        assert answer.preview_text == "This week's roadmap notes"
+
+    async def test_the_group_preview_request_carries_no_query_parameters(
+        self, client: GraphServiceClient, group_preview: respx.Route
+    ) -> None:
+        _ = await _preview(client, page=_GROUP_PAGE)
+
+        assert group_preview.calls.last.request.url.params == httpx.QueryParams()
+
+    @pytest.mark.usefixtures("group_preview")
+    async def test_the_page_uri_keeps_the_group(self, client: GraphServiceClient) -> None:
+        answer = await _preview(client, page=_GROUP_PAGE)
+
+        assert answer.page_uri == _GROUP_PAGE
+
+    async def test_a_404_on_the_group_preview_is_a_graph_not_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_PREVIEW_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "Not Found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _preview(client, page=_GROUP_PAGE)
+
+
 class TestWhatItRefuses:
     @pytest.mark.parametrize(
         "value",
@@ -203,6 +249,15 @@ class TestHowItDeclaresItself:
         parameters, _tool = await _registered(transport)
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert not [name for name in properties if word in name.casefold()]
+
+    async def test_the_page_argument_and_the_answer_name_the_group_handle_shape(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, Mapping[str, str]]", parameters["properties"])
+        assert "onenote:///groups/{group}/" in properties["page"]["description"]
+        page_uri = previewer.PagePreview.model_fields["page_uri"].description or ""
+        assert "onenote:///groups/{group}/" in page_uri
 
     async def test_it_announces_itself_as_read_only(self, transport: httpx.AsyncClient) -> None:
         _parameters, tool = await _registered(transport)

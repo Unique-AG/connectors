@@ -37,13 +37,25 @@ _SECTION_ID = "0-SYNTHETICSECTION0001!0001"
 _OTHER_SECTION_ID = "0-SYNTHETICSECTION0002!0001"
 _CHILD_GROUP_ID = "0-SYNTHETICGROUP0002!0001"
 
+_OWNER_ID = "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+
 _NOTEBOOK = OnenoteNotebookHandle(_NOTEBOOK_ID).uri
 _GROUP = OnenoteSectionGroupHandle(_GROUP_ID).uri
+_OWNED_NOTEBOOK = OnenoteNotebookHandle(_NOTEBOOK_ID, group_id=_OWNER_ID).uri
+_OWNED_GROUP = OnenoteSectionGroupHandle(_GROUP_ID, group_id=_OWNER_ID).uri
 
 _NOTEBOOK_SECTIONS_PATH = "/me/onenote/notebooks/0-SYNTHETICNOTEBOOK0001%210001/sections"
 _NOTEBOOK_GROUPS_PATH = "/me/onenote/notebooks/0-SYNTHETICNOTEBOOK0001%210001/sectionGroups"
 _GROUP_SECTIONS_PATH = "/me/onenote/sectionGroups/0-SYNTHETICGROUP0001%210001/sections"
 _GROUP_GROUPS_PATH = "/me/onenote/sectionGroups/0-SYNTHETICGROUP0001%210001/sectionGroups"
+
+_OWNED_ROOT = f"/groups/{_OWNER_ID}/onenote"
+_OWNED_NOTEBOOK_SECTIONS_PATH = f"{_OWNED_ROOT}/notebooks/0-SYNTHETICNOTEBOOK0001%210001/sections"
+_OWNED_NOTEBOOK_GROUPS_PATH = (
+    f"{_OWNED_ROOT}/notebooks/0-SYNTHETICNOTEBOOK0001%210001/sectionGroups"
+)
+_OWNED_GROUP_SECTIONS_PATH = f"{_OWNED_ROOT}/sectionGroups/0-SYNTHETICGROUP0001%210001/sections"
+_OWNED_GROUP_GROUPS_PATH = f"{_OWNED_ROOT}/sectionGroups/0-SYNTHETICGROUP0001%210001/sectionGroups"
 
 
 def _creator(name: str | None) -> dict[str, object] | None:
@@ -115,6 +127,26 @@ def group_sections(graph: respx.MockRouter) -> respx.Route:
 @pytest.fixture
 def group_groups(graph: respx.MockRouter) -> respx.Route:
     return graph.get(_GROUP_GROUPS_PATH).mock(return_value=_page())
+
+
+@pytest.fixture
+def owned_notebook_sections(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_OWNED_NOTEBOOK_SECTIONS_PATH).mock(return_value=_page())
+
+
+@pytest.fixture
+def owned_notebook_groups(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_OWNED_NOTEBOOK_GROUPS_PATH).mock(return_value=_page())
+
+
+@pytest.fixture
+def owned_group_sections(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_OWNED_GROUP_SECTIONS_PATH).mock(return_value=_page())
+
+
+@pytest.fixture
+def owned_group_groups(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_OWNED_GROUP_GROUPS_PATH).mock(return_value=_page())
 
 
 class TestWhatItAsks:
@@ -234,6 +266,227 @@ class TestWhatItAsks:
     ) -> None:
         with pytest.raises(AssertionError):
             _ = await lister.list_sections(client, parent=_NOTEBOOK, limit=limit)
+
+
+async def _list_with_every_option(client: GraphServiceClient, parent: str) -> lister.Sections:
+    return await lister.list_sections(
+        client, parent=parent, name_contains="Plan", order_by="created_desc", limit=7
+    )
+
+
+@pytest.mark.usefixtures(
+    "notebook_sections",
+    "notebook_groups",
+    "group_sections",
+    "group_groups",
+    "owned_notebook_sections",
+    "owned_notebook_groups",
+    "owned_group_sections",
+    "owned_group_groups",
+)
+class TestTheGroupRoute:
+    async def test_an_owned_notebook_parent_asks_the_owners_notebook_routes_only(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        owned_notebook_sections: respx.Route,
+        owned_notebook_groups: respx.Route,
+        owned_group_sections: respx.Route,
+        owned_group_groups: respx.Route,
+    ) -> None:
+        _ = await lister.list_sections(client, parent=_OWNED_NOTEBOOK, limit=50)
+
+        assert owned_notebook_sections.call_count == 1
+        assert owned_notebook_groups.call_count == 1
+        assert owned_group_sections.call_count == 0
+        assert owned_group_groups.call_count == 0
+        assert len(graph.calls) == 2
+
+    async def test_an_owned_section_group_parent_asks_the_owners_section_group_routes_only(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        owned_notebook_sections: respx.Route,
+        owned_notebook_groups: respx.Route,
+        owned_group_sections: respx.Route,
+        owned_group_groups: respx.Route,
+    ) -> None:
+        _ = await lister.list_sections(client, parent=_OWNED_GROUP, limit=50)
+
+        assert owned_group_sections.call_count == 1
+        assert owned_group_groups.call_count == 1
+        assert owned_notebook_sections.call_count == 0
+        assert owned_notebook_groups.call_count == 0
+        assert len(graph.calls) == 2
+
+    async def test_a_parent_with_no_owner_never_asks_an_owners_route(
+        self,
+        client: GraphServiceClient,
+        owned_notebook_sections: respx.Route,
+        owned_notebook_groups: respx.Route,
+        owned_group_sections: respx.Route,
+        owned_group_groups: respx.Route,
+    ) -> None:
+        _ = await lister.list_sections(client, parent=_NOTEBOOK, limit=50)
+        _ = await lister.list_sections(client, parent=_GROUP, limit=50)
+
+        assert owned_notebook_sections.call_count == 0
+        assert owned_notebook_groups.call_count == 0
+        assert owned_group_sections.call_count == 0
+        assert owned_group_groups.call_count == 0
+
+    async def test_the_owners_notebook_routes_send_the_query_strings_of_the_user_routes(
+        self,
+        client: GraphServiceClient,
+        notebook_sections: respx.Route,
+        notebook_groups: respx.Route,
+        owned_notebook_sections: respx.Route,
+        owned_notebook_groups: respx.Route,
+    ) -> None:
+        for parent in (_NOTEBOOK, _OWNED_NOTEBOOK):
+            _ = await _list_with_every_option(client, parent)
+
+        owned_sections = owned_notebook_sections.calls.last.request.url.params
+        owned_groups = owned_notebook_groups.calls.last.request.url.params
+        assert owned_sections == notebook_sections.calls.last.request.url.params
+        assert owned_groups == notebook_groups.calls.last.request.url.params
+        assert owned_sections["$top"] == "7"
+        assert owned_sections["$filter"] == "contains(tolower(displayName),'plan')"
+        assert owned_sections["$orderby"] == "createdDateTime desc"
+
+    async def test_the_owners_section_group_routes_send_the_query_strings_of_the_user_routes(
+        self,
+        client: GraphServiceClient,
+        group_sections: respx.Route,
+        group_groups: respx.Route,
+        owned_group_sections: respx.Route,
+        owned_group_groups: respx.Route,
+    ) -> None:
+        for parent in (_GROUP, _OWNED_GROUP):
+            _ = await _list_with_every_option(client, parent)
+
+        owned_sections = owned_group_sections.calls.last.request.url.params
+        owned_groups = owned_group_groups.calls.last.request.url.params
+        assert owned_sections == group_sections.calls.last.request.url.params
+        assert owned_groups == group_groups.calls.last.request.url.params
+        assert owned_groups["$top"] == "7"
+        assert owned_groups["$filter"] == "contains(tolower(displayName),'plan')"
+        assert owned_groups["$orderby"] == "createdDateTime desc"
+
+    async def test_the_parent_uri_spells_the_owned_handle_back(
+        self, client: GraphServiceClient
+    ) -> None:
+        answer = await lister.list_sections(client, parent=_OWNED_NOTEBOOK, limit=50)
+
+        assert answer.parent_uri == _OWNED_NOTEBOOK
+        assert answer.parent_uri.startswith(f"onenote:///groups/{_OWNER_ID}/notebooks/")
+
+    async def test_the_rows_under_an_owned_notebook_carry_its_group(
+        self,
+        client: GraphServiceClient,
+        owned_notebook_sections: respx.Route,
+        owned_notebook_groups: respx.Route,
+    ) -> None:
+        owned_notebook_sections.mock(return_value=_page(_section_payload(_SECTION_ID)))
+        owned_notebook_groups.mock(return_value=_page(_group_payload(_CHILD_GROUP_ID)))
+
+        answer = await lister.list_sections(client, parent=_OWNED_NOTEBOOK, limit=50)
+
+        assert [row.uri for row in answer.sections] == [
+            OnenoteSectionHandle(_SECTION_ID, group_id=_OWNER_ID).uri
+        ]
+        assert [row.uri for row in answer.section_groups] == [
+            OnenoteSectionGroupHandle(_CHILD_GROUP_ID, group_id=_OWNER_ID).uri
+        ]
+
+    async def test_the_rows_under_an_owned_section_group_carry_its_group(
+        self,
+        client: GraphServiceClient,
+        owned_group_sections: respx.Route,
+        owned_group_groups: respx.Route,
+    ) -> None:
+        owned_group_sections.mock(return_value=_page(_section_payload(_SECTION_ID)))
+        owned_group_groups.mock(return_value=_page(_group_payload(_CHILD_GROUP_ID)))
+
+        answer = await lister.list_sections(client, parent=_OWNED_GROUP, limit=50)
+
+        assert answer.sections[0].uri == OnenoteSectionHandle(_SECTION_ID, group_id=_OWNER_ID).uri
+        assert (
+            answer.section_groups[0].uri
+            == OnenoteSectionGroupHandle(_CHILD_GROUP_ID, group_id=_OWNER_ID).uri
+        )
+
+    async def test_the_rows_under_a_parent_with_no_owner_name_no_group(
+        self, client: GraphServiceClient, notebook_sections: respx.Route
+    ) -> None:
+        notebook_sections.mock(return_value=_page(_section_payload(_SECTION_ID)))
+
+        answer = await lister.list_sections(client, parent=_NOTEBOOK, limit=50)
+
+        assert "/groups/" not in answer.sections[0].uri
+
+    async def test_an_owned_notebook_reads_its_name_off_the_expansion_as_before(
+        self, client: GraphServiceClient, owned_notebook_sections: respx.Route
+    ) -> None:
+        owned_notebook_sections.mock(
+            return_value=_page(_section_payload(_SECTION_ID, notebook_name="Engineering"))
+        )
+
+        answer = await lister.list_sections(client, parent=_OWNED_NOTEBOOK, limit=50)
+
+        assert answer.notebook_name == "Engineering"
+
+    async def test_an_owned_walk_follows_a_next_link_under_the_owners_route(
+        self, client: GraphServiceClient, owned_notebook_sections: respx.Route
+    ) -> None:
+        owned_notebook_sections.mock(
+            side_effect=[
+                _page(
+                    _section_payload(_SECTION_ID, name="Early", created_by="Grace Hopper"),
+                    next_link=f"{GRAPH_V1}{_OWNED_NOTEBOOK_SECTIONS_PATH}?$skiptoken=second",
+                ),
+                _page(_section_payload(_OTHER_SECTION_ID, name="Late", created_by="Ada Lovelace")),
+            ]
+        )
+
+        answer = await lister.list_sections(
+            client, parent=_OWNED_NOTEBOOK, created_by="ada", limit=1
+        )
+
+        assert [row.name for row in answer.sections] == ["Late"]
+        assert answer.sections[0].uri == (
+            OnenoteSectionHandle(_OTHER_SECTION_ID, group_id=_OWNER_ID).uri
+        )
+        assert owned_notebook_sections.calls.last.request.url.params["$skiptoken"] == "second"
+
+    async def test_a_404_on_an_owned_route_is_a_not_found(
+        self, client: GraphServiceClient, owned_notebook_sections: respx.Route
+    ) -> None:
+        owned_notebook_sections.mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await lister.list_sections(client, parent=_OWNED_NOTEBOOK, limit=50)
+
+    @pytest.mark.parametrize(
+        "parent",
+        [
+            OnenoteSectionHandle(_SECTION_ID, group_id=_OWNER_ID).uri,
+            OnenotePageHandle("0-SYNTHETICPAGE0001!0001", group_id=_OWNER_ID).uri,
+            f"onenote:///groups/{_OWNER_ID}/notebooks/",
+            f"onenote:///groups/{_OWNER_ID}",
+        ],
+    )
+    async def test_an_owned_handle_that_is_neither_shape_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter, parent: str
+    ) -> None:
+        with pytest.raises(ToolError):
+            _ = await lister.list_sections(client, parent=parent, limit=50)
+
+        assert len(graph.calls) == 0
 
 
 class TestWhatItAnswers:
@@ -661,6 +914,14 @@ class TestWhatItRefuses:
         assert "onenote_list_sections" in message
         assert "onenote_create_section_group" in message
 
+    async def test_the_refusal_says_how_a_group_notebook_handle_starts(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as excinfo:
+            _ = await lister.list_sections(client, parent="Planning", limit=50)
+
+        assert "starts with onenote:///groups/{group}/ instead" in str(excinfo.value)
+
 
 class TestGraphFailures:
     def test_the_permission_is_notes_read(self) -> None:
@@ -753,6 +1014,25 @@ class TestItsArguments:
         described = cast("str", properties["created_by"]["description"])
         assert "both lists" in described
         assert "left out" in described
+
+    async def test_the_parent_says_how_a_group_notebook_handle_starts(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        properties = await self._properties(transport)
+
+        described = cast("str", properties["parent"]["description"])
+        assert "starts with onenote:///groups/{group}/ instead" in described
+
+    @pytest.mark.parametrize("row", [lister.SectionRow, lister.SectionGroupRow])
+    def test_a_row_handle_says_how_a_group_notebook_handle_starts(
+        self, row: type[lister.SectionRow | lister.SectionGroupRow]
+    ) -> None:
+        described = row.model_fields["uri"].description or ""
+
+        assert "A handle from a group notebook starts with onenote:///groups/{group}/ instead." in (
+            described
+        )
+        assert len(described.split()) <= 60
 
     def test_the_description_says_order_by_can_replace_the_default_order(self) -> None:
         assert "`order_by`" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
