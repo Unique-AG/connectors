@@ -63,6 +63,7 @@ from office_365_mcp.shared.calendar import (
     created_event,
     draft_details,
     event_body,
+    event_of,
     event_time,
     is_midnight,
     providers_without_teams,
@@ -786,6 +787,35 @@ class TestTheListingProjection:
 
     def test_it_names_the_categories_the_importance_and_the_series_master(self) -> None:
         assert {"categories", "importance", "seriesMasterId"} <= set(SUMMARY_FIELDS)
+
+
+_EVENT_PATH = "/me/calendars/AAMkSYNTHETIC-cal-0001%3D/events/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+
+
+class TestOneEventRead:
+    async def test_it_selects_the_listing_fields_and_no_more_by_default(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = graph.get(_EVENT_PATH).mock(return_value=httpx.Response(200, json={"id": _EVENT_ID}))
+
+        _ = await event_of(client, calendar_id=_CALENDAR_ID, event_id=_EVENT_ID)
+
+        assert read.calls.last.request.url.params["$select"].split(",") == list(SUMMARY_FIELDS)
+
+    async def test_it_selects_the_extra_fields_a_caller_asks_for_after_the_listing_fields(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = graph.get(_EVENT_PATH).mock(
+            return_value=httpx.Response(200, json={"id": _EVENT_ID, "allowNewTimeProposals": False})
+        )
+
+        event = await event_of(
+            client, calendar_id=_CALENDAR_ID, event_id=_EVENT_ID, also=("allowNewTimeProposals",)
+        )
+
+        selected = read.calls.last.request.url.params["$select"].split(",")
+        assert selected == [*SUMMARY_FIELDS, "allowNewTimeProposals"]
+        assert event.allow_new_time_proposals is False
 
 
 class TestOneRecurrenceRule:

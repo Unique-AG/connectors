@@ -175,10 +175,10 @@ class CalendarEvent(EventSummary):
     )
     allow_new_time_proposals: bool | None = Field(
         description=(
-            "This says whether an attendee can propose another time for this event. This "
-            + "connector proposes no time, and it answers no invitation. This field reports "
-            + "what the organizer allowed, and nothing that this tool can do. This field is "
-            + "null when Graph did not say."
+            "This says whether the organizer allows an attendee to propose another time for this "
+            + "event. When this field is true, outlook_respond_to_invite can propose a new time "
+            + "with a decline or a tentative response. Not every deployment exposes that tool. "
+            + "This field is null when Graph did not say."
         )
     )
     hide_attendees: bool | None = Field(

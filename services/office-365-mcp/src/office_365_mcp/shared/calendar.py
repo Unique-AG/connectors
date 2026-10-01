@@ -689,14 +689,16 @@ def repeated_address(addresses: Sequence[str]) -> str | None:
     return None
 
 
-async def event_of(client: GraphServiceClient, *, calendar_id: str, event_id: str) -> Event:
+async def event_of(
+    client: GraphServiceClient, *, calendar_id: str, event_id: str, also: tuple[str, ...] = ()
+) -> Event:
     with graph_step(STEP_EVENT):
         found = (
             await client.me.calendars.by_calendar_id(calendar_id)
             .events.by_event_id(event_id)
             .get(
                 request_configuration=RequestConfiguration[_EventItemQuery](
-                    query_parameters=_EventItemQuery(select=list(SUMMARY_FIELDS)),
+                    query_parameters=_EventItemQuery(select=[*SUMMARY_FIELDS, *also]),
                     headers=immutable_id_headers(),
                 )
             )

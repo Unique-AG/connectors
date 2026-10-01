@@ -461,6 +461,13 @@ class TestWhatItAnswers:
         assert answer.allow_new_time_proposals is False
         assert answer.hide_attendees is True
 
+    def test_the_proposal_field_names_the_tool_that_can_propose_a_new_time(self) -> None:
+        described = reader.CalendarEvent.model_fields["allow_new_time_proposals"].description or ""
+
+        assert "outlook_respond_to_invite can propose a new time" in described
+        assert "proposes no time" not in described
+        assert 15 <= len(described.split()) <= 60
+
     async def test_an_attachment_is_a_boolean_and_nothing_else(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
