@@ -198,7 +198,8 @@ already-granted set, for the signed-in user. It does not ask again.
 ## Admin consent
 
 Some permissions need a tenant administrator to grant them, before any user in that tenant can
-sign in. The Tools section marks these.
+sign in. The Tools section marks these. The marks show the rule of this deployment. For some
+permissions, this rule differs from the default consent rule that Microsoft lists.
 [Microsoft's own overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview)
 explains this step in more detail.
 
