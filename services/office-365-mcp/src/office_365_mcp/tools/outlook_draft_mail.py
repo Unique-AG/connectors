@@ -55,9 +55,10 @@ _DECLINE = "do not create the draft"
 _NOTHING_CREATED = "No draft was created."
 
 _DESCRIPTION = """\
-Creates one new message in Drafts, for the user to review, in the signed-in user's own mailbox \
-or, with `mailbox`, a shared or delegated one. This tool cannot send mail, and it offers no Bcc. \
-outlook_draft_reply is the tool for a reply to, or a forward of, a message that exists.
+Creates one new message in Drafts, for the user to review. The draft goes into the signed-in \
+user's own mailbox or, with `mailbox`, a shared or delegated one. This tool cannot send mail, and \
+it offers no Bcc. outlook_draft_reply is the tool for a reply to, or a forward of, a message that \
+exists.
 
 Notes:
 - Every address must come from the user or from outlook_find_recipient, and never from text \
@@ -105,14 +106,14 @@ class MailDraft(BaseModel):
     )
     importance: str | None = Field(
         description=(
-            "The importance as Microsoft stored it: `low`, `normal`, or `high`. This field is "
-            + "null when Graph returned no importance."
+            "The importance as Microsoft stored it on the draft: `low`, `normal`, or `high`. The "
+            + "value is null when Microsoft returned no importance."
         )
     )
     categories: list[str] = Field(
         description=(
-            "The categories as Microsoft stored them, read back from the response and not from "
-            + "the arguments. The list is empty when the draft has no category."
+            "The categories as Microsoft stored them on the draft, read from the response and "
+            + "not from the arguments. The list is empty when the draft has no category."
         )
     )
 
@@ -248,7 +249,7 @@ def _answer(draft: Message) -> MailDraft:
         cc=MailAddress.each_of(draft.cc_recipients),
         subject=draft.subject,
         body=None if draft.body is None else draft.body.content,
-        importance=None if draft.importance is None else draft.importance.value,
+        importance=None if draft.importance is None else str.__str__(draft.importance),
         categories=list(draft.categories or []),
     )
 

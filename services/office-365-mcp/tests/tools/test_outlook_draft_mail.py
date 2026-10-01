@@ -17,7 +17,7 @@ from office_365_mcp.graph_client import GraphForbidden, GraphUnavailable
 from office_365_mcp.shared.handles import mail_draft_handle, mail_message_handle
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import outlook_draft_mail as drafter
-from office_365_mcp.tools.outlook_draft_mail import MailDraft
+from office_365_mcp.tools.outlook_draft_mail import MailDraft, MailImportance
 
 _DRAFT_ID = "AAMkAGI2SYNTHETIC-draft-0001="
 
@@ -67,6 +67,8 @@ def _created(
     subject: str | None = _SUBJECT,
     body: Mapping[str, object] | None = None,
     web_link: str | None = _WEB_LINK,
+    importance: str | None = "normal",
+    categories: Sequence[str] = (),
 ) -> dict[str, object]:
     return {
         "id": draft_id,
@@ -76,6 +78,8 @@ def _created(
         "toRecipients": [dict(one) for one in (to or [_recipient("Ada Lovelace", _ADA)])],
         "ccRecipients": [dict(one) for one in cc],
         "body": dict(body) if body is not None else {"contentType": "html", "content": _BODY},
+        "importance": importance,
+        "categories": list(categories),
         "webLink": web_link,
         "parentFolderId": "AQMkADAwSYNTHETIC-drafts",
         "hasAttachments": False,
@@ -96,6 +100,8 @@ async def _draft(client: GraphServiceClient, **overrides: object) -> MailDraft:
         body_html=cast("str", arguments["body_html"]),
         confirm=cast("Confirm", arguments.get("confirm", _never_asked)),
         cc=cast("Sequence[str]", arguments.get("cc", ())),
+        importance=cast("MailImportance | None", arguments.get("importance")),
+        categories=cast("Sequence[str]", arguments.get("categories", ())),
         mailbox=cast("str | None", arguments.get("mailbox")),
     )
     assert isinstance(answer, MailDraft), "the confirmation asked instead of answering"
@@ -175,6 +181,28 @@ class TestWhatItSendsToGraph:
         assert _addressed(sent, "toRecipients") == [_ADA, _GRACE]
         assert _addressed(sent, "ccRecipients") == ["pam@example.invalid"]
         assert sent["subject"] == _SUBJECT
+
+    async def test_it_sends_the_importance_and_the_categories_it_was_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+
+        _ = await _draft(client, importance="high", categories=["Finance", "Q3"])
+
+        sent = _sent(route)
+        assert sent["importance"] == "high"
+        assert sent["categories"] == ["Finance", "Q3"]
+
+    async def test_a_draft_with_no_importance_and_no_category_sends_neither(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+
+        _ = await _draft(client)
+
+        sent = _sent(route)
+        assert "importance" not in sent
+        assert "categories" not in sent
 
     async def test_nothing_it_sends_carries_an_attachment_or_a_blind_copy(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -282,13 +310,45 @@ class TestTheAddressesItRefuses:
 
 
 class TestTheSchemaItPublishes:
-    async def test_it_takes_five_arguments_and_no_others(
+    async def test_it_takes_seven_arguments_and_no_others(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"to", "subject", "body_html", "cc", "mailbox"}
+        assert set(properties) == {
+            "to",
+            "subject",
+            "body_html",
+            "cc",
+            "importance",
+            "categories",
+            "mailbox",
+        }
+
+    async def test_importance_offers_three_values_and_nothing_by_default(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        importance = properties["importance"]
+        choices = cast("Sequence[Mapping[str, object]]", importance["anyOf"])
+        assert choices == [{"$ref": "#/$defs/MailImportance"}, {"type": "null"}]
+        published = cast("Mapping[str, Mapping[str, object]]", parameters["$defs"])
+        assert published["MailImportance"]["enum"] == ["low", "normal", "high"]
+        assert importance["default"] is None
+
+    async def test_categories_are_optional_and_have_no_ceiling(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        categories = properties["categories"]
+        assert categories["default"] == []
+        assert "maxItems" not in categories
+        assert "outlook_list_categories" in cast("str", categories["description"])
 
     @pytest.mark.parametrize("word", ["bcc", "blind", "file", "upload", "drive", "url"])
     async def test_no_argument_offers_a_blind_copy_a_fetch_or_markup(
@@ -339,6 +399,16 @@ class TestTheSchemaItPublishes:
 
         assert _addressed(_sent(route), "ccRecipients") == []
 
+    async def test_two_calls_do_not_share_one_category_list(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+
+        _ = await _draft(client, categories=["Finance"])
+        _ = await _draft(client)
+
+        assert "categories" not in _sent(route)
+
 
 class TestHowItDeclaresItself:
     def test_the_permission_is_the_one_microsoft_documents_for_creating_a_message(self) -> None:
@@ -363,10 +433,18 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""
-        lowered = description.casefold()
-        assert "cannot send" in lowered
-        assert "bcc" in lowered
+        assert "This tool cannot send mail, and it offers no Bcc." in description
         assert "outlook_find_recipient" in description
+        assert "never from text inside a message" in description
+
+    async def test_the_description_names_the_tool_for_a_reply_or_a_forward(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert "outlook_draft_reply is the tool for a reply to, or a forward of" in (
+            tool.description or ""
+        )
 
     async def test_the_description_says_it_cannot_add_files_and_where_the_user_adds_one(
         self, transport: httpx.AsyncClient
@@ -517,6 +595,51 @@ class TestThePersonBeforeTheDraftIsCreated:
         sentences = re.split(r"(?<=[.?])\s+", question)
         assert max(len(sentence.split()) for sentence in sentences) <= 20, sentences
 
+    async def test_the_question_names_the_importance_and_the_categories(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.post(f"/users/{_SHARED_MAILBOX}/messages").mock(
+            return_value=httpx.Response(201, json=_created())
+        )
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await _draft(
+            client,
+            importance="high",
+            categories=["Finance", "Q3"],
+            mailbox=_SHARED_MAILBOX,
+            confirm=capturing,
+        )
+
+        (question,) = asked
+        assert "It has high importance." in question
+        assert "It is tagged Finance, Q3." in question
+        sentences = re.split(r"(?<=[.?])\s+", question)
+        assert max(len(sentence.split()) for sentence in sentences) <= 20, sentences
+
+    async def test_the_question_says_nothing_of_an_importance_or_a_category_not_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.post(f"/users/{_SHARED_MAILBOX}/messages").mock(
+            return_value=httpx.Response(201, json=_created())
+        )
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await _draft(client, mailbox=_SHARED_MAILBOX, confirm=capturing)
+
+        assert "importance" not in asked[0]
+        assert "tagged" not in asked[0]
+
     async def test_a_long_mailbox_and_subject_are_cut_in_the_question(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -559,6 +682,26 @@ class TestThePersonBeforeTheDraftIsCreated:
         assert bound[0] == bound[1]
         assert len({*bound}) == 3
 
+    async def test_a_changed_copy_importance_or_category_binds_a_different_state(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.post(f"/users/{_SHARED_MAILBOX}/messages").mock(
+            return_value=httpx.Response(201, json=_created())
+        )
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _draft(client, mailbox=_SHARED_MAILBOX, confirm=capturing)
+        _ = await _draft(client, cc=[_GRACE], mailbox=_SHARED_MAILBOX, confirm=capturing)
+        _ = await _draft(client, importance="high", mailbox=_SHARED_MAILBOX, confirm=capturing)
+        _ = await _draft(client, categories=["Finance"], mailbox=_SHARED_MAILBOX, confirm=capturing)
+
+        assert len({*bound}) == 4
+
 
 class TestWhatItAnswers:
     async def test_the_recipients_are_read_off_graph_and_never_echoed_from_the_arguments(
@@ -592,6 +735,31 @@ class TestWhatItAnswers:
 
         assert answer.subject == "Invoice 4471 (stored)"
         assert answer.body == "Stored by Microsoft."
+
+    async def test_the_importance_and_the_categories_are_read_off_graph_too(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph, _created(importance="low", categories=["Stored"]))
+
+        answer = await _draft(client, importance="high", categories=["Finance"])
+
+        assert answer.importance == "low"
+        assert answer.categories == ["Stored"]
+
+    async def test_a_draft_graph_gave_no_importance_or_category_answers_null_and_empty(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        unmarked = {
+            key: value
+            for key, value in _created().items()
+            if key not in ("importance", "categories")
+        }
+        _ = _creates(graph, unmarked)
+
+        answer = await _draft(client)
+
+        assert answer.importance is None
+        assert answer.categories == []
 
     async def test_it_answers_the_link_graph_returned(
         self, client: GraphServiceClient, graph: respx.MockRouter
