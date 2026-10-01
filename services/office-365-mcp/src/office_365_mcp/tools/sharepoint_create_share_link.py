@@ -17,7 +17,12 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.files import ITEM_HANDLE_SOURCES, item_for_a_question, item_label
+from office_365_mcp.shared.files import (
+    ITEM_HANDLE_SOURCES,
+    item_access_refused,
+    item_for_a_question,
+    item_label,
+)
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
@@ -93,6 +98,12 @@ GRAPH_NOT_FOUND = (
     + "sharepoint_search_files, or browse the folder again with sharepoint_browse_folder, and "
     + "take the `uri` from that new result. The same handle fails the same way, so do not retry "
     + "it."
+)
+
+GRAPH_FORBIDDEN = (
+    item_access_refused(_NOTHING_CREATED)
+    + " An administrator can turn off links that work with no sign-in. If `audience` was "
+    + "`anonymous`, ask the user if a link for the organization is good enough."
 )
 
 

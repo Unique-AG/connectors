@@ -14,10 +14,13 @@ from fastmcp.server.elicitation import (
     CancelledElicitation,
     DeclinedElicitation,
 )
+from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import FunctionTool, Tool
+from fastmcp.tools.base import ToolResult
 from mcp.shared.exceptions import MCPError
 from mcp.types import (
     METHOD_NOT_FOUND,
+    CallToolRequestParams,
     ElicitRequest,
     ElicitRequestFormParams,
     ElicitResult,
@@ -38,7 +41,8 @@ from office_365_mcp.shared.files import ITEM_HANDLE_SOURCES
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, GraphAdviceMiddleware
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import sharepoint_invite as inviter
 from office_365_mcp.tools.sharepoint_invite import Invitation, a_person_agrees, invite
 
@@ -927,6 +931,37 @@ class TestGraphFailures:
         with pytest.raises(GraphForbidden):
             _ = await _invite(client)
 
+    async def test_a_refused_invite_reaches_the_model_as_access_advice_and_not_a_grant(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        post = graph.post(_INVITE_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "SYNTHETIC refusal"}}
+            )
+        )
+
+        async def invites(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+            assert context.message.name == inviter.TOOL_NAME
+            _ = await _invite(client)
+            raise AssertionError("Graph refused the invite, and the call still answered")
+
+        middleware = GraphAdviceMiddleware(
+            graph_advice(resolve(preset=None, enabled=(inviter.TOOL_NAME,)))
+        )
+        context = MiddlewareContext(
+            message=CallToolRequestParams(name=inviter.TOOL_NAME, arguments={})
+        )
+        with pytest.raises(ToolError) as raised:
+            _ = await middleware.on_call_tool(context, invites)
+
+        message = str(raised.value)
+        assert message.startswith(inviter.GRAPH_FORBIDDEN)
+        assert "HTTP 403" in message
+        assert "administrator to grant" not in message
+        assert "Files.ReadWrite.All" not in message
+        assert post.call_count == 1
+
     async def test_the_call_example_reaches_the_invite_with_an_agreeing_client(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -1091,3 +1126,6 @@ class TestHowItDeclaresItself:
         assert _NOTHING_SHARED in inviter.GRAPH_NOT_FOUND
         assert "sharepoint_search_files" in inviter.GRAPH_NOT_FOUND
         assert "sharepoint_browse_folder" in inviter.GRAPH_NOT_FOUND
+
+    def test_forbidden_advice_says_nothing_was_shared(self) -> None:
+        assert _NOTHING_SHARED in inviter.GRAPH_FORBIDDEN

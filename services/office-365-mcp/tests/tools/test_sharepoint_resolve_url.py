@@ -7,13 +7,17 @@ import pytest
 import respx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import Tool
+from fastmcp.tools.base import ToolResult
+from mcp.types import CallToolRequestParams
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.files import ITEM_FIELDS, DriveItemSummary
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
-from office_365_mcp.shared.seam import READ_ONLY
+from office_365_mcp.shared.seam import READ_ONLY, GraphAdviceMiddleware
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import sharepoint_resolve_url as resolver
 
 DRIVE_ID = "b!SYNTHETICDRIVE0000"
@@ -219,6 +223,35 @@ class TestGraphFailures:
         with pytest.raises(GraphForbidden):
             _ = await _resolve(client)
 
+    async def test_a_403_reaches_the_model_as_advice_to_open_the_link_first(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        shares = graph.route().mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "SYNTHETIC refusal"}}
+            )
+        )
+
+        async def resolves(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+            assert context.message.name == resolver.TOOL_NAME
+            _ = await _resolve(client)
+            raise AssertionError("Graph refused the link, and the call still answered")
+
+        middleware = GraphAdviceMiddleware(
+            graph_advice(resolve(preset=None, enabled=(resolver.TOOL_NAME,)))
+        )
+        context = MiddlewareContext(
+            message=CallToolRequestParams(name=resolver.TOOL_NAME, arguments={})
+        )
+        with pytest.raises(ToolError) as raised:
+            _ = await middleware.on_call_tool(context, resolves)
+
+        message = str(raised.value)
+        assert message.startswith(resolver.GRAPH_FORBIDDEN)
+        assert "HTTP 403" in message
+        assert "administrator" not in message
+        assert shares.call_count == 1
+
 
 async def _registered(transport: httpx.AsyncClient) -> Tool:
     mcp: FastMCP = FastMCP(name="schema-under-test")
@@ -309,3 +342,8 @@ class TestHowItDeclaresItself:
         assert "sharepoint_search_files" in resolver.GRAPH_NOT_FOUND
         assert "open the link in a browser" in resolver.GRAPH_NOT_FOUND
         assert "the call will fail the same way" in resolver.GRAPH_NOT_FOUND
+
+    def test_a_403_sends_the_user_to_a_browser_and_does_not_say_the_item_is_gone(self) -> None:
+        assert "open the link in a browser" in resolver.GRAPH_FORBIDDEN
+        assert "does not exist" not in resolver.GRAPH_FORBIDDEN
+        assert "found no" not in resolver.GRAPH_FORBIDDEN

@@ -27,6 +27,7 @@ from office_365_mcp.shared.files import (
     UNNAMED_ITEM_LABEL,
     DriveItemSummary,
     folder_label,
+    item_access_refused,
     item_for_a_question,
     item_label,
     parent_folder_label,
@@ -280,6 +281,22 @@ class TestSummaryAfterWrite:
 
         assert str(raised.value) == _UNREAD
         assert reread.call_count == 1
+
+
+class TestItemAccessRefused:
+    def test_it_says_what_did_not_happen_right_after_the_refusal(self) -> None:
+        assert item_access_refused("Nothing was moved.").startswith(
+            "Microsoft 365 refused this request for the signed-in user. Nothing was moved."
+        )
+
+    def test_it_says_that_a_repeat_fails_the_same_way(self) -> None:
+        assert "will fail the same way" in item_access_refused("Nothing was moved.")
+
+    def test_it_sends_nobody_to_an_administrator_for_a_grant(self) -> None:
+        refusal = item_access_refused("Nothing was moved.")
+
+        assert "administrator" not in refusal
+        assert "grant" not in refusal
 
 
 class TestFailOnConflict:

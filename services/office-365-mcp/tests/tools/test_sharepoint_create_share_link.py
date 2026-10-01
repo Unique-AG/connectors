@@ -41,8 +41,8 @@ from office_365_mcp.shared.seam import (
     Confirm,
     Confirmed,
     GraphAdviceMiddleware,
-    ToolAdvice,
 )
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import sharepoint_create_share_link as sharer
 from office_365_mcp.tools.sharepoint_create_share_link import (
     SharingLink,
@@ -138,6 +138,21 @@ def _asking(asked: list[str]) -> Confirm:
 
 def _body(route: respx.Route) -> Mapping[str, object]:
     return cast("Mapping[str, object]", json.loads(route.calls.last.request.content))
+
+
+async def _advised_anonymous_share(client: GraphServiceClient) -> str:
+    async def share(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+        assert context.message.name == sharer.TOOL_NAME
+        _ = await _share(client, audience="anonymous")
+        raise AssertionError("Graph refused the link, and the call still answered with one")
+
+    middleware = GraphAdviceMiddleware(
+        graph_advice(resolve(preset=None, enabled=(sharer.TOOL_NAME,)))
+    )
+    context = MiddlewareContext(message=CallToolRequestParams(name=sharer.TOOL_NAME, arguments={}))
+    with pytest.raises(ToolError) as raised:
+        _ = await middleware.on_call_tool(context, share)
+    return str(raised.value)
 
 
 async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
@@ -682,7 +697,7 @@ class TestGraphFailures:
     @pytest.mark.parametrize(
         ("status", "code", "advice"),
         [
-            (403, "accessDenied", "the delegated permission Files.ReadWrite.All"),
+            (403, "accessDenied", sharer.GRAPH_FORBIDDEN),
             (400, "invalidRequest", "it is a bad request"),
         ],
     )
@@ -701,27 +716,29 @@ class TestGraphFailures:
             )
         )
 
-        async def share(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
-            assert context.message.name == sharer.TOOL_NAME
-            _ = await _share(client, audience="anonymous")
-            raise AssertionError("Graph refused the link, and the call still answered with one")
+        message = await _advised_anonymous_share(client)
 
-        middleware = GraphAdviceMiddleware(
-            {
-                sharer.TOOL_NAME: ToolAdvice(
-                    permissions=sharer.GRAPH_PERMISSIONS, not_found=sharer.GRAPH_NOT_FOUND
-                )
-            }
+        assert advice in message
+        assert f"Graph error code {code}" in message
+        assert link_route.call_count == 1
+
+    async def test_a_refused_anonymous_link_is_about_access_and_not_about_a_grant(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        link_route = graph.post(_LINK_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "SYNTHETIC refusal"}}
+            )
         )
-        context = MiddlewareContext(
-            message=CallToolRequestParams(name=sharer.TOOL_NAME, arguments={})
-        )
 
-        with pytest.raises(ToolError) as raised:
-            _ = await middleware.on_call_tool(context, share)
+        message = await _advised_anonymous_share(client)
 
-        assert advice in str(raised.value)
-        assert f"Graph error code {code}" in str(raised.value)
+        assert message.startswith(sharer.GRAPH_FORBIDDEN)
+        assert "HTTP 403" in message
+        assert "Graph error code accessDenied" in message
+        assert "administrator to grant" not in message
+        assert "Files.ReadWrite.All" not in message
         assert link_route.call_count == 1
 
     async def test_the_call_example_reaches_graph_with_an_agreeing_person(
@@ -748,6 +765,12 @@ class TestGraphFailures:
     def test_not_found_advice_points_at_the_tools_that_find_an_item(self) -> None:
         assert "sharepoint_search_files" in sharer.GRAPH_NOT_FOUND
         assert "sharepoint_browse_folder" in sharer.GRAPH_NOT_FOUND
+
+    def test_forbidden_advice_says_no_link_was_created_and_offers_a_link_for_the_organization(
+        self,
+    ) -> None:
+        assert _NOTHING_CREATED in sharer.GRAPH_FORBIDDEN
+        assert "a link for the organization" in sharer.GRAPH_FORBIDDEN
 
 
 class TestHowItDeclaresItself:

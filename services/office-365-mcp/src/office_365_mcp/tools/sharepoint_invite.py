@@ -25,6 +25,7 @@ from office_365_mcp.shared.calendar import repeated_address
 from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
     display_name,
+    item_access_refused,
     item_for_a_question,
     item_label,
 )
@@ -104,6 +105,8 @@ GRAPH_NOT_FOUND = (
     + "sharepoint_browse_folder. Then take the `uri` from that new result. The same handle fails "
     + "the same way, so do not retry it."
 )
+
+GRAPH_FORBIDDEN = item_access_refused(_NOTHING_SHARED)
 
 
 def _bad_address(value: str) -> str:

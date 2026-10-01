@@ -113,6 +113,12 @@ class _NarrowsItsNotFound(Protocol):
 
 
 @runtime_checkable
+class _NarrowsItsForbidden(Protocol):
+    @property
+    def GRAPH_FORBIDDEN(self) -> str: ...
+
+
+@runtime_checkable
 class _NarrowsItsCall(Protocol):
     @property
     def GRAPH_CALL_NARROWS_TO(self) -> tuple[str, ...]: ...
@@ -468,6 +474,7 @@ def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
             permissions=module.GRAPH_PERMISSIONS,
             not_found=_not_found_advice(module),
             shown_by=tuple(tool for tool in _shown_by(module) if tool in selection.tools),
+            forbidden=_forbidden_advice(module),
         )
         for module in _TOOL_MODULES
         if module.TOOL_NAME in selection.tools
@@ -476,6 +483,10 @@ def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
 
 def _not_found_advice(module: ToolModule) -> str | None:
     return module.GRAPH_NOT_FOUND if isinstance(module, _NarrowsItsNotFound) else None
+
+
+def _forbidden_advice(module: ToolModule) -> str | None:
+    return module.GRAPH_FORBIDDEN if isinstance(module, _NarrowsItsForbidden) else None
 
 
 def _shown_by(module: ToolModule) -> tuple[str, ...]:
