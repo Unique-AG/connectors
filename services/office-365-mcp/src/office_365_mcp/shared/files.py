@@ -13,6 +13,7 @@ ITEM_FIELDS: tuple[str, ...] = (
     "size",
     "webUrl",
     "createdDateTime",
+    "createdBy",
     "lastModifiedDateTime",
     "lastModifiedBy",
     "file",
@@ -65,6 +66,12 @@ class DriveItemSummary(BaseModel):
     created_at: datetime | None = Field(
         description=(
             "When the item was created, as Graph reported it. Null when Graph recorded none."
+        )
+    )
+    created_by: str | None = Field(
+        description=(
+            "The display name of the person who created the item. Null when an application "
+            + "created the item rather than a person, or when Graph recorded no name."
         )
     )
     last_modified_at: datetime | None = Field(
@@ -140,8 +147,9 @@ class DriveItemSummary(BaseModel):
             size=item.size,
             web_url=item.web_url,
             created_at=item.created_date_time,
+            created_by=display_name(item.created_by),
             last_modified_at=item.last_modified_date_time,
-            last_modified_by=_display_name(item.last_modified_by),
+            last_modified_by=display_name(item.last_modified_by),
             mime_type=item.file.mime_type if item.file is not None else None,
             child_count=item.folder.child_count if item.folder is not None else None,
             parent_path=parent.path if parent is not None else None,
@@ -149,7 +157,7 @@ class DriveItemSummary(BaseModel):
         )
 
 
-def _display_name(identity: IdentitySet | None) -> str | None:
+def display_name(identity: IdentitySet | None) -> str | None:
     if identity is None or identity.user is None:
         return None
     return identity.user.display_name

@@ -93,6 +93,10 @@ the text names that tool. If not, the text tells the model to ask the user.
 | `sharepoint_browse_folder` | Read | `Files.Read.All` | Yes | Lists every item directly inside one folder, in OneDrive or SharePoint, one level only. |
 | `sharepoint_read_file` | Read | `Files.Read.All` | Yes | The answer is the content of one file, in its original format, or converted to PDF. |
 
+In the answer of `sharepoint_search_files` and `sharepoint_browse_folder`, each file or folder has
+`created_by` and `last_modified_by`. Each field holds the display name of a person. The field is
+null when an application made the item or the change, or when Graph recorded no name.
+
 ### OneNote
 
 | Tool | Kind | Permission | Admin consent | What it does |
