@@ -4,10 +4,16 @@ from typing import Annotated, Literal, cast
 
 import httpx
 from fastmcp import FastMCP
-from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.notebook import Notebook as GraphNotebook
+from msgraph.generated.models.notebook_collection_response import NotebookCollectionResponse
 from msgraph.generated.models.onenote_section import OnenoteSection
+from msgraph.generated.models.onenote_section_collection_response import (
+    OnenoteSectionCollectionResponse,
+)
 from msgraph.generated.models.section_group import SectionGroup
+from msgraph.generated.models.section_group_collection_response import (
+    SectionGroupCollectionResponse,
+)
 from msgraph.generated.users.item.onenote.notebooks.notebooks_request_builder import (
     NotebooksRequestBuilder,
 )
@@ -31,6 +37,8 @@ from office_365_mcp.shared.notes import (
     ContainerOrderBy,
     created_by_contains,
     creator_name_of,
+    get_with_query,
+    onenote_root,
     web_url_of,
 )
 from office_365_mcp.shared.odata import odata_literal
@@ -45,6 +53,14 @@ STEP_SECTION_GROUPS = "section_groups"
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
+
+GRAPH_NOT_FOUND = (
+    "Microsoft 365 will not list these notebooks. If this call named a `group`, the id most "
+    + "likely names no group that the signed-in user can reach. Take the id from "
+    + "teams_list_my_teams, or ask the user for it. This same id fails again, so do not retry "
+    + "it. If this call named no `group`, Microsoft most likely found no OneNote for this "
+    + "account, and no other argument fixes that."
+)
 
 _NOTEBOOK_FIELDS: tuple[str, ...] = (
     "id",
@@ -80,8 +96,8 @@ _DESCRIPTION = """\
 Lists every notebook the signed-in user owns or that somebody else shares with them, with every \
 section of each. This is the starting point for OneNote: notebook and section handles come from \
 here. A section group appears only through a section's `group_uri`. onenote_list_sections lists \
-section groups as rows. This tool does not reach a notebook on a SharePoint site or in a \
-Microsoft 365 team.
+section groups as rows. Pass `group` to list the notebooks of one Microsoft 365 group or team \
+instead. This tool does not reach a notebook on a SharePoint site.
 
 Notes:
 - `capped` true means a safety cap cut the listing short.
@@ -91,7 +107,8 @@ Notes:
 class NotebookSection(BaseModel):
     uri: str = Field(
         description=(
-            "This section's handle: onenote:///sections/{id}, with the id percent-encoded. Pass "
+            "This section's handle: onenote:///sections/{id}, with the id percent-encoded. A "
+            + "handle from a group notebook starts with onenote:///groups/{group}/ instead. Pass "
             + "it as `section` to onenote_list_pages or onenote_create_page, or as `to_section` "
             + "to onenote_copy_page. Never build one. A section id alone reaches nothing."
         )
@@ -99,7 +116,8 @@ class NotebookSection(BaseModel):
     group_uri: str | None = Field(
         description=(
             "The handle of the section group that holds this section directly: "
-            + "onenote:///sectiongroups/{id}. Pass it to onenote_list_sections, "
+            + "onenote:///sectiongroups/{id}. A handle from a group notebook starts with "
+            + "onenote:///groups/{group}/ instead. Pass it to onenote_list_sections, "
             + "onenote_create_section, or onenote_create_section_group as `parent`, or to "
             + "onenote_copy_section as `to_section_group`. Null when this section sits directly "
             + "under its notebook."
@@ -143,7 +161,8 @@ class NotebookSection(BaseModel):
 class Notebook(BaseModel):
     uri: str = Field(
         description=(
-            "This notebook's handle: onenote:///notebooks/{id}, with the id percent-encoded. "
+            "This notebook's handle: onenote:///notebooks/{id}, with the id percent-encoded. A "
+            + "handle from a group notebook starts with onenote:///groups/{group}/ instead. "
             + "Pass it as `parent` to onenote_list_sections, onenote_create_section or "
             + "onenote_create_section_group, as `to_notebook` to onenote_copy_section, or as "
             + "`notebook` to onenote_copy_notebook. Never build one. A notebook id alone reaches "
@@ -206,10 +225,11 @@ class Notebook(BaseModel):
 class Notebooks(BaseModel):
     notebooks: list[Notebook] = Field(
         description=(
-            "Every notebook this call found: the signed-in user's own, and the ones shared "
-            + "with them. `capped` true can leave this list incomplete. Empty when the user "
-            + "has no OneNote notebooks. A notebook with no id from Microsoft is left out. "
-            + "It never gets a handle that fails."
+            "Every notebook this call found. With no `group`, these are the signed-in user's "
+            + "own notebooks and the ones shared with them. With `group`, these are the "
+            + "notebooks of that group. `capped` true can leave this list incomplete. Empty when "
+            + "no notebook matches. A notebook with no id from Microsoft is left out. It never "
+            + "gets a handle that fails."
         )
     )
     capped: bool = Field(
@@ -226,6 +246,7 @@ class Notebooks(BaseModel):
 async def list_notebooks(
     client: GraphServiceClient,
     *,
+    group: str | None = None,
     name_contains: str | None = None,
     created_by: str | None = None,
     shared: bool | None = None,
@@ -234,14 +255,16 @@ async def list_notebooks(
 ) -> Notebooks:
     notebook_filter = _notebook_filter(name_contains, shared, role)
     orderby = None if order_by is None else [CONTAINER_ORDER_CLAUSES[order_by]]
+    root = onenote_root(client, group)
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_NOTEBOOKS):
-            first_notebooks = await client.me.onenote.notebooks.get(
-                request_configuration=RequestConfiguration[_NotebooksQuery](
-                    query_parameters=_NotebooksQuery(
-                        select=list(_NOTEBOOK_FIELDS), filter=notebook_filter, orderby=orderby
-                    )
-                )
+            first_notebooks = await get_with_query(
+                client,
+                root.notebooks,
+                _NotebooksQuery(
+                    select=list(_NOTEBOOK_FIELDS), filter=notebook_filter, orderby=orderby
+                ),
+                NotebookCollectionResponse,
             )
             assert first_notebooks is not None, "Graph answered notebooks with no collection"
             notebooks_collected = await collect_pages(
@@ -251,26 +274,28 @@ async def list_notebooks(
                 matches=None if created_by is None else created_by_contains(created_by),
             )
         with graph_step(STEP_SECTIONS):
-            first_sections = await client.me.onenote.sections.get(
-                request_configuration=RequestConfiguration[_SectionsQuery](
-                    query_parameters=_SectionsQuery(
-                        select=list(_SECTION_FIELDS),
-                        expand=list(_HIERARCHY_EXPANSIONS),
-                        orderby=orderby,
-                    )
-                )
+            first_sections = await get_with_query(
+                client,
+                root.sections,
+                _SectionsQuery(
+                    select=list(_SECTION_FIELDS),
+                    expand=list(_HIERARCHY_EXPANSIONS),
+                    orderby=orderby,
+                ),
+                OnenoteSectionCollectionResponse,
             )
             assert first_sections is not None, "Graph answered sections with no collection"
             sections_collected = await collect_pages(
                 first_sections, client, limit=MAX_SCANNED_ITEMS
             )
         with graph_step(STEP_SECTION_GROUPS):
-            first_groups = await client.me.onenote.section_groups.get(
-                request_configuration=RequestConfiguration[_SectionGroupsQuery](
-                    query_parameters=_SectionGroupsQuery(
-                        select=list(_SECTION_GROUP_FIELDS), expand=list(_HIERARCHY_EXPANSIONS)
-                    )
-                )
+            first_groups = await get_with_query(
+                client,
+                root.section_groups,
+                _SectionGroupsQuery(
+                    select=list(_SECTION_GROUP_FIELDS), expand=list(_HIERARCHY_EXPANSIONS)
+                ),
+                SectionGroupCollectionResponse,
             )
             assert first_groups is not None, "Graph answered section groups with no collection"
             groups_collected = await collect_pages(first_groups, client, limit=MAX_SCANNED_ITEMS)
@@ -279,6 +304,7 @@ async def list_notebooks(
         notebooks_collected.items,
         sections_collected.items,
         groups_collected.items,
+        group_id=group,
         capped=notebooks_collected.capped or sections_collected.capped or groups_collected.capped,
     )
 
@@ -302,28 +328,31 @@ def _assemble(
     sections: list[OnenoteSection],
     groups: list[SectionGroup],
     *,
+    group_id: str | None,
     capped: bool,
 ) -> Notebooks:
     groups_by_id = {group.id: group for group in groups if group.id is not None}
     notebook_ids = {notebook.id for notebook in notebooks if notebook.id is not None}
-    sections_by_notebook = _sections_by_notebook(sections, groups_by_id, notebook_ids)
+    sections_by_notebook = _sections_by_notebook(sections, groups_by_id, notebook_ids, group_id)
     return Notebooks(
         notebooks=[
             row
             for notebook in notebooks
-            if (row := _notebook_row(notebook, sections_by_notebook)) is not None
+            if (row := _notebook_row(notebook, sections_by_notebook, group_id)) is not None
         ],
         capped=capped,
     )
 
 
 def _notebook_row(
-    notebook: GraphNotebook, sections_by_notebook: Mapping[str, list[NotebookSection]]
+    notebook: GraphNotebook,
+    sections_by_notebook: Mapping[str, list[NotebookSection]],
+    group_id: str | None,
 ) -> Notebook | None:
     if notebook.id is None:
         return None
     return Notebook(
-        uri=OnenoteNotebookHandle(notebook.id).uri,
+        uri=OnenoteNotebookHandle(notebook.id, group_id=group_id).uri,
         name=notebook.display_name,
         is_default=notebook.is_default,
         is_shared=notebook.is_shared,
@@ -344,6 +373,7 @@ def _sections_by_notebook(
     sections: list[OnenoteSection],
     groups_by_id: Mapping[str, SectionGroup],
     notebook_ids: set[str],
+    group_id: str | None,
 ) -> dict[str, list[NotebookSection]]:
     by_notebook: dict[str, list[NotebookSection]] = {}
     for section in sections:
@@ -354,12 +384,16 @@ def _sections_by_notebook(
         if notebook_id is None or notebook_id not in notebook_ids:
             continue
         parent_group = section.parent_section_group
-        group_id = parent_group.id if parent_group is not None else None
+        section_group_id = parent_group.id if parent_group is not None else None
         row = NotebookSection(
-            uri=OnenoteSectionHandle(section.id).uri,
-            group_uri=None if group_id is None else OnenoteSectionGroupHandle(group_id).uri,
+            uri=OnenoteSectionHandle(section.id, group_id=group_id).uri,
+            group_uri=(
+                None
+                if section_group_id is None
+                else OnenoteSectionGroupHandle(section_group_id, group_id=group_id).uri
+            ),
             name=section.display_name,
-            group_path=_group_path(group_id, groups_by_id),
+            group_path=_group_path(section_group_id, groups_by_id),
             is_default=section.is_default,
             web_url=web_url_of(section.links),
             created_by=creator_name_of(section.created_by),
@@ -394,6 +428,18 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         annotations=READ_ONLY,
     )
     async def onenote_list_notebooks(
+        group: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The Microsoft 365 group or team whose notebooks this call lists, as its "
+                    + "Graph id. A team id is a group id. Take it from teams_list_my_teams, or "
+                    + "ask the user for it. Omit it to list every notebook the user owns or that "
+                    + "somebody shares with them."
+                ),
+            ),
+        ] = None,
         name_contains: Annotated[
             str | None,
             Field(
@@ -452,6 +498,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     ) -> Notebooks:
         return await list_notebooks(
             client,
+            group=group,
             name_contains=name_contains,
             created_by=created_by,
             shared=shared,

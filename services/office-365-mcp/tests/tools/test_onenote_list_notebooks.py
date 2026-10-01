@@ -6,13 +6,17 @@ import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
+from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_365_mcp.graph_client import GraphForbidden
+from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
+    onenote_notebook_handle,
+    onenote_section_group_handle,
+    onenote_section_handle,
 )
 from office_365_mcp.shared.notes import ContainerOrderBy
 from office_365_mcp.tools import onenote_list_notebooks as lister
@@ -22,6 +26,11 @@ from .conftest import GRAPH_V1
 _NOTEBOOKS = "/me/onenote/notebooks"
 _SECTIONS = "/me/onenote/sections"
 _SECTION_GROUPS = "/me/onenote/sectionGroups"
+
+_GROUP = "3f8c1a52-7d4e-4b9a-9c31-0e6f2a8b7d14"
+_GROUP_NOTEBOOKS = f"/groups/{_GROUP}/onenote/notebooks"
+_GROUP_SECTIONS = f"/groups/{_GROUP}/onenote/sections"
+_GROUP_SECTION_GROUPS = f"/groups/{_GROUP}/onenote/sectionGroups"
 
 _NOTEBOOK_SELECT = (
     "id,displayName,isDefault,isShared,userRole,createdBy,createdDateTime,"
@@ -141,6 +150,23 @@ def sections_route(graph: respx.MockRouter) -> respx.Route:
 @pytest.fixture
 def groups_route(graph: respx.MockRouter) -> respx.Route:
     return graph.get(_SECTION_GROUPS).mock(return_value=_page())
+
+
+@pytest.fixture
+def group_notebooks_route(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_GROUP_NOTEBOOKS).mock(return_value=_page(_notebook_payload(_ENGINEERING)))
+
+
+@pytest.fixture
+def group_sections_route(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_GROUP_SECTIONS).mock(
+        return_value=_page(_section_payload(_STANDUPS, group_id=_OUTER_GROUP))
+    )
+
+
+@pytest.fixture
+def group_section_groups_route(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_GROUP_SECTION_GROUPS).mock(return_value=_page(_group_payload(_OUTER_GROUP)))
 
 
 class TestWhatItAsks:
@@ -871,20 +897,255 @@ class TestTheOrder:
         assert [s.name for s in result.notebooks[1].sections] == ["Zulu", "Alpha"]
 
 
+class TestAGroupsNotebooks:
+    async def test_group_sends_each_of_the_three_requests_to_that_groups_route(
+        self,
+        client: GraphServiceClient,
+        group_notebooks_route: respx.Route,
+        group_sections_route: respx.Route,
+        group_section_groups_route: respx.Route,
+    ) -> None:
+        _ = await lister.list_notebooks(client, group=_GROUP)
+
+        assert group_notebooks_route.call_count == 1
+        assert group_sections_route.call_count == 1
+        assert group_section_groups_route.call_count == 1
+
+    @pytest.mark.usefixtures("group_section_groups_route")
+    async def test_group_never_calls_the_signed_in_users_own_route(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        group_notebooks_route: respx.Route,
+        group_sections_route: respx.Route,
+    ) -> None:
+        own = graph.get(url__regex=r".*/me/onenote/.*").mock(return_value=_page())
+
+        _ = await lister.list_notebooks(client, group=_GROUP)
+
+        assert own.call_count == 0
+        assert group_notebooks_route.call_count == 1
+        assert group_sections_route.call_count == 1
+
+    @pytest.mark.usefixtures("groups_route")
+    async def test_no_group_keeps_the_signed_in_users_own_routes_and_handles(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        notebooks_route: respx.Route,
+        sections_route: respx.Route,
+    ) -> None:
+        sections_route.mock(return_value=_page(_section_payload(_STANDUPS)))
+        grouped = graph.get(url__regex=r".*/groups/.*").mock(return_value=_page())
+
+        result = await lister.list_notebooks(client)
+
+        assert grouped.call_count == 0
+        assert notebooks_route.call_count == 1
+        assert result.notebooks[0].uri == OnenoteNotebookHandle(_ENGINEERING).uri
+        assert result.notebooks[0].sections[0].uri == OnenoteSectionHandle(_STANDUPS).uri
+
+    async def test_group_sends_the_query_strings_of_the_signed_in_users_own_routes(
+        self,
+        client: GraphServiceClient,
+        notebooks_route: respx.Route,
+        sections_route: respx.Route,
+        groups_route: respx.Route,
+        group_notebooks_route: respx.Route,
+        group_sections_route: respx.Route,
+        group_section_groups_route: respx.Route,
+    ) -> None:
+        _ = await lister.list_notebooks(
+            client, name_contains="Eng", shared=True, role="Contributor", order_by="name_desc"
+        )
+        _ = await lister.list_notebooks(
+            client,
+            group=_GROUP,
+            name_contains="Eng",
+            shared=True,
+            role="Contributor",
+            order_by="name_desc",
+        )
+
+        for own, grouped in (
+            (notebooks_route, group_notebooks_route),
+            (sections_route, group_sections_route),
+            (groups_route, group_section_groups_route),
+        ):
+            assert grouped.calls.last.request.url.params == own.calls.last.request.url.params
+
+    async def test_group_sends_the_filter_and_the_order_on_the_group_route(
+        self,
+        client: GraphServiceClient,
+        group_notebooks_route: respx.Route,
+        group_sections_route: respx.Route,
+        group_section_groups_route: respx.Route,
+    ) -> None:
+        _ = await lister.list_notebooks(
+            client,
+            group=_GROUP,
+            name_contains="Eng",
+            shared=True,
+            role="Contributor",
+            order_by="name_desc",
+        )
+
+        notebook_params = group_notebooks_route.calls.last.request.url.params
+        assert notebook_params["$filter"] == (
+            "contains(tolower(displayName),'eng') and isShared eq true and "
+            + "userRole eq 'Contributor'"
+        )
+        assert notebook_params["$orderby"] == "displayName desc"
+        assert group_sections_route.calls.last.request.url.params["$orderby"] == "displayName desc"
+        assert "$filter" not in group_sections_route.calls.last.request.url.params
+        assert "$orderby" not in group_section_groups_route.calls.last.request.url.params
+
+    @pytest.mark.usefixtures("group_section_groups_route")
+    async def test_group_filters_the_notebooks_by_creator_without_a_filter_clause(
+        self,
+        client: GraphServiceClient,
+        group_notebooks_route: respx.Route,
+        group_sections_route: respx.Route,
+    ) -> None:
+        group_notebooks_route.mock(
+            return_value=_page(
+                _notebook_payload(_ENGINEERING, display_name="Mine", created_by="Ada Lovelace"),
+                _notebook_payload(_PERSONAL, display_name="Theirs", created_by="Grace Hopper"),
+            )
+        )
+        group_sections_route.mock(return_value=_page())
+
+        result = await lister.list_notebooks(client, group=_GROUP, created_by="lovelace")
+
+        assert [notebook.name for notebook in result.notebooks] == ["Mine"]
+        assert "$filter" not in group_notebooks_route.calls.last.request.url.params
+
+    @pytest.mark.usefixtures("group_notebooks_route", "group_section_groups_route")
+    async def test_group_follows_a_next_link_on_the_group_route(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get(_GROUP_SECTIONS, params={"$skiptoken": "second"}).mock(
+            return_value=_page(_section_payload(_ROADMAP, display_name="Roadmap"))
+        )
+        graph.get(_GROUP_SECTIONS).mock(
+            return_value=_page(
+                _section_payload(_STANDUPS, display_name="Standups"),
+                next_link=f"{GRAPH_V1}{_GROUP_SECTIONS}?$skiptoken=second",
+            )
+        )
+
+        result = await lister.list_notebooks(client, group=_GROUP)
+
+        assert {section.name for section in result.notebooks[0].sections} == {
+            "Roadmap",
+            "Standups",
+        }
+
+    @pytest.mark.usefixtures(
+        "group_notebooks_route", "group_sections_route", "group_section_groups_route"
+    )
+    async def test_every_handle_in_a_group_answer_carries_the_group(
+        self, client: GraphServiceClient
+    ) -> None:
+        result = await lister.list_notebooks(client, group=_GROUP)
+
+        notebook = result.notebooks[0]
+        section = notebook.sections[0]
+        assert section.group_uri is not None
+        assert notebook.uri.startswith(f"onenote:///groups/{_GROUP}/notebooks/")
+        assert onenote_notebook_handle(notebook.uri) == OnenoteNotebookHandle(
+            _ENGINEERING, group_id=_GROUP
+        )
+        assert onenote_section_handle(section.uri) == OnenoteSectionHandle(
+            _STANDUPS, group_id=_GROUP
+        )
+        assert onenote_section_group_handle(section.group_uri) == OnenoteSectionGroupHandle(
+            _OUTER_GROUP, group_id=_GROUP
+        )
+
+    async def test_a_group_404_arrives_classified_as_not_found(
+        self, client: GraphServiceClient, group_notebooks_route: respx.Route
+    ) -> None:
+        group_notebooks_route.mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "gone"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await lister.list_notebooks(client, group=_GROUP)
+
+
 class TestHowItDescribesItself:
-    async def _properties(self, transport: httpx.AsyncClient) -> Mapping[str, Mapping[str, object]]:
+    async def _tool(self, transport: httpx.AsyncClient) -> Tool:
         mcp: FastMCP = FastMCP(name="schema-under-test")
         lister.register(mcp, transport)
         tool = await mcp.get_tool(lister.TOOL_NAME)
         assert tool is not None, "register left the tool off the server"
+        return tool
+
+    async def _properties(self, transport: httpx.AsyncClient) -> Mapping[str, Mapping[str, object]]:
+        tool = await self._tool(transport)
         return cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
 
-    async def test_it_takes_the_five_narrowing_and_ordering_arguments(
+    async def test_it_takes_the_group_and_the_five_narrowing_and_ordering_arguments(
         self, transport: httpx.AsyncClient
     ) -> None:
         properties = await self._properties(transport)
 
-        assert set(properties) == {"name_contains", "created_by", "shared", "role", "order_by"}
+        assert set(properties) == {
+            "group",
+            "name_contains",
+            "created_by",
+            "shared",
+            "role",
+            "order_by",
+        }
+
+    async def test_group_is_optional_and_never_empty(self, transport: httpx.AsyncClient) -> None:
+        tool = await self._tool(transport)
+        properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+
+        assert "group" not in tool.parameters.get("required", [])
+        assert cast("list[Mapping[str, object]]", properties["group"]["anyOf"])[0]["minLength"] == 1
+
+    async def test_group_says_whose_notebooks_it_lists_and_where_to_take_its_id(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        properties = await self._properties(transport)
+
+        described = cast("str", properties["group"]["description"])
+        assert "whose notebooks this call lists" in described
+        assert "A team id is a group id." in described
+        assert "teams_list_my_teams" in described
+        assert "Omit it to list every notebook the user owns" in described
+
+    async def test_the_description_offers_group_and_keeps_the_sharepoint_limit(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await self._tool(transport)
+
+        described = tool.description or ""
+        assert (
+            "Pass `group` to list the notebooks of one Microsoft 365 group or team instead."
+            in described
+        )
+        assert "This tool does not reach a notebook on a SharePoint site." in described
+        assert "or in a Microsoft 365 team" not in described
+
+    def test_the_handle_fields_name_the_group_spelling(self) -> None:
+        spelling = "A handle from a group notebook starts with onenote:///groups/{group}/ instead."
+
+        assert spelling in (lister.Notebook.model_fields["uri"].description or "")
+        assert spelling in (lister.NotebookSection.model_fields["uri"].description or "")
+        assert spelling in (lister.NotebookSection.model_fields["group_uri"].description or "")
+
+    def test_a_not_found_names_the_group_and_where_to_take_its_id(self) -> None:
+        advice = lister.GRAPH_NOT_FOUND
+
+        assert "`group`" in advice
+        assert "teams_list_my_teams" in advice
+        assert "fails again" in advice
 
     async def test_order_by_offers_the_six_orders(self, transport: httpx.AsyncClient) -> None:
         properties = await self._properties(transport)
