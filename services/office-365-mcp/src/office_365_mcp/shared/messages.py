@@ -9,6 +9,7 @@ from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.generated.models.chat_message_attachment import ChatMessageAttachment
 from msgraph.generated.models.chat_message_from_identity_set import ChatMessageFromIdentitySet
+from msgraph.generated.models.chat_message_importance import ChatMessageImportance
 from msgraph.generated.models.chat_message_mention import ChatMessageMention
 from msgraph.generated.models.chat_message_mentioned_identity_set import (
     ChatMessageMentionedIdentitySet,
@@ -346,9 +347,19 @@ class Mention(BaseModel, frozen=True):
     )
 
 
-def outgoing_message(text: str, *, mentions: Sequence[Mention] = ()) -> ChatMessage:
+def outgoing_message(
+    text: str,
+    *,
+    mentions: Sequence[Mention] = (),
+    importance: ChatMessageImportance | None = None,
+    subject: str | None = None,
+) -> ChatMessage:
     if not mentions:
-        return ChatMessage(body=ItemBody(content=text, content_type=BodyType.Text))
+        return ChatMessage(
+            body=ItemBody(content=text, content_type=BodyType.Text),
+            importance=importance,
+            subject=subject,
+        )
     tags = " ".join(
         f'<at id="{index}">{html.escape(mention.name)}</at>'
         for index, mention in enumerate(mentions)
@@ -374,4 +385,6 @@ def outgoing_message(text: str, *, mentions: Sequence[Mention] = ()) -> ChatMess
             )
             for index, mention in enumerate(mentions)
         ],
+        importance=importance,
+        subject=subject,
     )

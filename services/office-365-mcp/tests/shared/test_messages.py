@@ -1,5 +1,6 @@
 import pytest
 from msgraph.generated.models.body_type import BodyType
+from msgraph.generated.models.chat_message_importance import ChatMessageImportance
 from pydantic import ValidationError
 
 from office_365_mcp.shared.messages import Mention, outgoing_message
@@ -59,6 +60,29 @@ class TestOutgoingMessage:
 
         assert built.body is not None
         assert built.body.content == '<at id="0">Jane Smith</at> first line<br>second line'
+
+    @pytest.mark.parametrize("mentions", [(), (_JANE,)])
+    def test_a_message_built_without_them_sets_no_importance_and_no_subject(
+        self, mentions: tuple[Mention, ...]
+    ) -> None:
+        built = outgoing_message("Ship it Friday.", mentions=mentions)
+
+        assert (built.importance, built.subject) == (None, None)
+
+    @pytest.mark.parametrize("mentions", [(), (_JANE,)])
+    @pytest.mark.parametrize(
+        "importance",
+        [ChatMessageImportance.Normal, ChatMessageImportance.High, ChatMessageImportance.Urgent],
+    )
+    def test_the_importance_and_the_subject_go_out_as_given(
+        self, mentions: tuple[Mention, ...], importance: ChatMessageImportance
+    ) -> None:
+        built = outgoing_message(
+            "Ship it Friday.", mentions=mentions, importance=importance, subject="Release plan"
+        )
+
+        assert built.importance is importance
+        assert built.subject == "Release plan"
 
 
 class TestMention:

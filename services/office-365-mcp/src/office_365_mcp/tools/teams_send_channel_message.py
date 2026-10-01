@@ -1,7 +1,7 @@
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from typing import Annotated
+from typing import Annotated, Literal
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -10,6 +10,7 @@ from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.chat_message import ChatMessage
+from msgraph.generated.models.chat_message_importance import ChatMessageImportance
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
@@ -38,6 +39,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message": "Ship it.",
 }
 
+type ChannelImportance = Literal["normal", "high"]
+
 _AGREE = "post"
 _DECLINE = "do not post"
 _NOTHING_SENT = "Nothing was posted."
@@ -65,9 +68,13 @@ async def send_channel_message(
     message: str,
     confirm: Confirm,
     mentions: Sequence[Mention] = (),
+    subject: str | None = None,
+    importance: ChannelImportance | None = None,
 ) -> TeamsMessage | InputRequiredResult:
-    question = _question(message, team_id, channel_id, mentions)
-    about = _about(message, team_id, channel_id, mentions)
+    question = _question(
+        message, team_id, channel_id, mentions, subject=subject, importance=importance
+    )
+    about = _about(message, team_id, channel_id, mentions, subject=subject, importance=importance)
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME, step=STEP_SEND):
@@ -80,7 +87,14 @@ async def send_channel_message(
                 client.teams.by_team_id(team_id)
                 .channels.by_channel_id(channel_id)
                 .messages.post(
-                    outgoing_message(message, mentions=mentions),
+                    outgoing_message(
+                        message,
+                        mentions=mentions,
+                        importance=(
+                            None if importance is None else ChatMessageImportance(importance)
+                        ),
+                        subject=subject,
+                    ),
                     request_configuration=_send_request(),
                 )
             )
@@ -96,19 +110,44 @@ async def send_channel_message(
     )
 
 
-def _question(message: str, team_id: str, channel_id: str, mentions: Sequence[Mention]) -> str:
+def _question(
+    message: str,
+    team_id: str,
+    channel_id: str,
+    mentions: Sequence[Mention],
+    *,
+    subject: str | None,
+    importance: ChannelImportance | None,
+) -> str:
     named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
     mentioned = f" It mentions {named}." if mentions else ""
+    details = [
+        text
+        for text in (
+            None if subject is None else f"the subject {cut_for_a_question(subject)!r}",
+            None if importance is None else f"{importance} importance",
+        )
+        if text is not None
+    ]
+    marked = f" with {' and '.join(details)}" if details else ""
     return (
-        f"Post {cut_for_a_question(message)!r} to channel {channel_id!r} in team {team_id!r} "
-        + f"now?{mentioned} {_CANNOT_BE_RECALLED}"
+        f"Post {cut_for_a_question(message)!r}{marked} to channel {channel_id!r} in team "
+        + f"{team_id!r} now?{mentioned} {_CANNOT_BE_RECALLED}"
     )
 
 
-def _about(message: str, team_id: str, channel_id: str, mentions: Sequence[Mention]) -> str:
+def _about(
+    message: str,
+    team_id: str,
+    channel_id: str,
+    mentions: Sequence[Mention],
+    *,
+    subject: str | None,
+    importance: ChannelImportance | None,
+) -> str:
     mentioned = [[mention.user_id, mention.name] for mention in mentions]
     return hashlib.sha256(
-        json.dumps([team_id, channel_id, message, mentioned]).encode()
+        json.dumps([team_id, channel_id, message, mentioned, subject, importance]).encode()
     ).hexdigest()
 
 
@@ -160,6 +199,25 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         ctx: Context,
+        subject: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The subject of the new channel post, as plain text. Omit this parameter to "
+                    + "post the message with no subject."
+                ),
+            ),
+        ] = None,
+        importance: Annotated[
+            ChannelImportance | None,
+            Field(
+                description=(
+                    "The importance of the new message: `normal` or `high`. Set this parameter "
+                    + "only when the user asks for an importance."
+                ),
+            ),
+        ] = None,
         client: GraphServiceClient = graph,
     ) -> TeamsMessage | InputRequiredResult:
         return await send_channel_message(
@@ -169,4 +227,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             message=message,
             confirm=a_person_agrees(ctx),
             mentions=mentions,
+            subject=subject,
+            importance=importance,
         )

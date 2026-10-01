@@ -1,7 +1,7 @@
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from typing import Annotated
+from typing import Annotated, Literal
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -10,6 +10,7 @@ from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.chat_message import ChatMessage
+from msgraph.generated.models.chat_message_importance import ChatMessageImportance
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
@@ -37,6 +38,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message": "Ship it.",
 }
 
+type ChatImportance = Literal["normal", "high", "urgent"]
+
 _AGREE = "send"
 _DECLINE = "do not send"
 _NOTHING_SENT = "Nothing was sent."
@@ -63,9 +66,10 @@ async def send_chat_message(
     message: str,
     confirm: Confirm,
     mentions: Sequence[Mention] = (),
+    importance: ChatImportance | None = None,
 ) -> TeamsMessage | InputRequiredResult:
-    question = _question(message, chat_id, mentions)
-    about = _about(message, chat_id, mentions)
+    question = _question(message, chat_id, mentions, importance=importance)
+    about = _about(message, chat_id, mentions, importance=importance)
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME, step=STEP_SEND):
@@ -75,7 +79,11 @@ async def send_chat_message(
         refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             sent = await client.chats.by_chat_id(chat_id).messages.post(
-                outgoing_message(message, mentions=mentions),
+                outgoing_message(
+                    message,
+                    mentions=mentions,
+                    importance=None if importance is None else ChatMessageImportance(importance),
+                ),
                 request_configuration=_send_request(),
             )
 
@@ -88,18 +96,25 @@ async def send_chat_message(
     return TeamsMessage.from_message(sent, handle=MessageHandle(sent.id, chat_id=chat_id))
 
 
-def _question(message: str, chat_id: str, mentions: Sequence[Mention]) -> str:
+def _question(
+    message: str, chat_id: str, mentions: Sequence[Mention], *, importance: ChatImportance | None
+) -> str:
     named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
     mentioned = f" It mentions {named}." if mentions else ""
+    marked = "" if importance is None else f" with {importance} importance"
     return (
-        f"Send {cut_for_a_question(message)!r} to chat {chat_id!r} now?{mentioned} "
+        f"Send {cut_for_a_question(message)!r}{marked} to chat {chat_id!r} now?{mentioned} "
         + _CANNOT_BE_RECALLED
     )
 
 
-def _about(message: str, chat_id: str, mentions: Sequence[Mention]) -> str:
+def _about(
+    message: str, chat_id: str, mentions: Sequence[Mention], *, importance: ChatImportance | None
+) -> str:
     mentioned = [[mention.user_id, mention.name] for mention in mentions]
-    return hashlib.sha256(json.dumps([chat_id, message, mentioned]).encode()).hexdigest()
+    return hashlib.sha256(
+        json.dumps([chat_id, message, mentioned, importance]).encode()
+    ).hexdigest()
 
 
 def _send_request() -> RequestConfiguration[QueryParameters]:
@@ -143,6 +158,15 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         ctx: Context,
+        importance: Annotated[
+            ChatImportance | None,
+            Field(
+                description=(
+                    "The importance of the new message: `normal`, `high`, or `urgent`. Set this "
+                    + "parameter only when the user asks for an importance."
+                ),
+            ),
+        ] = None,
         client: GraphServiceClient = graph,
     ) -> TeamsMessage | InputRequiredResult:
         return await send_chat_message(
@@ -151,4 +175,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             message=message,
             confirm=a_person_agrees(ctx),
             mentions=mentions,
+            importance=importance,
         )
