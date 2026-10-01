@@ -86,6 +86,7 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "sharepoint_copy_item",
         "sharepoint_create_folder",
         "sharepoint_create_text_file",
+        "sharepoint_invite",
         "teams_send_channel_message",
         "teams_send_chat_message",
     }

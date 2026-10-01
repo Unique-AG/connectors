@@ -697,6 +697,8 @@ GRAPH_STEPS = frozenset(
         "move_item",
         "copy_item",
         "delete_item",
+        "create_link",
+        "invite",
         "chats",
         "joined_teams",
         "channels",

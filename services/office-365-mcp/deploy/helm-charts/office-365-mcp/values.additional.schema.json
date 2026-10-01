@@ -69,6 +69,7 @@
                 "sharepoint-search",
                 "sharepoint-read",
                 "sharepoint-write",
+                "sharepoint-share",
                 "onenote-read",
                 "onenote-write",
                 "onenote-delete"

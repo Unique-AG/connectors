@@ -378,6 +378,22 @@ run "preset_sharepoint_write" {
   }
 }
 
+run "preset_sharepoint_share" {
+  variables {
+    tools_preset = "sharepoint-share"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Files.Read.All,Files.ReadWrite.All"
+    error_message = "sharepoint-share composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All", "Files.ReadWrite.All"]
+    error_message = "A sharing link and an invitation need no permission that sharepoint-write does not have. This composed ${join(",", local.admin_consent)}"
+  }
+}
+
 run "preset_onenote_read" {
   variables {
     tools_preset = "onenote-read"
