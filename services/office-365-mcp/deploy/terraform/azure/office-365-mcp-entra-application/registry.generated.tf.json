@@ -158,6 +158,20 @@
           ]
         },
         {
+          "name": "outlook_draft_reply_all",
+          "permissions": [
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
+          ]
+        },
+        {
+          "name": "outlook_update_draft",
+          "permissions": [
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
+          ]
+        },
+        {
           "name": "outlook_send_draft",
           "permissions": [
             "Mail.Send",
@@ -414,6 +428,8 @@
         "outlook_move_mail",
         "outlook_draft_mail",
         "outlook_draft_reply",
+        "outlook_draft_reply_all",
+        "outlook_update_draft",
         "outlook_send_draft",
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",
@@ -518,7 +534,9 @@
           "outlook_mark_mail",
           "outlook_move_mail",
           "outlook_draft_mail",
-          "outlook_draft_reply"
+          "outlook_draft_reply",
+          "outlook_draft_reply_all",
+          "outlook_update_draft"
         ],
         "outlook-send": [
           "outlook_search_mail",
@@ -531,6 +549,8 @@
           "outlook_move_mail",
           "outlook_draft_mail",
           "outlook_draft_reply",
+          "outlook_draft_reply_all",
+          "outlook_update_draft",
           "outlook_send_draft"
         ],
         "outlook-mailbox": [

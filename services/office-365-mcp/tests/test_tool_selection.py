@@ -279,7 +279,15 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "outlook_draft_reply": {
         "message_ref": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
     },
-    "outlook_send_draft": {"draft_ref": ("outlook_draft_mail", "outlook_draft_reply")},
+    "outlook_draft_reply_all": {
+        "message_ref": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
+    },
+    "outlook_update_draft": {
+        "draft_ref": ("outlook_draft_mail", "outlook_draft_reply", "outlook_draft_reply_all")
+    },
+    "outlook_send_draft": {
+        "draft_ref": ("outlook_draft_mail", "outlook_draft_reply", "outlook_draft_reply_all")
+    },
     "outlook_disable_mail_rule": {"rule_ref": ("outlook_get_mailbox_settings",)},
     "outlook_list_events": {"calendar_ref": ("outlook_list_calendars",)},
     "outlook_read_event": {"uri": ("outlook_list_events",)},
@@ -375,6 +383,7 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "outlook_move_mail": frozenset({"destination"}),
     "outlook_draft_mail": frozenset({"subject", "body_html"}),
     "outlook_draft_reply": frozenset({"mode", "body_html"}),
+    "outlook_draft_reply_all": frozenset({"body_html"}),
     "outlook_set_automatic_reply": frozenset({"status"}),
     "outlook_disable_mail_rule": frozenset({"enabled"}),
     "outlook_list_events": frozenset({"starts_on", "ends_on", "time_zone", "subject_contains"}),
@@ -387,7 +396,9 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     ),
     "outlook_respond_to_invite": frozenset({"response"}),
     "outlook_check_availability": frozenset({"addresses", "starts_at", "ends_at", "time_zone"}),
-    "outlook_suggest_meeting_times": frozenset({"attendees", "starts_at", "ends_at", "time_zone"}),
+    "outlook_suggest_meeting_times": frozenset(
+        {"attendees", "starts_at", "ends_at", "time_zone", "display_name"}
+    ),
     "sharepoint_search_files": frozenset({"query"}),
     "onenote_list_pages": frozenset({"title_contains"}),
     "onenote_create_page": frozenset({"title", "body_html"}),
@@ -611,7 +622,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Mail.ReadWrite.Shared",
         ),
         0,
-        11,
+        13,
     ),
     (
         ToolsPreset.OUTLOOK_SEND,
@@ -627,7 +638,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Mail.Send.Shared",
         ),
         0,
-        12,
+        14,
     ),
     (
         ToolsPreset.OUTLOOK_AUTOMATE,

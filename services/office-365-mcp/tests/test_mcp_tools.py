@@ -624,6 +624,8 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_move_mail",
         "outlook_draft_mail",
         "outlook_draft_reply",
+        "outlook_draft_reply_all",
+        "outlook_update_draft",
         "outlook_send_draft",
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",

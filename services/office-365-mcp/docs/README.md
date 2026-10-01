@@ -11,14 +11,14 @@
 
 office-365-mcp is a Python MCP server, built on FastMCP, that connects Microsoft 365 to MCP
 clients through the Microsoft Graph API. It reaches Outlook mail and calendar, Microsoft Teams,
-SharePoint and OneDrive, OneNote, and user identity. The server has 60 tools in total. A
-deployment turns on a fixed subset of these 60 tools (never all of them, unless a preset or a
+SharePoint and OneDrive, OneNote, and user identity. The server has 62 tools in total. A
+deployment turns on a fixed subset of these 62 tools (never all of them, unless a preset or a
 list names every one). This document explains what each tool does, how a deployment picks its
 tools, and how sign-in and consent work.
 
 ## Tools
 
-office-365-mcp has 60 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
+office-365-mcp has 62 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
 calendar, SharePoint and OneDrive, and OneNote. One tool, `get_me`, is always on, in every
 configuration. The Kind column is a hint to the calling client about the kind of change a tool
 makes. It does not control access to the tool.
@@ -32,7 +32,7 @@ the text names that tool. If not, the text tells the model to ask the user.
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `get_me` | Read | `User.Read` | No | The answer is the signed-in user's own Microsoft 365 profile: id, display name, email address, sign-in name, and job title. |
+| `get_me` | Read | `User.Read` | No | The answer is the signed-in user's own Microsoft 365 profile. It holds the id, display name, given name, surname, email address, sign-in name, job title, office location, telephone numbers, and preferred language. |
 
 ### Microsoft Teams
 
@@ -66,6 +66,8 @@ the text names that tool. If not, the text tells the model to ask the user.
 | `outlook_move_mail` | Write, changes or removes | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | Moves messages into another folder, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. This connector erases mail only by moving it to Deleted Items. The tool asks the user to approve a change to a shared or delegated mailbox. |
 | `outlook_draft_mail` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A new message, composed into Drafts, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The tool cannot send it. The tool cannot add files, so the user adds a file in Outlook before they send the draft. The tool asks the user to approve a change to a shared or delegated mailbox. |
 | `outlook_draft_reply` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A reply or a forward, composed into Drafts and left there, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. A forward carries the original message's attachments. The tool cannot add new files, so the user adds a file in Outlook before they send the draft. The tool asks the user to approve a change to a shared or delegated mailbox. |
+| `outlook_draft_reply_all` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A reply to everyone on one message, composed into Drafts and left there, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The draft lists every recipient. The tool cannot add files, so the user adds a file in Outlook before they send the draft. The tool asks the user to approve a change to a shared or delegated mailbox. |
+| `outlook_update_draft` | Write, changes or removes, safe to repeat | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | Changes the subject, text, recipients, importance, or categories of one draft that this connector composed. The mailbox is the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The tool cannot send the draft. The tool asks the user to approve a change to a shared or delegated mailbox. |
 | `outlook_send_draft` | Write, changes or removes | `Mail.Send`, `Mail.ReadBasic`, `Mail.Send.Shared`, `Mail.Read.Shared` | No | The only tool in this connector that puts mail on the wire. It sends a draft that this connector composed, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
 | `outlook_set_automatic_reply` | Write, safe to repeat | `MailboxSettings.ReadWrite` | No | Turns the out-of-office reply on for a fixed period, or off. The reply never runs with no end date. The tool asks the user to approve turning it on. |
 | `outlook_disable_mail_rule` | Write, safe to repeat | `MailboxSettings.ReadWrite` | No | Turns one existing inbox rule off, and nothing else. |
@@ -149,8 +151,8 @@ description.
 | `teams-meetings` | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | Both transcripts and recordings, for one meeting. |
 | `teams-write` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message` | Finds a chat or a channel, and posts a new message to either. |
 | `outlook-read` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | Finds a message, reads it in full, walks the folder tree, reads a thread, lists a folder, and resolves a name to an address. |
-| `outlook-write` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | Everything in `outlook-read`, plus marking, filing, and drafting mail. |
-| `outlook-send` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_send_draft` | Everything in `outlook-write`, plus sending a draft that this connector composed. |
+| `outlook-write` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_draft_reply_all`, `outlook_update_draft` | Everything in `outlook-read`, plus marking and filing mail, and drafting or changing a draft. |
+| `outlook-send` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_draft_reply_all`, `outlook_update_draft`, `outlook_send_draft` | Everything in `outlook-write`, plus sending a draft that this connector composed. |
 | `outlook-mailbox` | `outlook_get_mailbox_settings`, `outlook_list_categories` | Shows what quietly acts on the mailbox — the rules and the automatic reply — and lists every category with its name and color. |
 | `outlook-automate` | `outlook_get_mailbox_settings`, `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | Everything in `outlook-mailbox`, plus setting the automatic reply and turning an inbox rule off. |
 | `outlook-calendar` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times` | Names every calendar that the mailbox reaches, reads what sits on one, and checks or suggests free time. |

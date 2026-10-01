@@ -79,6 +79,7 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "outlook_create_event_on_behalf",
         "outlook_draft_mail",
         "outlook_draft_reply",
+        "outlook_draft_reply_all",
         "outlook_move_mail",
         "outlook_respond_to_invite",
         "outlook_send_draft",
