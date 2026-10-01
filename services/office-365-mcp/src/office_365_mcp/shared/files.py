@@ -37,6 +37,7 @@ STEP_ITEM = "drive_item"
 FAIL_ON_CONFLICT: Mapping[str, str] = {"@microsoft.graph.conflictBehavior": "fail"}
 
 TOP_FOLDER_LABEL = "the top folder of the drive"
+DRIVE_ROOT_ITEM_ID = "root"
 UNNAMED_FOLDER_LABEL = "an unnamed folder"
 UNNAMED_ITEM_LABEL = "an unnamed item"
 
@@ -203,7 +204,7 @@ def folder_label(folder: DriveItem) -> str:
     if not folder.name:
         return UNNAMED_FOLDER_LABEL
     crumb = _breadcrumb(folder.parent_reference)
-    return _the_folder(folder.name if crumb is None else f"{crumb}/{folder.name}")
+    return the_folder(folder.name if crumb is None else f"{crumb}/{folder.name}")
 
 
 def item_label(item: DriveItem) -> str:
@@ -216,9 +217,9 @@ def parent_folder_label(item: DriveItem) -> str:
     reference = item.parent_reference
     crumb = _breadcrumb(reference)
     if crumb is not None:
-        return _the_folder(crumb) if crumb else TOP_FOLDER_LABEL
+        return the_folder(crumb) if crumb else TOP_FOLDER_LABEL
     if reference is not None and reference.name:
-        return _the_folder(reference.name)
+        return the_folder(reference.name)
     return UNNAMED_FOLDER_LABEL
 
 
@@ -229,8 +230,12 @@ def _breadcrumb(reference: ItemReference | None) -> str | None:
     return unquote(path.split(":", 1)[1]).rstrip("/")
 
 
-def _the_folder(where: str) -> str:
+def the_folder(where: str) -> str:
     return f"the folder {cut_for_a_question(where)!r}"
+
+
+def the_file(name: str) -> str:
+    return f"the file {cut_for_a_question(name)!r}"
 
 
 async def item_for_a_question(client: GraphServiceClient, drive_id: str, item_id: str) -> DriveItem:

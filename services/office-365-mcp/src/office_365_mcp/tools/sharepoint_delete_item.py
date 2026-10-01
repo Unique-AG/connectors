@@ -20,10 +20,11 @@ from office_365_mcp.shared.files import (
     item_access_refused,
     item_for_a_question,
     parent_folder_label,
+    the_file,
+    the_folder,
 )
 from office_365_mcp.shared.handles import DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.notes import write_state_for
-from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
@@ -158,9 +159,9 @@ async def delete_item(
 def _question(item: DriveItem) -> str:
     where = parent_folder_label(item)
     if item.folder is None:
-        file = f"the file {cut_for_a_question(item.name)!r}" if item.name else UNNAMED_ITEM_LABEL
+        file = the_file(item.name) if item.name else UNNAMED_ITEM_LABEL
         return f"Move {file} from {where} to the recycle bin?"
-    folder = f"the folder {cut_for_a_question(item.name)!r}" if item.name else UNNAMED_FOLDER_LABEL
+    folder = the_folder(item.name) if item.name else UNNAMED_FOLDER_LABEL
     return (
         f"Move {folder} from {where} to the recycle bin, together with everything "
         + f"inside it?{_how_full(item.folder.child_count)}"

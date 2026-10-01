@@ -10,7 +10,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
-from office_365_mcp.shared.files import display_name
+from office_365_mcp.shared.files import DRIVE_ROOT_ITEM_ID, display_name
 from office_365_mcp.shared.handles import DriveFolderHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -22,7 +22,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.Read.All",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
-_ROOT_ITEM = "root"
 
 _DRIVE_FIELDS: tuple[str, ...] = ("id", "name", "driveType", "webUrl", "description", "owner")
 
@@ -85,7 +84,7 @@ class DriveSummary(BaseModel):
         if drive.id is None:
             return None
         return cls(
-            root_uri=DriveFolderHandle(drive.id, _ROOT_ITEM).uri,
+            root_uri=DriveFolderHandle(drive.id, DRIVE_ROOT_ITEM_ID).uri,
             name=drive.name,
             drive_type=drive.drive_type,
             web_url=drive.web_url,

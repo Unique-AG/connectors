@@ -15,7 +15,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
-from office_365_mcp.shared.files import ITEM_FIELDS, DriveItemSummary
+from office_365_mcp.shared.files import DRIVE_ROOT_ITEM_ID, ITEM_FIELDS, DriveItemSummary
 from office_365_mcp.shared.handles import DriveFolderHandle, drive_folder_handle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -36,7 +36,6 @@ GRAPH_NOT_FOUND = (
     + "this handle fails in the same way."
 )
 
-_ROOT_ITEM = "root"
 
 _DRIVE_FIELDS: tuple[str, ...] = ("id",)
 
@@ -171,7 +170,7 @@ async def _my_drive_root(client: GraphServiceClient) -> DriveFolderHandle:
             )
         )
     assert drive is not None and drive.id is not None, "Graph returned no id for the user's drive"
-    return DriveFolderHandle(drive.id, _ROOT_ITEM)
+    return DriveFolderHandle(drive.id, DRIVE_ROOT_ITEM_ID)
 
 
 async def _children(
