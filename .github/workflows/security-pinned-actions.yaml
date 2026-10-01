@@ -1,0 +1,30 @@
+name: "[Security] Pinned Actions"
+
+on:
+  # No `branches` filter. Stacked pull requests target their parent branch, not `main`.
+  # A `branches: [main]` filter skips this workflow for all pull requests in a stack except the first.
+  # Only `paths` decides when the workflow runs.
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+
+permissions:
+  contents: read # to read the repository
+
+concurrency:
+  group: security-pinned-actions-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check-pinned-actions:
+    name: Verify action SHAs are pinned
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify pinned actions
+        uses: unique-ag/actions/github/policies/verify-pinned-actions@84a4f60c0a56daae108b22e096b72bb10f476d08 # main

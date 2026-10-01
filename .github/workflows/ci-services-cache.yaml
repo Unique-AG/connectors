@@ -1,4 +1,4 @@
-name: "Services Cache Warming"
+name: "[CI] Services Cache Warming"
 
 on:
   schedule:
@@ -11,29 +11,31 @@ on:
         default: "all"
 
 permissions:
-  contents: read
-  packages: read # Required for docker/login-action to authenticate with GHCR
-  actions: read # Required for cache-from: type=gha
+  contents: read # to read the repository
+  packages: read # to let the called workflow log in to GHCR and read the cache image
+  actions: read # to let the called workflow read the GitHub Actions cache
 
 jobs:
   build-matrix:
     name: Build matrix
     runs-on: ubuntu-slim
+    timeout-minutes: 5
     outputs:
       services: ${{ steps.matrix.outputs.services }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      # Builds a JSON array of service names to fan out into parallel cache warming jobs.
-      # On manual dispatch with specific services, validates input and uses the comma-separated input.
-      # Otherwise (scheduled or "all"), auto-discovers services from the services/ directory.
+      # The list contains a service only if it has the file services/<name>/deploy/Dockerfile.
+      # A service without a Dockerfile fails the build.
       - name: Build service matrix
         id: matrix
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_SERVICES: ${{ github.event.inputs.services }}
         run: |
-          available=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+          available=$(find services -mindepth 3 -maxdepth 3 -type f -path 'services/*/deploy/Dockerfile' | cut -d/ -f2 | sort)
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_SERVICES" != "all" ]; then
             IFS=',' read -ra requested <<< "$INPUT_SERVICES"
@@ -54,8 +56,6 @@ jobs:
           fi
           echo "services=$services" >> "$GITHUB_OUTPUT"
 
-  # Fans out into one job per service using the reusable cache template.
-  # Dockerfile paths are derived from the convention: services/<name>/deploy/Dockerfile
   cache:
     name: ${{ matrix.service }}
     needs: build-matrix

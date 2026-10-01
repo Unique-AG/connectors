@@ -1,9 +1,5 @@
 name: "[Security] Dependency Review"
 
-concurrency:
-  group: dependency-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
@@ -12,20 +8,26 @@ on:
       - "services/**/package.json"
       - "services/**/uv.lock"
       - "packages/**"
-      - ".github/workflows/dependency-review.yaml"
+      - ".github/workflows/security-dependency-review.yaml"
 
 permissions:
-  contents: read
-  pull-requests: write
+  contents: read # to read the repository
+  pull-requests: write # to comment the summary on the pull request
+
+concurrency:
+  group: security-dependency-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   dependency-review:
     name: dependency-review
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 10
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'security-exception') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Dependency Review
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0

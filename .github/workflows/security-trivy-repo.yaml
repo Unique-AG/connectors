@@ -1,31 +1,37 @@
 name: "[Security] Trivy Repository Scan"
 
-concurrency:
-  group: security-trivy-repo-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - "services/*/deploy/**"
+      - "**/*docker-compose*.yaml"
+      - ".github/workflows/security-trivy-repo.yaml"
   push:
     branches:
       - main
 
 permissions:
-  contents: read
+  contents: read # to read the repository
+
+concurrency:
+  group: security-trivy-repo-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   trivy-config:
     name: Misconfiguration
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
-      contents: read
-      security-events: write
+      contents: read # to read the repository
+      security-events: write # to upload the results to code scanning
     env:
       TRIVY_DISABLE_VEX_NOTICE: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -33,7 +39,6 @@ jobs:
           scan-ref: .
           severity: CRITICAL,HIGH
           limit-severities-for-sarif: true
-          skip-dirs: "**/node_modules,**/.venv,**/dist"
           format: sarif
           output: trivy-config.sarif
           exit-code: "0"

@@ -1,0 +1,61 @@
+name: "[Release] Manual Re-Run"
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to release again. Last resort: use it only when a release did not finish."
+        required: true
+        type: choice
+        options:
+          - backstop-mcp
+          - confluence-connector
+          - hello-mcp
+          - kb-mcp
+          - office-365-mcp
+          - outlook-semantic-mcp
+          - sharepoint-connector
+          - teams-mcp
+          - with-intelligence-mcp
+      existing-version:
+        description: "Version to release again, without a leading v (for example 3.1.3). The run builds from the release tag and reuses an image that exists."
+        required: true
+        type: string
+
+permissions:
+  contents: read # to let the called workflow read the repository
+  packages: write # to let the called workflow push the image and the charts to GHCR
+  id-token: write # to let the called workflow sign in to Azure and sign the image
+  security-events: write # to let the called workflow upload the scan results
+
+jobs:
+  guard:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      contents: read # to read the repository
+    env:
+      SERVICE: ${{ inputs.service }}
+      VERSION: ${{ inputs.existing-version }}
+    steps:
+      - name: Start from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Start this workflow from main."
+          exit 1
+
+      - name: Find the release tag
+        run: |
+          if ! git ls-remote --exit-code --tags "https://github.com/$GITHUB_REPOSITORY" "refs/tags/$SERVICE@$VERSION" > /dev/null; then
+            echo "::error::The tag $SERVICE@$VERSION does not exist. Type the version without a leading v, for example 3.1.3."
+            exit 1
+          fi
+
+  manual-release:
+    needs: guard
+    uses: ./.github/workflows/_template-cd.yaml
+    with:
+      service-name: ${{ inputs.service }}
+      service-version: ${{ inputs.existing-version }}
+      ref: refs/tags/${{ inputs.service }}@${{ inputs.existing-version }}
+      publish-docs: false

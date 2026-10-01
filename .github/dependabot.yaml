@@ -44,6 +44,12 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
+      opentelemetry:
+        patterns:
+          - "opentelemetry-*"
+      unique:
+        patterns:
+          - "unique-*"
       per-dependency:
         patterns:
           - "*"

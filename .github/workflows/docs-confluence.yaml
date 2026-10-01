@@ -1,0 +1,42 @@
+name: "[Docs] Publish to Confluence"
+
+on:
+  workflow_dispatch:
+    inputs:
+      docs-path:
+        description: "Docs directory to publish. Releases publish docs already. Use this workflow as a last resort, or to publish before a release."
+        required: true
+        type: choice
+        options:
+          - docs/recordings-and-transcripts
+          - services/confluence-connector/docs
+          - services/office-365-mcp/docs
+          - services/outlook-semantic-mcp/docs
+          - services/sharepoint-connector/docs
+          - services/teams-mcp/docs
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/recordings-and-transcripts/**"
+
+permissions:
+  contents: read # to read the repository
+
+jobs:
+  guard:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Start from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Start this workflow from main."
+          exit 1
+
+  publish-docs:
+    needs: guard
+    uses: ./.github/workflows/_template-docs-confluence.yaml
+    secrets: inherit
+    with:
+      docs-path: ${{ inputs.docs-path || 'docs/recordings-and-transcripts' }}

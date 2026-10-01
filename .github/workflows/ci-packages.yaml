@@ -1,32 +1,34 @@
-name: "[packages] Validate"
+name: "[CI] Packages"
 
 on:
-  # Design decision: no `branches` filter. Features here land as stacks of PRs that target their
-  # parent branch, not `main`; a `branches: [main]` filter silently skipped this gate for every
-  # PR in a stack except the base one. `paths` alone decides — the gate matters wherever the
-  # files it guards change, whatever the PR merges into.
+  # No `branches` filter. Stacked pull requests target their parent branch, not `main`.
+  # A `branches: [main]` filter skips this workflow for all pull requests in a stack except the first.
+  # Only `paths` decides when the workflow runs.
   pull_request:
     paths:
       - "packages/**"
+      - "!packages/mcp-credential-auth/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "turbo.json"
       - "tsconfig.json"
       - "biome.json"
-      - .github/workflows/packages.ci.yaml
+      - ".github/workflows/ci-packages.yaml"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-packages-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
     permissions:
-      actions: write # cache needs write access
+      contents: read # to read the repository
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -36,23 +38,10 @@ jobs:
         with:
           run_install: false
 
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Sync pack format and lint
+      - name: Check syncpack format and lint
         run: pnpm syncpack format --check && pnpm syncpack lint
 
       - name: Run style (all packages)

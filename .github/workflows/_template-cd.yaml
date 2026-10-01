@@ -1,4 +1,4 @@
-name: "[TEMPLATE] CD"
+name: "[Template] CD"
 
 on:
   workflow_call:
@@ -11,24 +11,29 @@ on:
         description: "Version of the package (e.g., 1.2.0)"
         required: true
         type: string
-      dockerfile:
-        description: "Path to a specific Dockerfile (e.g., services/outlook-semantic-mcp/deploy/Dockerfile)"
-        default: "./Dockerfile"
-        type: string
-      docs-path:
-        description: "Path to the docs directory relative to repo root (optional)"
+      ref:
+        description: "Git ref to build from (default: the ref that started the workflow)"
         required: false
+        default: ""
         type: string
+      publish-docs:
+        description: "Publish the docs of the service to Confluence"
+        required: false
+        default: true
+        type: boolean
 
 jobs:
-  # Build and push container to registry
   containerize:
+    concurrency:
+      group: release-${{ inputs.service-name }}-${{ inputs.service-version }}
+      cancel-in-progress: false
     permissions:
-      packages: write
-      id-token: write
+      contents: read # to read the repository
+      packages: write # to push the image and the charts to GHCR
+      id-token: write # to sign in to Azure and to sign the image with OIDC
     outputs:
-      digest: ${{ steps.build-and-push.outputs.digest }}
-    runs-on: ubuntu-latest
+      digest: ${{ steps.existing.outputs.digest || steps.build-and-push.outputs.digest }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       GHCR_REGISTRY: ghcr.io
@@ -44,7 +49,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.ref }}
           fetch-depth: 2
+          persist-credentials: false
+
+      - name: Resolve source revision
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Setup docker buildx
         uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
@@ -58,6 +69,8 @@ jobs:
             ${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_REPO }}
           tags: |
             type=raw,value=${{ inputs.service-version }}
+          labels: |
+            org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
 
       - name: Login to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -66,18 +79,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Refuse to overwrite a released version
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          IMAGE: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:${{ inputs.service-version }}
-        run: |
-          if docker buildx imagetools inspect "$IMAGE" > /dev/null 2>&1; then
-            echo "::error::${IMAGE} exists. Release a new version instead."
-            exit 1
-          fi
-
       - name: Login to Azure as uniquecr token issuer (OIDC)
-        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # Azure Login Action v3.1.0
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: 46c63b6f-67ac-476a-9d5d-6db2d18743bb # acr_oidc uniquecr_push
           tenant-id: 99330c76-81d2-460e-861e-35af8e2a4266
@@ -88,7 +91,7 @@ jobs:
         run: |
           TOKEN=$(az acr login --name uniquecr --expose-token --output tsv --query accessToken)
           echo "::add-mask::$TOKEN"
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Login to ACR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -109,20 +112,80 @@ jobs:
         run: |
           TOKEN=$(az acr login --name getunique --expose-token --output tsv --query accessToken)
           echo "::add-mask::$TOKEN"
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Login to helm registries
+        env:
+          UNIQUECR_TOKEN: ${{ steps.acr-token.outputs.token }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GETUNIQUE_TOKEN: ${{ steps.acr-token-getunique.outputs.token }}
         run: |
-          echo "${{ steps.acr-token.outputs.token }}" | helm registry login ${{ env.UNIQUECR_REGISTRY }} --username 00000000-0000-0000-0000-000000000000 --password-stdin
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.GHCR_REGISTRY }} --username ${{ github.actor }} --password-stdin
-          echo "${{ steps.acr-token-getunique.outputs.token }}" | helm registry login ${{ env.GETUNIQUE_REGISTRY }} --username 00000000-0000-0000-0000-000000000000 --password-stdin
+          echo "$UNIQUECR_TOKEN" | helm registry login "$UNIQUECR_REGISTRY" --username 00000000-0000-0000-0000-000000000000 --password-stdin
+          echo "$GHCR_TOKEN" | helm registry login "$GHCR_REGISTRY" --username "$GITHUB_ACTOR" --password-stdin
+          echo "$GETUNIQUE_TOKEN" | helm registry login "$GETUNIQUE_REGISTRY" --username 00000000-0000-0000-0000-000000000000 --password-stdin
+
+      - name: Look for an existing image
+        id: existing
+        env:
+          GHCR_IMAGE: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:${{ inputs.service-version }}
+          UNIQUECR_IMAGE: ${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_REPO }}:${{ inputs.service-version }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          digest_of() {
+            local output error
+            error=$(mktemp)
+            if output=$(docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}' 2>"$error"); then
+              echo "$output"
+            elif grep -qiE 'not found|NAME_UNKNOWN|MANIFEST_UNKNOWN|404' "$error"; then
+              echo ""
+            else
+              echo "::error::Could not look up $1: $(cat "$error")" >&2
+              return 1
+            fi
+          }
+          ghcr_digest=$(digest_of "$GHCR_IMAGE")
+          uniquecr_digest=$(digest_of "$UNIQUECR_IMAGE")
+          if [ -z "$ghcr_digest" ] && [ -z "$uniquecr_digest" ]; then
+            echo "No image for this version yet. The next step builds it."
+            exit 0
+          fi
+          if [ -n "$ghcr_digest" ] && [ -n "$uniquecr_digest" ] && [ "$ghcr_digest" != "$uniquecr_digest" ]; then
+            echo "::error::The registries hold different images for this version. GHCR: $ghcr_digest. uniquecr: $uniquecr_digest. Delete one tag by hand. This workflow never overwrites a released tag."
+            exit 1
+          fi
+          # The label does not prove who built the image. It stops a reuse of an image from another commit.
+          if [ -n "$ghcr_digest" ]; then
+            existing_ref="$GHCR_REGISTRY/$GHCR_REPO@$ghcr_digest"
+          else
+            existing_ref="$UNIQUECR_REGISTRY/$UNIQUECR_REPO@$uniquecr_digest"
+          fi
+          image_config=$(docker buildx imagetools inspect "$existing_ref" --format '{{json .Image}}')
+          revision=$(jq -r '.config.Labels["org.opencontainers.image.revision"] // empty' <<< "$image_config")
+          if [ "$revision" != "$SOURCE_SHA" ]; then
+            echo "::error::The existing image for this version comes from ${revision:-an unknown commit}, not from the commit $SOURCE_SHA of the release tag. This workflow does not reuse or sign it. If the image is wrong, delete the tag by hand."
+            exit 1
+          fi
+          if [ -z "$uniquecr_digest" ]; then
+            echo "::notice::Only GHCR has this version. Copying the image to uniquecr."
+            docker buildx imagetools create --tag "$UNIQUECR_IMAGE" "$GHCR_REGISTRY/$GHCR_REPO@$ghcr_digest"
+            digest=$ghcr_digest
+          elif [ -z "$ghcr_digest" ]; then
+            echo "::notice::Only uniquecr has this version. Copying the image to GHCR."
+            docker buildx imagetools create --tag "$GHCR_IMAGE" "$UNIQUECR_REGISTRY/$UNIQUECR_REPO@$uniquecr_digest"
+            digest=$uniquecr_digest
+          else
+            digest=$ghcr_digest
+          fi
+          echo "::notice::The image for this version exists ($digest). This run reuses it and does not build again."
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       - name: Build and push container
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         id: build-and-push
+        if: steps.existing.outputs.digest == ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          file: ${{ inputs.dockerfile }}
+          file: services/${{ inputs.service-name }}/deploy/Dockerfile
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
           provenance: mode=max
@@ -141,42 +204,45 @@ jobs:
 
       - name: Sign and verify the images with GitHub OIDC Token
         env:
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          DIGEST: ${{ steps.existing.outputs.digest || steps.build-and-push.outputs.digest }}
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |
-          images=""
-          for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
-          done
-          cosign sign --yes ${images}
-          cosign verify ${images} \
-          --certificate-identity-regexp="^https://github.com/${{ github.repository }}/\.github/workflows/.*@refs/heads/main$" \
-          --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+          images=()
+          while IFS= read -r tag; do
+            if [ -n "$tag" ]; then
+              images+=("${tag}@${DIGEST}")
+            fi
+          done <<< "$TAGS"
+          cosign sign --yes "${images[@]}"
+          cosign verify "${images[@]}" \
+            --certificate-identity-regexp="^https://github.com/${GITHUB_REPOSITORY}/\.github/workflows/.*@refs/heads/main$" \
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com
 
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
 
       - name: Push Helm charts
         env:
           DESTINATION: /tmp
+          SERVICE_NAME: ${{ inputs.service-name }}
         run: |
           deno run \
-          --allow-run \
-          --allow-read \
-          --allow-write=${{ env.DESTINATION }} \
-          scripts/helm-package-push.ts \
-          --chart services/${{ inputs.service-name }}/deploy/helm-charts/${{ inputs.service-name }} \
-          --destination ${{ env.DESTINATION }} \
-          --registry oci://${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_CHART_REPO }} \
-          --registry oci://${{ env.GHCR_REGISTRY }}/${{ env.GHCR_CHART_REPO }} \
-          --registry oci://${{ env.GETUNIQUE_REGISTRY }}/${{ env.GETUNIQUE_CHART_REPO }}
+            --allow-run \
+            --allow-read \
+            --allow-write="$DESTINATION" \
+            scripts/helm-package-push.ts \
+            --chart "services/$SERVICE_NAME/deploy/helm-charts/$SERVICE_NAME" \
+            --destination "$DESTINATION" \
+            --registry "oci://$UNIQUECR_REGISTRY/$UNIQUECR_CHART_REPO" \
+            --registry "oci://$GHCR_REGISTRY/$GHCR_CHART_REPO" \
+            --registry "oci://$GETUNIQUE_REGISTRY/$GETUNIQUE_CHART_REPO"
 
   security-trivy-image-scan:
     needs: containerize
     permissions:
-      contents: read
-      packages: read
-      security-events: write
-    runs-on: ubuntu-latest
+      contents: read # to read the repository
+      packages: read # to pull the image from GHCR
+      security-events: write # to upload the results to code scanning
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       GHCR_REGISTRY: ghcr.io
@@ -186,6 +252,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: .github/trivy-templates
+          persist-credentials: false
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -229,9 +296,9 @@ jobs:
   security-trivy-license-scan:
     needs: containerize
     permissions:
-      contents: read
-      packages: read
-    runs-on: ubuntu-latest
+      contents: read # to read the repository
+      packages: read # to pull the image from GHCR
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       GHCR_REGISTRY: ghcr.io
@@ -249,17 +316,30 @@ jobs:
           scan-type: image
           image-ref: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}@${{ needs.containerize.outputs.digest }}
           scanners: license
+          format: json
+          output: trivy-license.json
           severity: UNKNOWN,HIGH,CRITICAL
           exit-code: "0"
           timeout: 15m
           cache: true
 
+      - name: Write license summary
+        if: always() && hashFiles('trivy-license.json') != ''
+        run: |
+          jq -r '
+            [.Results[]?.Licenses[]?]
+            | group_by([.Severity, .Name])
+            | map({severity: .[0].Severity, license: (.[0].Name | gsub("[|\n]"; " ")), packages: length})
+            | sort_by(.severity, .license)
+            | ["| Severity | License | Packages |", "| --- | --- | --- |"] + map("| \(.severity) | \(.license) | \(.packages) |")
+            | .[]
+          ' trivy-license.json >> "$GITHUB_STEP_SUMMARY"
+
   publish-docs:
-    if: ${{ inputs.docs-path != '' }}
+    if: inputs.publish-docs
     permissions:
-      contents: read
+      contents: read # to let the called workflow read the repository
     uses: ./.github/workflows/_template-docs-confluence.yaml
-    with:
-      service-name: ${{ inputs.service-name }}
-      docs-path: ${{ inputs.docs-path }}
     secrets: inherit
+    with:
+      docs-path: services/${{ inputs.service-name }}/docs

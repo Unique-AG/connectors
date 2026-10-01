@@ -1,12 +1,8 @@
 name: "[Security] Trivy Registry Image Scan"
 
-concurrency:
-  group: security-trivy-registry
-  cancel-in-progress: false
-
 on:
   schedule:
-    - cron: "0 6 * * 3"
+    - cron: "0 6 * * 3" # Every Wednesday at 6 AM UTC
   workflow_dispatch:
     inputs:
       services:
@@ -15,17 +11,23 @@ on:
         default: all
 
 permissions:
-  contents: read
+  contents: read # to read the repository
+
+concurrency:
+  group: security-trivy-registry
+  cancel-in-progress: false
 
 jobs:
   detect-services:
     name: Detect services
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     outputs:
       services: ${{ steps.build-matrix.outputs.services }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Build service matrix
         id: build-matrix
@@ -57,16 +59,16 @@ jobs:
   scan:
     name: Image ${{ matrix.service.service }}
     needs: detect-services
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         service: ${{ fromJson(needs.detect-services.outputs.services) }}
     permissions:
-      contents: read
-      packages: read
-      security-events: write
+      contents: read # to read the repository
+      packages: read # to pull the image from GHCR
+      security-events: write # to upload the results to code scanning
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     env:
       IMAGE: ghcr.io/unique-ag/connectors/services/${{ matrix.service.service }}
       VERSION: ${{ matrix.service.version }}
@@ -78,6 +80,7 @@ jobs:
             /.github/trivy-templates/
             /.github/trivyignore.yaml
           sparse-checkout-cone-mode: false
+          persist-credentials: false
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
