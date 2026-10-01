@@ -37,10 +37,13 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 _DESCRIPTION = """\
-Resolves a OneNote web address into a notebook handle. It asks Microsoft directly. It does not \
-search or guess. A page's or a section's address resolves to the notebook that holds it. \
-onenote_list_recent_notebooks rows carry no handle. Pass their `web_url` here to get one. Pass \
-`group` for the address of a notebook that a Microsoft 365 group or team owns.\
+Resolves a OneNote web address into the handle of a notebook, for the signed-in user. It asks \
+Microsoft directly. It does not search or guess. onenote_list_recent_notebooks is the sibling for \
+recent notebooks. Its rows carry no handle, so pass their `web_url` here to get one.
+
+Notes:
+- The address of a page or a section resolves to the notebook that holds it.
+- Pass `group` for the address of a notebook that a Microsoft 365 group or team owns.
 """
 
 _OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS = (

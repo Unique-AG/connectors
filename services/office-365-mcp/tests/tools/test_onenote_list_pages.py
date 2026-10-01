@@ -342,6 +342,41 @@ class TestTheGroupRoute:
             OnenotePageHandle(_OTHER_PAGE_ID, group_id=_GROUP_ID).uri,
         ]
 
+    async def test_a_group_and_a_creating_app_go_out_on_one_call_to_the_group_route(
+        self, client: GraphServiceClient, group_pages: respx.Route, pages: respx.Route
+    ) -> None:
+        group_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        answer = await lister.list_pages(
+            client,
+            group=_GROUP_ID,
+            created_by_app_id=_APP_ID,
+            title_contains="Roadmap",
+            limit=25,
+        )
+
+        assert group_pages.call_count == 1
+        assert pages.call_count == 0
+        assert group_pages.calls.last.request.url.params["$filter"] == (
+            "contains(tolower(title),'roadmap') and createdByAppId eq 'WLID-000000004C12821A'"
+        )
+        assert answer.pages[0].uri == OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
+        assert answer.pages[0].created_by_app_id == _APP_ID
+
+    async def test_a_group_section_handle_and_a_creating_app_go_out_on_one_call(
+        self, client: GraphServiceClient, group_section_pages: respx.Route
+    ) -> None:
+        group_section_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        answer = await lister.list_pages(
+            client, section=_GROUP_SECTION, created_by_app_id=_APP_ID, limit=25
+        )
+
+        assert group_section_pages.calls.last.request.url.params["$filter"] == (
+            "createdByAppId eq 'WLID-000000004C12821A'"
+        )
+        assert answer.pages[0].uri == OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
+
     async def test_a_section_handle_of_a_group_asks_that_groups_section_route(
         self,
         client: GraphServiceClient,
@@ -925,9 +960,13 @@ class TestItsArguments:
         properties = await self._properties(transport)
 
         described = cast("str", properties["group"]["description"])
-        assert "whose pages this call searches" in described
-        assert "teams_list_my_teams" in described
+        assert described.startswith(
+            "The Microsoft 365 group or team whose pages this call searches"
+        )
+        assert "A team id is a group id." in described
+        assert "Take it from teams_list_my_teams, or ask the user for it." in described
         assert "only without `section`" in described
+        assert 15 <= len(described.split()) <= 60
 
     async def test_the_section_argument_says_how_a_group_section_handle_starts(
         self, transport: httpx.AsyncClient

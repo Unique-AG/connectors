@@ -346,8 +346,26 @@ class TestHowItDeclaresItself:
         parameters, _tool = await _registered(transport)
         properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
         described = cast("str", properties["group"]["description"])
-        assert "whose notebook this address opens" in described
-        assert "teams_list_my_teams" in described
+        assert described.startswith(
+            "The Microsoft 365 group or team whose notebook this address opens"
+        )
+        assert "A team id is a group id." in described
+        assert "Take it from teams_list_my_teams, or ask the user for it." in described
+        assert 15 <= len(described.split()) <= 60
+
+    async def test_the_description_has_a_lead_with_the_sibling_and_notes_with_the_group_bullet(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        lead, separator, notes = description.partition("\n\nNotes:\n")
+        bullets = [line for line in notes.splitlines() if line.startswith("- ")]
+        assert separator, "the description has no Notes section"
+        assert 45 <= len(description.split()) <= 210
+        assert 1 <= len(bullets) <= 3
+        assert "onenote_list_recent_notebooks" in lead
+        assert any("Pass `group`" in bullet for bullet in bullets)
 
     def test_the_answer_handle_says_how_a_group_notebook_handle_starts(self) -> None:
         described = finder.FoundNotebook.model_fields["uri"].description or ""

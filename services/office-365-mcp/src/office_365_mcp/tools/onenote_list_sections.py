@@ -5,11 +5,6 @@ from typing import Annotated
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_builder import BaseRequestBuilder
-from kiota_abstractions.method import Method
-from kiota_abstractions.serialization.parsable import Parsable
-from kiota_abstractions.serialization.parsable_factory import ParsableFactory
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_section import OnenoteSection
 from msgraph.generated.models.onenote_section_collection_response import (
     OnenoteSectionCollectionResponse,
@@ -27,14 +22,7 @@ from msgraph.generated.users.item.onenote.notebooks.item.sections import (
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import (
-    MAX_SCANNED_ITEMS,
-    TypedQueryParameters,
-    collect_pages,
-    graph_errors,
-    graph_step,
-    request_with_query,
-)
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
@@ -46,6 +34,7 @@ from office_365_mcp.shared.notes import (
     ContainerOrderBy,
     created_by_contains,
     creator_name_of,
+    get_with_query,
     onenote_root,
     web_url_of,
 )
@@ -294,21 +283,6 @@ def _name_filter(name_contains: str | None) -> str | None:
     return f"contains(tolower(displayName),'{literal}')"
 
 
-async def _get[M: Parsable](
-    client: GraphServiceClient,
-    builder: BaseRequestBuilder,
-    typed: TypedQueryParameters,
-    model: ParsableFactory[M],
-) -> M | None:
-    request = request_with_query(
-        Method.GET, builder.url_template, builder.path_parameters, query={}, typed=typed
-    )
-    request.headers.try_add("Accept", "application/json")
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, model, {"XXX": ODataError}
-    )
-
-
 async def _first_sections(
     client: GraphServiceClient,
     handle: OnenoteNotebookHandle | OnenoteSectionGroupHandle,
@@ -323,7 +297,7 @@ async def _first_sections(
         if isinstance(handle, OnenoteNotebookHandle)
         else root.section_groups.by_section_group_id(handle.section_group_id).sections
     )
-    return await _get(
+    return await get_with_query(
         client,
         sections,
         _SectionsQuery(
@@ -351,7 +325,7 @@ async def _first_section_groups(
         if isinstance(handle, OnenoteNotebookHandle)
         else root.section_groups.by_section_group_id(handle.section_group_id).section_groups
     )
-    return await _get(
+    return await get_with_query(
         client,
         section_groups,
         _SectionGroupsQuery(
