@@ -2,10 +2,11 @@ from collections.abc import Mapping
 from typing import Annotated
 
 import httpx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.method import Method
 from kiota_abstractions.request_information import RequestInformation
+from mcp.types import InputRequiredResult
 from msgraph.generated.users.item.onenote.notebooks.item.copy_notebook import (
     copy_notebook_post_request_body as _copy_notebook_body,
 )
@@ -16,12 +17,26 @@ from office_365_mcp.graph_client import (
     FetchedResponse,
     fetch_response,
     graph_errors,
+    graph_step,
     native_response,
     no_retry,
+    not_graph,
 )
-from office_365_mcp.shared.handles import onenote_notebook_handle
-from office_365_mcp.shared.notes import OperationSummary, accepted_operation
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
+from office_365_mcp.shared.handles import OnenoteNotebookHandle, onenote_notebook_handle
+from office_365_mcp.shared.notes import (
+    OperationSummary,
+    accepted_operation,
+    notebook_audience,
+    onenote_root,
+    write_state_for,
+)
+from office_365_mcp.shared.seam import (
+    WRITE_ADDITIVE,
+    Confirm,
+    answer_pending,
+    graph_client_for_caller,
+    person_confirms,
+)
 
 TOOL_NAME = "onenote_copy_notebook"
 
@@ -34,6 +49,13 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("onenote_list_notebooks",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "notebook": "onenote:///notebooks/1-SYNTHETICNOTEBOOK0000"
 }
+
+_COPY = "copy"
+_DO_NOT_COPY = "do not copy"
+_NOTHING_COPIED = "Nothing was copied."
+
+_UNNAMED_NOTEBOOK = "an unnamed notebook"
+_OWN_ONEDRIVE = "your own OneDrive"
 
 _NOT_A_NOTEBOOK_HANDLE = (
     "onenote_copy_notebook takes a notebook handle in `notebook`. It looks like "
@@ -60,43 +82,83 @@ GRAPH_NOT_FOUND = (
 )
 
 _DESCRIPTION = """\
-Starts a copy of a whole notebook into the signed-in user's own OneDrive. This call does not copy \
-the notebook itself: Microsoft runs the copy, and the answer is the operation that tracks it. \
-Pass the answer's `uri` to onenote_get_operation until `status` reads Completed or Failed.
+Starts a copy of a whole notebook into the signed-in user's own OneDrive, or into a Microsoft 365 \
+group with `to_group`. This call does not copy the notebook itself: Microsoft runs the copy, and \
+the answer is the operation that tracks it. Pass the answer's `uri` to onenote_get_operation until \
+`status` reads Completed or Failed.
 
 Notes:
-- This tool asks nobody to agree, because the copy lands in the user's own OneDrive.
+- This tool asks the user to agree before it writes into a Microsoft 365 group. A copy into the \
+user's own OneDrive starts without a question.
 - If a call times out, do not call this tool again first: a second call starts a second copy. \
 Before you call again, make sure that onenote_list_notebooks does not show the copy.
 """
 
 
+def _question(name: str | None, to_group: str | None, new_name: str | None) -> str:
+    notebook = name or _UNNAMED_NOTEBOOK
+    where = _OWN_ONEDRIVE if to_group is None else f"the Microsoft 365 group {to_group!r}"
+    renamed = f", renamed {new_name!r}" if new_name is not None else ""
+    return f"Copy the notebook {notebook!r} into {where}{renamed}?"
+
+
+def a_person_agrees(ctx: Context) -> Confirm:
+    return person_confirms(ctx, agree=_COPY, decline=_DO_NOT_COPY, nothing_happened=_NOTHING_COPIED)
+
+
 async def copy_notebook(
-    client: GraphServiceClient, *, notebook: str, new_name: str | None = None
-) -> OperationSummary:
+    client: GraphServiceClient,
+    *,
+    notebook: str,
+    new_name: str | None = None,
+    to_group: str | None = None,
+    confirm: Confirm,
+    answer_pending: bool = False,
+) -> OperationSummary | InputRequiredResult:
     handle = onenote_notebook_handle(notebook)
     if handle is None:
         raise ToolError(_NOT_A_NOTEBOOK_HANDLE)
 
-    with graph_errors(TOOL_NAME, step=STEP_COPY_NOTEBOOK):
-        fetched = await _copy(client, handle.notebook_id, new_name)
+    about = write_state_for("copy_notebook", handle.uri, to_group or "", new_name or "")
+    fetched: FetchedResponse | None = None
+    asked: InputRequiredResult | None = None
+    refused: str | None = None
+    with graph_errors(TOOL_NAME):
+        if answer_pending or to_group is not None:
+            source = await notebook_audience(client, handle.notebook_id, group_id=handle.group_id)
+            with not_graph():
+                answer = await confirm(_question(source.name, to_group, new_name), about)
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
+        if refused is None and asked is None:
+            with graph_step(STEP_COPY_NOTEBOOK):
+                fetched = await _copy(client, handle, new_name, to_group)
 
-    summary = accepted_operation(fetched)
+    if asked is not None:
+        return asked
+    if refused is not None:
+        raise ToolError(refused)
+    assert fetched is not None, "a copy neither asked about nor refused sent nothing"
+    summary = accepted_operation(fetched, group_id=handle.group_id)
     if summary is None:
         raise ToolError(_NO_OPERATION_NAMED)
     return summary
 
 
 async def _copy(
-    client: GraphServiceClient, notebook_id: str, new_name: str | None
+    client: GraphServiceClient,
+    handle: OnenoteNotebookHandle,
+    new_name: str | None,
+    to_group: str | None,
 ) -> FetchedResponse:
-    builder = client.me.onenote.notebooks.by_notebook_id(notebook_id).copy_notebook
+    root = onenote_root(client, handle.group_id)
+    builder = root.notebooks.by_notebook_id(handle.notebook_id).copy_notebook
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
     request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
         "application/json",
-        _copy_notebook_body.CopyNotebookPostRequestBody(rename_as=new_name),
+        _copy_notebook_body.CopyNotebookPostRequestBody(group_id=to_group, rename_as=new_name),
     )
     request.add_request_options([*no_retry(), *native_response()])
     return await fetch_response(client, request)
@@ -119,22 +181,42 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The notebook to copy: the `uri` of a onenote_list_notebooks or "
                     + "onenote_find_notebook_from_url result, or a onenote_create_notebook answer, "
-                    + "copied word for word. The shape is onenote:///notebooks/{id}."
+                    + "copied word for word. The shape is onenote:///notebooks/{id}. A handle from "
+                    + "a group notebook starts with onenote:///groups/{group}/ instead."
                 ),
             ),
         ],
+        ctx: Context,
         new_name: Annotated[
             str | None,
             Field(
                 min_length=1,
                 description=(
                     "A new name for the copy. Omit it to keep the notebook's own name. The name "
-                    + "must be unique across the user's OneNote and must not contain any of "
-                    + "these characters: ? * / : < > | ' \". Microsoft refuses a bad name and no "
-                    + "copy starts."
+                    + "must be unique among the notebooks where the copy lands, and it must not "
+                    + "contain any of these characters: ? * / : < > | ' \". Microsoft refuses a "
+                    + "bad name and no copy starts."
+                ),
+            ),
+        ] = None,
+        to_group: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The Microsoft 365 group or team that gets the copy, as its Graph id. A team "
+                    + "id is a group id. Take it from teams_list_my_teams, or ask the user for it. "
+                    + "Omit it to copy the notebook into the user's own OneDrive."
                 ),
             ),
         ] = None,
         client: GraphServiceClient = graph,
-    ) -> OperationSummary:
-        return await copy_notebook(client, notebook=notebook, new_name=new_name)
+    ) -> OperationSummary | InputRequiredResult:
+        return await copy_notebook(
+            client,
+            notebook=notebook,
+            new_name=new_name,
+            to_group=to_group,
+            confirm=a_person_agrees(ctx),
+            answer_pending=answer_pending(ctx),
+        )

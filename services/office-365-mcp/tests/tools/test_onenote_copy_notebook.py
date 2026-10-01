@@ -5,29 +5,43 @@ from typing import cast
 import httpx
 import pytest
 import respx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from fastmcp.tools import Tool
+from fastmcp.tools import FunctionTool, Tool
+from mcp.types import (
+    ElicitRequest,
+    ElicitRequestFormParams,
+    ElicitResult,
+    InputRequiredResult,
+    InputResponse,
+)
+from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
+    OnenoteOperationHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
     onenote_notebook_handle,
 )
-from office_365_mcp.shared.notes import OperationSummary
-from office_365_mcp.shared.seam import WRITE_ADDITIVE
+from office_365_mcp.shared.notes import OperationSummary, write_state_for
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
 from office_365_mcp.tools import onenote_copy_notebook as copier
-from office_365_mcp.tools.onenote_copy_notebook import copy_notebook
+from office_365_mcp.tools.onenote_copy_notebook import a_person_agrees, copy_notebook
 
 _NOTEBOOK_ID = "1-SYNTHETICNOTEBOOK0000!0-ABCDEF"
 _OPERATION_ID = "1-SYNTHETICOPERATION0000!0-ABCDEF"
+_GROUP_ID = "5c6b7a81-2f0d-4a24-9b1e-8a9c3c470f9e"
+_SOURCE_GROUP_ID = "0f9e8a9c-3c47-4a24-9b1e-5c6b7a812f0d"
 
 _NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID).uri
+_GROUP_NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID, group_id=_SOURCE_GROUP_ID).uri
 
 _COPY_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}/copyNotebook"
+_NOTEBOOK_GET_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}"
+_SOURCE_GROUP_ROOT = f"/groups/{_SOURCE_GROUP_ID}/onenote"
 
 
 def _operation_payload(
@@ -68,10 +82,48 @@ def _copies_with_header_only(
     )
 
 
+def _notebook_route(
+    graph: respx.MockRouter, *, path: str = _NOTEBOOK_GET_PATH, name: str | None = "Work"
+) -> respx.Route:
+    return graph.get(path).mock(
+        return_value=httpx.Response(
+            200,
+            json={"id": _NOTEBOOK_ID, "displayName": name, "isShared": False, "userRole": "Owner"},
+        )
+    )
+
+
+async def _never_asked(question: str, about: str) -> str | None:
+    raise AssertionError(f"a copy into the user's own OneDrive asked {question!r} for {about!r}")
+
+
+async def _agrees(question: str, about: str) -> str | None:
+    assert question, "the person was asked nothing at all"
+    assert about, "the answer was bound to nothing"
+    return None
+
+
+async def _refuses(question: str, about: str) -> str | None:
+    assert question
+    assert about
+    return "Nothing was copied."
+
+
 async def _copy(
-    client: GraphServiceClient, *, notebook: str = _NOTEBOOK_URI, new_name: str | None = None
+    client: GraphServiceClient,
+    *,
+    notebook: str = _NOTEBOOK_URI,
+    new_name: str | None = None,
+    to_group: str | None = None,
+    confirm: Confirm = _never_asked,
 ) -> OperationSummary:
-    return await copy_notebook(client, notebook=notebook, new_name=new_name)
+    answer = await copy_notebook(
+        client, notebook=notebook, new_name=new_name, to_group=to_group, confirm=confirm
+    )
+    assert isinstance(answer, OperationSummary), (
+        "this call was answered with a question, not an operation"
+    )
+    return answer
 
 
 def _sent(route: respx.Route) -> dict[str, object]:
@@ -115,7 +167,7 @@ class TestWhatItSendsToGraph:
 
         assert _sent(copy) == {"renameAs": "Renamed notebook"}
 
-    async def test_no_group_site_or_folder_keys_are_ever_sent(
+    async def test_no_group_site_or_folder_keys_are_sent_without_to_group(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         copy = _copies_with_header_only(graph)
@@ -290,6 +342,229 @@ class TestGraphFailures:
         assert "onenote_find_notebook_from_url" in copier.GRAPH_NOT_FOUND
 
 
+def _group_source_copies(graph: respx.MockRouter) -> respx.Route:
+    location = f"https://graph.microsoft.com/v1.0{_SOURCE_GROUP_ROOT}/operations/{_OPERATION_ID}"
+    return graph.post(f"{_SOURCE_GROUP_ROOT}/notebooks/{_NOTEBOOK_ID}/copyNotebook").mock(
+        return_value=httpx.Response(202, content=b"", headers={"Operation-Location": location})
+    )
+
+
+class TestCopyingIntoAMicrosoft365Group:
+    async def test_to_group_asks_first_and_sends_the_group_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph, name="Work")
+        copy = _copies_with_header_only(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _copy(client, to_group=_GROUP_ID, confirm=capturing)
+
+        assert asked == [f"Copy the notebook 'Work' into the Microsoft 365 group {_GROUP_ID!r}?"]
+        assert _sent(copy) == {"groupId": _GROUP_ID}
+
+    async def test_to_group_and_a_new_name_reach_the_question_and_the_body(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph)
+        copy = _copies_with_header_only(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _copy(client, to_group=_GROUP_ID, new_name="Team copy", confirm=capturing)
+
+        assert "renamed 'Team copy'" in asked[0]
+        sent = _sent(copy)
+        assert sent == {"groupId": _GROUP_ID, "renameAs": "Team copy"}
+        assert "siteId" not in sent
+        assert "siteCollectionId" not in sent
+        assert "notebookFolder" not in sent
+
+    async def test_a_declined_copy_into_a_group_starts_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph)
+        copy = _copies_with_header_only(graph)
+
+        with pytest.raises(ToolError, match="Nothing was copied"):
+            _ = await _copy(client, to_group=_GROUP_ID, confirm=_refuses)
+
+        assert copy.call_count == 0
+
+    async def test_about_binds_the_notebook_the_group_and_the_new_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph)
+        _ = _copies_with_header_only(graph)
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _copy(client, to_group=_GROUP_ID, confirm=capturing)
+        _ = await _copy(client, to_group=_GROUP_ID, new_name="Team copy", confirm=capturing)
+
+        assert bound == [
+            write_state_for("copy_notebook", _NOTEBOOK_URI, _GROUP_ID, ""),
+            write_state_for("copy_notebook", _NOTEBOOK_URI, _GROUP_ID, "Team copy"),
+        ]
+
+    async def test_a_group_source_is_copied_under_the_group_that_holds_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        copy = _group_source_copies(graph)
+
+        answer = await _copy(client, notebook=_GROUP_NOTEBOOK_URI)
+
+        assert copy.call_count == 1
+        assert len(graph.calls) == 1
+        assert _sent(copy) == {}
+        assert answer.uri == OnenoteOperationHandle(_OPERATION_ID, group_id=_SOURCE_GROUP_ID).uri
+
+    async def test_a_group_source_is_named_from_the_group_that_holds_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        name = _notebook_route(graph, path=f"{_SOURCE_GROUP_ROOT}/notebooks/{_NOTEBOOK_ID}")
+        copy = _group_source_copies(graph)
+
+        _ = await _copy(client, notebook=_GROUP_NOTEBOOK_URI, to_group=_GROUP_ID, confirm=_agrees)
+
+        assert name.call_count == 1
+        assert _sent(copy) == {"groupId": _GROUP_ID}
+
+    async def test_the_first_round_asks_and_never_reaches_the_copy(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph, name="Work")
+        copy = _copies_with_header_only(graph)
+
+        answer = await copy_notebook(
+            client,
+            notebook=_NOTEBOOK_URI,
+            to_group=_GROUP_ID,
+            confirm=a_person_agrees(_modern_context()),
+        )
+
+        assert isinstance(answer, InputRequiredResult)
+        assert answer.request_state == write_state_for(
+            "copy_notebook", _NOTEBOOK_URI, _GROUP_ID, ""
+        )
+        requests = answer.input_requests or {}
+        request = requests[next(iter(requests))]
+        assert isinstance(request, ElicitRequest)
+        assert isinstance(request.params, ElicitRequestFormParams)
+        assert "Work" in request.params.message
+        assert copy.call_count == 0
+
+    async def test_the_second_round_copies_under_the_id_it_was_agreed_to_by(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph)
+        copy = _copies_with_header_only(graph)
+
+        first = await copy_notebook(
+            client,
+            notebook=_NOTEBOOK_URI,
+            to_group=_GROUP_ID,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+
+        answer = await copy_notebook(
+            client,
+            notebook=_NOTEBOOK_URI,
+            to_group=_GROUP_ID,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": "copy"})},
+                    state=first.request_state,
+                )
+            ),
+            answer_pending=True,
+        )
+
+        assert isinstance(answer, OperationSummary)
+        assert copy.call_count == 1
+        assert _sent(copy) == {"groupId": _GROUP_ID}
+
+    async def test_a_pending_decline_is_honored_even_without_to_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph)
+        copy = _copies_with_header_only(graph)
+        asked: list[str] = []
+
+        async def refusing(question: str, about: str) -> str | None:
+            assert about == write_state_for("copy_notebook", _NOTEBOOK_URI, "", "")
+            asked.append(question)
+            return "Nothing was copied."
+
+        with pytest.raises(ToolError, match="Nothing was copied"):
+            _ = await copy_notebook(
+                client, notebook=_NOTEBOOK_URI, confirm=refusing, answer_pending=True
+            )
+
+        assert asked == ["Copy the notebook 'Work' into your own OneDrive?"]
+        assert copy.call_count == 0
+
+    async def test_register_asks_before_a_copy_into_a_group(
+        self, transport: httpx.AsyncClient, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph)
+        copy = _copies_with_header_only(graph)
+        mcp: FastMCP = FastMCP(name="wiring-under-test")
+        copier.register(mcp, transport)
+        tool = await mcp.get_tool(copier.TOOL_NAME)
+        assert isinstance(tool, FunctionTool)
+
+        answer = cast(
+            "OperationSummary | InputRequiredResult",
+            await tool.fn(
+                notebook=_NOTEBOOK_URI,
+                new_name=None,
+                to_group=_GROUP_ID,
+                ctx=_modern_context(),
+                client=client,
+            ),
+        )
+
+        assert isinstance(answer, InputRequiredResult)
+        assert copy.call_count == 0
+
+
+class _ModernRequest:
+    protocol_version: str = LATEST_MODERN_VERSION
+
+
+def _modern_context(
+    *, answers: Mapping[str, InputResponse] | None = None, state: str | None = None
+) -> Context:
+    class _Client:
+        request_context: _ModernRequest = _ModernRequest()
+        input_responses: Mapping[str, InputResponse] | None = answers
+        request_state: str | None = state
+
+        async def elicit(self, message: str, response_type: object = None) -> object:
+            raise AssertionError(
+                f"a connection with no back-channel was asked {message!r} over it, "
+                + f"expecting {response_type!r} back"
+            )
+
+    return cast("Context", cast("object", _Client()))
+
+
 class TestHowItDeclaresItself:
     def test_the_permission_is_notes_create(self) -> None:
         assert copier.GRAPH_PERMISSIONS == ("Notes.Create",)
@@ -304,10 +579,12 @@ class TestHowItDeclaresItself:
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert set(copier.GRAPH_CALL_EXAMPLE) <= set(properties)
 
-    async def test_it_takes_two_arguments_and_no_others(self, transport: httpx.AsyncClient) -> None:
+    async def test_it_takes_three_arguments_and_no_others(
+        self, transport: httpx.AsyncClient
+    ) -> None:
         parameters, _tool = await _registered(transport)
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"notebook", "new_name"}
+        assert set(properties) == {"notebook", "new_name", "to_group"}
 
     @pytest.mark.parametrize("word", ["client", "ctx", "context", "token", "graph"])
     async def test_no_wiring_of_this_server_is_published_as_an_argument(
@@ -330,15 +607,37 @@ class TestHowItDeclaresItself:
         assert annotations.destructive_hint is WRITE_ADDITIVE["destructiveHint"]
         assert annotations.idempotent_hint is WRITE_ADDITIVE["idempotentHint"]
 
-    async def test_the_description_says_no_confirmation_is_asked(
+    async def test_the_description_says_only_a_copy_into_a_group_is_asked_about(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
 
         description = (tool.description or "").casefold()
-        assert "asks nobody to agree" in description
+        assert "asks the user to agree before it writes into a microsoft 365 group" in description
+        assert "a copy into the user's own onedrive starts without a question" in description
         assert "do not call this tool again first" in description
         assert "onenote_get_operation" in description
+
+    async def test_the_to_group_description_names_where_the_id_comes_from(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", tool.parameters["properties"])
+        to_group = cast("Mapping[str, object]", properties["to_group"])
+        description = cast("str", to_group["description"])
+
+        assert "A team id is a group id." in description
+        assert "teams_list_my_teams" in description
+        assert "own OneDrive" in description
+
+    async def test_the_notebook_description_names_the_group_shape(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", tool.parameters["properties"])
+        notebook = cast("Mapping[str, object]", properties["notebook"])
+
+        assert "onenote:///groups/{group}/" in cast("str", notebook["description"])
 
     async def test_the_new_name_description_lists_the_forbidden_characters(
         self, transport: httpx.AsyncClient
