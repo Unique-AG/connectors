@@ -200,6 +200,28 @@ class TestNotes:
         assert result.mandates[0].latest_note_date == "2026-07-15"
 
     @respx.mock
+    async def test_notes_are_plain_text(self) -> None:
+        mandate = {
+            **OPEN_SEARCH,
+            "note": (
+                "<p>Approved a $25m commitment.&nbsp;"
+                '<a href="https://example.invalid/recap">See the recap</a>.</p>'
+            ),
+            "notes": [
+                {
+                    "date": "2026-07-15",
+                    "note": "<p>Shortlist drawn up.</p>",
+                }
+            ],
+        }
+        _mock([mandate])
+        client, _ = build_client()
+        result = await get_mandates(investor_id=2504, client=client)
+        assert isinstance(result, InvestorMandatesResponse)
+        assert result.mandates[0].note == "Approved a $25m commitment. See the recap."
+        assert result.mandates[0].latest_note == "Shortlist drawn up."
+
+    @respx.mock
     async def test_a_mandate_with_no_notes_omits_them(self) -> None:
         _mock([AWARDED])
         client, _ = build_client()

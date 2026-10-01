@@ -28,6 +28,7 @@ INTENTION: dict[str, object] = {
     "asset_class": {"id": 1, "name": "Hedge Funds"},
     "allocation_amount": {"value_lower_usd": 10000000, "value_upper_usd": 25000000},
     "preference_only": False,
+    "note": "<p>Looking at global macro.&nbsp;Ticket is firm.</p>",
     "structures": [{"id": 1, "name": "Commingled"}],
     "classification_segments": {
         "strategies": {
@@ -111,3 +112,4 @@ class TestProjection:
         assert intention.allocation_amount.lower_usd == 10000000
         assert intention.preference_only is False
         assert intention.structures == ["Commingled"]
+        assert intention.note == "Looking at global macro. Ticket is firm."

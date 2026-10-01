@@ -8,6 +8,7 @@ from with_intelligence_mcp.features.mandates.api_responses import (
     MandateNoteAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
+from with_intelligence_mcp.utils import html_to_markdown
 
 
 class MandateAmountResponse(OmitNoneModel):
@@ -147,8 +148,8 @@ class MandateResponse(OmitNoneModel):
             rfp_link=attributes.rfp_link,
             last_reviewed=attributes.last_reviewed.date if attributes.last_reviewed else None,
             updated_at=attributes.updated_at,
-            note=attributes.note,
-            latest_note=latest_note.note if latest_note else None,
+            note=html_to_markdown(attributes.note),
+            latest_note=html_to_markdown(latest_note.note) if latest_note else None,
             latest_note_date=latest_note.date if latest_note else None,
         )
 

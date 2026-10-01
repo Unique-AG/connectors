@@ -10,6 +10,7 @@ from with_intelligence_mcp.features.intentions.api_responses import (
 )
 from with_intelligence_mcp.features.investors import ClassificationAttributes
 from with_intelligence_mcp.models import OmitNoneModel
+from with_intelligence_mcp.utils import html_to_markdown
 
 
 class IntentionAmountResponse(OmitNoneModel):
@@ -99,7 +100,7 @@ class IntentionResponse(OmitNoneModel):
             themes=_when_present(attributes, "themes", _names(attributes.themes)),
             allocation_amount=_amount(attributes.allocation_amount),
             ticket_size=_amount(attributes.ticket_size),
-            note=attributes.note,
+            note=html_to_markdown(attributes.note),
             preference_only=attributes.preference_only,
             search_consultant=attributes.search_consultant,
             preferences=_when_present(
