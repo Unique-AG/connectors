@@ -90,7 +90,7 @@ run "preset_teams_is_the_whole_surface" {
   }
 
   assert {
-    condition     = length(local.tools) == 10
+    condition     = length(local.tools) == 11
     error_message = "teams resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 
@@ -192,7 +192,7 @@ run "preset_teams_write" {
   }
 
   assert {
-    condition     = length(local.tools) == 6
+    condition     = length(local.tools) == 8
     error_message = "teams-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 

@@ -15,6 +15,12 @@
           ]
         },
         {
+          "name": "teams_list_chat_messages",
+          "permissions": [
+            "Chat.Read"
+          ]
+        },
+        {
           "name": "teams_list_my_teams",
           "permissions": [
             "Team.ReadBasic.All"
@@ -55,6 +61,13 @@
         {
           "name": "teams_send_channel_message",
           "permissions": [
+            "ChannelMessage.Send"
+          ]
+        },
+        {
+          "name": "teams_react_to_message",
+          "permissions": [
+            "ChatMessage.Send",
             "ChannelMessage.Send"
           ]
         },
@@ -393,6 +406,7 @@
       "tool_names": [
         "get_me",
         "teams_list_chats",
+        "teams_list_chat_messages",
         "teams_list_my_teams",
         "teams_list_channels",
         "teams_browse_channel",
@@ -400,6 +414,7 @@
         "teams_read_message",
         "teams_send_chat_message",
         "teams_send_channel_message",
+        "teams_react_to_message",
         "teams_list_meeting_transcripts",
         "teams_read_transcript",
         "teams_list_meeting_recordings",
@@ -456,6 +471,7 @@
       "presets": {
         "teams": [
           "teams_list_chats",
+          "teams_list_chat_messages",
           "teams_list_my_teams",
           "teams_list_channels",
           "teams_browse_channel",
@@ -470,6 +486,7 @@
         ],
         "teams-messages": [
           "teams_list_chats",
+          "teams_list_chat_messages",
           "teams_search_messages",
           "teams_read_message"
         ],
@@ -498,7 +515,9 @@
           "teams_list_my_teams",
           "teams_list_channels",
           "teams_send_chat_message",
-          "teams_send_channel_message"
+          "teams_send_channel_message",
+          "teams_list_chat_messages",
+          "teams_react_to_message"
         ],
         "outlook-read": [
           "outlook_search_mail",

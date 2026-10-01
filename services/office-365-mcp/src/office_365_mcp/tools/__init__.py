@@ -58,10 +58,12 @@ from office_365_mcp.tools import (
     sharepoint_search_files,
     teams_browse_channel,
     teams_list_channels,
+    teams_list_chat_messages,
     teams_list_chats,
     teams_list_meeting_recordings,
     teams_list_meeting_transcripts,
     teams_list_my_teams,
+    teams_react_to_message,
     teams_read_message,
     teams_read_transcript,
     teams_search_messages,
@@ -116,6 +118,7 @@ class _ShowsItsChange(Protocol):
 _TOOL_MODULES: tuple[ToolModule, ...] = (
     get_me,
     teams_list_chats,
+    teams_list_chat_messages,
     teams_list_my_teams,
     teams_list_channels,
     teams_browse_channel,
@@ -123,6 +126,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     teams_read_message,
     teams_send_chat_message,
     teams_send_channel_message,
+    teams_react_to_message,
     teams_list_meeting_transcripts,
     teams_read_transcript,
     teams_list_meeting_recordings,
@@ -183,6 +187,7 @@ ALWAYS_ON: str = get_me.TOOL_NAME
 PRESETS: Mapping[str, tuple[str, ...]] = {
     "teams": (
         "teams_list_chats",
+        "teams_list_chat_messages",
         "teams_list_my_teams",
         "teams_list_channels",
         "teams_browse_channel",
@@ -193,7 +198,12 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_list_meeting_recordings",
     ),
     "teams-chat": ("teams_list_chats",),
-    "teams-messages": ("teams_list_chats", "teams_search_messages", "teams_read_message"),
+    "teams-messages": (
+        "teams_list_chats",
+        "teams_list_chat_messages",
+        "teams_search_messages",
+        "teams_read_message",
+    ),
     "teams-channels": ("teams_list_my_teams", "teams_list_channels", "teams_browse_channel"),
     "teams-transcripts": (
         "teams_list_chats",
@@ -213,6 +223,8 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_list_channels",
         "teams_send_chat_message",
         "teams_send_channel_message",
+        "teams_list_chat_messages",
+        "teams_react_to_message",
     ),
     "outlook-read": (
         "outlook_search_mail",

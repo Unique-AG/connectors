@@ -31,7 +31,7 @@ STEP_SEND = "send_chat_message"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMessage.Send",)
 
-CHANGE_SHOWN_BY: tuple[str, ...] = ()
+CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_list_chat_messages",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "chat_id": "19:release@thread.v2",

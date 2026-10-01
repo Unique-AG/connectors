@@ -248,6 +248,7 @@ class TestRegisteringWhatWasSelected:
 
 
 _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
+    "teams_list_chat_messages": {"chat_id": ("teams_list_chats",)},
     "teams_list_channels": {"team_id": ("teams_list_my_teams",)},
     "teams_browse_channel": {
         "team_id": ("teams_list_my_teams",),
@@ -258,6 +259,14 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_send_channel_message": {
         "team_id": ("teams_list_my_teams",),
         "channel_id": ("teams_list_channels", "teams_search_messages"),
+    },
+    "teams_react_to_message": {
+        "uri": (
+            "teams_list_chat_messages",
+            "teams_browse_channel",
+            "teams_search_messages",
+            "teams_read_message",
+        )
     },
     "teams_search_messages": {"mentions": ("get_me",)},
     "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
@@ -354,6 +363,7 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
 _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "teams_send_chat_message": frozenset({"message"}),
     "teams_send_channel_message": frozenset({"message"}),
+    "teams_react_to_message": frozenset({"reaction"}),
     "teams_search_messages": frozenset(
         {
             "query",
@@ -534,7 +544,7 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
 
 PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     (ToolsPreset.TEAMS_CHAT, ("User.Read", "Chat.Read"), 0, 2),
-    (ToolsPreset.TEAMS_MESSAGES, ("User.Read", "Chat.Read", "ChannelMessage.Read.All"), 1, 4),
+    (ToolsPreset.TEAMS_MESSAGES, ("User.Read", "Chat.Read", "ChannelMessage.Read.All"), 1, 5),
     (
         ToolsPreset.TEAMS_CHANNELS,
         ("User.Read", "Team.ReadBasic.All", "Channel.ReadBasic.All", "ChannelMessage.Read.All"),
@@ -578,7 +588,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "OnlineMeetingRecording.Read.All",
         ),
         3,
-        10,
+        11,
     ),
     (
         ToolsPreset.TEAMS_WRITE,
@@ -591,7 +601,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "ChannelMessage.Send",
         ),
         0,
-        6,
+        8,
     ),
     (
         ToolsPreset.OUTLOOK_READ,

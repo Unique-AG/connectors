@@ -568,6 +568,7 @@ _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_list_events": ("starts_on", "ends_on"),
     "outlook_search_mail": ("received_after", "received_before"),
     "teams_search_messages": ("sent_after", "sent_before"),
+    "teams_list_chat_messages": ("sent_before",),
     "sharepoint_search_files": ("modified_after", "modified_before"),
     "onenote_list_pages": (
         "modified_after",
@@ -582,6 +583,7 @@ _MESSAGE_TOOLS: tuple[str, ...] = (
     "teams_read_message",
     "teams_browse_channel",
     "teams_search_messages",
+    "teams_list_chat_messages",
 )
 
 
@@ -645,6 +647,7 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "onenote_copy_notebook",
         "teams_send_chat_message",
         "teams_send_channel_message",
+        "teams_react_to_message",
     }
 )
 
@@ -658,6 +661,7 @@ class TestTheToolsThisServerAdvertises:
         assert set(tools) == {
             "get_me",
             "teams_list_chats",
+            "teams_list_chat_messages",
             "teams_list_my_teams",
             "teams_list_channels",
             "teams_browse_channel",
@@ -756,6 +760,10 @@ class TestTheToolsThisServerAdvertises:
             "job_title",
         }
         assert set(_properties(tools["teams_list_chats"].output_schema)) == {"chats", "capped"}
+        assert set(_properties(tools["teams_list_chat_messages"].output_schema)) == {
+            "messages",
+            "more_messages",
+        }
         assert set(_properties(tools["teams_list_my_teams"].output_schema)) == {"teams"}
         assert set(_properties(tools["teams_list_channels"].output_schema)) == {"channels"}
         assert set(_properties(tools["teams_browse_channel"].output_schema)) == {
