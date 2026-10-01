@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.3.0](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.4...office-365-mcp@0.3.0) (2026-10-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **office-365-mcp:** remove limits Graph does not set, confirm writes that reach others ([#1133](https://github.com/Unique-AG/connectors/issues/1133))
+* **office-365-mcp:** remove inline attachments from the draft tools ([#1112](https://github.com/Unique-AG/connectors/issues/1112))
+
+### Features
+
+* **office-365-mcp:** remove limits Graph does not set, confirm writes that reach others ([#1133](https://github.com/Unique-AG/connectors/issues/1133)) ([be428f9](https://github.com/Unique-AG/connectors/commit/be428f96886e5bd4918594ac5a20702c138c3c0e))
+
+
+### Bug Fixes
+
+* **office-365-mcp:** cap sharepoint_read_file while it downloads ([c3f8dc5](https://github.com/Unique-AG/connectors/commit/c3f8dc558fb5235eb3c4627bd9d4db915e9cef23))
+* **office-365-mcp:** close idle MCP sessions after a configurable timeout ([#1113](https://github.com/Unique-AG/connectors/issues/1113)) ([02c64ec](https://github.com/Unique-AG/connectors/commit/02c64ecff11e5a7cb3bc4a324e542cfc9c6882f5))
+* **office-365-mcp:** fail outlook_mark_mail when no message was marked ([0ad93ad](https://github.com/Unique-AG/connectors/commit/0ad93ad1bc7180123305aaa1a560f4ae854391c2))
+* **office-365-mcp:** give the model Graph's reason for a rejected request ([0ad93ad](https://github.com/Unique-AG/connectors/commit/0ad93ad1bc7180123305aaa1a560f4ae854391c2))
+* **office-365-mcp:** keep secrets out of configuration errors ([c3f8dc5](https://github.com/Unique-AG/connectors/commit/c3f8dc558fb5235eb3c4627bd9d4db915e9cef23))
+* **office-365-mcp:** keep the written-but-not-read answer of OneNote writes ([0ad93ad](https://github.com/Unique-AG/connectors/commit/0ad93ad1bc7180123305aaa1a560f4ae854391c2))
+* **office-365-mcp:** make tool descriptions match what the tools do ([0ad93ad](https://github.com/Unique-AG/connectors/commit/0ad93ad1bc7180123305aaa1a560f4ae854391c2))
+* **office-365-mcp:** remove inline attachments from the draft tools ([#1112](https://github.com/Unique-AG/connectors/issues/1112)) ([ba01da9](https://github.com/Unique-AG/connectors/commit/ba01da947bb3aa08109c1097cf60a165b38aa255))
+* **office-365-mcp:** report a deleted OneNote page when the retried delete finds it gone ([0ad93ad](https://github.com/Unique-AG/connectors/commit/0ad93ad1bc7180123305aaa1a560f4ae854391c2))
+* **office-365-mcp:** say why a confirmation question got no answer ([0ad93ad](https://github.com/Unique-AG/connectors/commit/0ad93ad1bc7180123305aaa1a560f4ae854391c2))
+* **office-365-mcp:** stop logging outbound request URLs ([c3f8dc5](https://github.com/Unique-AG/connectors/commit/c3f8dc558fb5235eb3c4627bd9d4db915e9cef23))
+* **office-365-mcp:** tell the model that a failed write can already be done ([0ad93ad](https://github.com/Unique-AG/connectors/commit/0ad93ad1bc7180123305aaa1a560f4ae854391c2))
+
+
+### Dependencies
+
+* bump hatchling in /* ([#1108](https://github.com/Unique-AG/connectors/issues/1108)) ([776e037](https://github.com/Unique-AG/connectors/commit/776e037be020704fb437c471c548c16db863c2fc))
+* bump ruff in /* ([#1107](https://github.com/Unique-AG/connectors/issues/1107)) ([9953c11](https://github.com/Unique-AG/connectors/commit/9953c118eeac82f79cd1eacc6038f8a35bc2569c))
+* bump unique-mcp in /services/office-365-mcp ([#1109](https://github.com/Unique-AG/connectors/issues/1109)) ([3653a86](https://github.com/Unique-AG/connectors/commit/3653a8604cbf76470b62fb801af44cc4e447f771))
+* **with-intelligence-mcp,backstop-mcp,hello-mcp,kb-mcp,office-365-mcp,ci,scripts,deps:** add deployment and release ([#988](https://github.com/Unique-AG/connectors/issues/988)) ([55f48cd](https://github.com/Unique-AG/connectors/commit/55f48cd2e2676601c5f3d6590a8990c6986c5132))
+
 ## [0.2.4](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.3...office-365-mcp@0.2.4) (2026-09-25)
 
 

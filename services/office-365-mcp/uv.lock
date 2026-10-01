@@ -1484,7 +1484,7 @@ wheels = [
 
 [[package]]
 name = "office-365-mcp"
-version = "0.2.4"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "asyncpg" },
