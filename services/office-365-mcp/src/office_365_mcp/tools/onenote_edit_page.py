@@ -5,9 +5,10 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.default_query_parameters import QueryParameters
+from kiota_abstractions.method import Method
+from kiota_abstractions.request_information import RequestInformation
 from mcp.types import InputRequiredResult
+from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_patch_action_type import OnenotePatchActionType
 from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
@@ -23,6 +24,7 @@ from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
     NotebookAudience,
     PageSummary,
+    onenote_root,
     page_for_a_question,
     page_summary,
     write_state_for,
@@ -96,7 +98,8 @@ support custom tags.
 _NOT_A_PAGE_HANDLE = (
     "onenote_edit_page takes a page handle. It looks like onenote:///pages/{id}, with the id "
     + "percent-encoded, for example "
-    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A section handle "
+    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A handle from a group "
+    + "notebook starts with onenote:///groups/{group}/ instead. A section handle "
     + "(onenote:///sections/{id}) is not a page handle: it names a whole section, not one page "
     + "inside it. A page title, a web address, and a bare id with no scheme are not handles "
     + "either. Take the `uri` from a onenote_list_pages row or a onenote_create_page answer, "
@@ -175,7 +178,7 @@ async def edit_page(
 
     about = write_state_for(
         _EDIT,
-        handle.page_id,
+        handle.uri,
         json.dumps([command.model_dump() for command in commands], sort_keys=True),
     )
     destructive = any(command.action in _DESTRUCTIVE_ACTIONS for command in commands)
@@ -183,7 +186,7 @@ async def edit_page(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        pre_read = await page_for_a_question(client, handle.page_id)
+        pre_read = await page_for_a_question(client, handle.page_id, group_id=handle.group_id)
         if answer_pending or pre_read.audience.reaches_others or destructive:
             with not_graph():
                 answer = await confirm(
@@ -196,7 +199,7 @@ async def edit_page(
             with graph_step(STEP_EDIT_CONTENT):
                 await _edit(client, handle, commands)
             try:
-                summary = await page_summary(client, handle.page_id)
+                summary = await page_summary(client, handle.page_id, group_id=handle.group_id)
             except GraphFailure as failure:
                 raise Advised(_WRITTEN_BUT_UNREAD) from failure
 
@@ -262,9 +265,21 @@ async def _edit(
             for command in commands
         ]
     )
-    await client.me.onenote.pages.by_onenote_page_id(handle.page_id).onenote_patch_content.post(
+    patch = (
+        onenote_root(client, handle.group_id)
+        .pages.by_onenote_page_id(handle.page_id)
+        .onenote_patch_content
+    )
+    request = RequestInformation(Method.POST, patch.url_template, patch.path_parameters)
+    request.headers.try_add("Accept", "application/json")
+    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
+        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+        "application/json",
         body,
-        request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
+    )
+    request.add_request_options(no_retry())
+    await client.request_adapter.send_no_response_content_async(  # pyright: ignore[reportUnknownMemberType]
+        request, {"XXX": ODataError}
     )
 
 
@@ -285,7 +300,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The page to change: the `uri` of a onenote_list_pages row or a "
                     + "onenote_create_page answer, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle is not a page handle."
+                    + "onenote:///pages/{id}. A handle from a group notebook starts with "
+                    + "onenote:///groups/{group}/ instead. A section handle is not a page handle."
                 ),
             ),
         ],

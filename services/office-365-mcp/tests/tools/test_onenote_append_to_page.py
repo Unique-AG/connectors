@@ -51,6 +51,18 @@ _NOTEBOOK_ID = "NOTEBOOK1"
 
 _NOTEBOOK_GET_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}"
 
+_GROUP_ID = "5c6b7a81-2f0d-4a24-9b1e-8a9c3c470f9e"
+
+_GROUP_PAGE_URI = OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
+
+_GROUP_GET_PATH = f"/groups/{_GROUP_ID}/onenote/pages/{_PAGE_ID}"
+
+_GROUP_PATCH_PATH = f"{_GROUP_GET_PATH}/onenotePatchContent"
+
+_GROUP_NOTEBOOK_GET_PATH = f"/groups/{_GROUP_ID}/onenote/notebooks/{_NOTEBOOK_ID}"
+
+_GROUP_REASON = "which belongs to a Microsoft 365 group"
+
 
 def _page_payload(
     *,
@@ -113,6 +125,20 @@ def _notebook_route(
     return graph.get(f"/me/onenote/notebooks/{notebook_id}").mock(
         return_value=httpx.Response(200, json=payload)
     )
+
+
+def _group_reads(graph: respx.MockRouter) -> tuple[respx.Route, respx.Route]:
+    page_route = graph.get(_GROUP_GET_PATH).mock(
+        return_value=httpx.Response(200, json=_page_payload(section=_SECTION, notebook=_NOTEBOOK))
+    )
+    notebook_route = graph.get(_GROUP_NOTEBOOK_GET_PATH).mock(
+        return_value=httpx.Response(200, json=_notebook_payload(is_shared=False, user_role="Owner"))
+    )
+    return page_route, notebook_route
+
+
+def _group_patches(graph: respx.MockRouter, *, status: int = 204) -> respx.Route:
+    return graph.post(_GROUP_PATCH_PATH).mock(return_value=httpx.Response(status))
 
 
 async def _agrees(question: str, about: str) -> str | None:
@@ -294,6 +320,14 @@ class TestWhatItRefuses:
     async def test_a_section_handle_is_refused_by_name(self, client: GraphServiceClient) -> None:
         with pytest.raises(ToolError, match="section handle"):
             _ = await _append(client, page=OnenoteSectionHandle("SECTION1").uri)
+
+    async def test_the_refusal_names_how_a_group_page_handle_starts(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _append(client, page="Meeting notes")
+
+        assert "onenote:///groups/{group}/" in str(refused.value)
 
 
 class TestWhatItAnswers:
@@ -621,7 +655,7 @@ class TestThePersonBetweenTheAppendAndTheOthersInTheNotebook:
         assert "Work" in question
         assert "shared with other people" in question
         assert "Agenda: pricing" in question
-        assert bound == [write_state_for("append", _PAGE_ID, "<p>Agenda: pricing</p>")]
+        assert bound == [write_state_for("append", _PAGE_URI, "<p>Agenda: pricing</p>")]
 
     async def test_the_question_says_who_the_notebook_belongs_to_when_it_is_not_the_user(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -712,6 +746,153 @@ class TestThePersonBetweenTheAppendAndTheOthersInTheNotebook:
         assert await confirm("Append to 'Meeting notes' in 'Work'?", "synthetic-state") is None
 
 
+class TestAPageInAGroupNotebook:
+    async def test_it_asks_with_the_group_reason_even_for_an_unshared_notebook_the_user_owns(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _group_reads(graph)
+        patch = _group_patches(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _append(client, page=_GROUP_PAGE_URI, confirm=capturing)
+
+        assert len(asked) == 1, "a group notebook was written to without asking anybody"
+        assert _GROUP_REASON in asked[0]
+        assert patch.call_count == 1
+
+    async def test_every_read_and_the_one_patch_go_to_the_group_and_none_to_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_route, notebook_route = _group_reads(graph)
+        patch = _group_patches(graph)
+
+        _ = await _append(client, page=_GROUP_PAGE_URI, body_html="<p>one</p>")
+
+        made = cast("Sequence[Call]", graph.calls)
+        assert [call.request.method for call in made] == ["GET", "GET", "POST", "GET"]
+        assert made[0].request.url.path.endswith(_GROUP_GET_PATH)
+        assert made[1].request.url.path.endswith(_GROUP_NOTEBOOK_GET_PATH)
+        assert made[2].request.url.path.endswith(_GROUP_PATCH_PATH)
+        assert made[3].request.url.path.endswith(_GROUP_GET_PATH)
+        assert not [call for call in made if "/me/" in call.request.url.path]
+        assert (page_route.call_count, notebook_route.call_count, patch.call_count) == (2, 1, 1)
+        assert _sent(patch) == {
+            "commands": [
+                {"action": "Append", "content": "<p>one</p>", "position": "After", "target": "body"}
+            ]
+        }
+
+    async def test_a_decline_sends_no_patch_and_no_reread(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_route, _notebook_route = _group_reads(graph)
+        patch = _group_patches(graph)
+
+        with pytest.raises(ToolError, match="Nothing was appended"):
+            _ = await _append(client, page=_GROUP_PAGE_URI, confirm=_refuses)
+
+        assert patch.call_count == 0
+        assert page_route.call_count == 1
+
+    async def test_the_answer_keeps_the_group_in_its_handles(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _group_reads(graph)
+        _ = _group_patches(graph)
+
+        answer = await _append(client, page=_GROUP_PAGE_URI)
+
+        assert answer.uri == _GROUP_PAGE_URI
+        assert answer.section_uri == OnenoteSectionHandle("SECTION1", group_id=_GROUP_ID).uri
+
+    async def test_the_pending_round_binds_to_the_group_handle(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _group_reads(graph)
+        patch = _group_patches(graph)
+
+        first = await append_to_page(
+            client,
+            page=_GROUP_PAGE_URI,
+            body_html=_BODY_HTML,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        assert first.request_state == write_state_for("append", _GROUP_PAGE_URI, _BODY_HTML)
+        key = next(iter(first.input_requests or {}))
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await append_to_page(
+                client,
+                page=_GROUP_PAGE_URI,
+                body_html=_BODY_HTML,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={key: ElicitResult(action="accept", content={"value": "append"})},
+                        state=write_state_for("append", _PAGE_URI, _BODY_HTML),
+                    )
+                ),
+                answer_pending=True,
+            )
+        assert patch.call_count == 0
+
+        answer = await append_to_page(
+            client,
+            page=_GROUP_PAGE_URI,
+            body_html=_BODY_HTML,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": "append"})},
+                    state=first.request_state,
+                )
+            ),
+            answer_pending=True,
+        )
+
+        assert isinstance(answer, PageSummary)
+        assert answer.uri == _GROUP_PAGE_URI
+        assert patch.call_count == 1
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_group_patch_graph_declines_is_never_sent_a_second_time(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _group_reads(graph)
+        patch = _group_patches(graph, status=503)
+
+        with pytest.raises(GraphUnavailable):
+            _ = await _append(client, page=_GROUP_PAGE_URI)
+
+        assert patch.call_count == 1, "no_retry means one attempt, however Graph answers"
+
+    async def test_a_failed_group_reread_is_reported_as_a_successful_write(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_NOTEBOOK_GET_PATH).mock(
+            return_value=httpx.Response(200, json=_notebook_payload())
+        )
+        reread = graph.get(_GROUP_GET_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_page_payload(notebook=_NOTEBOOK)),
+                httpx.Response(
+                    404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+                ),
+            ]
+        )
+        patch = _group_patches(graph)
+
+        with pytest.raises(ToolError, match="Microsoft 365 added the content to the page"):
+            _ = await _append(client, page=_GROUP_PAGE_URI)
+
+        assert patch.call_count == 1
+        assert reread.call_count == 2
+
+
 def _context(answer: object) -> Context:
     class _Client:
         request_context: object = None
@@ -763,7 +944,7 @@ class TestTheEraWithNoBackChannel:
         )
 
         assert isinstance(answer, InputRequiredResult)
-        assert answer.request_state == write_state_for("append", _PAGE_ID, _BODY_HTML)
+        assert answer.request_state == write_state_for("append", _PAGE_URI, _BODY_HTML)
         assert patch.call_count == 0
 
     async def test_the_first_round_asks_the_question_this_tool_words(
@@ -795,7 +976,7 @@ class TestTheEraWithNoBackChannel:
         _ = _rereads(graph, _page_payload(notebook=_NOTEBOOK))
         _ = _notebook_route(graph, is_shared=True, user_role="Owner")
         patch = _patches(graph)
-        state = write_state_for("append", _PAGE_ID, _BODY_HTML)
+        state = write_state_for("append", _PAGE_URI, _BODY_HTML)
 
         first = await append_to_page(
             client,
@@ -1020,6 +1201,17 @@ class TestHowItDeclaresItself:
         parameters, _tool = await _registered(transport)
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert set(properties) == {"page", "body_html"}
+
+    async def test_the_page_argument_says_how_a_group_handle_starts(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+
+        assert (
+            "A handle from a group notebook starts with onenote:///groups/{group}/ instead."
+            in cast("str", properties["page"]["description"])
+        )
 
     async def test_the_body_html_schema_sets_no_maximum_length(
         self, transport: httpx.AsyncClient
