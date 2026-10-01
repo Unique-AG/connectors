@@ -78,6 +78,7 @@ class ToolsPreset(StrEnum):
     TEAMS_WRITE_FILES = "teams-write-files"
     TEAMS_EDIT = "teams-edit"
     TEAMS_MEETINGS_WRITE = "teams-meetings-write"
+    TEAMS_CHAT_ADMIN = "teams-chat-admin"
     TEAMS_FILES = "teams-files"
     OUTLOOK_READ = "outlook-read"
     OUTLOOK_MAILBOX = "outlook-mailbox"

@@ -170,6 +170,31 @@
           ]
         },
         {
+          "name": "teams_create_chat",
+          "permissions": [
+            "Chat.Create",
+            "User.Read"
+          ]
+        },
+        {
+          "name": "teams_add_chat_member",
+          "permissions": [
+            "ChatMember.ReadWrite"
+          ]
+        },
+        {
+          "name": "teams_remove_chat_member",
+          "permissions": [
+            "ChatMember.ReadWrite"
+          ]
+        },
+        {
+          "name": "teams_rename_chat",
+          "permissions": [
+            "Chat.ReadWrite"
+          ]
+        },
+        {
           "name": "outlook_search_mail",
           "permissions": [
             "Mail.Read",
@@ -506,6 +531,10 @@
         "teams_create_meeting",
         "teams_update_meeting",
         "teams_delete_meeting",
+        "teams_create_chat",
+        "teams_add_chat_member",
+        "teams_remove_chat_member",
+        "teams_rename_chat",
         "outlook_search_mail",
         "outlook_read_mail",
         "outlook_browse_folders",
@@ -647,6 +676,14 @@
           "teams_create_meeting",
           "teams_update_meeting",
           "teams_delete_meeting"
+        ],
+        "teams-chat-admin": [
+          "teams_list_chats",
+          "teams_list_chat_members",
+          "teams_create_chat",
+          "teams_add_chat_member",
+          "teams_remove_chat_member",
+          "teams_rename_chat"
         ],
         "teams-files": [
           "teams_list_my_teams",
@@ -806,6 +843,8 @@
         "OnlineMeetingRecording.Read.All",
         "OnlineMeetingArtifact.Read.All",
         "OnlineMeetings.ReadWrite",
+        "Chat.Create",
+        "ChatMember.ReadWrite",
         "Mail.Read",
         "Mail.Read.Shared",
         "People.Read",
@@ -823,9 +862,7 @@
         "Calendars.ReadWrite.Shared",
         "Notes.Read",
         "Notes.Create",
-        "Notes.ReadWrite",
-        "Chat.Create",
-        "ChatMember.ReadWrite"
+        "Notes.ReadWrite"
       ],
       "needs_admin_consent": {
         "User.Read": false,

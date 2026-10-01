@@ -271,6 +271,27 @@ run "preset_teams_meetings_write" {
   }
 }
 
+run "preset_teams_chat_admin" {
+  variables {
+    tools_preset = "teams-chat-admin"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Chat.Create,ChatMember.ReadWrite,Chat.ReadWrite"
+    error_message = "teams-chat-admin composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 7
+    error_message = "teams-chat-admin resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 1
+    error_message = "teams-chat-admin needs an administrator for ChatMember.ReadWrite only, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
 run "preset_teams_files" {
   variables {
     tools_preset = "teams-files"

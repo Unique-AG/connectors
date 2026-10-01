@@ -656,6 +656,10 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "teams_create_meeting",
         "teams_update_meeting",
         "teams_delete_meeting",
+        "teams_create_chat",
+        "teams_add_chat_member",
+        "teams_remove_chat_member",
+        "teams_rename_chat",
     }
 )
 

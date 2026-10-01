@@ -11,14 +11,14 @@
 
 office-365-mcp is a Python MCP server, built on FastMCP, that connects Microsoft 365 to MCP
 clients through the Microsoft Graph API. It reaches Outlook mail and calendar, Microsoft Teams,
-SharePoint and OneDrive, OneNote, and user identity. The server has 73 tools in total. A
-deployment turns on a fixed subset of these 73 tools (never all of them, unless a preset or a
+SharePoint and OneDrive, OneNote, and user identity. The server has 77 tools in total. A
+deployment turns on a fixed subset of these 77 tools (never all of them, unless a preset or a
 list names every one). This document explains what each tool does, how a deployment picks its
 tools, and how sign-in and consent work.
 
 ## Tools
 
-office-365-mcp has 73 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
+office-365-mcp has 77 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
 calendar, SharePoint and OneDrive, and OneNote. One tool, `get_me`, is always on, in every
 configuration. The Kind column is a hint to the calling client about the kind of change a tool
 makes. It does not control access to the tool.
@@ -62,6 +62,10 @@ the text names that tool. If not, the text tells the model to ask the user.
 | `teams_create_meeting` | Write, safe to repeat | `OnlineMeetings.ReadWrite` | No | Creates one Teams online meeting as the signed-in user, with the attendees that the user names. The meeting is on no calendar, and the tool sends no invitation. A repeat of the same request returns the same meeting. The tool asks the user to approve each change. |
 | `teams_update_meeting` | Write, changes or removes, safe to repeat | `OnlineMeetings.ReadWrite`, `User.Read` | No | Changes the subject, the time, or the attendee list of one Teams online meeting that the signed-in user organizes. The change goes to the Teams online meeting only, and never to a calendar event. A new attendee list replaces the current list. The tool asks the user to approve each change. |
 | `teams_delete_meeting` | Write, changes or removes | `OnlineMeetings.ReadWrite`, `User.Read` | No | Deletes one Teams online meeting that the signed-in user organizes. The delete goes to the Teams online meeting only, and never to a calendar event. This connector cannot undo the delete. The tool asks the user to approve each change. |
+| `teams_create_chat` | Write, adds | `Chat.Create`, `User.Read` | No | Creates one Teams chat, one-on-one or group, for the signed-in user and the people that the user names. The tool adds the signed-in user to the chat, and it posts no message. If the one-on-one chat exists already, Microsoft returns that chat and creates no new chat. The tool asks the user to approve each change. |
+| `teams_add_chat_member` | Write, adds | `ChatMember.ReadWrite` | Yes | Adds one person to an existing Teams chat, as the signed-in user, with the `owner` role. With `share_history`, the new member can see all earlier messages of the chat. Microsoft refuses an addition to a one-on-one chat. Everyone in the conversation can see the change. The tool asks the user to approve each change. |
+| `teams_remove_chat_member` | Write, changes or removes | `ChatMember.ReadWrite` | Yes | Removes one member from an existing Teams chat, as the signed-in user, by the `membership_id` that `teams_list_chat_members` reported. Microsoft refuses a removal from a one-on-one chat. Everyone in the conversation can see the change. The tool asks the user to approve each change. |
+| `teams_rename_chat` | Write, safe to repeat | `Chat.ReadWrite` | No | Changes the topic of one Teams group chat, as the signed-in user. The topic is the title of the chat. Microsoft 365 accepts a new topic only for a group chat, never for a one-on-one chat or a meeting chat. Everyone in the conversation can see the change. The tool asks the user to approve each change. |
 
 ### Outlook mail
 
@@ -135,7 +139,7 @@ the text names that tool. If not, the text tells the model to ask the user.
 
 A deployment turns tools on in one of two ways:
 
-- **A preset.** One of the 25 named bundles in the table below.
+- **A preset.** One of the 26 named bundles in the table below.
 - **An exact list.** The `TOOLS_ENABLED` configuration, which names every wanted tool.
 
 A deployment must pick exactly one way:
@@ -148,7 +152,7 @@ A deployment must pick exactly one way:
 - A deployment cannot start from a preset and then add or remove one tool. For a mix of tools
   that no preset covers, name every wanted tool in the exact list instead.
 
-There are 25 presets. This table names each preset's tools, besides `get_me`, and gives a short
+There are 26 presets. This table names each preset's tools, besides `get_me`, and gives a short
 description.
 
 | Preset | Tools | Description |
@@ -164,6 +168,7 @@ description.
 | `teams-write-files` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members`, `teams_send_chat_message_with_files`, `teams_send_channel_message_with_files`, `sharepoint_search_files`, `sharepoint_browse_folder` | Everything in `teams-write`, plus a message with files that are already in SharePoint. It also finds a file in SharePoint to attach. |
 | `teams-edit` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members`, `teams_browse_channel`, `teams_list_message_replies`, `teams_edit_message`, `teams_delete_message` | Everything in `teams-write`, plus editing and deleting a message. It also reads the posts of a channel and the replies to a post, to find a channel message to change. |
 | `teams-meetings-write` | `teams_list_chats`, `teams_read_meeting`, `teams_create_meeting`, `teams_update_meeting`, `teams_delete_meeting` | Finds a meeting chat, and reads one meeting and its attendance. It also creates a Teams online meeting, and changes or deletes one that the signed-in user organizes. |
+| `teams-chat-admin` | `teams_list_chats`, `teams_list_chat_members`, `teams_create_chat`, `teams_add_chat_member`, `teams_remove_chat_member`, `teams_rename_chat` | Everything in `teams-chat`. It also creates a chat, adds or removes a member, and renames a group chat. |
 | `teams-files` | `teams_list_my_teams`, `teams_list_channels`, `teams_get_channel_files_folder`, `sharepoint_browse_folder`, `sharepoint_read_file` | Finds a channel, finds the folder that holds its files, lists that folder, and reads one file. |
 | `outlook-read` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | Finds a message, reads it in full, walks the folder tree, reads a thread, lists a folder, and resolves a name to an address. |
 | `outlook-write` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | Everything in `outlook-read`, plus marking, filing, and drafting mail. |
@@ -246,7 +251,7 @@ mcpConfig:
     preset: teams        # or: enabled: get_me,teams_list_chats
 ```
 
-The `preset` key names one of the 25 presets in the Presets table. The `enabled` key names an
+The `preset` key names one of the 26 presets in the Presets table. The `enabled` key names an
 exact, comma-separated list of tool names instead. A deployment that needs a mix that no preset
 covers uses `enabled`, and names every wanted tool. Granting admin consent is a separate step,
 covered in Admin consent.

@@ -330,6 +330,16 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     },
     "teams_update_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
     "teams_delete_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
+    "teams_create_chat": {"members": ("teams_list_chat_members", "teams_list_chats")},
+    "teams_add_chat_member": {
+        "chat_id": ("teams_list_chats", "teams_create_chat"),
+        "user_id": ("teams_list_chat_members", "teams_list_chats"),
+    },
+    "teams_remove_chat_member": {
+        "chat_id": ("teams_list_chats", "teams_create_chat"),
+        "membership_id": ("teams_list_chat_members",),
+    },
+    "teams_rename_chat": {"chat_id": ("teams_list_chats", "teams_create_chat")},
     "outlook_read_mail": {"uri": ("outlook_search_mail",)},
     "outlook_browse_folders": {"parent": ("outlook_browse_folders",)},
     "outlook_read_thread": {"uri": ("outlook_search_mail",)},
@@ -426,6 +436,8 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "teams_react_to_message": frozenset({"reaction"}),
     "teams_edit_message": frozenset({"message", "name"}),
     "teams_create_meeting": frozenset({"subject", "starts_at", "ends_at"}),
+    "teams_create_chat": frozenset({"chat_type", "topic"}),
+    "teams_rename_chat": frozenset({"topic"}),
     "teams_search_messages": frozenset(
         {
             "query",
@@ -771,6 +783,12 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ),
         0,
         6,
+    ),
+    (
+        ToolsPreset.TEAMS_CHAT_ADMIN,
+        ("User.Read", "Chat.Read", "Chat.Create", "ChatMember.ReadWrite", "Chat.ReadWrite"),
+        1,
+        7,
     ),
     (
         ToolsPreset.TEAMS_FILES,

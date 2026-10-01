@@ -61,6 +61,7 @@
                 "teams-write-files",
                 "teams-edit",
                 "teams-meetings-write",
+                "teams-chat-admin",
                 "teams-files",
                 "outlook-read",
                 "outlook-mailbox",
