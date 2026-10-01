@@ -32,7 +32,7 @@ from office_365_mcp.graph_client import (
     GraphNotFound,
     GraphUnavailable,
 )
-from office_365_mcp.shared.files import NAME_RULES
+from office_365_mcp.shared.files import FOLDER_HANDLE_SOURCES, ITEM_HANDLE_SOURCES, NAME_RULES
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -101,12 +101,16 @@ def _folder(
     name: str | None = "Reports",
     drive_id: str = _OTHER_DRIVE_ID,
     root: bool = False,
+    parent_path: str | None = None,
 ) -> dict[str, object]:
     return {
         "id": item_id,
         "name": name,
         "folder": {"childCount": 2},
-        "parentReference": {"driveId": drive_id},
+        "parentReference": {
+            "driveId": drive_id,
+            **({} if parent_path is None else {"path": parent_path}),
+        },
         **({"root": {}} if root else {}),
     }
 
@@ -364,8 +368,19 @@ class TestWhatItRefuses:
         with pytest.raises(ToolError) as refused:
             _ = await _copy(client, item="Plan.docx")
 
+        assert ITEM_HANDLE_SOURCES in str(refused.value)
         assert "sharepoint_search_files" in str(refused.value)
         assert "sharepoint_browse_folder" in str(refused.value)
+
+    async def test_the_folder_refusal_names_the_tools_that_mint_a_folder_handle(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _copy(client, to_folder="Reports")
+
+        assert FOLDER_HANDLE_SOURCES in str(refused.value)
+        assert "`root_uri`" in str(refused.value)
+        assert "sharepoint_list_drives" in str(refused.value)
 
     @pytest.mark.parametrize(
         "value",
@@ -571,6 +586,18 @@ class TestThePersonBetweenTheCopyAndTheDestination:
         _ = await _copy(client, name="Plan (copy).docx", confirm=_asking(asked))
 
         assert asked == ["Copy 'Plan.docx' into the folder 'Reports' as 'Plan (copy).docx'?"]
+
+    async def test_the_question_names_the_path_of_the_destination_folder(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _FILE_PATH, _file())
+        _ = _reads(graph, _DESTINATION_PATH, _folder(parent_path="/drive/root:/Finance%20Team"))
+        _ = _accepts(graph)
+        asked: list[str] = []
+
+        _ = await _copy(client, confirm=_asking(asked))
+
+        assert asked == ["Copy 'Plan.docx' into the folder '/Finance Team/Reports'?"]
 
     async def test_the_question_names_the_top_of_a_drive_as_the_destination(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -922,6 +949,23 @@ class TestHowItDeclaresItself:
             for name, schema in _properties(parameters).items()
         }
         assert all(15 <= count <= 60 for count in counts.values()), counts
+
+    async def test_the_item_description_names_every_handle_source(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        assert ITEM_HANDLE_SOURCES in str(_properties(parameters)["item"]["description"])
+
+    async def test_the_folder_description_names_every_folder_handle_source(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        described = str(_properties(parameters)["to_folder"]["description"])
+        assert FOLDER_HANDLE_SOURCES in described
+        assert "`root_uri`" in described
+        assert "sharepoint_list_drives" in described
 
     async def test_the_name_description_states_the_name_rules(
         self, transport: httpx.AsyncClient

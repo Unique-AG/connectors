@@ -25,10 +25,11 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
+    FOLDER_HANDLE_SOURCES,
+    ITEM_HANDLE_SOURCES,
     NAME_RULES,
-    TOP_FOLDER_LABEL,
-    UNNAMED_FOLDER_LABEL,
     UNNAMED_ITEM_LABEL,
+    folder_label,
     item_for_a_question,
     unusable_name,
 )
@@ -85,16 +86,17 @@ _NOT_AN_ITEM_HANDLE = (
     "sharepoint_copy_item takes a file handle or a folder handle in `item`. A file handle looks "
     + "like sharepoint:///files/{drive_id}/{item_id}, and a folder handle looks like "
     + "sharepoint:///folders/{drive_id}/{item_id}. A name, a path and a web address are not "
-    + "handles. Take the `uri` of a sharepoint_search_files hit or of a sharepoint_browse_folder "
-    + "row, and copy it word for word. This same value fails again, so do not retry it."
+    + "handles. "
+    + ITEM_HANDLE_SOURCES
+    + " This same value fails again, so do not retry it."
 )
 
 _NOT_A_FOLDER_HANDLE = (
     "sharepoint_copy_item takes a folder handle in `to_folder`. It looks like "
     + "sharepoint:///folders/{drive_id}/{item_id}. A file handle is not a folder handle, because "
-    + "a file cannot hold a copy. Take the `uri` of a folder from sharepoint_browse_folder or "
-    + "sharepoint_search_files, and copy it word for word. This same value fails again, so do not "
-    + "retry it."
+    + "a file cannot hold a copy. "
+    + FOLDER_HANDLE_SOURCES
+    + " This same value fails again, so do not retry it."
 )
 
 _TOP_FOLDER_CANNOT_BE_COPIED = (
@@ -219,13 +221,7 @@ def _cannot_copy(original: DriveItem, target: DriveItem) -> str | None:
 def _question(original: DriveItem, target: DriveItem, name: str | None) -> str:
     item_label = repr(original.name) if original.name else UNNAMED_ITEM_LABEL
     renamed = f" as {name!r}" if name is not None else ""
-    return f"Copy {item_label} into {_destination_label(target)}{renamed}?"
-
-
-def _destination_label(target: DriveItem) -> str:
-    if target.root is not None:
-        return TOP_FOLDER_LABEL
-    return f"the folder {target.name!r}" if target.name else UNNAMED_FOLDER_LABEL
+    return f"Copy {item_label} into {folder_label(target)}{renamed}?"
 
 
 async def _start_copy(
@@ -275,11 +271,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The file or folder to copy: the `uri` of a sharepoint_search_files hit or of "
-                    + "a sharepoint_browse_folder row, copied word for word. A file handle is "
-                    + "sharepoint:///files/{drive_id}/{item_id} and a folder handle is "
-                    + "sharepoint:///folders/{drive_id}/{item_id}. This tool cannot copy the top "
-                    + "folder of a drive."
+                    "The file or folder to copy. A file handle and a folder handle both work. "
+                    + ITEM_HANDLE_SOURCES
+                    + " A web address, a path and a name are not handles. This tool cannot copy "
+                    + "the top folder of a drive."
                 ),
             ),
         ],
@@ -288,10 +283,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The folder that gets the copy, as the `uri` of a folder from "
-                    + "sharepoint_browse_folder or sharepoint_search_files, copied word for word. "
-                    + "The shape is sharepoint:///folders/{drive_id}/{item_id}. A file handle is "
-                    + "not a folder handle."
+                    "The folder that gets the copy. "
+                    + FOLDER_HANDLE_SOURCES
+                    + " A file handle, a path and a web address are not folder handles."
                 ),
             ),
         ],
