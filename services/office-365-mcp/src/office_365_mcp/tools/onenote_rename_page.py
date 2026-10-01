@@ -5,7 +5,10 @@ from typing import Annotated
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
+from kiota_abstractions.method import Method
+from kiota_abstractions.request_information import RequestInformation
 from mcp.types import InputRequiredResult
+from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_patch_action_type import OnenotePatchActionType
 from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
@@ -20,6 +23,7 @@ from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
     NotebookAudience,
     PageSummary,
+    onenote_root,
     page_for_a_question,
     page_summary,
     write_state_for,
@@ -66,7 +70,8 @@ index, which can lag, so it can be stale or empty.
 _NOT_A_PAGE_HANDLE = (
     "onenote_rename_page takes a page handle. It looks like onenote:///pages/{id}, with the id "
     + "percent-encoded, for example "
-    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A section handle "
+    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A handle from a group "
+    + "notebook starts with onenote:///groups/{group}/ instead. A section handle "
     + "(onenote:///sections/{id}) is not a page handle: it names a whole section, not one page "
     + "inside it. A page title, a web address, and a bare id with no scheme are not handles "
     + "either. Take the `uri` from a onenote_list_pages row or a onenote_create_page answer, "
@@ -120,13 +125,13 @@ async def rename_page(
     if handle is None:
         raise ToolError(_NOT_A_PAGE_HANDLE)
 
-    about = write_state_for(_RENAME, handle.page_id, title)
+    about = write_state_for(_RENAME, handle.uri, title)
     summary: PageSummary | None = None
     previous_title: str | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        pre_read = await page_for_a_question(client, handle.page_id)
+        pre_read = await page_for_a_question(client, handle.page_id, group_id=handle.group_id)
         previous_title = pre_read.page.title
         if answer_pending or pre_read.audience.reaches_others:
             with not_graph():
@@ -137,7 +142,7 @@ async def rename_page(
             with graph_step(STEP_RENAME_PAGE):
                 await _rename(client, handle, title)
             try:
-                summary = await page_summary(client, handle.page_id)
+                summary = await page_summary(client, handle.page_id, group_id=handle.group_id)
             except GraphFailure as failure:
                 raise Advised(_WRITTEN_BUT_UNREAD) from failure
 
@@ -166,9 +171,20 @@ async def _rename(client: GraphServiceClient, handle: OnenotePageHandle, title: 
     command = OnenotePatchContentCommand(
         target="title", action=OnenotePatchActionType.Replace, content=escape(title)
     )
-    body = _post_request_body.OnenotePatchContentPostRequestBody(commands=[command])
-    await client.me.onenote.pages.by_onenote_page_id(handle.page_id).onenote_patch_content.post(
-        body
+    patch = (
+        onenote_root(client, handle.group_id)
+        .pages.by_onenote_page_id(handle.page_id)
+        .onenote_patch_content
+    )
+    request = RequestInformation(Method.POST, patch.url_template, patch.path_parameters)
+    request.headers.try_add("Accept", "application/json")
+    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
+        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+        "application/json",
+        _post_request_body.OnenotePatchContentPostRequestBody(commands=[command]),
+    )
+    await client.request_adapter.send_no_response_content_async(  # pyright: ignore[reportUnknownMemberType]
+        request, {"XXX": ODataError}
     )
 
 
@@ -189,7 +205,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The page to rename: the `uri` of a onenote_list_pages row or a "
                     + "onenote_create_page answer, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle is not a page handle."
+                    + "onenote:///pages/{id}. A handle from a group notebook starts with "
+                    + "onenote:///groups/{group}/ instead. A section handle is not a page handle."
                 ),
             ),
         ],

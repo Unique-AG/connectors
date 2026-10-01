@@ -12,7 +12,12 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
 from office_365_mcp.shared.handles import OnenoteSectionHandle, onenote_page_handle
-from office_365_mcp.shared.notes import NotebookAudience, page_for_a_question, write_state_for
+from office_365_mcp.shared.notes import (
+    NotebookAudience,
+    onenote_root,
+    page_for_a_question,
+    write_state_for,
+)
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
@@ -51,7 +56,8 @@ onenote_edit_page and onenote_rename_page answer 404 for it.
 _NOT_A_PAGE_HANDLE = (
     "onenote_delete_page takes a page handle. It looks like onenote:///pages/{id}, with the id "
     + "percent-encoded, for example "
-    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A section handle "
+    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A handle from a group "
+    + "notebook starts with onenote:///groups/{group}/ instead. A section handle "
     + "(onenote:///sections/{id}) is not a page handle: it names a whole section, not one page "
     + "inside it. A page title, a web address, and a bare id with no scheme are not handles "
     + "either. Take the `uri` from a onenote_list_pages row or a onenote_create_page answer, "
@@ -111,12 +117,12 @@ async def delete_page(
     if handle is None:
         raise ToolError(_NOT_A_PAGE_HANDLE)
 
-    about = write_state_for(_DELETE, handle.page_id)
+    about = write_state_for(_DELETE, handle.uri)
     found: OnenotePage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        pre_read = await page_for_a_question(client, handle.page_id)
+        pre_read = await page_for_a_question(client, handle.page_id, group_id=handle.group_id)
         found = pre_read.page
         with not_graph():
             answer = await confirm(_question(found, pre_read.audience), about)
@@ -124,14 +130,18 @@ async def delete_page(
         refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with suppress(GraphNotFound), graph_step(STEP_DELETE_PAGE):
-                await client.me.onenote.pages.by_onenote_page_id(handle.page_id).delete()
+                await (
+                    onenote_root(client, handle.group_id)
+                    .pages.by_onenote_page_id(handle.page_id)
+                    .delete()
+                )
 
     if asked is not None:
         return asked
     if refused is not None:
         raise ToolError(refused)
     assert found is not None, "a delete neither asked about nor refused deleted nothing"
-    return _answer(found)
+    return _answer(found, group_id=handle.group_id)
 
 
 def _question(page: OnenotePage, audience: NotebookAudience) -> str:
@@ -153,13 +163,15 @@ def a_person_agrees(ctx: Context) -> Confirm:
     )
 
 
-def _answer(page: OnenotePage) -> DeletedPage:
+def _answer(page: OnenotePage, *, group_id: str | None) -> DeletedPage:
     section = page.parent_section
     section_id = section.id if section is not None else None
     notebook = page.parent_notebook
     return DeletedPage(
         title=page.title,
-        section_uri=None if section_id is None else OnenoteSectionHandle(section_id).uri,
+        section_uri=(
+            None if section_id is None else OnenoteSectionHandle(section_id, group_id=group_id).uri
+        ),
         section_name=section.display_name if section is not None else None,
         notebook_name=notebook.display_name if notebook is not None else None,
         deleted=True,
@@ -183,7 +195,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The page to delete: the `uri` of a onenote_list_pages row or a "
                     + "onenote_create_page answer, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle is not a page handle."
+                    + "onenote:///pages/{id}. A handle from a group notebook starts with "
+                    + "onenote:///groups/{group}/ instead. A section handle is not a page handle."
                 ),
             ),
         ],
