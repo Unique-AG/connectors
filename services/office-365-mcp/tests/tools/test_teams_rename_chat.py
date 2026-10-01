@@ -23,7 +23,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field, TypeAdapter
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared.seam import WRITE_IDEMPOTENT, Confirmed
+from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS
+from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirmed
 from office_365_mcp.tools import teams_rename_chat as renamer
 from office_365_mcp.tools.teams_rename_chat import RenamedChat, a_person_agrees, rename_chat
 
@@ -159,7 +160,7 @@ class TestTheSchemaBeforeTheRequest:
         [
             pytest.param("Release: planning", id="colon"),
             pytest.param(":", id="colon-only"),
-            pytest.param("x" * (renamer.MAX_TOPIC_CHARACTERS + 1), id="251-characters"),
+            pytest.param("x" * (CHAT_TOPIC_MAX_CHARACTERS + 1), id="251-characters"),
             pytest.param("", id="empty"),
         ],
     )
@@ -259,7 +260,7 @@ class TestThePersonBeforeTheChange:
 
         assert asked == [
             f"Rename the chat {_CHAT_ID!r} to {_TOPIC!r}? "
-            + "Everyone in the chat can see this change."
+            + "Everyone in the conversation can see this change."
         ]
 
     async def test_a_client_that_cannot_ask_renames_nothing(
@@ -447,17 +448,17 @@ class TestHowItDeclaresItself:
     def test_it_names_no_tool_that_shows_the_change(self) -> None:
         assert not hasattr(renamer, "CHANGE_SHOWN_BY")
 
-    async def test_it_announces_itself_as_an_idempotent_write_that_destroys_nothing(
+    async def test_it_announces_itself_as_a_destructive_write_that_is_safe_to_repeat(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
         annotations = tool.annotations
         assert annotations is not None
-        assert annotations.read_only_hint is WRITE_IDEMPOTENT["readOnlyHint"]
-        assert annotations.destructive_hint is WRITE_IDEMPOTENT["destructiveHint"]
-        assert annotations.idempotent_hint is WRITE_IDEMPOTENT["idempotentHint"]
-        assert annotations.open_world_hint is WRITE_IDEMPOTENT["openWorldHint"]
+        assert annotations.read_only_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["readOnlyHint"]
+        assert annotations.destructive_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["destructiveHint"]
+        assert annotations.idempotent_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["idempotentHint"]
+        assert annotations.open_world_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["openWorldHint"]
 
     async def test_the_description_says_who_sees_it_that_it_asks_every_time_and_how_to_retry(
         self, transport: httpx.AsyncClient
@@ -465,7 +466,7 @@ class TestHowItDeclaresItself:
         tool = await _registered(transport)
 
         description = " ".join((tool.description or "").split())
-        assert "Everyone in the chat can see the change." in description
+        assert "Everyone in the conversation can see the change." in description
         assert (
             "This tool asks the user to agree before it renames a chat, every time. This tool "
             + "renames nothing unless the user agrees."

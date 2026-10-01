@@ -22,6 +22,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared import identity
+from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirmed
 from office_365_mcp.tools import teams_create_chat as creator
 from office_365_mcp.tools.teams_create_chat import NewChatKind, a_person_agrees, create_chat
@@ -153,7 +154,7 @@ class TestWhatItAsksGraphFor:
         assert '"user@odata.bind"' in raw
         assert "user@odata_bind" not in raw
 
-    async def test_a_one_on_one_chat_carries_no_topic(
+    async def test_a_one_to_one_chat_carries_no_topic(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         post = _creates(graph)
@@ -164,7 +165,7 @@ class TestWhatItAsksGraphFor:
 
         body = _sent(post)
         assert body["chatType"] == "oneOnOne"
-        assert "topic" not in body, "a one-on-one chat went out with a topic or a null topic"
+        assert "topic" not in body, "a one-to-one chat went out with a topic or a null topic"
 
     @pytest.mark.parametrize(
         "members",
@@ -207,7 +208,7 @@ class TestTheRefusalsBeforeAnyRequest:
             [OTHER_USER_ID, SIGNED_IN_USER_ID],
         ],
     )
-    async def test_a_one_on_one_chat_with_more_than_one_person_is_refused(
+    async def test_a_one_to_one_chat_with_more_than_one_person_is_refused(
         self, client: GraphServiceClient, graph: respx.MockRouter, members: list[str]
     ) -> None:
         _ = _creates(graph)
@@ -215,9 +216,9 @@ class TestTheRefusalsBeforeAnyRequest:
         with pytest.raises(ToolError, match="exactly one other person"):
             _ = await create_chat(client, chat_type="oneOnOne", members=members, confirm=_agrees)
 
-        assert len(graph.calls) == 0, "a refused one-on-one chat still reached Graph"
+        assert len(graph.calls) == 0, "a refused one-to-one chat still reached Graph"
 
-    async def test_a_one_on_one_chat_with_a_topic_is_refused(
+    async def test_a_one_to_one_chat_with_a_topic_is_refused(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _creates(graph)
@@ -231,7 +232,7 @@ class TestTheRefusalsBeforeAnyRequest:
                 confirm=_agrees,
             )
 
-        assert len(graph.calls) == 0, "a one-on-one chat with a topic still reached Graph"
+        assert len(graph.calls) == 0, "a one-to-one chat with a topic still reached Graph"
 
     async def test_the_refusal_says_no_chat_was_created(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -296,7 +297,7 @@ class TestTheSchemaRefusals:
         topic = (await _listed(transport))["topic"]
 
         options = cast("Sequence[Mapping[str, object]]", topic["anyOf"])
-        assert options[0]["maxLength"] == creator.MAX_TOPIC_CHARACTERS == 250
+        assert options[0]["maxLength"] == CHAT_TOPIC_MAX_CHARACTERS == 250
 
 
 class TestThePersonBeforeTheCreate:
@@ -334,7 +335,7 @@ class TestThePersonBeforeTheCreate:
             f"Create a group Teams chat named 'Release' with {OTHER_USER_ID}, {_THIRD_USER_ID}?"
         ]
 
-    async def test_the_question_for_a_one_on_one_chat_names_the_person(
+    async def test_the_question_for_a_one_to_one_chat_names_the_person(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _creates(graph)
@@ -348,7 +349,7 @@ class TestThePersonBeforeTheCreate:
             client, chat_type="oneOnOne", members=[OTHER_USER_ID], confirm=capturing
         )
 
-        assert asked == [f"Create a one-on-one Teams chat with {OTHER_USER_ID}?"]
+        assert asked == [f"Create a one-to-one Teams chat with {OTHER_USER_ID}?"]
 
     async def test_the_question_leaves_out_the_signed_in_user(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -669,7 +670,7 @@ class TestWhatItAnswers:
         assert answer.created_at is not None
         assert answer.created_at.isoformat() == "2026-10-01T09:30:00+00:00"
 
-    async def test_an_existing_one_on_one_chat_comes_back_with_its_own_creation_time(
+    async def test_an_existing_one_to_one_chat_comes_back_with_its_own_creation_time(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _creates(graph, _chat_payload(created_at="2024-02-01T08:00:00Z"))
@@ -734,13 +735,14 @@ class TestHowItDeclaresItself:
             + "creates nothing unless the user agrees."
         ) in " ".join((tool.description or "").split())
 
-    async def test_the_description_says_an_existing_one_on_one_chat_comes_back(
+    async def test_the_description_says_an_existing_one_to_one_chat_comes_back(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
         assert (
-            "If that chat exists already, Microsoft returns it and creates no new chat."
+            "Only one one-to-one chat can exist between two people. If that chat exists already, "
+            + "Microsoft returns it and creates no new chat."
         ) in " ".join((tool.description or "").split())
 
     async def test_the_description_says_how_to_retry(self, transport: httpx.AsyncClient) -> None:
@@ -772,4 +774,4 @@ class TestHowItDeclaresItself:
 
         assert members["minItems"] == 1
         items = cast("Mapping[str, object]", members["items"])
-        assert items["pattern"] == creator._ENTRA_ID  # pyright: ignore[reportPrivateUsage]
+        assert items["pattern"] == identity.ENTRA_OBJECT_ID_PATTERN

@@ -14,6 +14,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
+from office_365_mcp.shared.identity import ENTRA_OBJECT_ID_PATTERN
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -33,8 +34,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "chat_id": "19:release@thread.v2",
     "user_id": "00000000-0000-4000-8000-000000000002",
 }
-
-_ENTRA_OBJECT_ID = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 
 _OWNER = "owner"
 _USER_BIND = "user@odata.bind"
@@ -156,7 +155,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         user_id: Annotated[
             str,
             Field(
-                pattern=_ENTRA_OBJECT_ID,
+                pattern=ENTRA_OBJECT_ID_PATTERN,
                 description=(
                     "The Microsoft Entra object id of the person to add, as a GUID. Copy it from "
                     + "the `user_id` of a teams_list_chat_members row, of a teams_list_chats "

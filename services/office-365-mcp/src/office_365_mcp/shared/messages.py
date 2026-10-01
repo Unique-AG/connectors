@@ -401,6 +401,11 @@ def _json(value: str | None) -> object | None:
         return None
 
 
+CHAT_TOPIC_MAX_CHARACTERS = 250
+
+CHAT_TOPIC_PATTERN = r"^[^:]*$"
+
+
 class Mention(BaseModel, frozen=True):
     user_id: str = Field(
         pattern=ENTRA_OBJECT_ID_PATTERN,

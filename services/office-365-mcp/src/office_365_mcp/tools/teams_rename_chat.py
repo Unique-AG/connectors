@@ -12,8 +12,9 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, not_graph
+from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT_TOPIC_PATTERN
 from office_365_mcp.shared.seam import (
-    WRITE_IDEMPOTENT,
+    WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
     graph_client_for_caller,
     person_confirms,
@@ -30,20 +31,16 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "topic": "Release planning",
 }
 
-MAX_TOPIC_CHARACTERS = 250
-
-_NO_COLON = r"^[^:]*$"
-
 _RENAME = "rename"
 _DO_NOT_RENAME = "do not rename"
 _NOTHING_RENAMED = "Nothing was renamed."
-_EVERYONE_SEES_IT = "Everyone in the chat can see this change."
+_EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
 
 _DESCRIPTION = """\
 Changes the topic of one Teams group chat, as the signed-in user. The topic is the title of the \
 chat. Microsoft 365 lets this tool rename a group chat only, not a one-to-one chat or a meeting \
 chat. teams_list_chats gives the `chat_id`, the `chat_type`, and the current `topic`. Everyone in \
-the chat can see the change.
+the conversation can see the change.
 
 Notes:
 - This tool asks the user to agree before it renames a chat, every time. This tool renames \
@@ -109,7 +106,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         name=TOOL_NAME,
         title="Rename a Teams Chat",
         description=_DESCRIPTION,
-        annotations=WRITE_IDEMPOTENT,
+        annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )
     async def teams_rename_chat(
         chat_id: Annotated[
@@ -126,13 +123,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                max_length=MAX_TOPIC_CHARACTERS,
-                pattern=_NO_COLON,
+                max_length=CHAT_TOPIC_MAX_CHARACTERS,
+                pattern=CHAT_TOPIC_PATTERN,
                 description=(
                     "The new topic of the chat, as the user writes it. The topic can have at most "
-                    + f"{MAX_TOPIC_CHARACTERS} characters, and it must not contain a colon (:). "
-                    + "The answer's `topic` is what Microsoft stored. Read it from the answer, not "
-                    + "from this argument."
+                    + f"{CHAT_TOPIC_MAX_CHARACTERS} characters, and it must not contain a colon "
+                    + "(:). The answer's `topic` is what Microsoft stored. Read it from the "
+                    + "answer, not from this argument."
                 ),
             ),
         ],

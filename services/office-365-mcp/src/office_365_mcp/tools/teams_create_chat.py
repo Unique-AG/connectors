@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
+from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT_TOPIC_PATTERN
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -39,13 +40,7 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "members": ["00000000-0000-4000-8000-000000000002"],
 }
 
-MAX_TOPIC_CHARACTERS = 250
-
 type NewChatKind = Literal["oneOnOne", "group"]
-
-_ENTRA_ID = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-
-_NO_COLON = r"^[^:]*$"
 
 _MEMBER = "#microsoft.graph.aadUserConversationMember"
 _OWNER = "owner"
@@ -60,14 +55,14 @@ _FAILS_THE_SAME_WAY = (
 )
 
 _DESCRIPTION = """\
-Creates one Teams chat for the signed-in user with the people in `members`: a one-on-one chat \
+Creates one Teams chat for the signed-in user with the people in `members`: a one-to-one chat \
 with one other person, or a group chat. This tool adds the signed-in user to the chat, and it \
 posts no message. teams_send_chat_message posts to the chat, and teams_list_chats shows it.
 
 Notes:
 - This tool asks the user to agree before it creates a chat, every time. This tool creates \
 nothing unless the user agrees.
-- Only one one-on-one chat can exist between two people. If that chat exists already, Microsoft \
+- Only one one-to-one chat can exist between two people. If that chat exists already, Microsoft \
 returns it and creates no new chat.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 teams_list_chats does not already show the chat.
@@ -76,15 +71,15 @@ teams_list_chats does not already show the chat.
 
 def _not_one_other(count: int) -> str:
     return (
-        f"teams_create_chat was given {count} people for a one-on-one chat. A one-on-one chat "
+        f"teams_create_chat was given {count} people for a one-to-one chat. A one-to-one chat "
         + "has exactly one other person. Do not include the signed-in user, because this tool "
         + "adds that user itself. For more people, set `chat_type` to `group`. "
         + f"{_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
     )
 
 
-_A_TOPIC_ON_ONE_ON_ONE = (
-    "teams_create_chat was given a `topic` for a one-on-one chat. Microsoft allows a topic only on "
+_A_TOPIC_ON_ONE_TO_ONE = (
+    "teams_create_chat was given a `topic` for a one-to-one chat. Microsoft allows a topic only on "
     + "a group chat. Call again without `topic`, or set `chat_type` to `group`. "
     + f"{_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
 )
@@ -114,12 +109,12 @@ class CreatedChat(BaseModel):
     topic: str | None = Field(
         description=(
             "The name of the chat as Microsoft stored it, read from the response. This value is "
-            + "null for a one-on-one chat and for a group chat with no name."
+            + "null for a one-to-one chat and for a group chat with no name."
         )
     )
     created_at: datetime | None = Field(
         description=(
-            "When Microsoft created the chat. For a one-on-one chat, a time before this call means "
+            "When Microsoft created the chat. For a one-to-one chat, a time before this call means "
             + "that the chat existed already, and that this call created nothing new. Null when "
             + "Graph gave no time."
         )
@@ -189,14 +184,14 @@ def _refusal(chat_type: NewChatKind, given: Sequence[str], topic: str | None) ->
     if chat_type == "oneOnOne" and len(given) != 1:
         return _not_one_other(len(given))
     if chat_type == "oneOnOne" and topic is not None:
-        return _A_TOPIC_ON_ONE_ON_ONE
+        return _A_TOPIC_ON_ONE_TO_ONE
     return None
 
 
 def _question(chat_type: NewChatKind, others: Sequence[str], topic: str | None) -> str:
     people = ", ".join(others)
     if chat_type == "oneOnOne":
-        return f"Create a one-on-one Teams chat with {people}?"
+        return f"Create a one-to-one Teams chat with {people}?"
     named = "" if topic is None else f" named {cut_for_a_question(topic)!r}"
     return f"Create a group Teams chat{named} with {people}?"
 
@@ -247,7 +242,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         members: Annotated[
-            list[Annotated[str, Field(pattern=_ENTRA_ID)]],
+            list[Annotated[str, Field(pattern=identity.ENTRA_OBJECT_ID_PATTERN)]],
             Field(
                 min_length=1,
                 description=(
@@ -264,12 +259,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=1,
-                max_length=MAX_TOPIC_CHARACTERS,
-                pattern=_NO_COLON,
+                max_length=CHAT_TOPIC_MAX_CHARACTERS,
+                pattern=CHAT_TOPIC_PATTERN,
                 description=(
-                    f"The name of a group chat, at most {MAX_TOPIC_CHARACTERS} characters, with no "
-                    + "`:` character. Microsoft allows a topic only on a group chat, so leave this "
-                    + "null for `oneOnOne`. Null creates a group chat with no name."
+                    "The name of a group chat, at most "
+                    + f"{CHAT_TOPIC_MAX_CHARACTERS} characters, with no `:` character. Microsoft "
+                    + "allows a topic only on a group chat, so leave this null for `oneOnOne`. "
+                    + "Null creates a group chat with no name."
                 ),
             ),
         ] = None,
