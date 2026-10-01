@@ -106,6 +106,15 @@ only next to the calendar it was read from. Graph answers a different id for the
 delegated copy. The read request needs both halves: `/me/calendars/{calendar}/events/{event}`.
 `teams:///transcripts/{a}/{b}` uses the same two-segment shape, for the same reason.
 
+A OneNote handle starts with `onenote:///groups/{group}/` when Graph addresses its item under
+`/groups/{id}/onenote`. Graph documents that root for a notebook that a Microsoft 365 group owns.
+The id of a team is the id of its group. A handle of an item under `/me/onenote` keeps its
+spelling. The group segment is not a handle family. It comes before one of the five OneNote
+families.
+
+Graph also documents `/sites/{id}/onenote` for a notebook that a SharePoint site owns. This
+connector does not reach a site notebook.
+
 This layout follows seven layering rules:
 
 1. `shared/` imports no tool module. Only `shared/seam.py` imports FastMCP. This keeps the
