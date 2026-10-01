@@ -1,10 +1,15 @@
+from collections.abc import Mapping
+from typing import cast
+
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
+from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
-from office_365_mcp.shared.handles import MailRuleHandle
+from office_365_mcp.shared.handles import MailFolderHandle, MailRuleHandle, mail_folder_handle
 from office_365_mcp.tools import outlook_get_mailbox_settings as settings_tool
 
 from .conftest import GRAPH_V1
@@ -20,6 +25,8 @@ _ARCHIVE_FOLDER_ID = "AQMkADAwSYNTHETIC-archive"
 _OUTSIDE = "collector@elsewhere.invalid"
 _INSIDE = "deputy@example.invalid"
 
+_PREFERENCE_PARTS = ("time_zone", "working_hours", "language", "archive_folder_uri")
+
 
 def _recipient(address: str | None, *, name: str | None = None) -> dict[str, object]:
     return {"emailAddress": {"address": address, "name": name}}
@@ -33,6 +40,8 @@ def _rule_payload(
     sequence: int | None = 1,
     is_read_only: bool | None = False,
     has_error: bool | None = False,
+    conditions: dict[str, object] | None = None,
+    exceptions: dict[str, object] | None = None,
     actions: dict[str, object] | None = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
@@ -43,6 +52,10 @@ def _rule_payload(
         "isReadOnly": is_read_only,
         "hasError": has_error,
     }
+    if conditions is not None:
+        payload["conditions"] = conditions
+    if exceptions is not None:
+        payload["exceptions"] = exceptions
     if actions is not None:
         payload["actions"] = actions
     return payload
@@ -74,6 +87,24 @@ def _reply_payload(
     return payload
 
 
+def _preferences_payload(
+    *,
+    time_zone: str | None = "W. Europe Standard Time",
+    archive_folder: str | None = _ARCHIVE_FOLDER_ID,
+) -> dict[str, object]:
+    return {
+        "timeZone": time_zone,
+        "language": {"locale": "de-CH", "displayName": "German (Switzerland)"},
+        "workingHours": {
+            "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+            "startTime": "08:00:00.0000000",
+            "endTime": "17:00:00.0000000",
+            "timeZone": {"name": "W. Europe Standard Time"},
+        },
+        "archiveFolder": archive_folder,
+    }
+
+
 def _page(*items: dict[str, object], next_link: str | None = None) -> httpx.Response:
     body: dict[str, object] = {"value": list(items)}
     if next_link is not None:
@@ -81,9 +112,31 @@ def _page(*items: dict[str, object], next_link: str | None = None) -> httpx.Resp
     return httpx.Response(200, json=body)
 
 
-def _settings_response(reply: dict[str, object] | None) -> httpx.Response:
+def _settings_response(
+    reply: dict[str, object] | None, preferences: dict[str, object] | None = None
+) -> httpx.Response:
     body: dict[str, object] = {} if reply is None else {"automaticRepliesSetting": reply}
-    return httpx.Response(200, json=body)
+    return httpx.Response(200, json={**body, **(preferences or {})})
+
+
+def _described(tool: Tool) -> dict[str, str | None]:
+    answer = cast("Mapping[str, object]", tool.output_schema)
+    definitions = cast("Mapping[str, Mapping[str, object]]", answer.get("$defs", {}))
+    models: dict[str, Mapping[str, object]] = {"answer": answer, **definitions}
+    return {
+        f"{model}.{name}": cast("Mapping[str, str | None]", field).get("description")
+        for model, schema in models.items()
+        for name, field in cast("Mapping[str, object]", schema.get("properties", {})).items()
+    }
+
+
+@pytest.fixture
+async def published(transport: httpx.AsyncClient) -> Tool:
+    mcp: FastMCP = FastMCP(name="schema-under-test")
+    settings_tool.register(mcp, transport)
+    tool = await mcp.get_tool(settings_tool.TOOL_NAME)
+    assert tool is not None, "register left the tool off the server"
+    return tool
 
 
 @pytest.fixture
@@ -93,7 +146,9 @@ def rules(graph: respx.MockRouter) -> respx.Route:
 
 @pytest.fixture
 def mailbox(graph: respx.MockRouter) -> respx.Route:
-    return graph.get(_SETTINGS).mock(return_value=_settings_response(_reply_payload()))
+    return graph.get(_SETTINGS).mock(
+        return_value=_settings_response(_reply_payload(), _preferences_payload())
+    )
 
 
 @pytest.fixture
@@ -102,7 +157,7 @@ def categories(graph: respx.MockRouter) -> respx.Route:
 
 
 class TestWhatItAsksGraphFor:
-    async def test_the_default_reads_all_three_collections(
+    async def test_the_default_spends_one_request_on_each_of_the_three_resources(
         self,
         client: GraphServiceClient,
         rules: respx.Route,
@@ -117,7 +172,12 @@ class TestWhatItAsksGraphFor:
 
     @pytest.mark.parametrize(
         ("include", "asked"),
-        [("rules", _RULES), ("replies", _SETTINGS), ("categories", _CATEGORIES)],
+        [
+            ("rules", _RULES),
+            ("replies", _SETTINGS),
+            ("preferences", _SETTINGS),
+            ("categories", _CATEGORIES),
+        ],
     )
     async def test_one_question_spends_one_graph_request(
         self,
@@ -157,17 +217,10 @@ class TestWhatItAsksGraphFor:
             "sequence",
             "isReadOnly",
             "hasError",
+            "conditions",
+            "exceptions",
             "actions",
         ]
-
-    async def test_it_never_asks_for_the_conditions_it_does_not_report(
-        self, client: GraphServiceClient, rules: respx.Route
-    ) -> None:
-        _ = await settings_tool.get_mailbox_settings(client, include="rules")
-
-        selected = rules.calls.last.request.url.params["$select"].split(",")
-        assert "conditions" not in selected
-        assert "exceptions" not in selected
 
     async def test_it_asks_the_mailbox_for_the_automatic_reply_alone(
         self, client: GraphServiceClient, mailbox: respx.Route
@@ -176,6 +229,22 @@ class TestWhatItAsksGraphFor:
 
         params = mailbox.calls.last.request.url.params
         assert params["$select"].split(",") == ["automaticRepliesSetting"]
+
+    async def test_it_reads_the_preferences_from_the_whole_resource_with_no_select(
+        self, client: GraphServiceClient, mailbox: respx.Route
+    ) -> None:
+        _ = await settings_tool.get_mailbox_settings(client, include="preferences")
+
+        assert "$select" not in mailbox.calls.last.request.url.params
+
+    @pytest.mark.usefixtures("rules", "categories")
+    async def test_the_default_reads_the_reply_and_the_preferences_in_one_request(
+        self, client: GraphServiceClient, mailbox: respx.Route
+    ) -> None:
+        _ = await settings_tool.get_mailbox_settings(client, include="all")
+
+        assert mailbox.call_count == 1
+        assert "$select" not in mailbox.calls.last.request.url.params
 
 
 class TestWhatARuleSays:
@@ -358,13 +427,115 @@ class TestWhatARuleSays:
         assert answer.rules == []
         assert answer.rules_capped is False
 
-    def test_a_rule_handle_names_the_tool_that_turns_the_rule_off(self) -> None:
-        described = settings_tool.InboxRule.model_fields["uri"].description
 
-        assert described is not None
-        assert "outlook_disable_mail_rule" in described
-        assert "no tool here can change" not in described
-        assert "No tool here can delete a rule." in described
+class TestWhatTriggersARule:
+    async def test_a_rule_reports_the_conditions_graph_gave_it(
+        self, client: GraphServiceClient, rules: respx.Route
+    ) -> None:
+        rules.mock(
+            return_value=_page(
+                _rule_payload(
+                    conditions={
+                        "subjectContains": ["invoice", "receipt"],
+                        "fromAddresses": [_recipient(_OUTSIDE)],
+                        "hasAttachments": True,
+                        "importance": "high",
+                        "withinSizeRange": {"minimumSize": 100},
+                    }
+                )
+            )
+        )
+
+        rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
+
+        assert rule is not None
+        assert rule[0].conditions is not None
+        assert rule[0].conditions.subject_contains == ["invoice", "receipt"]
+        assert rule[0].conditions.from_addresses == [_OUTSIDE]
+        assert rule[0].conditions.has_attachments is True
+        assert rule[0].conditions.importance == "high"
+        assert rule[0].conditions.within_size_range is not None
+        assert rule[0].conditions.within_size_range.minimum_kb == 100
+        assert rule[0].exceptions is None
+
+    async def test_the_exceptions_of_a_rule_are_reported_apart_from_its_conditions(
+        self, client: GraphServiceClient, rules: respx.Route
+    ) -> None:
+        rules.mock(
+            return_value=_page(
+                _rule_payload(
+                    conditions={"senderContains": ["newsletter"]},
+                    exceptions={"sentToMe": True, "categories": ["Important"]},
+                )
+            )
+        )
+
+        rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
+
+        assert rule is not None
+        assert rule[0].conditions is not None
+        assert rule[0].conditions.sender_contains == ["newsletter"]
+        assert rule[0].conditions.sent_to_me is None
+        assert rule[0].exceptions is not None
+        assert rule[0].exceptions.sent_to_me is True
+        assert rule[0].exceptions.categories == ["Important"]
+        assert rule[0].exceptions.sender_contains is None
+
+    async def test_only_the_predicates_the_rule_sets_reach_the_published_answer(
+        self, client: GraphServiceClient, rules: respx.Route
+    ) -> None:
+        rules.mock(
+            return_value=_page(
+                _rule_payload(
+                    conditions={
+                        "subjectContains": ["invoice"],
+                        "bodyContains": [],
+                        "fromAddresses": [],
+                        "hasAttachments": None,
+                        "importance": None,
+                    },
+                    exceptions={"isAutomaticReply": True},
+                )
+            )
+        )
+
+        answer = await settings_tool.get_mailbox_settings(client, include="rules")
+
+        published = cast("list[Mapping[str, object]]", answer.model_dump(mode="json")["rules"])
+        assert published[0]["conditions"] == {"subject_contains": ["invoice"]}
+        assert published[0]["exceptions"] == {"is_automatic_reply": True}
+
+    @pytest.mark.parametrize("conditions", [None, {}, {"subjectContains": [], "isSigned": None}])
+    async def test_a_rule_with_nothing_set_has_null_conditions_and_null_exceptions(
+        self, client: GraphServiceClient, rules: respx.Route, conditions: dict[str, object] | None
+    ) -> None:
+        rules.mock(return_value=_page(_rule_payload(conditions=conditions, exceptions=conditions)))
+
+        rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
+
+        assert rule is not None
+        assert rule[0].conditions is None
+        assert rule[0].exceptions is None
+
+    async def test_the_conditions_and_the_actions_of_one_rule_stay_together(
+        self, client: GraphServiceClient, rules: respx.Route
+    ) -> None:
+        rules.mock(
+            return_value=_page(
+                _rule_payload(
+                    conditions={"bodyOrSubjectContains": ["urgent"]},
+                    actions={"forwardTo": [_recipient(_OUTSIDE)], "markAsRead": True},
+                )
+            )
+        )
+
+        rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
+
+        assert rule is not None
+        assert rule[0].conditions is not None
+        assert rule[0].conditions.body_or_subject_contains == ["urgent"]
+        assert rule[0].forwards_to == [_OUTSIDE]
+        assert rule[0].marks_as_read is True
 
 
 class TestTheAutomaticReply:
@@ -434,6 +605,101 @@ class TestTheAutomaticReply:
         assert answer.automatic_reply.scheduled_start is None
 
 
+class TestThePreferences:
+    @pytest.mark.parametrize("zone", ["W. Europe Standard Time", "Europe/Zurich"])
+    async def test_the_time_zone_is_reported_in_the_spelling_graph_gave(
+        self, client: GraphServiceClient, mailbox: respx.Route, zone: str
+    ) -> None:
+        mailbox.mock(return_value=_settings_response(None, _preferences_payload(time_zone=zone)))
+
+        answer = await settings_tool.get_mailbox_settings(client, include="preferences")
+
+        assert answer.time_zone == zone
+
+    @pytest.mark.usefixtures("mailbox")
+    async def test_the_working_hours_carry_the_days_the_times_and_the_zone(
+        self, client: GraphServiceClient
+    ) -> None:
+        answer = await settings_tool.get_mailbox_settings(client, include="preferences")
+
+        hours = answer.working_hours
+        assert hours is not None
+        assert hours.days == ["monday", "tuesday", "wednesday", "thursday", "friday"]
+        assert hours.starts_at == "08:00:00"
+        assert hours.ends_at == "17:00:00"
+        assert hours.time_zone == "W. Europe Standard Time"
+
+    @pytest.mark.usefixtures("mailbox")
+    async def test_the_language_carries_the_locale_and_its_display_name(
+        self, client: GraphServiceClient
+    ) -> None:
+        answer = await settings_tool.get_mailbox_settings(client, include="preferences")
+
+        assert answer.language is not None
+        assert answer.language.locale == "de-CH"
+        assert answer.language.display_name == "German (Switzerland)"
+
+    async def test_a_language_with_only_a_locale_has_a_null_display_name(
+        self, client: GraphServiceClient, mailbox: respx.Route
+    ) -> None:
+        mailbox.mock(
+            return_value=_settings_response(
+                None, {**_preferences_payload(), "language": {"locale": "fr-CH"}}
+            )
+        )
+
+        answer = await settings_tool.get_mailbox_settings(client, include="preferences")
+
+        assert answer.language is not None
+        assert answer.language.locale == "fr-CH"
+        assert answer.language.display_name is None
+
+    @pytest.mark.usefixtures("mailbox")
+    async def test_the_archive_folder_is_a_folder_handle_that_outlook_move_mail_takes(
+        self, client: GraphServiceClient
+    ) -> None:
+        answer = await settings_tool.get_mailbox_settings(client, include="preferences")
+
+        assert answer.archive_folder_uri == MailFolderHandle(_ARCHIVE_FOLDER_ID).uri
+        assert mail_folder_handle(answer.archive_folder_uri or "") == MailFolderHandle(
+            _ARCHIVE_FOLDER_ID
+        )
+
+    @pytest.mark.parametrize("archive_folder", [None, ""])
+    async def test_a_mailbox_with_no_archive_folder_has_a_null_handle(
+        self, client: GraphServiceClient, mailbox: respx.Route, archive_folder: str | None
+    ) -> None:
+        mailbox.mock(
+            return_value=_settings_response(
+                None, _preferences_payload(archive_folder=archive_folder)
+            )
+        )
+
+        answer = await settings_tool.get_mailbox_settings(client, include="preferences")
+
+        assert answer.archive_folder_uri is None
+
+    async def test_a_mailbox_graph_reported_no_preferences_for_is_still_answered(
+        self, client: GraphServiceClient, mailbox: respx.Route
+    ) -> None:
+        mailbox.mock(return_value=_settings_response(None))
+
+        answer = await settings_tool.get_mailbox_settings(client, include="preferences")
+
+        assert [getattr(answer, name) for name in _PREFERENCE_PARTS] == [None] * 4
+
+    @pytest.mark.usefixtures("rules", "mailbox", "categories")
+    async def test_the_default_answers_the_reply_and_the_preferences_from_one_response(
+        self, client: GraphServiceClient
+    ) -> None:
+        answer = await settings_tool.get_mailbox_settings(client, include="all")
+
+        assert answer.automatic_reply is not None
+        assert answer.automatic_reply.status == "scheduled"
+        assert answer.time_zone == "W. Europe Standard Time"
+        assert answer.archive_folder_uri == MailFolderHandle(_ARCHIVE_FOLDER_ID).uri
+
+
 class TestCategories:
     async def test_it_answers_the_names_the_user_chose(
         self, client: GraphServiceClient, categories: respx.Route
@@ -463,22 +729,23 @@ class TestWhatIncludeLeavesOut:
     @pytest.mark.parametrize(
         ("include", "present"),
         [
-            ("rules", "rules"),
-            ("replies", "automatic_reply"),
-            ("categories", "categories"),
+            ("rules", ("rules",)),
+            ("replies", ("automatic_reply",)),
+            ("categories", ("categories",)),
+            ("preferences", _PREFERENCE_PARTS),
         ],
     )
     @pytest.mark.usefixtures("rules", "mailbox", "categories")
     async def test_what_was_not_asked_for_is_null_rather_than_empty(
-        self, client: GraphServiceClient, include: settings_tool.Include, present: str
+        self, client: GraphServiceClient, include: settings_tool.Include, present: tuple[str, ...]
     ) -> None:
         answer = await settings_tool.get_mailbox_settings(client, include=include)
 
         answered = {
             name: getattr(answer, name) is not None
-            for name in ("rules", "automatic_reply", "categories")
+            for name in ("rules", "automatic_reply", "categories", *_PREFERENCE_PARTS)
         }
-        assert answered == {name: (name == present) for name in answered}
+        assert answered == {name: (name in present) for name in answered}
 
     @pytest.mark.usefixtures("mailbox")
     async def test_a_cap_flag_is_null_for_a_collection_that_was_not_read(
@@ -491,7 +758,7 @@ class TestWhatIncludeLeavesOut:
 
 
 class TestWhatItCannotSee:
-    @pytest.mark.parametrize("include", ["all", "rules", "replies", "categories"])
+    @pytest.mark.parametrize("include", ["all", "rules", "replies", "categories", "preferences"])
     @pytest.mark.usefixtures("rules", "mailbox", "categories")
     async def test_every_answer_says_mailbox_level_forwarding_is_not_covered(
         self, client: GraphServiceClient, include: settings_tool.Include
@@ -513,6 +780,76 @@ class TestWhatItCannotSee:
 
         assert "cannot see Exchange mailbox-level forwarding" in description
         assert "does not prove that nobody forwards this mailbox's mail" in description
+
+
+class TestWhatItPublishes:
+    def test_every_field_of_the_answer_says_what_it_is(self, published: Tool) -> None:
+        undescribed = sorted(path for path, text in _described(published).items() if not text)
+
+        assert undescribed == [], "a model is handed these values with nothing to say what they are"
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "answer.time_zone",
+            "answer.working_hours",
+            "answer.language",
+            "answer.archive_folder_uri",
+            "Language.locale",
+            "Language.display_name",
+        ],
+    )
+    def test_every_new_field_says_what_it_is_in_15_to_60_words(
+        self, published: Tool, path: str
+    ) -> None:
+        description = _described(published)[path] or ""
+
+        assert 15 <= len(description.split()) <= 60
+
+    def test_the_archive_folder_field_names_the_tool_that_takes_the_handle(
+        self, published: Tool
+    ) -> None:
+        text = _described(published)["answer.archive_folder_uri"] or ""
+
+        assert "outlook_move_mail" in text
+        assert "`folder_ref`" in text
+
+    def test_a_rule_predicate_that_is_not_set_is_not_a_required_key(self, published: Tool) -> None:
+        answer = cast("Mapping[str, object]", published.output_schema)
+        definitions = cast("Mapping[str, Mapping[str, object]]", answer["$defs"])
+
+        assert "required" not in definitions["RuleConditions"]
+        assert "required" not in definitions["SizeRangeKb"]
+
+    def test_the_include_field_names_the_preferences_part(self, published: Tool) -> None:
+        properties = cast("Mapping[str, Mapping[str, object]]", published.parameters["properties"])
+        text = cast("str", properties["include"]["description"])
+
+        assert "`preferences`" in text
+        assert "the time zone, the working hours, the language, and the archive folder" in text
+
+    def test_the_description_names_every_part_of_the_answer(self, published: Tool) -> None:
+        description = published.description or ""
+
+        for part in (
+            "inbox rules with their conditions, exceptions, and actions",
+            "the automatic reply",
+            "the category names",
+            "the time zone",
+            "the working hours",
+            "the language",
+            "the archive folder",
+        ):
+            assert part in description
+
+    def test_the_description_keeps_the_house_shape(self, published: Tool) -> None:
+        description = published.description or ""
+
+        lead, separator, notes = description.partition("\n\nNotes:\n")
+        assert separator, "a lead paragraph, a blank line, then Notes:"
+        assert "\n" not in lead.strip()
+        assert 1 <= sum(line.startswith("- ") for line in notes.splitlines()) <= 4
+        assert 45 <= len(description.split()) <= 210
 
 
 class TestPaging:

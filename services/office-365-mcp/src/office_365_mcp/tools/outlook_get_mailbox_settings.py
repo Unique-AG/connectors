@@ -8,10 +8,10 @@ from msgraph.generated.models.automatic_replies_setting import AutomaticRepliesS
 from msgraph.generated.models.automatic_replies_status import AutomaticRepliesStatus
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
 from msgraph.generated.models.external_audience_scope import ExternalAudienceScope
+from msgraph.generated.models.locale_info import LocaleInfo
+from msgraph.generated.models.mailbox_settings import MailboxSettings
 from msgraph.generated.models.message_rule import MessageRule
-from msgraph.generated.models.message_rule_actions import MessageRuleActions
 from msgraph.generated.models.outlook_category import OutlookCategory
-from msgraph.generated.models.recipient import Recipient
 from msgraph.generated.users.item.mail_folders.item.message_rules.message_rules_request_builder import (  # noqa: E501
     MessageRulesRequestBuilder,
 )
@@ -31,7 +31,9 @@ from office_365_mcp.graph_client import (
     graph_errors,
     graph_step,
 )
-from office_365_mcp.shared.handles import MailRuleHandle
+from office_365_mcp.shared.calendar import WorkingHoursSummary
+from office_365_mcp.shared.handles import MailFolderHandle
+from office_365_mcp.shared.rules import InboxRule
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_get_mailbox_settings"
@@ -61,10 +63,12 @@ _RULE_FIELDS: tuple[str, ...] = (
     "sequence",
     "isReadOnly",
     "hasError",
+    "conditions",
+    "exceptions",
     "actions",
 )
 
-_SETTINGS_FIELDS: tuple[str, ...] = ("automaticRepliesSetting",)
+_REPLY_FIELDS: tuple[str, ...] = ("automaticRepliesSetting",)
 
 _CATEGORY_FIELDS: tuple[str, ...] = ("displayName",)
 
@@ -72,82 +76,23 @@ _RulesQuery = MessageRulesRequestBuilder.MessageRulesRequestBuilderGetQueryParam
 _SettingsQuery = MailboxSettingsRequestBuilder.MailboxSettingsRequestBuilderGetQueryParameters
 _CategoriesQuery = MasterCategoriesRequestBuilder.MasterCategoriesRequestBuilderGetQueryParameters
 
-type Include = Literal["all", "rules", "replies", "categories"]
+type Include = Literal["all", "rules", "replies", "categories", "preferences"]
 
 type AutoReplyStatus = Literal["disabled", "alwaysEnabled", "scheduled"]
 type ExternalAudience = Literal["none", "contactsOnly", "all"]
 
-_DESCRIPTION = (
-    "Shows what quietly acts on the mailbox — inbox rules, automatic replies, and categories — "
-    "though it cannot see Exchange mailbox-level forwarding, so this does not prove that nobody "
-    "forwards this mailbox's mail."
-)
+_DESCRIPTION = """\
+Reads the settings of the signed-in user's own mailbox. The answer holds the inbox rules with \
+their conditions, exceptions, and actions. It also holds the automatic reply, the category names, \
+the time zone, the working hours, the language, and the archive folder. If this deployment exposes \
+outlook_set_automatic_reply, that tool changes the automatic reply.
 
-
-class InboxRule(BaseModel):
-    uri: str = Field(
-        description=(
-            "This is the handle of the rule, `outlook:///rules/{id}`. If this deployment exposes "
-            + "outlook_disable_mail_rule, pass this handle to that tool to disable the rule. No "
-            + "tool here can delete a rule."
-        )
-    )
-    display_name: str | None = Field(
-        description="The rule's name; a label, not a description. Null if Graph recorded none."
-    )
-    is_enabled: bool | None = Field(
-        description="Whether the rule runs; false means it exists but does nothing right now."
-    )
-    sequence: int | None = Field(description="The order Outlook evaluates rules in, lowest first.")
-    is_read_only: bool | None = Field(
-        description="True for a rule the rules API cannot modify; it still runs."
-    )
-    has_error: bool | None = Field(description="True when Microsoft 365 marked the rule broken.")
-    forwards_to: list[str] = Field(
-        description="Addresses this rule forwards a copy of the message to."
-    )
-    redirects_to: list[str] = Field(
-        description="Addresses this rule redirects the message to, with the original sender kept."
-    )
-    forward_as_attachment_to: list[str] = Field(
-        description="Addresses this rule forwards the message to as an attachment."
-    )
-    moves_to_folder: str | None = Field(
-        description="The Graph id of the folder this rule moves the message to; null if none."
-    )
-    deletes: bool | None = Field(
-        description="True when the rule deletes the message, permanently or to Deleted Items."
-    )
-    marks_as_read: bool | None = Field(
-        description="True when the rule marks the message read on arrival."
-    )
-    stops_processing_more_rules: bool | None = Field(
-        description="True when this rule stops Outlook from evaluating any rule after it."
-    )
-
-    @classmethod
-    def from_rule(cls, rule: MessageRule) -> Self:
-        assert rule.id is not None, "Graph returned a message rule with no id"
-        actions = rule.actions
-        return cls(
-            uri=MailRuleHandle(rule.id).uri,
-            display_name=rule.display_name,
-            is_enabled=rule.is_enabled,
-            sequence=rule.sequence,
-            is_read_only=rule.is_read_only,
-            has_error=rule.has_error,
-            forwards_to=_addresses(None if actions is None else actions.forward_to),
-            redirects_to=_addresses(None if actions is None else actions.redirect_to),
-            forward_as_attachment_to=_addresses(
-                None if actions is None else actions.forward_as_attachment_to
-            ),
-            moves_to_folder=None if actions is None else actions.move_to_folder,
-            deletes=_deletes(actions),
-            marks_as_read=None if actions is None else actions.mark_as_read,
-            stops_processing_more_rules=(
-                None if actions is None else actions.stop_processing_rules
-            ),
-        )
+Notes:
+- This tool cannot see Exchange mailbox-level forwarding. A rule list with no forward action \
+does not prove that nobody forwards this mailbox's mail.
+- If this deployment exposes outlook_list_categories, that tool also gives the color of each \
+category.
+"""
 
 
 class ScheduledMoment(BaseModel):
@@ -211,6 +156,27 @@ class AutomaticReply(BaseModel):
         )
 
 
+class Language(BaseModel):
+    locale: str | None = Field(
+        description=(
+            "The locale of the mailbox owner. It has a 2-letter language code and a 2-letter "
+            + "country or region code, for example `en-US`. Null when Graph reports none."
+        )
+    )
+    display_name: str | None = Field(
+        description=(
+            "The name of the locale in natural language, for example `English (United States)`. "
+            + "Null when Graph reports none."
+        )
+    )
+
+    @classmethod
+    def from_locale_info(cls, info: LocaleInfo | None) -> Self | None:
+        if info is None:
+            return None
+        return cls(locale=info.locale, display_name=info.display_name)
+
+
 class MailboxSettingsReport(BaseModel):
     covers_mailbox_level_forwarding: Literal[False] = Field(
         default=False,
@@ -234,6 +200,32 @@ class MailboxSettingsReport(BaseModel):
     categories_capped: bool | None = Field(
         description="True when more categories exist and the listing stopped short."
     )
+    time_zone: str | None = Field(
+        description=(
+            "The default time zone of the mailbox, in the spelling that the administrator chose. "
+            + "It is a Windows name such as `Pacific Standard Time`, or an IANA name. Null when "
+            + "`include` did not ask for it, or when Graph reports none."
+        )
+    )
+    working_hours: WorkingHoursSummary | None = Field(
+        description=(
+            "The days and the hours in which the mailbox owner works. Null when `include` did "
+            + "not ask for them, or when Graph reports none."
+        )
+    )
+    language: Language | None = Field(
+        description=(
+            "The preferred language and the country or region of the mailbox owner. Null when "
+            + "`include` did not ask for it, or when Graph reports none."
+        )
+    )
+    archive_folder_uri: str | None = Field(
+        description=(
+            "The handle of the archive folder of the mailbox, `outlook:///folders/{id}`. If this "
+            + "deployment exposes outlook_move_mail, pass this handle as `folder_ref` to that "
+            + "tool. Null when `include` did not ask for it, or when Graph reports none."
+        )
+    )
 
 
 async def get_mailbox_settings(
@@ -242,22 +234,39 @@ async def get_mailbox_settings(
     wants_rules = include in ("all", "rules")
     wants_replies = include in ("all", "replies")
     wants_categories = include in ("all", "categories")
+    wants_preferences = include in ("all", "preferences")
+    wants_settings = wants_replies or wants_preferences
+    settings_select = None if wants_preferences else _REPLY_FIELDS
 
     with graph_errors(TOOL_NAME):
         rules = await _inbox_rules(client) if wants_rules else None
-        setting = await _automatic_reply(client) if wants_replies else None
+        settings = await _mailbox_settings(client, settings_select) if wants_settings else None
         categories = await _categories(client) if wants_categories else None
 
+    reply = None if settings is None else settings.automatic_replies_setting
+    preferences = settings if wants_preferences else None
     return MailboxSettingsReport(
         rules=None if rules is None else [InboxRule.from_rule(rule) for rule in rules.items],
         rules_capped=None if rules is None else rules.capped,
-        automatic_reply=AutomaticReply.from_setting(setting) if wants_replies else None,
+        automatic_reply=AutomaticReply.from_setting(reply) if wants_replies else None,
         categories=(
             None
             if categories is None
             else [_category_name(category) for category in categories.items]
         ),
         categories_capped=None if categories is None else categories.capped,
+        time_zone=None if preferences is None else preferences.time_zone,
+        working_hours=(
+            None
+            if preferences is None
+            else WorkingHoursSummary.from_working_hours(preferences.working_hours)
+        ),
+        language=None if preferences is None else Language.from_locale_info(preferences.language),
+        archive_folder_uri=(
+            None
+            if preferences is None or not preferences.archive_folder
+            else MailFolderHandle(preferences.archive_folder).uri
+        ),
     )
 
 
@@ -274,14 +283,15 @@ async def _inbox_rules(client: GraphServiceClient) -> CollectedItems[MessageRule
         return await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)
 
 
-async def _automatic_reply(client: GraphServiceClient) -> AutomaticRepliesSetting | None:
+async def _mailbox_settings(
+    client: GraphServiceClient, select: tuple[str, ...] | None
+) -> MailboxSettings | None:
     with graph_step(STEP_SETTINGS):
-        settings = await client.me.mailbox_settings.get(
+        return await client.me.mailbox_settings.get(
             request_configuration=RequestConfiguration[_SettingsQuery](
-                query_parameters=_SettingsQuery(select=list(_SETTINGS_FIELDS))
+                query_parameters=_SettingsQuery(select=None if select is None else list(select))
             )
         )
-    return None if settings is None else settings.automatic_replies_setting
 
 
 async def _categories(client: GraphServiceClient) -> CollectedItems[OutlookCategory]:
@@ -298,25 +308,6 @@ async def _categories(client: GraphServiceClient) -> CollectedItems[OutlookCateg
 def _category_name(category: OutlookCategory) -> str:
     assert category.display_name is not None, "Graph returned a category with no display name"
     return category.display_name
-
-
-def _addresses(recipients: list[Recipient] | None) -> list[str]:
-    named: list[str] = []
-    for recipient in recipients or []:
-        email = recipient.email_address
-        if email is None:
-            continue
-        address = email.address if email.address else email.name
-        if address is not None:
-            named.append(address)
-    return named
-
-
-def _deletes(actions: MessageRuleActions | None) -> bool | None:
-    if actions is None:
-        return None
-    said = [flag for flag in (actions.delete, actions.permanent_delete) if flag is not None]
-    return any(said) if said else None
 
 
 def _reply_status(status: AutomaticRepliesStatus | None) -> AutoReplyStatus | None:
@@ -357,7 +348,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Include,
             Field(
                 description=(
-                    "Which of the three to read: `all`, `rules`, `replies`, or `categories`."
+                    "The part of the mailbox settings to read: `all`, `rules`, `replies`, "
+                    + "`categories`, or `preferences`. The `preferences` part is the time zone, "
+                    + "the working hours, the language, and the archive folder."
                 )
             ),
         ] = "all",
