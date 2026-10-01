@@ -1,7 +1,6 @@
 from collections.abc import Mapping
 from contextlib import suppress
 from typing import Annotated, Literal
-from urllib.parse import unquote
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -15,10 +14,11 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.files import (
-    TOP_FOLDER_LABEL,
+    ITEM_HANDLE_SOURCES,
     UNNAMED_FOLDER_LABEL,
     UNNAMED_ITEM_LABEL,
     item_for_a_question,
+    parent_folder_label,
 )
 from office_365_mcp.shared.handles import DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.notes import write_state_for
@@ -43,8 +43,6 @@ _DELETE = "delete"
 _KEEP_THE_ITEM = "keep the item"
 _NOTHING_DELETED = "The item was not moved to the recycle bin."
 
-_ITS_FOLDER = "its folder"
-
 _DESCRIPTION = """\
 Moves one file or one folder in OneDrive or SharePoint to the recycle bin, for the signed-in \
 user. A folder goes to the recycle bin together with everything inside it. This connector never \
@@ -62,10 +60,10 @@ _NOT_AN_ITEM_HANDLE = (
     "sharepoint_delete_item takes a file handle or a folder handle. A file handle looks like "
     + "sharepoint:///files/{drive_id}/{item_id}. A folder handle looks like "
     + "sharepoint:///folders/{drive_id}/{item_id}. Both ids are percent-encoded. A web address, "
-    + "a path, a file name and a bare item id are not handles. Take the `uri` of a "
-    + "sharepoint_search_files hit or of a sharepoint_browse_folder row, and copy it word for "
-    + "word. The item was not moved to the recycle bin. This same value fails again, so do not "
-    + "retry it."
+    + "a path, a file name and a bare item id are not handles. "
+    + ITEM_HANDLE_SOURCES
+    + " The item was not moved to the recycle bin. This same value fails again, so do not retry "
+    + "it."
 )
 
 _THE_DRIVE_ROOT = (
@@ -154,7 +152,7 @@ async def delete_item(
 
 
 def _question(item: DriveItem) -> str:
-    where = _where(item)
+    where = parent_folder_label(item)
     if item.folder is None:
         file = f"the file {item.name!r}" if item.name else UNNAMED_ITEM_LABEL
         return f"Move {file} from {where} to the recycle bin?"
@@ -163,15 +161,6 @@ def _question(item: DriveItem) -> str:
         f"Move {folder} from {where} to the recycle bin, together with everything "
         + f"inside it?{_how_full(item.folder.child_count)}"
     )
-
-
-def _where(item: DriveItem) -> str:
-    parent = item.parent_reference
-    path = parent.path if parent is not None else None
-    if path is None or ":" not in path:
-        return _ITS_FOLDER
-    inside = unquote(path.split(":", 1)[1]).strip("/")
-    return repr(inside) if inside else TOP_FOLDER_LABEL
 
 
 def _how_full(child_count: int | None) -> str:
@@ -215,11 +204,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The file or folder to move to the recycle bin: the `uri` of a "
-                    + "sharepoint_browse_folder row or a sharepoint_search_files hit, copied word "
-                    + "for word. The shape is sharepoint:///files/{drive_id}/{item_id} or "
-                    + "sharepoint:///folders/{drive_id}/{item_id}. A web address or a name is not "
-                    + "a handle."
+                    "The file or folder to move to the recycle bin. A file handle and a folder "
+                    + "handle both work. "
+                    + ITEM_HANDLE_SOURCES
+                    + " A web address, a path and a name are not handles."
                 ),
             ),
         ],

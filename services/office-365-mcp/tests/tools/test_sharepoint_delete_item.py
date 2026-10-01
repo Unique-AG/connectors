@@ -28,6 +28,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
+from office_365_mcp.shared.files import ITEM_HANDLE_SOURCES
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -242,6 +243,15 @@ class TestWhatItRefuses:
         assert "sharepoint_search_files" in str(refused.value)
         assert "The item was not moved to the recycle bin." in str(refused.value)
 
+    async def test_the_handle_refusal_carries_the_shared_handle_sources(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _delete(client, item=_NAME)
+
+        assert ITEM_HANDLE_SOURCES in str(refused.value)
+        assert str(refused.value).endswith("This same value fails again, so do not retry it.")
+
     async def test_the_top_folder_of_a_drive_is_refused_after_the_read_and_nobody_is_asked(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -387,7 +397,7 @@ class TestConfirmationIsAlwaysAsked:
 
         async def capturing(question: str, about: str) -> str | None:
             assert question == (
-                f"Move the file {_NAME!r} from 'Reports/Q1 2026' to the recycle bin?"
+                f"Move the file {_NAME!r} from the folder '/Reports/Q1 2026' to the recycle bin?"
             )
             bound.append(about)
             return None
@@ -418,8 +428,8 @@ class TestConfirmationIsAlwaysAsked:
         asked = await _asked(client, item=_FOLDER_URI)
 
         assert asked == [
-            "Move the folder 'Q1' from 'Reports/Q1 2026' to the recycle bin, together with "
-            + f"everything inside it?{said}"
+            "Move the folder 'Q1' from the folder '/Reports/Q1 2026' to the recycle bin, together "
+            + f"with everything inside it?{said}"
         ]
 
     async def test_an_item_at_the_top_of_a_drive_is_asked_about_by_that_place(
@@ -442,7 +452,19 @@ class TestConfirmationIsAlwaysAsked:
 
         asked = await _asked(client)
 
-        assert asked == ["Move an unnamed item from its folder to the recycle bin?"]
+        assert asked == ["Move an unnamed item from an unnamed folder to the recycle bin?"]
+
+    async def test_a_parent_with_a_name_and_no_path_is_asked_about_by_its_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(
+            graph, _item_payload(parent={"driveId": _DRIVE_ID, "id": _PARENT_ID, "name": "Reports"})
+        )
+        _ = _deletes(graph)
+
+        asked = await _asked(client)
+
+        assert asked == [f"Move the file {_NAME!r} from the folder 'Reports' to the recycle bin?"]
 
     async def test_a_folder_that_graph_left_unnamed_is_asked_about_as_an_unnamed_folder(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -453,8 +475,8 @@ class TestConfirmationIsAlwaysAsked:
         asked = await _asked(client, item=_FOLDER_URI)
 
         assert asked == [
-            "Move an unnamed folder from 'Reports/Q1 2026' to the recycle bin, together with "
-            + "everything inside it? The folder is empty."
+            "Move an unnamed folder from the folder '/Reports/Q1 2026' to the recycle bin, "
+            + "together with everything inside it? The folder is empty."
         ]
 
     @pytest.mark.parametrize(
@@ -693,6 +715,14 @@ class TestHowItDeclaresItself:
         parameters, _tool = await _registered(transport)
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert not [name for name in properties if word in name.casefold()]
+
+    async def test_the_item_description_carries_the_shared_handle_sources(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+
+        assert ITEM_HANDLE_SOURCES in str(properties["item"]["description"])
 
     async def test_it_announces_itself_as_a_destructive_idempotent_write(
         self, transport: httpx.AsyncClient
