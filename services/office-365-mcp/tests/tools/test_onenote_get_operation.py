@@ -276,6 +276,55 @@ class TestAGroupNotebook:
 
         assert answer.uri == _GROUP_OPERATION_URI
 
+    @pytest.mark.parametrize(
+        "location",
+        [
+            "https://graph.microsoft.com/v1.0/groups/{group}/onenote/sections/{id}",
+            "https://graph.microsoft.com/v1.0/groups('{group}')/onenote/sections/{id}",
+        ],
+    )
+    async def test_a_result_location_that_names_the_group_gives_a_result_handle_under_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter, location: str
+    ) -> None:
+        section_id = "1-COPIEDSECTION00000000000000000!0-ABCDEF"
+        _ = graph.get(_GROUP_GET_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=_operation_payload(
+                    status="Completed",
+                    resource_location=location.format(group=_GROUP_ID, id=section_id),
+                    resource_id=section_id,
+                ),
+            )
+        )
+
+        answer = await _get(client, operation=_GROUP_OPERATION_URI)
+
+        assert answer.result_uri == OnenoteSectionHandle(section_id, group_id=_GROUP_ID).uri
+        assert answer.result_kind == "section"
+
+    async def test_a_result_location_that_names_no_group_gives_a_result_handle_outside_any_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_id = "1-COPIEDPAGE0000000000000000000000!0-ABCDEF"
+        _ = graph.get(_GROUP_GET_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=_operation_payload(
+                    status="Completed",
+                    resource_location=(
+                        "https://graph.microsoft.com/v1.0/users/me/onenote/pages/" + page_id
+                    ),
+                    resource_id=page_id,
+                ),
+            )
+        )
+
+        answer = await _get(client, operation=_GROUP_OPERATION_URI)
+
+        assert answer.uri == _GROUP_OPERATION_URI
+        assert answer.result_uri == OnenotePageHandle(page_id).uri
+
     async def test_a_404_under_the_group_is_a_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -318,6 +367,14 @@ class TestWhatItRefuses:
     ) -> None:
         with pytest.raises(ToolError, match="onenote_copy_page"):
             _ = await _get(client, operation="not a handle")
+
+    async def test_the_refusal_names_the_group_handle_shape(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _get(client, operation="not a handle")
+
+        assert "onenote:///groups/{group}/" in str(refused.value)
 
 
 class TestGraphFailures:

@@ -113,6 +113,20 @@ class TestAGroupNotebook:
         assert request.headers["accept"] == "application/octet-stream, application/json"
         assert request.url.params == httpx.QueryParams()
 
+    @pytest.mark.parametrize("address", [_VALUE_ADDRESS, _CONTENT_ADDRESS])
+    async def test_a_me_address_keeps_the_me_route(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        group_content: respx.Route,
+        content: respx.Route,
+        address: str,
+    ) -> None:
+        _ = await _read(client, transport, resource=address)
+
+        assert content.call_count == 1
+        assert group_content.call_count == 0
+
     async def test_a_404_under_the_group_is_a_graph_not_found(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:
@@ -271,10 +285,9 @@ class TestGraphFailures:
         assert "onenote_read_page" in reader.GRAPH_NOT_FOUND
         assert "fails again" in reader.GRAPH_NOT_FOUND
 
-    def test_the_not_found_advice_limits_the_unreachable_notebooks_to_sites(self) -> None:
-        assert "site notebook" in reader.GRAPH_NOT_FOUND
-        assert "team" not in reader.GRAPH_NOT_FOUND
-        assert "group" not in reader.GRAPH_NOT_FOUND
+    def test_the_not_found_advice_names_the_notebooks_this_sign_in_can_miss(self) -> None:
+        assert "group, team or site notebook" in reader.GRAPH_NOT_FOUND
+        assert "out of reach through the sign-in of this connector" in reader.GRAPH_NOT_FOUND
 
 
 async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:

@@ -431,6 +431,7 @@ class TestWhatItRefuses:
             _ = await _read(client, transport, page=_SECTION)
 
         assert "onenote:///sections/{id}" in str(refused.value)
+        assert "onenote:///groups/{group}/" in str(refused.value)
 
 
 class TestGraphFailures:

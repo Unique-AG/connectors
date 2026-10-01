@@ -25,7 +25,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _NOT_AN_OPERATION_HANDLE = (
     "onenote_get_operation takes an operation handle. It looks like onenote:///operations/{id}, "
     + "with the id percent-encoded, for example "
-    + "onenote:///operations/1-SYNTHETICOPERATION0000. A page handle "
+    + "onenote:///operations/1-SYNTHETICOPERATION0000. A handle from a group notebook starts "
+    + "with onenote:///groups/{group}/ instead. A page handle "
     + "(onenote:///pages/{id}), a section handle (onenote:///sections/{id}) and a notebook "
     + "handle (onenote:///notebooks/{id}) are none of them an operation handle: they name what a "
     + "copy reads from or, once it finishes, produces — never the copy itself. Take the `uri` "

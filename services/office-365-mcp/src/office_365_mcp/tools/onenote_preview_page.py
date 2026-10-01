@@ -35,7 +35,8 @@ Notes:
 _NOT_A_PAGE_HANDLE = (
     "onenote_preview_page takes a page handle. It looks like onenote:///pages/{id}, and it "
     + "comes from the `uri` of an onenote_list_pages row, or of what onenote_create_page just "
-    + "wrote. Copy it exactly. A section handle, which looks like onenote:///sections/{id}, is "
+    + "wrote. A handle from a group notebook starts with onenote:///groups/{group}/ instead. "
+    + "Copy it exactly. A section handle, which looks like onenote:///sections/{id}, is "
     + "not a page handle: a section holds pages, and has no preview of its own. A page title, a "
     + "web address, and a bare id are not handles either. Call onenote_list_pages and take a "
     + "`uri` from its answer. This same value fails again, so do not retry it."

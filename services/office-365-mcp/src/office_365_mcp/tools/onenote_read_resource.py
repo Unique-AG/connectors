@@ -64,9 +64,9 @@ _NOTHING_CAME_BACK = (
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 has no such resource. It was most likely deleted along with the page that "
-    + "held it. An image in a site notebook is also not always reachable through the sign-in of "
-    + "this connector. Re-read the page that holds it with onenote_read_page and take a fresh "
-    + "address from its `html`. This same address fails again, so do not retry it."
+    + "held it. An image in a group, team or site notebook can also be out of reach through the "
+    + "sign-in of this connector. Re-read the page that holds it with onenote_read_page and take "
+    + "a fresh address from its `html`. This same address fails again, so do not retry it."
 )
 
 
