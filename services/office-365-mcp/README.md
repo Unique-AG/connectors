@@ -94,12 +94,14 @@ When only one tool owns a fact, that fact does not belong in `shared/`. Examples
 - a request
 - a refusal
 
-**`handles.py` writes one URL segment for each handle family. Four families use two segments
-instead of one.**
+**`handles.py` writes one URL segment for each handle family. Some families use two or more
+segments instead of one.**
 
-Every `teams:///` family, and every `outlook:///` mail family, names a single id. A calendar handle
-also names a single id. Microsoft states that a container type has no immutable id, because its
-regular ids "were already constant".
+Each `outlook:///` mail family names a single id. An attachment handle is the exception, because
+every Graph route to an attachment goes through its message or its event. So a mail attachment
+handle names two ids, and an event attachment handle names three. A calendar handle also names a
+single id. Microsoft states that a container type has no immutable id, because its regular ids
+"were already constant".
 
 An event handle is `outlook:///events/{calendar}/{event}`, two segments. An event id is meaningful
 only next to the calendar it was read from. Graph answers a different id for the same meeting in a
