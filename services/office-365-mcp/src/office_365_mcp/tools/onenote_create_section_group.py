@@ -21,7 +21,12 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionGroupHandle,
     onenote_container_handle,
 )
-from office_365_mcp.shared.notes import ContainerAudience, container_audience, write_state_for
+from office_365_mcp.shared.notes import (
+    ContainerAudience,
+    container_audience,
+    onenote_root,
+    write_state_for,
+)
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -54,7 +59,8 @@ _UNNAMED_SECTION_GROUP = "an unnamed section group"
 
 _DESCRIPTION = """\
 Creates a new, empty section group directly under `parent`, a notebook or another section group. \
-OneNote can show the change to everyone who opens the notebook.
+The notebook can be the signed-in user's own, or one that a Microsoft 365 group owns. OneNote can \
+show the change to everyone who opens the notebook.
 
 Notes:
 - This tool asks the user to agree before it writes into a notebook that is shared with other \
@@ -73,7 +79,8 @@ _NOT_A_PARENT_HANDLE = (
     + "onenote_find_notebook_from_url answer, or from a onenote_create_notebook answer. A "
     + "section group handle looks like onenote:///sectiongroups/{id} and comes from the `uri` "
     + "of a section group in an onenote_list_sections result, or from this same tool's own "
-    + "answer. A section handle (onenote:///sections/{id}), a page handle, a plain name and a "
+    + "answer. A handle from a group notebook starts with onenote:///groups/{group}/ instead. "
+    + "A section handle (onenote:///sections/{id}), a page handle, a plain name and a "
     + "web address are none of them one of these. This same value fails again, so do not retry "
     + "it."
 )
@@ -91,8 +98,9 @@ class CreatedSectionGroup(BaseModel):
     uri: str = Field(
         description=(
             "This new section group's handle: onenote:///sectiongroups/{id}, with the id "
-            + "percent-encoded. Pass it to onenote_create_section to add a section to it, or to "
-            + "onenote_list_sections to see what is directly under it."
+            + "percent-encoded. A handle from a group notebook starts with "
+            + "onenote:///groups/{group}/ instead. Pass it to onenote_create_section to add a "
+            + "section to it, or to onenote_list_sections to see what is directly under it."
         )
     )
     name: str | None = Field(
@@ -176,16 +184,13 @@ async def _post_section_group(
     *,
     name: str,
 ) -> SectionGroup | None:
+    root = onenote_root(client, handle.group_id)
     if isinstance(handle, OnenoteNotebookHandle):
-        return await client.me.onenote.notebooks.by_notebook_id(
-            handle.notebook_id
-        ).section_groups.post(
+        return await root.notebooks.by_notebook_id(handle.notebook_id).section_groups.post(
             SectionGroup(display_name=name),
             request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
         )
-    nested = client.me.onenote.section_groups.by_section_group_id(
-        handle.section_group_id
-    ).section_groups
+    nested = root.section_groups.by_section_group_id(handle.section_group_id).section_groups
     request = RequestInformation(Method.POST, nested.url_template, dict(nested.path_parameters))
     request.headers.try_add("Accept", "application/json")
     request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
@@ -206,7 +211,7 @@ def _answer(
         "Graph created a section group it gave no id, which cannot be addressed"
     )
     return CreatedSectionGroup(
-        uri=OnenoteSectionGroupHandle(group.id).uri,
+        uri=OnenoteSectionGroupHandle(group.id, group_id=handle.group_id).uri,
         name=group.display_name,
         created_at=group.created_date_time,
         parent_uri=handle.uri,
@@ -228,12 +233,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Where the new section group is created, as a `uri`. A notebook's `uri` comes "
-                    + "from onenote_list_notebooks, onenote_find_notebook_from_url, or "
-                    + "onenote_create_notebook. A section group's `uri` comes from "
-                    + "onenote_list_sections or from this same tool's own answer. A section group "
-                    + "nests at any depth, so pass a group's own `uri` to nest a new section "
-                    + "group under it."
+                    "Where the new section group is created, as a `uri`. A notebook's handle, "
+                    + "onenote:///notebooks/{id}, comes from onenote_list_notebooks, "
+                    + "onenote_find_notebook_from_url, or onenote_create_notebook. A section "
+                    + "group's handle, onenote:///sectiongroups/{id}, comes from "
+                    + "onenote_list_sections or from this same tool's own answer. A handle from a "
+                    + "group notebook starts with onenote:///groups/{group}/ instead. A section "
+                    + "group at any depth can be the parent."
                 ),
             ),
         ],

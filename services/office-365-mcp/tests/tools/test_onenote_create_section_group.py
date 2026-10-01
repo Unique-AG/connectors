@@ -1,5 +1,5 @@
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import cast
 
 import httpx
@@ -12,6 +12,7 @@ from fastmcp.tools import FunctionTool
 from mcp.types import ElicitResult, InputRequiredResult, InputResponse
 from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import (
@@ -38,6 +39,17 @@ _NOTEBOOK_AUDIENCE_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}"
 _GROUP_AUDIENCE_PATH = f"/me/onenote/sectionGroups/{_GROUP_ID}"
 _NOTEBOOK_GROUPS_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}/sectionGroups"
 _GROUP_GROUPS_PATH = f"/me/onenote/sectionGroups/{_GROUP_ID}/sectionGroups"
+
+_TEAM_ID = "5c6b7a81-2f0d-4a24-9b1e-8a9c3c470f9e"
+_TEAM_REASON = "which belongs to a Microsoft 365 group"
+
+_TEAM_NOTEBOOK = OnenoteNotebookHandle(_NOTEBOOK_ID, group_id=_TEAM_ID).uri
+_TEAM_GROUP = OnenoteSectionGroupHandle(_GROUP_ID, group_id=_TEAM_ID).uri
+
+_TEAM_NOTEBOOK_AUDIENCE_PATH = f"/groups/{_TEAM_ID}/onenote/notebooks/{_NOTEBOOK_ID}"
+_TEAM_GROUP_AUDIENCE_PATH = f"/groups/{_TEAM_ID}/onenote/sectionGroups/{_GROUP_ID}"
+_TEAM_NOTEBOOK_GROUPS_PATH = f"/groups/{_TEAM_ID}/onenote/notebooks/{_NOTEBOOK_ID}/sectionGroups"
+_TEAM_GROUP_GROUPS_PATH = f"/groups/{_TEAM_ID}/onenote/sectionGroups/{_GROUP_ID}/sectionGroups"
 
 
 def _notebook_payload(
@@ -88,6 +100,44 @@ def notebook_groups(graph: respx.MockRouter) -> respx.Route:
 @pytest.fixture
 def group_groups(graph: respx.MockRouter) -> respx.Route:
     return graph.post(_GROUP_GROUPS_PATH).mock(
+        return_value=httpx.Response(201, json=_group_payload())
+    )
+
+
+@pytest.fixture
+def team_notebook_audience(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_TEAM_NOTEBOOK_AUDIENCE_PATH).mock(
+        return_value=httpx.Response(200, json=_notebook_payload())
+    )
+
+
+@pytest.fixture
+def team_group_audience(graph: respx.MockRouter) -> respx.Route:
+    _ = graph.get(_TEAM_NOTEBOOK_AUDIENCE_PATH).mock(
+        return_value=httpx.Response(200, json=_notebook_payload())
+    )
+    return graph.get(_TEAM_GROUP_AUDIENCE_PATH).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": _GROUP_ID,
+                "displayName": "Projects",
+                "parentNotebook": {"id": _NOTEBOOK_ID},
+            },
+        )
+    )
+
+
+@pytest.fixture
+def team_notebook_groups(graph: respx.MockRouter) -> respx.Route:
+    return graph.post(_TEAM_NOTEBOOK_GROUPS_PATH).mock(
+        return_value=httpx.Response(201, json=_group_payload())
+    )
+
+
+@pytest.fixture
+def team_group_groups(graph: respx.MockRouter) -> respx.Route:
+    return graph.post(_TEAM_GROUP_GROUPS_PATH).mock(
         return_value=httpx.Response(201, json=_group_payload())
     )
 
@@ -719,3 +769,177 @@ class TestNoRefusalIsEverRaisedByThePrompt:
             await confirm("Create the section group 'X' in the notebook 'Y'?", "synthetic-state")
             is None
         )
+
+
+class TestANotebookThatBelongsToAGroup:
+    @pytest.mark.usefixtures("team_notebook_audience")
+    async def test_a_group_notebook_parent_asks_then_posts_once_under_the_group(
+        self,
+        client: GraphServiceClient,
+        team_notebook_groups: respx.Route,
+        notebook_groups: respx.Route,
+    ) -> None:
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, parent=_TEAM_NOTEBOOK, confirm=counting)
+
+        assert len(asked) == 1, "a group notebook the user owns was written without a question"
+        assert team_notebook_groups.call_count == 1
+        assert _sent(team_notebook_groups)["displayName"] == _NAME
+        assert notebook_groups.call_count == 0
+
+    @pytest.mark.usefixtures("team_group_audience")
+    async def test_a_group_section_group_parent_asks_then_posts_once_via_the_hand_built_route(
+        self,
+        client: GraphServiceClient,
+        team_group_groups: respx.Route,
+        group_groups: respx.Route,
+    ) -> None:
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, parent=_TEAM_GROUP, name="A nested group", confirm=counting)
+
+        assert len(asked) == 1
+        assert team_group_groups.call_count == 1
+        assert _sent(team_group_groups)["displayName"] == "A nested group"
+        assert team_group_groups.calls.last.request.headers["accept"] == "application/json"
+        assert group_groups.call_count == 0
+
+    @pytest.mark.usefixtures("retry_sleeps", "team_notebook_audience")
+    async def test_the_group_notebook_route_is_never_retried(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = graph.post(_TEAM_NOTEBOOK_GROUPS_PATH).mock(return_value=httpx.Response(503))
+
+        with pytest.raises(GraphUnavailable):
+            _ = await _create(client, parent=_TEAM_NOTEBOOK)
+
+        assert post.call_count == 1, "no_retry means one attempt, however Graph answers"
+
+    @pytest.mark.usefixtures("retry_sleeps", "team_group_audience")
+    async def test_the_hand_built_group_route_is_never_retried(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = graph.post(_TEAM_GROUP_GROUPS_PATH).mock(return_value=httpx.Response(503))
+
+        with pytest.raises(GraphUnavailable):
+            _ = await _create(client, parent=_TEAM_GROUP)
+
+        assert post.call_count == 1, "no_retry means one attempt, however Graph answers"
+
+    @pytest.mark.usefixtures("team_notebook_audience")
+    async def test_a_refusal_creates_nothing_in_a_group_notebook(
+        self, client: GraphServiceClient, team_notebook_groups: respx.Route
+    ) -> None:
+        with pytest.raises(ToolError, match="No section group was created"):
+            _ = await _create(client, parent=_TEAM_NOTEBOOK, confirm=_refuses)
+
+        assert team_notebook_groups.call_count == 0
+
+    @pytest.mark.usefixtures("team_notebook_audience", "team_notebook_groups")
+    async def test_the_question_gives_the_group_as_the_reason(
+        self, client: GraphServiceClient
+    ) -> None:
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, parent=_TEAM_NOTEBOOK, confirm=capturing)
+
+        assert asked == [
+            f"Create the section group {_NAME!r} in the notebook 'Work', {_TEAM_REASON}?"
+        ]
+
+    @pytest.mark.usefixtures("team_group_audience", "team_group_groups")
+    async def test_the_question_names_the_group_section_group_and_the_group_reason(
+        self, client: GraphServiceClient
+    ) -> None:
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, parent=_TEAM_GROUP, confirm=capturing)
+
+        assert asked == [
+            f"Create the section group {_NAME!r} in the section group 'Projects' of the notebook "
+            + f"'Work', {_TEAM_REASON}?"
+        ]
+
+    @pytest.mark.usefixtures("team_notebook_audience", "team_notebook_groups")
+    async def test_a_group_notebook_parent_answers_with_group_handles(
+        self, client: GraphServiceClient
+    ) -> None:
+        answer = await _create(client, parent=_TEAM_NOTEBOOK)
+
+        assert answer.uri == OnenoteSectionGroupHandle(_CHILD_GROUP_ID, group_id=_TEAM_ID).uri
+        assert answer.parent_uri == _TEAM_NOTEBOOK
+
+    @pytest.mark.usefixtures("team_group_audience", "team_group_groups")
+    async def test_a_group_section_group_parent_answers_with_group_handles(
+        self, client: GraphServiceClient
+    ) -> None:
+        answer = await _create(client, parent=_TEAM_GROUP)
+
+        assert answer.uri == OnenoteSectionGroupHandle(_CHILD_GROUP_ID, group_id=_TEAM_ID).uri
+        assert answer.parent_uri == _TEAM_GROUP
+
+    @pytest.mark.usefixtures("team_notebook_audience")
+    async def test_the_first_round_binds_the_agreement_to_the_group_handle(
+        self, client: GraphServiceClient, team_notebook_groups: respx.Route
+    ) -> None:
+        answer = await create_section_group(
+            client,
+            parent=_TEAM_NOTEBOOK,
+            name=_NAME,
+            confirm=a_person_agrees(_modern_context()),
+        )
+
+        assert isinstance(answer, InputRequiredResult)
+        assert answer.request_state == write_state_for(
+            "create_section_group", _TEAM_NOTEBOOK, _NAME
+        )
+        assert answer.request_state != write_state_for("create_section_group", _NOTEBOOK, _NAME)
+        assert team_notebook_groups.call_count == 0
+
+    @pytest.mark.parametrize(
+        "parent", [_TEAM_NOTEBOOK, _TEAM_GROUP], ids=["notebook", "section-group"]
+    )
+    @pytest.mark.usefixtures("team_group_audience", "team_notebook_groups", "team_group_groups")
+    async def test_a_group_parent_never_reaches_a_me_route(
+        self, client: GraphServiceClient, graph: respx.MockRouter, parent: str
+    ) -> None:
+        _ = await _create(client, parent=parent)
+
+        calls = cast("Sequence[Call]", graph.calls)
+        assert len(calls) > 0
+        assert all(
+            call.request.url.path.startswith(f"/v1.0/groups/{_TEAM_ID}/onenote/") for call in calls
+        )
+
+    @pytest.mark.parametrize("parent", [_NOTEBOOK, _GROUP], ids=["notebook", "section-group"])
+    @pytest.mark.usefixtures("group_audience", "notebook_groups", "group_groups")
+    async def test_a_parent_with_no_group_never_reaches_a_group_route(
+        self, client: GraphServiceClient, graph: respx.MockRouter, parent: str
+    ) -> None:
+        answer = await _create(client, parent=parent)
+
+        assert answer.uri == OnenoteSectionGroupHandle(_CHILD_GROUP_ID).uri
+        calls = cast("Sequence[Call]", graph.calls)
+        assert len(calls) > 0
+        assert all(call.request.url.path.startswith("/v1.0/me/") for call in calls)
