@@ -45,8 +45,8 @@ from office_365_mcp.shared.seam import (
     Advised,
     Confirm,
     GraphAdviceMiddleware,
-    ToolAdvice,
 )
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import sharepoint_rename_item as renamer
 from office_365_mcp.tools.sharepoint_rename_item import RenamedItem, a_person_agrees, rename_item
 
@@ -152,13 +152,7 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
 
 
 async def _advised(client: GraphServiceClient) -> str:
-    advice = GraphAdviceMiddleware(
-        {
-            renamer.TOOL_NAME: ToolAdvice(
-                permissions=renamer.GRAPH_PERMISSIONS, not_found=renamer.GRAPH_NOT_FOUND
-            )
-        }
-    )
+    advice = GraphAdviceMiddleware(graph_advice(resolve(preset=None, enabled=(renamer.TOOL_NAME,))))
 
     async def renames(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
         _ = context
@@ -465,6 +459,24 @@ class TestGraphFailures:
         with pytest.raises(GraphForbidden):
             _ = await _rename(client)
 
+    async def test_a_403_on_the_rename_after_the_read_reaches_the_model_as_item_access(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _pre_reads(graph, _item_payload())
+        patch = graph.patch(_ITEM_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        message = await _advised(client)
+
+        assert message.startswith(renamer.GRAPH_FORBIDDEN)
+        assert "HTTP 403" in message
+        assert "administrator to grant" not in message
+        assert "Files.ReadWrite.All" not in message
+        assert patch.call_count == 1
+
     async def test_a_failed_re_read_is_reported_as_a_rename_that_happened(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -535,6 +547,9 @@ class TestGraphFailures:
         assert "nothing was renamed" in renamer.GRAPH_NOT_FOUND
         assert "sharepoint_search_files" in renamer.GRAPH_NOT_FOUND
         assert "sharepoint_browse_folder" in renamer.GRAPH_NOT_FOUND
+
+    def test_forbidden_advice_says_the_item_was_not_renamed(self) -> None:
+        assert "The item was not renamed." in renamer.GRAPH_FORBIDDEN
 
 
 class TestThePersonBetweenTheRenameAndTheFolder:

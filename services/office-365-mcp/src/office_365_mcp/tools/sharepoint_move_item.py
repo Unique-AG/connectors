@@ -18,6 +18,7 @@ from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
     DriveItemSummary,
     folder_label,
+    item_access_refused,
     item_for_a_question,
     item_label,
     parent_folder_label,
@@ -127,6 +128,8 @@ GRAPH_NOT_FOUND = (
     + "`uri` values from that new result. If you call this tool again with the same arguments, "
     + "the call will fail the same way."
 )
+
+GRAPH_FORBIDDEN = item_access_refused(_NOTHING_MOVED)
 
 _MOVED_BUT_UNREAD = (
     "Microsoft 365 moved the item. Then this connector did not get a complete answer about the "

@@ -13,10 +13,13 @@ from fastmcp.server.elicitation import (
     CancelledElicitation,
     DeclinedElicitation,
 )
+from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import Tool
+from fastmcp.tools.base import ToolResult
 from mcp.shared.exceptions import MCPError
 from mcp.types import (
     METHOD_NOT_FOUND,
+    CallToolRequestParams,
     ElicitRequest,
     ElicitRequestFormParams,
     ElicitResult,
@@ -36,7 +39,8 @@ from office_365_mcp.shared.handles import (
 )
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
+from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm, GraphAdviceMiddleware
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import sharepoint_delete_item as deleter
 from office_365_mcp.tools.sharepoint_delete_item import DeletedItem, a_person_agrees, delete_item
 
@@ -137,6 +141,19 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
     tool = await mcp.get_tool(deleter.TOOL_NAME)
     assert tool is not None, "register left the tool off the server"
     return cast("Mapping[str, object]", tool.parameters), tool
+
+
+async def _advised(client: GraphServiceClient) -> str:
+    async def deleting(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+        _ = context
+        _ = await _delete(client)
+        raise AssertionError("the delete answered, so there is no Graph failure to advise on")
+
+    advice = GraphAdviceMiddleware(graph_advice(resolve(preset=None, enabled=(deleter.TOOL_NAME,))))
+    context = MiddlewareContext(message=CallToolRequestParams(name=deleter.TOOL_NAME, arguments={}))
+    with pytest.raises(ToolError) as raised:
+        _ = await advice.on_call_tool(context, deleting)
+    return str(raised.value)
 
 
 class TestWhatItSendsToGraph:
@@ -336,6 +353,20 @@ class TestGraphFailures:
         with pytest.raises(GraphForbidden):
             _ = await _delete(client)
 
+    async def test_a_403_on_the_delete_after_the_read_reaches_the_model_as_item_access(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _item_payload())
+        delete_route = graph.delete(_ITEM_PATH).mock(return_value=httpx.Response(403, json=_DENIED))
+
+        message = await _advised(client)
+
+        assert message.startswith(deleter.GRAPH_FORBIDDEN)
+        assert "HTTP 403" in message
+        assert "administrator to grant" not in message
+        assert "Files.ReadWrite.All" not in message
+        assert delete_route.call_count == 1
+
     async def test_the_call_example_reaches_graph_and_the_pre_read_is_what_a_403_refuses(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -356,6 +387,9 @@ class TestGraphFailures:
         assert "already gone" in deleter.GRAPH_NOT_FOUND
         assert "sharepoint_browse_folder" in deleter.GRAPH_NOT_FOUND
         assert "sharepoint_search_files" in deleter.GRAPH_NOT_FOUND
+
+    def test_forbidden_advice_says_the_item_was_not_moved_to_the_recycle_bin(self) -> None:
+        assert "The item was not moved to the recycle bin." in deleter.GRAPH_FORBIDDEN
 
 
 class TestConfirmationIsAlwaysAsked:

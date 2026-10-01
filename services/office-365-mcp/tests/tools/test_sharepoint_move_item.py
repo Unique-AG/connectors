@@ -61,8 +61,8 @@ from office_365_mcp.shared.seam import (
     Confirm,
     Confirmed,
     GraphAdviceMiddleware,
-    ToolAdvice,
 )
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import sharepoint_move_item as mover
 from office_365_mcp.tools.sharepoint_move_item import MovedItem, a_person_agrees, move_item
 
@@ -230,13 +230,7 @@ async def _advised(client: GraphServiceClient) -> str:
         _ = await _move(client)
         raise AssertionError("the move answered, so there is no Graph failure to advise on")
 
-    advice = GraphAdviceMiddleware(
-        {
-            mover.TOOL_NAME: ToolAdvice(
-                permissions=mover.GRAPH_PERMISSIONS, not_found=mover.GRAPH_NOT_FOUND
-            )
-        }
-    )
+    advice = GraphAdviceMiddleware(graph_advice(resolve(preset=None, enabled=(mover.TOOL_NAME,))))
     context = MiddlewareContext(message=CallToolRequestParams(name=mover.TOOL_NAME, arguments={}))
     with pytest.raises(ToolError) as raised:
         _ = await advice.on_call_tool(context, moving)
@@ -1017,6 +1011,23 @@ class TestGraphFailures:
 
         assert advice.startswith(mover.GRAPH_NOT_FOUND)
 
+    async def test_a_403_on_the_move_after_the_reads_reaches_the_model_as_item_access(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        patch = _patches(
+            graph,
+            httpx.Response(403, json={"error": {"code": "accessDenied", "message": "denied"}}),
+        )
+
+        message = await _advised(client)
+
+        assert message.startswith(mover.GRAPH_FORBIDDEN)
+        assert "HTTP 403" in message
+        assert "administrator to grant" not in message
+        assert "Files.ReadWrite.All" not in message
+        assert patch.call_count == 1
+
     async def test_the_call_example_reaches_graph_and_the_pre_read_is_what_a_403_refuses(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -1290,3 +1301,6 @@ class TestHowItDeclaresItself:
         assert "sharepoint_search_files" in mover.GRAPH_NOT_FOUND
         assert "sharepoint_browse_folder" in mover.GRAPH_NOT_FOUND
         assert "nothing was moved" in mover.GRAPH_NOT_FOUND
+
+    def test_forbidden_advice_says_nothing_was_moved(self) -> None:
+        assert _NOTHING_MOVED in mover.GRAPH_FORBIDDEN

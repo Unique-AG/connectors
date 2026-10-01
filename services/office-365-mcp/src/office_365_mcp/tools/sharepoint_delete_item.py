@@ -17,6 +17,7 @@ from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
     UNNAMED_FOLDER_LABEL,
     UNNAMED_ITEM_LABEL,
+    item_access_refused,
     item_for_a_question,
     parent_folder_label,
 )
@@ -83,6 +84,8 @@ GRAPH_NOT_FOUND = (
     + "that result, it is already gone and nothing is left to delete. The same handle fails the "
     + "same way, so do not retry it."
 )
+
+GRAPH_FORBIDDEN = item_access_refused(_NOTHING_DELETED)
 
 
 class DeletedItem(BaseModel):

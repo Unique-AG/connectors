@@ -16,6 +16,7 @@ from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
     NAME_RULES,
     DriveItemSummary,
+    item_access_refused,
     item_for_a_question,
     item_label,
     parent_folder_label,
@@ -81,6 +82,8 @@ GRAPH_NOT_FOUND = (
     + "sharepoint_browse_folder, and take the `uri` from that new result. The same handle fails "
     + "the same way, so do not retry it."
 )
+
+GRAPH_FORBIDDEN = item_access_refused(_NOTHING_RENAMED)
 
 _WRITTEN_BUT_UNREAD = (
     "Microsoft 365 renamed the item. Then this connector did not receive the renamed item from "
