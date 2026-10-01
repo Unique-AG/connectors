@@ -10,6 +10,12 @@ from datetime import timedelta
 import httpx
 import pytest
 import respx
+from msgraph.generated.models.identity import Identity
+from msgraph.generated.models.identity_set import IdentitySet
+from msgraph.generated.models.meeting_participant_info import MeetingParticipantInfo
+from msgraph.generated.models.meeting_participants import MeetingParticipants
+from msgraph.generated.models.online_meeting import OnlineMeeting
+from msgraph.generated.models.user import User
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.shared import handles, meetings
@@ -106,3 +112,57 @@ class TestHowLongAnAbsenceStaysUnsettled:
         """Microsoft publishes no availability SLA, and a tight window reports a still-processing
         transcript as one that will never exist — the one wrong answer a caller cannot detect."""
         assert timedelta(hours=1) <= meetings.ARTIFACT_DELAY_ALLOWANCE
+
+
+_ORGANIZER_ID = "00000000-0000-4000-8000-000000000001"
+_ATTENDEE_ID = "00000000-0000-4000-8000-000000000002"
+
+
+def _organized_by(organizer_id: str | None) -> OnlineMeeting:
+    return OnlineMeeting(
+        participants=MeetingParticipants(
+            organizer=MeetingParticipantInfo(identity=IdentitySet(user=Identity(id=organizer_id))),
+            attendees=[
+                MeetingParticipantInfo(identity=IdentitySet(user=Identity(id=_ATTENDEE_ID)))
+            ],
+        )
+    )
+
+
+class TestWhoOrganizesTheMeeting:
+    def test_the_organizer_is_the_signed_in_user(self) -> None:
+        assert meetings.organized_by(_organized_by(_ORGANIZER_ID), User(id=_ORGANIZER_ID))
+
+    def test_an_attendee_is_not_the_organizer(self) -> None:
+        assert not meetings.organized_by(_organized_by(_ORGANIZER_ID), User(id=_ATTENDEE_ID))
+
+    def test_the_ids_compare_without_case(self) -> None:
+        assert meetings.organized_by(_organized_by(_ORGANIZER_ID.upper()), User(id=_ORGANIZER_ID))
+
+    @pytest.mark.parametrize(
+        "meeting",
+        [
+            pytest.param(OnlineMeeting(), id="no-participants"),
+            pytest.param(OnlineMeeting(participants=MeetingParticipants()), id="no-organizer"),
+            pytest.param(
+                OnlineMeeting(participants=MeetingParticipants(organizer=MeetingParticipantInfo())),
+                id="no-identity",
+            ),
+            pytest.param(
+                OnlineMeeting(
+                    participants=MeetingParticipants(
+                        organizer=MeetingParticipantInfo(identity=IdentitySet())
+                    )
+                ),
+                id="no-user",
+            ),
+            pytest.param(_organized_by(None), id="no-id"),
+        ],
+    )
+    def test_a_meeting_that_names_no_organizer_is_not_organized_by_the_user(
+        self, meeting: OnlineMeeting
+    ) -> None:
+        assert not meetings.organized_by(meeting, User(id=_ORGANIZER_ID))
+
+    def test_a_user_with_no_id_organizes_nothing(self) -> None:
+        assert not meetings.organized_by(_organized_by(_ORGANIZER_ID), User())

@@ -21,6 +21,7 @@ from typing import Protocol
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.online_meeting import OnlineMeeting
+from msgraph.generated.models.user import User
 from msgraph.generated.users.item.online_meetings.online_meetings_request_builder import (
     OnlineMeetingsRequestBuilder,
 )
@@ -84,6 +85,14 @@ async def resolve_meeting(
     assert matched is not None, "Graph answered GET /me/onlineMeetings with no collection"
     meetings = matched.value or []
     return meetings[0] if meetings else None
+
+
+def organized_by(meeting: OnlineMeeting, user: User) -> bool:
+    participants = meeting.participants
+    organizer = None if participants is None else participants.organizer
+    identities = None if organizer is None else organizer.identity
+    named = None if identities is None or identities.user is None else identities.user.id
+    return named is not None and user.id is not None and named.casefold() == user.id.casefold()
 
 
 async def newest_of[T: MeetingArtifact](
