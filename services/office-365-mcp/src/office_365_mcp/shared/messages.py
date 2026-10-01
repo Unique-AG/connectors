@@ -36,7 +36,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.calendar import confirmation_id_for
-from office_365_mcp.shared.handles import MessageHandle
+from office_365_mcp.shared.files import AttachableFile
+from office_365_mcp.shared.handles import DriveFileHandle, MessageHandle
 from office_365_mcp.shared.identity import ENTRA_OBJECT_ID_PATTERN
 from office_365_mcp.shared.prose import cut_for_a_question
 
@@ -424,22 +425,36 @@ def outgoing_message(
     mentions: Sequence[Mention] = (),
     importance: ChatMessageImportance | None = None,
     subject: str | None = None,
+    attachments: Sequence[AttachableFile] = (),
 ) -> ChatMessage:
-    if not mentions:
+    if not mentions and not attachments:
         return ChatMessage(
             body=ItemBody(content=text, content_type=BodyType.Text),
             importance=importance,
             subject=subject,
         )
-    tags = " ".join(
-        f'<at id="{index}">{html.escape(mention.name)}</at>'
-        for index, mention in enumerate(mentions)
+    content = " ".join(
+        (
+            *(
+                f'<at id="{index}">{html.escape(mention.name)}</at>'
+                for index, mention in enumerate(mentions)
+            ),
+            html.escape(text).replace("\n", "<br>"),
+            *(f'<attachment id="{file.attachment_id}"></attachment>' for file in attachments),
+        )
     )
     return ChatMessage(
-        body=ItemBody(
-            content=f"{tags} {html.escape(text).replace('\n', '<br>')}",
-            content_type=BodyType.Html,
-        ),
+        body=ItemBody(content=content, content_type=BodyType.Html),
+        attachments=[
+            ChatMessageAttachment(
+                id=file.attachment_id,
+                content_type="reference",
+                content_url=file.web_dav_url,
+                name=file.name,
+            )
+            for file in attachments
+        ]
+        or None,
         mentions=[
             ChatMessageMention(
                 id=index,
@@ -455,7 +470,8 @@ def outgoing_message(
                 ),
             )
             for index, mention in enumerate(mentions)
-        ],
+        ]
+        or None,
         importance=importance,
         subject=subject,
     )
@@ -516,6 +532,11 @@ CHAT_SUBJECT_FIELD: str = (
     + "with no subject."
 )
 
+ATTACHMENTS_FIELD: str = (
+    "The files to attach, as handles, one entry for each file. Copy each handle from the `uri` "
+    + "of a sharepoint_search_files hit or of a sharepoint_browse_folder row."
+)
+
 TEAM_ID_FIELD: str = (
     "The team that holds the channel, as the `team_id` that teams_list_my_teams reported. It is "
     + "a GUID, not a `teams:///` handle."
@@ -560,9 +581,12 @@ def send_question(
     *,
     subject: str | None,
     importance: ChatImportance | None,
+    files: Sequence[AttachableFile] = (),
 ) -> str:
     named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
     mentioned = f" It mentions {named}." if mentions else ""
+    listed = ", ".join(repr(cut_for_a_question(file.name)) for file in files)
+    attached = f" It attaches {listed}." if files else ""
     details = [
         text
         for text in (
@@ -574,7 +598,7 @@ def send_question(
     marked = f" with {' and '.join(details)}" if details else ""
     return (
         f"{words.verb} {cut_for_a_question(message)!r}{marked} {destination} now?"
-        + f"{mentioned} {words.cannot_be_recalled}"
+        + f"{mentioned}{attached} {words.cannot_be_recalled}"
     )
 
 
@@ -585,6 +609,7 @@ def send_binding(
     *,
     subject: str | None,
     importance: ChatImportance | None,
+    files: Sequence[DriveFileHandle] = (),
 ) -> str:
     return confirmation_id_for(
         *destination,
@@ -592,6 +617,8 @@ def send_binding(
         *mention_fields(mentions),
         repr(subject),
         repr(importance),
+        str(len(files)),
+        *(handle.uri for handle in files),
     )
 
 

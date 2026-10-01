@@ -5,6 +5,8 @@ from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.chat_message_importance import ChatMessageImportance
 from pydantic import ValidationError
 
+from office_365_mcp.shared.files import AttachableFile
+from office_365_mcp.shared.handles import DriveFileHandle
 from office_365_mcp.shared.messages import (
     CHANNEL_POST,
     CHAT_SEND,
@@ -20,6 +22,20 @@ from office_365_mcp.shared.messages import (
 
 _JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
 _ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelace")
+
+_BUDGET = AttachableFile(
+    attachment_id="153fa47d-18c9-4179-be08-9879815a9f90",
+    web_dav_url="https://contoso.sharepoint.invalid/sites/finance/Shared%20Documents/Budget.docx",
+    name="Budget.docx",
+)
+_PLAN = AttachableFile(
+    attachment_id="0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+    web_dav_url="https://contoso.sharepoint.invalid/sites/finance/Shared%20Documents/Plan.pptx",
+    name="Plan <draft>.pptx",
+)
+
+_BUDGET_HANDLE = DriveFileHandle("b!SYNTHETICDRIVE0000", "01SYNTHETICFILE0000")
+_PLAN_HANDLE = DriveFileHandle("b!SYNTHETICDRIVE0000", "01SYNTHETICFILE0001")
 
 _CHAT_ID = "19:release@thread.v2"
 _TO_THE_CHAT = f"to chat {_CHAT_ID!r}"
@@ -107,6 +123,47 @@ class TestOutgoingMessage:
         assert built.importance is importance
         assert built.subject == "Release plan"
 
+    @pytest.mark.parametrize("mentions", [(), (_JANE,)])
+    def test_a_message_built_without_files_carries_no_attachment(
+        self, mentions: tuple[Mention, ...]
+    ) -> None:
+        assert outgoing_message("Ship it.", mentions=mentions).attachments is None
+
+    def test_an_attachment_makes_the_text_escaped_html_with_the_tag_after_it(self) -> None:
+        built = outgoing_message('a < b & "c"\nnext', attachments=[_BUDGET])
+
+        assert built.body is not None
+        assert built.body.content_type == BodyType.Html
+        assert built.body.content == (
+            "a &lt; b &amp; &quot;c&quot;<br>next "
+            + '<attachment id="153fa47d-18c9-4179-be08-9879815a9f90"></attachment>'
+        )
+        assert built.mentions is None
+
+    def test_each_attachment_is_a_reference_to_its_webdav_address(self) -> None:
+        built = outgoing_message("Ship it.", attachments=[_BUDGET, _PLAN])
+
+        assert built.attachments is not None
+        assert [
+            (attachment.id, attachment.content_type, attachment.content_url, attachment.name)
+            for attachment in built.attachments
+        ] == [
+            (_BUDGET.attachment_id, "reference", _BUDGET.web_dav_url, "Budget.docx"),
+            (_PLAN.attachment_id, "reference", _PLAN.web_dav_url, "Plan <draft>.pptx"),
+        ]
+
+    def test_the_mentions_come_first_and_the_attachments_last_in_the_order_given(self) -> None:
+        built = outgoing_message("Ship it.", mentions=[_JANE], attachments=[_BUDGET, _PLAN])
+
+        assert built.body is not None
+        assert built.body.content == (
+            '<at id="0">Jane Smith</at> Ship it. '
+            + '<attachment id="153fa47d-18c9-4179-be08-9879815a9f90"></attachment> '
+            + '<attachment id="0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"></attachment>'
+        )
+        assert built.mentions is not None
+        assert len(built.mentions) == 1
+
 
 class TestMention:
     @pytest.mark.parametrize(
@@ -154,6 +211,22 @@ class TestSendQuestion:
             + "be recalled once sent."
         )
 
+    def test_the_files_come_after_the_mentions_in_the_order_given(self) -> None:
+        question = send_question(
+            CHAT_SEND,
+            _MESSAGE,
+            _TO_THE_CHAT,
+            (_JANE,),
+            subject=None,
+            importance=None,
+            files=(_BUDGET, _PLAN),
+        )
+
+        assert question == (
+            "Send 'Ship it Friday.' to chat '19:release@thread.v2' now? It mentions 'Jane Smith'. "
+            + "It attaches 'Budget.docx', 'Plan <draft>.pptx'. This cannot be recalled once sent."
+        )
+
     def test_a_channel_post_names_the_channel_the_team_and_that_it_cannot_be_recalled(
         self,
     ) -> None:
@@ -166,6 +239,26 @@ class TestSendQuestion:
             + "'8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81' now? This cannot be recalled once posted."
         )
 
+    def test_a_channel_post_names_the_subject_the_importance_the_mentions_and_the_files(
+        self,
+    ) -> None:
+        question = send_question(
+            CHANNEL_POST,
+            _MESSAGE,
+            _TO_THE_CHANNEL,
+            (_JANE,),
+            subject=_SUBJECT,
+            importance="high",
+            files=(_BUDGET,),
+        )
+
+        assert question == (
+            "Post 'Ship it Friday.' with the subject 'Release plan' and high importance to channel "
+            + "'19:general@thread.tacv2' in team '8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81' now? It "
+            + "mentions 'Jane Smith'. It attaches 'Budget.docx'. This cannot be recalled once "
+            + "posted."
+        )
+
 
 def _bound(
     message: str = _MESSAGE,
@@ -174,13 +267,18 @@ def _bound(
     *,
     subject: str | None = None,
     importance: ChatImportance | None = None,
+    files: Sequence[DriveFileHandle] = (),
 ) -> str:
-    return send_binding((chat_id,), message, mentions, subject=subject, importance=importance)
+    return send_binding(
+        (chat_id,), message, mentions, subject=subject, importance=importance, files=files
+    )
 
 
 class TestSendBinding:
     def test_the_same_request_is_bound_the_same_way_twice(self) -> None:
-        assert _bound(mentions=(_JANE,)) == _bound(mentions=(_JANE,))
+        assert _bound(mentions=(_JANE,), files=(_BUDGET_HANDLE,)) == _bound(
+            mentions=(_JANE,), files=(_BUDGET_HANDLE,)
+        )
 
     def test_two_messages_with_the_same_120_char_preview_are_bound_apart(self) -> None:
         common_prefix = "x" * 120
@@ -217,6 +315,37 @@ class TestSendBinding:
 
         assert len({_bound(mentions=mentions) for mentions in sets}) == 6
 
+    def test_each_set_of_files_is_bound_apart_and_their_order_counts(self) -> None:
+        sets: tuple[tuple[DriveFileHandle, ...], ...] = (
+            (),
+            (_BUDGET_HANDLE,),
+            (_PLAN_HANDLE,),
+            (_BUDGET_HANDLE, _PLAN_HANDLE),
+            (_PLAN_HANDLE, _BUDGET_HANDLE),
+        )
+
+        assert len({_bound(files=attached) for attached in sets}) == 5
+
+    def test_a_mention_a_subject_or_an_importance_beside_a_file_is_bound_apart(self) -> None:
+        cases: tuple[tuple[tuple[Mention, ...], str | None, ChatImportance | None], ...] = (
+            ((), None, None),
+            ((_JANE,), None, None),
+            ((), _SUBJECT, None),
+            ((), None, "urgent"),
+        )
+
+        bindings = {
+            _bound(
+                mentions=mentions,
+                subject=subject,
+                importance=importance,
+                files=(_BUDGET_HANDLE,),
+            )
+            for mentions, subject, importance in cases
+        }
+
+        assert len(bindings) == 4
+
 
 def _bound_in_channel(
     *,
@@ -226,6 +355,7 @@ def _bound_in_channel(
     mentions: Sequence[Mention] = (),
     subject: str | None = None,
     importance: ChannelImportance | None = None,
+    files: Sequence[DriveFileHandle] = (),
 ) -> str:
     return send_binding(
         (team_id, channel_id, repr(reply_to_id)),
@@ -233,6 +363,7 @@ def _bound_in_channel(
         mentions,
         subject=subject,
         importance=importance,
+        files=files,
     )
 
 
@@ -255,6 +386,20 @@ class TestSendBindingInAChannel:
         importances: tuple[ChannelImportance | None, ...] = (None, "normal", "high")
 
         assert len({_bound_in_channel(importance=importance) for importance in importances}) == 3
+
+    def test_each_file_set_mention_subject_importance_and_thread_is_bound_apart(self) -> None:
+        bindings = {
+            _bound_in_channel(files=(_BUDGET_HANDLE,)),
+            _bound_in_channel(files=(_PLAN_HANDLE,)),
+            _bound_in_channel(files=(_BUDGET_HANDLE, _PLAN_HANDLE)),
+            _bound_in_channel(files=(_PLAN_HANDLE, _BUDGET_HANDLE)),
+            _bound_in_channel(files=(_BUDGET_HANDLE,), mentions=(_JANE,)),
+            _bound_in_channel(files=(_BUDGET_HANDLE,), subject=_SUBJECT),
+            _bound_in_channel(files=(_BUDGET_HANDLE,), importance="high"),
+            _bound_in_channel(files=(_BUDGET_HANDLE,), reply_to_id=_ROOT_ID),
+        }
+
+        assert len(bindings) == 8
 
 
 class TestSubjectOnAReply:
