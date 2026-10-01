@@ -17,7 +17,11 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.files import UNNAMED_ITEM_LABEL, item_for_a_question
+from office_365_mcp.shared.files import (
+    ITEM_HANDLE_SOURCES,
+    UNNAMED_ITEM_LABEL,
+    item_for_a_question,
+)
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
@@ -73,9 +77,9 @@ _NOT_AN_ITEM_HANDLE = (
     "sharepoint_create_share_link did not get a file handle or a folder handle. A file handle "
     + "looks like sharepoint:///files/{drive_id}/{item_id}, and a folder handle looks like "
     + "sharepoint:///folders/{drive_id}/{item_id}, with both ids percent-encoded. A web address "
-    + "is not a handle, and no site name, folder name or file name becomes a handle. Take the "
-    + "`uri` of a sharepoint_search_files hit or of a sharepoint_browse_folder row, and copy it "
-    + "word for word. No link was created. This same value fails again, so do not retry it."
+    + "is not a handle, and no site name, folder name or file name becomes a handle. "
+    + ITEM_HANDLE_SOURCES
+    + " No link was created. This same value fails again, so do not retry it."
 )
 
 _NO_WEB_ADDRESS = (
@@ -210,10 +214,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The file or folder to share, as the `uri` of a sharepoint_search_files hit "
-                    + "or of a sharepoint_browse_folder row, copied word for word. A file handle "
-                    + "and a folder handle both work. A web address is not a handle, and an item "
-                    + "id alone reaches nothing."
+                    "The file or folder to share. A file handle and a folder handle both work. "
+                    + ITEM_HANDLE_SOURCES
+                    + " A web address, a path and a name are not handles."
                 ),
             ),
         ],

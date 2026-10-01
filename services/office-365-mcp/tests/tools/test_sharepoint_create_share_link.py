@@ -26,6 +26,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
+from office_365_mcp.shared.files import ITEM_HANDLE_SOURCES
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
@@ -298,6 +299,7 @@ class TestWhatItRefuses:
 
         assert "sharepoint_search_files" in str(raised.value)
         assert "sharepoint_browse_folder" in str(raised.value)
+        assert ITEM_HANDLE_SOURCES in str(raised.value)
 
 
 class TestThePersonBeforeTheLink:
@@ -741,6 +743,20 @@ class TestHowItDeclaresItself:
         parameters, _tool = await _registered(transport)
 
         assert _properties(parameters)["audience"]["default"] == "organization"
+
+    async def test_the_item_argument_names_every_source_of_an_item_handle(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        assert ITEM_HANDLE_SOURCES in str(_properties(parameters)["item"]["description"])
+
+    async def test_the_item_argument_is_described_in_15_to_60_words(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        assert 15 <= len(str(_properties(parameters)["item"]["description"]).split()) <= 60
 
     async def test_the_call_example_is_accepted_by_the_schema(
         self, transport: httpx.AsyncClient

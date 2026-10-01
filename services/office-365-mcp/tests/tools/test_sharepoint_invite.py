@@ -34,6 +34,7 @@ from office_365_mcp.graph_client import (
     GraphThrottled,
     GraphUnavailable,
 )
+from office_365_mcp.shared.files import ITEM_HANDLE_SOURCES
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
@@ -344,6 +345,7 @@ class TestWhatItRefuses:
         refusal = str(raised.value)
         assert "sharepoint_search_files" in refusal
         assert "sharepoint_browse_folder" in refusal
+        assert ITEM_HANDLE_SOURCES in refusal
         assert _NOTHING_SHARED in refusal
 
     @pytest.mark.parametrize(
@@ -1003,6 +1005,13 @@ class TestHowItDeclaresItself:
             for name, schema in _properties(parameters).items()
         }
         assert all(15 <= count <= 60 for count in counts.values()), counts
+
+    async def test_the_item_argument_names_every_source_of_an_item_handle(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        assert ITEM_HANDLE_SOURCES in str(_properties(parameters)["item"]["description"])
 
     async def test_no_argument_names_a_tool_outside_the_sharepoint_family(
         self, transport: httpx.AsyncClient

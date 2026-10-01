@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import repeated_address
 from office_365_mcp.shared.files import (
+    ITEM_HANDLE_SOURCES,
     TOP_FOLDER_LABEL,
     UNNAMED_ITEM_LABEL,
     display_name,
@@ -91,9 +92,9 @@ _NOT_AN_ITEM_HANDLE = (
     "sharepoint_invite did not get a file handle or a folder handle. A file handle looks like "
     + "sharepoint:///files/{drive_id}/{item_id}, with both ids percent-encoded. A folder handle "
     + "looks like sharepoint:///folders/{drive_id}/{item_id}. A web address is not a handle, and "
-    + "no site name, folder name, or file name becomes a handle. Take the `uri` of a "
-    + "sharepoint_search_files hit or of a sharepoint_browse_folder row, and copy it word for "
-    + f"word. {_NOTHING_SHARED} This same value fails again, so do not retry it."
+    + "no site name, folder name, or file name becomes a handle. "
+    + ITEM_HANDLE_SOURCES
+    + f" {_NOTHING_SHARED} This same value fails again, so do not retry it."
 )
 
 GRAPH_NOT_FOUND = (
@@ -314,9 +315,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "This is the file or folder to share. Pass the `uri` of a "
-                    + "sharepoint_search_files hit or of a sharepoint_browse_folder row, copied "
-                    + "word for word. A web address, a site name, and a file name are not handles."
+                    "The file or folder to share with the people in `recipients`. A file handle "
+                    + "and a folder handle both work. "
+                    + ITEM_HANDLE_SOURCES
+                    + " A web address, a path and a name are not handles."
                 ),
             ),
         ],
