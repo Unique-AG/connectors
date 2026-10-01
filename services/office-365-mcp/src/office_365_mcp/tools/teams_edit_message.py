@@ -55,7 +55,8 @@ Notes:
 - This tool asks the user to agree before it changes a message, every time. This tool changes \
 nothing unless the user agrees.
 - The new text replaces all of the old text. A mention stays in the message only if `mentions` \
-gives it again.
+gives it again. This tool sends no file and no card, so the change can remove a file or a card \
+from the message.
 """
 
 _BAD_HANDLE = """\

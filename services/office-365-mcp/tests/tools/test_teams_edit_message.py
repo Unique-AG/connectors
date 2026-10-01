@@ -560,7 +560,7 @@ class TestHowItDeclaresItself:
         assert annotations.idempotent_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["idempotentHint"]
         assert annotations.open_world_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["openWorldHint"]
 
-    async def test_the_description_says_it_asks_every_time_and_what_the_edit_replaces(
+    async def test_the_description_says_it_asks_every_time_and_what_the_edit_replaces_or_removes(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
@@ -574,6 +574,10 @@ class TestHowItDeclaresItself:
         assert (
             "The new text replaces all of the old text. A mention stays in the message only if "
             + "`mentions` gives it again."
+        ) in description
+        assert (
+            "This tool sends no file and no card, so the change can remove a file or a card from "
+            + "the message."
         ) in description
 
     async def test_the_description_names_the_tools_that_send_and_remove_a_message(
