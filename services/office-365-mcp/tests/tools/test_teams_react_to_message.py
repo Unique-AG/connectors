@@ -21,7 +21,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import MessageHandle, message_handle
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirmed
+from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Confirmed
 from office_365_mcp.tools import teams_react_to_message as reactor
 from office_365_mcp.tools.teams_react_to_message import (
     ChangedReaction,
@@ -515,17 +515,17 @@ class TestHowItDeclaresItself:
     def test_teams_read_message_shows_the_change(self) -> None:
         assert reactor.CHANGE_SHOWN_BY == ("teams_read_message",)
 
-    async def test_it_announces_itself_as_an_addition_rather_than_a_destructive_write(
+    async def test_it_announces_itself_as_a_destructive_write_that_is_not_idempotent(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
         annotations = tool.annotations
         assert annotations is not None
-        assert annotations.read_only_hint is WRITE_ADDITIVE["readOnlyHint"]
-        assert annotations.destructive_hint is WRITE_ADDITIVE["destructiveHint"]
-        assert annotations.idempotent_hint is WRITE_ADDITIVE["idempotentHint"]
-        assert annotations.open_world_hint is WRITE_ADDITIVE["openWorldHint"]
+        assert annotations.read_only_hint is WRITE_DESTRUCTIVE["readOnlyHint"]
+        assert annotations.destructive_hint is WRITE_DESTRUCTIVE["destructiveHint"]
+        assert annotations.idempotent_hint is WRITE_DESTRUCTIVE["idempotentHint"]
+        assert annotations.open_world_hint is WRITE_DESTRUCTIVE["openWorldHint"]
 
     async def test_the_description_says_it_asks_every_time_and_how_to_retry(
         self, transport: httpx.AsyncClient

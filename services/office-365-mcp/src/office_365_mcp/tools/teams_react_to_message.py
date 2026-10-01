@@ -34,7 +34,7 @@ from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
 from office_365_mcp.shared.handles import MessageHandle, message_handle
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
-    WRITE_ADDITIVE,
+    WRITE_DESTRUCTIVE,
     Confirm,
     graph_client_for_caller,
     narrowed_to,
@@ -223,7 +223,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         name=TOOL_NAME,
         title="React to a Teams Message",
         description=_DESCRIPTION,
-        annotations=WRITE_ADDITIVE,
+        annotations=WRITE_DESTRUCTIVE,
     )
     async def teams_react_to_message(
         uri: Annotated[
