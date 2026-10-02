@@ -16,19 +16,28 @@ Every artifact API stops working once the meeting expires, roughly 60 days after
 (https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams#meeting-expiration).
 """
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
+from msgraph.generated.models.identity import Identity
+from msgraph.generated.models.identity_set import IdentitySet
+from msgraph.generated.models.meeting_participant_info import MeetingParticipantInfo
+from msgraph.generated.models.meeting_participants import MeetingParticipants
 from msgraph.generated.models.online_meeting import OnlineMeeting
+from msgraph.generated.models.user import User
 from msgraph.generated.users.item.online_meetings.online_meetings_request_builder import (
     OnlineMeetingsRequestBuilder,
 )
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import CollectedItems, GraphCollection, collect_pages, graph_step
+from office_365_mcp.shared.calendar import counted_people
 from office_365_mcp.shared.handles import MeetingHandle
+from office_365_mcp.shared.identity import Person
 from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.window import as_utc
 
 # This is the least-privileged permission for the resolve filter, and it needs no admin consent.
@@ -86,6 +95,86 @@ async def resolve_meeting(
     return meetings[0] if meetings else None
 
 
+def organized_by(meeting: OnlineMeeting, user: User) -> bool:
+    participants = meeting.participants
+    organizer = None if participants is None else participants.organizer
+    identities = None if organizer is None else organizer.identity
+    named = None if identities is None or identities.user is None else identities.user.id
+    return named is not None and user.id is not None and named.casefold() == user.id.casefold()
+
+
+def meeting_times(
+    tool: str, starts_at: str, ends_at: str, *, tail: str
+) -> tuple[datetime, datetime] | str:
+    opens = _instant(tool, "starts_at", starts_at, tail=tail)
+    if isinstance(opens, str):
+        return opens
+    closes = _instant(tool, "ends_at", ends_at, tail=tail)
+    if isinstance(closes, str):
+        return closes
+    if closes <= opens:
+        return (
+            f"{tool} received an `ends_at` that is not after `starts_at`. A meeting must end "
+            + "after it starts. A meeting that runs past midnight ends on the next day. Make sure "
+            + f"that the date of `ends_at` is correct. {tail}"
+        )
+    return opens, closes
+
+
+def meeting_participants(attendees: Sequence[str]) -> MeetingParticipants:
+    return MeetingParticipants(
+        attendees=[
+            MeetingParticipantInfo(identity=IdentitySet(user=Identity(id=attendee)))
+            for attendee in attendees
+        ]
+    )
+
+
+def participant_id(participant: MeetingParticipantInfo) -> str | None:
+    identity = participant.identity
+    user = identity.user if identity is not None else None
+    return user.id if user is not None else None
+
+
+def attendee_ids(participants: MeetingParticipants | None) -> list[str] | None:
+    attendees = None if participants is None else participants.attendees
+    if attendees is None:
+        return None
+    return [user_id for attendee in attendees if (user_id := participant_id(attendee)) is not None]
+
+
+def distinct_people(people: Sequence[Person]) -> tuple[Person, ...]:
+    first_named: dict[str, str] = {}
+    for person in people:
+        _ = first_named.setdefault(person.user_id.lower(), person.name)
+    return tuple(
+        Person(user_id=user_id, name=first_named[user_id]) for user_id in sorted(first_named)
+    )
+
+
+def named_people(people: Sequence[Person]) -> str:
+    names = [repr(cut_for_a_question(person.name)) for person in people]
+    return f"{counted_people(names)}: {', '.join(names)}"
+
+
+def not_a_meeting_handle(tool: str, *, tail: str) -> str:
+    return (
+        f"{tool} takes the `meeting_uri` handle from teams_list_chats or teams_create_meeting, "
+        + "and this value is not one. A meeting handle has exactly one shape:\n"
+        + "  teams:///meetings/{join_web_url}\n"
+        + "with the join URL percent-encoded. A `teams:///transcripts/...` handle is not a "
+        + "meeting handle. Copy the `meeting_uri` of a tool result word for word. "
+        + tail
+    )
+
+
+def not_the_organizer(verb: str, *, tail: str) -> str:
+    return (
+        "Microsoft 365 does not name the signed-in user as the organizer of this meeting. This "
+        + f"tool {verb} only a meeting that the signed-in user organizes. {tail}"
+    )
+
+
 async def newest_of[T: MeetingArtifact](
     first_page: GraphCollection[T],
     client: GraphServiceClient,
@@ -127,6 +216,26 @@ def _told_apart[T: MeetingArtifact](artifacts: list[T]) -> list[T]:
             seen.add(identifier)
         kept.append(artifact)
     return kept
+
+
+def _instant(tool: str, argument: str, value: str, *, tail: str) -> datetime | str:
+    try:
+        moment = datetime.fromisoformat(value)
+    except ValueError:
+        return (
+            f"{tool} received {value!r} in `{argument}`. This value is not an ISO-8601 date and "
+            + "time. Write the date, the time, and an offset, for example "
+            + "`2026-03-02T14:00:00+01:00`. Calculate the date and the time from what the user "
+            + f"said. If the day or the hour is ambiguous, ask the user. {tail}"
+        )
+    if moment.utcoffset() is None:
+        return (
+            f"{tool} received {value!r} in `{argument}`. This time has no offset, so it does not "
+            + "name one instant. Add the offset of the zone of the user, for example "
+            + "`2026-03-02T14:00:00+01:00`, or add `Z` for UTC. If the zone is not clear, ask the "
+            + f"user. {tail}"
+        )
+    return moment
 
 
 def _settled_by(moment: datetime | None, now: datetime) -> bool:

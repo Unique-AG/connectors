@@ -1,20 +1,46 @@
 import html
 import json
 import re
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Self, cast
+from typing import Literal, Self, cast
 
+from kiota_abstractions.base_request_configuration import RequestConfiguration
+from kiota_abstractions.headers_collection import HeadersCollection
+from msgraph.generated.chats.item.messages.item.chat_message_item_request_builder import (
+    ChatMessageItemRequestBuilder as ChatMessageRequestBuilder,
+)
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.generated.models.chat_message_attachment import ChatMessageAttachment
 from msgraph.generated.models.chat_message_from_identity_set import ChatMessageFromIdentitySet
+from msgraph.generated.models.chat_message_importance import ChatMessageImportance
 from msgraph.generated.models.chat_message_mention import ChatMessageMention
+from msgraph.generated.models.chat_message_mentioned_identity_set import (
+    ChatMessageMentionedIdentitySet,
+)
 from msgraph.generated.models.chat_message_reaction import ChatMessageReaction
 from msgraph.generated.models.chat_message_type import ChatMessageType
 from msgraph.generated.models.identity import Identity
+from msgraph.generated.models.item_body import ItemBody
+from msgraph.generated.models.teamwork_user_identity_type import TeamworkUserIdentityType
+from msgraph.generated.models.user import User
+from msgraph.generated.teams.item.channels.item.messages.item import (
+    chat_message_item_request_builder as channel_post,
+)
+from msgraph.generated.teams.item.channels.item.messages.item.replies.item import (
+    chat_message_item_request_builder as channel_reply,
+)
+from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.shared.handles import MessageHandle
+from office_365_mcp.graph_client import graph_step
+from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.files import AttachableFile
+from office_365_mcp.shared.handles import DriveFileHandle, MessageHandle
+from office_365_mcp.shared.identity import ENTRA_OBJECT_ID_PATTERN
+from office_365_mcp.shared.prose import cut_for_a_question
 
 
 class MessageSender(BaseModel):
@@ -172,6 +198,64 @@ class TeamsMessage(BaseModel):
         )
 
 
+STEP_CHAT_MESSAGE = "chat_message"
+STEP_CHANNEL_MESSAGE = "channel_message"
+STEP_CHANNEL_REPLY = "channel_reply"
+
+_PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
+
+type _ChatMessageQuery = ChatMessageRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
+type _ChannelMessageQuery = (
+    channel_post.ChatMessageItemRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
+)
+type _ChannelReplyQuery = (
+    channel_reply.ChatMessageItemRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
+)
+
+
+async def get_message(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage | None:
+    if handle.chat_id is not None:
+        with graph_step(STEP_CHAT_MESSAGE):
+            return await (
+                client.chats.by_chat_id(handle.chat_id)
+                .messages.by_chat_message_id(handle.message_id)
+                .get(
+                    request_configuration=RequestConfiguration[_ChatMessageQuery](
+                        headers=unknown_enum_headers()
+                    )
+                )
+            )
+    assert handle.team_id is not None and handle.channel_id is not None, (
+        "a handle addresses either a chat or a team channel"
+    )
+    messages = (
+        client.teams.by_team_id(handle.team_id).channels.by_channel_id(handle.channel_id).messages
+    )
+    if handle.reply_to_id is not None:
+        with graph_step(STEP_CHANNEL_REPLY):
+            return await (
+                messages.by_chat_message_id(handle.reply_to_id)
+                .replies.by_chat_message_id1(handle.message_id)
+                .get(
+                    request_configuration=RequestConfiguration[_ChannelReplyQuery](
+                        headers=unknown_enum_headers()
+                    )
+                )
+            )
+    with graph_step(STEP_CHANNEL_MESSAGE):
+        return await messages.by_chat_message_id(handle.message_id).get(
+            request_configuration=RequestConfiguration[_ChannelMessageQuery](
+                headers=unknown_enum_headers()
+            )
+        )
+
+
+def unknown_enum_headers() -> HeadersCollection:
+    headers = HeadersCollection()
+    headers.add(*_PREFER_UNKNOWN_ENUMS)
+    return headers
+
+
 _EVENT_TYPE = re.compile(r"\A#?microsoft\.graph\.(.+?)EventMessageDetail\Z")
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
@@ -320,3 +404,287 @@ def _json(value: str | None) -> object | None:
         return cast("object", json.loads(value))
     except ValueError:
         return None
+
+
+CHAT_TOPIC_MAX_CHARACTERS = 250
+
+CHAT_TOPIC_PATTERN = r"^[^:]*$"
+
+
+class Mention(BaseModel, frozen=True):
+    user_id: str = Field(
+        pattern=ENTRA_OBJECT_ID_PATTERN,
+        description=(
+            "The Microsoft Entra object id of the person to mention, as a GUID. Copy it from the "
+            + "`user_id` of get_me, of a teams_list_chat_members row, of a teams_list_chats "
+            + "member, or of a message `sender`. Never build it from a name or an email address."
+        ),
+    )
+    name: str = Field(
+        min_length=1,
+        description=(
+            "The text that Teams shows for the mention, usually the display name of the person. "
+            + "Use the `display_name` from the same result as the `user_id`."
+        ),
+    )
+
+
+def outgoing_message(
+    text: str,
+    *,
+    mentions: Sequence[Mention] = (),
+    importance: ChatMessageImportance | None = None,
+    subject: str | None = None,
+    attachments: Sequence[AttachableFile] = (),
+) -> ChatMessage:
+    if not mentions and not attachments:
+        return ChatMessage(
+            body=ItemBody(content=text, content_type=BodyType.Text),
+            importance=importance,
+            subject=subject,
+        )
+    content = " ".join(
+        (
+            *(
+                f'<at id="{index}">{html.escape(mention.name)}</at>'
+                for index, mention in enumerate(mentions)
+            ),
+            html.escape(text).replace("\n", "<br>"),
+            *(f'<attachment id="{file.attachment_id}"></attachment>' for file in attachments),
+        )
+    )
+    return ChatMessage(
+        body=ItemBody(content=content, content_type=BodyType.Html),
+        attachments=[
+            ChatMessageAttachment(
+                id=file.attachment_id,
+                content_type="reference",
+                content_url=file.web_dav_url,
+                name=file.name,
+            )
+            for file in attachments
+        ]
+        or None,
+        mentions=[
+            ChatMessageMention(
+                id=index,
+                mention_text=mention.name,
+                mentioned=ChatMessageMentionedIdentitySet(
+                    user=Identity(
+                        id=mention.user_id,
+                        display_name=mention.name,
+                        additional_data={
+                            "userIdentityType": TeamworkUserIdentityType.AadUser.value
+                        },
+                    )
+                ),
+            )
+            for index, mention in enumerate(mentions)
+        ]
+        or None,
+        importance=importance,
+        subject=subject,
+    )
+
+
+type ChatImportance = Literal["normal", "high", "urgent"]
+
+type ChannelImportance = Literal["normal", "high"]
+
+
+@dataclass(frozen=True, slots=True)
+class SendWords:
+    verb: str
+    agree: str
+    decline: str
+    nothing_sent: str
+    cannot_be_recalled: str
+
+
+CHAT_SEND = SendWords(
+    verb="Send",
+    agree="send",
+    decline="do not send",
+    nothing_sent="Nothing was sent.",
+    cannot_be_recalled="This cannot be recalled once sent.",
+)
+
+CHANNEL_POST = SendWords(
+    verb="Post",
+    agree="post",
+    decline="do not post",
+    nothing_sent="Nothing was posted.",
+    cannot_be_recalled="This cannot be recalled once posted.",
+)
+
+CHAT_ID_FIELD: str = (
+    "The chat to post to, as the `chat_id` that teams_list_chats reported, for example "
+    + "`19:...@thread.v2`. It is not a `teams:///` handle."
+)
+
+MESSAGE_FIELD: str = (
+    "The text of the message, as plain text. Do not put HTML or mention markup in this text, "
+    + "because this tool writes all the markup itself."
+)
+
+MENTIONS_FIELD: str = (
+    "The people to @mention, one entry for each person. With an empty list, the message "
+    + "mentions nobody."
+)
+
+CHAT_IMPORTANCE_FIELD: str = (
+    "The importance of the new message: `normal`, `high`, or `urgent`. If the user does not ask "
+    + "for an importance, omit this parameter."
+)
+
+CHAT_SUBJECT_FIELD: str = (
+    "The subject of the new chat message, as plain text. Omit this parameter to send the message "
+    + "with no subject."
+)
+
+ATTACHMENTS_FIELD: str = (
+    "The files to attach, as handles, one entry for each file. Copy each handle from the `uri` "
+    + "of a sharepoint_search_files hit or of a sharepoint_browse_folder row."
+)
+
+TEAM_ID_FIELD: str = (
+    "The team that holds the channel, as the `team_id` that teams_list_my_teams reported. It is "
+    + "a GUID, not a `teams:///` handle."
+)
+
+CHANNEL_ID_FIELD: str = (
+    "The channel to post to, as the `channel_id` that teams_list_channels reported for this team, "
+    + "for example `19:...@thread.tacv2`. It is not a `teams:///` handle."
+)
+
+REPLY_TO_ID_FIELD: str = (
+    "The `message_id` of the channel post to reply to, from a channel message that another Teams "
+    + "tool returned. Give the id of a post, never the id of a reply. To answer a reply, give the "
+    + "`reply_to_id` of that reply. Omit this parameter to start a new post."
+)
+
+CHANNEL_SUBJECT_FIELD: str = (
+    "The subject of the new channel post, as plain text. Omit this parameter to post the message "
+    + "with no subject. This tool refuses a subject together with `reply_to_id`."
+)
+
+CHANNEL_IMPORTANCE_FIELD: str = (
+    "The importance of the new message: `normal` or `high`. If the user does not ask for an "
+    + "importance, omit this parameter."
+)
+
+
+def subject_on_a_reply(tool: str) -> str:
+    return (
+        f"{tool} received both `subject` and `reply_to_id`. This tool sets a subject only on a new "
+        + "channel post, never on a reply. To reply in the thread, omit `subject`. To start a new "
+        + f"post with a subject, omit `reply_to_id`. {CHANNEL_POST.nothing_sent} If you call this "
+        + "tool again with the same arguments, the call will fail the same way."
+    )
+
+
+def send_question(
+    words: SendWords,
+    message: str,
+    destination: str,
+    mentions: Sequence[Mention],
+    *,
+    subject: str | None,
+    importance: ChatImportance | None,
+    files: Sequence[AttachableFile] = (),
+) -> str:
+    named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
+    mentioned = f" It mentions {named}." if mentions else ""
+    listed = ", ".join(repr(cut_for_a_question(file.name)) for file in files)
+    attached = f" It attaches {listed}." if files else ""
+    details = [
+        text
+        for text in (
+            None if subject is None else f"the subject {cut_for_a_question(subject)!r}",
+            None if importance is None else f"{importance} importance",
+        )
+        if text is not None
+    ]
+    marked = f" with {' and '.join(details)}" if details else ""
+    return (
+        f"{words.verb} {cut_for_a_question(message)!r}{marked} {destination} now?"
+        + f"{mentioned}{attached} {words.cannot_be_recalled}"
+    )
+
+
+def send_binding(
+    destination: Sequence[str],
+    message: str,
+    mentions: Sequence[Mention],
+    *,
+    subject: str | None,
+    importance: ChatImportance | None,
+    files: Sequence[DriveFileHandle] = (),
+) -> str:
+    return confirmation_id_for(
+        *destination,
+        message,
+        *mention_fields(mentions),
+        repr(subject),
+        repr(importance),
+        str(len(files)),
+        *(handle.uri for handle in files),
+    )
+
+
+def mention_fields(mentions: Sequence[Mention]) -> tuple[str, ...]:
+    return (
+        str(len(mentions)),
+        *(field for mention in mentions for field in (mention.user_id, mention.name)),
+    )
+
+
+EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
+
+
+STEP_CHAT = "chat"
+STEP_CHAT_MEMBERS = "chat_members"
+
+_A_CHAT_WITH_NO_NAMES = "a Teams chat that has no topic"
+
+
+async def chat_in_question(
+    client: GraphServiceClient, chat_id: str, *, leaving_out: str | None = None
+) -> str:
+    chat = client.chats.by_chat_id(chat_id)
+    with graph_step(STEP_CHAT):
+        found = await chat.get()
+    assert found is not None, "Graph answered a chat read with no chat"
+    topic = _present(found.topic)
+    if topic is not None:
+        return f"the Teams chat {cut_for_a_question(topic)!r}"
+    with graph_step(STEP_CHAT_MEMBERS):
+        page = await chat.members.get()
+    assert page is not None, "Graph answered a chat member listing with no collection"
+    names = [
+        name
+        for member in page.value or []
+        if member.id != leaving_out and (name := _present(member.display_name)) is not None
+    ]
+    if not names:
+        return _A_CHAT_WITH_NO_NAMES
+    return f"the Teams chat with {cut_for_a_question(', '.join(names))!r}"
+
+
+def message_in_question(message: TeamsMessage) -> str:
+    sender = message.sender.display_name if message.sender is not None else None
+    sent_from = "" if sender is None else f" from {cut_for_a_question(sender)!r}"
+    says = "has no text" if message.text is None else f"says {cut_for_a_question(message.text)!r}"
+    return f"the Teams message{sent_from} that {says}"
+
+
+def sent_by(message: TeamsMessage, user: User) -> bool:
+    sender = None if message.sender is None else message.sender.user_id
+    return sender is not None and user.id is not None and sender.casefold() == user.id.casefold()
+
+
+def not_the_sender(verb: str, *, tail: str) -> str:
+    return (
+        "Microsoft 365 does not name the signed-in user as the sender of this message. This tool "
+        + f"{verb} only a message that the signed-in user sent. {tail}"
+    )
