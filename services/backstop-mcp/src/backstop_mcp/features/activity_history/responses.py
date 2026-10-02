@@ -97,11 +97,11 @@ __all__ = [
 ]
 
 _MAX_RECIPIENTS = 3
-_FULL_BODY_MAX_CHARS = 10_000_000
+# Snippet on every search row. The full body is `description`, and only when requested.
 _SHORT_DESCRIPTION_MAX_CHARS = 400
 
 
-def _markdown(html: str | None, *, max_chars: int) -> str | None:
+def _markdown(html: str | None, *, max_chars: int | None = None) -> str | None:
     if not html:
         return None
     text = extract_gist_from_html(html, max_chars=max_chars).text
@@ -689,7 +689,7 @@ class ActivityDetailResponse(OmitNoneModel):
         `detail.resource_id`, so what comes back is byte-identical to what went in — and stays
         a handle the model can pass straight back to this tool.
         """
-        gist = extract_gist_from_html(detail.description or "", max_chars=_FULL_BODY_MAX_CHARS)
+        gist = extract_gist_from_html(detail.description or "")
         return cls(
             activity_id=activity_id,
             type=detail.type,
@@ -893,7 +893,7 @@ class SearchActivitiesRowResponse(OmitNoneModel):
                 row.short_description, max_chars=_SHORT_DESCRIPTION_MAX_CHARS
             )
         if "description" in include:
-            overrides["description"] = _markdown(row.description, max_chars=_FULL_BODY_MAX_CHARS)
+            overrides["description"] = _markdown(row.description)
         return project_fields(row, fields=include, into=cls, overrides=overrides)
 
 

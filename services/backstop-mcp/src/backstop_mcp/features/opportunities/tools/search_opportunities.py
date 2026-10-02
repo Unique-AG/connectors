@@ -1,8 +1,8 @@
 """`search_opportunities`: firm-wide pipeline walk over `GET /opportunities`.
 
 `filter[representative.name][eq]` is the only representative filter Backstop accepts, and it is
-the deal-level field, often blank. `representative` here is the colleague's pipeline: the investor
-organization's representative, matched in memory. Every filter is client-side.
+the deal-level field, which may be blank. `representative` here matches the investor
+organization's representative, in memory. Every filter is client-side.
 """
 
 import logging
@@ -72,7 +72,7 @@ class OpportunityCustomFieldFilter(BaseModel):
         description=(
             "Stored values that satisfy this predicate, OR. Each is compared whole and "
             "case-insensitively against the select options list_custom_fields returns — "
-            "pass the exact option (`Convert Arb`), not a substring (`Converts`). A list "
+            "pass the exact option, not a substring. A list "
             "value matches when any element equals one of these. A missing value does not "
             "match — this filter cannot mean 'the field is empty'."
         ),
@@ -105,8 +105,8 @@ async def search_opportunities(
         Field(
             description=(
                 "Backstop **login** (`user_name` from list_system_users), not a display name. "
-                "Keeps deals whose investor organization is represented by that login — the "
-                "colleague's pipeline — including deals with no representative on the deal "
+                "Keeps deals whose investor organization is represented by that login, "
+                "including deals with no representative on the deal "
                 "itself. It does not match the deal-level representative. A display name "
                 "such as 'Jane Doe' returns 0 rows. Applied after the server-side read."
             )
@@ -129,11 +129,9 @@ async def search_opportunities(
         Field(
             description=(
                 "Linked fund: short names (exact, e.g. NWON) or display-name substrings. "
-                "Several values are OR, so onshore and offshore can be one walk, e.g. "
+                "Several values are OR, so several vehicles can be one walk, e.g. "
                 '["NWON", "NWOF"]. Resolve names with get_product '
-                "first when unsure. This is not the strategy. Converts, dispersion, and "
-                "long vol are opportunity custom fields — filter those with `custom_fields`. "
-                "Applied after the server-side read."
+                "first when unsure. Applied after the server-side read."
             )
         ),
     ] = None,
@@ -143,8 +141,7 @@ async def search_opportunities(
             description=(
                 "Opportunity custom-field predicates, AND. Each is a definition id from "
                 "list_custom_fields(entity_types=['opportunities']) plus the exact stored "
-                "option. This is how a strategy question is answered: the Product field "
-                "option `Convert Arb`, not a deal name containing Converts, and not the "
+                "option (`<option from list_custom_fields>`), not a deal name and not the "
                 "linked-fund `product` argument. Applied after the server-side read."
             )
         ),
@@ -154,7 +151,8 @@ async def search_opportunities(
         Field(
             description=(
                 "Every row's custom fields come back as `custom_field_values` by default "
-                "(Opportunity Type, and so on), so one walk answers the table. Leave this "
+                "(the fields a table is grouped or labelled by), so one walk answers the table. "
+                "Leave this "
                 "false. Set it true only to retry a call that timed out, to see whether "
                 "reading the custom fields is what made it slow. Refused together with "
                 "`custom_fields`, which needs them."
@@ -196,35 +194,18 @@ async def search_opportunities(
 
     `product` matches the linked fund. A short name matches exactly; a display-name
     substring matches every vehicle whose name contains it. Several `product` values are
-    OR. `mode="aggregate", group_by="product"` counts that linked fund. The chip is often
+    OR. `mode="aggregate", group_by="product"` counts that linked fund. The chip may be
     empty, and then every open deal is `(unattributed)`.
 
-    A strategy question (converts, dispersion, long vol) is an opportunity custom field.
-    list_custom_fields(entity_types=["opportunities"]), then `custom_fields` with that
-    definition id and the exact option (`Convert Arb`, not `Converts` or `Convertibles`).
-    The other table columns are on each row's `custom_field_values`. If a call times out,
-    retry once with `exclude_custom_fields=true` to see whether reading them is the cause;
-    otherwise leave it false. That walk is the full match. Do not select deals because the
-    name contains the strategy word, and do not call get_opportunities_by_ids to re-read
-    fields this walk already returned.
+    If a call times out, retry once with `exclude_custom_fields=true` to see whether
+    reading them is the cause; otherwise leave it false. That walk is the full match.
+    Do not call get_opportunities_by_ids to re-read fields this walk already returned.
 
-    "Current investor", "prospect", and "former investor" are an organization status
-    custom field (Investor Status on search_organizations), not `is_open` and not a
-    stage. `is_open` means the deal is still in the pipeline. After this walk, check
-    Investor Status on each distinct `investor.id` with get_organization. Keep only the
-    status the user named.
-
-    Prospect, Grade, and Investor Type are organization fields on this CRM, not deal
-    fields. Before choosing between search_organizations and this tool, call
-    list_custom_fields for both organizations and opportunities, and search the collection
-    where the user's words exist. A prospect is not an opportunity stage.
-
-    A colleague's pipeline is the representative on the investor organization, not the
-    representative stored on the deal. Pass that **login** from list_system_users as
-    `representative`; it matches `investor_representative` on each row. The deal-level
-    `representative` is often blank, so do not filter or group on it. Strategy on a deal
-    stays the opportunity custom field; do not infer it from the deal name. A display name
-    silently returns zero rows. Every filter is applied after the server-side read.
+    `is_open` means the deal is still in the pipeline. `representative` matches the
+    investor organization's representative login (`investor_representative` on each row),
+    not the deal-level field, which may be blank. Pass that **login** from
+    list_system_users. A display name silently returns zero rows. Every filter is applied
+    after the server-side read.
     `coverage.visible_count` is Backstop's total before those filters. An empty `rows`
     list means nothing matched.
 
@@ -248,12 +229,13 @@ async def search_opportunities(
     `days_since_last_activity`. Days in stage is not activity.
 
     Call like: {"representative": "jdoe", "is_open": true}
-    A colleague's pipeline: {"representative": "jdoe", "is_open": true, "fields": ["name",
-    "stage", "requested_amount", "investor", "investor_representative", "representative"]}
-    Converts in the open pipeline: {"is_open": true, "custom_fields": [{"definition_id":
-    "<Product id from list_custom_fields>", "values": ["Convert Arb"]}],
+    Investor-organization representative: {"representative": "jdoe", "is_open": true,
+    "fields": ["name", "stage", "requested_amount", "investor", "investor_representative",
+    "representative"]}
+    One custom-field option: {"is_open": true, "custom_fields": [{"definition_id":
+    "<id from list_custom_fields>", "values": ["<option from list_custom_fields>"]}],
     "fields": ["name", "stage", "requested_amount", "expected_investment_date", "investor"]}
-    Product pipeline: {"product": ["NWON", "NWOF"], "is_open": true}
+    Several vehicles: {"product": ["NWON", "NWOF"], "is_open": true}
     Stage changes: {"fields": ["name", "stage", "previous_stage",
     "date_entered_current_stage", "is_open", "investor"]}
     """

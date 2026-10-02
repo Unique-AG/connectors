@@ -1,14 +1,15 @@
 """Firm-wide `GET /opportunities` walk: sparse fields and includes, filtered in memory.
 
 `filter[representative.name][eq]` is the only server-side filter that works, and it matches the
-representative stored on the deal — often blank. A colleague's pipeline is the representative on
-the investor organization, so this walk does not send that filter. It side-loads
+representative stored on the deal — may be blank. The tool filters on the investor
+organization's representative, so this walk does not send that filter. It side-loads
 `investor.representative` and keeps deals by that login. `filter[stage.name]`,
 `filter[product.name]`, and `filter[isOpen]` are `400 Invalid filter field` too, so every filter
 is client-side. The investor include arrives as a `contacts` resource, so the sparse key is
 `fields[contacts]`, not `fields[organizations]`. That key must list `representative`, or the
 organization's representative linkage is dropped from the side-load
-(`docs/json/opportunities_include_investor_representative.json`).
+(confirmed by probe: without `representative` in `fields[contacts]` the side-load drops
+the organization's representative linkage).
 """
 
 import asyncio

@@ -9,7 +9,6 @@ from collections.abc import Callable
 import pytest
 
 from backstop_mcp.features.accounts.tools.get_capital_flows import get_capital_flows
-from backstop_mcp.features.accounts.tools.get_product_investors import get_product_investors
 from backstop_mcp.features.activity_history.tools.get_activity_detail import (
     get_activity_detail,
 )
@@ -18,35 +17,31 @@ from backstop_mcp.features.activity_tags.tools.list_activity_tags import list_ac
 from backstop_mcp.features.opportunities.tools.search_opportunities import search_opportunities
 from backstop_mcp.features.org_people.tools.get_person import get_person
 from backstop_mcp.features.org_people.tools.search_organizations import search_organizations
+from backstop_mcp.features.org_people.tools.search_people import search_people
 from backstop_mcp.features.reports.tools.run_report import run_report
 
 _ROUTES: tuple[tuple[Callable[..., object], str], ...] = (
-    (run_report, 'A quoted report name, or "pull my X report", is this tool'),
-    (run_report, "Do not rebuild it with get_capital_flows"),
-    (run_report, "This tool cannot filter by product or date"),
-    (run_report, "Keep every transaction type inside the cut"),
-    (run_report, "replaces the product set"),
-    (get_capital_flows, "Use this when no report is named"),
+    (run_report, "A saved report is this tool by exact name"),
+    (run_report, "cannot filter by product or date"),
+    (run_report, "Follow `next_offset`"),
+    (get_capital_flows, "Backstop refuses an unfiltered read"),
     (search_activities, "A named calendar day is both `start_date` and `end_date`"),
     (search_activities, '"since March" is only `start_date`'),
-    (search_activities, "a later email is not evidence the earlier ask was inside it"),
     (search_activities, "then every returned id in `activity_tag_ids`"),
-    (search_activities, "grouped by investor"),
-    (get_activity_detail, "A later email is not evidence the earlier ask was inside it"),
-    (get_product_investors, "is every feeder in this one call"),
-    (get_product_investors, "Do not ask onshore or offshore before continuing"),
-    (get_product_investors, "Balance can order that list; it is not the answer"),
+    (search_activities, "`attachments_count` is a count only"),
+    (get_activity_detail, "An empty list means nothing was attached"),
     (get_person, "`job_title`, `department`, the `locations` include, and `email`"),
-    (get_person, "Do not ask the user for Backstop field names"),
+    (get_person, "Do not ask the user for standard field names"),
     (search_opportunities, "A stage-change question"),
     (search_opportunities, "including deals that closed — do not pass `is_open`"),
     (search_opportunities, "do not walk get_opportunities_by_ids for this question"),
-    (search_opportunities, "the representative on the investor organization"),
-    (search_opportunities, "call list_custom_fields for both organizations and opportunities"),
-    (search_organizations, "call list_custom_fields for both organizations and opportunities"),
+    (search_opportunities, "investor organization's representative"),
     (search_organizations, "`country` is the stored full name"),
     (search_opportunities, "retry once with `exclude_custom_fields=true`"),
     (search_organizations, "retry once with `exclude_custom_fields=true`"),
+    (search_people, "exact display name"),
+    (search_people, "`country` is the stored full name"),
+    (search_people, "retry once with `exclude_custom_fields=true`"),
     (list_activity_tags, "pass every matching id to search_activities `activity_tag_ids`"),
 )
 

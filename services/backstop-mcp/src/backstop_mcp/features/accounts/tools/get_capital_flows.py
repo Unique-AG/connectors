@@ -62,9 +62,6 @@ async def get_capital_flows(
 ) -> CapitalFlowsResolvedResponse:
     """Subscriptions and redemptions in a date window — also the only share-class source.
 
-    Use this when no report is named. A quoted report name, or "pull my X report", is
-    run_report with that exact string, not a rebuild here.
-
     Always pass `start_date` and `end_date`; Backstop refuses an unfiltered read. Two collection
     walks, one per direction — `request_count` is what they actually cost, and `scan_truncated`
     says when a window was too big to read whole. Actuals only (`COMPLETED`); `non_actual_count`

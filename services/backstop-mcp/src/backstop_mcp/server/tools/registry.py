@@ -48,6 +48,7 @@ from backstop_mcp.features.org_people.tools.get_organization import get_organiza
 from backstop_mcp.features.org_people.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.features.org_people.tools.get_person import get_person
 from backstop_mcp.features.org_people.tools.search_organizations import search_organizations
+from backstop_mcp.features.org_people.tools.search_people import search_people
 from backstop_mcp.features.org_people_writes.tools.create_employment import create_employment
 from backstop_mcp.features.org_people_writes.tools.create_organization import create_organization
 from backstop_mcp.features.org_people_writes.tools.create_person import create_person
@@ -67,6 +68,7 @@ type ToolFunction = Callable[..., Awaitable[object]]
 TOOLS: tuple[ToolFunction, ...] = (
     get_organization,
     search_organizations,
+    search_people,
     get_person,
     list_custom_fields,
     list_custom_field_groups,

@@ -48,7 +48,7 @@ def _row(row_id: int = 1, **overrides: object) -> dict[str, object]:
         "title": "Catch-up",
         "effectiveDate": "8/20/2026",
         "meetingType": "Phone - Outbound",
-        "activityTags": [{"id": 474963, "name": "AT: Dispersion"}],
+        "activityTags": [{"id": 9001, "name": "XY: Alpha"}],
         "associatedWith": [{"resourceType": "people", "resourceId": _PARTY_ID}],
         "author": {"name": "Asaph Stephen", "id": 3406537},
         "attendees": [{"name": "Ada"}],
@@ -86,7 +86,7 @@ class TestSearchActivities:
                 end_date=date(2026, 8, 20),
                 search_type="people",
                 party_id=_PARTY_ID,
-                activity_tag_ids=["474963", "455289"],
+                activity_tag_ids=["9001", "9002"],
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
             ),
@@ -102,8 +102,8 @@ class TestSearchActivities:
         assert attributes["resourceType"] == "people"
         tag_filter = object_dict(object_list(filters["activityTags"])[0])
         assert [object_dict(item)["value"] for item in object_list(tag_filter["searchValues"])] == [
-            "474963",
-            "455289",
+            "9001",
+            "9002",
         ]
         effective = object_dict(filters["effectiveDate"])
         assert effective["startTimestamp"] == "2024-01-01T00:00:00"
@@ -322,7 +322,7 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
-                activity_tag_ids=["474963"],
+                activity_tag_ids=["9001"],
                 mode="aggregate",
                 group_by="type",
                 resolve_party_query=make_resolve_party_query(client),
@@ -346,7 +346,7 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
-                activity_tag_ids=["474963"],
+                activity_tag_ids=["9001"],
                 include_description=True,
                 mode="aggregate",
                 group_by="type",
@@ -404,8 +404,8 @@ class TestSearchActivities:
             return_value=_page(
                 _row(
                     1,
-                    shortDescription="Ross Kasarda, Greg Hines&nbsp;",
-                    formattedDescription="<p>Discussed <b>dispersion</b>.</p>",
+                    shortDescription="Ada North, Ben West&nbsp;",
+                    formattedDescription="<p>Discussed <b>alpha</b>.</p>",
                 ),
                 total=1,
             )
@@ -416,7 +416,7 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
-                activity_tag_ids=["474963"],
+                activity_tag_ids=["9001"],
                 include_description=True,
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
@@ -427,7 +427,7 @@ class TestSearchActivities:
         row = object_dict(object_list(tool_payload(result)["rows"])[0])
         assert "&nbsp;" not in str(row.get("short_description", ""))
         assert "<p>" not in str(row.get("description", ""))
-        assert "dispersion" in str(row.get("description", ""))
+        assert "alpha" in str(row.get("description", ""))
 
     @pytest.mark.asyncio
     @respx.mock

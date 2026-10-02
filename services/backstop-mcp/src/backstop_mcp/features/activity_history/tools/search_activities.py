@@ -205,8 +205,7 @@ async def search_activities(
             default=None,
             description=(
                 "Pass every id `list_activity_tags` returned for the term; the list is OR. "
-                "Tag names carry prefixes (for example 'XY: Follow-up'), so requiring an "
-                "exact name misses the tag. REST get_activity_history `activity_tag_ids` is AND."
+                "REST get_activity_history `activity_tag_ids` is AND."
             ),
         ),
     ] = None,
@@ -295,16 +294,11 @@ async def search_activities(
     A party missing from a firm-wide row sample is not
     inactive; for "who has had no activity since X" use get_last_activity_for_parties.
     `attachments_count` is a count only — pass the row `activity_id` (or `id`) to
-    `get_activity_detail` for the names. Do not assume what the files are. Whether a promised
-    follow-up was sent is that attachment list on get_activity_detail: a later email is not
-    evidence the earlier ask was inside it.
+    `get_activity_detail` for the names. Do not assume what the files are.
 
-    A strategy in activities is list_activity_tags with that term, then every returned id in
-    `activity_tag_ids`. Tag names carry prefixes, so an exact name misses. Description text
-    is not searchable; read bodies after the rows are back. Who a colleague updates on a
-    fund is the meetings on that fund they attend, grouped by investor; a fund named without
-    a feeder is every feeder. The representative is the one on the organization. Balance can
-    order that list; it is not the answer. Meeting, call,
+    A term in activities is list_activity_tags with that substring, then every returned id
+    in `activity_tag_ids`. Description text is not searchable; read bodies after the rows
+    are back. Meeting, call,
     note, and document rows from `get_activity_history` use the
     same argument; history email ids do not. Attendee columns use the structured
     `attendees` names on these rows, not names read out of the title or body.

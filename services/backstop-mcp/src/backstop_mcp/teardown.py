@@ -25,6 +25,7 @@ from backstop_mcp.dependencies import (
     get_engine,
     get_resolution_config,
     get_session_factory,
+    get_tenant_guidance_config,
 )
 from backstop_mcp.features.accounts import (
     get_accounts_for_product_query_factory,
@@ -86,6 +87,7 @@ from backstop_mcp.features.org_people import (
     get_people_for_organization_query_factory,
     get_person_query_factory,
     get_search_organizations_query_factory,
+    get_search_people_query_factory,
 )
 from backstop_mcp.features.org_people_writes import (
     get_create_employment_command_factory,
@@ -126,6 +128,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_auth_config,
     get_activity_history_config,
     get_resolution_config,
+    get_tenant_guidance_config,
     get_engine,
     get_session_factory,
     get_encryption_key,
@@ -176,6 +179,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_organization_query_factory,
     get_people_for_organization_query_factory,
     get_search_organizations_query_factory,
+    get_search_people_query_factory,
     get_party_name_query_factory,
     get_resolve_party_query_factory,
     get_modify_contact_location_command_factory,

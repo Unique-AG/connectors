@@ -221,7 +221,7 @@ class TestGetOpportunitiesByIds:
         assert first.call_count == 1
         assert second.call_count == 1
         assert [row.id for row in result.opportunities] == ["5755031", "5072909"]
-        assert result.opportunities[0].stage == "IDD"
+        assert result.opportunities[0].stage == "Stage B"
         assert result.opportunities[0].stage_history == ()
         assert result.not_found == ()
         assert result.errors == ()
@@ -240,7 +240,7 @@ class TestGetOpportunitiesByIds:
         params = [request.url.params.get("include") for request in recorded_requests(route.calls)]
         assert params == ["stage", "stage,stageHistory"]
         assert omitted.opportunities[0].stage_history == ()
-        assert [change.stage for change in included.opportunities[0].stage_history] == ["IDD"]
+        assert [change.stage for change in included.opportunities[0].stage_history] == ["Stage B"]
 
     @pytest.mark.asyncio
     @respx.mock

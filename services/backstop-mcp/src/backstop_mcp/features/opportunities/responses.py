@@ -172,7 +172,7 @@ class OpportunityResponse(OmitNoneModel):
     )
     name: StrippedStr | None = Field(
         default=None,
-        description="Name of the deal, usually 'investor - fund' — e.g. 'Contoso - Harbor Select'.",
+        description="Name of the deal, e.g. 'Contoso - Harbor Select'.",
     )
     stage: str | None = Field(
         default=None,
@@ -511,7 +511,7 @@ class SearchOpportunityRowResponse(OmitNoneModel):
             "Omitted when this deployment has no UI origin. Echo it; never invent one."
         ),
     )
-    name: str | None = Field(default=None, description="Deal name, usually 'investor - fund'.")
+    name: str | None = Field(default=None, description="Deal name.")
     stage: str | None = Field(default=None, description="The stage the deal is in now.")
     stage_id: str | None = Field(default=None, description="Backstop id of the current stage.")
     previous_stage: str | None = Field(
@@ -550,24 +550,21 @@ class SearchOpportunityRowResponse(OmitNoneModel):
     investor_representative: str | None = Field(
         default=None,
         description=(
-            "Login of the colleague who represents the investor organization, which puts the "
-            "deal in that colleague's pipeline. Absent when the organization has no "
+            "Login of the representative on the investor organization. Absent when the "
+            "organization has no "
             "representative."
         ),
     )
     representative: str | None = Field(
         default=None,
         description=(
-            "Login stored as the representative on the deal itself. Often blank; a blank "
+            "Login stored as the representative on the deal itself. May be blank; a blank "
             "value does not mean the deal is unowned — read `investor_representative`."
         ),
     )
     product: ProductFromOpportunityResponse | None = Field(
         default=None,
-        description=(
-            "Linked fund when the include arrived. Often absent. Strategy labels such as "
-            "converts are an opportunity custom field, read from `custom_field_values`."
-        ),
+        description="Linked fund when the include arrived.",
     )
     custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
         default=None,

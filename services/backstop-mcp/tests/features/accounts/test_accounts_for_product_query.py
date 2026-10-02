@@ -235,9 +235,9 @@ class TestGetAccountsForProductQuery:
             return_value=_page(
                 _account(
                     "1",
-                    name="Europe feeder",
+                    name="North account",
                     regularCustomFieldValues=[
-                        {"definitionId": 8689949, "name": "Investor Location", "value": "Europe"}
+                        {"definitionId": 8689949, "name": "Region", "value": "North"}
                     ],
                 )
             )
@@ -258,18 +258,18 @@ class TestGetAccountsForProductQuery:
             return_value=_page(
                 _account(
                     "1",
-                    name="Europe feeder",
+                    name="North account",
                     usDomiciled=False,
                     regularCustomFieldValues=[
                         {
                             "definitionId": 8689949,
-                            "name": "Investor Location",
-                            "value": "Europe",
+                            "name": "Region",
+                            "value": "North",
                         },
                         {
                             "definitionId": "2",
                             "name": "Tags",
-                            "value": ["Middle East", "Europe"],
+                            "value": ["West", "North"],
                         },
                         {"definitionId": "3", "name": "Unset", "value": None},
                     ],
@@ -287,8 +287,8 @@ class TestGetAccountsForProductQuery:
         values = listing.accounts[0].custom_field_values
         assert values is not None
         assert [(item.definition_id, item.name, item.value) for item in values] == [
-            ("8689949", "Investor Location", "Europe"),
-            ("2", "Tags", "Middle East; Europe"),
+            ("8689949", "Region", "North"),
+            ("2", "Tags", "West; North"),
         ]
         assert listing.accounts[0].us_domiciled is False
         assert listing.accounts[1].custom_field_values is None

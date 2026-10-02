@@ -2,7 +2,7 @@
 
 Search and listing walks carry the stored values on every record. These helpers turn them into
 `StoredCustomFieldValueResponse` rows and test them against the `custom_fields` predicates, so
-the organization, opportunity, and account walks share one reading of a stored value.
+the people, organization, opportunity, and account walks share one reading of a stored value.
 """
 
 from collections.abc import Iterator, Sequence

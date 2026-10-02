@@ -1,0 +1,17 @@
+# Tenant guidance overlay example. Placeholders only (Contoso, Northwind, XY:).
+# Budgets, enforced by the app and the chart schema: server_instructions ≤ 2500
+# characters, each tool description ≤ 800, each parameter ≤ 300.
+# Empty tenantGuidance means the shipped descriptions only.
+# Shape: docs/plans/tenant-guidance-overlay.md §1.1
+tenantGuidance:
+  server_instructions: |
+    Vocabulary on this CRM:
+    - A strategy word is usually a custom field. Call list_custom_fields and filter on the exact option.
+    - A fund named without a vehicle is every matching vehicle: find them with get_product and pass the ids together.
+    - Activity tag names carry a short prefix (for example "XY: Follow-up").
+  tools:
+    search_opportunities:
+      description: |
+        Contoso open pipeline for one option: {"is_open": true, "custom_fields": [{"definition_id": "<id from list_custom_fields>", "values": ["<option from list_custom_fields>"]}]}
+      parameters:
+        custom_fields: "Use the exact option text from list_custom_fields, not a substring."

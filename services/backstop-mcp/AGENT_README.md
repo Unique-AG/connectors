@@ -39,6 +39,9 @@ Run the scripts from `services/backstop-mcp` so `uv run` picks up the service ve
 Reuse a cached probe instead of hitting the API again. Do not rewrite these scripts.
 The `backstop-api` skill is the workflow; this folder is the tooling.
 
+Live response captures stay in `.probe-cache/`. Committed JSON fixtures must be synthetic
+and minimal.
+
 ---
 
 ## Deprecated layout (do not copy)

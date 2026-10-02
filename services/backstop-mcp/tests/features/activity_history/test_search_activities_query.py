@@ -52,7 +52,7 @@ def _meeting(row_id: int, *, title: str = "Meeting") -> dict[str, object]:
         "startDate": "2026-08-03T11:00:00.000-0400",
         "stopDate": "2026-08-03T12:00:00.000-0400",
         "meetingType": "Face to Face",
-        "activityTags": [{"id": 474963, "name": "AT: Dispersion"}],
+        "activityTags": [{"id": 9001, "name": "XY: Alpha"}],
         "attendees": [{"name": "Ada"}],
         "author": {"name": "Emily Orscheln", "id": 3566561},
         "associatedWith": [
@@ -104,8 +104,8 @@ class TestEntityActivitiesRequestBody:
             types=("meeting_call", "email"),
             party_id="354566359",
             resource_type="organizations",
-            activity_tags=("474963", "455289"),
-            authors=("achandrinou@deepcapitalgroup.com",),
+            activity_tags=("9001", "9002"),
+            authors=("cara@contoso.example",),
             include_description=False,
         )
 
@@ -130,10 +130,10 @@ class TestEntityActivitiesRequestBody:
         }
         assert new_filters["types"] == [{"searchValues": [{"value": "call"}, {"value": "email"}]}]
         assert new_filters["activityTags"] == [
-            {"searchValues": [{"value": "474963"}, {"value": "455289"}]}
+            {"searchValues": [{"value": "9001"}, {"value": "9002"}]}
         ]
         assert new_filters["authors"] == [
-            {"searchValues": [{"value": "achandrinou@deepcapitalgroup.com", "isEmail": True}]}
+            {"searchValues": [{"value": "cara@contoso.example", "isEmail": True}]}
         ]
 
     def test_description_flag_is_opt_in(self) -> None:
@@ -145,7 +145,7 @@ class TestEntityActivitiesRequestBody:
                 end_date=date(2026, 1, 31),
                 types=(),
                 party_id=None,
-                activity_tags=("474963",),
+                activity_tags=("9001",),
                 authors=(),
                 include_description=True,
             )
@@ -184,7 +184,7 @@ class TestFetchEntityActivities:
         assert row.id == "76715331"
         assert row.effective_date == date(2026, 8, 3)
         assert row.meeting_type == "Face to Face"
-        assert row.tags[0].id == "474963"
+        assert row.tags[0].id == "9001"
         assert row.associated_with[0].id == "341681749"
         assert row.author is not None
         assert row.author.id == "3566561"
@@ -370,7 +370,7 @@ def _party_row(
         row["primaryEntity"] = {"resourceType": "organizations", "resourceId": party_id}
     else:
         row["associatedWith"] = [{"resourceType": "people", "resourceId": "357918383"}]
-        row["inheritedFrom"] = [{"name": "Kent Voss"}]
+        row["inheritedFrom"] = [{"name": "Ada North"}]
     return row
 
 
@@ -569,7 +569,7 @@ class TestIgnoredEntityActivityFilters:
         result = await make_search_activities_query(client).run(
             start_date=date(2026, 6, 1),
             end_date=date(2026, 9, 30),
-            activity_tags=("474963",),
+            activity_tags=("9001",),
         )
 
         assert [row.id for row in result.rows] == ["1"]
@@ -585,7 +585,7 @@ class TestIgnoredEntityActivityFilters:
         result = await make_search_activities_query(client).run(
             start_date=date(2026, 6, 1),
             end_date=date(2026, 9, 30),
-            activity_tags=("474963",),
+            activity_tags=("9001",),
         )
 
         assert [row.id for row in result.rows] == ["1"]

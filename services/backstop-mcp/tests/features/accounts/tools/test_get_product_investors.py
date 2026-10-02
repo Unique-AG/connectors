@@ -211,9 +211,9 @@ class TestGetProductInvestors:
             return_value=_accounts_page(
                 _account(
                     _ACCOUNT_ID,
-                    name="Europe feeder",
+                    name="North account",
                     regularCustomFieldValues=[
-                        {"definitionId": 8689949, "name": "Investor Location", "value": "Europe"},
+                        {"definitionId": 8689949, "name": "Region", "value": "North"},
                     ],
                 ),
             )
@@ -283,9 +283,9 @@ class TestGetProductInvestors:
                 _account(
                     _ACCOUNT_ID,
                     owner_id=_OWNER_ID,
-                    name="Europe feeder",
+                    name="North account",
                     regularCustomFieldValues=[
-                        {"definitionId": 8689949, "name": "Investor Location", "value": "Europe"},
+                        {"definitionId": 8689949, "name": "Region", "value": "North"},
                     ],
                 ),
                 _account("2", name="Blank location"),
@@ -309,7 +309,7 @@ class TestGetProductInvestors:
         listing_payload = object_dict(object_list(tool_payload(result)["products"])[0])
         rows = [object_dict(item) for item in object_list(listing_payload["accounts"])]
         assert rows[0]["custom_field_values"] == [
-            {"definition_id": "8689949", "name": "Investor Location", "value": "Europe"}
+            {"definition_id": "8689949", "name": "Region", "value": "North"}
         ]
         assert "custom_field_values" not in rows[1]
 
@@ -552,11 +552,9 @@ class TestGetProductInvestors:
         assert "include_latest_value=true" in doc
         assert "latest_value_totals" in doc
         assert "Investor Location" not in doc
-        assert "Which field that is differs by tenant" in " ".join(doc.split())
-        assert "ask the user which to use" in " ".join(doc.split())
-        assert "weighted by latest value" in " ".join(doc.split())
-        assert "us_domiciled" in doc
-        assert "exclude_custom_fields" in doc
+        assert "geographical" not in doc
+        assert "us_domiciled" not in doc
+        assert "exclude_custom_fields" not in doc
 
     @pytest.mark.asyncio
     @respx.mock

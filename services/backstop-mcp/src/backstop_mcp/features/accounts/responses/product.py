@@ -31,7 +31,7 @@ class ProductRecordResponse(OmitNoneModel):
         default_factory=list,
         description=(
             "Custom-field values on this product joined to list_custom_fields definitions "
-            "(Strategy, Domicile, Fee Structure, …). Empty when the record has none or the "
+            "(every product custom field with a value). Empty when the record has none or the "
             "catalog could not be loaded. Slice with custom_field_names rather than fetching again."
         ),
     )
@@ -62,7 +62,7 @@ class ProductResolvedResponse(OmitNoneModel):
         default=False,
         description=(
             f"True when the catalog walk stopped at the {MAX_PRODUCT_SCAN_RECORDS}-product scan "
-            "ceiling, so `products` is a prefix of the catalog. An absent Strategy then means "
+            "ceiling, so `products` is a prefix of the catalog. An absent field then means "
             "'not in what was read', not 'not in the firm'. Always false for a single product."
         ),
     )

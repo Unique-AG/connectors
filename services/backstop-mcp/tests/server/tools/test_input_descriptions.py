@@ -56,6 +56,7 @@ _TOOLS_WITH_USAGE_SAMPLES = frozenset(
         "get_last_activity_for_parties",
         "search_opportunities",
         "search_organizations",
+        "search_people",
         "build_backstop_links",
         "parse_backstop_link",
     }
@@ -180,6 +181,13 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         "definition_id",
         "list_custom_fields",
         "get_organization",
+        '"values"',
+        "exclude_custom_fields",
+    ),
+    "search_people": (
+        "definition_id",
+        "list_custom_fields",
+        "get_person",
         '"values"',
         "exclude_custom_fields",
     ),

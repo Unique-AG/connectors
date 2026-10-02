@@ -11,9 +11,9 @@ class _Flags(BaseModel):
 
 
 def test_valid_scalars_parse() -> None:
-    parsed = _Flags.model_validate({"flag": True, "count": 3, "amount": 1.5, "name": "  Koch  "})
+    parsed = _Flags.model_validate({"flag": True, "count": 3, "amount": 1.5, "name": "  Contoso  "})
 
-    assert parsed == _Flags(flag=True, count=3, amount=1.5, name="Koch")
+    assert parsed == _Flags(flag=True, count=3, amount=1.5, name="Contoso")
 
 
 def test_junk_scalars_become_none() -> None:
@@ -38,5 +38,5 @@ def test_adapters_accept_pydantic_coercions() -> None:
     assert TypeAdapter(LenientBool).validate_python("yes") is True
     assert TypeAdapter(LenientInt).validate_python("3") == 3
     assert TypeAdapter(LenientFloat).validate_python("1.5") == 1.5
-    assert TypeAdapter(LenientStr).validate_python(" Koch ") == "Koch"
+    assert TypeAdapter(LenientStr).validate_python(" Contoso ") == "Contoso"
     assert TypeAdapter(LenientStr).validate_python(42) is None
