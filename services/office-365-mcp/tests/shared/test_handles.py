@@ -48,11 +48,6 @@ _REPLY_HANDLE = handles.MessageHandle(
 
 
 class TestTheMessageHandleGrammar:
-    """`teams_search_messages` mints two of these. `teams_browse_channel` and
-    `teams_list_message_replies` mint the third. `teams_read_message` reads all three back. The
-    grammar is none of their own: a handle one mints and another 404s on does not look like a
-    disagreement."""
-
     def test_it_reads_the_two_shapes_search_emits_and_decodes_their_ids(self) -> None:
         chat = handles.message_handle(_CHAT_URI)
         channel = handles.message_handle(_CHANNEL_URI)
@@ -61,10 +56,6 @@ class TestTheMessageHandleGrammar:
         assert channel == _CHANNEL_HANDLE
 
     def test_it_reads_the_reply_shape_that_a_search_cannot_mint(self) -> None:
-        """Graph addresses a channel reply under the post it answers. The search projection
-        carries no `replyToId`, so a search hit on a reply degrades to the unreadable root-post
-        shape. `teams_browse_channel` and `teams_list_message_replies` know the parent post, so
-        they mint the reply shape."""
         reply = handles.message_handle(_REPLY_URI)
 
         assert reply == _REPLY_HANDLE
@@ -125,7 +116,7 @@ _MESSAGE_SHAPES = (
 )
 
 _FAILS_THE_SAME_WAY = (
-    "If you call this tool again with this value, the call will fail the same way."
+    "If you call this tool again with the same arguments, the call will fail the same way."
 )
 
 

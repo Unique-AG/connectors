@@ -2504,7 +2504,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         message = _error_text(result)
-        assert "replies of each post on the channel's first page" in message, message
+        assert "replies of the posts on the first page of the channel" in message, message
         assert "no route to its full text" in message
         assert "a second browse returns the same window" in message
         assert "stop looking" in message
