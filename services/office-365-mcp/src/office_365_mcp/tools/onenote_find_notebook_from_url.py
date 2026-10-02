@@ -24,8 +24,14 @@ from office_365_mcp.shared.handles import (
     onenote_section_group_handle,
     onenote_section_handle,
 )
-from office_365_mcp.shared.notes import client_url_of, onenote_root, owner_named, web_url_of
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.notes import (
+    client_url_of,
+    onenote_root,
+    owner_named,
+    owner_of_graph_url,
+    web_url_of,
+)
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 
 TOOL_NAME = "onenote_find_notebook_from_url"
 
@@ -44,8 +50,27 @@ recent notebooks. Its rows carry no handle, so pass their `web_url` here to get 
 
 Notes:
 - The address of a page or a section resolves to the notebook that holds it.
-- Pass `group` for the address of a notebook that a Microsoft 365 group or team owns.
+- Pass `group` or `site` for the address of a notebook that a group, a team or a SharePoint site \
+owns. Without them, the handle carries the group or the site only when Microsoft names it in its \
+answer.
+- If a later call on an onenote:///notebooks/ handle answers not found, call this tool again with \
+`group` or `site`.
 """
+
+_GROUP_AND_SITE = (
+    "onenote_find_notebook_from_url takes at most one of `group` and `site`. A notebook belongs "
+    + "to one group or one site, never to both. The same combination fails again, so do not retry "
+    + "it as it is."
+)
+
+_OWNER_REFUSED = (
+    "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
+    + "Most likely, the signed-in user is not a member of that group or site, or the id is "
+    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool works "
+    + "without `group` and `site`, the permissions of this connector are not the problem. If it "
+    + "fails without them too, ask a Microsoft 365 administrator to grant the delegated "
+    + "permission Notes.Read. This same call fails again, so do not retry it."
+)
 
 _OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS = (
     "onenote_find_notebook_from_url takes a web address or Microsoft's own `onenote:` client "
@@ -69,8 +94,9 @@ GRAPH_NOT_FOUND = (
     + "notebook, or name a notebook this user has no access to. Take a fresh `web_url` from "
     + "onenote_list_notebooks or onenote_list_recent_notebooks, or from a page, section or "
     + "notebook this connector already read, and copy it exactly. This same address fails "
-    + "again, so do not retry it. If this call named a `group`, that group most likely does not "
-    + "own the notebook. A call with another `group`, or with none, can still work."
+    + "again, so do not retry it. If this call named a `group` or a `site`, that group or site "
+    + "most likely does not own the notebook. A call with another one, or with none, can still "
+    + "work."
 )
 
 
@@ -137,9 +163,15 @@ class FoundNotebook(BaseModel):
 
 
 async def find_notebook_from_url(
-    client: GraphServiceClient, *, web_url: str, group: str | None = None
+    client: GraphServiceClient,
+    *,
+    web_url: str,
+    group: str | None = None,
+    site: str | None = None,
 ) -> FoundNotebook:
     assert len(web_url) >= 1, "web_url must not be empty"
+    if group is not None and site is not None:
+        raise ToolError(_GROUP_AND_SITE)
     if onenote_notebook_handle(web_url) is not None:
         raise ToolError(_OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS)
     if (
@@ -149,11 +181,15 @@ async def find_notebook_from_url(
     ):
         raise ToolError(_OWN_OTHER_HANDLE_NOT_A_WEB_ADDRESS)
 
-    owner = owner_named(group=group, site=None)
-    with graph_errors(TOOL_NAME, step=STEP_NOTEBOOK_FROM_URL):
-        found = await _resolve(client, web_url, owner)
+    named = owner_named(group=group, site=site)
+    with (
+        owner_refused(named is not None, _OWNER_REFUSED),
+        graph_errors(TOOL_NAME, step=STEP_NOTEBOOK_FROM_URL),
+    ):
+        found = await _resolve(client, web_url, named)
     assert found is not None, "Graph answered getNotebookFromWebUrl with nothing"
-    return _answer(found, owner)
+    answered = None if found.self is None else owner_of_graph_url(found.self)
+    return _answer(found, named if named is not None else answered)
 
 
 async def _resolve(
@@ -226,6 +262,19 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
+        site: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The SharePoint site whose notebook this address opens, as its Graph site id. "
+                    + "The id is a host name and two ids, joined by commas, and not "
+                    + "percent-encoded. Ask the user for it. Pass at most one of `group` and "
+                    + "`site`. Omit both for a notebook that the user owns or that somebody "
+                    + "shares with them."
+                ),
+            ),
+        ] = None,
         client: GraphServiceClient = graph,
     ) -> FoundNotebook:
-        return await find_notebook_from_url(client, web_url=web_url, group=group)
+        return await find_notebook_from_url(client, web_url=web_url, group=group, site=site)
