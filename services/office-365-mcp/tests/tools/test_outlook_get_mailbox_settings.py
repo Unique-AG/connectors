@@ -10,6 +10,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.handles import MailFolderHandle, MailRuleHandle, mail_folder_handle
+from office_365_mcp.shared.rules import MailRule, RuleActions
 from office_365_mcp.tools import outlook_get_mailbox_settings as settings_tool
 
 from .conftest import GRAPH_V1
@@ -118,6 +119,11 @@ def _settings_response(
 ) -> httpx.Response:
     body: dict[str, object] = {} if reply is None else {"automaticRepliesSetting": reply}
     return httpx.Response(200, json={**body, **(preferences or {})})
+
+
+def _actions(rule: MailRule) -> RuleActions:
+    assert rule.actions is not None, "the rule reported no actions"
+    return rule.actions
 
 
 def _described(tool: Tool) -> dict[str, str | None]:
@@ -263,7 +269,7 @@ class TestWhatARuleSays:
         answer = await settings_tool.get_mailbox_settings(client, include="rules")
 
         assert answer.rules is not None
-        assert answer.rules[0].forwards_to == [_OUTSIDE]
+        assert _actions(answer.rules[0]).forward_to == [_OUTSIDE]
 
     async def test_a_redirect_and_an_attachment_forward_are_reported_apart_from_a_forward(
         self, client: GraphServiceClient, rules: respx.Route
@@ -283,9 +289,10 @@ class TestWhatARuleSays:
         rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
 
         assert rule is not None
-        assert rule[0].forwards_to == [_OUTSIDE]
-        assert rule[0].redirects_to == [_INSIDE]
-        assert rule[0].forward_as_attachment_to == ["audit@example.invalid"]
+        actions = _actions(rule[0])
+        assert actions.forward_to == [_OUTSIDE]
+        assert actions.redirect_to == [_INSIDE]
+        assert actions.forward_as_attachment_to == ["audit@example.invalid"]
 
     async def test_a_recipient_with_no_address_is_named_rather_than_dropped(
         self, client: GraphServiceClient, rules: respx.Route
@@ -306,7 +313,7 @@ class TestWhatARuleSays:
         rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
 
         assert rule is not None
-        assert rule[0].forwards_to == ["Archive Service", _OUTSIDE]
+        assert _actions(rule[0]).forward_to == ["Archive Service", _OUTSIDE]
 
     async def test_each_rule_carries_the_handle_that_names_it(
         self, client: GraphServiceClient, rules: respx.Route
@@ -368,10 +375,11 @@ class TestWhatARuleSays:
         rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
 
         assert rule is not None
-        assert rule[0].moves_to_folder == _ARCHIVE_FOLDER_ID
-        assert rule[0].deletes is True
-        assert rule[0].marks_as_read is True
-        assert rule[0].stops_processing_more_rules is True
+        actions = _actions(rule[0])
+        assert actions.move_to_folder == _ARCHIVE_FOLDER_ID
+        assert actions.delete is True
+        assert actions.mark_as_read is True
+        assert actions.stop_processing_rules is True
 
     async def test_a_rule_that_categorizes_copies_and_sets_the_importance_reports_each_of_them(
         self, client: GraphServiceClient, rules: respx.Route
@@ -392,11 +400,12 @@ class TestWhatARuleSays:
         rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
 
         assert rule is not None
-        assert rule[0].assigns_categories == ["Partner", "Urgent"]
-        assert rule[0].copies_to_folder == _COPY_FOLDER_ID
-        assert rule[0].marks_importance == "high"
-        assert rule[0].moves_to_folder == _ARCHIVE_FOLDER_ID
-        assert rule[0].permanently_deletes is None
+        actions = _actions(rule[0])
+        assert actions.assign_categories == ["Partner", "Urgent"]
+        assert actions.copy_to_folder == _COPY_FOLDER_ID
+        assert actions.mark_importance == "high"
+        assert actions.move_to_folder == _ARCHIVE_FOLDER_ID
+        assert actions.permanent_delete is None
 
     @pytest.mark.parametrize("importance", ["low", "normal", "high"])
     async def test_every_importance_a_rule_sets_is_reported_by_its_own_name(
@@ -407,7 +416,7 @@ class TestWhatARuleSays:
         rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
 
         assert rule is not None
-        assert rule[0].marks_importance == importance
+        assert _actions(rule[0]).mark_importance == importance
 
     async def test_a_permanent_erase_is_reported_apart_from_a_delete_to_deleted_items(
         self, client: GraphServiceClient, rules: respx.Route
@@ -422,22 +431,22 @@ class TestWhatARuleSays:
         rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
 
         assert rule is not None
-        assert [(row.deletes, row.permanently_deletes) for row in rule] == [
-            (True, True),
+        assert [(_actions(row).delete, _actions(row).permanent_delete) for row in rule] == [
+            (False, True),
             (True, False),
         ]
 
-    async def test_a_rule_that_permanently_deletes_is_reported_as_deleting(
+    async def test_a_rule_that_permanently_deletes_still_reports_it(
         self, client: GraphServiceClient, rules: respx.Route
     ) -> None:
-        rules.mock(
-            return_value=_page(_rule_payload(actions={"delete": False, "permanentDelete": True}))
-        )
+        rules.mock(return_value=_page(_rule_payload(actions={"permanentDelete": True})))
 
-        rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
+        answer = await settings_tool.get_mailbox_settings(client, include="rules")
 
-        assert rule is not None
-        assert rule[0].deletes is True
+        assert answer.rules is not None
+        assert _actions(answer.rules[0]).permanent_delete is True
+        published = cast("list[Mapping[str, object]]", answer.model_dump(mode="json")["rules"])
+        assert published[0]["actions"] == {"permanent_delete": True}
 
     async def test_a_rule_that_does_none_of_these_says_false_rather_than_nothing(
         self, client: GraphServiceClient, rules: respx.Route
@@ -453,13 +462,14 @@ class TestWhatARuleSays:
         rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
 
         assert rule is not None
-        assert rule[0].deletes is False
-        assert rule[0].marks_as_read is False
-        assert rule[0].forwards_to == []
-        assert rule[0].moves_to_folder is None
-        assert rule[0].assigns_categories == []
-        assert rule[0].copies_to_folder is None
-        assert rule[0].marks_importance is None
+        actions = _actions(rule[0])
+        assert actions.delete is False
+        assert actions.mark_as_read is False
+        assert actions.forward_to is None
+        assert actions.move_to_folder is None
+        assert actions.assign_categories is None
+        assert actions.copy_to_folder is None
+        assert actions.mark_importance is None
 
     async def test_a_rule_graph_reported_no_actions_for_is_still_listed(
         self, client: GraphServiceClient, rules: respx.Route
@@ -470,15 +480,24 @@ class TestWhatARuleSays:
 
         assert rule is not None
         assert rule[0].uri == MailRuleHandle(_RULE_ID).uri
-        assert rule[0].deletes is None
-        assert rule[0].marks_as_read is None
-        assert rule[0].stops_processing_more_rules is None
-        assert rule[0].moves_to_folder is None
-        assert rule[0].forwards_to == []
-        assert rule[0].assigns_categories == []
-        assert rule[0].copies_to_folder is None
-        assert rule[0].marks_importance is None
-        assert rule[0].permanently_deletes is None
+        assert rule[0].actions is None
+
+    async def test_a_rule_is_published_in_one_shape_with_its_actions_nested(
+        self, client: GraphServiceClient, rules: respx.Route
+    ) -> None:
+        rules.mock(
+            return_value=_page(
+                _rule_payload(
+                    actions={"forwardTo": [_recipient(_OUTSIDE)], "markAsRead": True},
+                )
+            )
+        )
+
+        answer = await settings_tool.get_mailbox_settings(client, include="rules")
+
+        published = cast("list[Mapping[str, object]]", answer.model_dump(mode="json")["rules"])
+        assert set(published[0]) == set(MailRule.model_fields)
+        assert published[0]["actions"] == {"forward_to": [_OUTSIDE], "mark_as_read": True}
 
     @pytest.mark.usefixtures("rules")
     async def test_a_mailbox_with_no_rules_answers_an_empty_list(
@@ -596,8 +615,8 @@ class TestWhatTriggersARule:
         assert rule is not None
         assert rule[0].conditions is not None
         assert rule[0].conditions.body_or_subject_contains == ["urgent"]
-        assert rule[0].forwards_to == [_OUTSIDE]
-        assert rule[0].marks_as_read is True
+        assert _actions(rule[0]).forward_to == [_OUTSIDE]
+        assert _actions(rule[0]).mark_as_read is True
 
 
 class TestTheAutomaticReply:
@@ -853,6 +872,7 @@ class TestWhatItPublishes:
     @pytest.mark.parametrize(
         "path",
         [
+            "answer.rules",
             "answer.time_zone",
             "answer.working_hours",
             "answer.language",
@@ -881,7 +901,19 @@ class TestWhatItPublishes:
         definitions = cast("Mapping[str, Mapping[str, object]]", answer["$defs"])
 
         assert "required" not in definitions["RuleConditions"]
+        assert "required" not in definitions["RuleActions"]
         assert "required" not in definitions["SizeRangeKb"]
+
+    def test_a_rule_is_published_in_the_one_shape_that_the_rule_tools_answer_with(
+        self, published: Tool
+    ) -> None:
+        answer = cast("Mapping[str, object]", published.output_schema)
+        definitions = cast("Mapping[str, Mapping[str, object]]", answer["$defs"])
+
+        assert "InboxRule" not in definitions
+        assert set(cast("Mapping[str, object]", definitions["MailRule"]["properties"])) == set(
+            MailRule.model_fields
+        )
 
     def test_the_include_field_names_the_preferences_part(self, published: Tool) -> None:
         properties = cast("Mapping[str, Mapping[str, object]]", published.parameters["properties"])

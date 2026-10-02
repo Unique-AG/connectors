@@ -2,7 +2,7 @@ import hashlib
 import json
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from typing import Annotated, Literal, Self, cast, get_args
+from typing import Annotated, ClassVar, Literal, Self, cast, get_args
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.email_address import EmailAddress
@@ -25,7 +25,7 @@ from msgraph.generated.users.item.mail_folders.item.message_rules.message_rules_
     MessageRulesRequestBuilder,
 )
 from msgraph.graph_service_client import GraphServiceClient
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
@@ -478,113 +478,6 @@ _RULE_EXCEPTIONS = (
 )
 
 
-class InboxRule(BaseModel):
-    uri: str = Field(description=_RULE_URI)
-    display_name: str | None = Field(description=_RULE_DISPLAY_NAME)
-    is_enabled: bool | None = Field(description=_RULE_IS_ENABLED)
-    sequence: int | None = Field(description=_RULE_SEQUENCE)
-    is_read_only: bool | None = Field(description=_RULE_IS_READ_ONLY)
-    has_error: bool | None = Field(description=_RULE_HAS_ERROR)
-    conditions: RuleConditions | None = Field(description=_RULE_CONDITIONS)
-    exceptions: RuleConditions | None = Field(description=_RULE_EXCEPTIONS)
-    forwards_to: list[str] = Field(
-        description=(
-            "The addresses to which this rule forwards a copy of each matching message. Empty "
-            + "when the rule has no forward action."
-        )
-    )
-    redirects_to: list[str] = Field(
-        description=(
-            "The addresses to which this rule redirects each matching message, with the original "
-            + "sender kept. Empty when the rule has no redirect action."
-        )
-    )
-    forward_as_attachment_to: list[str] = Field(
-        description=(
-            "The addresses to which this rule forwards each matching message as an attachment. "
-            + "Empty when the rule has no such action."
-        )
-    )
-    moves_to_folder: str | None = Field(
-        description=(
-            "The Graph id of the folder to which this rule moves each matching message. Null "
-            + "when the rule does not move mail."
-        )
-    )
-    copies_to_folder: str | None = Field(
-        description=(
-            "The Graph id of the folder in which this rule puts a copy of each matching message. "
-            + "Null when the rule copies no mail."
-        )
-    )
-    deletes: bool | None = Field(
-        description=(
-            "True when the rule deletes each matching message, permanently or to Deleted Items. "
-            + "Null when Graph reports no delete action."
-        )
-    )
-    permanently_deletes: bool | None = Field(
-        description=(
-            "True when the rule erases each matching message permanently, without Deleted Items. "
-            + "Null when Graph reports no such action."
-        )
-    )
-    assigns_categories: list[str] = Field(
-        description=(
-            "The names of the categories that this rule puts on each matching message. Empty "
-            + "when the rule has no such action."
-        )
-    )
-    marks_importance: str | None = Field(
-        description=(
-            "The importance that this rule sets on each matching message: `low`, `normal`, or "
-            + "`high`. Null when the rule sets no importance."
-        )
-    )
-    marks_as_read: bool | None = Field(
-        description=(
-            "True when the rule marks each matching message as read when it arrives. Null if "
-            + "Graph does not say."
-        )
-    )
-    stops_processing_more_rules: bool | None = Field(
-        description=(
-            "True when this rule stops Outlook from running any rule that comes after it in "
-            + "`sequence`. Null if Graph does not say."
-        )
-    )
-
-    @classmethod
-    def from_rule(cls, rule: MessageRule) -> Self:
-        assert rule.id is not None, "Graph returned a message rule with no id"
-        actions = rule.actions
-        return cls(
-            uri=MailRuleHandle(rule.id).uri,
-            display_name=rule.display_name,
-            is_enabled=rule.is_enabled,
-            sequence=rule.sequence,
-            is_read_only=rule.is_read_only,
-            has_error=rule.has_error,
-            conditions=conditions_of(rule.conditions),
-            exceptions=conditions_of(rule.exceptions),
-            forwards_to=_addresses(None if actions is None else actions.forward_to),
-            redirects_to=_addresses(None if actions is None else actions.redirect_to),
-            forward_as_attachment_to=_addresses(
-                None if actions is None else actions.forward_as_attachment_to
-            ),
-            moves_to_folder=None if actions is None else actions.move_to_folder,
-            copies_to_folder=None if actions is None else actions.copy_to_folder,
-            deletes=_deletes(actions),
-            permanently_deletes=None if actions is None else actions.permanent_delete,
-            assigns_categories=[] if actions is None else actions.assign_categories or [],
-            marks_importance=None if actions is None else spelled(actions.mark_importance),
-            marks_as_read=None if actions is None else actions.mark_as_read,
-            stops_processing_more_rules=(
-                None if actions is None else actions.stop_processing_rules
-            ),
-        )
-
-
 class RuleActions(BaseModel):
     assign_categories: list[str] | None = Field(
         default=None,
@@ -728,7 +621,30 @@ class MailRule(BaseModel):
         )
 
 
+class SizeRangeKbInput(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    minimum_kb: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "The smallest size, in kilobytes, that an incoming message must have for the "
+            + "condition or the exception to apply. Omit it to set no minimum."
+        ),
+    )
+    maximum_kb: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "The largest size, in kilobytes, that an incoming message can have for the "
+            + "condition or the exception to apply. Omit it to set no maximum."
+        ),
+    )
+
+
 class RuleConditionsInput(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
     body_contains: list[Annotated[str, Field(min_length=1)]] | None = Field(
         default=None,
         min_length=1,
@@ -946,7 +862,7 @@ class RuleConditionsInput(BaseModel):
             + "or the exception to apply. Omit it when the subject does not matter."
         ),
     )
-    within_size_range: SizeRangeKb | None = Field(
+    within_size_range: SizeRangeKbInput | None = Field(
         default=None,
         description=(
             "The size range, in kilobytes, that an incoming message must fall in for the "
@@ -956,6 +872,8 @@ class RuleConditionsInput(BaseModel):
 
 
 class RuleActionsInput(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
     assign_categories: list[Annotated[str, Field(min_length=1)]] | None = Field(
         default=None,
         min_length=1,
@@ -1259,7 +1177,7 @@ def _recipients(addresses: list[str] | None) -> list[Recipient] | None:
     return [Recipient(email_address=EmailAddress(address=address.strip())) for address in addresses]
 
 
-def _size_range(size: SizeRangeKb | None) -> SizeRange | None:
+def _size_range(size: SizeRangeKbInput | None) -> SizeRange | None:
     if size is None or (size.minimum_kb is None and size.maximum_kb is None):
         return None
     return SizeRange(minimum_size=size.minimum_kb, maximum_size=size.maximum_kb)
@@ -1299,10 +1217,3 @@ def _addresses(recipients: list[Recipient] | None) -> list[str]:
         if address is not None:
             named.append(address)
     return named
-
-
-def _deletes(actions: MessageRuleActions | None) -> bool | None:
-    if actions is None:
-        return None
-    said = [flag for flag in (actions.delete, actions.permanent_delete) if flag is not None]
-    return any(said) if said else None

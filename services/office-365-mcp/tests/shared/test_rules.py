@@ -1,8 +1,3 @@
-"""A rule's conditions and exceptions are one Graph type, `messageRulePredicates`, with thirty
-optional members. Graph sends an unset member as null or as an empty list, so the assertions read
-the serialized dump, which leaves an unset member out.
-"""
-
 import dataclasses
 import hashlib
 import json
@@ -19,7 +14,7 @@ from msgraph.generated.models.message_rule_predicates import MessageRulePredicat
 from msgraph.generated.models.recipient import Recipient
 from msgraph.generated.models.sensitivity import Sensitivity
 from msgraph.generated.models.size_range import SizeRange
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle, MailRuleHandle
@@ -28,7 +23,6 @@ from office_365_mcp.shared.rules import (
     NO_RULE_ACTION,
     NOT_A_RULE_FOLDER,
     READ_ONLY_RULE,
-    InboxRule,
     MailRule,
     RuleActionName,
     RuleActions,
@@ -37,6 +31,7 @@ from office_365_mcp.shared.rules import (
     RuleConditionsInput,
     RuleFolders,
     SizeRangeKb,
+    SizeRangeKbInput,
     actions_for,
     actions_of,
     conditions_of,
@@ -294,7 +289,6 @@ class TestTheModelCoversWhatMicrosoftDefines:
             for model in (
                 RuleConditions,
                 SizeRangeKb,
-                InboxRule,
                 RuleActions,
                 MailRule,
                 RuleConditionsInput,
@@ -323,9 +317,26 @@ class TestTheModelCoversWhatMicrosoftDefines:
         assert "outlook_list_categories" not in description.replace(LIST_CATEGORIES_GUARD, "")
 
 
-class TestAnInboxRule:
+class TestAMailRule:
+    def test_the_answer_nests_the_conditions_and_the_actions_the_rule_sets(self) -> None:
+        rule = MailRule.from_rule(
+            MessageRule(
+                id=_RULE_ID,
+                display_name="Newsletters",
+                conditions=_predicates(sender_contains=["newsletter"]),
+                actions=MessageRuleActions(mark_as_read=True),
+            )
+        )
+
+        assert rule.uri == MailRuleHandle(_RULE_ID).uri
+        assert rule.conditions is not None
+        assert rule.conditions.model_dump() == {"sender_contains": ["newsletter"]}
+        assert rule.actions is not None
+        assert rule.actions.model_dump() == {"mark_as_read": True}
+        assert rule.exceptions is None
+
     def test_the_conditions_and_the_exceptions_are_read_from_their_own_members(self) -> None:
-        rule = InboxRule.from_rule(
+        rule = MailRule.from_rule(
             MessageRule(
                 id=_RULE_ID,
                 conditions=_predicates(sender_contains=["newsletter"]),
@@ -339,13 +350,13 @@ class TestAnInboxRule:
         assert rule.exceptions.model_dump() == {"sent_to_me": True, "categories": ["Important"]}
 
     def test_a_rule_with_no_conditions_and_no_exceptions_reports_both_as_null(self) -> None:
-        rule = InboxRule.from_rule(MessageRule(id=_RULE_ID))
+        rule = MailRule.from_rule(MessageRule(id=_RULE_ID))
 
         assert rule.conditions is None
         assert rule.exceptions is None
 
     def test_a_rule_with_an_exception_and_no_condition_keeps_only_the_exception(self) -> None:
-        rule = InboxRule.from_rule(
+        rule = MailRule.from_rule(
             MessageRule(id=_RULE_ID, exceptions=_predicates(is_automatic_reply=True))
         )
 
@@ -354,7 +365,7 @@ class TestAnInboxRule:
         assert rule.exceptions.is_automatic_reply is True
 
     def test_the_published_rule_nests_only_the_set_predicates(self) -> None:
-        rule = InboxRule.from_rule(
+        rule = MailRule.from_rule(
             MessageRule(
                 id=_RULE_ID,
                 conditions=_predicates(subject_contains=["invoice"], body_contains=[]),
@@ -366,14 +377,14 @@ class TestAnInboxRule:
         assert published["exceptions"] is None
 
     def test_the_handle_is_the_one_that_names_the_rule(self) -> None:
-        assert InboxRule.from_rule(MessageRule(id=_RULE_ID)).uri == MailRuleHandle(_RULE_ID).uri
+        assert MailRule.from_rule(MessageRule(id=_RULE_ID)).uri == MailRuleHandle(_RULE_ID).uri
 
     def test_a_rule_with_no_id_is_refused(self) -> None:
         with pytest.raises(AssertionError, match="no id"):
-            _ = InboxRule.from_rule(MessageRule())
+            _ = MailRule.from_rule(MessageRule())
 
     def test_every_action_the_rule_has_is_reported_in_its_own_field(self) -> None:
-        rule = InboxRule.from_rule(
+        rule = MailRule.from_rule(
             MessageRule(
                 id=_RULE_ID,
                 actions=MessageRuleActions(
@@ -392,48 +403,44 @@ class TestAnInboxRule:
             )
         )
 
-        assert rule.assigns_categories == ["Partner", "Urgent"]
-        assert rule.copies_to_folder == _COPIED_INTO
-        assert rule.deletes is True
-        assert rule.forward_as_attachment_to == [_ADA]
-        assert rule.forwards_to == [_DANA]
-        assert rule.marks_as_read is True
-        assert rule.marks_importance == "high"
-        assert rule.moves_to_folder == _MOVED_INTO
-        assert rule.permanently_deletes is True
-        assert rule.redirects_to == [_ERIN]
-        assert rule.stops_processing_more_rules is True
+        assert rule.actions is not None
+        assert rule.actions.model_dump() == {
+            "assign_categories": ["Partner", "Urgent"],
+            "copy_to_folder": _COPIED_INTO,
+            "delete": True,
+            "forward_as_attachment_to": [_ADA],
+            "forward_to": [_DANA],
+            "mark_as_read": True,
+            "mark_importance": "high",
+            "move_to_folder": _MOVED_INTO,
+            "permanent_delete": True,
+            "redirect_to": [_ERIN],
+            "stop_processing_rules": True,
+        }
 
     def test_a_delete_to_deleted_items_is_not_a_permanent_erase(self) -> None:
-        rule = InboxRule.from_rule(
+        rule = MailRule.from_rule(
             MessageRule(
                 id=_RULE_ID, actions=MessageRuleActions(delete=True, permanent_delete=False)
             )
         )
 
-        assert rule.deletes is True
-        assert rule.permanently_deletes is False
+        assert rule.actions is not None
+        assert rule.actions.delete is True
+        assert rule.actions.permanent_delete is False
 
-    def test_a_rule_with_no_actions_reports_every_action_as_unset(self) -> None:
-        rule = InboxRule.from_rule(MessageRule(id=_RULE_ID))
+    def test_a_rule_with_no_actions_reports_no_actions(self) -> None:
+        assert MailRule.from_rule(MessageRule(id=_RULE_ID)).actions is None
 
-        assert rule.assigns_categories == []
-        assert rule.copies_to_folder is None
-        assert rule.marks_importance is None
-        assert rule.permanently_deletes is None
-
-    def test_a_rule_whose_actions_set_nothing_reports_every_action_as_unset(self) -> None:
-        rule = InboxRule.from_rule(
+    def test_a_rule_whose_actions_set_nothing_reports_no_actions(self) -> None:
+        rule = MailRule.from_rule(
             MessageRule(id=_RULE_ID, actions=MessageRuleActions(assign_categories=[]))
         )
 
-        assert rule.assigns_categories == []
-        assert rule.copies_to_folder is None
-        assert rule.marks_importance is None
-        assert rule.permanently_deletes is None
+        assert rule.actions is None
 
     def test_a_rule_handle_names_the_tools_that_change_delete_and_turn_off_the_rule(self) -> None:
-        described = InboxRule.model_fields["uri"].description
+        described = MailRule.model_fields["uri"].description
 
         assert described is not None
         assert "outlook_disable_mail_rule" in described
@@ -513,6 +520,50 @@ class TestTheInputSpellsWhatTheAnswerReports:
             assert "required" not in model.model_json_schema(mode="serialization")
 
 
+class TestTheInputRefusesWhatItDoesNotKnow:
+    @pytest.mark.parametrize(
+        "given",
+        [
+            {"permanent_delete": True},
+            {"permanentDelete": True},
+            {"forward_too": [_DANA]},
+            {"mark_as_read": True, "forwards_to": [_DANA]},
+        ],
+        ids=["permanent-erase", "camel-case", "misspelled", "beside-a-known-key"],
+    )
+    def test_an_action_the_input_does_not_have_is_refused(self, given: dict[str, object]) -> None:
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+            _ = TypeAdapter(RuleActionsInput).validate_python(given)
+
+    @pytest.mark.parametrize(
+        "given",
+        [
+            {"subject_contain": ["invoice"]},
+            {"subject_contains": ["invoice"], "is_urgent": True},
+            {"within_size_range": {"minimum_kb": 1, "largest_kb": 9}},
+        ],
+        ids=["misspelled", "beside-a-known-key", "in-the-size-range"],
+    )
+    def test_a_predicate_the_input_does_not_have_is_refused(self, given: dict[str, object]) -> None:
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+            _ = TypeAdapter(RuleConditionsInput).validate_python(given)
+
+    @pytest.mark.parametrize("name", ["minimum_kb", "maximum_kb"])
+    def test_a_negative_size_is_refused(self, name: str) -> None:
+        with pytest.raises(ValidationError, match="greater than or equal to 0"):
+            _ = TypeAdapter(SizeRangeKbInput).validate_python({name: -1})
+
+    def test_a_size_of_zero_is_accepted_and_an_omitted_bound_stays_unset(self) -> None:
+        size = TypeAdapter(SizeRangeKbInput).validate_python({"minimum_kb": 0})
+
+        assert size.minimum_kb == 0
+        assert size.maximum_kb is None
+
+    def test_every_input_object_says_in_its_schema_that_it_takes_no_other_key(self) -> None:
+        for model in (RuleActionsInput, RuleConditionsInput, SizeRangeKbInput):
+            assert model.model_json_schema()["additionalProperties"] is False
+
+
 class TestTheConditionsThatReachGraph:
     def test_every_predicate_given_comes_back_as_the_same_predicate(self) -> None:
         predicates = predicates_for(_EVERY_CONDITION)
@@ -534,9 +585,19 @@ class TestTheConditionsThatReachGraph:
     def test_no_conditions_is_no_predicates(self) -> None:
         assert predicates_for(None) is None
 
+    def test_a_size_range_with_one_bound_sends_only_that_bound(self) -> None:
+        predicates = predicates_for(
+            RuleConditionsInput(within_size_range=SizeRangeKbInput(maximum_kb=512))
+        )
+
+        assert predicates is not None
+        assert predicates.within_size_range is not None
+        assert predicates.within_size_range.maximum_size == 512
+        assert predicates.within_size_range.minimum_size is None
+
     def test_a_conditions_object_that_sets_nothing_is_no_predicates(self) -> None:
         assert predicates_for(RuleConditionsInput()) is None
-        assert predicates_for(RuleConditionsInput(within_size_range=SizeRangeKb())) is None
+        assert predicates_for(RuleConditionsInput(within_size_range=SizeRangeKbInput())) is None
 
 
 class TestTheActionsThatReachGraph:
@@ -552,12 +613,6 @@ class TestTheActionsThatReachGraph:
 
     def test_no_action_ever_erases_permanently(self) -> None:
         assert actions_for(_EVERY_ACTION, _FOLDERS).permanent_delete is None
-
-    def test_a_permanent_erase_smuggled_into_the_input_is_dropped(self) -> None:
-        smuggled = RuleActionsInput.model_validate({"permanent_delete": True, "mark_as_read": True})
-
-        assert actions_for(smuggled, _FOLDERS).permanent_delete is None
-        assert RuleActionsInput.model_validate({"permanent_delete": True}).sets_nothing
 
     def test_an_actions_object_that_sets_something_says_so(self) -> None:
         assert RuleActionsInput().sets_nothing
@@ -691,29 +746,6 @@ class TestTheActionsThatAreReported:
 
         assert reported is not None
         assert "null" not in reported.model_dump_json()
-
-
-class TestAMailRule:
-    def test_the_answer_nests_the_conditions_and_the_actions_the_rule_sets(self) -> None:
-        rule = MailRule.from_rule(
-            MessageRule(
-                id=_RULE_ID,
-                display_name="Newsletters",
-                conditions=_predicates(sender_contains=["newsletter"]),
-                actions=MessageRuleActions(mark_as_read=True),
-            )
-        )
-
-        assert rule.uri == MailRuleHandle(_RULE_ID).uri
-        assert rule.conditions is not None
-        assert rule.conditions.model_dump() == {"sender_contains": ["newsletter"]}
-        assert rule.actions is not None
-        assert rule.actions.model_dump() == {"mark_as_read": True}
-        assert rule.exceptions is None
-
-    def test_a_rule_with_no_id_is_refused(self) -> None:
-        with pytest.raises(AssertionError, match="no id"):
-            _ = MailRule.from_rule(MessageRule())
 
 
 class TestWhatAnInputMustSpell:

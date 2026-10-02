@@ -6,7 +6,7 @@ import httpx
 import pytest
 import respx
 from fastmcp import Context, FastMCP
-from fastmcp.exceptions import ToolError
+from fastmcp.exceptions import ToolError, ValidationError
 from fastmcp.server.elicitation import AcceptedElicitation, DeclinedElicitation
 from fastmcp.tools import Tool
 from mcp.types import ElicitRequest, ElicitRequestFormParams, ElicitResult, InputRequiredResult
@@ -46,6 +46,9 @@ _STRANGER = "stranger@evil.invalid"
 _NOTHING_CHANGED = "The rule was not changed."
 
 _RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
+
+_UNKNOWN_KEY = "Extra inputs are not permitted"
+_NEGATIVE_SIZE = "greater than or equal to 0"
 
 
 def _recipient(address: str) -> dict[str, object]:
@@ -251,6 +254,16 @@ def _property_names(schema: object) -> set[str]:
         return named.union(*(_property_names(value) for value in mapping.values()))
     if isinstance(schema, list):
         return set[str]().union(*(_property_names(item) for item in cast("list[object]", schema)))
+    return set()
+
+
+def _referenced(schema: object) -> set[str]:
+    if isinstance(schema, Mapping):
+        mapping = cast("Mapping[str, object]", schema)
+        own = {cast("str", mapping["$ref"])} if "$ref" in mapping else set[str]()
+        return own.union(*(_referenced(value) for value in mapping.values()))
+    if isinstance(schema, list):
+        return set[str]().union(*(_referenced(item) for item in cast("list[object]", schema)))
     return set()
 
 
@@ -498,6 +511,46 @@ class TestWhatItRefusesBeforeGraph:
     ) -> None:
         with pytest.raises(ToolError, match="outlook_get_mailbox_settings"):
             _ = await _update(client, rule_ref=not_a_rule, display_name="Renamed")
+
+        assert len(graph.calls) == 0
+
+    @pytest.mark.parametrize(
+        ("argument", "given", "refusal"),
+        [
+            ("actions", {"permanent_delete": True, "delete": True}, _UNKNOWN_KEY),
+            ("actions", {"permanentDelete": True, "delete": True}, _UNKNOWN_KEY),
+            ("actions", {"mark_as_read": True, "forward_too": [_DANA]}, _UNKNOWN_KEY),
+            ("conditions", {"subject_contain": ["invoice"]}, _UNKNOWN_KEY),
+            ("exceptions", {"sent_to_me": True, "is_urgent": True}, _UNKNOWN_KEY),
+            (
+                "conditions",
+                {"within_size_range": {"minimum_kb": 1, "largest_kb": 9}},
+                _UNKNOWN_KEY,
+            ),
+            ("conditions", {"within_size_range": {"minimum_kb": -1}}, _NEGATIVE_SIZE),
+        ],
+        ids=[
+            "permanent-erase",
+            "permanent-erase-camel-case",
+            "misspelled-action",
+            "misspelled-condition",
+            "unknown-exception",
+            "unknown-size-key",
+            "negative-size",
+        ],
+    )
+    async def test_a_key_or_a_size_the_input_refuses_never_reaches_graph(
+        self,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        argument: str,
+        given: dict[str, object],
+        refusal: str,
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError, match=refusal):
+            _ = await tool.run({**updater.GRAPH_CALL_EXAMPLE, argument: given})
 
         assert len(graph.calls) == 0
 
@@ -1067,6 +1120,34 @@ class TestHowItDeclaresItself:
 
         assert parameters["type"] == "object"
         assert not {"anyOf", "oneOf", "allOf", "not", "enum", "const"} & set(parameters)
+
+    @pytest.mark.parametrize(
+        ("argument", "model"),
+        [
+            ("actions", "RuleActionsInput"),
+            ("conditions", "RuleConditionsInput"),
+            ("exceptions", "RuleConditionsInput"),
+        ],
+    )
+    async def test_every_rule_object_an_argument_takes_names_no_key_beyond_its_own(
+        self, transport: httpx.AsyncClient, argument: str, model: str
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        definitions = cast("Mapping[str, Mapping[str, object]]", parameters["$defs"])
+        assert _referenced(properties[argument]) == {f"#/$defs/{model}"}
+        assert definitions[model]["additionalProperties"] is False
+
+    async def test_the_size_range_names_no_key_beyond_its_own(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        definitions = cast("Mapping[str, Mapping[str, object]]", parameters["$defs"])
+        conditions = cast("Mapping[str, object]", definitions["RuleConditionsInput"]["properties"])
+        assert _referenced(conditions["within_size_range"]) == {"#/$defs/SizeRangeKbInput"}
+        assert definitions["SizeRangeKbInput"]["additionalProperties"] is False
 
     @pytest.mark.parametrize("word", ["client", "ctx", "context", "token", "graph"])
     async def test_no_wiring_of_this_server_is_published_as_an_argument(

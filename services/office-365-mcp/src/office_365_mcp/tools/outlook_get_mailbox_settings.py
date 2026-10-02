@@ -33,7 +33,7 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.calendar import WorkingHoursSummary
 from office_365_mcp.shared.handles import MailFolderHandle
-from office_365_mcp.shared.rules import InboxRule
+from office_365_mcp.shared.rules import MailRule
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_get_mailbox_settings"
@@ -185,8 +185,11 @@ class MailboxSettingsReport(BaseModel):
             + "so this does not prove that nobody forwards this mailbox's mail."
         ),
     )
-    rules: list[InboxRule] | None = Field(
-        description="The Inbox rules, in Graph's order; null when `include` did not ask for them."
+    rules: list[MailRule] | None = Field(
+        description=(
+            "The inbox rules, in the order that Graph gives them. Each rule has its `conditions`, "
+            + "`exceptions`, and `actions`. Null when `include` did not ask for them."
+        )
     )
     rules_capped: bool | None = Field(
         description="True when more rules exist and the listing stopped short."
@@ -246,7 +249,7 @@ async def get_mailbox_settings(
     reply = None if settings is None else settings.automatic_replies_setting
     preferences = settings if wants_preferences else None
     return MailboxSettingsReport(
-        rules=None if rules is None else [InboxRule.from_rule(rule) for rule in rules.items],
+        rules=None if rules is None else [MailRule.from_rule(rule) for rule in rules.items],
         rules_capped=None if rules is None else rules.capped,
         automatic_reply=AutomaticReply.from_setting(reply) if wants_replies else None,
         categories=(
