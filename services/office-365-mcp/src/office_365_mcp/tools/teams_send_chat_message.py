@@ -1,7 +1,5 @@
-import hashlib
-import json
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Literal
+from typing import Annotated
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -16,8 +14,20 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
 from office_365_mcp.shared.handles import MessageHandle
-from office_365_mcp.shared.messages import Mention, TeamsMessage, outgoing_message
-from office_365_mcp.shared.prose import cut_for_a_question
+from office_365_mcp.shared.messages import (
+    CHAT_ID_FIELD,
+    CHAT_IMPORTANCE_FIELD,
+    CHAT_SEND,
+    CHAT_SUBJECT_FIELD,
+    MENTIONS_FIELD,
+    MESSAGE_FIELD,
+    ChatImportance,
+    Mention,
+    TeamsMessage,
+    outgoing_message,
+    send_binding,
+    send_question,
+)
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -37,13 +47,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "chat_id": "19:release@thread.v2",
     "message": "Ship it.",
 }
-
-type ChatImportance = Literal["normal", "high", "urgent"]
-
-_AGREE = "send"
-_DECLINE = "do not send"
-_NOTHING_SENT = "Nothing was sent."
-_CANNOT_BE_RECALLED = "This cannot be recalled once sent."
 
 _DESCRIPTION = """\
 Sends one message as the signed-in user to an existing Teams chat. The message can @mention \
@@ -69,8 +72,15 @@ async def send_chat_message(
     importance: ChatImportance | None = None,
     subject: str | None = None,
 ) -> TeamsMessage | InputRequiredResult:
-    question = _question(message, chat_id, mentions, subject=subject, importance=importance)
-    about = _about(message, chat_id, mentions, subject=subject, importance=importance)
+    question = send_question(
+        CHAT_SEND,
+        message,
+        f"to chat {chat_id!r}",
+        mentions,
+        subject=subject,
+        importance=importance,
+    )
+    about = send_binding((chat_id,), message, mentions, subject=subject, importance=importance)
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME, step=STEP_SEND):
@@ -86,7 +96,7 @@ async def send_chat_message(
                     importance=None if importance is None else ChatMessageImportance(importance),
                     subject=subject,
                 ),
-                request_configuration=_send_request(),
+                request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
             )
 
     if asked is not None:
@@ -98,51 +108,13 @@ async def send_chat_message(
     return TeamsMessage.from_message(sent, handle=MessageHandle(sent.id, chat_id=chat_id))
 
 
-def _question(
-    message: str,
-    chat_id: str,
-    mentions: Sequence[Mention],
-    *,
-    subject: str | None,
-    importance: ChatImportance | None,
-) -> str:
-    named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
-    mentioned = f" It mentions {named}." if mentions else ""
-    details = [
-        text
-        for text in (
-            None if subject is None else f"the subject {cut_for_a_question(subject)!r}",
-            None if importance is None else f"{importance} importance",
-        )
-        if text is not None
-    ]
-    marked = f" with {' and '.join(details)}" if details else ""
-    return (
-        f"Send {cut_for_a_question(message)!r}{marked} to chat {chat_id!r} now?{mentioned} "
-        + _CANNOT_BE_RECALLED
-    )
-
-
-def _about(
-    message: str,
-    chat_id: str,
-    mentions: Sequence[Mention],
-    *,
-    subject: str | None,
-    importance: ChatImportance | None,
-) -> str:
-    mentioned = [[mention.user_id, mention.name] for mention in mentions]
-    return hashlib.sha256(
-        json.dumps([chat_id, message, mentioned, subject, importance]).encode()
-    ).hexdigest()
-
-
-def _send_request() -> RequestConfiguration[QueryParameters]:
-    return RequestConfiguration[QueryParameters](options=no_retry())
-
-
 def a_person_agrees(ctx: Context) -> Confirm:
-    return person_confirms(ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_SENT)
+    return person_confirms(
+        ctx,
+        agree=CHAT_SEND.agree,
+        decline=CHAT_SEND.decline,
+        nothing_happened=CHAT_SEND.nothing_sent,
+    )
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -155,48 +127,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         annotations=WRITE_ADDITIVE,
     )
     async def teams_send_chat_message(
-        chat_id: Annotated[
-            str,
-            Field(
-                min_length=1,
-                description="The chat to post to, as reported by teams_list_chats.",
-            ),
-        ],
-        message: Annotated[
-            str,
-            Field(min_length=1, description="The message to send, as plain text."),
-        ],
-        mentions: Annotated[
-            list[Mention],
-            Field(
-                default=[],
-                description=(
-                    "The people to @mention, one entry for each person. This tool writes the "
-                    + "mention markup itself, so `message` stays plain text. An empty list sends "
-                    + "a message with no mention."
-                ),
-            ),
-        ],
+        chat_id: Annotated[str, Field(min_length=1, description=CHAT_ID_FIELD)],
+        message: Annotated[str, Field(min_length=1, description=MESSAGE_FIELD)],
+        mentions: Annotated[list[Mention], Field(default=[], description=MENTIONS_FIELD)],
         ctx: Context,
         importance: Annotated[
-            ChatImportance | None,
-            Field(
-                description=(
-                    "The importance of the new message: `normal`, `high`, or `urgent`. Set this "
-                    + "parameter only when the user asks for an importance."
-                ),
-            ),
+            ChatImportance | None, Field(description=CHAT_IMPORTANCE_FIELD)
         ] = None,
-        subject: Annotated[
-            str | None,
-            Field(
-                min_length=1,
-                description=(
-                    "The subject of the new chat message, as plain text. Omit this parameter to "
-                    + "send the message with no subject."
-                ),
-            ),
-        ] = None,
+        subject: Annotated[str | None, Field(min_length=1, description=CHAT_SUBJECT_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> TeamsMessage | InputRequiredResult:
         return await send_chat_message(

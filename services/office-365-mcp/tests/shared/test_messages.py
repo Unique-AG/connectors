@@ -1,12 +1,27 @@
+from collections.abc import Sequence
+
 import pytest
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.chat_message_importance import ChatMessageImportance
 from pydantic import ValidationError
 
-from office_365_mcp.shared.messages import Mention, outgoing_message
+from office_365_mcp.shared.messages import (
+    CHAT_SEND,
+    ChatImportance,
+    Mention,
+    mention_fields,
+    outgoing_message,
+    send_binding,
+    send_question,
+)
 
 _JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
 _ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelace")
+
+_CHAT_ID = "19:release@thread.v2"
+_TO_THE_CHAT = f"to chat {_CHAT_ID!r}"
+_MESSAGE = "Ship it Friday."
+_SUBJECT = "Release plan"
 
 
 class TestOutgoingMessage:
@@ -97,3 +112,101 @@ class TestMention:
     def test_an_empty_name_is_refused(self) -> None:
         with pytest.raises(ValidationError):
             _ = Mention(user_id=_JANE.user_id, name="")
+
+
+class TestSendQuestion:
+    def test_a_plain_message_names_the_text_the_chat_and_that_it_cannot_be_recalled(self) -> None:
+        question = send_question(
+            CHAT_SEND, _MESSAGE, _TO_THE_CHAT, (), subject=None, importance=None
+        )
+
+        assert question == (
+            "Send 'Ship it Friday.' to chat '19:release@thread.v2' now? This cannot be recalled "
+            + "once sent."
+        )
+
+    def test_an_importance_alone_follows_the_text(self) -> None:
+        question = send_question(
+            CHAT_SEND, _MESSAGE, _TO_THE_CHAT, (), subject=None, importance="urgent"
+        )
+
+        assert question == (
+            "Send 'Ship it Friday.' with urgent importance to chat '19:release@thread.v2' now? "
+            + "This cannot be recalled once sent."
+        )
+
+    def test_it_names_the_subject_the_importance_and_each_person_it_mentions(self) -> None:
+        question = send_question(
+            CHAT_SEND, _MESSAGE, _TO_THE_CHAT, (_JANE, _ADA), subject=_SUBJECT, importance="high"
+        )
+
+        assert question == (
+            "Send 'Ship it Friday.' with the subject 'Release plan' and high importance to chat "
+            + "'19:release@thread.v2' now? It mentions 'Jane Smith', 'Ada Lovelace'. This cannot "
+            + "be recalled once sent."
+        )
+
+
+def _bound(
+    message: str = _MESSAGE,
+    chat_id: str = _CHAT_ID,
+    mentions: Sequence[Mention] = (),
+    *,
+    subject: str | None = None,
+    importance: ChatImportance | None = None,
+) -> str:
+    return send_binding((chat_id,), message, mentions, subject=subject, importance=importance)
+
+
+class TestSendBinding:
+    def test_the_same_request_is_bound_the_same_way_twice(self) -> None:
+        assert _bound(mentions=(_JANE,)) == _bound(mentions=(_JANE,))
+
+    def test_two_messages_with_the_same_120_char_preview_are_bound_apart(self) -> None:
+        common_prefix = "x" * 120
+
+        assert _bound(common_prefix + " short tail") != _bound(
+            common_prefix + " a very different, much longer tail"
+        )
+
+    def test_the_same_message_to_a_different_chat_is_bound_apart(self) -> None:
+        assert _bound(chat_id=_CHAT_ID) != _bound(chat_id="19:other@thread.v2")
+
+    def test_each_importance_is_bound_apart(self) -> None:
+        importances: tuple[ChatImportance | None, ...] = (None, "normal", "high", "urgent")
+
+        assert len({_bound(importance=importance) for importance in importances}) == 4
+
+    def test_each_subject_is_bound_apart(self) -> None:
+        subjects = (None, _SUBJECT, "Release plan, revised")
+
+        assert len({_bound(subject=subject) for subject in subjects}) == 3
+
+    def test_the_subject_and_the_message_are_bound_apart(self) -> None:
+        assert _bound("Ship it", subject="Friday") != _bound("Ship it Friday")
+
+    def test_each_set_of_mentions_is_bound_apart(self) -> None:
+        sets: tuple[tuple[Mention, ...], ...] = (
+            (),
+            (_JANE,),
+            (_ADA,),
+            (_JANE, _ADA),
+            (_ADA, _JANE),
+            (Mention(user_id=_JANE.user_id, name="Ada Lovelace"),),
+        )
+
+        assert len({_bound(mentions=mentions) for mentions in sets}) == 6
+
+
+class TestMentionFields:
+    def test_the_count_comes_first_then_each_id_and_name_in_the_order_given(self) -> None:
+        assert mention_fields((_JANE, _ADA)) == (
+            "2",
+            _JANE.user_id,
+            "Jane Smith",
+            _ADA.user_id,
+            "Ada Lovelace",
+        )
+
+    def test_no_mention_is_a_count_of_zero(self) -> None:
+        assert mention_fields(()) == ("0",)

@@ -2,8 +2,9 @@ import html
 import json
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Self, cast
+from typing import Literal, Self, cast
 
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.chat_message import ChatMessage
@@ -21,8 +22,10 @@ from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.teamwork_user_identity_type import TeamworkUserIdentityType
 from pydantic import BaseModel, Field
 
+from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.handles import MessageHandle
 from office_365_mcp.shared.identity import ENTRA_OBJECT_ID_PATTERN
+from office_365_mcp.shared.prose import cut_for_a_question
 
 
 class MessageSender(BaseModel):
@@ -335,8 +338,8 @@ class Mention(BaseModel, frozen=True):
         pattern=ENTRA_OBJECT_ID_PATTERN,
         description=(
             "The Microsoft Entra object id of the person to mention, as a GUID. Copy it from the "
-            + "`user_id` of get_me, of a teams_list_chats member, or of a message `sender`. "
-            + "Never build it from a name or an email address."
+            + "`user_id` of get_me, of a teams_list_chat_members row, of a teams_list_chats "
+            + "member, or of a message `sender`. Never build it from a name or an email address."
         ),
     )
     name: str = Field(
@@ -388,4 +391,100 @@ def outgoing_message(
         ],
         importance=importance,
         subject=subject,
+    )
+
+
+type ChatImportance = Literal["normal", "high", "urgent"]
+
+
+@dataclass(frozen=True, slots=True)
+class SendWords:
+    verb: str
+    agree: str
+    decline: str
+    nothing_sent: str
+    cannot_be_recalled: str
+
+
+CHAT_SEND = SendWords(
+    verb="Send",
+    agree="send",
+    decline="do not send",
+    nothing_sent="Nothing was sent.",
+    cannot_be_recalled="This cannot be recalled once sent.",
+)
+
+CHAT_ID_FIELD: str = (
+    "The chat to post to, as the `chat_id` that teams_list_chats reported, for example "
+    + "`19:...@thread.v2`. It is not a `teams:///` handle."
+)
+
+MESSAGE_FIELD: str = (
+    "The text of the message, as plain text. Do not put HTML or mention markup in this text, "
+    + "because this tool writes all the markup itself."
+)
+
+MENTIONS_FIELD: str = (
+    "The people to @mention, one entry for each person. With an empty list, the message "
+    + "mentions nobody."
+)
+
+CHAT_IMPORTANCE_FIELD: str = (
+    "The importance of the new message: `normal`, `high`, or `urgent`. Set this parameter only "
+    + "when the user asks for an importance."
+)
+
+CHAT_SUBJECT_FIELD: str = (
+    "The subject of the new chat message, as plain text. Omit this parameter to send the message "
+    + "with no subject."
+)
+
+
+def send_question(
+    words: SendWords,
+    message: str,
+    destination: str,
+    mentions: Sequence[Mention],
+    *,
+    subject: str | None,
+    importance: ChatImportance | None,
+) -> str:
+    named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
+    mentioned = f" It mentions {named}." if mentions else ""
+    details = [
+        text
+        for text in (
+            None if subject is None else f"the subject {cut_for_a_question(subject)!r}",
+            None if importance is None else f"{importance} importance",
+        )
+        if text is not None
+    ]
+    marked = f" with {' and '.join(details)}" if details else ""
+    return (
+        f"{words.verb} {cut_for_a_question(message)!r}{marked} {destination} now?"
+        + f"{mentioned} {words.cannot_be_recalled}"
+    )
+
+
+def send_binding(
+    destination: Sequence[str],
+    message: str,
+    mentions: Sequence[Mention],
+    *,
+    subject: str | None,
+    importance: ChatImportance | None,
+) -> str:
+    return confirmation_id_for(
+        *destination,
+        message,
+        *mention_fields(mentions),
+        repr(subject),
+        repr(importance),
+    )
+
+
+def mention_fields(mentions: Sequence[Mention]) -> tuple[str, ...]:
+    return (
+        str(len(mentions)),
+        *(field for mention in mentions for field in (mention.user_id, mention.name)),
     )

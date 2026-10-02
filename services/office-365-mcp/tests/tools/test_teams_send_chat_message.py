@@ -20,15 +20,16 @@ from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
-from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared.messages import Mention
+from office_365_mcp.graph_client import (
+    GraphForbidden,
+    GraphNotFound,
+    GraphThrottled,
+    GraphUnavailable,
+)
+from office_365_mcp.shared.messages import ChatImportance, Mention
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirmed
 from office_365_mcp.tools import teams_send_chat_message as sender
-from office_365_mcp.tools.teams_send_chat_message import (
-    ChatImportance,
-    a_person_agrees,
-    send_chat_message,
-)
+from office_365_mcp.tools.teams_send_chat_message import a_person_agrees, send_chat_message
 
 from .conftest import TEAMS_SENDER, message_payload
 
@@ -243,78 +244,6 @@ class TestThePersonBeforeTheSend:
 
         assert len(asked) == 1
         assert "subject" not in asked[0]
-
-    def test_the_binding_differs_for_two_messages_with_the_same_120_char_preview(self) -> None:
-        common_prefix = "x" * 120
-
-        first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            common_prefix + " short tail", _CHAT_ID, (), subject=None, importance=None
-        )
-        second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            common_prefix + " a very different, much longer tail",
-            _CHAT_ID,
-            (),
-            subject=None,
-            importance=None,
-        )
-
-        assert first != second
-
-    def test_the_binding_differs_for_the_same_message_to_a_different_chat(self) -> None:
-        first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            _MESSAGE, _CHAT_ID, (), subject=None, importance=None
-        )
-        second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            _MESSAGE, "19:other@thread.v2", (), subject=None, importance=None
-        )
-        assert first != second
-
-    def test_the_binding_differs_when_only_the_importance_differs(self) -> None:
-        bindings = {
-            sender._about(  # pyright: ignore[reportPrivateUsage]
-                _MESSAGE, _CHAT_ID, (), subject=None, importance=importance
-            )
-            for importance in (None, "normal", "high", "urgent")
-        }
-
-        assert len(bindings) == 4
-
-    def test_the_binding_differs_when_only_the_subject_differs(self) -> None:
-        bindings = {
-            sender._about(  # pyright: ignore[reportPrivateUsage]
-                _MESSAGE, _CHAT_ID, (), subject=subject, importance=None
-            )
-            for subject in (None, _SUBJECT, "Release plan, revised")
-        }
-
-        assert len(bindings) == 3
-
-    def test_the_binding_keeps_the_subject_and_the_message_apart(self) -> None:
-        first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            "Ship it", _CHAT_ID, (), subject="Friday", importance=None
-        )
-        second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            "Ship it Friday", _CHAT_ID, (), subject=None, importance=None
-        )
-
-        assert first != second
-
-    def test_the_binding_differs_when_only_the_mentions_differ(self) -> None:
-        bindings = {
-            sender._about(  # pyright: ignore[reportPrivateUsage]
-                _MESSAGE, _CHAT_ID, mentions, subject=None, importance=None
-            )
-            for mentions in (
-                (),
-                (_JANE,),
-                (_ADA,),
-                (_JANE, _ADA),
-                (_ADA, _JANE),
-                (Mention(user_id=_JANE.user_id, name="Ada Lovelace"),),
-            )
-        }
-
-        assert len(bindings) == 6
 
     async def test_the_confirmation_happens_before_the_post(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -708,7 +637,7 @@ class TestTheRetryItRefuses:
     ) -> None:
         post = graph.post(_SEND_PATH).mock(return_value=httpx.Response(503))
 
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        with pytest.raises(GraphUnavailable):
             _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
 
         assert post.call_count == 1
@@ -721,7 +650,7 @@ class TestTheRetryItRefuses:
             return_value=httpx.Response(429, headers={"Retry-After": "12"})
         )
 
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        with pytest.raises(GraphThrottled):
             _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
 
         assert post.call_count == 1
