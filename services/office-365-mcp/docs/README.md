@@ -123,9 +123,10 @@ The handles of a notebook that a Microsoft 365 group or team owns start with
 `onenote:///sites/{site}/`. A team id is a group id, and `teams_list_my_teams` lists the teams of
 the user. Every write into a group or site notebook asks the user to agree first.
 
-The question that asks the user to agree names a group or a site by its id only. A name needs a
-permission to read groups or sites. This connector does not hold that permission. No tool of this
-connector finds the id of a site, so the user gives it.
+The question that asks the user to agree names a group or a site by its id only. To name it, a
+OneNote tool needs a permission to read groups or sites. The OneNote tools do not hold that
+permission. `teams_list_my_teams` gives the name of each team that the user is a member of. No tool
+of this connector finds the id of a site, so the user gives it.
 
 ## Presets
 
