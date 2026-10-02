@@ -287,7 +287,7 @@ run "preset_outlook_calendar" {
   }
 
   assert {
-    condition     = length(local.tools) == 7
+    condition     = length(local.tools) == 13
     error_message = "outlook-calendar resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
@@ -303,7 +303,7 @@ run "preset_outlook_calendar_write" {
   }
 
   assert {
-    condition     = length(local.tools) == 11
+    condition     = length(local.tools) == 22
     error_message = "outlook-calendar-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
@@ -319,13 +319,34 @@ run "preset_outlook_calendar_delegate" {
   }
 
   assert {
-    condition     = length(local.tools) == 12
+    condition     = length(local.tools) == 23
     error_message = "outlook-calendar-delegate resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 
   assert {
     condition     = length(local.admin_consent) == 0
     error_message = "every delegated Calendars permission is AdminConsentRequired: No, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_outlook_group_calendar" {
+  variables {
+    tools_preset = "outlook-group-calendar"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Team.ReadBasic.All,Calendars.Read"
+    error_message = "outlook-group-calendar composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 3
+    error_message = "outlook-group-calendar resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "the group calendar view takes Calendars.Read in place of Group.Read.All, so it needs no administrator, and this needs ${join(",", local.admin_consent)}"
   }
 }
 
