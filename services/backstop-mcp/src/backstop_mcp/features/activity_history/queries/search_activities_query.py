@@ -1,55 +1,9 @@
-"""Firm-wide (or party) activity search via `POST /entity-activities`.
-
-The path is in the instance swagger (tag "System - Entity Activities"). The entry is a
-create: summary "Create a new entity activity", response 201, and a note that `filterName`,
-`entityId`, and `resourceType` are required. It does not create a record. It is the activity
-filter the CRM Activity Explorer posts. The example body is placeholders — `filters`,
-`newFilters`, and `sorts` are empty objects, and response fields (`results`, `totalCount`)
-are mixed into the request. Behaviour below was measured on a live instance. Where swagger
-and a response disagree, the response wins.
-
-**Why this path.** One POST returns meetings, calls, notes, emails, and documents together,
-already filtered by date window, type, party, tag, and author, and already sorted by
-`effectiveDate`. `get_activity_history` is separate per-party REST streams, each paged on
-its own. This search is also firm-wide. Those streams hang off one party
-(`/{segment}/{id}/activities`), so a question that spans the firm, or more than one client,
-has no REST collection to read.
-
-**Failure is not an empty result.** The published contract does not match the search, so a
-404, a schema drift, or a 401 that re-verified (`BackstopTransientAuthError`) is not "no
-activity exists". `search_activities` names `get_activity_history` — the party-scoped
-fallback — in the failure payload. Keep that fallback working. Keep this module's schemas
-lenient, and keep `api_responses.py` degrading unreadable fields to `None` rather than
-raising.
-
-**Measured behaviour.** Pagination is `pageNum` (1-based) × `pageSize` in the JSON body —
-not `paginate` / `links.next`. `pageNum × pageSize > 10000` is HTTP 500, so this module
-clamps before the request and returns whatever was already fetched. Success is HTTP 201.
-
-`filters` on this body is ignored (a date window and `associatedWiths` both returned the
-firm's newest 10000). The date window goes under `newFilters.effectiveDate` as ISO
-timestamps. A party is top-level `entityId` (int) plus `resourceType` (`organizations` /
-`people` / `contacts` / `employees`), which also returns activities inherited through that
-party's people. `filterName` is not sent. Types, tags, and authors are `newFilters` lists
-of one `{searchValues: [{value}]}` object — a bare string is HTTP 500 (`NewFilterDto`), and
-a string inside `searchValues` is HTTP 500 (`SearchValue`). Author values also set
-`isEmail: true` on the search-value object; the same key on the filter object is HTTP 400.
-
-The tool token `meeting_call` is sent as the search value `call`. Call rows come back as
-`type` "Call" and `activityType` "meeting". On one day, no type filter and a types list
-that contained `meeting_call` both returned `totalCount` 366, while `email_blast` alone
-returned 341, `note` alone returned 4, and `note`/`email`/`meeting`/`call`/`document`/
-`task` together returned 23. `note`, `email`, `meeting`, `document`, and `email_blast`
-are sent as themselves.
-
-`activityTags` on this body is OR (union). REST `filter[activityTagIds]` is AND. Counts are
-permission-filtered: `totalCount` is visible-to-this-credential, not a firm-wide fact, and it
-saturates at 10000.
-"""
+"""Firm-wide or party activity search via `POST /entity-activities` (a search, not a create)."""
 
 import logging
 from collections.abc import Mapping, Sequence
 from datetime import date
+from typing import Literal
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
@@ -75,6 +29,8 @@ from backstop_mcp.metrics import BACKSTOP_FILTER_IGNORED
 logger = logging.getLogger(__name__)
 
 MAX_RETRIEVABLE = 10_000
+# Org search returns activity inherited through people; those rows name the person only.
+_INHERITED_PARTY_KINDS: frozenset[str] = frozenset({"people", "contacts", "employees"})
 
 _TYPE_LABELS: dict[EntityActivityType, str] = {
     "meeting": "meeting",
@@ -97,11 +53,7 @@ _TYPE_FILTER_VALUES: dict[EntityActivityType, str] = {
 
 
 class SearchActivitiesQuery:
-    """Walk `POST /entity-activities` until the set is exhausted, `max_rows`, or the 10000 wall.
-
-    Swagger calls this a create. It is a search. Read the module docstring before changing
-    the request body.
-    """
+    """Walk `POST /entity-activities` until the set is exhausted, `max_rows`, or the 10000 wall."""
 
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
@@ -184,6 +136,7 @@ class SearchActivitiesQuery:
                 end_date=end_date,
                 types=types,
                 party_id=party_id,
+                resource_type=resource_type,
                 activity_tags=activity_tags,
                 total_count=total_count,
                 scoped=scoped,
@@ -283,7 +236,7 @@ class SearchActivitiesQuery:
             new_filters["authors"] = [
                 {"searchValues": [{"value": email, "isEmail": True} for email in authors]}
             ]
-        include_fields = ["associatedWith"]
+        include_fields = ["associatedWith", "inheritedFrom", "primaryEntity"]
         if include_description:
             include_fields = [*include_fields, "description"]
         attributes: dict[str, object] = {
@@ -309,17 +262,14 @@ class SearchActivitiesQuery:
         end_date: date,
         types: Sequence[EntityActivityType],
         party_id: str | None,
+        resource_type: SearchType | None,
         activity_tags: Sequence[str],
         total_count: int | None,
         scoped: bool,
     ) -> tuple[tuple[EntityActivityDto, ...], int, dict[str, int]]:
-        """Project one page, dropping rows that show Backstop ignored a filter it accepted.
+        """Drop rows that show an ignored filter. Person-only rows on a party search are kept.
 
-        Returns the kept rows, the unreadable/unprojectable count, and rows-violating per ignored
-        filter name (in report order; `total_count` counts 0). A row outside the date window,
-        types, or tags is dropped on its own. A party page where no readable row names the
-        party drops every readable row. `totalCount` sitting on the 10000 saturation value of a
-        scoped search is reported too: the filters narrowed nothing.
+        A non-party search whose totalCount is 10000 is reported as `total_count`.
         """
         check_types = bool(types) and frozenset(types) != frozenset(ENTITY_ACTIVITY_TYPES)
         allowed_types = {_TYPE_LABELS[token] for token in types if token in _TYPE_LABELS}
@@ -329,6 +279,7 @@ class SearchActivitiesQuery:
         tag_violations = 0
         readable = 0
         party_hits = 0
+        party_contradictions = 0
         unreadable = 0
         unprojectable = 0
         projected: list[EntityActivityDto] = []
@@ -353,8 +304,12 @@ class SearchActivitiesQuery:
                 if row_tags.isdisjoint(requested_tags):
                     tag_violations += 1
                     row_violation = True
-            if party_id is not None and party_id in self._party_ids(attributes):
-                party_hits += 1
+            if party_id is not None:
+                relation = self._party_relation(attributes, party_id, resource_type)
+                if relation == "hit":
+                    party_hits += 1
+                elif relation == "contradict":
+                    party_contradictions += 1
             if row_violation:
                 continue
             row = EntityActivityDto.from_attributes(attributes)
@@ -363,7 +318,9 @@ class SearchActivitiesQuery:
                 continue
             projected.append(row)
 
-        party_violation = party_id is not None and readable > 0 and party_hits == 0
+        party_violation = (
+            party_id is not None and readable > 0 and party_hits == 0 and party_contradictions > 0
+        )
         if party_violation:
             projected = []
             unprojectable = 0
@@ -377,17 +334,38 @@ class SearchActivitiesQuery:
             violating["activity_tags"] = tag_violations
         if party_violation:
             violating["party"] = readable
-        if scoped and total_count == MAX_RETRIEVABLE:
+        if party_id is None and scoped and total_count == MAX_RETRIEVABLE:
             violating["total_count"] = 0
         return tuple(projected), unreadable + unprojectable, violating
 
-    def _party_ids(self, attributes: EntityActivityAttributes) -> set[str]:
+    def _party_relation(
+        self,
+        attributes: EntityActivityAttributes,
+        party_id: str,
+        resource_type: SearchType | None,
+    ) -> Literal["hit", "contradict", "neutral"]:
+        """`hit` names the id; `contradict` names another party of the same kind; else `neutral`."""
         refs = (
             *attributes.associated_with,
             *attributes.inherited_from,
             *(() if attributes.primary_entity is None else (attributes.primary_entity,)),
         )
-        return {ref.resource_id for ref in refs if ref.resource_id is not None}
+        named = False
+        other_party = False
+        for ref in refs:
+            if ref.resource_id is None:
+                continue
+            if ref.resource_id == party_id:
+                named = True
+                continue
+            if resource_type == "organizations" and ref.resource_type in _INHERITED_PARTY_KINDS:
+                continue
+            other_party = True
+        if named:
+            return "hit"
+        if other_party:
+            return "contradict"
+        return "neutral"
 
     def _record_ignored_filters(
         self,

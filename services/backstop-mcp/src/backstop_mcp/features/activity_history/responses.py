@@ -1037,7 +1037,8 @@ class PartyLastActivityResponse(OmitNoneModel):
         default=None,
         description=(
             "Activities of the requested types in the window that this credential can see. "
-            "Absent when `status` is `unknown`."
+            "Absent when `status` is `unknown`. 10000 means at least 10000: Backstop "
+            "saturates there."
         ),
     )
     reason: str | None = Field(
@@ -1054,14 +1055,15 @@ class PartyLastActivityResponse(OmitNoneModel):
                 status="unknown",
                 reason=dto.error,
             )
-        if fetch.server_filter_ignored:
+        ignored = tuple(name for name in fetch.server_filter_ignored if name != "total_count")
+        if ignored:
             return cls(
                 party_id=dto.party_id,
                 search_type=dto.search_type,
                 status="unknown",
                 reason=(
                     "Backstop ignored these filters: "
-                    + ", ".join(fetch.server_filter_ignored)
+                    + ", ".join(ignored)
                     + ". The result is not scoped to this party and window."
                 ),
             )

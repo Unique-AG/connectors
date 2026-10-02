@@ -114,7 +114,11 @@ class TestEntityActivitiesRequestBody:
         assert attributes["pageNum"] == 1
         assert attributes["pageSize"] == 500
         assert "shouldIncludeDescription" not in attributes
-        assert attributes["includeFields"] == ["associatedWith"]
+        assert attributes["includeFields"] == [
+            "associatedWith",
+            "inheritedFrom",
+            "primaryEntity",
+        ]
         assert attributes["sorts"] == [{"columnName": "effectiveDate", "ascending": False}]
         assert attributes["entityId"] == 354566359
         assert attributes["resourceType"] == "organizations"
@@ -148,7 +152,12 @@ class TestEntityActivitiesRequestBody:
         )
 
         assert attributes["shouldIncludeDescription"] is True
-        assert attributes["includeFields"] == ["associatedWith", "description"]
+        assert attributes["includeFields"] == [
+            "associatedWith",
+            "inheritedFrom",
+            "primaryEntity",
+            "description",
+        ]
 
 
 class TestFetchEntityActivities:
@@ -444,13 +453,73 @@ class TestIgnoredEntityActivityFilters:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_party_page_where_no_row_names_the_party_is_dropped_and_flagged(
+    async def test_person_only_rows_on_an_org_search_are_kept(self, client: BackstopClient) -> None:
+        """Inherited activity and email blasts often name only a person, not the organization."""
+        respx.post(_URL).mock(
+            return_value=_page(
+                _party_row(1, effective_date="9/22/2026", party_id=None),
+                _party_row(2, effective_date="9/21/2026", party_id=None),
+                total=2,
+            )
+        )
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            party_id="341764767",
+            resource_type="organizations",
+        )
+
+        assert [row.id for row in result.rows] == ["1", "2"]
+        assert result.server_filter_ignored == ()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_row_that_names_the_org_only_on_primary_entity_is_kept(
+        self, client: BackstopClient
+    ) -> None:
+        row = _party_row(1, effective_date="9/22/2026", party_id=None)
+        row["primaryEntity"] = {"resourceType": "organizations", "resourceId": "341764767"}
+        respx.post(_URL).mock(return_value=_page(row, total=1))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            party_id="341764767",
+            resource_type="organizations",
+        )
+
+        assert [kept.id for kept in result.rows] == ["1"]
+        assert result.server_filter_ignored == ()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_primary_entity_for_another_organization_drops_the_page(
+        self, client: BackstopClient
+    ) -> None:
+        row = _party_row(1, effective_date="9/22/2026", party_id=None)
+        row["primaryEntity"] = {"resourceType": "organizations", "resourceId": "1"}
+        respx.post(_URL).mock(return_value=_page(row, total=1))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            party_id="341764767",
+            resource_type="organizations",
+        )
+
+        assert result.rows == ()
+        assert result.server_filter_ignored == ("party",)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_page_naming_another_organization_is_dropped_and_flagged(
         self, client: BackstopClient
     ) -> None:
         route = respx.post(_URL).mock(
             return_value=_page(
-                _party_row(1, effective_date="9/22/2026", party_id=None),
-                _party_row(2, effective_date="9/21/2026", party_id=None),
+                _party_row(1, effective_date="9/22/2026", party_id="1"),
+                _party_row(2, effective_date="9/21/2026", party_id="1"),
                 total=900,
             )
         )
@@ -521,3 +590,25 @@ class TestIgnoredEntityActivityFilters:
 
         assert [row.id for row in result.rows] == ["1"]
         assert result.server_filter_ignored == ("total_count",)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_party_search_on_the_ceiling_is_not_an_ignored_filter(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(
+            return_value=_page(
+                _party_row(1, effective_date="9/22/2026", party_id="341764767"),
+                total=10_000,
+            )
+        )
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            party_id="341764767",
+            resource_type="organizations",
+        )
+
+        assert [row.id for row in result.rows] == ["1"]
+        assert result.server_filter_ignored == ()

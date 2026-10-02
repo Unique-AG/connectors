@@ -393,17 +393,9 @@ class GetActivityHistoryQuery:
         *,
         stream: BackstopActivityType,
     ) -> tuple[tuple[AttendeeResponse, ...] | None, ...]:
-        """Attendees per row from `/meeting-or-calls/{id}/attendees`, aligned with `resources`.
+        """Attendees per meeting or call, aligned with `resources`. Other types stay absent.
 
-        Notes and documents stay absent: they are not meetings. A row without a
-        `specificResource` id has nothing to look up, and a failed lookup leaves that row's
-        `attendees` absent without failing the page.
-
-        The lookups run in parallel because each is one short GET and the page would otherwise
-        pay them back to back. The fan-out is bounded by this page's meeting or call rows — at
-        most the stream's `limit` (10 by default, so at most 20 across the meeting and call
-        streams) — and every request still waits on the client's per-user concurrency gate
-        (5 in flight by default), so the parallelism cannot exceed what Backstop allows a token.
+        A missing id or a failed lookup leaves that row's attendees absent.
         """
         if stream not in {"meeting", "call"}:
             return tuple(None for _ in resources)

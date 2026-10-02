@@ -1,14 +1,6 @@
-"""`get_product_investors`: who holds one or more products, and — only when asked — how much.
+"""Who holds one or more products, and each account's latest value only when asked.
 
-The response is one listing per product plus one entry per investor across them, so the reader
-never joins rows back to vehicles. By default there are no figures. `include_latest_value=true`
-adds each account's latest `values` point and per-investor totals, at one Backstop request per
-account,
-capped at `_MAX_VALUED_ACCOUNTS`. That is the one sanctioned product-wide figure: the model
-calling `get_time_series` once per account instead is the fan-out this connector removed, and
-it is where rows get dropped (a sizing answer once left out the second-largest investor).
-Any other dated figure is still `get_time_series` on a specific account, or on a product's
-`aums` for the fund-level number.
+Values are one request per account and capped. Any other dated figure is `get_time_series`.
 """
 
 import logging

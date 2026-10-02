@@ -1,14 +1,6 @@
-"""Latest `values` point for each of a set of accounts.
+"""Newest `values` point per account: one GET each, gathered under the client's concurrency gate.
 
-`get_product_investors` is the consumer, and only when the caller opted in. There is no bulk
-path: table-data answers a product id with an empty table, and `GET /time-series` is 400. So
-this is one `GET /accounts/{id}/values?sort=-date` page per account, gathered. The per-user
-request gate on `BackstopClient` bounds how many are in flight, so gathering does not breach
-Backstop's concurrency limit. The caller owns the account cap.
-
-One account failing costs that account's figure, not the answer. Auth and rate-limit errors
-still abort: the rest of the batch would fail the same way. A non-`Exception` (cancellation)
-is re-raised, never folded into a row.
+One account failing costs that figure. Auth and rate-limit errors abort the batch.
 """
 
 import asyncio

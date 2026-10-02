@@ -171,7 +171,7 @@ class EntityActivityAssociatedWithAttributes(BaseModel):
 
 
 class EntityActivityPartyRefAttributes(BaseModel):
-    """`inheritedFrom[]` / `primaryEntity` on a search row: only the id is read.
+    """`inheritedFrom[]` / `primaryEntity` on a search row.
 
     Read only to check a party search; a junk entry is dropped rather than failing the row.
     """
@@ -179,6 +179,7 @@ class EntityActivityPartyRefAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     resource_id: WireId = Field(default=None, alias="resourceId")
+    resource_type: str | None = Field(default=None, alias="resourceType")
 
 
 _PartyRefs = Annotated[tuple[EntityActivityPartyRefAttributes, ...], BeforeValidator(_dict_rows)]

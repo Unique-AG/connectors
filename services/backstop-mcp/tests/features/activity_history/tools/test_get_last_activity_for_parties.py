@@ -203,3 +203,62 @@ class TestGetLastActivityForParties:
 
         assert result.fallback_tool == "get_activity_history"
         assert "not 'no activity'" in result.message
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_saturated_count_still_reports_the_newest_activity(
+        self, client: BackstopClient
+    ) -> None:
+        _by_entity({100: _page(_row("100", row_id=11, effective_date="8/20/2026"), total=10_000)})
+
+        result = tool_model(
+            await get_last_activity_for_parties(
+                parties=[PartyRef(party_id="100", search_type="organizations")],
+                end_date=_END,
+                get_last_activity_for_parties_query=_query(client),
+            ),
+            LastActivityForPartiesResolvedResponse,
+        )
+
+        found = result.parties[0]
+        assert found.status == "found"
+        assert found.last_activity is not None
+        assert found.last_activity.id == "11"
+        assert found.activity_count == 10_000
+        assert result.unknown_count == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_activity_that_names_only_a_person_is_found(
+        self, client: BackstopClient
+    ) -> None:
+        _by_entity(
+            {
+                100: _page(
+                    {
+                        "id": 11,
+                        "type": "Email",
+                        "title": "Follow-up",
+                        "effectiveDate": "8/20/2026",
+                        "associatedWith": [{"resourceType": "people", "resourceId": "357918383"}],
+                    },
+                    total=1,
+                )
+            }
+        )
+
+        result = tool_model(
+            await get_last_activity_for_parties(
+                parties=[PartyRef(party_id="100", search_type="organizations")],
+                end_date=_END,
+                get_last_activity_for_parties_query=_query(client),
+            ),
+            LastActivityForPartiesResolvedResponse,
+        )
+
+        found = result.parties[0]
+        assert found.status == "found"
+        assert found.last_activity is not None
+        assert found.last_activity.id == "11"
+        assert found.activity_count == 1
+        assert result.unknown_count == 0
