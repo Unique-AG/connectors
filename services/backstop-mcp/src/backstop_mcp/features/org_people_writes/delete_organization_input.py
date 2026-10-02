@@ -15,10 +15,11 @@ __all__ = [
 
 DELETE_ORGANIZATION_INPUT_DESCRIPTION = (
     "Required. The organization to hard-delete. Needs a trusted `party_id` "
-    "(search_type defaults to organizations). Deletion is permanent: Backstop has no "
-    "recycle bin. The tool removes the organization's locations, then the organization. "
-    "It reads the record and asks the user to confirm when the client can elicit; "
-    "otherwise it deletes immediately. Never invent an id. " + REFUSE_BULK_DELETE
+    + "(search_type defaults to organizations). Deletion is permanent: Backstop has no "
+    + "recycle bin. The tool removes the organization's locations, then the organization. "
+    + "It reads the record and asks the user to confirm when the client can elicit; "
+    + "otherwise it deletes immediately. Never invent an id. "
+    + REFUSE_BULK_DELETE
 )
 
 _ORG_SEARCH_TYPE_DESCRIPTION = (

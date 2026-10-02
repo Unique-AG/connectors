@@ -15,10 +15,11 @@ __all__ = [
 
 DELETE_PERSON_INPUT_DESCRIPTION = (
     "Required. The person to hard-delete. Needs a trusted `party_id` "
-    "(search_type defaults to people). Deletion is permanent: Backstop has no "
-    "recycle bin. The tool removes the person's locations, then the person. It reads "
-    "the record and asks the user to confirm when the client can elicit; otherwise it "
-    "deletes immediately. Never invent an id. " + REFUSE_BULK_DELETE
+    + "(search_type defaults to people). Deletion is permanent: Backstop has no "
+    + "recycle bin. The tool removes the person's locations, then the person. It reads "
+    + "the record and asks the user to confirm when the client can elicit; otherwise it "
+    + "deletes immediately. Never invent an id. "
+    + REFUSE_BULK_DELETE
 )
 
 _PERSON_SEARCH_TYPE_DESCRIPTION = (
