@@ -2,23 +2,31 @@ from collections.abc import Sequence
 
 import pytest
 from msgraph.generated.models.body_type import BodyType
+from msgraph.generated.models.chat_message import ChatMessage
+from msgraph.generated.models.chat_message_from_identity_set import ChatMessageFromIdentitySet
 from msgraph.generated.models.chat_message_importance import ChatMessageImportance
+from msgraph.generated.models.identity import Identity
+from msgraph.generated.models.item_body import ItemBody
 from pydantic import ValidationError
 
 from office_365_mcp.shared.files import AttachableFile
-from office_365_mcp.shared.handles import DriveFileHandle
+from office_365_mcp.shared.handles import DriveFileHandle, MessageHandle
 from office_365_mcp.shared.messages import (
     CHANNEL_POST,
     CHAT_SEND,
     ChannelImportance,
     ChatImportance,
     Mention,
+    TeamsMessage,
     mention_fields,
+    message_in_question,
     outgoing_message,
     send_binding,
     send_question,
     subject_on_a_reply,
+    unknown_enum_headers,
 )
+from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 
 _JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
 _ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelace")
@@ -425,3 +433,49 @@ class TestMentionFields:
 
     def test_no_mention_is_a_count_of_zero(self) -> None:
         assert mention_fields(()) == ("0",)
+
+
+def _chat_message(*, sender: str | None, text: str | None) -> TeamsMessage:
+    message = ChatMessage(
+        id="1770000000000",
+        from_=None
+        if sender is None
+        else ChatMessageFromIdentitySet(user=Identity(id=_JANE.user_id, display_name=sender)),
+        body=None if text is None else ItemBody(content=text, content_type=BodyType.Text),
+    )
+    return TeamsMessage.from_message(
+        message, handle=MessageHandle("1770000000000", chat_id=_CHAT_ID)
+    )
+
+
+class TestMessageInQuestion:
+    def test_it_names_the_sender_and_quotes_the_text(self) -> None:
+        said = message_in_question(_chat_message(sender="Jane Smith", text=_MESSAGE))
+
+        assert said == "the Teams message from 'Jane Smith' that says 'Ship it Friday.'"
+
+    def test_a_message_with_no_sender_names_nobody(self) -> None:
+        said = message_in_question(_chat_message(sender=None, text=_MESSAGE))
+
+        assert said == "the Teams message that says 'Ship it Friday.'"
+
+    def test_a_message_with_no_text_says_so(self) -> None:
+        said = message_in_question(_chat_message(sender="Jane Smith", text=None))
+
+        assert said == "the Teams message from 'Jane Smith' that has no text"
+
+    def test_a_long_text_is_cut(self) -> None:
+        long = "a" * (PREVIEW_CHARACTERS + 1)
+
+        said = message_in_question(_chat_message(sender=None, text=long))
+
+        assert long not in said
+        assert f"{'a' * PREVIEW_CHARACTERS}…" in said
+
+
+class TestUnknownEnumHeaders:
+    def test_asks_graph_for_the_unknown_enum_members(self) -> None:
+        assert unknown_enum_headers().get_all() == {"prefer": {"include-unknown-enum-members"}}
+
+    def test_every_call_builds_its_own_collection(self) -> None:
+        assert unknown_enum_headers() is not unknown_enum_headers()

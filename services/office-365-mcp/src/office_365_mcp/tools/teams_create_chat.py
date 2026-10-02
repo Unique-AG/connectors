@@ -17,8 +17,8 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.calendar import confirmation_id_for
-from office_365_mcp.shared.identity import Person
-from office_365_mcp.shared.meetings import named_people
+from office_365_mcp.shared.identity import Person, user_bind
+from office_365_mcp.shared.meetings import distinct_people, named_people
 from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT_TOPIC_PATTERN
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -45,7 +45,6 @@ type NewChatKind = Literal["oneOnOne", "group"]
 
 _MEMBER = "#microsoft.graph.aadUserConversationMember"
 _OWNER = "owner"
-_USER_BIND = "user@odata.bind"
 
 _CREATE = "create"
 _DO_NOT_CREATE = "do not create"
@@ -140,7 +139,7 @@ async def create_chat(
     topic: str | None = None,
     confirm: Confirm,
 ) -> CreatedChat | InputRequiredResult:
-    given = _distinct(members)
+    given = distinct_people(members)
     refused = _refusal(chat_type, given, topic)
     if refused is not None:
         raise ToolError(refused)
@@ -175,13 +174,6 @@ async def create_chat(
     return CreatedChat.from_chat(created)
 
 
-def _distinct(members: Sequence[Person]) -> tuple[Person, ...]:
-    kept: dict[str, Person] = {}
-    for member in members:
-        _ = kept.setdefault(member.user_id.casefold(), member)
-    return tuple(kept.values())
-
-
 def _refusal(chat_type: NewChatKind, given: Sequence[Person], topic: str | None) -> str | None:
     if chat_type == "oneOnOne" and len(given) != 1:
         return _not_one_other(len(given))
@@ -209,7 +201,7 @@ def _new_chat(chat_type: NewChatKind, members: Sequence[str], topic: str | None)
             AadUserConversationMember(
                 odata_type=_MEMBER,
                 roles=[_OWNER],
-                additional_data={_USER_BIND: f"https://graph.microsoft.com/v1.0/users('{member}')"},
+                additional_data=user_bind(member),
             )
             for member in members
         ],

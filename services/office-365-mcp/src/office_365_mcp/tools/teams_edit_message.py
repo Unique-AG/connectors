@@ -19,10 +19,12 @@ from office_365_mcp.shared.handles import (
     not_a_message_handle,
 )
 from office_365_mcp.shared.messages import (
+    EVERYONE_SEES_IT,
     Mention,
     TeamsMessage,
     get_message,
     mention_fields,
+    message_in_question,
     outgoing_message,
 )
 from office_365_mcp.shared.prose import cut_for_a_question
@@ -56,7 +58,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _AGREE = "edit"
 _DECLINE = "do not edit"
 _NOTHING_CHANGED = "No message was changed."
-_EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
 
 _ALREADY_DELETED = (
     f"This message is deleted, and a deleted message cannot be changed. {_NOTHING_CHANGED} If you "
@@ -152,16 +153,9 @@ def _question(current: TeamsMessage, message: str, mentions: Sequence[Mention]) 
     )
     removed = f" The change can remove {attached} from the message." if attached else ""
     return (
-        f"Replace the text of {_the_message(current)} with {cut_for_a_question(message)!r}?"
-        + f"{mentioned}{removed} {_EVERYONE_SEES_IT}"
+        f"Replace the text of {message_in_question(current)} with {cut_for_a_question(message)!r}?"
+        + f"{mentioned}{removed} {EVERYONE_SEES_IT}"
     )
-
-
-def _the_message(current: TeamsMessage) -> str:
-    sender = current.sender.display_name if current.sender is not None else None
-    sent_by = "" if sender is None else f" from {cut_for_a_question(sender)!r}"
-    says = "has no text" if current.text is None else f"says {cut_for_a_question(current.text)!r}"
-    return f"the Teams message{sent_by} that {says}"
 
 
 def _about(handle: MessageHandle, message: str, mentions: Sequence[Mention]) -> str:

@@ -151,7 +151,7 @@ class TestWhatItSendsToGraph:
 
         assert _body(route) == {
             "@odata.type": "#microsoft.graph.aadUserConversationMember",
-            "user@odata.bind": f"https://graph.microsoft.com/v1.0/users/{_GRACE_ID}",
+            "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{_GRACE_ID}')",
             "roles": ["owner"],
         }
         assert "Grace Hopper" not in route.calls.last.request.content.decode()
@@ -167,7 +167,7 @@ class TestWhatItSendsToGraph:
 
         assert _body(route) == {
             "@odata.type": "#microsoft.graph.aadUserConversationMember",
-            "user@odata.bind": f"https://graph.microsoft.com/v1.0/users/{_GRACE_ID}",
+            "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{_GRACE_ID}')",
             "roles": ["owner"],
             "visibleHistoryStartDateTime": _ALL_HISTORY,
         }
@@ -449,7 +449,8 @@ class TestTheEraWithNoBackChannel:
 
         assert route.call_count == 1
         assert (
-            _body(route)["user@odata.bind"] == f"https://graph.microsoft.com/v1.0/users/{_GRACE_ID}"
+            _body(route)["user@odata.bind"]
+            == f"https://graph.microsoft.com/v1.0/users('{_GRACE_ID}')"
         )
 
 

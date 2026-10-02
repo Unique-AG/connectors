@@ -5,7 +5,6 @@ from typing import Annotated
 import httpx
 from fastmcp import FastMCP
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.chats.item.messages.messages_request_builder import MessagesRequestBuilder
 from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.graph_service_client import GraphServiceClient
@@ -13,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
-from office_365_mcp.shared.messages import TeamsMessage
+from office_365_mcp.shared.messages import TeamsMessage, unknown_enum_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import closes_at, opens_at
 
@@ -28,8 +27,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"chat_id": "19:release@thread.v2"}
 MAX_MESSAGES = 50
 
 _NEWEST_FIRST = "createdDateTime desc"
-
-_PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 
 _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
@@ -75,7 +72,7 @@ async def list_chat_messages(
         query_parameters=_MessagesQuery(
             top=limit, orderby=[_NEWEST_FIRST], filter=_sent_before_filter(sent_before)
         ),
-        headers=_headers(),
+        headers=unknown_enum_headers(),
     )
     with graph_errors(TOOL_NAME, step=STEP):
         page = await client.chats.by_chat_id(chat_id).messages.get(
@@ -99,12 +96,6 @@ def _first_instant_past(bound: date | datetime) -> datetime:
     if isinstance(bound, datetime):
         return closes_at(bound).replace(microsecond=0) + timedelta(seconds=1)
     return opens_at(bound + timedelta(days=1))
-
-
-def _headers() -> HeadersCollection:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_UNKNOWN_ENUMS)
-    return headers
 
 
 def _row(message: ChatMessage, chat_id: str) -> TeamsMessage:

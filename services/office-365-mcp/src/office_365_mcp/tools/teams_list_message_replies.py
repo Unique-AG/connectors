@@ -7,7 +7,6 @@ import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.generated.teams.item.channels.item.messages.item.replies.replies_request_builder import (  # noqa: E501
     RepliesRequestBuilder,
@@ -17,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import CHANNEL_PERMISSION, MessageHandle, message_handle
-from office_365_mcp.shared.messages import TeamsMessage, event_of
+from office_365_mcp.shared.messages import TeamsMessage, event_of, unknown_enum_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "teams_list_message_replies"
@@ -34,8 +33,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 MAX_REPLIES = 50
-
-_PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 
 type _RepliesQuery = RepliesRequestBuilder.RepliesRequestBuilderGetQueryParameters
 
@@ -89,7 +86,7 @@ async def teams_list_message_replies(
     )
 
     configuration = RequestConfiguration[_RepliesQuery](
-        headers=_headers(),
+        headers=unknown_enum_headers(),
         query_parameters=RepliesRequestBuilder.RepliesRequestBuilderGetQueryParameters(top=limit),
     )
     with graph_errors(TOOL_NAME, step=STEP):
@@ -117,12 +114,6 @@ def _reply_handle(post: MessageHandle, reply: ChatMessage) -> MessageHandle:
 
 def _sent_at(message: ChatMessage) -> datetime:
     return message.created_date_time or datetime.min.replace(tzinfo=UTC)
-
-
-def _headers() -> HeadersCollection:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_UNKNOWN_ENUMS)
-    return headers
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

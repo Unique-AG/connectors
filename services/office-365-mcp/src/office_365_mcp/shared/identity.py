@@ -48,6 +48,10 @@ class Person(BaseModel, frozen=True):
     )
 
 
+def user_bind(user_id: str) -> dict[str, str]:
+    return {"user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{user_id}')"}
+
+
 async def signed_in_user(client: GraphServiceClient) -> User:
     """The signed-in user, projected onto `PROFILE`.
 

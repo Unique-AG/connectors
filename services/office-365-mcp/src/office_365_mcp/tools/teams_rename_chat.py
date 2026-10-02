@@ -11,7 +11,11 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, not_graph
 from office_365_mcp.shared.calendar import confirmation_id_for
-from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT_TOPIC_PATTERN
+from office_365_mcp.shared.messages import (
+    CHAT_TOPIC_MAX_CHARACTERS,
+    CHAT_TOPIC_PATTERN,
+    EVERYONE_SEES_IT,
+)
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
@@ -33,7 +37,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _RENAME = "rename"
 _DO_NOT_RENAME = "do not rename"
 _NOTHING_RENAMED = "Nothing was renamed."
-_EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
 
 _DESCRIPTION = """\
 Changes the topic of one Teams group chat, as the signed-in user. The topic is the title of the \
@@ -85,7 +88,7 @@ async def rename_chat(
 
 
 def _question(chat_id: str, topic: str) -> str:
-    return f"Rename the chat {chat_id!r} to {topic!r}? {_EVERYONE_SEES_IT}"
+    return f"Rename the chat {chat_id!r} to {topic!r}? {EVERYONE_SEES_IT}"
 
 
 def _about(chat_id: str, topic: str) -> str:

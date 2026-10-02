@@ -31,6 +31,7 @@ from office_365_mcp.tools.teams_create_chat import NewChatKind, a_person_agrees,
 from .conftest import ME, OTHER_USER_ID, SIGNED_IN_USER_ID
 
 _THIRD_USER_ID = "00000000-0000-4000-8000-000000000003"
+_LETTERED_USER_ID = "abcdef00-0000-4000-8000-00000000000a"
 
 _GRACE = Person(user_id=OTHER_USER_ID, name="Grace Hopper")
 _BOB = Person(user_id=_THIRD_USER_ID, name="Bob Kelso")
@@ -200,6 +201,30 @@ class TestWhatItAsksGraphFor:
 
         bound = [member["user@odata.bind"] for member in _members_sent(post)]
         assert bound == [_bind(SIGNED_IN_USER_ID), _bind(OTHER_USER_ID), _bind(_THIRD_USER_ID)]
+
+    async def test_an_id_that_differs_only_in_case_is_bound_once_and_keeps_the_first_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _creates(graph, _chat_payload(chat_type="group"))
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await create_chat(
+            client,
+            chat_type="group",
+            members=[
+                Person(user_id=_LETTERED_USER_ID.upper(), name="Grace Hopper"),
+                Person(user_id=_LETTERED_USER_ID, name="Grace"),
+            ],
+            confirm=capturing,
+        )
+
+        bound = [member["user@odata.bind"] for member in _members_sent(post)]
+        assert bound == [_bind(SIGNED_IN_USER_ID), _bind(_LETTERED_USER_ID)]
+        assert asked == ["Create a group Teams chat with 1 person: 'Grace Hopper'?"]
 
 
 class TestTheRefusalsBeforeAnyRequest:

@@ -19,8 +19,12 @@ from office_365_mcp.shared.handles import (
     message_handle,
     not_a_message_handle,
 )
-from office_365_mcp.shared.messages import TeamsMessage, get_message
-from office_365_mcp.shared.prose import cut_for_a_question
+from office_365_mcp.shared.messages import (
+    EVERYONE_SEES_IT,
+    TeamsMessage,
+    get_message,
+    message_in_question,
+)
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
     Confirm,
@@ -62,7 +66,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _AGREE = "delete"
 _DECLINE = "do not delete"
 _NOTHING_DELETED = "No message was deleted."
-_EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
 
 _ALREADY_DELETED = (
     f"This message is already deleted. {_NOTHING_DELETED} If you call this tool again with this "
@@ -135,10 +138,7 @@ async def delete_message(
 
 
 def _question(current: TeamsMessage) -> str:
-    sender = current.sender.display_name if current.sender is not None else None
-    sent_by = "" if sender is None else f" from {cut_for_a_question(sender)!r}"
-    says = "has no text" if current.text is None else f"says {cut_for_a_question(current.text)!r}"
-    return f"Delete the Teams message{sent_by} that {says}? {_EVERYONE_SEES_IT}"
+    return f"Delete {message_in_question(current)}? {EVERYONE_SEES_IT}"
 
 
 def _about(handle: MessageHandle) -> str:

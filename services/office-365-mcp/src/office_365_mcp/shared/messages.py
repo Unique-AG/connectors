@@ -218,7 +218,7 @@ async def get_message(client: GraphServiceClient, handle: MessageHandle) -> Chat
                 .messages.by_chat_message_id(handle.message_id)
                 .get(
                     request_configuration=RequestConfiguration[_ChatMessageQuery](
-                        headers=_headers()
+                        headers=unknown_enum_headers()
                     )
                 )
             )
@@ -235,17 +235,19 @@ async def get_message(client: GraphServiceClient, handle: MessageHandle) -> Chat
                 .replies.by_chat_message_id1(handle.message_id)
                 .get(
                     request_configuration=RequestConfiguration[_ChannelReplyQuery](
-                        headers=_headers()
+                        headers=unknown_enum_headers()
                     )
                 )
             )
     with graph_step(STEP_CHANNEL_MESSAGE):
         return await messages.by_chat_message_id(handle.message_id).get(
-            request_configuration=RequestConfiguration[_ChannelMessageQuery](headers=_headers())
+            request_configuration=RequestConfiguration[_ChannelMessageQuery](
+                headers=unknown_enum_headers()
+            )
         )
 
 
-def _headers() -> HeadersCollection:
+def unknown_enum_headers() -> HeadersCollection:
     headers = HeadersCollection()
     headers.add(*_PREFER_UNKNOWN_ENUMS)
     return headers
@@ -632,3 +634,13 @@ def mention_fields(mentions: Sequence[Mention]) -> tuple[str, ...]:
         str(len(mentions)),
         *(field for mention in mentions for field in (mention.user_id, mention.name)),
     )
+
+
+EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
+
+
+def message_in_question(message: TeamsMessage) -> str:
+    sender = message.sender.display_name if message.sender is not None else None
+    sent_by = "" if sender is None else f" from {cut_for_a_question(sender)!r}"
+    says = "has no text" if message.text is None else f"says {cut_for_a_question(message.text)!r}"
+    return f"the Teams message{sent_by} that {says}"

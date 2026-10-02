@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.handles import CHAT_PERMISSION
+from office_365_mcp.shared.messages import EVERYONE_SEES_IT
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
@@ -44,7 +45,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _AGREE = "remove"
 _DECLINE = "do not remove"
 _NOTHING_REMOVED = "Nobody was removed."
-_EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
 _NO_NAME = "a member with no name"
 _FAILS_THE_SAME_WAY = (
     "If you call this tool again with the same arguments, the call will fail the same way."
@@ -121,7 +121,7 @@ async def remove_chat_member(
 
 
 def _question(member: ConversationMember) -> str:
-    return f"Remove {_who(member)} from the Teams chat? {_EVERYONE_SEES_IT}"
+    return f"Remove {_who(member)} from the Teams chat? {EVERYONE_SEES_IT}"
 
 
 def _who(member: ConversationMember) -> str:

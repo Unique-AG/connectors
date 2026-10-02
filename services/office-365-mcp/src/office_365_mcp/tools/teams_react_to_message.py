@@ -42,7 +42,12 @@ from office_365_mcp.shared.handles import (
     message_handle,
     not_a_message_handle,
 )
-from office_365_mcp.shared.messages import TeamsMessage, get_message
+from office_365_mcp.shared.messages import (
+    EVERYONE_SEES_IT,
+    TeamsMessage,
+    get_message,
+    message_in_question,
+)
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
@@ -89,7 +94,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 _NOTHING_CHANGED = "No reaction was changed."
-_EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
 
 _ALREADY_DELETED = (
     f"This message is already deleted. {_NOTHING_CHANGED} If you call this tool again with this "
@@ -184,10 +188,7 @@ async def _target(client: GraphServiceClient, handle: MessageHandle) -> str | No
     message = TeamsMessage.from_message(found, handle=handle)
     if message.deleted_at is not None:
         return None
-    sender = message.sender.display_name if message.sender is not None else None
-    sent_by = "" if sender is None else f" from {cut_for_a_question(sender)!r}"
-    says = "has no text" if message.text is None else f"says {cut_for_a_question(message.text)!r}"
-    return f"the Teams message{sent_by} that {says}"
+    return message_in_question(message)
 
 
 async def _channel_target(client: GraphServiceClient, handle: MessageHandle) -> str:
@@ -223,7 +224,7 @@ async def _channel_target(client: GraphServiceClient, handle: MessageHandle) -> 
 def _question(target: str, reaction: str, *, remove: bool) -> str:
     shown = cut_for_a_question(reaction)
     change = f"Remove the reaction {shown!r} from" if remove else f"Add the reaction {shown!r} to"
-    return f"{change} {target}? {_EVERYONE_SEES_IT}"
+    return f"{change} {target}? {EVERYONE_SEES_IT}"
 
 
 def _permissions(handle: MessageHandle) -> tuple[str, ...]:

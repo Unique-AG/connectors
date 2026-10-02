@@ -13,7 +13,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
 from office_365_mcp.shared.calendar import confirmation_id_for
-from office_365_mcp.shared.identity import Person
+from office_365_mcp.shared.identity import Person, user_bind
+from office_365_mcp.shared.messages import EVERYONE_SEES_IT
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -36,15 +37,12 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 _OWNER = "owner"
-_USER_BIND = "user@odata.bind"
-_USERS = "https://graph.microsoft.com/v1.0/users/"
 _VISIBLE_HISTORY = "visibleHistoryStartDateTime"
 _ALL_HISTORY = "0001-01-01T00:00:00Z"
 
 _AGREE = "add"
 _DECLINE = "do not add"
 _NOTHING_ADDED = "Nobody was added."
-_EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
 _ALL_HISTORY_SHOWN = "The new member will see all earlier messages of the chat."
 _NO_HISTORY_SHOWN = "The new member will not see the earlier messages of the chat."
 
@@ -113,15 +111,16 @@ async def add_chat_member(
 
 
 def _member(user_id: str, *, share_history: bool) -> AadUserConversationMember:
-    bind = {_USER_BIND: f"{_USERS}{user_id}"}
     history = {_VISIBLE_HISTORY: _ALL_HISTORY} if share_history else {}
-    return AadUserConversationMember(roles=[_OWNER], additional_data={**bind, **history})
+    return AadUserConversationMember(
+        roles=[_OWNER], additional_data={**user_bind(user_id), **history}
+    )
 
 
 def _question(member: Person, *, share_history: bool) -> str:
     history = _ALL_HISTORY_SHOWN if share_history else _NO_HISTORY_SHOWN
     name = cut_for_a_question(member.name)
-    return f"Add {name!r} to the Teams chat? {history} {_EVERYONE_SEES_IT}"
+    return f"Add {name!r} to the Teams chat? {history} {EVERYONE_SEES_IT}"
 
 
 def _about(chat_id: str, user_id: str, *, share_history: bool) -> str:
