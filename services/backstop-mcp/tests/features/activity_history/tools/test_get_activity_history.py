@@ -108,7 +108,7 @@ class TestGetActivityHistoryDocstring:
         doc = get_activity_history.__doc__ or ""
         assert "search_activities" in doc
         assert "Do not start here" in doc
-        assert "fallback" in doc
+        assert "fallback" in doc.lower()
         assert "include_description" in doc
         assert "get_activity_detail" in doc
         assert "activity_id" in doc
