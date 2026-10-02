@@ -306,8 +306,6 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
             "teams_list_chat_messages",
             "teams_browse_channel",
             "teams_list_message_replies",
-            "teams_search_messages",
-            "teams_read_message",
         ),
         "user_id": _MENTION_SOURCES,
     },
@@ -316,8 +314,6 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
             "teams_list_chat_messages",
             "teams_browse_channel",
             "teams_list_message_replies",
-            "teams_search_messages",
-            "teams_read_message",
         )
     },
     "teams_search_messages": {"mentions": ("get_me",)},
@@ -619,7 +615,9 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         assert set(TOOL_NAMES) == named, f"no preset names {sorted(set(TOOL_NAMES) - named)}"
 
 
-_NAMES_ONLY_ITS_PRESETS_TOOLS: frozenset[str] = frozenset({"teams_react_to_message"})
+_NAMES_ONLY_ITS_PRESETS_TOOLS: frozenset[str] = frozenset(
+    {"teams_react_to_message", "teams_edit_message", "teams_delete_message"}
+)
 
 
 def _descriptions(schema: Mapping[str, object]) -> list[str]:

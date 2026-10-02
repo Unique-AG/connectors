@@ -10,10 +10,21 @@ from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, not_graph
+from office_365_mcp.graph_client import graph_errors, graph_step, not_graph
 from office_365_mcp.shared.calendar import confirmation_id_for
-from office_365_mcp.shared.handles import MessageHandle, message_handle, not_a_message_handle
-from office_365_mcp.shared.messages import Mention, mention_fields, outgoing_message
+from office_365_mcp.shared.handles import (
+    CHANNEL_PERMISSION,
+    MessageHandle,
+    message_handle,
+    not_a_message_handle,
+)
+from office_365_mcp.shared.messages import (
+    Mention,
+    TeamsMessage,
+    get_message,
+    mention_fields,
+    outgoing_message,
+)
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
@@ -25,14 +36,17 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "teams_edit_message"
 
-STEP = "edit_message"
+STEP_EDIT = "edit_message"
 
 _CHAT_READ_WRITE = "Chat.ReadWrite"
 _CHANNEL_READ_WRITE = "ChannelMessage.ReadWrite"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = (_CHAT_READ_WRITE, _CHANNEL_READ_WRITE)
+GRAPH_PERMISSIONS: tuple[str, ...] = (_CHAT_READ_WRITE, _CHANNEL_READ_WRITE, CHANNEL_PERMISSION)
 
-GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (_CHAT_READ_WRITE,)
+_CHAT_PERMISSIONS: tuple[str, ...] = (_CHAT_READ_WRITE,)
+_CHANNEL_PERMISSIONS: tuple[str, ...] = (_CHANNEL_READ_WRITE, CHANNEL_PERMISSION)
+
+GRAPH_CALL_NARROWS_TO: tuple[str, ...] = _CHAT_PERMISSIONS
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000",
@@ -43,6 +57,11 @@ _AGREE = "edit"
 _DECLINE = "do not edit"
 _NOTHING_CHANGED = "No message was changed."
 _EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
+
+_ALREADY_DELETED = (
+    f"This message is deleted, and a deleted message cannot be changed. {_NOTHING_CHANGED} If you "
+    + "call this tool again with this handle, the call will fail the same way."
+)
 
 _DESCRIPTION = """\
 Replaces the text of one Teams message, as the signed-in user. The message can be a chat \
@@ -71,9 +90,10 @@ GRAPH_NOT_FOUND = (
 class EditedMessage(BaseModel):
     uri: str = Field(
         description=(
-            "The handle of the message that this call changed. Pass this handle to "
-            + "teams_read_message to see the new text. Its `last_edited_at` shows when the "
-            + "message was last changed."
+            "The handle of the message that this call changed. teams_list_chat_messages shows the "
+            + "new text of a chat message, and teams_browse_channel shows the new text of a "
+            + "channel message. The `last_edited_at` of the message shows when the message was "
+            + "last changed."
         )
     )
     text: str = Field(
@@ -99,15 +119,22 @@ async def edit_message(
     confirm: Confirm,
     mentions: Sequence[Mention] = (),
 ) -> EditedMessage | InputRequiredResult:
-    with graph_errors(TOOL_NAME, step=STEP):
-        with not_graph():
-            answer = await confirm(
-                _question(handle, message, mentions), _about(handle, message, mentions)
-            )
-        asked = answer if isinstance(answer, InputRequiredResult) else None
-        refused = answer if isinstance(answer, str) else None
+    asked: InputRequiredResult | None = None
+    with graph_errors(TOOL_NAME):
+        found = await get_message(client, handle)
+        assert found is not None, "Graph answered a message read with no message"
+        current = TeamsMessage.from_message(found, handle=handle)
+        refused = _ALREADY_DELETED if current.deleted_at is not None else None
+        if refused is None:
+            with not_graph():
+                answer = await confirm(
+                    _question(current, message, mentions), _about(handle, message, mentions)
+                )
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
-            await _edit(client, handle, _new_body(message, mentions))
+            with graph_step(STEP_EDIT):
+                await _edit(client, handle, _new_body(message, mentions))
 
     if asked is not None:
         return asked
@@ -116,21 +143,33 @@ async def edit_message(
     return EditedMessage(uri=handle.uri, text=message, mentions=list(mentions))
 
 
-def _question(handle: MessageHandle, message: str, mentions: Sequence[Mention]) -> str:
+def _question(current: TeamsMessage, message: str, mentions: Sequence[Mention]) -> str:
     named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
     mentioned = f" It mentions {named}." if mentions else ""
-    return (
-        f"Replace the text of the Teams message {handle.uri} with "
-        + f"{cut_for_a_question(message)!r}?{mentioned} {_EVERYONE_SEES_IT}"
+    attached = ", ".join(
+        repr(cut_for_a_question(attachment.name)) if attachment.name else "an attachment"
+        for attachment in current.attachments
     )
+    removed = f" The change can remove {attached} from the message." if attached else ""
+    return (
+        f"Replace the text of {_the_message(current)} with {cut_for_a_question(message)!r}?"
+        + f"{mentioned}{removed} {_EVERYONE_SEES_IT}"
+    )
+
+
+def _the_message(current: TeamsMessage) -> str:
+    sender = current.sender.display_name if current.sender is not None else None
+    sent_by = "" if sender is None else f" from {cut_for_a_question(sender)!r}"
+    says = "has no text" if current.text is None else f"says {cut_for_a_question(current.text)!r}"
+    return f"the Teams message{sent_by} that {says}"
 
 
 def _about(handle: MessageHandle, message: str, mentions: Sequence[Mention]) -> str:
     return confirmation_id_for(handle.uri, message, *mention_fields(mentions))
 
 
-def _permission(handle: MessageHandle) -> str:
-    return _CHAT_READ_WRITE if handle.chat_id is not None else _CHANNEL_READ_WRITE
+def _permissions(handle: MessageHandle) -> tuple[str, ...]:
+    return _CHAT_PERMISSIONS if handle.chat_id is not None else _CHANNEL_PERMISSIONS
 
 
 def _new_body(message: str, mentions: Sequence[Mention]) -> ChatMessage:
@@ -182,9 +221,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The message to change, as the `uri` handle from a "
-                    + "teams_list_chat_messages, teams_browse_channel, teams_list_message_replies, "
-                    + "teams_search_messages, or teams_read_message result. Copy the handle word "
-                    + "for word."
+                    + "teams_list_chat_messages, teams_browse_channel, or "
+                    + "teams_list_message_replies result. Copy the handle word for word."
                 ),
             ),
         ],
@@ -216,7 +254,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         handle = message_handle(uri)
         if handle is None:
             raise ToolError(not_a_message_handle(TOOL_NAME, _NOTHING_CHANGED))
-        await narrowed_to(ctx, _permission(handle))
+        await narrowed_to(ctx, *_permissions(handle))
         return await edit_message(
             client,
             handle=handle,

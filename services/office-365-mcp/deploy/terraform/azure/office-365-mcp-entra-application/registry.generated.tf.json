@@ -110,7 +110,8 @@
           "name": "teams_edit_message",
           "permissions": [
             "Chat.ReadWrite",
-            "ChannelMessage.ReadWrite"
+            "ChannelMessage.ReadWrite",
+            "ChannelMessage.Read.All"
           ]
         },
         {
@@ -118,7 +119,8 @@
           "permissions": [
             "Chat.ReadWrite",
             "ChannelMessage.ReadWrite",
-            "User.Read"
+            "User.Read",
+            "ChannelMessage.Read.All"
           ]
         },
         {

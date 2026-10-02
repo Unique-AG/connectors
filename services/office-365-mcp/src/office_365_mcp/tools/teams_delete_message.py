@@ -13,7 +13,14 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.calendar import confirmation_id_for
-from office_365_mcp.shared.handles import MessageHandle, message_handle, not_a_message_handle
+from office_365_mcp.shared.handles import (
+    CHANNEL_PERMISSION,
+    MessageHandle,
+    message_handle,
+    not_a_message_handle,
+)
+from office_365_mcp.shared.messages import TeamsMessage, get_message
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
     Confirm,
@@ -29,10 +36,15 @@ STEP_DELETE = "delete_message"
 _CHAT_WRITE = "Chat.ReadWrite"
 _CHANNEL_WRITE = "ChannelMessage.ReadWrite"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = (_CHAT_WRITE, _CHANNEL_WRITE, identity.GRAPH_PERMISSION)
+GRAPH_PERMISSIONS: tuple[str, ...] = (
+    _CHAT_WRITE,
+    _CHANNEL_WRITE,
+    identity.GRAPH_PERMISSION,
+    CHANNEL_PERMISSION,
+)
 
 _CHAT_PERMISSIONS: tuple[str, ...] = (_CHAT_WRITE, identity.GRAPH_PERMISSION)
-_CHANNEL_PERMISSIONS: tuple[str, ...] = (_CHANNEL_WRITE,)
+_CHANNEL_PERMISSIONS: tuple[str, ...] = (_CHANNEL_WRITE, CHANNEL_PERMISSION)
 
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = _CHAT_PERMISSIONS
 
@@ -51,6 +63,11 @@ _AGREE = "delete"
 _DECLINE = "do not delete"
 _NOTHING_DELETED = "No message was deleted."
 _EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
+
+_ALREADY_DELETED = (
+    f"This message is already deleted. {_NOTHING_DELETED} If you call this tool again with this "
+    + "handle, the call will fail the same way."
+)
 
 _DESCRIPTION = """\
 Deletes one Teams message as the signed-in user. The message can be a chat message, a channel \
@@ -96,11 +113,17 @@ class DeletedMessage(BaseModel):
 async def delete_message(
     client: GraphServiceClient, *, handle: MessageHandle, confirm: Confirm
 ) -> DeletedMessage | InputRequiredResult:
+    asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME):
-        with not_graph():
-            answer = await confirm(_question(handle), _about(handle))
-        asked = answer if isinstance(answer, InputRequiredResult) else None
-        refused = answer if isinstance(answer, str) else None
+        found = await get_message(client, handle)
+        assert found is not None, "Graph answered a message read with no message"
+        current = TeamsMessage.from_message(found, handle=handle)
+        refused = _ALREADY_DELETED if current.deleted_at is not None else None
+        if refused is None:
+            with not_graph():
+                answer = await confirm(_question(current), _about(handle))
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             await _soft_delete(client, handle)
 
@@ -111,8 +134,11 @@ async def delete_message(
     return DeletedMessage(uri=handle.uri, deleted=True)
 
 
-def _question(handle: MessageHandle) -> str:
-    return f"Delete the Teams message {handle.uri}? {_EVERYONE_SEES_IT}"
+def _question(current: TeamsMessage) -> str:
+    sender = current.sender.display_name if current.sender is not None else None
+    sent_by = "" if sender is None else f" from {cut_for_a_question(sender)!r}"
+    says = "has no text" if current.text is None else f"says {cut_for_a_question(current.text)!r}"
+    return f"Delete the Teams message{sent_by} that {says}? {_EVERYONE_SEES_IT}"
 
 
 def _about(handle: MessageHandle) -> str:
@@ -171,9 +197,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The message to delete, as the `uri` handle from a "
-                    + "teams_list_chat_messages, teams_browse_channel, teams_list_message_replies, "
-                    + "teams_search_messages, or teams_read_message result. Copy the handle word "
-                    + "for word."
+                    + "teams_list_chat_messages, teams_browse_channel, or "
+                    + "teams_list_message_replies result. Copy the handle word for word."
                 ),
             ),
         ],
