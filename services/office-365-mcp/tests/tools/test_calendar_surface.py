@@ -259,6 +259,12 @@ _NEWER_CALENDAR_TOOLS: frozenset[str] = frozenset(
         "outlook_cancel_event",
         "outlook_respond_to_invite",
         "outlook_list_time_zones",
+        "outlook_list_event_instances",
+        "outlook_list_reminders",
+        "outlook_list_calendar_groups",
+        "outlook_list_calendar_shares",
+        "outlook_list_event_attachments",
+        "outlook_read_event_attachment",
     }
 )
 

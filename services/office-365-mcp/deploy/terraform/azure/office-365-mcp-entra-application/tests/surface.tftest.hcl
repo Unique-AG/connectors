@@ -254,6 +254,22 @@ run "preset_outlook_write" {
   }
 }
 
+run "preset_outlook_delete" {
+  variables {
+    tools_preset = "outlook-delete"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,Mail.Read.Shared,People.Read,Mail.ReadWrite,Mail.ReadWrite.Shared"
+    error_message = "outlook-delete composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 22
+    error_message = "outlook-delete resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+}
+
 run "preset_outlook_send" {
   variables {
     tools_preset = "outlook-send"
@@ -273,6 +289,22 @@ run "preset_outlook_automate" {
   assert {
     condition     = join(",", local.permissions) == "User.Read,MailboxSettings.Read,MailboxSettings.ReadWrite"
     error_message = "outlook-automate composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_rules" {
+  variables {
+    tools_preset = "outlook-rules"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,MailboxSettings.Read,MailboxSettings.ReadWrite"
+    error_message = "outlook-rules composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 10
+    error_message = "outlook-rules resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
 
@@ -303,8 +335,29 @@ run "preset_outlook_calendar_write" {
   }
 
   assert {
-    condition     = length(local.tools) == 22
+    condition     = length(local.tools) == 17
     error_message = "outlook-calendar-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+}
+
+run "preset_outlook_calendar_manage" {
+  variables {
+    tools_preset = "outlook-calendar-manage"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadBasic,Calendars.ReadWrite"
+    error_message = "outlook-calendar-manage composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 22
+    error_message = "outlook-calendar-manage resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "every delegated Calendars permission is AdminConsentRequired: No, and this needs ${join(",", local.admin_consent)}"
   }
 }
 
@@ -319,7 +372,7 @@ run "preset_outlook_calendar_delegate" {
   }
 
   assert {
-    condition     = length(local.tools) == 23
+    condition     = length(local.tools) == 18
     error_message = "outlook-calendar-delegate resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 

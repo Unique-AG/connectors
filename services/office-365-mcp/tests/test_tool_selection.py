@@ -580,6 +580,55 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         assert set(TOOL_NAMES) == named, f"no preset names {sorted(set(TOOL_NAMES) - named)}"
 
 
+_OPT_IN: tuple[tuple[ToolsPreset, ToolsPreset, frozenset[str]], ...] = (
+    (ToolsPreset.OUTLOOK_DELETE, ToolsPreset.OUTLOOK_WRITE, frozenset({"outlook_delete_folder"})),
+    (
+        ToolsPreset.OUTLOOK_RULES,
+        ToolsPreset.OUTLOOK_AUTOMATE,
+        frozenset(
+            {"outlook_create_mail_rule", "outlook_update_mail_rule", "outlook_delete_mail_rule"}
+        ),
+    ),
+    (
+        ToolsPreset.OUTLOOK_CALENDAR_MANAGE,
+        ToolsPreset.OUTLOOK_CALENDAR_WRITE,
+        frozenset(
+            {
+                "outlook_forward_event",
+                "outlook_delete_event",
+                "outlook_share_calendar",
+                "outlook_unshare_calendar",
+                "outlook_delete_calendar",
+            }
+        ),
+    ),
+    (ToolsPreset.ONENOTE_DELETE, ToolsPreset.ONENOTE_WRITE, frozenset({"onenote_delete_page"})),
+)
+
+
+class TestAToolThatRemovesOrReachesOthersIsInAnOptInPreset:
+    @pytest.mark.parametrize(("opt_in", "base", "tools"), _OPT_IN)
+    def test_the_opt_in_preset_is_its_base_plus_those_tools(
+        self, opt_in: ToolsPreset, base: ToolsPreset, tools: frozenset[str]
+    ) -> None:
+        assert set(PRESETS[opt_in]) == set(PRESETS[base]) | tools
+
+    @pytest.mark.parametrize(
+        ("opt_in", "tools"), [(opt_in, tools) for opt_in, _base, tools in _OPT_IN]
+    )
+    def test_no_other_preset_names_them(self, opt_in: ToolsPreset, tools: frozenset[str]) -> None:
+        holders = {
+            preset: sorted(tools & set(members))
+            for preset, members in PRESETS.items()
+            if preset != opt_in and tools & set(members)
+        }
+
+        assert not holders, (
+            f"a deployment pinned to one of these presets would get {sorted(tools)} on the next "
+            + f"image bump, and only {opt_in} is meant to carry them: {holders}"
+        )
+
+
 PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     (ToolsPreset.TEAMS_CHAT, ("User.Read", "Chat.Read"), 0, 2),
     (ToolsPreset.TEAMS_MESSAGES, ("User.Read", "Chat.Read", "ChannelMessage.Read.All"), 1, 4),
@@ -659,6 +708,19 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Mail.ReadWrite.Shared",
         ),
         0,
+        21,
+    ),
+    (
+        ToolsPreset.OUTLOOK_DELETE,
+        (
+            "User.Read",
+            "Mail.Read",
+            "Mail.Read.Shared",
+            "People.Read",
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared",
+        ),
+        0,
         22,
     ),
     (
@@ -675,10 +737,16 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Mail.Send.Shared",
         ),
         0,
-        23,
+        22,
     ),
     (
         ToolsPreset.OUTLOOK_AUTOMATE,
+        ("User.Read", "MailboxSettings.Read", "MailboxSettings.ReadWrite"),
+        0,
+        7,
+    ),
+    (
+        ToolsPreset.OUTLOOK_RULES,
         ("User.Read", "MailboxSettings.Read", "MailboxSettings.ReadWrite"),
         0,
         10,
@@ -691,6 +759,18 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     ),
     (
         ToolsPreset.OUTLOOK_CALENDAR_WRITE,
+        (
+            "User.Read",
+            "Calendars.Read",
+            "Calendars.Read.Shared",
+            "Calendars.ReadBasic",
+            "Calendars.ReadWrite",
+        ),
+        0,
+        17,
+    ),
+    (
+        ToolsPreset.OUTLOOK_CALENDAR_MANAGE,
         (
             "User.Read",
             "Calendars.Read",
@@ -712,7 +792,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Calendars.ReadWrite.Shared",
         ),
         0,
-        23,
+        18,
     ),
     (
         ToolsPreset.OUTLOOK_GROUP_CALENDAR,

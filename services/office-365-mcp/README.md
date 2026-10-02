@@ -108,6 +108,11 @@ only next to the calendar it was read from. Graph answers a different id for the
 delegated copy. The read request needs both halves: `/me/calendars/{calendar}/events/{event}`.
 `teams:///transcripts/{a}/{b}` uses the same two-segment shape, for the same reason.
 
+A calendar-share handle is `outlook:///calendarpermissions/{calendar}/{permission}`, two segments.
+A permission id means something only under its calendar, so the handle names both. The tools
+`outlook_list_calendar_shares` and `outlook_share_calendar` mint it. The tool
+`outlook_unshare_calendar` parses it.
+
 This layout follows seven layering rules:
 
 1. `shared/` imports no tool module. Only `shared/seam.py` imports FastMCP. This keeps the
