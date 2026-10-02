@@ -12,10 +12,13 @@ from fastmcp.server.elicitation import (
     CancelledElicitation,
     DeclinedElicitation,
 )
+from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import Tool
+from fastmcp.tools.base import ToolResult
 from mcp.shared.exceptions import MCPError
 from mcp.types import (
     METHOD_NOT_FOUND,
+    CallToolRequestParams,
     ElicitRequest,
     ElicitRequestFormParams,
     ElicitResult,
@@ -29,7 +32,12 @@ from respx.models import Call
 from office_365_mcp.graph_client import GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.calendar import SERIES_MASTER_FIELD, confirmation_id_for
 from office_365_mcp.shared.handles import EventHandle, event_handle
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
+from office_365_mcp.shared.seam import (
+    WRITE_DESTRUCTIVE_IDEMPOTENT,
+    Confirm,
+    GraphAdviceMiddleware,
+    ToolAdvice,
+)
 from office_365_mcp.tools import outlook_delete_event as deleter
 from office_365_mcp.tools.outlook_delete_event import DeletedEvent, a_person_agrees, delete_event
 
@@ -144,6 +152,27 @@ async def _asked(
 
 def _made(router: respx.MockRouter) -> Sequence[Call]:
     return cast("Sequence[Call]", router.calls)
+
+
+async def _advice(client: GraphServiceClient) -> str:
+    advice = GraphAdviceMiddleware(
+        {
+            deleter.TOOL_NAME: ToolAdvice(
+                permissions=deleter.GRAPH_PERMISSIONS, not_found=deleter.GRAPH_NOT_FOUND
+            )
+        }
+    )
+
+    async def the_tool(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+        _ = context
+        _ = await _delete(client)
+        raise AssertionError("Graph refused nothing, so there is no advice to read")
+
+    with pytest.raises(ToolError) as raised:
+        _ = await advice.on_call_tool(
+            MiddlewareContext(message=CallToolRequestParams(name=deleter.TOOL_NAME)), the_tool
+        )
+    return str(raised.value)
 
 
 async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
@@ -360,18 +389,19 @@ class TestGraphErrors:
 
         assert delete_route.call_count == 0
 
-    async def test_a_404_on_the_delete_after_the_read_found_the_event_answers_deleted_once(
+    async def test_a_404_on_the_delete_after_the_read_found_the_event_says_nothing_was_deleted(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         read = _reads(graph, _event(subject="Weekly sync", attendees=[_attendee(_ADA)]))
         delete_route = _deletes(graph, status=404)
 
-        answer = await _delete(client)
+        message = await _advice(client)
 
         assert read.call_count == 1
         assert delete_route.call_count == 1
-        assert answer.uri == _URI
-        assert answer.subject == "Weekly sync"
+        assert message.startswith(deleter.GRAPH_NOT_FOUND)
+        assert "this call deleted nothing" in message
+        assert "The event is probably already gone." in message
 
 
 class TestWhatItAnswers:
@@ -623,6 +653,17 @@ class TestHowItDeclaresItself:
         assert "The `uri` of a series master deletes every occurrence of the series." in description
         assert "The `uri` of one occurrence deletes only that date." in description
         assert "`series_master` true when the delete reached the whole series" in description
+
+    async def test_the_description_says_a_repeat_after_a_timeout_finds_no_event(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        note = (
+            "This call is safe to repeat after a timeout. A second call finds no event and "
+            + "reports that."
+        )
+        assert note in (tool.description or "")
 
     def test_not_found_advice_points_at_the_lister(self) -> None:
         assert "outlook_list_events" in deleter.GRAPH_NOT_FOUND

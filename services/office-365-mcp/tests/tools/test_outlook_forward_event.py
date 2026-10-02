@@ -51,6 +51,11 @@ _NOTHING_FORWARDED = "This tool forwarded nothing."
 _SAME_FAILURE = (
     "If you call this tool again with the same arguments, the call will fail the same way."
 )
+_RETRY_NOTE = (
+    "If a call times out, do not call this tool again first. A second call can forward the "
+    + "event twice. No tool of this deployment can show a forward. Before you call this tool "
+    + "again, ask the user if the Microsoft 365 app shows the forward."
+)
 
 
 def _event(
@@ -741,8 +746,8 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""
-        assert "If a call times out, do not call this tool again first" in description
-        assert "ask the user if the Microsoft 365 app shows the forward" in description
+        assert description.endswith(f"- {_RETRY_NOTE}\n")
+        assert ": a second call" not in description
 
     async def test_every_field_of_the_answer_says_what_it_is(
         self, transport: httpx.AsyncClient

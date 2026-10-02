@@ -1,5 +1,4 @@
 from collections.abc import Mapping
-from contextlib import suppress
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
@@ -14,7 +13,7 @@ from msgraph.generated.models.event_type import EventType
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import (
     SERIES_MASTER_FIELD,
     EventAttendee,
@@ -140,7 +139,7 @@ async def delete_event(
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
-            with suppress(GraphNotFound), graph_step(STEP_DELETE):
+            with graph_step(STEP_DELETE):
                 await (
                     client.me.calendars.by_calendar_id(handle.calendar_id)
                     .events.by_event_id(handle.event_id)
