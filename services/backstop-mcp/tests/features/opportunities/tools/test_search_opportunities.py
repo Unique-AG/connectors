@@ -137,7 +137,7 @@ class TestSearchOpportunities:
         assert "get_opportunities_by_ids" in doc
         assert "custom_fields" in doc
         assert "list_custom_fields" in doc
-        assert "exact option" in doc
+        assert "exact option" not in doc
         annotations = cast("dict[str, object]", search_opportunities.__annotations__)
         field_info = next(
             item

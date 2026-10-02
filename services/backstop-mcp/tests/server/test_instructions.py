@@ -66,7 +66,10 @@ class TestInstructions:
         assert "search-then-delete" in INSTRUCTIONS
         assert "exact name, short name, or id is one vehicle" in INSTRUCTIONS
         assert "geographical breakdown" not in INSTRUCTIONS
-        assert "If no field or several fields could be it, ask the user which one." in INSTRUCTIONS
+        assert (
+            "If no field or several fields could be it, ask the user which one."
+            not in INSTRUCTIONS
+        )
         assert "Investor Location" not in INSTRUCTIONS
         assert "us_domiciled" not in INSTRUCTIONS
         assert "read `source` and `data_caveat`" in INSTRUCTIONS
@@ -85,8 +88,8 @@ class TestInstructions:
         assert "including closed deals" in INSTRUCTIONS
         assert "do not walk get_opportunities_by_ids" in INSTRUCTIONS
         assert "two fields are the latest move only" in INSTRUCTIONS
-        assert "usually tenant custom fields" in INSTRUCTIONS
-        assert "exact option text" in INSTRUCTIONS
+        assert "usually tenant custom fields" not in INSTRUCTIONS
+        assert "exact option text" not in INSTRUCTIONS
         assert "Country is the stored full name" in INSTRUCTIONS
         assert "investor organization's representative" in INSTRUCTIONS
         assert "Leave `exclude_custom_fields` false" in INSTRUCTIONS

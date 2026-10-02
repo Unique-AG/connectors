@@ -62,18 +62,13 @@ not the deal-level field, which may be blank. A stage-change question stays on \
 search_opportunities: select `previous_stage` and `date_entered_current_stage`, keep rows \
 inside the window including closed deals, and do not walk get_opportunities_by_ids. Those \
 two fields are the latest move only. The `product` argument is the linked fund and may be \
-blank. Do not keep deals because the name contains a strategy word. Country is the stored \
+blank. Country is the stored \
 full name. One party's deals: get_opportunities \
 (stage history is always included). Stage history, and custom fields the search call did \
 not request: get_opportunities_by_ids (`include_stage_history=true` for history). Open \
 follow-ups: get_tasks_for_party.
 
-Business terms such as strategy, status, tier, investor type, or region are usually tenant \
-custom fields. Call list_custom_fields for every entity type the term could live on \
-(organizations, opportunities, accounts, products, and `party`). Pick the field whose name \
-or options match the user's words, then filter or group by its definition id and the exact \
-option text. If no field or several fields could be it, ask the user which one. Say which \
-field and options you used. Custom-field names and types: list_custom_fields. Request \
+Custom-field names and types: list_custom_fields. Request \
 `party` too — fields shared by \
 people and organizations are listed only there. Layout tabs and sections: \
 list_custom_field_groups. Saved reports: run_report, by exact name. There is no endpoint \
