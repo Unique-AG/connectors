@@ -934,6 +934,21 @@ class TestTheFailuresItPassesOn:
             _ = await teams_read_message.teams_read_message(client, handle=_CHANNEL_HANDLE)
 
 
+class TestTheAdviceForAReplyItCannotRead:
+    def test_it_names_both_tools_that_emit_a_reply_handle(self) -> None:
+        advice = teams_read_message.GRAPH_NOT_FOUND
+
+        assert "teams_list_message_replies" in advice
+        assert "teams_browse_channel" in advice
+        assert "needs the handle of the post that the reply answers" in advice
+        assert "is the only tool that emits a reply's own handle" not in advice
+
+    def test_it_sends_a_search_hit_that_is_a_reply_to_the_browse(self) -> None:
+        advice = teams_read_message.GRAPH_NOT_FOUND
+
+        assert "does not name its post, so teams_browse_channel is its only route" in advice
+
+
 class TestTheRoundTripFromASearchResult:
     async def test_a_hit_from_search_is_read_by_its_own_handle(
         self, client: GraphServiceClient, graph: respx.MockRouter

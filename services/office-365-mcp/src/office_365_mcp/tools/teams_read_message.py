@@ -69,11 +69,12 @@ GRAPH_NOT_FOUND = (
     + "Graph does not say which of these it meant. Report that this tool did not read the "
     + "message, never that it was never written. Retrying will not help, and this connector has "
     + "no other route to the text. One well-formed handle always fails this way: a reply in a "
-    + "channel thread is addressed under the post it answers. A search result does not identify "
-    + "that post, so a search hit that is a reply cannot be read from its own handle. "
-    + "teams_browse_channel is the only tool that emits a reply's own handle. It reaches the "
-    + "replies of each post on the channel's first page, and no further. It follows neither "
-    + "Microsoft's cursor into an older part of a thread, nor the one into older posts. This is "
+    + "channel thread is addressed under the post it answers. teams_list_message_replies reads the "
+    + "replies of one post, but it needs the handle of the post that the reply answers. "
+    + "teams_browse_channel reads the replies of each post on the channel's first page, and no "
+    + "further. A search hit that is a reply does not name its post, so teams_browse_channel is "
+    + "its only route. teams_browse_channel follows neither Microsoft's cursor into an older part "
+    + "of a thread, nor the one into older posts. This is "
     + "because a given channel allows this whole connector about one request a second, across "
     + "the whole tenant. Browse that channel once. If the reply is not in what comes back, "
     + "there is no route to its full text, and a second browse returns the same window. Report "
@@ -154,8 +155,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The message handle (`uri`) from a teams_search_messages or "
-                    "teams_browse_channel result."
+                    "The message handle, as the `uri` of a message from teams_search_messages, "
+                    + "teams_browse_channel, teams_list_message_replies, or "
+                    + "teams_list_chat_messages. Copy it word for word."
                 ),
             ),
         ],

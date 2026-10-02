@@ -584,6 +584,7 @@ _MESSAGE_TOOLS: tuple[str, ...] = (
     "teams_browse_channel",
     "teams_search_messages",
     "teams_list_chat_messages",
+    "teams_list_message_replies",
 )
 
 
@@ -662,9 +663,11 @@ class TestTheToolsThisServerAdvertises:
             "get_me",
             "teams_list_chats",
             "teams_list_chat_messages",
+            "teams_list_chat_members",
             "teams_list_my_teams",
             "teams_list_channels",
             "teams_browse_channel",
+            "teams_list_message_replies",
             "teams_search_messages",
             "teams_read_message",
             "teams_list_meeting_transcripts",
@@ -764,12 +767,20 @@ class TestTheToolsThisServerAdvertises:
             "messages",
             "more_messages",
         }
+        assert set(_properties(tools["teams_list_chat_members"].output_schema)) == {
+            "members",
+            "more_members",
+        }
         assert set(_properties(tools["teams_list_my_teams"].output_schema)) == {"teams"}
         assert set(_properties(tools["teams_list_channels"].output_schema)) == {"channels"}
         assert set(_properties(tools["teams_browse_channel"].output_schema)) == {
             "messages",
             "more_posts_in_channel",
             "posts_cut_to_limit",
+        }
+        assert set(_properties(tools["teams_list_message_replies"].output_schema)) == {
+            "messages",
+            "more_replies",
         }
         assert set(_properties(tools["teams_search_messages"].output_schema)) == {
             "messages",
@@ -933,6 +944,8 @@ class TestTheToolsThisServerAdvertises:
 
         assert "teams_search_messages" in described
         assert "teams_browse_channel" in described
+        assert "teams_list_message_replies" in described
+        assert "teams_list_chat_messages" in described
 
     async def test_teams_read_transcript_takes_a_handle_and_a_window_and_names_its_one_shape(
         self, mcp_client: Client[FastMCPTransport]
