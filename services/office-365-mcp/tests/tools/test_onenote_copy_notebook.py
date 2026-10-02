@@ -32,6 +32,8 @@ from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm
 from office_365_mcp.tools import onenote_copy_notebook as copier
 from office_365_mcp.tools.onenote_copy_notebook import a_person_agrees, copy_notebook
 
+_BOTH_GROUPS_REFUSED = copier._BOTH_GROUPS_REFUSED  # pyright: ignore[reportPrivateUsage]
+
 _NOTEBOOK_ID = "1-SYNTHETICNOTEBOOK0000!0-ABCDEF"
 _OPERATION_ID = "1-SYNTHETICOPERATION0000!0-ABCDEF"
 _GROUP_ID = "5c6b7a81-2f0d-4a24-9b1e-8a9c3c470f9e"
@@ -416,13 +418,15 @@ class TestGraphFailures:
         assert isinstance(refused.value.__cause__, GraphForbidden)
         assert copy.call_count == 1
 
-    async def test_a_403_for_a_group_source_with_to_group_is_advised_about_the_group(
+    async def test_a_403_on_the_copy_for_a_group_source_with_to_group_names_both_groups(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _notebook_route(graph, path=f"{_SOURCE_GROUP_ROOT}/notebooks/{_NOTEBOOK_ID}")
         copy = graph.post(f"{_SOURCE_GROUP_ROOT}/notebooks/{_NOTEBOOK_ID}/copyNotebook").mock(
             return_value=httpx.Response(
-                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
             )
         )
 
@@ -432,12 +436,43 @@ class TestGraphFailures:
             )
 
         message = str(refused.value)
-        assert message.startswith(
-            "Microsoft 365 refused this request for the `to_group` that this call named."
+        assert message == (
+            _BOTH_GROUPS_REFUSED
+            + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
         )
         assert OWNED_REFUSED not in message
+        assert "refused this request for the `to_group`" not in message
         assert isinstance(refused.value.__cause__, GraphForbidden)
         assert copy.call_count == 1
+
+    async def test_a_403_on_the_source_read_for_a_group_source_with_to_group_names_both_groups(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"{_SOURCE_GROUP_ROOT}/notebooks/{_NOTEBOOK_ID}").mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+        copy = _group_source_copies(graph)
+
+        with pytest.raises(Advised) as refused:
+            _ = await _copy(
+                client, notebook=_GROUP_NOTEBOOK_URI, to_group=_GROUP_ID, confirm=_agrees
+            )
+
+        assert str(refused.value).startswith(_BOTH_GROUPS_REFUSED)
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert copy.call_count == 0
+
+    def test_the_advice_for_two_groups_names_the_source_and_the_target(self) -> None:
+        assert _BOTH_GROUPS_REFUSED == (
+            "Microsoft 365 refused this request for the group that owns the `notebook`, or for "
+            + "the `to_group` that this call named. Most likely, the signed-in user is not a "
+            + "member of one of the groups, or the `to_group` id is wrong. Ask the user for the "
+            + "correct id, or ask them to get access to both groups. If the user already has "
+            + "access, ask a Microsoft 365 administrator to examine the OneNote permissions of "
+            + "this connector. This same call fails again, so do not retry it."
+        )
 
 
 def _group_source_copies(graph: respx.MockRouter) -> respx.Route:

@@ -106,6 +106,15 @@ _OWNER_REFUSED = (
     + "connector. This same call fails again, so do not retry it."
 )
 
+_BOTH_GROUPS_REFUSED = (
+    "Microsoft 365 refused this request for the group that owns the `notebook`, or for the "
+    + "`to_group` that this call named. Most likely, the signed-in user is not a member of one of "
+    + "the groups, or the `to_group` id is wrong. Ask the user for the correct id, or ask them to "
+    + "get access to both groups. If the user already has access, ask a Microsoft 365 "
+    + "administrator to examine the OneNote permissions of this connector. This same call fails "
+    + "again, so do not retry it."
+)
+
 _DESCRIPTION = """\
 Starts a copy of a whole notebook into the signed-in user's own OneDrive, or into a Microsoft 365 \
 group with `to_group`. This tool cannot copy a notebook of a SharePoint site. This call does not \
@@ -156,7 +165,10 @@ async def copy_notebook(
     refused: str | None = None
     with (
         owner_refused(handle.owner is not None, OWNED_REFUSED),
-        owner_refused(to_group is not None, _OWNER_REFUSED),
+        owner_refused(
+            to_group is not None,
+            _OWNER_REFUSED if handle.owner is None else _BOTH_GROUPS_REFUSED,
+        ),
         graph_errors(TOOL_NAME),
     ):
         if answer_pending or to_group is not None:
