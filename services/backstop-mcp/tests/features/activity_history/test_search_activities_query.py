@@ -124,9 +124,7 @@ class TestEntityActivitiesRequestBody:
             "startTimestamp": "2025-08-20T00:00:00",
             "endTimestamp": "2026-08-20T23:59:59",
         }
-        assert new_filters["types"] == [
-            {"searchValues": [{"value": "call"}, {"value": "email"}]}
-        ]
+        assert new_filters["types"] == [{"searchValues": [{"value": "call"}, {"value": "email"}]}]
         assert new_filters["activityTags"] == [
             {"searchValues": [{"value": "474963"}, {"value": "455289"}]}
         ]
