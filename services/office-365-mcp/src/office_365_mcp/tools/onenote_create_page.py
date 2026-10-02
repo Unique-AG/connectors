@@ -108,8 +108,8 @@ onenote_list_pages does not show the page. Judge by `created_at`: a new title ca
 days.
 - To show a check box, a star or another built-in note tag, use the `data-tag` attribute. Put it \
 on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, `<p data-tag="to-do">` shows an \
-empty check box, and `data-tag="to-do:completed"` shows a ticked one. Microsoft Graph does not \
-support custom tags.
+empty check box, and `data-tag="to-do:completed"` shows a check box with a check mark. Microsoft \
+Graph does not support custom tags.
 """
 
 

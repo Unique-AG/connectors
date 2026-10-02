@@ -382,14 +382,17 @@ class TestGraphFailures:
     def test_the_not_found_text_covers_a_group_a_site_and_neither(self) -> None:
         advice = creator.GRAPH_NOT_FOUND
 
-        assert "For a `group` or a `site`" in advice
+        assert "If this call named a `group` or a `site`" in advice
         assert (
             "names nothing that the signed-in user can reach. Ask the user for the correct id."
             in advice
         )
         assert "teams_list_my_teams" not in advice
         assert "This same id fails again, so do not retry it." in advice
-        assert "Without `group` or `site`, Microsoft most likely found no OneNote" in advice
+        assert (
+            "If this call named no `group` and no `site`, Microsoft most likely found no OneNote"
+            in advice
+        )
 
     async def test_a_409_duplicate_name_is_a_generic_graph_failure(
         self, client: GraphServiceClient, notebooks: respx.Route
@@ -948,7 +951,7 @@ class TestHowItDeclaresItself:
             "This tool asks the user to agree before it creates a notebook in a group or a site. "
             + "Other people can open that notebook."
         ) in flat
-        assert "The question shows only the id of the group or the site." in flat
+        assert "The question names the group or the site only by its id." in flat
         assert (
             "If you know the name of that group or site, tell it to the user before you call."
         ) in flat
@@ -975,7 +978,10 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         description = " ".join((tool.description or "").split())
-        assert "onenote_list_notebooks with the same `group` or `site`" in description
+        assert (
+            "If the call named a `group` or a `site`, pass the same one to "
+            + "onenote_list_notebooks."
+        ) in description
 
     def test_the_answer_scopes_its_always_claims_to_a_create_without_an_owner(self) -> None:
         fields = creator.CreatedNotebook.model_fields

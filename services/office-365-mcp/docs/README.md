@@ -97,7 +97,7 @@ the text names that tool. If not, the text tells the model to ask the user.
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `onenote_list_notebooks` | Read | `Notes.Read` | No | Every notebook that the user owns, or that is shared with the user, with each notebook's sections. With `group`, the notebooks of one Microsoft 365 group or team. With `site`, the notebooks of one SharePoint site. Each notebook and each section shows `created_at` and `created_by`. `created_by` keeps the notebooks of one creator. `order_by` sorts the notebooks and their sections by name, by `created_at`, or by `last_modified_at`. |
+| `onenote_list_notebooks` | Read | `Notes.Read` | No | Every notebook that the user owns, or that is shared with the user, with each notebook's sections. With `group`, the notebooks of one Microsoft 365 group or team. With `site`, the notebooks of one SharePoint site. Each notebook and each section shows `created_at` and `created_by`. The `created_by` argument keeps only the notebooks of one creator. `order_by` sorts the notebooks and their sections by name, by `created_at`, or by `last_modified_at`. |
 | `onenote_list_pages` | Read | `Notes.Read` | No | Finds pages by title, or by the app that created them, across notebooks or in one section. With `group` or `site`, it searches the notebooks of one group or one SharePoint site. Microsoft Graph has no full-text search for OneNote. |
 | `onenote_read_page` | Read | `Notes.Read` | No | Reads the HTML of one page, exactly as Microsoft stores it. |
 | `onenote_create_page` | Write, adds | `Notes.Create` | No | Writes a new page into the signed-in user's OneNote, or into a section of a group or site notebook. No attachments or images. |
@@ -106,15 +106,15 @@ the text names that tool. If not, the text tells the model to ask the user.
 | `onenote_read_resource` | Read | `Notes.Read` | No | Fetches the bytes of one image or file that is embedded in a page, with its real media type. |
 | `onenote_find_notebook_from_url` | Read | `Notes.Read` | No | Resolves a OneNote web address into a notebook handle. With `group` or `site`, it resolves the address of a group or site notebook. |
 | `onenote_list_recent_notebooks` | Read | `Notes.Read` | No | Notebooks that the signed-in user opened recently, per Microsoft's own record. |
-| `onenote_list_sections` | Read | `Notes.Read` | No | Sections and section groups directly under one notebook or section group, one level at a time. Each row shows `created_at` and `created_by`. `created_by` keeps the rows of one creator. `order_by` sorts the rows by name, by `created_at`, or by `last_modified_at`. |
-| `onenote_create_notebook` | Write, adds | `Notes.Create` | No | Creates a new, empty notebook for the signed-in user. With `group` or `site`, the notebook belongs to a Microsoft 365 group or a SharePoint site. The tool asks the user to agree before it creates a notebook for a group or a site. |
+| `onenote_list_sections` | Read | `Notes.Read` | No | Sections and section groups directly under one notebook or section group, one level at a time. Each row shows `created_at` and `created_by`. The `created_by` argument keeps only the rows of one creator. `order_by` sorts the rows by name, by `created_at`, or by `last_modified_at`. |
+| `onenote_create_notebook` | Write, adds | `Notes.Create` | No | Creates a new, empty notebook for the signed-in user. With `group` or `site`, the notebook belongs to a Microsoft 365 group or a SharePoint site. The tool asks the user to agree before it creates a notebook in a group or a site. |
 | `onenote_create_section` | Write, adds | `Notes.Create` | No | Creates a new, empty section directly under a notebook or section group. |
 | `onenote_create_section_group` | Write, adds | `Notes.Create` | No | Creates a new, empty section group directly under a notebook or another section group. |
 | `onenote_edit_page` | Write, changes or removes | `Notes.ReadWrite` | No | Adds content next to an element on one page, or replaces one, through 1 to 20 batched commands. |
 | `onenote_rename_page` | Write, changes or removes, safe to repeat | `Notes.ReadWrite` | No | Changes the title of one page, and nothing else. |
 | `onenote_copy_page` | Write, adds | `Notes.Read`, `Notes.Create` | No | Starts a copy of one page into another section, on Microsoft's own systems. The page and the section can be in a group notebook. The tool cannot copy from or into a notebook of a SharePoint site. The answer is a handle for the operation. |
 | `onenote_copy_section` | Write, adds | `Notes.Create` | No | Starts a copy of one section into another notebook or section group. The section and the destination can be in a group notebook. The tool cannot copy from or into a notebook of a SharePoint site. The answer is a handle for the operation. |
-| `onenote_copy_notebook` | Write, adds | `Notes.Create` | No | Starts a copy of a whole notebook into the user's own OneDrive, on Microsoft's own systems. With `to_group`, the copy goes into a Microsoft 365 group. The tool asks the user to agree first. The tool cannot copy from or into a notebook of a SharePoint site. The answer is a handle for the operation. |
+| `onenote_copy_notebook` | Write, adds | `Notes.Create` | No | Starts a copy of a whole notebook into the user's own OneDrive, on Microsoft's own systems. With `to_group`, the copy goes into a Microsoft 365 group, and the tool asks the user to agree first. The tool cannot copy from or into a notebook of a SharePoint site. The answer is a handle for the operation. |
 | `onenote_get_operation` | Read | `Notes.Read` | No | Polls a copy operation, started by `onenote_copy_page`, `onenote_copy_section`, or `onenote_copy_notebook`, for its result. |
 | `onenote_delete_page` | Write, changes or removes, safe to repeat | `Notes.ReadWrite` | No | Erases one page outright. The tool always asks the user to approve this first, because Microsoft Graph keeps no recycle bin for OneNote. |
 
@@ -123,7 +123,7 @@ The handles of a notebook that a Microsoft 365 group or team owns start with
 `onenote:///sites/{site}/`. Every write into a group or site notebook asks the user to agree first.
 
 The OneNote tools hold no permission to read groups or sites. As a result, the questions of
-`onenote_create_notebook` and `onenote_copy_notebook` name the group or the site by its id only. The
+`onenote_create_notebook` and `onenote_copy_notebook` name the group or the site only by its id. The
 other OneNote writes name the notebook and say that it belongs to a group or a site.
 
 `teams_list_my_teams` gives the id and the name of each team that the user is a member of. A team id

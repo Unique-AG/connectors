@@ -88,9 +88,9 @@ GRAPH_NOT_FOUND = (
     "Microsoft 365 did not start this copy. The `notebook` handle is well formed. Most likely, "
     + "the notebook was deleted, or the signed-in user lost access to it. Find it again with "
     + "onenote_list_notebooks or onenote_find_notebook_from_url, and take a fresh `uri` from that "
-    + "result. If this call named a `to_group`, the id can also name no group that the user can "
-    + "reach. Ask the user for the correct id. This same call fails again, so do not retry it "
-    + "unchanged."
+    + "result. If this call named a `to_group`, the id can also name no group that the "
+    + "signed-in user can reach. Ask the user for the correct id. This same call fails again, so "
+    + "do not retry it unchanged."
 )
 
 _OWNER_REFUSED = (
@@ -98,8 +98,8 @@ _OWNER_REFUSED = (
     + "signed-in user is not a member of that group, or the id is wrong. Ask the user for the "
     + "correct id, or ask them to get access. If this tool also fails without `to_group`, ask a "
     + "Microsoft 365 administrator to grant the delegated permission Notes.Create. If the user "
-    + "already has access, ask an administrator to examine the OneNote permissions of this "
-    + "connector. This same call fails again, so do not retry it."
+    + "already has access, ask a Microsoft 365 administrator to examine the OneNote permissions "
+    + "of this connector. This same call fails again, so do not retry it."
 )
 
 _BOTH_GROUPS_REFUSED = (
@@ -122,7 +122,7 @@ Notes:
 user's own OneDrive starts without a question. The question names the group only by its id. \
 If you know the name of that group, tell it to the user before you call.
 - If a call times out, do not call this tool again first: a second call starts a second copy. \
-Before you call again, make sure that onenote_list_notebooks does not show the copy. If this call \
+Before you call again, make sure that onenote_list_notebooks does not show the copy. If the call \
 named a `to_group`, pass that id to onenote_list_notebooks as `group`.
 """
 
@@ -236,7 +236,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "A new name for the copy. Omit it to keep the notebook's own name. The name "
-                    + "must be unique among the notebooks where the copy lands, and it must not "
+                    + "must be unique among the notebooks where the copy lands. It must not "
                     + "contain any of these characters: ? * / : < > | ' \". Microsoft refuses a "
                     + "bad name and no copy starts."
                 ),

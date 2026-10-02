@@ -57,18 +57,20 @@ onenote_copy_notebook instead.
 
 Notes:
 - This tool asks the user to agree before it creates a notebook in a group or a site. Other people \
-can open that notebook. The question shows only the id of the group or the site. If you know the \
+can open that notebook. The question names the group or the site only by its id. If you know the \
 name of that group or site, tell it to the user before you call.
 - Microsoft refuses a duplicate name, and the same name fails again.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
-onenote_list_notebooks with the same `group` or `site` does not show a notebook named `name`.
+onenote_list_notebooks does not show a notebook named `name`. If the call named a `group` or a \
+`site`, pass the same one to onenote_list_notebooks.
 """
 
 GRAPH_NOT_FOUND = (
-    "Microsoft 365 will not create this notebook. For a `group` or a `site`, the id most likely "
-    + "names nothing that the signed-in user can reach. Ask the user for the correct id. This "
-    + "same id fails again, so do not retry it. Without `group` or `site`, Microsoft most likely "
-    + "found no OneNote for this account."
+    "Microsoft 365 will not create this notebook. If this call named a `group` or a `site`, the "
+    + "id most likely names nothing that the signed-in user can reach. Ask the user for the "
+    + "correct id. This same id fails again, so do not retry it. If this call named no `group` "
+    + "and no `site`, Microsoft most likely found no OneNote for this account. No other argument "
+    + "fixes that."
 )
 
 

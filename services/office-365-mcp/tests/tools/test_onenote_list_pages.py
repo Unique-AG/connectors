@@ -459,7 +459,7 @@ class TestTheGroupRoute:
     async def test_a_group_together_with_a_section_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, section: str
     ) -> None:
-        with pytest.raises(ToolError, match="`group` or `site` only when `section` is omitted"):
+        with pytest.raises(ToolError, match="`group` or `site` only without `section`"):
             _ = await lister.list_pages(client, section=section, group=_GROUP_ID, limit=25)
 
         assert len(graph.calls) == 0
@@ -497,7 +497,8 @@ class TestTheGroupRoute:
     def test_the_not_found_advice_covers_a_group_id(self) -> None:
         assert "`group`" in lister.GRAPH_NOT_FOUND
         assert (
-            "names no group that the signed-in user can reach. Ask the user for the correct id."
+            "If this call named a `group` or a `site`, the id most likely names nothing that the "
+            + "signed-in user can reach. Ask the user for the correct id."
             in lister.GRAPH_NOT_FOUND
         )
         assert "teams_list_my_teams" not in lister.GRAPH_NOT_FOUND
@@ -580,7 +581,7 @@ class TestTheSiteRoute:
     async def test_a_site_together_with_a_section_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, section: str
     ) -> None:
-        with pytest.raises(ToolError, match="`group` or `site` only when `section` is omitted"):
+        with pytest.raises(ToolError, match="`group` or `site` only without `section`"):
             _ = await lister.list_pages(client, section=section, site=_SITE_ID, limit=25)
 
         assert len(graph.calls) == 0
@@ -618,8 +619,8 @@ class TestTheSiteRoute:
             _ = await lister.list_pages(client, site=_SITE_ID, limit=25)
 
     def test_the_not_found_advice_covers_a_site_id(self) -> None:
-        assert "If this call named a `site`" in lister.GRAPH_NOT_FOUND
-        assert "names no site that the signed-in user can reach" in lister.GRAPH_NOT_FOUND
+        assert "If this call named a `group` or a `site`" in lister.GRAPH_NOT_FOUND
+        assert "names nothing that the signed-in user can reach" in lister.GRAPH_NOT_FOUND
         assert "This same id fails again, so do not retry it." in lister.GRAPH_NOT_FOUND
 
 

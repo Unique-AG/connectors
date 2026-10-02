@@ -478,8 +478,8 @@ class TestNamedOwnerRefused:
             + "the id is wrong. Ask the user for the correct id, or ask them to get access. If "
             + "this tool also fails without `group` and `site`, ask a Microsoft 365 administrator "
             + "to grant the delegated permission Notes.Read. If the user already has access, ask "
-            + "an administrator to examine the OneNote permissions of this connector. This same "
-            + "call fails again, so do not retry it."
+            + "a Microsoft 365 administrator to examine the OneNote permissions of this connector. "
+            + "This same call fails again, so do not retry it."
         )
 
     def test_it_changes_only_the_permission_name(self) -> None:

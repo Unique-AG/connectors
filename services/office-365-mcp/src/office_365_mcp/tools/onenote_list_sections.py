@@ -406,8 +406,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "onenote:///sectiongroups/{id}, comes from onenote_list_sections or "
                     + "onenote_create_section_group. A handle from a group or site notebook starts "
                     + "with onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. "
-                    + "Section handles, page handles, plain names and web addresses are not "
-                    + "accepted."
+                    + "This tool refuses section handles, page handles, plain names and web "
+                    + "addresses."
                 ),
             ),
         ],

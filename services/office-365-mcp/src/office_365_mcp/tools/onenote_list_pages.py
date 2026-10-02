@@ -46,12 +46,10 @@ GRAPH_NOT_FOUND = (
     + "well formed, so the section was most likely deleted, or moved to a different notebook, "
     + "which gives it a new handle: call onenote_list_notebooks again and take a fresh `uri` for "
     + "the section from there, because this same handle fails again. If this call named a "
-    + "`group`, the id most likely names no group that the signed-in user can reach. Ask the "
-    + "user for the correct id. This same id fails again, so do not retry it. If this call "
-    + "named a `site`, the id most likely names no site that the "
-    + "signed-in user can reach. Ask the user for the correct id. This same id fails again, so "
-    + "do not retry it. If it named none of these, Microsoft found no OneNote for this account "
-    + "to list pages from at all. No other argument here fixes that."
+    + "`group` or a `site`, the id most likely names nothing that the signed-in user can reach. "
+    + "Ask the user for the correct id. This same id fails again, so do not retry it. If it "
+    + "named none of these, Microsoft found no OneNote for this account to list pages from at "
+    + "all. No other argument here fixes that."
 )
 
 MAX_PAGES = 100
@@ -112,7 +110,7 @@ _PAGELEVEL_NEEDS_A_SECTION = (
 )
 
 _GROUP_WITH_A_SECTION = (
-    "onenote_list_pages takes `group` or `site` only when `section` is omitted. A section handle "
+    "onenote_list_pages takes `group` or `site` only without `section`. A section handle "
     + "from a group or site notebook already carries its owner. The same combination fails "
     + "again, so do not retry it as it is."
 )

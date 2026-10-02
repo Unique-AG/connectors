@@ -390,8 +390,8 @@ class TestGraphFailures:
         assert "not a member of that group" in message
         assert "Notes.Create" in message
         assert (
-            "If the user already has access, ask an administrator to examine the OneNote "
-            + "permissions of this connector."
+            "If the user already has access, ask a Microsoft 365 administrator to examine the "
+            + "OneNote permissions of this connector."
         ) in message
         assert "are not the problem" not in message
         assert "do not retry it" in message
@@ -770,7 +770,7 @@ class TestHowItDeclaresItself:
 
         description = tool.description or ""
         assert (
-            "If this call named a `to_group`, pass that id to onenote_list_notebooks as `group`."
+            "If the call named a `to_group`, pass that id to onenote_list_notebooks as `group`."
             in description
         )
 

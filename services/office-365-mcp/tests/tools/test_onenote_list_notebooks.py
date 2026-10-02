@@ -1234,8 +1234,8 @@ class TestAnOwnerThatRefusesTheCaller:
         )
         assert "grant the delegated permission Notes.Read" in message
         assert (
-            "If the user already has access, ask an administrator to examine the OneNote "
-            + "permissions of this connector."
+            "If the user already has access, ask a Microsoft 365 administrator to examine the "
+            + "OneNote permissions of this connector."
         ) in message
         assert "are not the problem" not in message
         assert "This same call fails again, so do not retry it." in message
@@ -1335,7 +1335,8 @@ class TestHowItDescribesItself:
 
         assert "`group`" in advice
         assert (
-            "names no group that the signed-in user can reach. Ask the user for the correct id."
+            "If this call named a `group` or a `site`, the id most likely names nothing that the "
+            + "signed-in user can reach. Ask the user for the correct id."
             in advice
         )
         assert "teams_list_my_teams" not in advice
@@ -1344,7 +1345,9 @@ class TestHowItDescribesItself:
     def test_a_not_found_names_the_site_and_says_the_same_id_fails_again(self) -> None:
         advice = lister.GRAPH_NOT_FOUND
 
-        assert "If this call named a `site`, the id most likely names no site" in advice
+        assert "If this call named a `group` or a `site`, the id most likely names nothing" in (
+            advice
+        )
         assert "Ask the user for the correct id. This same id fails again, so do not retry it." in (
             advice
         )

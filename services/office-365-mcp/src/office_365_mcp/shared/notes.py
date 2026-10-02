@@ -152,8 +152,8 @@ def named_owner_refused(permission: str) -> str:
         + "Most likely, the signed-in user is not a member of that group or site, or the id is "
         + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also "
         + "fails without `group` and `site`, ask a Microsoft 365 administrator to grant the "
-        + f"delegated permission {permission}. If the user already has access, ask an "
-        + "administrator to examine the OneNote permissions of this connector. This same call "
+        + f"delegated permission {permission}. If the user already has access, ask a Microsoft "
+        + "365 administrator to examine the OneNote permissions of this connector. This same call "
         + "fails again, so do not retry it."
     )
 

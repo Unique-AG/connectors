@@ -108,14 +108,13 @@ delegated copy. The read request needs both halves: `/me/calendars/{calendar}/ev
 
 A OneNote handle starts with `onenote:///groups/{group}/` when Graph addresses its item under
 `/groups/{id}/onenote`. Graph documents that root for a notebook that a Microsoft 365 group owns.
-The id of a team is the id of its group. A handle of an item under `/me/onenote` keeps its
-spelling. The group segment is not a handle family. It comes before one of the five OneNote
-families.
+A team id is a group id. A handle of an item under `/me/onenote` has no group segment. The group
+segment is not a handle family. It comes before one of the five OneNote families.
 
 A OneNote handle starts with `onenote:///sites/{site}/` when Graph addresses its item under
 `/sites/{id}/onenote`. Graph documents that root for a notebook that a SharePoint site owns. Graph
 documents no copy from or into a site notebook. As a result, the three copy tools refuse a site
-handle before any call.
+handle before they send a request to Graph.
 
 This layout follows seven layering rules:
 

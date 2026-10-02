@@ -60,12 +60,10 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 GRAPH_NOT_FOUND = (
-    "Microsoft 365 will not list these notebooks. If this call named a `group`, the id most "
-    + "likely names no group that the signed-in user can reach. Ask the user for the correct id. "
-    + "This same id fails again, so do not retry it. If this call named a `site`, the id most "
-    + "likely names no site that the signed-in user can reach. Ask the user for the correct id. "
-    + "This same id fails again, so do not retry it. If this call named no `group` and no "
-    + "`site`, Microsoft most likely found no OneNote for this account, and no other argument "
+    "Microsoft 365 will not list these notebooks. If this call named a `group` or a `site`, the "
+    + "id most likely names nothing that the signed-in user can reach. Ask the user for the "
+    + "correct id. This same id fails again, so do not retry it. If this call named no `group` "
+    + "and no `site`, Microsoft most likely found no OneNote for this account. No other argument "
     + "fixes that."
 )
 
@@ -242,8 +240,8 @@ class Notebooks(BaseModel):
             "Every notebook this call found. With `group` or `site`, these are the notebooks of "
             + "that group or site. With neither, these are the user's own notebooks and the ones "
             + "shared with them. `capped` true can leave this list incomplete. Empty when no "
-            + "notebook matches. A notebook with no id is left out. It never gets a handle that "
-            + "fails."
+            + "notebook matches. A notebook with no id from Microsoft is left out. It never gets "
+            + "a handle that fails."
         )
     )
     capped: bool = Field(
@@ -493,7 +491,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Keep only the notebooks whose `created_by` value contains this text, "
                     + "compared without regard to case. A notebook with a null `created_by` is "
-                    + "left out. A kept notebook still carries every one of its sections. Omit "
+                    + "left out. A matched notebook still carries every one of its sections. Omit "
                     + "it to list every notebook."
                 ),
             ),

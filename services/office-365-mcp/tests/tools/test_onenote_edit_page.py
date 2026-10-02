@@ -1450,8 +1450,8 @@ class TestHowItDeclaresItself:
             "To show a check box, a star or another built-in note tag, use the `data-tag` "
             + "attribute. Put it on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, "
             + '`<p data-tag="to-do">` shows an empty check box, and '
-            + '`data-tag="to-do:completed"` shows a ticked one. Microsoft Graph does not '
-            + "support custom tags."
+            + '`data-tag="to-do:completed"` shows a check box with a check mark. Microsoft '
+            + "Graph does not support custom tags."
         ) in (tool.description or "")
 
     def test_the_element_action_matrix_lives_on_target_and_action(self) -> None:
