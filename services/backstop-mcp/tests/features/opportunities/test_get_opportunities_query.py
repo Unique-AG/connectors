@@ -208,7 +208,7 @@ class TestProjection:
         result = await _run(client, vocabulary={})
 
         deal = result.opportunities[0]
-        assert deal.stage == "IDD"
+        assert deal.stage == "Stage B"
         assert deal.stage_id == "42482"
 
     @pytest.mark.asyncio
@@ -284,7 +284,7 @@ class TestProjection:
         result = await _run(client, vocabulary={})
 
         deal = result.opportunities[0]
-        assert deal.stage == "IDD"
+        assert deal.stage == "Stage B"
         assert deal.stage_id == "42482"
 
     @pytest.mark.asyncio
@@ -307,8 +307,8 @@ class TestProjection:
         result = await _run(client, vocabulary={})
 
         assert {deal.id: deal.stage for deal in result.opportunities} == {
-            "page-1": "IDD",
-            "page-2": "IDD",
+            "page-1": "Stage B",
+            "page-2": "Stage B",
         }
 
     @pytest.mark.asyncio
@@ -316,7 +316,7 @@ class TestProjection:
     async def test_previous_stage_is_carried_from_the_attribute(
         self, client: BackstopClient
     ) -> None:
-        """It names the stage the deal LEFT — 'Client Approval' while it sits in 'IDD'."""
+        """It names the stage the deal LEFT — 'Client Approval' while it sits in 'Stage B'."""
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(
                 _opportunity(
@@ -329,7 +329,7 @@ class TestProjection:
         result = await _run(client)
 
         assert result.opportunities[0].previous_stage == "Client Approval"
-        assert result.opportunities[0].stage == "IDD"
+        assert result.opportunities[0].stage == "Stage B"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -536,7 +536,7 @@ class TestStageHistory:
 
         by_id = {deal.id: deal for deal in result.opportunities}
         assert [change.stage for change in by_id["5072909"].stage_history] == ["Invested"]
-        assert [change.stage for change in by_id["5755031"].stage_history] == ["IDD"]
+        assert [change.stage for change in by_id["5755031"].stage_history] == ["Stage B"]
 
 
 class TestStatusFiltering:

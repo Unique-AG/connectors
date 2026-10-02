@@ -17,7 +17,7 @@ from tests.helpers import BASE_URL, client_factory, credential, resource
 
 type ClientBuilder = Callable[[str], BackstopClient]
 
-_LIVE_TAG_ID = "474963"
+_LIVE_TAG_ID = "9001"
 
 
 @pytest.fixture

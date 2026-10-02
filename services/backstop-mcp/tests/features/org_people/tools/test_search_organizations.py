@@ -69,24 +69,24 @@ class TestSearchOrganizations:
                 resource(
                     "7",
                     "organizations",
-                    name="Abu Dhabi Pension",
+                    name="Contoso Pension",
                     country="United Arab Emirates",
                     city="Abu Dhabi",
                     regularCustomFieldValues=[
-                        {"definitionId": "261621", "name": "Investor Status", "value": "Prospect"},
-                        {"definitionId": "8646227", "name": "Grade", "value": "Focus"},
+                        {"definitionId": "900011", "name": "Tier", "value": "Tier 1"},
+                        {"definitionId": "900013", "name": "Relationship", "value": "Tier 1"},
                     ],
                 ),
                 resource(
                     "8",
                     "organizations",
-                    name="Dubai Client",
+                    name="Northwind Client",
                     country="United Arab Emirates",
                     regularCustomFieldValues=[
                         {
-                            "definitionId": "261621",
-                            "name": "Investor Status",
-                            "value": "Current Investor",
+                            "definitionId": "900011",
+                            "name": "Tier",
+                            "value": "Tier 2",
                         },
                     ],
                 ),
@@ -100,7 +100,7 @@ class TestSearchOrganizations:
                     country="united arab",
                     custom_fields=[
                         OrganizationCustomFieldFilter(
-                            definition_id="261621", values=["Prospect", "Former Investor"]
+                            definition_id="900011", values=["Tier 1", "Tier 3"]
                         )
                     ],
                     search_organizations_query=make_search_organizations_query(client),
@@ -113,8 +113,8 @@ class TestSearchOrganizations:
         row = object_dict(rows[0])
         assert row["id"] == "7"
         assert row["custom_field_values"] == [
-            {"definition_id": "261621", "name": "Investor Status", "value": "Prospect"},
-            {"definition_id": "8646227", "name": "Grade", "value": "Focus"},
+            {"definition_id": "900011", "name": "Tier", "value": "Tier 1"},
+            {"definition_id": "900013", "name": "Relationship", "value": "Tier 1"},
         ]
 
     @pytest.mark.asyncio
@@ -135,7 +135,7 @@ class TestSearchOrganizations:
         base_url = f"{BASE_URL}/org-search-url"
         respx.get(f"{base_url}/organizations").mock(
             return_value=_page(
-                resource("42", "organizations", name="Koch", city="Wichita"),
+                resource("42", "organizations", name="Contoso", city="Wichita"),
                 total=1,
             )
         )
@@ -143,12 +143,12 @@ class TestSearchOrganizations:
         async with tool_client(base_url) as client:
             query = make_search_organizations_query(client, ui_base_url="https://crm.example")
             plain = tool_model(
-                await search_organizations(name="Koch", search_organizations_query=query),
+                await search_organizations(name="Contoso", search_organizations_query=query),
                 SearchOrganizationsResolvedResponse,
             )
             linked = tool_model(
                 await search_organizations(
-                    name="Koch",
+                    name="Contoso",
                     fields=["name", "url"],
                     search_organizations_query=query,
                 ),

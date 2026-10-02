@@ -773,11 +773,11 @@ class TestActivityTagFilterAndIncludes:
             stream="meeting",
             limit=10,
             offset=0,
-            activity_tag_ids=("474963", "88"),
+            activity_tag_ids=("9001", "88"),
         )
 
         params = route.calls.last.request.url.params
-        assert params["filter[activityTagIds]"] == "474963,88"
+        assert params["filter[activityTagIds]"] == "9001,88"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -797,7 +797,7 @@ class TestActivityTagFilterAndIncludes:
     async def test_projects_tags_from_one_page_and_does_not_follow_attendee_links(
         self, client: BackstopClient
     ) -> None:
-        tag_by_id = respx.get(f"{BASE_URL}/activity-tags/474963").mock(
+        tag_by_id = respx.get(f"{BASE_URL}/activity-tags/9001").mock(
             return_value=httpx.Response(500)
         )
         attendees = respx.get(f"{BASE_URL}/meeting-or-calls/1/attendees").mock(
@@ -820,15 +820,13 @@ class TestActivityTagFilterAndIncludes:
                                 },
                             },
                             "relationships": {
-                                "activityTags": {
-                                    "data": [{"type": "activity-tags", "id": "474963"}]
-                                },
+                                "activityTags": {"data": [{"type": "activity-tags", "id": "9001"}]},
                                 "attendees": {"data": [{"type": "people", "id": "p1"}]},
                             },
                         }
                     ],
                     "included": [
-                        resource("474963", "activity-tags", name="Quarterly Review"),
+                        resource("9001", "activity-tags", name="Quarterly Review"),
                         resource("p1", "people", name="Pat Lee"),
                     ],
                     "links": {"next": None},
@@ -848,7 +846,7 @@ class TestActivityTagFilterAndIncludes:
         assert item.regarding.id == "o42"
         assert item.regarding.resource_type == "organizations"
         assert item.regarding.search_type == "organizations"
-        assert [(tag.id, tag.name) for tag in item.tags] == [("474963", "Quarterly Review")]
+        assert [(tag.id, tag.name) for tag in item.tags] == [("9001", "Quarterly Review")]
         assert item.attendees is None
 
 

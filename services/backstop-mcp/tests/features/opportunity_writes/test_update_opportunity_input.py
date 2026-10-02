@@ -9,10 +9,10 @@ _ADAPTER: TypeAdapter[UpdateOpportunityInput] = TypeAdapter(UpdateOpportunityInp
 
 
 def test_accepts_a_stage_patch() -> None:
-    parsed = _ADAPTER.validate_python({"opportunity_id": "5755101", "stage": "IDD"})
+    parsed = _ADAPTER.validate_python({"opportunity_id": "5755101", "stage": "Stage B"})
 
     assert parsed.opportunity_id == "5755101"
-    assert parsed.stage == "IDD"
+    assert parsed.stage == "Stage B"
 
 
 def test_rejects_an_update_with_no_change_fields() -> None:

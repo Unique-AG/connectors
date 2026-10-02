@@ -8,7 +8,8 @@ the investor organization, so this walk does not send that filter. It side-loads
 is client-side. The investor include arrives as a `contacts` resource, so the sparse key is
 `fields[contacts]`, not `fields[organizations]`. That key must list `representative`, or the
 organization's representative linkage is dropped from the side-load
-(`docs/json/opportunities_include_investor_representative.json`).
+(confirmed by probe: without `representative` in `fields[contacts]` the side-load drops
+the organization's representative linkage).
 """
 
 import asyncio
