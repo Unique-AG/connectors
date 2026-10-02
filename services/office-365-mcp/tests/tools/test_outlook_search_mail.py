@@ -230,27 +230,6 @@ class TestWhatItAsksGraphFor:
 
 class TestTheNarrowingTermsItSends:
     @pytest.mark.parametrize(
-        ("has_attachments", "term"),
-        [(True, "hasAttachments:true"), (False, "hasAttachments:false")],
-    )
-    async def test_has_attachments_is_sent_as_the_property_microsoft_lists_for_search(
-        self,
-        client: GraphServiceClient,
-        searched: respx.Route,
-        translated: respx.Route,
-        has_attachments: bool,
-        term: str,
-    ) -> None:
-        searched.mock(return_value=httpx.Response(200, json={"value": []}))
-        translated.mock(return_value=httpx.Response(200, json={"value": []}))
-
-        await search_mail(
-            client, SearchCriteria(query="invoice"), has_attachments=has_attachments, limit=25
-        )
-
-        assert searched.calls.last.request.url.params["$search"] == f'"invoice AND {term}"'
-
-    @pytest.mark.parametrize(
         ("importance", "term"),
         [
             ("low", "importance:low"),
@@ -273,7 +252,7 @@ class TestTheNarrowingTermsItSends:
 
         assert searched.calls.last.request.url.params["$search"] == f'"invoice AND {term}"'
 
-    async def test_the_window_comes_first_then_the_importance_term_then_the_attachment_term(
+    async def test_the_window_comes_first_then_the_importance_term(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
@@ -285,18 +264,28 @@ class TestTheNarrowingTermsItSends:
             received_after=date(2026, 9, 1),
             received_before=date(2026, 9, 30),
             importance="high",
-            has_attachments=True,
             limit=25,
         )
 
         params = searched.calls.last.request.url.params
         assert params["$search"] == (
             '"invoice from:bob@vance.invalid AND received>=2026-09-01T00:00:00Z '
-            + 'AND received<2026-10-01T00:00:00Z AND importance:high AND hasAttachments:true"'
+            + 'AND received<2026-10-01T00:00:00Z AND importance:high"'
         )
         assert "$filter" not in params
 
-    async def test_a_quoted_criterion_stays_escaped_beside_the_new_terms(
+    async def test_a_quoted_criterion_stays_escaped_beside_the_importance_term(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(client, SearchCriteria(sender="Bob Vance"), importance="low", limit=25)
+
+        sent = searched.calls.last.request.url.params["$search"]
+        assert sent == '"from:\\"Bob Vance\\" AND importance:low"'
+
+    async def test_flagged_has_attachments_and_category_add_no_term_to_the_search(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
         searched.mock(return_value=httpx.Response(200, json={"value": []}))
@@ -304,27 +293,16 @@ class TestTheNarrowingTermsItSends:
 
         await search_mail(
             client,
-            SearchCriteria(sender="Bob Vance"),
-            importance="low",
-            has_attachments=False,
+            SearchCriteria(query="invoice"),
+            flagged=True,
+            has_attachments=True,
+            category="Invoices",
             limit=25,
-        )
-
-        sent = searched.calls.last.request.url.params["$search"]
-        assert sent == '"from:\\"Bob Vance\\" AND importance:low AND hasAttachments:false"'
-
-    async def test_flagged_and_category_add_no_term_to_the_search(
-        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
-    ) -> None:
-        searched.mock(return_value=httpx.Response(200, json={"value": []}))
-        translated.mock(return_value=httpx.Response(200, json={"value": []}))
-
-        await search_mail(
-            client, SearchCriteria(query="invoice"), flagged=True, category="Invoices", limit=25
         )
 
         params = searched.calls.last.request.url.params
         assert params["$search"] == '"invoice"'
+        assert "hasattachment" not in params["$search"].casefold()
         assert "$filter" not in params
 
 
@@ -355,6 +333,37 @@ class TestTheNarrowingItAppliesToThePage:
 
         results = await search_mail(
             client, SearchCriteria(query="invoice"), flagged=flagged, limit=25
+        )
+
+        assert [hit.uri for hit in results.messages] == [
+            MailMessageHandle(_stable_id(number)).uri for number in kept
+        ]
+
+    @pytest.mark.parametrize(("has_attachments", "kept"), [(True, [1]), (False, [2])])
+    async def test_has_attachments_keeps_the_mail_by_attachment_state_and_a_null_matches_neither(
+        self,
+        client: GraphServiceClient,
+        searched: respx.Route,
+        translated: respx.Route,
+        has_attachments: bool,
+        kept: list[int],
+    ) -> None:
+        searched.mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _hit(1, hasAttachments=True),
+                        _hit(2, hasAttachments=False),
+                        _hit(3, hasAttachments=None),
+                    ]
+                },
+            )
+        )
+        translated.mock(return_value=httpx.Response(200, json=_translation_of(1, 2, 3)))
+
+        results = await search_mail(
+            client, SearchCriteria(query="invoice"), has_attachments=has_attachments, limit=25
         )
 
         assert [hit.uri for hit in results.messages] == [
@@ -1060,9 +1069,10 @@ class TestWhatItTellsAModel:
         parameters, _ = await _registered(transport)
 
         properties = cast("Mapping[str, Mapping[str, str]]", parameters["properties"])
-        for name in ("importance", "has_attachments"):
-            assert "Graph applies this filter inside the search" in properties[name]["description"]
-        for name in ("flagged", "category"):
+        assert (
+            "Graph applies this filter inside the search" in properties["importance"]["description"]
+        )
+        for name in ("flagged", "has_attachments", "category"):
             described = properties[name]["description"]
             assert "applies this filter to the page that Graph returns" in described
             assert "fewer than `limit` messages" in described
@@ -1086,7 +1096,7 @@ class TestWhatItTellsAModel:
 
         assert tool.output_schema is not None
         described = cast("str", tool.output_schema["properties"]["more_may_exist"]["description"])
-        assert "before it applies `flagged` and `category`" in described
+        assert "before it applies `flagged`, `has_attachments`, and `category`" in described
 
     async def test_importance_admits_the_three_values_graph_reports_and_nothing_else(
         self, transport: httpx.AsyncClient

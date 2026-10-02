@@ -65,7 +65,7 @@ class MailSearchResults(BaseModel):
     more_may_exist: bool = Field(
         description=(
             "True if Graph returned `limit` messages, so more matches can exist. The tool "
-            "computes this before it applies `flagged` and `category`."
+            "computes this before it applies `flagged`, `has_attachments`, and `category`."
         )
     )
 
@@ -124,7 +124,7 @@ async def search_mail(
         [
             asked,
             *_window_terms(received_after, received_before),
-            *_property_terms(importance, has_attachments),
+            *_importance_terms(importance),
         ]
     )
     reached = graph_mailbox(client, mailbox)
@@ -141,7 +141,7 @@ async def search_mail(
                 )
             )
         found = [message for message in (page.value if page is not None else None) or []]
-        kept = _narrowed(found, flagged=flagged, category=category)
+        kept = _narrowed(found, flagged=flagged, has_attachments=has_attachments, category=category)
         stable = await _stable_ids(reached, kept)
 
     return MailSearchResults(
@@ -206,20 +206,24 @@ def _window_terms(
     return terms
 
 
-def _property_terms(importance: MailImportance | None, has_attachments: bool | None) -> list[str]:
-    terms: list[str] = []
-    if importance is not None:
-        terms.append(f"importance:{_KQL_IMPORTANCE[importance]}")
-    if has_attachments is not None:
-        terms.append(f"hasAttachments:{kql.flag(has_attachments)}")
-    return terms
+def _importance_terms(importance: MailImportance | None) -> list[str]:
+    if importance is None:
+        return []
+    return [f"importance:{_KQL_IMPORTANCE[importance]}"]
 
 
-def _narrowed(found: list[Message], *, flagged: bool | None, category: str | None) -> list[Message]:
+def _narrowed(
+    found: list[Message],
+    *,
+    flagged: bool | None,
+    has_attachments: bool | None,
+    category: str | None,
+) -> list[Message]:
     return [
         message
         for message in found
         if (flagged is None or has_flag_state(message, flagged))
+        and (has_attachments is None or message.has_attachments is has_attachments)
         and (category is None or carries_category(message, category))
     ]
 
@@ -317,8 +321,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Set to true for only the mail that has attachments. Set to false for only "
-                    "the mail that has none. Inline attachments do not count. Graph applies this "
-                    "filter inside the search."
+                    "the mail that has none. Inline attachments do not count. The tool applies "
+                    "this filter to the page that Graph returns, so the result can hold fewer "
+                    "than `limit` messages."
                 )
             ),
         ] = None,
