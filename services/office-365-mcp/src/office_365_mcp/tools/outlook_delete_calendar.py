@@ -65,9 +65,9 @@ outlook_list_calendars lists the calendars and their handles. This tool always a
 agree, and the question names the calendar.
 
 Notes:
-- No event is lost, because this tool refuses a calendar that holds an event. It also refuses \
-the default calendar, a calendar that another person owns, and a calendar that Microsoft marks \
-as not removable.
+- This tool refuses a calendar that holds an event. It looks for an event again after the user \
+agrees, immediately before the delete. This tool also refuses the default calendar, a calendar \
+that another person owns, and a calendar that Microsoft marks as not removable.
 - Microsoft does not document whether a deleted calendar can be restored.
 - This call is safe to repeat after a timeout. A second call finds no calendar and reports that.
 """
@@ -149,6 +149,8 @@ async def delete_calendar(
                 )
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
+            if answer is None and await _holds_an_event(client, handle.calendar_id):
+                refused = _HOLDS_AN_EVENT
         if refused is None and asked is None:
             with suppress(GraphNotFound), graph_step(STEP_DELETE):
                 await client.me.calendars.by_calendar_id(handle.calendar_id).delete()

@@ -52,6 +52,16 @@ _STATE = confirmation_id_for(_URI, deleter.TOOL_NAME)
 _ADA = "ada@example.invalid"
 _GRACE = "grace@example.invalid"
 
+_ONE_EVENT = "AAMkSYNTHETIC-event-0001="
+
+_READ_THEN_DELETE = [
+    ("GET", f"/v1.0/me/calendars/{_CALENDAR_ID}"),
+    ("GET", "/v1.0/me"),
+    ("GET", f"/v1.0/me/calendars/{_CALENDAR_ID}/events"),
+    ("GET", f"/v1.0/me/calendars/{_CALENDAR_ID}/events"),
+    ("DELETE", f"/v1.0/me/calendars/{_CALENDAR_ID}"),
+]
+
 _NOT_FOUND = {"error": {"code": "ErrorItemNotFound", "message": "not found"}}
 
 _SAME_FAILURE = (
@@ -129,6 +139,11 @@ def _made(route: respx.Route) -> Sequence[Call]:
     return cast("Sequence[Call]", route.calls)
 
 
+def _requests(graph: respx.MockRouter, *, since: int = 0) -> list[tuple[str, str]]:
+    made = cast("Sequence[Call]", graph.calls)
+    return [(call.request.method, call.request.url.path) for call in made[since:]]
+
+
 async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
     mcp: FastMCP = FastMCP(name="schema-under-test")
     deleter.register(mcp, transport)
@@ -138,7 +153,7 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
 
 
 class TestWhatItSendsToGraph:
-    async def test_it_reads_the_calendar_the_user_and_one_event_then_deletes(
+    async def test_it_reads_the_calendar_the_user_and_the_events_twice_then_deletes(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _reads(graph)
@@ -146,14 +161,7 @@ class TestWhatItSendsToGraph:
 
         _ = await _delete(client)
 
-        made = cast("Sequence[Call]", graph.calls)
-        calendar = f"/v1.0/me/calendars/{_CALENDAR_ID}"
-        assert [(call.request.method, call.request.url.path) for call in made] == [
-            ("GET", calendar),
-            ("GET", "/v1.0/me"),
-            ("GET", f"{calendar}/events"),
-            ("DELETE", calendar),
-        ]
+        assert _requests(graph) == _READ_THEN_DELETE
 
     async def test_the_calendar_read_asks_for_what_the_refusals_need(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -174,9 +182,11 @@ class TestWhatItSendsToGraph:
 
         _ = await _delete(client)
 
-        query = _made(events_route)[0].request.url.params
-        assert query["$top"] == "1"
-        assert query["$select"] == "id"
+        reads = _made(events_route)
+        assert len(reads) == 2
+        for read in reads:
+            assert read.request.url.params["$top"] == "1"
+            assert read.request.url.params["$select"] == "id"
 
     async def test_the_delete_carries_no_body(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -206,7 +216,7 @@ class TestWhatItRefuses:
     @pytest.mark.parametrize(
         "value",
         [
-            EventHandle(_CALENDAR_ID, "AAMkSYNTHETIC-event-0001=").uri,
+            EventHandle(_CALENDAR_ID, _ONE_EVENT).uri,
             "outlook:///folders/AQMkADAwSYNTHETIC-folder-0001",
             "Project Apollo",
             _CALENDAR_ID,
@@ -272,7 +282,7 @@ class TestWhatItRefuses:
     async def test_a_calendar_that_holds_an_event_is_refused_and_the_user_told_to_move_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _reads(graph, events=_events("AAMkSYNTHETIC-event-0001="))
+        _ = _reads(graph, events=_events(_ONE_EVENT))
         delete_route = _deletes(graph)
 
         with pytest.raises(ToolError) as raised:
@@ -298,6 +308,50 @@ class TestWhatItRefuses:
             _ = await _delete(client, confirm=_never_asked)
 
         assert delete_route.call_count == 0
+
+    async def test_an_event_added_while_the_user_decides_is_refused_and_nothing_is_deleted(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _, _, events_route = _reads(graph)
+        _ = events_route.mock(
+            side_effect=[
+                httpx.Response(200, json=_events()),
+                httpx.Response(200, json=_events(_ONE_EVENT)),
+            ]
+        )
+        delete_route = _deletes(graph)
+
+        with pytest.raises(ToolError) as raised:
+            _ = await delete_calendar(
+                client,
+                calendar_ref=_URI,
+                confirm=a_person_agrees(_context(AcceptedElicitation(data="delete"))),
+            )
+
+        message = str(raised.value)
+        assert "holds at least one event" in message
+        assert "Nothing was deleted." in message
+        assert message.endswith(_SAME_FAILURE)
+        assert events_route.call_count == 2
+        assert delete_route.call_count == 0
+
+    async def test_the_events_are_read_again_only_after_the_user_agrees(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _, _, events_route = _reads(graph)
+        _ = _deletes(graph)
+        reads_when_asked: list[int] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert question
+            assert about
+            reads_when_asked.append(events_route.call_count)
+            return None
+
+        _ = await _delete(client, confirm=counting)
+
+        assert reads_when_asked == [1]
+        assert events_route.call_count == 2
 
 
 class TestWhatItAnswers:
@@ -579,6 +633,27 @@ class TestTheEraWithNoBackChannel:
         assert isinstance(answer, DeletedCalendar)
         assert delete_route.call_count == 1
 
+    async def test_the_second_round_reads_the_events_again_before_the_delete(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _deletes(graph)
+        key = await _first_round(client)
+        before = len(graph.calls)
+
+        _ = await delete_calendar(
+            client,
+            calendar_ref=_URI,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": "delete"})},
+                    state=_STATE,
+                )
+            ),
+        )
+
+        assert _requests(graph, since=before) == _READ_THEN_DELETE
+
     async def test_a_second_round_that_declines_deletes_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -621,7 +696,7 @@ class TestTheEraWithNoBackChannel:
     async def test_a_refused_calendar_is_never_put_to_a_person(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _reads(graph, events=_events("AAMkSYNTHETIC-event-0001="))
+        _ = _reads(graph, events=_events(_ONE_EVENT))
         delete_route = _deletes(graph)
 
         with pytest.raises(ToolError, match="holds at least one event"):
@@ -671,9 +746,12 @@ class TestHowItDeclaresItself:
 
         description = tool.description or ""
         assert "This tool always asks the user to agree" in description
-        assert "No event is lost, because this tool refuses a calendar that holds an event" in (
-            description
+        assert "No event is lost" not in description
+        assert "This tool refuses a calendar that holds an event" in description
+        looks_again = (
+            "It looks for an event again after the user agrees, immediately before the delete"
         )
+        assert looks_again in description
         assert "the default calendar" in description
         assert "another person owns" in description
         assert "Microsoft does not document whether a deleted calendar can be restored" in (
