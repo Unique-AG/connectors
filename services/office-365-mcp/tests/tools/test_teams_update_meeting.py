@@ -139,6 +139,31 @@ async def _update(
     )
 
 
+async def _bound(
+    client: GraphServiceClient,
+    *,
+    subject: str | None = None,
+    starts_at: str | None = None,
+    ends_at: str | None = None,
+    attendees: Sequence[Person] | None = None,
+) -> str:
+    bound: list[str] = []
+
+    async def capturing(_question: str, about: str) -> Confirmed:
+        bound.append(about)
+        return None
+
+    _ = await _update(
+        client,
+        subject=subject,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        attendees=attendees,
+        confirm=capturing,
+    )
+    return bound[0]
+
+
 def _sent(route: respx.Route) -> Mapping[str, object]:
     body = cast("Mapping[str, object]", json.loads(route.calls.last.request.content))
     return {key: value for key, value in body.items() if key != "@odata.type"}
@@ -558,50 +583,42 @@ class TestThePersonBeforeTheChange:
             "Change the Teams meeting 'Pricing review': the subject to 'Pricing review (moved)'?"
         ]
 
-    def test_the_binding_differs_for_every_change(self) -> None:
-        handle = meeting_handle(_URI)
-        assert handle is not None
-        about = updater._about  # pyright: ignore[reportPrivateUsage]
-        change = updater._change  # pyright: ignore[reportPrivateUsage]
+    async def test_the_binding_differs_for_every_change(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
 
-        bound = about(handle, change("A", None, None, None))
+        bound = await _bound(client, subject="A")
 
-        assert bound == about(handle, change("A", None, None, None))
-        assert bound != about(handle, change("B", None, None, None))
-        assert bound != about(handle, change("A", None, None, []))
-        assert bound != about(
-            handle, change("A", "2026-03-02T15:00:00Z", "2026-03-02T16:00:00Z", None)
+        assert bound == await _bound(client, subject="A")
+        assert bound != await _bound(client, subject="B")
+        assert bound != await _bound(client, subject="A", attendees=[])
+        assert bound != await _bound(
+            client, subject="A", starts_at="2026-03-02T15:00:00Z", ends_at="2026-03-02T16:00:00Z"
         )
 
-    def test_keeping_the_attendees_and_removing_every_attendee_bind_differently(self) -> None:
-        handle = meeting_handle(_URI)
-        assert handle is not None
-        about = updater._about  # pyright: ignore[reportPrivateUsage]
-        change = updater._change  # pyright: ignore[reportPrivateUsage]
+    async def test_keeping_the_attendees_and_removing_every_attendee_bind_differently(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
 
-        keeps = about(handle, change("A", None, None, None))
-        removes = about(handle, change("A", None, None, []))
+        keeps = await _bound(client, subject="A")
+        removes = await _bound(client, subject="A", attendees=[])
 
         assert keeps != removes
 
-    def test_the_same_ids_under_other_names_bind_the_same_way(self) -> None:
-        handle = meeting_handle(_URI)
-        assert handle is not None
-        about = updater._about  # pyright: ignore[reportPrivateUsage]
-        change = updater._change  # pyright: ignore[reportPrivateUsage]
+    async def test_the_same_ids_under_other_names_bind_the_same_way(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
 
-        named = about(handle, change(None, None, None, [_BOB, _GRACE]))
-        renamed = about(
-            handle,
-            change(
-                None,
-                None,
-                None,
-                [
-                    Person(user_id=_GRACE_ID.upper(), name="Admiral Hopper"),
-                    Person(user_id=OTHER_USER_ID, name="bob@contoso.invalid"),
-                ],
-            ),
+        named = await _bound(client, attendees=[_BOB, _GRACE])
+        renamed = await _bound(
+            client,
+            attendees=[
+                Person(user_id=_GRACE_ID.upper(), name="Admiral Hopper"),
+                Person(user_id=OTHER_USER_ID, name="bob@contoso.invalid"),
+            ],
         )
 
         assert named == renamed

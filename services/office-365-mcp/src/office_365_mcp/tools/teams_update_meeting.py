@@ -79,15 +79,15 @@ _NOT_A_MEETING_HANDLE = not_a_meeting_handle(TOOL_NAME, tail=_REFUSED)
 
 _NO_SUCH_MEETING = (
     "Microsoft 365 has no meeting with this handle that the signed-in user can see. "
-    + f"{_NOTHING_CHANGED} Do not change the handle by hand. Call teams_list_chats and use the "
-    + f"`meeting_uri` that it reports. {_FAILS_THE_SAME_WAY}"
+    + f"{_NOTHING_CHANGED} Do not change the handle by hand. Use the `meeting_uri` that "
+    + f"teams_list_chats reports. {_FAILS_THE_SAME_WAY}"
 )
 
 _NOT_THE_ORGANIZER = not_the_organizer("changes", tail=_REFUSED)
 
 _NOTHING_TO_CHANGE = (
-    "teams_update_meeting received no change. The call left out `subject`, `starts_at` with "
-    + f"`ends_at`, and `attendees`. {_NOTHING_CHANGED} Give at least one of them. To see what "
+    "teams_update_meeting received no change. The call did not include `subject`, `starts_at` "
+    + f"with `ends_at`, or `attendees`. {_NOTHING_CHANGED} Give at least one of them. To see what "
     + "the meeting holds now, call teams_read_meeting first."
 )
 

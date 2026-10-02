@@ -69,7 +69,7 @@ _NO_SUCH_MEETING = (
     "Microsoft 365 has no meeting with this handle that the signed-in user can see. "
     + f"{_NOTHING_DELETED} If the meeting is already deleted, no meeting is left to delete. Do "
     + "not change the handle by hand. "
-    + f"Call teams_list_chats and use the `meeting_uri` that it reports. {_FAILS_THE_SAME_WAY}"
+    + f"Use the `meeting_uri` that teams_list_chats reports. {_FAILS_THE_SAME_WAY}"
 )
 
 _NOT_THE_ORGANIZER = not_the_organizer("deletes", tail=_REFUSED)

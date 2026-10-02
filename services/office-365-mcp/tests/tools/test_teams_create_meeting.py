@@ -681,10 +681,10 @@ class TestHowItDeclaresItself:
         assert "outlook_draft_mail" not in description
         assert "outlook_create_event" not in description
 
-    def test_the_answer_says_to_give_the_join_link_to_the_user(self) -> None:
+    def test_the_answer_says_to_give_the_join_url_to_the_user(self) -> None:
         join_web_url = str(CreatedMeeting.model_fields["join_web_url"].description)
 
-        assert "Give this link to the user." in join_web_url
+        assert "Give this URL to the user." in join_web_url
 
     async def test_the_description_says_a_repeat_creates_no_second_meeting(
         self, transport: httpx.AsyncClient

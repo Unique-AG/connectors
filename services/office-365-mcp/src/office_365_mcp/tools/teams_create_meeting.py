@@ -68,7 +68,8 @@ Notes:
 - This tool asks the user to agree before it creates anything, every time. This tool creates \
 nothing unless the user agrees.
 - Microsoft documents a calendar event with an online meeting as the way to read the transcript of \
-a meeting later. If the user will want a transcript or a calendar entry, tell the user this first.
+a meeting later. If the user will want a transcript or a calendar event, tell the user this before \
+you create the meeting.
 - This call is safe to repeat after a timeout. The same request returns the same meeting, and it \
 creates no second meeting.
 """
@@ -77,15 +78,15 @@ creates no second meeting.
 class CreatedMeeting(BaseModel):
     meeting_uri: str | None = Field(
         description=(
-            "This is a handle for the meeting, built from its join link. Pass this handle "
+            "This is a handle for the meeting, built from its join URL. Pass this handle "
             + "verbatim to a tool that takes a `meeting_uri`. This field is null when Graph "
-            + "returned no join link."
+            + "returned no join URL."
         )
     )
     join_web_url: str | None = Field(
         description=(
-            "This is the link that joins the meeting in Teams, exactly as Microsoft returned it. "
-            + "Give this link to the user. Share it only with the people that the user names. "
+            "This is the join URL of the meeting in Teams, exactly as Microsoft returned it. "
+            + "Give this URL to the user. Share it only with the people that the user names. "
             + "This field is null when Graph returned none."
         )
     )
