@@ -251,6 +251,8 @@ _NO_SUCH_ZONE: tuple[type[Exception], ...] = (ZoneInfoNotFoundError, ValueError)
 
 _AN_EVENT = "#microsoft.graph.event"
 
+_PREFER_HTML_BODY = ("Prefer", 'outlook.body-content-type="html"')
+
 type PatternType = Literal[
     "daily", "weekly", "absoluteMonthly", "relativeMonthly", "absoluteYearly", "relativeYearly"
 ]
@@ -885,16 +887,26 @@ def repeated_address(addresses: Sequence[str]) -> str | None:
 
 
 async def event_of(
-    client: GraphServiceClient, *, calendar_id: str, event_id: str, also: tuple[str, ...] = ()
+    client: GraphServiceClient,
+    *,
+    calendar_id: str,
+    event_id: str,
+    also: tuple[str, ...] = (),
+    html_body: bool = False,
 ) -> Event:
+    headers = immutable_id_headers()
+    if html_body:
+        headers.add(*_PREFER_HTML_BODY)
     with graph_step(STEP_EVENT):
         found = (
             await client.me.calendars.by_calendar_id(calendar_id)
             .events.by_event_id(event_id)
             .get(
                 request_configuration=RequestConfiguration[_EventItemQuery](
-                    query_parameters=_EventItemQuery(select=[*SUMMARY_FIELDS, *also]),
-                    headers=immutable_id_headers(),
+                    query_parameters=_EventItemQuery(
+                        select=[*SUMMARY_FIELDS, *also, *(("body",) if html_body else ())]
+                    ),
+                    headers=headers,
                 )
             )
         )
@@ -1210,6 +1222,8 @@ class EventPatch:
     hide_attendees: bool | None = None
     response_requested: bool | None = None
     allow_new_time_proposals: bool | None = None
+    body_html: str | None = None
+    online_meeting: bool = False
 
 
 def merged_categories(
@@ -1260,6 +1274,16 @@ def patch_changes(patch: EventPatch) -> list[str]:
                 patch.allow_new_time_proposals,
                 yes="let the attendees propose a new time",
                 no="let no attendee propose a new time",
+            ),
+            (
+                ""
+                if patch.body_html is None
+                else f"replace the body {_body_described(patch.body_html)}"
+            ),
+            (
+                "add a Teams meeting that this connector cannot remove later"
+                if patch.online_meeting
+                else ""
             ),
             _attendee_list_set(patch),
         )
@@ -1316,6 +1340,15 @@ def event_patch_body(patch: EventPatch) -> Event:
         hide_attendees=patch.hide_attendees,
         response_requested=patch.response_requested,
         allow_new_time_proposals=patch.allow_new_time_proposals,
+        body=(
+            None
+            if patch.body_html is None
+            else ItemBody(content=patch.body_html, content_type=BodyType.Html)
+        ),
+        is_online_meeting=True if patch.online_meeting else None,
+        online_meeting_provider=(
+            OnlineMeetingProviderType.TeamsForBusiness if patch.online_meeting else None
+        ),
     )
 
 

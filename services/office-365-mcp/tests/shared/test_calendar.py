@@ -832,6 +832,33 @@ class TestOneEventRead:
         assert selected == [*SUMMARY_FIELDS, "allowNewTimeProposals"]
         assert event.allow_new_time_proposals is False
 
+    async def test_it_prefers_no_body_format_by_default(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = graph.get(_EVENT_PATH).mock(return_value=httpx.Response(200, json={"id": _EVENT_ID}))
+
+        _ = await event_of(client, calendar_id=_CALENDAR_ID, event_id=_EVENT_ID)
+
+        assert read.calls.last.request.headers["prefer"] == 'IdType="ImmutableId"'
+
+    async def test_an_html_body_read_selects_the_body_and_prefers_html(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = graph.get(_EVENT_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": _EVENT_ID, "body": {"contentType": "html", "content": "<p>Hi</p>"}},
+            )
+        )
+
+        event = await event_of(client, calendar_id=_CALENDAR_ID, event_id=_EVENT_ID, html_body=True)
+
+        request = read.calls.last.request
+        assert request.url.params["$select"].split(",") == [*SUMMARY_FIELDS, "body"]
+        assert 'outlook.body-content-type="html"' in request.headers["prefer"]
+        assert 'IdType="ImmutableId"' in request.headers["prefer"]
+        assert event.body is not None and event.body.content == "<p>Hi</p>"
+
 
 class TestOneRecurrenceRule:
     def test_a_weekly_rule_until_a_date_reports_its_days_and_both_dates(self) -> None:
@@ -1161,6 +1188,11 @@ class TestThePatchBody:
             (EventPatch(hide_attendees=True), "hideAttendees", True),
             (EventPatch(response_requested=False), "responseRequested", False),
             (EventPatch(allow_new_time_proposals=False), "allowNewTimeProposals", False),
+            (
+                EventPatch(body_html="<p>A &amp; B</p>"),
+                "body",
+                {"content": "<p>A &amp; B</p>", "contentType": "html"},
+            ),
         ],
         ids=[
             "show-as",
@@ -1174,6 +1206,7 @@ class TestThePatchBody:
             "hide-attendees",
             "no-response",
             "no-proposals",
+            "body",
         ],
     )
     def test_each_option_is_the_only_property_sent_in_microsofts_spelling(
@@ -1181,6 +1214,13 @@ class TestThePatchBody:
     ) -> None:
         assert _payload(event_patch_body(patch)) == {
             property_name: value,
+            "@odata.type": "#microsoft.graph.event",
+        }
+
+    def test_an_online_meeting_is_sent_as_a_teams_meeting(self) -> None:
+        assert _payload(event_patch_body(EventPatch(online_meeting=True))) == {
+            "isOnlineMeeting": True,
+            "onlineMeetingProvider": "teamsForBusiness",
             "@odata.type": "#microsoft.graph.event",
         }
 
@@ -1256,6 +1296,14 @@ class TestWhatAPatchSays:
             (EventPatch(response_requested=False), "ask the attendees for no response"),
             (EventPatch(allow_new_time_proposals=True), "let the attendees propose a new time"),
             (EventPatch(allow_new_time_proposals=False), "let no attendee propose a new time"),
+            (
+                EventPatch(body_html="<p>Agenda: pricing</p>"),
+                "replace the body with a body of 22 characters that starts 'Agenda: pricing'",
+            ),
+            (
+                EventPatch(online_meeting=True),
+                "add a Teams meeting that this connector cannot remove later",
+            ),
         ],
         ids=[
             "subject",
@@ -1279,6 +1327,8 @@ class TestWhatAPatchSays:
             "no-response",
             "proposals",
             "no-proposals",
+            "body",
+            "online-meeting",
         ],
     )
     def test_each_change_on_its_own_is_named(self, patch: EventPatch, said: str) -> None:
@@ -1305,6 +1355,8 @@ class TestWhatAPatchSays:
             hide_attendees=True,
             response_requested=False,
             allow_new_time_proposals=False,
+            body_html="<p>Agenda</p>",
+            online_meeting=True,
         )
 
         assert patch_changes(patch) == [
@@ -1320,6 +1372,8 @@ class TestWhatAPatchSays:
             "hide the attendee list",
             "ask the attendees for no response",
             "let no attendee propose a new time",
+            "replace the body with a body of 13 characters that starts 'Agenda'",
+            "add a Teams meeting that this connector cannot remove later",
             f"change the attendee list to 1 person: {_MINE}",
         ]
 

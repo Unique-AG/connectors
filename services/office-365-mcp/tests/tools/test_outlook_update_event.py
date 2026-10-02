@@ -8,6 +8,7 @@ import pytest
 import respx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.tools import Tool
 from mcp.types import ElicitRequest, ElicitRequestFormParams, ElicitResult, InputRequiredResult
 from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
@@ -31,10 +32,19 @@ _EVENT_PATH = f"/me/calendars/{quote(_CALENDAR_ID, safe='')}/events/{quote(_EVEN
 
 _URI = EventHandle(_CALENDAR_ID, _EVENT_ID).uri
 
+_CALENDAR_PATH = f"/me/calendars/{quote(_CALENDAR_ID, safe='')}"
+
 _ADA = "ada@example.invalid"
 _GRACE = "grace@example.invalid"
 _PAM = "pam@example.invalid"
 _ROOM = "room-3@example.invalid"
+
+_JOIN_URL = (
+    "https://teams.microsoft.invalid/l/meetup-join/19%3ameeting_SYNTHETIC%40thread.v2/0"
+    + "?context=synthetic&tenant=synthetic"
+)
+
+_AGENDA = "<p>Agenda: pricing</p>"
 
 
 def _moment(local: str = "2026-03-02T14:00:00.0000000", zone: str = "UTC") -> dict[str, object]:
@@ -104,6 +114,27 @@ def _ready(graph: respx.MockRouter, payload: dict[str, object] | None = None) ->
     return _updates(graph, payload)
 
 
+def _online(
+    join_url: str | None = _JOIN_URL, *, attendees: Sequence[Mapping[str, object]] = ()
+) -> dict[str, object]:
+    return _event(attendees=attendees) | {
+        "isOnlineMeeting": True,
+        "onlineMeeting": None if join_url is None else {"joinUrl": join_url},
+    }
+
+
+def _calendar(graph: respx.MockRouter, *providers: str) -> respx.Route:
+    return graph.get(_CALENDAR_PATH).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": _CALENDAR_ID,
+                "allowedOnlineMeetingProviders": list(providers or ("teamsForBusiness",)),
+            },
+        )
+    )
+
+
 async def _agrees(question: str, about: str) -> str | None:
     assert question, "the person was asked nothing at all"
     assert about, "the answer was bound to nothing"
@@ -127,6 +158,8 @@ class _Options(TypedDict, total=False):
     hide_attendees: bool
     response_requested: bool
     allow_new_time_proposals: bool
+    body_html: str
+    online_meeting: bool
 
 
 async def _update(
@@ -836,6 +869,12 @@ class TestTheOptionsItSendsToGraph:
                 False,
                 id="no-proposals",
             ),
+            pytest.param(
+                _Options(body_html=_AGENDA),
+                "body",
+                {"content": _AGENDA, "contentType": "html"},
+                id="body",
+            ),
         ],
     )
     async def test_each_option_alone_is_the_only_change_sent(
@@ -1043,6 +1082,11 @@ class TestWhatTheQuestionSaysAboutTheOptions:
                 "let no attendee propose a new time",
                 id="no-proposals",
             ),
+            pytest.param(
+                _Options(body_html=_AGENDA),
+                "replace the body with a body of 22 characters that starts 'Agenda: pricing'",
+                id="body",
+            ),
         ],
     )
     async def test_each_option_is_named_in_the_question(
@@ -1122,6 +1166,7 @@ class TestTheIdAnAnswerIsBoundTo:
             pytest.param(_Options(hide_attendees=True), id="hide-attendees"),
             pytest.param(_Options(response_requested=False), id="response-requested"),
             pytest.param(_Options(allow_new_time_proposals=False), id="new-time-proposals"),
+            pytest.param(_Options(body_html=_AGENDA), id="body"),
         ],
     )
     async def test_each_option_binds_the_answer_to_another_id(
@@ -1141,6 +1186,11 @@ class TestTheIdAnAnswerIsBoundTo:
         [
             pytest.param(_Options(is_reminder_on=True), _Options(is_reminder_on=False), id="on"),
             pytest.param(_Options(show_as="busy"), _Options(show_as="free"), id="show-as"),
+            pytest.param(
+                _Options(body_html=_AGENDA),
+                _Options(body_html="<p>Agenda: budget</p>"),
+                id="body",
+            ),
         ],
     )
     async def test_two_values_of_one_option_bind_two_ids(
@@ -1187,17 +1237,76 @@ class TestTheIdAnAnswerIsBoundTo:
         assert asked.abouts[0] != asked.abouts[1]
 
 
-async def _parameters(transport: httpx.AsyncClient) -> Mapping[str, object]:
+async def _tool(transport: httpx.AsyncClient) -> Tool:
     mcp: FastMCP = FastMCP(name="schema-under-test")
     register(mcp, transport)
     tool = await mcp.get_tool(TOOL_NAME)
     assert tool is not None, "register left the tool off the server"
-    return cast("Mapping[str, object]", tool.parameters)
+    return tool
+
+
+async def _parameters(transport: httpx.AsyncClient) -> Mapping[str, object]:
+    return cast("Mapping[str, object]", (await _tool(transport)).parameters)
 
 
 class TestHowItDeclaresItself:
     async def test_only_the_handle_is_required(self, transport: httpx.AsyncClient) -> None:
         assert (await _parameters(transport))["required"] == ["uri"]
+
+    async def test_the_description_is_a_lead_and_a_few_notes_of_the_house_length(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        description = (await _tool(transport)).description or ""
+
+        lead, separator, notes = description.partition("\n\nNotes:\n")
+        assert separator, "the description has no Notes section"
+        assert "the body" in lead
+        assert "add a Teams meeting" in lead
+        assert 1 <= len([line for line in notes.splitlines() if line.startswith("- ")]) <= 4
+        assert 45 <= len(description.split()) <= 210
+
+    async def test_the_description_keeps_the_agree_gate_and_the_retry_rule(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        description = " ".join(((await _tool(transport)).description or "").split())
+
+        assert "This tool changes nothing unless the user agrees." in description
+        assert "If a call times out, do not call this tool again first." in description
+
+    @pytest.mark.parametrize("argument", ["body_html", "online_meeting"])
+    async def test_each_new_argument_is_described_in_15_to_60_words(
+        self, transport: httpx.AsyncClient, argument: str
+    ) -> None:
+        parameters = await _parameters(transport)
+
+        described = str(_object(_object(parameters["properties"])[argument])["description"])
+        assert 15 <= len(described.split()) <= 60
+
+    async def test_the_body_argument_tells_the_model_to_keep_the_join_link(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters = await _parameters(transport)
+
+        described = str(_object(_object(parameters["properties"])["body_html"])["description"])
+        assert "It replaces the whole body." in described
+        assert "the new body must hold the `join_url` that outlook_read_event reports" in described
+
+    async def test_an_empty_body_never_reaches_the_tool(self, transport: httpx.AsyncClient) -> None:
+        parameters = await _parameters(transport)
+
+        body = _object(_object(parameters["properties"])["body_html"])
+        assert cast("Sequence[object]", body["anyOf"])[0] == {"minLength": 1, "type": "string"}
+
+    async def test_online_meeting_can_only_turn_a_meeting_on(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters = await _parameters(transport)
+
+        meeting = _object(_object(parameters["properties"])["online_meeting"])
+        assert cast("Sequence[object]", meeting["anyOf"]) == [
+            {"const": True, "type": "boolean"},
+            {"type": "null"},
+        ]
 
     async def test_the_free_busy_choice_leaves_out_the_status_only_microsoft_sets(
         self, transport: httpx.AsyncClient
@@ -1240,6 +1349,8 @@ class TestTheNothingToChangeRefusal:
             "hide_attendees",
             "response_requested",
             "allow_new_time_proposals",
+            "body_html",
+            "online_meeting",
         ],
     )
     async def test_it_names_each_argument_that_changes_the_event(
@@ -1303,3 +1414,212 @@ class TestTheSecondRoundOfACategoryChange:
         assert isinstance(second, UpdatedEvent)
         assert patch.call_count == 1
         assert _sent(patch)["categories"] == ["Budget", "Blue category"]
+
+
+class TestTheBodyItWrites:
+    async def test_a_new_body_reads_the_event_body_as_html_first(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph)
+        _ = _updates(graph)
+
+        _ = await _update(client, body_html=_AGENDA)
+
+        request = read.calls.last.request
+        assert {"body", "isOnlineMeeting", "onlineMeeting"} <= set(
+            request.url.params["$select"].split(",")
+        )
+        assert 'outlook.body-content-type="html"' in request.headers["prefer"]
+        assert 'IdType="ImmutableId"' in request.headers["prefer"]
+
+    async def test_a_change_without_a_body_reads_no_body(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph)
+        _ = _updates(graph)
+
+        _ = await _update(client, subject="Renamed")
+
+        request = read.calls.last.request
+        assert "body" not in request.url.params["$select"].split(",")
+        assert "outlook.body-content-type" not in request.headers["prefer"]
+
+    async def test_a_body_that_keeps_the_join_link_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _online())
+        patch = _updates(graph)
+        body = f'<p>New agenda.</p><p><a href="{_JOIN_URL}">Join the meeting</a></p>'
+
+        _ = await _update(client, body_html=body)
+
+        assert _object(_sent(patch)["body"]) == {"content": body, "contentType": "html"}
+
+    async def test_a_join_link_written_with_html_entities_is_kept(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _online())
+        patch = _updates(graph)
+        body = f'<a href="{_JOIN_URL.replace("&", "&amp;")}">Join the meeting</a>'
+
+        _ = await _update(client, body_html=body)
+
+        assert patch.call_count == 1
+
+    async def test_a_body_without_the_join_link_writes_nothing_and_asks_nobody(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _online(attendees=[_attendee(_ADA)]))
+        patch = _updates(graph)
+        asked = _Asked()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(client, body_html=_AGENDA, confirm=asked)
+
+        assert str(refused.value) == (
+            "outlook_update_event was given a `body_html` without the join link of the online "
+            + "meeting of this event. NOTHING WAS CHANGED. Microsoft documents that a body without "
+            + "the online-meeting block can turn the online meeting off. Copy the meeting part of "
+            + "the `body` that outlook_read_event reports into `body_html`. Keep this join link in "
+            + f"it exactly as it is here: `{_JOIN_URL}`. Retrying these values will fail "
+            + "identically."
+        )
+        assert patch.call_count == 0
+        assert asked.questions == []
+
+    async def test_a_body_for_an_online_meeting_with_no_join_link_writes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _online(None))
+        patch = _updates(graph)
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(client, body_html=_AGENDA)
+
+        assert str(refused.value).startswith(
+            "outlook_update_event cannot change the body of this online meeting, because Microsoft "
+            + "reported no join link for it. NOTHING WAS CHANGED."
+        )
+        assert patch.call_count == 0
+
+    async def test_the_second_round_writes_the_body_it_was_agreed_to_by(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
+        patch = _updates(graph)
+
+        first = await update_event(
+            client, uri=_URI, body_html=_AGENDA, confirm=a_person_agrees(_modern_context())
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        request = requests[key]
+        assert isinstance(request, ElicitRequest)
+        params = request.params
+        assert isinstance(params, ElicitRequestFormParams)
+        assert "replace the body with a body of 22 characters" in params.message
+        schema = cast(
+            "Mapping[str, object]",
+            cast("Mapping[str, object]", params.requested_schema)["properties"],
+        )
+        agree = cast("Sequence[str]", cast("Mapping[str, object]", schema["value"])["enum"])[0]
+
+        second = await update_event(
+            client,
+            uri=_URI,
+            body_html=_AGENDA,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": agree})},
+                    state=first.request_state,
+                )
+            ),
+        )
+
+        assert isinstance(second, UpdatedEvent)
+        assert patch.call_count == 1
+        assert _object(_sent(patch)["body"])["content"] == _AGENDA
+
+
+class TestTheTeamsMeetingItAdds:
+    async def test_it_reads_the_calendar_and_sends_a_teams_meeting(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        calendar = _calendar(graph)
+        patch = _updates(graph)
+
+        _ = await _update(client, online_meeting=True)
+
+        assert "allowedOnlineMeetingProviders" in calendar.calls.last.request.url.params[
+            "$select"
+        ].split(",")
+        assert _sent(patch) == {
+            "isOnlineMeeting": True,
+            "onlineMeetingProvider": "teamsForBusiness",
+            "@odata.type": "#microsoft.graph.event",
+        }
+
+    async def test_a_calendar_without_teams_writes_nothing_and_asks_nobody(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
+        _ = _calendar(graph, "skypeForBusiness", "skypeForConsumer")
+        patch = _updates(graph)
+        asked = _Asked()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(client, online_meeting=True, confirm=asked)
+
+        assert str(refused.value) == (
+            "outlook_update_event was asked for a Microsoft Teams meeting on a calendar that does "
+            + "not take one. Microsoft names skypeForBusiness, skypeForConsumer as the "
+            + "online-meeting providers that this calendar allows. NOTHING WAS CHANGED. This is a "
+            + "property of the calendar, so call again without `online_meeting`. Retrying these "
+            + "values will fail identically."
+        )
+        assert patch.call_count == 0
+        assert asked.questions == []
+
+    async def test_an_event_that_already_is_an_online_meeting_writes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _online())
+        calendar = _calendar(graph)
+        patch = _updates(graph)
+
+        with pytest.raises(ToolError, match="already is an online meeting. NOTHING WAS CHANGED."):
+            _ = await _update(client, online_meeting=True)
+
+        assert calendar.call_count == 0
+        assert patch.call_count == 0
+
+    async def test_the_question_says_this_connector_cannot_remove_the_meeting(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
+        _ = _calendar(graph)
+        _ = _updates(graph)
+        asked = _Asked()
+
+        _ = await _update(client, online_meeting=True, confirm=asked)
+
+        assert asked.questions == [
+            "Update 'Pricing review': add a Teams meeting that this connector cannot remove "
+            + "later? Microsoft mails every current attendee about this change, and this "
+            + "connector cannot recall it."
+        ]
+
+    async def test_online_meeting_binds_the_answer_to_another_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
+        _ = _calendar(graph)
+        _ = _updates(graph)
+        asked = _Asked()
+
+        _ = await _update(client, subject="Renamed", confirm=asked)
+        _ = await _update(client, subject="Renamed", online_meeting=True, confirm=asked)
+
+        assert asked.abouts[0] != asked.abouts[1]

@@ -1,6 +1,8 @@
+import hashlib
+import html
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -10,6 +12,7 @@ from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.attendee_type import AttendeeType
+from msgraph.generated.models.calendar import Calendar
 from msgraph.generated.models.event import Event
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
@@ -36,12 +39,14 @@ from office_365_mcp.shared.calendar import (
     EventSensitivity,
     EventSummary,
     ShowAs,
+    calendar_of,
     confirmation_id_for,
     event_of,
     event_patch_body,
     invited_attendee,
     merged_categories,
     patch_changes,
+    providers_without_teams,
     repeated_address,
     resource_addresses,
     series_reach,
@@ -84,11 +89,11 @@ _NOTHING_HAPPENED = "Nothing was changed."
 
 _DESCRIPTION = """\
 Changes one existing event that the signed-in user organizes. This tool can change the subject, \
-the time, the location, and the attendee lists. It can also change the free-busy status, the \
-categories, the importance, the sensitivity, and the reminder. Other arguments set whether the \
-attendees see the attendee list, send a response, or propose a new time. A change that reaches an \
-attendee mails the attendee a notice that the meeting changed. outlook_cancel_event is the tool \
-that cancels an event that the user organizes.
+the time, the location, the body, and the attendee lists. It can also change the free-busy \
+status, the categories, the importance, the sensitivity, and the reminder, or add a Teams \
+meeting. Other arguments set whether the attendees see the attendee list, send a response, or \
+propose a new time. A change that reaches an attendee mails the attendee a notice that the \
+meeting changed. outlook_cancel_event is the tool that cancels an event that the user organizes.
 
 Notes:
 - Each argument that you give replaces that part of the event. An argument that you omit keeps \
@@ -120,12 +125,12 @@ _NOT_THE_ORGANIZER = (
 
 _NOTHING_TO_CHANGE = (
     "outlook_update_event was given no argument that changes anything. NOTHING WAS CHANGED. The "
-    + "arguments that change the event are `subject`, the time arguments, `location`, the two "
-    + "attendee lists, `show_as`, `add_categories`, and `remove_categories`. The other arguments "
-    + "that change it are `importance`, `sensitivity`, `is_reminder_on`, "
-    + "`reminder_minutes_before_start`, `hide_attendees`, `response_requested`, and "
-    + "`allow_new_time_proposals`. Pass at least one of them. If you are not sure what the event "
-    + "currently holds, call outlook_read_event first."
+    + "arguments that change the event are `subject`, the time arguments, `location`, "
+    + "`body_html`, `online_meeting`, the two attendee lists, `show_as`, `add_categories`, and "
+    + "`remove_categories`. The other arguments that change it are `importance`, `sensitivity`, "
+    + "`is_reminder_on`, `reminder_minutes_before_start`, `hide_attendees`, `response_requested`, "
+    + "and `allow_new_time_proposals`. Pass at least one of them. If you are not sure what the "
+    + "event currently holds, call outlook_read_event first."
 )
 
 _RETRY = " Retrying these values will fail identically."
@@ -210,6 +215,43 @@ def _categories_unchanged(current: Sequence[str]) -> str:
     )
 
 
+_ALREADY_ONLINE = (
+    "outlook_update_event was given `online_meeting`, but this event already is an online "
+    + "meeting. NOTHING WAS CHANGED. After an event becomes an online meeting, Microsoft does not "
+    + f"let a caller change that meeting. Call again without `online_meeting`.{_RETRY}"
+)
+
+_MEETING_BLOCK = (
+    " Microsoft documents that a body without the online-meeting block can turn the online "
+    + "meeting off."
+)
+
+
+def _join_link_dropped(join_url: str | None) -> str:
+    if join_url is None:
+        return (
+            "outlook_update_event cannot change the body of this online meeting, because Microsoft "
+            + f"reported no join link for it. NOTHING WAS CHANGED.{_MEETING_BLOCK} Without the "
+            + "join link, this tool cannot make sure that the new body keeps that block. Ask the "
+            + f"user to change the body in Outlook.{_RETRY}"
+        )
+    return (
+        "outlook_update_event was given a `body_html` without the join link of the online meeting "
+        + f"of this event. NOTHING WAS CHANGED.{_MEETING_BLOCK} Copy the meeting part of the "
+        + "`body` that outlook_read_event reports into `body_html`. Keep this join link in it "
+        + f"exactly as it is here: `{join_url}`.{_RETRY}"
+    )
+
+
+def _no_teams_meeting(allowed: Sequence[str]) -> str:
+    return (
+        "outlook_update_event was asked for a Microsoft Teams meeting on a calendar that does not "
+        + f"take one. Microsoft names {', '.join(allowed)} as the online-meeting providers that "
+        + "this calendar allows. NOTHING WAS CHANGED. This is a property of the calendar, so call "
+        + f"again without `online_meeting`.{_RETRY}"
+    )
+
+
 class UpdatedEvent(EventSummary):
     attendees: list[EventAttendee] = Field(
         description="The attendees Microsoft now holds for this event."
@@ -242,6 +284,8 @@ async def update_event(
     hide_attendees: bool | None = None,
     response_requested: bool | None = None,
     allow_new_time_proposals: bool | None = None,
+    body_html: str | None = None,
+    online_meeting: bool = False,
     confirm: Confirm,
 ) -> UpdatedEvent | InputRequiredResult:
     handle = event_handle(uri)
@@ -250,6 +294,7 @@ async def update_event(
     if (
         not add_categories
         and not remove_categories
+        and not online_meeting
         and all(
             value is None
             for value in (
@@ -268,6 +313,7 @@ async def update_event(
                 hide_attendees,
                 response_requested,
                 allow_new_time_proposals,
+                body_html,
             )
         )
     ):
@@ -292,7 +338,12 @@ async def update_event(
     updated: Event | None = None
     asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME):
-        event = await event_of(client, calendar_id=handle.calendar_id, event_id=handle.event_id)
+        event = await event_of(
+            client,
+            calendar_id=handle.calendar_id,
+            event_id=handle.event_id,
+            html_body=body_html is not None,
+        )
         patch = EventPatch(
             subject=subject,
             starts_at=starts_at,
@@ -312,8 +363,14 @@ async def update_event(
             hide_attendees=hide_attendees,
             response_requested=response_requested,
             allow_new_time_proposals=allow_new_time_proposals,
+            body_html=body_html,
+            online_meeting=online_meeting,
         )
         refused = _refusal(event, patch)
+        if refused is None and patch.online_meeting:
+            refused = _no_teams_meeting_here(
+                await calendar_of(client, calendar_id=handle.calendar_id)
+            )
         body = _patched(patch, before=event)
         if refused is None and _reaches_an_attendee(body, before=event):
             with not_graph():
@@ -414,9 +471,24 @@ def _invited_once(required: tuple[str, ...], optional: tuple[str, ...]) -> None:
 def _refusal(event: Event, patch: EventPatch) -> str | None:
     if event.is_organizer is False:
         return _NOT_THE_ORGANIZER
+    join_url = None if event.online_meeting is None else event.online_meeting.join_url
+    online = event.is_online_meeting is True or join_url is not None
+    if online and patch.online_meeting:
+        return _ALREADY_ONLINE
+    if online and patch.body_html is not None and not _holds(patch.body_html, join_url):
+        return _join_link_dropped(join_url)
     if patch == EventPatch():
         return _categories_unchanged(event.categories or [])
     return None
+
+
+def _holds(body_html: str, join_url: str | None) -> bool:
+    return join_url is not None and (join_url in body_html or join_url in html.unescape(body_html))
+
+
+def _no_teams_meeting_here(calendar: Calendar) -> str | None:
+    allowed = providers_without_teams(calendar)
+    return None if allowed is None else _no_teams_meeting(allowed)
 
 
 def _patched(patch: EventPatch, *, before: Event) -> Event:
@@ -478,8 +550,10 @@ def _about(uri: str, patch: EventPatch) -> str:
                 patch.hide_attendees,
                 patch.response_requested,
                 patch.allow_new_time_proposals,
+                patch.online_meeting,
             )
         ),
+        "" if patch.body_html is None else hashlib.sha256(patch.body_html.encode()).hexdigest(),
     )
 
 
@@ -627,6 +701,29 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         allow_new_time_proposals: Annotated[
             bool | None, Field(description=ALLOW_NEW_TIME_PROPOSALS_CHANGE_FIELD)
         ] = None,
+        body_html: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The new body of the event, as HTML. It replaces the whole body. Write `<p>` "
+                    + "or `<br>` for line breaks, and escape `&`, `<`, and `>`. On an online "
+                    + "meeting, the new body must hold the `join_url` that outlook_read_event "
+                    + "reports. Otherwise this tool refuses and changes nothing."
+                ),
+            ),
+        ] = None,
+        online_meeting: Annotated[
+            Literal[True] | None,
+            Field(
+                description=(
+                    "Set this parameter to true to add a Microsoft Teams meeting, so the "
+                    + "invitation carries a joining link. Once this is set, no tool here can undo "
+                    + "it. This tool refuses before it asks anybody when the event already is an "
+                    + "online meeting, or when the calendar does not allow Teams."
+                ),
+            ),
+        ] = None,
         client: GraphServiceClient = graph,
     ) -> UpdatedEvent | InputRequiredResult:
         return await update_event(
@@ -649,5 +746,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             hide_attendees=hide_attendees,
             response_requested=response_requested,
             allow_new_time_proposals=allow_new_time_proposals,
+            body_html=body_html,
+            online_meeting=online_meeting is True,
             confirm=a_person_agrees(ctx),
         )
