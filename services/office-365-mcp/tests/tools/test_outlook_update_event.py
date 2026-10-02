@@ -18,6 +18,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphNotFound, GraphThrottled, GraphUnavailable
 from office_365_mcp.shared.calendar import (
+    STORED_CATEGORIES_FIELD,
     EventImportance,
     EventSensitivity,
     EventSummary,
@@ -64,6 +65,13 @@ _STORED_INNER = (
 _STORED_BODY = f"<html><body>{_STORED_INNER}</body></html>"
 
 _RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
+
+_BODY_WITH_MEETING = (
+    "outlook_update_event was given `body_html` and `online_meeting` together. NOTHING WAS "
+    + "CHANGED. Microsoft does not document that a new body in the same change keeps a new Teams "
+    + "meeting. Call this tool with `body_html` first. Then call it again with "
+    + f"`online_meeting`. {_RETRY}"
+)
 
 _BODY_DROPPED = (
     "outlook_update_event was given a `body_html` that does not keep the stored body of this "
@@ -361,6 +369,32 @@ class TestWhatItSendsToGraph:
             for a in cast("Sequence[Mapping[str, object]]", sent["attendees"])
         ]
         assert invited == [(_GRACE, "required"), (_ROOM, "resource")]
+
+    @pytest.mark.parametrize(
+        ("required", "optional"),
+        [
+            pytest.param([_ADA, _ROOM], [], id="required"),
+            pytest.param([_ADA, _ROOM.upper()], [], id="required-in-another-case"),
+            pytest.param([_ADA], [_ROOM], id="optional"),
+        ],
+    )
+    async def test_a_room_the_caller_lists_again_reaches_graph_once_as_a_resource(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        required: Sequence[str],
+        optional: Sequence[str],
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA), _attendee(_ROOM, kind="resource")]))
+        patch = _updates(graph)
+
+        _ = await _update(client, attendees=required, optional_attendees=optional)
+
+        invited = [
+            (cast("str", cast("Mapping[str, object]", a["emailAddress"])["address"]), a["type"])
+            for a in cast("Sequence[Mapping[str, object]]", _sent(patch)["attendees"])
+        ]
+        assert invited == [(_ADA, "required"), (_ROOM, "resource")]
 
     async def test_a_resource_attendee_is_not_added_when_attendees_are_left_untouched(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -663,6 +697,26 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
+    async def test_a_body_given_with_a_new_meeting_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(client, body_html=_AGENDA, online_meeting=True)
+
+        assert str(refused.value) == _BODY_WITH_MEETING
+        assert len(graph.calls) == 0
+
+    async def test_a_body_given_with_a_new_meeting_on_an_online_event_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _online())
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(client, body_html=_STORED_BODY, online_meeting=True)
+
+        assert str(refused.value) == _BODY_WITH_MEETING
+        assert len(graph.calls) == 0
+
     async def test_an_attendee_of_the_meeting_cannot_update_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -860,6 +914,9 @@ class TestWhatItAnswers:
         for name in EventSummary.model_fields:
             assert getattr(answer, name) == getattr(expected, name), name
 
+    def test_the_categories_are_described_as_the_ones_microsoft_stored(self) -> None:
+        assert UpdatedEvent.model_fields["categories"].description == STORED_CATEGORIES_FIELD
+
     async def test_the_answer_reports_the_updated_attendees_from_the_response(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -1002,7 +1059,6 @@ class TestTheOptionsItSendsToGraph:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _reads(graph, _tagged("Budget"))
-        _ = _calendar(graph)
         patch = _updates(graph)
 
         _ = await _update(
@@ -1019,7 +1075,6 @@ class TestTheOptionsItSendsToGraph:
             hide_attendees=True,
             response_requested=False,
             body_html=_AGENDA,
-            online_meeting=True,
         )
 
         sent = _sent(patch)
@@ -1445,6 +1500,14 @@ class TestHowItDeclaresItself:
 
         body = _object(_object(parameters["properties"])["body_html"])
         assert cast("Sequence[object]", body["anyOf"])[0] == {"minLength": 1, "type": "string"}
+
+    async def test_the_meeting_argument_names_the_body_that_it_refuses_with(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters = await _parameters(transport)
+
+        described = str(_object(_object(parameters["properties"])["online_meeting"])["description"])
+        assert "It also refuses when this call gives `body_html`." in described
 
     async def test_online_meeting_can_only_turn_a_meeting_on(
         self, transport: httpx.AsyncClient

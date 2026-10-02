@@ -2,6 +2,7 @@ import hashlib
 import html
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from datetime import datetime
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
@@ -27,6 +28,7 @@ from office_365_mcp.shared.calendar import (
     RESPONSE_REQUESTED_CHANGE_FIELD,
     SENSITIVITY_CHANGE_FIELD,
     SHOW_AS_CHANGE_FIELD,
+    STORED_CATEGORIES_FIELD,
     STORED_HIDE_ATTENDEES_FIELD,
     STORED_IS_REMINDER_ON_FIELD,
     STORED_REMINDER_MINUTES_FIELD,
@@ -221,6 +223,13 @@ def _categories_unchanged(current: Sequence[str]) -> str:
     )
 
 
+_BODY_WITH_MEETING = (
+    "outlook_update_event was given `body_html` and `online_meeting` together. NOTHING WAS "
+    + "CHANGED. Microsoft does not document that a new body in the same change keeps a new Teams "
+    + "meeting. Call this tool with `body_html` first. Then call it again with "
+    + f"`online_meeting`.{_RETRY}"
+)
+
 _ALREADY_ONLINE = (
     "outlook_update_event was given `online_meeting`, but this event already is an online "
     + "meeting. NOTHING WAS CHANGED. After an event becomes an online meeting, Microsoft does not "
@@ -265,6 +274,7 @@ def _no_teams_meeting(allowed: Sequence[str]) -> str:
 
 
 class UpdatedEvent(EventSummary):
+    categories: list[str] = Field(description=STORED_CATEGORIES_FIELD)
     attendees: list[EventAttendee] = Field(
         description="The attendees Microsoft now holds for this event."
     )
@@ -327,6 +337,7 @@ async def update_event(
         )
     ):
         raise ToolError(_NOTHING_TO_CHANGE)
+    _body_given_apart_from_meeting(body_html, online_meeting)
     _time_trio(starts_at, ends_at, time_zone)
     _attendees_given_together(attendees, optional_attendees)
     _categories_given_apart(add_categories, remove_categories)
@@ -406,6 +417,11 @@ async def update_event(
         raise ToolError(refused)
     assert updated is not None, "an update that nothing refused answered with no event"
     return _answer(updated, calendar_id=handle.calendar_id, time_zone=time_zone)
+
+
+def _body_given_apart_from_meeting(body_html: str | None, online_meeting: bool) -> None:
+    if body_html is not None and online_meeting:
+        raise ToolError(_BODY_WITH_MEETING)
 
 
 def _time_trio(starts_at: str | None, ends_at: str | None, time_zone: str | None) -> None:
@@ -509,16 +525,27 @@ def _no_teams_meeting_here(calendar: Calendar) -> str | None:
 
 
 def _patched(patch: EventPatch, *, before: Event) -> Event:
-    body = event_patch_body(patch)
-    if patch.attendees is not None:
-        rooms = resource_addresses(before)
-        if rooms:
-            assert body.attendees is not None, "attendees was just set on this same body"
-            body.attendees = [
-                *body.attendees,
-                *(invited_attendee(room, AttendeeType.Resource) for room in rooms),
-            ]
+    if patch.attendees is None:
+        return event_patch_body(patch)
+    rooms = resource_addresses(before)
+    carried = frozenset(room.casefold() for room in rooms)
+    body = event_patch_body(
+        replace(
+            patch,
+            attendees=_without(patch.attendees, carried),
+            optional_attendees=_without(patch.optional_attendees or (), carried),
+        )
+    )
+    assert body.attendees is not None, "attendees was just set on this same body"
+    body.attendees = [
+        *body.attendees,
+        *(invited_attendee(room, AttendeeType.Resource) for room in rooms),
+    ]
     return body
+
+
+def _without(addresses: Sequence[str], carried: frozenset[str]) -> tuple[str, ...]:
+    return tuple(address for address in addresses if address.casefold() not in carried)
 
 
 def _reaches_an_attendee(body: Event, *, before: Event) -> bool:
@@ -714,7 +741,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "Set this parameter to true to add a Microsoft Teams meeting, so the "
                     + "invitation carries a joining link. Once this is set, no tool here can undo "
                     + "it. This tool refuses before it asks anybody when the event already is an "
-                    + "online meeting, or when the calendar does not allow Teams."
+                    + "online meeting, or when the calendar does not allow Teams. It also refuses "
+                    + "when this call gives `body_html`."
                 ),
             ),
         ] = None,
