@@ -49,7 +49,7 @@ GRAPH_NOT_FOUND = (
     + "named a `site`, the id most likely names no site that the "
     + "signed-in user can reach. Ask the user for the correct id. This same id fails again, so "
     + "do not retry it. If it named none of these, Microsoft found no OneNote for this account "
-    + "to list pages from at all, and no other argument here fixes that."
+    + "to list pages from at all. No other argument here fixes that."
 )
 
 _OWNER_REFUSED = (

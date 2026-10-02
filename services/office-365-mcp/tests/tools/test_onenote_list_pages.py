@@ -889,6 +889,15 @@ class TestGraphFailures:
         assert "onenote_list_notebooks" in lister.GRAPH_NOT_FOUND
         assert "fails again" in lister.GRAPH_NOT_FOUND
 
+    def test_the_not_found_advice_says_no_argument_fixes_a_missing_onenote(self) -> None:
+        assert (
+            "If it named none of these, Microsoft found no OneNote for this account to list "
+            + "pages from at all."
+            in lister.GRAPH_NOT_FOUND
+        )
+        assert "No other argument here fixes that." in lister.GRAPH_NOT_FOUND
+        assert "at all, and no other argument" not in lister.GRAPH_NOT_FOUND
+
 
 async def _ordered(client: GraphServiceClient, order_by: lister.OrderBy) -> None:
     _ = await lister.list_pages(client, order_by=order_by, limit=25)
