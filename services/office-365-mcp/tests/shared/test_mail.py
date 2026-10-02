@@ -1,4 +1,6 @@
+import asyncio
 from collections.abc import Mapping, Sequence
+from typing import cast
 
 import httpx
 import pytest
@@ -7,11 +9,19 @@ from msgraph.generated.models.followup_flag import FollowupFlag
 from msgraph.generated.models.followup_flag_status import FollowupFlagStatus
 from msgraph.generated.models.message import Message
 from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
 
-from office_365_mcp.graph_client import GraphFailure, GraphNotFound, GraphUnavailable
+from office_365_mcp.graph_client import (
+    GraphFailure,
+    GraphForbidden,
+    GraphNotFound,
+    GraphUnavailable,
+)
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle
 from office_365_mcp.shared.mail import (
+    OUTLOOK_FOLDER_NAMES,
     STEP_DESTINATION,
+    STEP_OUTLOOK_FOLDER,
     AddressFault,
     MailDestination,
     MailFault,
@@ -20,6 +30,7 @@ from office_365_mcp.shared.mail import (
     copied_and_marked,
     destination_asked_for,
     has_flag_state,
+    made_by_outlook,
     mail_batch_confirmation_id,
     message_handles,
     one_address_each,
@@ -34,6 +45,14 @@ _ALEX = "alex@example.invalid"
 
 _FIRST = MailMessageHandle("AAMkAGI2SYNTHETIC-immutable-0001=")
 _SECOND = MailMessageHandle("AAMkAGI2SYNTHETIC-immutable-0002=")
+
+_FOLDER_ID = "AQMkADAwSYNTHETIC-folder-0001"
+_ROOT_ID = "AQMkADAwSYNTHETIC-msgfolderroot"
+_SYNC_ISSUES_ID = "AQMkADAwSYNTHETIC-syncissues"
+_INBOX_ID = "AQMkADAwSYNTHETIC-inbox"
+_CONFLICTS_ID = "AQMkADAwSYNTHETIC-conflicts"
+
+_FOLDERS = "/me/mailFolders"
 
 _ARCHIVE_ID = "AQMkADAwSYNTHETIC-archive"
 _ARCHIVE = MailFolderHandle(_ARCHIVE_ID)
@@ -317,6 +336,144 @@ class TestResolveDestination:
 
     def test_the_graph_step_is_the_one_the_dashboard_knows(self) -> None:
         assert STEP_DESTINATION == "destination_folder"
+
+
+def _no_such_folder() -> httpx.Response:
+    return httpx.Response(
+        404, json={"error": {"code": "ErrorItemNotFound", "message": "not found"}}
+    )
+
+
+def _only_these_exist(graph: respx.MockRouter, found: Mapping[str, str]) -> None:
+    for name in OUTLOOK_FOLDER_NAMES:
+        response = (
+            httpx.Response(200, json={"id": found[name]}) if name in found else _no_such_folder()
+        )
+        _ = graph.get(f"{_FOLDERS}/{name}").mock(return_value=response)
+
+
+def _read_names(graph: respx.MockRouter) -> list[str]:
+    calls = cast("Sequence[Call]", graph.calls)
+    return [call.request.url.path.rsplit("/", 1)[-1] for call in calls]
+
+
+async def _made_by_outlook(
+    client: GraphServiceClient, folder_id: str, parent_id: str | None
+) -> bool:
+    return await made_by_outlook(graph_mailbox(client, None).mail_folders, folder_id, parent_id)
+
+
+class TestMadeByOutlook:
+    def test_the_names_are_the_two_parents_and_the_fourteen_children_and_the_step_is_known(
+        self,
+    ) -> None:
+        assert STEP_OUTLOOK_FOLDER == "mail_folder"
+        assert OUTLOOK_FOLDER_NAMES == (
+            "msgfolderroot",
+            "syncissues",
+            "archive",
+            "clutter",
+            "conflicts",
+            "conversationhistory",
+            "drafts",
+            "inbox",
+            "junkemail",
+            "localfailures",
+            "outbox",
+            "recoverableitemsdeletions",
+            "scheduled",
+            "searchfolders",
+            "sentitems",
+            "serverfailures",
+        )
+
+    @pytest.mark.parametrize(
+        ("name", "folder_id"), [("msgfolderroot", _ROOT_ID), ("syncissues", _SYNC_ISSUES_ID)]
+    )
+    async def test_a_parent_folder_is_refused_after_the_two_parent_lookups(
+        self, client: GraphServiceClient, graph: respx.MockRouter, name: str, folder_id: str
+    ) -> None:
+        _only_these_exist(graph, {"msgfolderroot": _ROOT_ID, "syncissues": _SYNC_ISSUES_ID})
+
+        assert await _made_by_outlook(client, folder_id, "above") is True
+        assert sorted(_read_names(graph)) == ["msgfolderroot", "syncissues"], name
+
+    async def test_a_top_level_folder_with_the_id_of_the_inbox_is_refused(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _only_these_exist(graph, {"msgfolderroot": _ROOT_ID, "inbox": _INBOX_ID})
+
+        assert await _made_by_outlook(client, _INBOX_ID, _ROOT_ID) is True
+
+    async def test_a_child_of_sync_issues_with_the_id_of_conflicts_is_refused(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _only_these_exist(graph, {"syncissues": _SYNC_ISSUES_ID, "conflicts": _CONFLICTS_ID})
+
+        assert await _made_by_outlook(client, _CONFLICTS_ID, _SYNC_ISSUES_ID) is True
+
+    async def test_a_top_level_user_folder_is_not_refused_after_every_name_is_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        found = {name: f"AQMkADAwSYNTHETIC-{name}" for name in OUTLOOK_FOLDER_NAMES}
+        _only_these_exist(graph, found)
+
+        assert await _made_by_outlook(client, _FOLDER_ID, found["msgfolderroot"]) is False
+        assert sorted(_read_names(graph)) == sorted(OUTLOOK_FOLDER_NAMES)
+
+    @pytest.mark.parametrize("parent_id", [None, "AQMkADAwSYNTHETIC-folder-0002"])
+    async def test_a_nested_folder_makes_only_the_two_parent_lookups(
+        self, client: GraphServiceClient, graph: respx.MockRouter, parent_id: str | None
+    ) -> None:
+        _only_these_exist(graph, {"msgfolderroot": _ROOT_ID, "syncissues": _SYNC_ISSUES_ID})
+
+        assert await _made_by_outlook(client, _FOLDER_ID, parent_id) is False
+        assert sorted(_read_names(graph)) == ["msgfolderroot", "syncissues"]
+
+    async def test_a_name_that_answers_not_found_is_skipped_and_the_others_are_still_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _only_these_exist(graph, {"msgfolderroot": _ROOT_ID, "sentitems": _INBOX_ID})
+
+        assert await _made_by_outlook(client, _INBOX_ID, _ROOT_ID) is True
+        read = _read_names(graph)
+        assert {"clutter", "archive", "sentitems"} <= set(read)
+
+    async def test_a_failure_that_is_not_a_not_found_is_raised(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _only_these_exist(graph, {"msgfolderroot": _ROOT_ID})
+        _ = graph.get(f"{_FOLDERS}/clutter").mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "ErrorAccessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await _made_by_outlook(client, _FOLDER_ID, _ROOT_ID)
+
+    async def test_at_most_four_lookups_are_in_flight_at_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        open_calls = 0
+        most_open = 0
+
+        async def answering(request: httpx.Request) -> httpx.Response:
+            nonlocal open_calls, most_open
+            open_calls += 1
+            most_open = max(most_open, open_calls)
+            await asyncio.sleep(0.01)
+            open_calls -= 1
+            if request.url.path.endswith("/msgfolderroot"):
+                return httpx.Response(200, json={"id": _ROOT_ID})
+            return _no_such_folder()
+
+        lookups = graph.get(path__regex=rf"{_FOLDERS}/[a-z]+$").mock(side_effect=answering)
+
+        assert await _made_by_outlook(client, _FOLDER_ID, _ROOT_ID) is False
+
+        assert lookups.call_count == len(OUTLOOK_FOLDER_NAMES)
+        assert most_open == 4
 
 
 _ARCHIVE_TARGET = MailDestination(folder_id="archive", name="archive")

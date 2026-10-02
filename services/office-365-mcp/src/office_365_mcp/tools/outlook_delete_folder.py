@@ -1,7 +1,6 @@
 import hashlib
 import json
 from collections.abc import Mapping
-from contextlib import suppress
 from typing import Annotated
 
 import httpx
@@ -17,20 +16,12 @@ from msgraph.generated.users.item.mail_folders.item.mail_folder_item_request_bui
 from msgraph.generated.users.item.mail_folders.item.move.move_post_request_body import (
     MovePostRequestBody,
 )
-from msgraph.generated.users.item.mail_folders.mail_folders_request_builder import (
-    MailFoldersRequestBuilder,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import (
-    GraphNotFound,
-    graph_errors,
-    graph_step,
-    no_retry,
-    not_graph,
-)
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailFolderHandle, mail_folder_handle
+from office_365_mcp.shared.mail import OUTLOOK_FOLDER_NAMES, made_by_outlook
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -64,25 +55,6 @@ GRAPH_NOT_FOUND = (
 )
 
 _DELETED_ITEMS = "deleteditems"
-
-_PARENT_NAMES: tuple[str, ...] = ("msgfolderroot", "syncissues")
-
-_CHILD_NAMES: tuple[str, ...] = (
-    "archive",
-    "clutter",
-    "conflicts",
-    "conversationhistory",
-    "drafts",
-    "inbox",
-    "junkemail",
-    "localfailures",
-    "outbox",
-    "recoverableitemsdeletions",
-    "scheduled",
-    "searchfolders",
-    "sentitems",
-    "serverfailures",
-)
 
 _FOLDER_FIELDS: tuple[str, ...] = (
     "displayName",
@@ -183,7 +155,7 @@ async def delete_folder(
             "Graph answered the Deleted Items read with no id to move the folder to"
         )
         refused = _refusal(handle, folder, deleted_items.id)
-        if refused is None and await _made_by_outlook(folders, folder.id, folder.parent_folder_id):
+        if refused is None and await made_by_outlook(folders, folder.id, folder.parent_folder_id):
             refused = _outlook_makes(folder.display_name or handle.uri)
         if refused is None:
             with not_graph():
@@ -215,7 +187,7 @@ def _folder(folder_ref: str) -> MailFolderHandle:
     handle = mail_folder_handle(folder_ref)
     if handle is None:
         raise ToolError(_NOT_A_FOLDER_HANDLE)
-    if handle.folder_id.casefold() in (*_PARENT_NAMES, *_CHILD_NAMES):
+    if handle.folder_id.casefold() in OUTLOOK_FOLDER_NAMES:
         raise ToolError(_outlook_makes(handle.folder_id))
     return handle
 
@@ -230,27 +202,6 @@ def _outlook_makes(named: str) -> str:
         + "This tool does not move it. Nothing was deleted. If you call this tool again with "
         + "the same arguments, the call will fail the same way."
     )
-
-
-async def _well_known_id(folders: MailFoldersRequestBuilder, name: str) -> str | None:
-    found: MailFolder | None = None
-    with suppress(GraphNotFound), graph_step(STEP_READ_FOLDER):
-        found = await folders.by_mail_folder_id(name).get(request_configuration=_select(("id",)))
-    return None if found is None else found.id
-
-
-async def _made_by_outlook(
-    folders: MailFoldersRequestBuilder, folder_id: str, parent_id: str | None
-) -> bool:
-    parents = [await _well_known_id(folders, name) for name in _PARENT_NAMES]
-    if folder_id in parents:
-        return True
-    if parent_id is None or parent_id not in parents:
-        return False
-    for name in _CHILD_NAMES:
-        if await _well_known_id(folders, name) == folder_id:
-            return True
-    return False
 
 
 def _refusal(handle: MailFolderHandle, folder: MailFolder, deleted_items_id: str) -> str | None:

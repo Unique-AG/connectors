@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailFolderHandle, mail_folder_handle
+from office_365_mcp.shared.mail import OUTLOOK_FOLDER_NAMES, made_by_outlook
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -55,6 +56,8 @@ _NOTHING_RENAMED = "The folder was not renamed."
 
 _SOMEONE_ELSES = "That mailbox belongs to someone else, not to the signed-in user."
 
+_FOLDER_FIELDS: tuple[str, ...] = ("id", "parentFolderId", "displayName")
+
 _FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
@@ -65,6 +68,7 @@ delegated one. outlook_browse_folders lists the folders and their handles.
 Notes:
 - This tool asks the user to agree before it changes a shared or delegated mailbox. \
 It changes the user's own mailbox without a question.
+- This tool refuses a folder that Outlook creates for every mailbox, such as Inbox.
 - This call is safe to repeat after a timeout.
 """
 
@@ -108,8 +112,19 @@ async def rename_folder(
     answer: Confirmed = None
     renamed: MailFolder | None = None
     with graph_errors(TOOL_NAME):
-        if mailbox is not None:
-            current = await _current_name(folder, handle)
+        with graph_step(STEP_READ_FOLDER):
+            read = await folder.get(
+                request_configuration=RequestConfiguration[_FolderQuery](
+                    query_parameters=_FolderQuery(select=list(_FOLDER_FIELDS))
+                )
+            )
+        assert read is not None and read.id is not None, (
+            "Graph answered a mail folder read with no folder or no id"
+        )
+        current = read.display_name or handle.uri
+        if await made_by_outlook(reached.mail_folders, read.id, read.parent_folder_id):
+            answer = _outlook_makes(current)
+        elif mailbox is not None:
             with not_graph():
                 answer = await confirm(
                     _question(mailbox, current, name), _about(mailbox, handle, name)
@@ -139,18 +154,17 @@ def _folder(folder_ref: str) -> MailFolderHandle:
     handle = mail_folder_handle(folder_ref)
     if handle is None:
         raise ToolError(_NOT_A_FOLDER_HANDLE)
+    if handle.folder_id.casefold() in OUTLOOK_FOLDER_NAMES:
+        raise ToolError(_outlook_makes(handle.folder_id))
     return handle
 
 
-async def _current_name(folder: MailFolderItemRequestBuilder, handle: MailFolderHandle) -> str:
-    with graph_step(STEP_READ_FOLDER):
-        read = await folder.get(
-            request_configuration=RequestConfiguration[_FolderQuery](
-                query_parameters=_FolderQuery(select=["displayName"])
-            )
-        )
-    assert read is not None, "Graph answered a mail folder read with no folder"
-    return read.display_name or handle.uri
+def _outlook_makes(named: str) -> str:
+    return (
+        f"Outlook creates the folder {cut_for_a_question(named)!r} for every mailbox. "
+        + "This tool does not rename it. Nothing was renamed. If you call this tool again with "
+        + "the same arguments, the call will fail the same way."
+    )
 
 
 def _question(mailbox: str, current: str, name: str) -> str:

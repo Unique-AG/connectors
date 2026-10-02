@@ -347,7 +347,7 @@ class TestWhatItRefuses:
             "If you call this tool again with the same arguments, the call will fail the same way."
         )
         assert move.call_count == 0
-        assert _read_names(graph)[-1] == "inbox", "the reads went on after the id matched"
+        assert sorted(_read_names(graph)[4:]) == sorted(_OUTLOOK_NAMES), "a name was not read"
 
     async def test_a_child_of_sync_issues_with_the_id_of_conflicts_is_refused(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -379,7 +379,7 @@ class TestWhatItRefuses:
 
         assert move.call_count == 0
         read = _read_names(graph)
-        assert read[-1] == "sentitems"
+        assert "sentitems" in read
         assert "archive" in read, "a name that answered not found ended the reads"
 
     @pytest.mark.parametrize(

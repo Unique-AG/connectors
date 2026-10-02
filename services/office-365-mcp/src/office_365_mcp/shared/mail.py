@@ -1,10 +1,13 @@
+import asyncio
 import hashlib
 import re
 from collections.abc import Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Literal, Self
 
+from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.followup_flag import FollowupFlag
@@ -13,10 +16,16 @@ from msgraph.generated.models.mail_folder import MailFolder
 from msgraph.generated.models.mail_search_folder import MailSearchFolder
 from msgraph.generated.models.message import Message
 from msgraph.generated.models.recipient import Recipient
+from msgraph.generated.users.item.mail_folders.item.mail_folder_item_request_builder import (
+    MailFolderItemRequestBuilder,
+)
+from msgraph.generated.users.item.mail_folders.mail_folders_request_builder import (
+    MailFoldersRequestBuilder,
+)
 from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphFailure, graph_step
+from office_365_mcp.graph_client import GraphFailure, GraphNotFound, graph_step
 from office_365_mcp.shared.handles import (
     MailFolderHandle,
     MailMessageHandle,
@@ -48,6 +57,32 @@ SUMMARY_FIELDS: tuple[str, ...] = (
 PREVIEW_CHARACTERS = 255
 
 STEP_DESTINATION = "destination_folder"
+STEP_OUTLOOK_FOLDER = "mail_folder"
+
+_FOLDER_LOOKUPS_IN_FLIGHT = 4
+
+_PARENT_NAMES: tuple[str, ...] = ("msgfolderroot", "syncissues")
+
+_CHILD_NAMES: tuple[str, ...] = (
+    "archive",
+    "clutter",
+    "conflicts",
+    "conversationhistory",
+    "drafts",
+    "inbox",
+    "junkemail",
+    "localfailures",
+    "outbox",
+    "recoverableitemsdeletions",
+    "scheduled",
+    "searchfolders",
+    "sentitems",
+    "serverfailures",
+)
+
+OUTLOOK_FOLDER_NAMES: tuple[str, ...] = (*_PARENT_NAMES, *_CHILD_NAMES)
+
+_FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQueryParameters
 
 ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
@@ -340,6 +375,34 @@ async def resolve_destination(
     if folder.is_hidden:
         return MailFault.HIDDEN_FOLDER
     return MailDestination(folder_id=wanted.folder_id, name=folder.display_name or wanted.uri)
+
+
+async def _well_known_id(folders: MailFoldersRequestBuilder, name: str) -> str | None:
+    found: MailFolder | None = None
+    with suppress(GraphNotFound), graph_step(STEP_OUTLOOK_FOLDER):
+        found = await folders.by_mail_folder_id(name).get(
+            request_configuration=RequestConfiguration[_FolderQuery](
+                query_parameters=_FolderQuery(select=["id"])
+            )
+        )
+    return None if found is None else found.id
+
+
+async def made_by_outlook(
+    folders: MailFoldersRequestBuilder, folder_id: str, parent_id: str | None
+) -> bool:
+    parents = await asyncio.gather(*(_well_known_id(folders, name) for name in _PARENT_NAMES))
+    if folder_id in parents:
+        return True
+    if parent_id is None or parent_id not in parents:
+        return False
+    in_flight = asyncio.Semaphore(_FOLDER_LOOKUPS_IN_FLIGHT)
+
+    async def child_id(name: str) -> str | None:
+        async with in_flight:
+            return await _well_known_id(folders, name)
+
+    return folder_id in await asyncio.gather(*(child_id(name) for name in _CHILD_NAMES))
 
 
 def _is_search_folder(folder: MailFolder) -> bool:

@@ -26,6 +26,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle
+from office_365_mcp.shared.mail import OUTLOOK_FOLDER_NAMES
 from office_365_mcp.shared.seam import (
     WRITE_IDEMPOTENT,
     Confirm,
@@ -38,16 +39,32 @@ from office_365_mcp.tools.outlook_rename_folder import RenamedFolder, a_person_a
 
 _FOLDER_ID = "AQMkADAwSYNTHETIC-folder-0001"
 _FOLDER_REF = MailFolderHandle(_FOLDER_ID).uri
+_INBOX_ID = "AQMkADAwSYNTHETIC-inbox"
+_ROOT_ID = "AQMkADAwSYNTHETIC-msgfolderroot"
 
 _MAILBOX = "alex@example.invalid"
+_OTHER_MAILBOX = "pam@example.invalid"
 
-_OWN = f"/me/mailFolders/{_FOLDER_ID}"
-_SHARED = f"/users/{_MAILBOX}/mailFolders/{_FOLDER_ID}"
+_OWN_FOLDERS = "/me/mailFolders"
+_SHARED_FOLDERS = f"/users/{_MAILBOX}/mailFolders"
+_OWN = f"{_OWN_FOLDERS}/{_FOLDER_ID}"
+_SHARED = f"{_SHARED_FOLDERS}/{_FOLDER_ID}"
 
 _OLD_NAME = "Invoices"
 _NAME = "Invoices 2025"
 
 _NOT_RENAMED = "The folder was not renamed."
+
+
+@pytest.fixture(autouse=True)
+def no_well_known_folders(graph: respx.MockRouter) -> None:
+    for under in (_OWN_FOLDERS, _SHARED_FOLDERS, f"/users/{_OTHER_MAILBOX}/mailFolders"):
+        for name in OUTLOOK_FOLDER_NAMES:
+            _ = graph.get(f"{under}/{name}").mock(
+                return_value=httpx.Response(
+                    404, json={"error": {"code": "ErrorItemNotFound", "message": "not found"}}
+                )
+            )
 
 
 async def _agrees(question: str, about: str) -> Confirmed:
@@ -64,11 +81,13 @@ async def _never_asked(question: str, about: str) -> Confirmed:
     raise AssertionError(f"a person was asked {question!r} about {about!r}")
 
 
-def _stored(*, folder_id: str | None = _FOLDER_ID, name: str | None = _NAME) -> dict[str, object]:
+def _stored(
+    *, folder_id: str | None = _FOLDER_ID, name: str | None = _NAME, parent: str = _INBOX_ID
+) -> dict[str, object]:
     return {
         "id": folder_id,
         "displayName": name,
-        "parentFolderId": "AQMkADAwSYNTHETIC-inbox",
+        "parentFolderId": parent,
         "childFolderCount": 2,
         "unreadItemCount": 0,
         "totalItemCount": 12,
@@ -89,8 +108,19 @@ def _patches(
     )
 
 
+def _exists(
+    graph: respx.MockRouter, name: str, folder_id: str, *, under: str = _OWN_FOLDERS
+) -> None:
+    _ = graph.get(f"{under}/{name}").mock(return_value=httpx.Response(200, json={"id": folder_id}))
+
+
 def _methods(graph: respx.MockRouter) -> list[str]:
     return [call.request.method for call in cast("Sequence[Call]", graph.calls)]
+
+
+def _read_names(graph: respx.MockRouter) -> list[str]:
+    calls = cast("Sequence[Call]", graph.calls)
+    return [call.request.url.path.rsplit("/", 1)[-1] for call in calls]
 
 
 def _sent(route: respx.Route) -> dict[str, object]:
@@ -121,19 +151,29 @@ async def _registered(transport: httpx.AsyncClient) -> FunctionTool:
 
 
 class TestWhatItSendsToGraph:
-    async def test_the_own_mailbox_patches_the_folder_and_reads_nothing(
+    async def test_the_own_mailbox_reads_the_folder_and_the_two_parents_and_then_patches_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        read = _reads(graph, _OWN)
         patch = _patches(graph)
 
         _ = await _rename(client)
 
         assert patch.call_count == 1
-        assert _methods(graph) == ["PATCH"]
+        assert _methods(graph) == ["GET", "GET", "GET", "PATCH"]
+        names = _read_names(graph)
+        assert (names[0], names[3]) == (_FOLDER_ID, _FOLDER_ID)
+        assert sorted(names[1:3]) == ["msgfolderroot", "syncissues"]
+        assert set(read.calls.last.request.url.params["$select"].split(",")) == {
+            "id",
+            "parentFolderId",
+            "displayName",
+        }
 
     async def test_the_patch_carries_only_the_new_name(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, _OWN)
         patch = _patches(graph)
 
         _ = await _rename(client, name="Receipts / 2025")
@@ -142,7 +182,7 @@ class TestWhatItSendsToGraph:
         assert sent["displayName"] == "Receipts / 2025"
         assert set(sent) <= {"@odata.type", "displayName"}, sent
 
-    async def test_a_shared_mailbox_reads_the_name_and_then_patches_that_mailbox(
+    async def test_a_shared_mailbox_reads_the_folder_once_and_then_patches_that_mailbox(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         read = _reads(graph)
@@ -150,14 +190,15 @@ class TestWhatItSendsToGraph:
 
         _ = await _rename(client, mailbox=_MAILBOX, confirm=_agrees)
 
-        assert _methods(graph) == ["GET", "PATCH"]
-        assert read.calls.last.request.url.params["$select"] == "displayName"
+        assert _methods(graph) == ["GET", "GET", "GET", "PATCH"]
+        assert read.call_count == 1
         assert patch.call_count == 1
 
     async def test_the_call_example_renames_a_folder_in_the_own_mailbox(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         example = cast("dict[str, str]", renamer.GRAPH_CALL_EXAMPLE)
+        _ = _reads(graph, _OWN)
         patch = _patches(graph)
 
         _ = await _rename(client, folder_ref=example["folder_ref"], name=example["name"])
@@ -168,6 +209,7 @@ class TestWhatItSendsToGraph:
     async def test_a_rename_graph_declines_is_sent_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, _OWN)
         patch = graph.patch(_OWN).mock(return_value=httpx.Response(503))
 
         with pytest.raises(GraphUnavailable):
@@ -197,11 +239,75 @@ class TestWhatItRefuses:
         assert "Nothing was renamed." in str(raised.value)
         assert len(graph.calls) == 0
 
+    @pytest.mark.parametrize("mailbox", [None, _MAILBOX], ids=["own-mailbox", "shared-mailbox"])
+    @pytest.mark.parametrize("name", ["inbox", "SentItems", "msgfolderroot", "syncissues"])
+    async def test_a_well_known_name_in_a_handle_is_refused_before_any_call_to_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter, name: str, mailbox: str | None
+    ) -> None:
+        patch = _patches(graph)
+
+        with pytest.raises(ToolError, match=f"Outlook creates the folder '{name}'") as raised:
+            _ = await _rename(
+                client, folder_ref=MailFolderHandle(name).uri, mailbox=mailbox, confirm=_never_asked
+            )
+
+        assert "This tool does not rename it. Nothing was renamed." in str(raised.value)
+        assert len(graph.calls) == 0
+        assert patch.call_count == 0
+
+    @pytest.mark.parametrize(
+        ("mailbox", "under"),
+        [(None, _OWN_FOLDERS), (_MAILBOX, _SHARED_FOLDERS)],
+        ids=["own-mailbox", "shared-mailbox"],
+    )
+    async def test_the_inbox_at_the_top_level_is_refused_before_anybody_is_asked(
+        self, client: GraphServiceClient, graph: respx.MockRouter, mailbox: str | None, under: str
+    ) -> None:
+        _ = graph.get(f"{under}/{_INBOX_ID}").mock(
+            return_value=httpx.Response(
+                200, json=_stored(folder_id=_INBOX_ID, name="Inbox", parent=_ROOT_ID)
+            )
+        )
+        patch = _patches(graph, f"{under}/{_INBOX_ID}")
+        _exists(graph, "msgfolderroot", _ROOT_ID, under=under)
+        _exists(graph, "inbox", _INBOX_ID, under=under)
+
+        with pytest.raises(ToolError, match="Outlook creates the folder 'Inbox'") as raised:
+            _ = await _rename(
+                client,
+                folder_ref=MailFolderHandle(_INBOX_ID).uri,
+                mailbox=mailbox,
+                confirm=_never_asked,
+            )
+
+        assert "This tool does not rename it. Nothing was renamed." in str(raised.value)
+        assert str(raised.value).endswith(
+            "If you call this tool again with the same arguments, the call will fail the same way."
+        )
+        assert patch.call_count == 0
+
+    async def test_a_user_folder_called_inbox_at_the_top_level_is_renamed_with_no_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_OWN).mock(
+            return_value=httpx.Response(200, json=_stored(name="Inbox", parent=_ROOT_ID))
+        )
+        patch = _patches(graph)
+        for name in OUTLOOK_FOLDER_NAMES:
+            _exists(graph, name, f"AQMkADAwSYNTHETIC-{name}")
+        _exists(graph, "msgfolderroot", _ROOT_ID)
+
+        _ = await _rename(client, confirm=_never_asked)
+
+        assert patch.call_count == 1
+        assert set(OUTLOOK_FOLDER_NAMES) <= set(_read_names(graph)), "a documented name was skipped"
+
 
 class TestWhatItAnswers:
     async def test_the_handle_and_the_name_are_read_off_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, _OWN)
         _ = _patches(graph, payload=_stored(name="Invoices 2025 (stored)"))
 
         answer = await _rename(client)
@@ -212,6 +318,7 @@ class TestWhatItAnswers:
     async def test_a_rename_that_names_no_id_is_a_programming_error(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, _OWN)
         _ = _patches(graph, payload=_stored(folder_id=None))
 
         with pytest.raises(AssertionError):
@@ -222,6 +329,7 @@ class TestTheFailuresItPassesOn:
     async def test_a_folder_graph_will_not_return_is_a_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, _OWN)
         _ = graph.patch(_OWN).mock(
             return_value=httpx.Response(
                 404, json={"error": {"code": "ErrorItemNotFound", "message": "not found"}}
@@ -249,6 +357,7 @@ class TestTheFailuresItPassesOn:
     async def test_a_refused_rename_is_a_forbidden(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, _OWN)
         _ = graph.patch(_OWN).mock(
             return_value=httpx.Response(
                 403, json={"error": {"code": "ErrorAccessDenied", "message": "denied"}}
@@ -265,6 +374,7 @@ class TestTheFailuresItPassesOn:
     async def test_a_name_another_folder_has_is_a_conflict_and_not_a_bad_request(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, _OWN)
         _ = graph.patch(_OWN).mock(
             return_value=httpx.Response(
                 409,
@@ -311,11 +421,12 @@ class TestThePersonBeforeTheFolderIsRenamed:
     async def test_the_signed_in_users_own_mailbox_asks_nobody(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, _OWN)
         _ = _patches(graph)
 
         _ = await _rename(client, confirm=_never_asked)
 
-        assert _methods(graph) == ["PATCH"]
+        assert _methods(graph) == ["GET", "GET", "GET", "PATCH"]
 
     async def test_a_refusal_renames_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -368,7 +479,7 @@ class TestThePersonBeforeTheFolderIsRenamed:
             (_FOLDER_REF, _NAME, _MAILBOX),
             (_FOLDER_REF, "Other", _MAILBOX),
             (MailFolderHandle("AQMkADAwSYNTHETIC-folder-0009").uri, _NAME, _MAILBOX),
-            (_FOLDER_REF, _NAME, "pam@example.invalid"),
+            (_FOLDER_REF, _NAME, _OTHER_MAILBOX),
         )
         for folder_ref, name, mailbox in calls:
             _ = await _rename(
@@ -581,6 +692,10 @@ class TestHowItDeclaresItself:
             "This tool asks the user to agree before it changes a shared or delegated mailbox. "
             + "It changes the user's own mailbox without a question."
         ) in description
+        assert (
+            "This tool refuses a folder that Outlook creates for every mailbox, such as Inbox."
+            in description
+        )
         assert "This call is safe to repeat after a timeout." in description
         assert "The folder keeps its mail and its subfolders." in description
 
