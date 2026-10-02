@@ -9,7 +9,6 @@ from collections.abc import Callable
 import pytest
 
 from backstop_mcp.features.accounts.tools.get_capital_flows import get_capital_flows
-from backstop_mcp.features.accounts.tools.get_product_investors import get_product_investors
 from backstop_mcp.features.activity_history.tools.get_activity_detail import (
     get_activity_detail,
 )
@@ -18,6 +17,7 @@ from backstop_mcp.features.activity_tags.tools.list_activity_tags import list_ac
 from backstop_mcp.features.opportunities.tools.search_opportunities import search_opportunities
 from backstop_mcp.features.org_people.tools.get_person import get_person
 from backstop_mcp.features.org_people.tools.search_organizations import search_organizations
+from backstop_mcp.features.org_people.tools.search_people import search_people
 from backstop_mcp.features.reports.tools.run_report import run_report
 
 _ROUTES: tuple[tuple[Callable[..., object], str], ...] = (
@@ -30,8 +30,6 @@ _ROUTES: tuple[tuple[Callable[..., object], str], ...] = (
     (search_activities, "then every returned id in `activity_tag_ids`"),
     (search_activities, "`attachments_count` is a count only"),
     (get_activity_detail, "An empty list means nothing was attached"),
-    (get_product_investors, "group it as blank"),
-    (get_product_investors, "substitute `us_domiciled`"),
     (get_person, "`job_title`, `department`, the `locations` include, and `email`"),
     (get_person, "Do not ask the user for standard field names"),
     (search_opportunities, "A stage-change question"),
@@ -43,6 +41,10 @@ _ROUTES: tuple[tuple[Callable[..., object], str], ...] = (
     (search_organizations, "`country` is the stored full name"),
     (search_opportunities, "retry once with `exclude_custom_fields=true`"),
     (search_organizations, "retry once with `exclude_custom_fields=true`"),
+    (search_people, "list_custom_fields for people and party"),
+    (search_people, "exact display name"),
+    (search_people, "`country` is the stored full name"),
+    (search_people, "retry once with `exclude_custom_fields=true`"),
     (list_activity_tags, "pass every matching id to search_activities `activity_tag_ids`"),
 )
 

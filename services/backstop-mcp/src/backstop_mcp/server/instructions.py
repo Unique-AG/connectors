@@ -20,7 +20,9 @@ query actually used. Account, product, opportunity, and activity ids are not par
 
 Which tool. One organization or person: get_organization / get_person (`include` names are \
 `locations`, `email_addresses`, and the rest listed on the parameter). Firm-wide \
-organizations: search_organizations. People at an organization: get_people_for_party. \
+organizations: search_organizations. Firm-wide people: search_people (`name` is the exact \
+display name, usually 'Last, First'; `last_name` is the substring Backstop filters). People \
+at an organization: get_people_for_party. \
 `numberOfEmployees` is not a roster. Key employee is read-only here; set it in the CRM UI. \
 The roster is the source; the copy on get_person is present but unreliable. A person's title, \
 department, location, and email are `job_title`, `department`, the `locations` include, and \
@@ -31,9 +33,8 @@ Holdings: get_accounts_for_party first; read `source` and `data_caveat`. Dated s
 get_time_series on one account or one product. Do not iterate every account in a fund. \
 Fund-level assets under management are the product's `aums`. Who is in a product: \
 get_product_investors. A partial product name covers every matching vehicle; an exact name, \
-short name, or id is one vehicle. A geographical breakdown groups on a location field from \
-`custom_field_values`, weighted by latest value. `us_domiciled` stays the US/non-US flag. \
-Product custom fields: get_product — omit all three selectors to read the whole catalog in \
+short name, or id is one vehicle. Product custom fields: get_product — omit all three \
+selectors to read the whole catalog in \
 one call. Those values are not on get_product_investors.
 
 A saved report is run_report by exact name. It cannot filter by product or date: follow \
@@ -95,7 +96,7 @@ create_employment, end_employment, and create_opportunity.
 
 Reading results. A missing figure is not zero. `unknown`, truncation, \
 `custom_fields_unavailable`, or a failed search means the check did not happen — say you \
-cannot answer rather than infer. search_organizations, search_opportunities, and \
+cannot answer rather than infer. search_organizations, search_people, search_opportunities, and \
 get_product_investors return each row's custom fields as `custom_field_values`, stored text \
 that stays on the row when the catalog flag is true. Leave `exclude_custom_fields` false; \
 set it true only to retry a call that timed out, to see whether reading them is the cause. \

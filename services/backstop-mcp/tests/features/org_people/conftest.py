@@ -10,6 +10,7 @@ from backstop_mcp.features.org_people import (
     GetPeopleForOrganizationQuery,
     GetPersonQuery,
     SearchOrganizationsQuery,
+    SearchPeopleQuery,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import (
@@ -65,6 +66,17 @@ def make_search_organizations_query(
     ui_base_url: str | None = None,
 ) -> SearchOrganizationsQuery:
     return SearchOrganizationsQuery(
+        client=client,
+        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=ui_base_url),
+    )
+
+
+def make_search_people_query(
+    client: BackstopClient,
+    *,
+    ui_base_url: str | None = None,
+) -> SearchPeopleQuery:
+    return SearchPeopleQuery(
         client=client,
         build_entity_link_util=BuildEntityLinkUtil(ui_base_url=ui_base_url),
     )

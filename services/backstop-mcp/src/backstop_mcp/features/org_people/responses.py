@@ -35,6 +35,8 @@ __all__ = [
     "OrganizationResolvedResponse",
     "SearchOrganizationRowResponse",
     "SearchOrganizationsResolvedResponse",
+    "SearchPeopleResolvedResponse",
+    "SearchPersonRowResponse",
     "PartyOrgPeopleResponse",
     "PartyOrganizationResponse",
     "PartyPersonResponse",
@@ -553,10 +555,22 @@ class SearchOrganizationRowResponse(OmitNoneModel):
     name: str | None = Field(default=None, description="Organization name.")
     legal_name: str | None = Field(default=None, description="Legal name, when Backstop has one.")
     email: str | None = Field(default=None, description="Primary email. Not email2 or email3.")
-    city: str | None = Field(default=None, description="City on the organization record.")
-    country: str | None = Field(default=None, description="Country on the organization record.")
+    city: str | None = Field(default=None, description="City of the primary contact location.")
+    country: str | None = Field(
+        default=None, description="Country of the primary contact location."
+    )
     state: str | None = Field(
-        default=None, description="State or region on the organization record."
+        default=None, description="State or region of the primary contact location."
+    )
+    postal_code: str | None = Field(
+        default=None, description="Postal code of the primary contact location."
+    )
+    street_address: str | None = Field(
+        default=None, description="Street address of the primary contact location."
+    )
+    location_title: str | None = Field(
+        default=None,
+        description="Title of the primary contact location, such as 'Business' or 'London'.",
     )
     website: str | None = Field(default=None, description="Website on the organization record.")
     other_id: str | None = Field(
@@ -611,5 +625,104 @@ class SearchOrganizationsResolvedResponse(OmitNoneModel):
             "Every organization matching every filter, up to the scan ceiling. `id` is always "
             "present so the next call is get_organization. Default fields are id, name, "
             "legal_name, email, city, and country."
+        ),
+    )
+
+
+class SearchPersonRowResponse(OmitNoneModel):
+    """One person from a firm-wide search, limited to the fields the caller asked for."""
+
+    id: str = Field(
+        description=(
+            "Backstop people id. Always present. Pass it to get_person as `party_id` with "
+            "`search_type` `people`. Never invent one. A contacts or employees id is not "
+            "this id."
+        )
+    )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "CRM link for this person. Omitted unless `fields` includes `url`. Absent when "
+            "this deployment has no UI origin."
+        ),
+    )
+    name: str | None = Field(
+        default=None,
+        description="Display name as Backstop stores it, usually 'Last, First'.",
+    )
+    first_name: str | None = Field(default=None, description="First name.")
+    last_name: str | None = Field(default=None, description="Last name.")
+    email: str | None = Field(default=None, description="Primary email. Not email2 or email3.")
+    email2: str | None = Field(default=None, description="Second email.")
+    email3: str | None = Field(default=None, description="Third email.")
+    job_title: str | None = Field(default=None, description="Job title on the person record.")
+    company_name: str | None = Field(
+        default=None,
+        description="Company-name text on the person record. Not the employer's roster.",
+    )
+    department: str | None = Field(default=None, description="Department on the person record.")
+    city: str | None = Field(default=None, description="City of the primary contact location.")
+    country: str | None = Field(
+        default=None, description="Country of the primary contact location."
+    )
+    state: str | None = Field(
+        default=None, description="State or region of the primary contact location."
+    )
+    postal_code: str | None = Field(
+        default=None, description="Postal code of the primary contact location."
+    )
+    street_address: str | None = Field(
+        default=None, description="Street address of the primary contact location."
+    )
+    location_title: str | None = Field(
+        default=None,
+        description="Title of the primary contact location, such as 'Business' or 'London'.",
+    )
+    website: str | None = Field(default=None, description="Website on the person record.")
+    other_id: str | None = Field(
+        default=None, description="Backstop `otherId`, when the person has one."
+    )
+    custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every custom field with a value on this person — group or label rows by these "
+            "(the fields a table is grouped or labelled by). Absent when the call set "
+            "`exclude_custom_fields`. A field missing here has no value on this person: "
+            "group it as blank, do not look it up again."
+        ),
+    )
+
+    def project(self, *, fields: frozenset[str], url: str | None) -> Self:
+        overrides: dict[str, object] = {"url": url} if "url" in fields else {}
+        return project_fields(self, fields=fields, into=type(self), overrides=overrides)
+
+
+class SearchPeopleResolvedResponse(OmitNoneModel):
+    """A completed firm-wide people search: matching rows plus how much was read."""
+
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description=(
+            "Always 'resolved': the walk ran. An empty `rows` list is not 'nothing matched' "
+            "when `coverage` says the scan ceiling clamped the walk."
+        ),
+    )
+    coverage: ScanCoverageResponse = Field(
+        description=(
+            "How much of the Backstop result was read. `visible_count` is Backstop's total "
+            "for the server-side filters, before first name, job title, company name, "
+            "department, city, country, state, website, and custom-field predicates. An "
+            "`email` filter is three lookups (`email`, `email2`, `email3`) and "
+            "`visible_count` is the sum of those totals, so one person stored on two of "
+            "those fields can be counted twice. A custom-field-only call reports the "
+            "whole collection here, up to the scan ceiling."
+        )
+    )
+    rows: tuple[SearchPersonRowResponse, ...] = Field(
+        default=(),
+        description=(
+            "Every person matching every filter, up to the scan ceiling. `id` is always "
+            "present so the next call is get_person with `search_type` `people`. Default "
+            "fields are id, name, email, job_title, company_name, city, and country."
         ),
     )

@@ -107,8 +107,7 @@ async def get_product_investors(
             description=(
                 "Every account's custom fields come back as `custom_field_values` by "
                 "default. Leave this false. Set it true only to retry a call that timed "
-                "out, to see whether reading the custom fields is what made it slow; "
-                "a geographical breakdown needs them."
+                "out, to see whether reading the custom fields is what made it slow."
             )
         ),
     ] = False,
@@ -140,19 +139,8 @@ async def get_product_investors(
     person. A listing with no accounts and `closed_omitted>0` means every account in that
     product is closed — pass `include_closed=true` rather than reading that as "no investors".
 
-    A geographical breakdown of investors uses an account custom field that holds where the
-    investor is, weighted by latest value. Which field that is differs by tenant, so look
-    before choosing: read the `name` of each entry in the accounts' `custom_field_values`
-    (present unless `exclude_custom_fields` is set) and pick the location or region field.
-    If none looks like location, or several could, ask the user which to use. Do not guess
-    and do not substitute `us_domiciled`, which is only the US/non-US flag. Weight each
-    account by `latest_value.amount` (`include_latest_value=true` on that call). An account
-    without that field in `custom_field_values` has no value — group it as blank.
-
     Call like: {"products": ["NGUP"], "include_latest_value": false}
     Several vehicles: {"products": ["NWON", "NWOF"]}
-    Geography: {"products": ["NWON", "NWOF"], "include_latest_value": true}, then group on
-    the location field you found in `custom_field_values`
     """
     with _tracer.start_as_current_span("accounts.product_investors") as span:
         span.set_attribute("product_count", len(products))

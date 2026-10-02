@@ -1,26 +1,29 @@
-"""Firm-wide `GET /organizations`: server filters where Backstop accepts them, then in memory.
+"""Firm-wide `GET /people`: server filters where Backstop accepts them, then in memory.
 
-`filter[name][like]`, `filter[email][eq]`, `filter[otherId][eq]`, and
-`filter[matchingDomains][eq]` change `totalResourceCount` on this API. `filter[city]`,
-`filter[legalName]`, `filter[website]`, `filter[ria]`, `filter[internalOrganization]`,
-`filter[email2]`, and any custom-field field name are `400 Invalid filter field`.
+`filter[name][eq]`, `filter[lastName][like]`, `filter[email][eq]`, `filter[email2][eq]`,
+`filter[email3][eq]`, `filter[otherId][eq]`, and `filter[emailDomains][eq]` change
+`totalResourceCount`. `filter[name][like]` is an unsupported operator. `filter[firstName]`,
+`filter[jobTitle]`, `filter[companyName]`, `filter[department]`, `filter[city]`,
+`filter[country]`, `filter[state]`, and `filter[website]` are `400 Invalid filter field`.
 `filter[regularCustomFieldValues][eq]` is recognized and then rejected: Backstop cannot
-convert a query-string value into `RegularCustomFieldValueDto`. Those predicates run
-after the fetch. `filter[email][eq]` is the primary email only.
+convert a query-string value into `RegularCustomFieldValueDto`. Those predicates run after
+the fetch. `emailDomains` filters, but `fields[people]` rejects it.
 
-A custom-field-only call reads the collection. Large tenants have thousands of
-organizations; a sparse page carrying `regularCustomFieldValues` takes seconds, and the
-per-user gate allows five concurrent requests, so the walk requests later pages in
-parallel. Every match is returned; the scan ceiling is the only limit.
+An email is three exact lookups, unioned by id: a person can store the address on `email`,
+`email2`, or `email3`. A custom-field-only call reads the collection. The people collection
+is larger than organizations; a sparse page carrying `regularCustomFieldValues` takes
+seconds, and the per-user gate allows five concurrent requests, so the walk requests later
+pages in parallel. Every match is returned; the scan ceiling is the only limit.
 """
 
+import asyncio
 import logging
 from collections.abc import Sequence
 
 from opentelemetry import trace
 from pydantic import ValidationError
 
-from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.backstop_client import BackstopClient, PageResult
 from backstop_mcp.features.collection_scan import scan_coverage
 from backstop_mcp.features.custom_fields import (
     CustomFieldMatch,
@@ -28,25 +31,26 @@ from backstop_mcp.features.custom_fields import (
     satisfies_every,
     stored_custom_field_values,
 )
-from backstop_mcp.features.org_people.api_responses import OrganizationResource
+from backstop_mcp.features.org_people.api_responses import PersonResource
 from backstop_mcp.features.org_people.responses import (
-    SearchOrganizationRowResponse,
-    SearchOrganizationsResolvedResponse,
+    SearchPeopleResolvedResponse,
+    SearchPersonRowResponse,
 )
-from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
 
-# Scan ceiling. A larger collection stops here and says so in `coverage` rather than
-# reading without a bound.
-MAX_ORGANIZATION_SCAN_RECORDS = 10_000
+# Above the people collection this was sized against (about twenty thousand). A larger
+# collection stops here and says so in `coverage`.
+MAX_PEOPLE_SCAN_RECORDS = 30_000
 
 _PAGE_SIZE = 500
+_EMAIL_FIELDS: tuple[str, ...] = ("email", "email2", "email3")
 
 
-class SearchOrganizationsQuery:
-    """Walk `GET /organizations` and keep rows that match every predicate."""
+class SearchPeopleQuery:
+    """Walk `GET /people` and keep rows that match every predicate."""
 
     def __init__(
         self, *, client: BackstopClient, build_entity_link_util: BuildEntityLinkUtil
@@ -58,10 +62,14 @@ class SearchOrganizationsQuery:
         self,
         *,
         name: str | None = None,
+        last_name: str | None = None,
         email: str | None = None,
         other_id: str | None = None,
-        matching_domain: str | None = None,
-        legal_name: str | None = None,
+        email_domain: str | None = None,
+        first_name: str | None = None,
+        job_title: str | None = None,
+        company_name: str | None = None,
+        department: str | None = None,
         city: str | None = None,
         country: str | None = None,
         state: str | None = None,
@@ -69,18 +77,20 @@ class SearchOrganizationsQuery:
         street_address: str | None = None,
         location_title: str | None = None,
         website: str | None = None,
-        ria: bool | None = None,
-        internal_organization: bool | None = None,
         custom_fields: Sequence[CustomFieldMatch] = (),
         exclude_custom_fields: bool = False,
         fields: frozenset[str],
-    ) -> SearchOrganizationsResolvedResponse:
+    ) -> SearchPeopleResolvedResponse:
         """Read the server-filtered collection, then apply predicates Backstop rejects."""
         name = self._text(name)
+        last_name = self._text(last_name)
         email = self._text(email)
         other_id = self._text(other_id)
-        matching_domain = self._text(matching_domain)
-        legal_name = self._text(legal_name)
+        email_domain = self._text(email_domain)
+        first_name = self._text(first_name)
+        job_title = self._text(job_title)
+        company_name = self._text(company_name)
+        department = self._text(department)
         city = self._text(city)
         country = self._text(country)
         state = self._text(state)
@@ -90,7 +100,10 @@ class SearchOrganizationsQuery:
         website = self._text(website)
         predicates = normalize_matches(custom_fields)
         should_filter_in_memory = self._has_in_memory_predicate(
-            legal_name=legal_name,
+            first_name=first_name,
+            job_title=job_title,
+            company_name=company_name,
+            department=department,
             city=city,
             country=country,
             state=state,
@@ -98,29 +111,24 @@ class SearchOrganizationsQuery:
             street_address=street_address,
             location_title=location_title,
             website=website,
-            ria=ria,
-            internal_organization=internal_organization,
             predicates=predicates,
         )
-        with _tracer.start_as_current_span("org_people.query.search_organizations") as span:
+        with _tracer.start_as_current_span("org_people.query.search_people") as span:
             span.set_attribute("memory", should_filter_in_memory)
-            pages = await self._client.paginate(
-                "/organizations",
-                schema=OrganizationResource,
-                params=self._query_params(
-                    name=name,
-                    email=email,
-                    other_id=other_id,
-                    matching_domain=matching_domain,
-                    exclude_custom_fields=exclude_custom_fields,
-                ),
-                max_records=MAX_ORGANIZATION_SCAN_RECORDS,
-                page_size=_PAGE_SIZE,
-                parallel=True,
+            resources, total_count, ceiling_clamped = await self._read(
+                name=name,
+                last_name=last_name,
+                email=email,
+                other_id=other_id,
+                email_domain=email_domain,
+                exclude_custom_fields=exclude_custom_fields,
             )
             selected, dropped = self._select(
-                pages.items,
-                legal_name=legal_name,
+                resources,
+                first_name=first_name,
+                job_title=job_title,
+                company_name=company_name,
+                department=department,
                 city=city,
                 country=country,
                 state=state,
@@ -128,22 +136,20 @@ class SearchOrganizationsQuery:
                 street_address=street_address,
                 location_title=location_title,
                 website=website,
-                ria=ria,
-                internal_organization=internal_organization,
                 predicates=predicates,
             )
-            if should_filter_in_memory:
+            if should_filter_in_memory or email is not None:
                 selected = tuple(sorted(selected, key=self._name_order))
-            span.set_attribute("rows_scanned", len(pages.items))
+            span.set_attribute("rows_scanned", len(resources))
             span.set_attribute("matched", len(selected))
             logger.info(
-                "org_people.search.fetched",
+                "org_people.search_people.fetched",
                 extra={
                     "memory": should_filter_in_memory,
-                    "rows_scanned": len(pages.items),
+                    "rows_scanned": len(resources),
                     "matched": len(selected),
                     "dropped": dropped,
-                    "total_count": pages.total_count,
+                    "total_count": total_count,
                 },
             )
             projected = fields | {"id"}
@@ -152,25 +158,66 @@ class SearchOrganizationsQuery:
             return self._to_response(
                 selected,
                 fields=projected,
-                rows_scanned=len(pages.items),
+                rows_scanned=len(resources),
                 rows_dropped=dropped,
-                total_count=pages.total_count,
-                ceiling_clamped=pages.truncated,
+                total_count=total_count,
+                ceiling_clamped=ceiling_clamped,
             )
+
+    async def _read(
+        self,
+        *,
+        name: str | None,
+        last_name: str | None,
+        email: str | None,
+        other_id: str | None,
+        email_domain: str | None,
+        exclude_custom_fields: bool,
+    ) -> tuple[tuple[PersonResource, ...], int | None, bool]:
+        params = self._query_params(
+            name=name,
+            last_name=last_name,
+            other_id=other_id,
+            email_domain=email_domain,
+            exclude_custom_fields=exclude_custom_fields,
+        )
+        if email is None:
+            page = await self._fetch(params)
+            return tuple(page.items), page.total_count, page.truncated
+        pages = await asyncio.gather(
+            *(self._fetch({**params, f"filter[{field}][eq]": email}) for field in _EMAIL_FIELDS)
+        )
+        return self._merge(pages)
+
+    async def _fetch(self, params: dict[str, object]) -> PageResult[PersonResource]:
+        return await self._client.paginate(
+            "/people",
+            schema=PersonResource,
+            params=params,
+            max_records=MAX_PEOPLE_SCAN_RECORDS,
+            page_size=_PAGE_SIZE,
+            parallel=True,
+        )
 
     def _query_params(
         self,
         *,
         name: str | None,
-        email: str | None,
+        last_name: str | None,
         other_id: str | None,
-        matching_domain: str | None,
+        email_domain: str | None,
         exclude_custom_fields: bool,
     ) -> dict[str, object]:
         wire_fields = [
             "name",
-            "legalName",
+            "firstName",
+            "lastName",
             "email",
+            "email2",
+            "email3",
+            "jobTitle",
+            "companyName",
+            "department",
             "city",
             "country",
             "state",
@@ -179,31 +226,44 @@ class SearchOrganizationsQuery:
             "locationTitle",
             "website",
             "otherId",
-            "matchingDomains",
-            "ria",
-            "internalOrganization",
         ]
         if not exclude_custom_fields:
             wire_fields.append("regularCustomFieldValues")
         params: dict[str, object] = {
             "sort": "name",
-            "fields[organizations]": ",".join(wire_fields),
+            "fields[people]": ",".join(wire_fields),
         }
         if name is not None:
-            params["filter[name][like]"] = name
-        if email is not None:
-            params["filter[email][eq]"] = email
+            params["filter[name][eq]"] = name
+        if last_name is not None:
+            params["filter[lastName][like]"] = last_name
         if other_id is not None:
             params["filter[otherId][eq]"] = other_id
-        if matching_domain is not None:
-            params["filter[matchingDomains][eq]"] = matching_domain
+        if email_domain is not None:
+            params["filter[emailDomains][eq]"] = email_domain
         return params
+
+    def _merge(
+        self, pages: Sequence[PageResult[PersonResource]]
+    ) -> tuple[tuple[PersonResource, ...], int | None, bool]:
+        by_id: dict[str, PersonResource] = {}
+        for page in pages:
+            for resource in page.items:
+                by_id.setdefault(resource.id, resource)
+        return (
+            tuple(by_id.values()),
+            self._visible_count(pages),
+            any(page.truncated for page in pages),
+        )
 
     def _select(
         self,
-        resources: Sequence[OrganizationResource],
+        resources: Sequence[PersonResource],
         *,
-        legal_name: str | None,
+        first_name: str | None,
+        job_title: str | None,
+        company_name: str | None,
+        department: str | None,
         city: str | None,
         country: str | None,
         state: str | None,
@@ -211,17 +271,18 @@ class SearchOrganizationsQuery:
         street_address: str | None,
         location_title: str | None,
         website: str | None,
-        ria: bool | None,
-        internal_organization: bool | None,
         predicates: tuple[CustomFieldMatch, ...],
-    ) -> tuple[tuple[SearchOrganizationRowResponse, ...], int]:
-        selected: list[SearchOrganizationRowResponse] = []
+    ) -> tuple[tuple[SearchPersonRowResponse, ...], int]:
+        selected: list[SearchPersonRowResponse] = []
         dropped = 0
         for resource in resources:
             try:
                 row = self._row(
                     resource,
-                    legal_name=legal_name,
+                    first_name=first_name,
+                    job_title=job_title,
+                    company_name=company_name,
+                    department=department,
                     city=city,
                     country=country,
                     state=state,
@@ -229,15 +290,13 @@ class SearchOrganizationsQuery:
                     street_address=street_address,
                     location_title=location_title,
                     website=website,
-                    ria=ria,
-                    internal_organization=internal_organization,
                     predicates=predicates,
                 )
             except ValidationError as exc:
                 dropped += 1
                 logger.warning(
-                    "org_people.search.record.unreadable",
-                    extra={"organization_id": resource.id},
+                    "org_people.search_people.record.unreadable",
+                    extra={"person_id": resource.id},
                     exc_info=exc,
                 )
                 continue
@@ -247,9 +306,12 @@ class SearchOrganizationsQuery:
 
     def _row(
         self,
-        resource: OrganizationResource,
+        resource: PersonResource,
         *,
-        legal_name: str | None,
+        first_name: str | None,
+        job_title: str | None,
+        company_name: str | None,
+        department: str | None,
         city: str | None,
         country: str | None,
         state: str | None,
@@ -257,12 +319,16 @@ class SearchOrganizationsQuery:
         street_address: str | None,
         location_title: str | None,
         website: str | None,
-        ria: bool | None,
-        internal_organization: bool | None,
         predicates: tuple[CustomFieldMatch, ...],
-    ) -> SearchOrganizationRowResponse | None:
+    ) -> SearchPersonRowResponse | None:
         attributes = resource.attributes
-        if not self._matches_text(attributes.legal_name, legal_name):
+        if not self._matches_text(attributes.first_name, first_name):
+            return None
+        if not self._matches_text(attributes.job_title, job_title):
+            return None
+        if not self._matches_text(attributes.company_name, company_name):
+            return None
+        if not self._matches_text(attributes.department, department):
             return None
         if not self._matches_text(attributes.city, city):
             return None
@@ -278,20 +344,19 @@ class SearchOrganizationsQuery:
             return None
         if not self._matches_text(attributes.website, website):
             return None
-        if ria is not None and attributes.ria is not ria:
-            return None
-        if (
-            internal_organization is not None
-            and attributes.internal_organization is not internal_organization
-        ):
-            return None
         if not satisfies_every(attributes.regular_custom_field_values, predicates):
             return None
-        return SearchOrganizationRowResponse(
+        return SearchPersonRowResponse(
             id=resource.id,
             name=attributes.name,
-            legal_name=attributes.legal_name,
+            first_name=attributes.first_name,
+            last_name=attributes.last_name,
             email=attributes.email,
+            email2=attributes.email2,
+            email3=attributes.email3,
+            job_title=attributes.job_title,
+            company_name=attributes.company_name,
+            department=attributes.department,
             city=attributes.city,
             country=attributes.country,
             state=attributes.state,
@@ -300,30 +365,27 @@ class SearchOrganizationsQuery:
             location_title=attributes.location_title,
             website=attributes.website,
             other_id=attributes.other_id,
-            matching_domains=attributes.matching_domains,
-            ria=attributes.ria,
-            internal_organization=attributes.internal_organization,
             custom_field_values=stored_custom_field_values(attributes.regular_custom_field_values)
             or None,
         )
 
     def _to_response(
         self,
-        selected: tuple[SearchOrganizationRowResponse, ...],
+        selected: tuple[SearchPersonRowResponse, ...],
         *,
         fields: frozenset[str],
         rows_scanned: int,
         rows_dropped: int,
         total_count: int | None,
         ceiling_clamped: bool,
-    ) -> SearchOrganizationsResolvedResponse:
+    ) -> SearchPeopleResolvedResponse:
         coverage = scan_coverage(
             rows_scanned=rows_scanned,
             visible_count=total_count,
             rows_dropped=rows_dropped,
-            ceiling=MAX_ORGANIZATION_SCAN_RECORDS,
+            ceiling=MAX_PEOPLE_SCAN_RECORDS,
             ceiling_clamped=ceiling_clamped,
-            # One `paginate` call: a failed page raises rather than returning a short list.
+            # One `paginate` call, or three email lookups: a failed page raises.
             partial_due_to_error=False,
         )
         rows = tuple(
@@ -331,7 +393,7 @@ class SearchOrganizationsQuery:
                 fields=fields,
                 url=(
                     self._build_entity_link_util.canonical_url(
-                        target=OrganizationLinkTarget(party_id=row.id)
+                        target=PersonLinkTarget(party_id=row.id)
                     )
                     if "url" in fields
                     else None
@@ -339,12 +401,15 @@ class SearchOrganizationsQuery:
             )
             for row in selected
         )
-        return SearchOrganizationsResolvedResponse(coverage=coverage, rows=rows)
+        return SearchPeopleResolvedResponse(coverage=coverage, rows=rows)
 
     def _has_in_memory_predicate(
         self,
         *,
-        legal_name: str | None,
+        first_name: str | None,
+        job_title: str | None,
+        company_name: str | None,
+        department: str | None,
         city: str | None,
         country: str | None,
         state: str | None,
@@ -352,14 +417,15 @@ class SearchOrganizationsQuery:
         street_address: str | None,
         location_title: str | None,
         website: str | None,
-        ria: bool | None,
-        internal_organization: bool | None,
         predicates: tuple[CustomFieldMatch, ...],
     ) -> bool:
         return any(
             value is not None
             for value in (
-                legal_name,
+                first_name,
+                job_title,
+                company_name,
+                department,
                 city,
                 country,
                 state,
@@ -367,10 +433,17 @@ class SearchOrganizationsQuery:
                 street_address,
                 location_title,
                 website,
-                ria,
-                internal_organization,
             )
         ) or bool(predicates)
+
+    @staticmethod
+    def _visible_count(pages: Sequence[PageResult[PersonResource]]) -> int | None:
+        total = 0
+        for page in pages:
+            if page.total_count is None:
+                return None
+            total += page.total_count
+        return total
 
     @staticmethod
     def _text(value: str | None) -> str | None:
@@ -380,7 +453,7 @@ class SearchOrganizationsQuery:
         return stripped or None
 
     @staticmethod
-    def _name_order(row: SearchOrganizationRowResponse) -> str:
+    def _name_order(row: SearchPersonRowResponse) -> str:
         return (row.name or "").casefold()
 
     @staticmethod
