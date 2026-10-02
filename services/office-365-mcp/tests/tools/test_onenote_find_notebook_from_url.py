@@ -371,9 +371,12 @@ class TestHowItDeclaresItself:
         assert "onenote_list_recent_notebooks" in lead
         assert any("Pass `group`" in bullet for bullet in bullets)
 
-    def test_the_answer_handle_says_how_a_group_notebook_handle_starts(self) -> None:
+    def test_the_answer_handle_says_how_a_group_or_site_notebook_handle_starts(self) -> None:
         described = finder.FoundNotebook.model_fields["uri"].description or ""
-        assert "starts with onenote:///groups/{group}/" in described
+        assert (
+            "starts with onenote:///groups/{group}/ " + "or onenote:///sites/{site}/ instead"
+            in described
+        )
 
     @pytest.mark.parametrize("word", ["client", "ctx", "context", "token", "graph"])
     async def test_no_wiring_of_this_server_is_published_as_an_argument(

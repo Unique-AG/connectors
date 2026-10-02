@@ -269,13 +269,14 @@ class TestWhatItRefuses:
         with pytest.raises(ToolError, match="section handle"):
             _ = await _delete(client, page=OnenoteSectionHandle("SECTION1").uri)
 
-    async def test_the_refusal_names_how_a_group_page_handle_starts(
+    async def test_the_refusal_names_how_a_group_or_site_page_handle_starts(
         self, client: GraphServiceClient
     ) -> None:
         with pytest.raises(ToolError) as refused:
             _ = await _delete(client, page="Meeting notes")
 
         assert "onenote:///groups/{group}/" in str(refused.value)
+        assert "onenote:///sites/{site}/" in str(refused.value)
 
 
 class TestWhatItAnswers:
@@ -883,14 +884,15 @@ class TestHowItDeclaresItself:
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert set(properties) == {"page"}
 
-    async def test_the_page_argument_says_how_a_group_handle_starts(
+    async def test_the_page_argument_says_how_a_group_or_site_handle_starts(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
         properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
 
         assert (
-            "A handle from a group notebook starts with onenote:///groups/{group}/ instead."
+            "A handle from a group or site notebook starts with onenote:///groups/{group}/ "
+            + "or onenote:///sites/{site}/ instead."
             in cast("str", properties["page"]["description"])
         )
 

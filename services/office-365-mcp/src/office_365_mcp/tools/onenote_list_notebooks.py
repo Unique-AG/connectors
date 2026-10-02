@@ -110,19 +110,20 @@ class NotebookSection(BaseModel):
     uri: str = Field(
         description=(
             "This section's handle: onenote:///sections/{id}, with the id percent-encoded. A "
-            + "handle from a group notebook starts with onenote:///groups/{group}/ instead. Pass "
-            + "it as `section` to onenote_list_pages or onenote_create_page, or as `to_section` "
-            + "to onenote_copy_page. Never build one. A section id alone reaches nothing."
+            + "handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. Pass it as `section` to onenote_list_pages or "
+            + "onenote_create_page, or as `to_section` to onenote_copy_page. Never build one. A "
+            + "section id alone reaches nothing."
         )
     )
     group_uri: str | None = Field(
         description=(
             "The handle of the section group that holds this section directly: "
-            + "onenote:///sectiongroups/{id}. A handle from a group notebook starts with "
-            + "onenote:///groups/{group}/ instead. Pass it to onenote_list_sections, "
-            + "onenote_create_section, or onenote_create_section_group as `parent`, or to "
-            + "onenote_copy_section as `to_section_group`. Null when this section sits directly "
-            + "under its notebook."
+            + "onenote:///sectiongroups/{id}. A handle from a group or site notebook starts with "
+            + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. Pass it to "
+            + "onenote_list_sections, onenote_create_section, or onenote_create_section_group as "
+            + "`parent`, or to onenote_copy_section as `to_section_group`. Null when this section "
+            + "sits directly under its notebook."
         )
     )
     name: str | None = Field(
@@ -164,11 +165,11 @@ class Notebook(BaseModel):
     uri: str = Field(
         description=(
             "This notebook's handle: onenote:///notebooks/{id}, with the id percent-encoded. A "
-            + "handle from a group notebook starts with onenote:///groups/{group}/ instead. "
-            + "Pass it as `parent` to onenote_list_sections, onenote_create_section or "
-            + "onenote_create_section_group, as `to_notebook` to onenote_copy_section, or as "
-            + "`notebook` to onenote_copy_notebook. Never build one. A notebook id alone reaches "
-            + "nothing."
+            + "handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. Pass it as `parent` to onenote_list_sections, "
+            + "onenote_create_section or onenote_create_section_group, as `to_notebook` to "
+            + "onenote_copy_section, or as `notebook` to onenote_copy_notebook. Never build one. A "
+            + "notebook id alone reaches nothing."
         )
     )
     name: str | None = Field(

@@ -78,11 +78,11 @@ class FoundNotebook(BaseModel):
     uri: str = Field(
         description=(
             "This notebook's handle: onenote:///notebooks/{id}, with the id percent-encoded. A "
-            + "handle from a group notebook starts with onenote:///groups/{group}/ instead. Pass "
-            + "it to onenote_list_sections, onenote_create_section or onenote_create_section_group "
-            + "to work inside the notebook. Pass it to onenote_copy_section as `to_notebook`, or "
-            + "to onenote_copy_notebook as `notebook`. Never build one: a notebook id alone "
-            + "reaches nothing."
+            + "handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. Pass it to onenote_list_sections, "
+            + "onenote_create_section or onenote_create_section_group to work inside the notebook. "
+            + "Pass it to onenote_copy_section as `to_notebook`, or to onenote_copy_notebook as "
+            + "`notebook`. Never build one: a notebook id alone reaches nothing."
         )
     )
     name: str | None = Field(

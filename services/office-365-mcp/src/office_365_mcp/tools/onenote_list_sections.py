@@ -94,9 +94,10 @@ _NOT_A_PARENT_HANDLE = (
     + "answer, or from a onenote_create_notebook answer. A section group handle looks like "
     + "onenote:///sectiongroups/{id} and comes from the `uri` of a section group in a prior "
     + "onenote_list_sections result, or from a onenote_create_section_group answer. A handle "
-    + "from a group notebook starts with onenote:///groups/{group}/ instead. A section "
-    + "handle (onenote:///sections/{id}), a page handle, a plain name and a web address are none "
-    + "of them one of these. This same value fails again, so do not retry it."
+    + "from a group or site notebook starts with onenote:///groups/{group}/ or "
+    + "onenote:///sites/{site}/ instead. A section handle (onenote:///sections/{id}), a page "
+    + "handle, a plain name and a web address are none of them one of these. This same value fails "
+    + "again, so do not retry it."
 )
 
 GRAPH_NOT_FOUND = (
@@ -114,9 +115,10 @@ class SectionRow(BaseModel):
     uri: str = Field(
         description=(
             "This section's handle: onenote:///sections/{id}, with the id percent-encoded. A "
-            + "handle from a group notebook starts with onenote:///groups/{group}/ instead. Pass "
-            + "it as `section` to onenote_list_pages or onenote_create_page, or as `to_section` "
-            + "to onenote_copy_page. Never build one. A section id alone reaches nothing."
+            + "handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. Pass it as `section` to onenote_list_pages or "
+            + "onenote_create_page, or as `to_section` to onenote_copy_page. Never build one. A "
+            + "section id alone reaches nothing."
         )
     )
     name: str | None = Field(
@@ -151,11 +153,11 @@ class SectionGroupRow(BaseModel):
     uri: str = Field(
         description=(
             "This section group's handle: onenote:///sectiongroups/{id}, with the id "
-            + "percent-encoded. A handle from a group notebook starts with "
-            + "onenote:///groups/{group}/ instead. Pass it to onenote_list_sections, "
-            + "onenote_create_section, or onenote_create_section_group as `parent`, or to "
-            + "onenote_copy_section as `to_section_group`. Never build one. A section group id "
-            + "alone reaches nothing."
+            + "percent-encoded. A handle from a group or site notebook starts with "
+            + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. Pass it to "
+            + "onenote_list_sections, onenote_create_section, or onenote_create_section_group as "
+            + "`parent`, or to onenote_copy_section as `to_section_group`. Never build one. A "
+            + "section group id alone reaches nothing."
         )
     )
     name: str | None = Field(
@@ -380,9 +382,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "onenote_list_notebooks, onenote_find_notebook_from_url, or "
                     + "onenote_create_notebook. A section group's handle, "
                     + "onenote:///sectiongroups/{id}, comes from onenote_list_sections or "
-                    + "onenote_create_section_group. A handle from a group notebook starts with "
-                    + "onenote:///groups/{group}/ instead. A section handle, a page handle, a "
-                    + "plain name and a web address are not accepted here."
+                    + "onenote_create_section_group. A handle from a group or site notebook starts "
+                    + "with onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. "
+                    + "Section handles, page handles, plain names and web addresses are not "
+                    + "accepted."
                 ),
             ),
         ],

@@ -954,13 +954,16 @@ class TestWhatItRefuses:
         assert "onenote_list_sections" in message
         assert "onenote_create_section_group" in message
 
-    async def test_the_refusal_says_how_a_group_notebook_handle_starts(
+    async def test_the_refusal_says_how_a_group_or_site_notebook_handle_starts(
         self, client: GraphServiceClient
     ) -> None:
         with pytest.raises(ToolError) as excinfo:
             _ = await lister.list_sections(client, parent="Planning", limit=50)
 
-        assert "starts with onenote:///groups/{group}/ instead" in str(excinfo.value)
+        assert (
+            "starts with onenote:///groups/{group}/ " + "or onenote:///sites/{site}/ instead"
+            in str(excinfo.value)
+        )
 
 
 class TestGraphFailures:
@@ -1055,22 +1058,27 @@ class TestItsArguments:
         assert "both lists" in described
         assert "left out" in described
 
-    async def test_the_parent_says_how_a_group_notebook_handle_starts(
+    async def test_the_parent_says_how_a_group_or_site_notebook_handle_starts(
         self, transport: httpx.AsyncClient
     ) -> None:
         properties = await self._properties(transport)
 
         described = cast("str", properties["parent"]["description"])
-        assert "starts with onenote:///groups/{group}/ instead" in described
+        assert (
+            "starts with onenote:///groups/{group}/ " + "or onenote:///sites/{site}/ instead"
+            in described
+        )
 
     @pytest.mark.parametrize("row", [lister.SectionRow, lister.SectionGroupRow])
-    def test_a_row_handle_says_how_a_group_notebook_handle_starts(
+    def test_a_row_handle_says_how_a_group_or_site_notebook_handle_starts(
         self, row: type[lister.SectionRow | lister.SectionGroupRow]
     ) -> None:
         described = row.model_fields["uri"].description or ""
 
-        assert "A handle from a group notebook starts with onenote:///groups/{group}/ instead." in (
-            described
+        assert (
+            "A handle from a group or site notebook starts with onenote:///groups/{group}/ "
+            + "or onenote:///sites/{site}/ instead."
+            in described
         )
         assert len(described.split()) <= 60
 

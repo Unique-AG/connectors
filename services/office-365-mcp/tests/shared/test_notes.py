@@ -181,13 +181,14 @@ class TestTheHandleFieldsNameTheGroupShape:
             (notes.OperationSummary, "uri"),
         ],
     )
-    def test_a_handle_field_says_how_a_group_handle_starts(
+    def test_a_handle_field_says_how_a_group_or_site_handle_starts(
         self, model: type[BaseModel], field: str
     ) -> None:
         described = model.model_fields[field].description or ""
 
         assert (
-            "A handle from a group notebook starts with onenote:///groups/{group}/ instead."
+            "A handle from a group or site notebook starts with onenote:///groups/{group}/ "
+            + "or onenote:///sites/{site}/ instead."
             in described
         )
 

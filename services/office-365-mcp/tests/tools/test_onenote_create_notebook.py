@@ -701,8 +701,10 @@ class TestHowItDeclaresItself:
         assert 'Without `group`, a notebook this call created is always "Owner"' in (
             fields["user_role"].description or ""
         )
-        assert "A handle from a group notebook starts with onenote:///groups/{group}/ instead." in (
-            fields["uri"].description or ""
+        assert (
+            "A handle from a group or site notebook starts with onenote:///groups/{group}/ "
+            + "or onenote:///sites/{site}/ instead."
+            in (fields["uri"].description or "")
         )
 
     async def test_the_name_description_lists_the_forbidden_characters(

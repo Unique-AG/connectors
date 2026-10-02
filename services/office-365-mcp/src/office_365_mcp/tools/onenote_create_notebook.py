@@ -63,9 +63,9 @@ class CreatedNotebook(BaseModel):
     uri: str = Field(
         description=(
             "This new notebook's handle: onenote:///notebooks/{id}, with the id percent-encoded. "
-            + "A handle from a group notebook starts with onenote:///groups/{group}/ instead. "
-            + "Pass it to onenote_create_section to add a section, or to "
-            + "onenote_create_section_group to add a section group."
+            + "A handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. Pass it to onenote_create_section to add a "
+            + "section, or to onenote_create_section_group to add a section group."
         )
     )
     name: str | None = Field(

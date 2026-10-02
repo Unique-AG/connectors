@@ -1313,15 +1313,17 @@ class TestHowItDeclaresItself:
         assert "notebook of a Microsoft 365 group" in (tool.description or "")
 
     @pytest.mark.parametrize("argument", ["page", "to_section"])
-    async def test_each_handle_argument_names_the_group_shape(
+    async def test_each_handle_argument_names_the_group_and_site_shapes(
         self, transport: httpx.AsyncClient, argument: str
     ) -> None:
         parameters, _tool = await _registered(transport)
         properties = cast("Mapping[str, object]", parameters["properties"])
         field = cast("Mapping[str, object]", properties[argument])
 
-        assert "A handle from a group notebook starts with onenote:///groups/{group}/ instead." in (
-            cast("str", field["description"])
+        assert (
+            "A handle from a group or site notebook starts with onenote:///groups/{group}/ "
+            + "or onenote:///sites/{site}/ instead."
+            in cast("str", field["description"])
         )
 
     @pytest.mark.parametrize(
@@ -1329,10 +1331,12 @@ class TestHowItDeclaresItself:
         [("onenote:///groups//pages/1-PAGE", _SECTION_URI), (_PAGE_URI, "onenote:///groups/")],
         ids=["page", "to_section"],
     )
-    async def test_each_refusal_names_the_group_shape(
+    async def test_each_refusal_names_the_group_and_site_shapes(
         self, client: GraphServiceClient, page: str, to_section: str
     ) -> None:
-        with pytest.raises(ToolError, match=r"onenote:///groups/\{group\}/ instead"):
+        with pytest.raises(
+            ToolError, match=r"onenote:///groups/\{group\}/ or onenote:///sites/\{site\}/ instead"
+        ):
             _ = await _copy(client, page=page, to_section=to_section)
 
 

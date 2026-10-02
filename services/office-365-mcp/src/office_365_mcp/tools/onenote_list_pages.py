@@ -90,12 +90,12 @@ newest change first.
 _NOT_A_SECTION_HANDLE = (
     "onenote_list_pages takes a section handle in `section`. It looks like "
     + "onenote:///sections/{id}, and it comes from the `uri` of a section in an "
-    + "onenote_list_notebooks result. A handle from a group notebook starts with "
-    + "onenote:///groups/{group}/ instead. Copy it exactly. A section's name is not a handle, "
-    + "nor is a notebook's name, nor a web address, nor a bare section id. A page handle "
-    + "(onenote:///pages/{id}) is not one either, because a page holds no pages of its own to "
-    + "list. Omit `section` to search every notebook the user owns and every notebook shared "
-    + "with them instead. This same value fails again, so do not retry it."
+    + "onenote_list_notebooks result. A handle from a group or site notebook starts with "
+    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. Copy it exactly. A "
+    + "section's name is not a handle, nor is a notebook's name, nor a web address, nor a bare "
+    + "section id. A page handle (onenote:///pages/{id}) is not one either, because a page holds "
+    + "no pages of its own to list. Omit `section` to search every notebook the user owns and "
+    + "every notebook shared with them instead. This same value fails again, so do not retry it."
 )
 
 _PAGELEVEL_NEEDS_A_SECTION = (
@@ -327,9 +327,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Search only this section's pages, as the `uri` of a section in an "
                     + "onenote_list_notebooks result: onenote:///sections/{id}. A handle from a "
-                    + "group notebook starts with onenote:///groups/{group}/ instead. A "
-                    + "section's name, a notebook's name and a page handle are not section "
-                    + "handles."
+                    + "group or site notebook starts with onenote:///groups/{group}/ or "
+                    + "onenote:///sites/{site}/ instead. A section's name, a notebook's name and a "
+                    + "page handle are not section handles."
                 ),
             ),
         ] = None,

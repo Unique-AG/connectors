@@ -190,7 +190,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "The notebook to copy: the `uri` of a onenote_list_notebooks or "
                     + "onenote_find_notebook_from_url result, or a onenote_create_notebook answer, "
                     + "copied word for word. The shape is onenote:///notebooks/{id}. A handle from "
-                    + "a group notebook starts with onenote:///groups/{group}/ instead."
+                    + "a group or site notebook starts with onenote:///groups/{group}/ or "
+                    + "onenote:///sites/{site}/ instead."
                 ),
             ),
         ],

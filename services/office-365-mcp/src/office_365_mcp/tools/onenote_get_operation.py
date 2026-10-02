@@ -25,8 +25,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _NOT_AN_OPERATION_HANDLE = (
     "onenote_get_operation takes an operation handle. It looks like onenote:///operations/{id}, "
     + "with the id percent-encoded, for example "
-    + "onenote:///operations/1-SYNTHETICOPERATION0000. A handle from a group notebook starts "
-    + "with onenote:///groups/{group}/ instead. A page handle "
+    + "onenote:///operations/1-SYNTHETICOPERATION0000. A handle from a group or site notebook "
+    + "starts with onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A page handle "
     + "(onenote:///pages/{id}), a section handle (onenote:///sections/{id}) and a notebook "
     + "handle (onenote:///notebooks/{id}) are none of them an operation handle: they name what a "
     + "copy reads from or, once it finishes, produces — never the copy itself. Take the `uri` "
@@ -91,9 +91,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The copy to poll: the `uri` of a onenote_copy_page, onenote_copy_section or "
                     + "onenote_copy_notebook answer, copied word for word. The shape is "
-                    + "onenote:///operations/{id}. A handle from a group notebook starts with "
-                    + "onenote:///groups/{group}/ instead. An operation id alone, with no "
-                    + "connector scheme around it, reaches nothing."
+                    + "onenote:///operations/{id}. A handle from a group or site notebook starts "
+                    + "with onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. An "
+                    + "operation id alone, with no connector scheme around it, reaches nothing."
                 ),
             ),
         ],

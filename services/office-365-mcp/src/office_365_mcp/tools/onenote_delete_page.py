@@ -56,12 +56,12 @@ onenote_edit_page and onenote_rename_page answer 404 for it.
 _NOT_A_PAGE_HANDLE = (
     "onenote_delete_page takes a page handle. It looks like onenote:///pages/{id}, with the id "
     + "percent-encoded, for example "
-    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A handle from a group "
-    + "notebook starts with onenote:///groups/{group}/ instead. A section handle "
-    + "(onenote:///sections/{id}) is not a page handle: it names a whole section, not one page "
-    + "inside it. A page title, a web address, and a bare id with no scheme are not handles "
-    + "either. Take the `uri` from a onenote_list_pages row or a onenote_create_page answer, "
-    + "and copy it word for word. This same value fails again, so do not retry it."
+    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A handle from a group or "
+    + "site notebook starts with onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A "
+    + "section handle (onenote:///sections/{id}) is not a page handle: it names a whole section, "
+    + "not one page inside it. A page title, a web address, and a bare id with no scheme are not "
+    + "handles either. Take the `uri` from a onenote_list_pages row or a onenote_create_page "
+    + "answer, and copy it word for word. This same value fails again, so do not retry it."
 )
 
 GRAPH_NOT_FOUND = (
@@ -195,8 +195,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The page to delete: the `uri` of a onenote_list_pages row or a "
                     + "onenote_create_page answer, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A handle from a group notebook starts with "
-                    + "onenote:///groups/{group}/ instead. A section handle is not a page handle."
+                    + "onenote:///pages/{id}. A handle from a group or site notebook starts with "
+                    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A section "
+                    + "handle is not a page handle."
                 ),
             ),
         ],

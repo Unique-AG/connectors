@@ -408,13 +408,14 @@ class TestWhatItRefuses:
         with pytest.raises(ToolError, match="onenote_copy_page"):
             _ = await _get(client, operation="not a handle")
 
-    async def test_the_refusal_names_the_group_handle_shape(
+    async def test_the_refusal_names_the_group_and_site_handle_shapes(
         self, client: GraphServiceClient
     ) -> None:
         with pytest.raises(ToolError) as refused:
             _ = await _get(client, operation="not a handle")
 
         assert "onenote:///groups/{group}/" in str(refused.value)
+        assert "onenote:///sites/{site}/" in str(refused.value)
 
 
 class TestGraphFailures:

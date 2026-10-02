@@ -73,10 +73,11 @@ GRAPH_NOT_FOUND = (
 _NOT_A_SECTION_HANDLE = (
     "onenote_create_page takes a section handle in `section`, if it is given at all. It looks "
     + "like onenote:///sections/{id}, and it comes from the `uri` of a section in an "
-    + "onenote_list_notebooks result. A handle from a group notebook starts with "
-    + "onenote:///groups/{group}/ instead. Copy it exactly. A section name is not a handle, and "
-    + "neither is a notebook name, a path, a web address or a bare id. Omit `section` entirely "
-    + "to create the page in the default section of the default notebook instead."
+    + "onenote_list_notebooks result. A handle from a group or site notebook starts with "
+    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. Copy it exactly. A section "
+    + "name is not a handle, and neither is a notebook name, a path, a web address or a bare id. "
+    + "Omit `section` entirely to create the page in the default section of the default notebook "
+    + "instead."
 )
 
 _BOTH_SECTION_AND_SECTION_NAME = (
@@ -90,8 +91,9 @@ _BOTH_SECTION_AND_SECTION_NAME = (
 
 _DESCRIPTION = """\
 Writes a new page into the signed-in user's OneNote, or into a notebook that a Microsoft 365 \
-group owns. There is no way to attach a file or an image. onenote_append_to_page adds to a page \
-later. OneNote can show the change to everyone who opens the notebook.
+group or a SharePoint site owns. There is no way to attach a file or an image. \
+onenote_append_to_page adds to a page later. OneNote can show the change to everyone who opens \
+the notebook.
 
 Notes:
 - This tool asks the user to agree before it writes into a notebook that is shared with other \
@@ -113,9 +115,9 @@ class CreatedPage(BaseModel):
     uri: str = Field(
         description=(
             "This new page's handle: onenote:///pages/{id}, with the id percent-encoded. A "
-            + "handle from a group notebook starts with onenote:///groups/{group}/ instead. Pass "
-            + "it to onenote_read_page to read the page back, or to onenote_append_to_page to "
-            + "add more to it."
+            + "handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. Pass it to onenote_read_page to read the page "
+            + "back, or to onenote_append_to_page to add more to it."
         )
     )
     title: str | None = Field(
@@ -144,10 +146,10 @@ class CreatedPage(BaseModel):
     section_uri: str | None = Field(
         description=(
             "The handle of the section this page was written into: onenote:///sections/{id}. "
-            + "A handle from a group notebook starts with onenote:///groups/{group}/ instead. "
-            + "This is the `section` argument's own handle when one was given, though "
-            + "Microsoft's own response can name a different section instead. Null when "
-            + "`section` was omitted and `section_name` created a new section."
+            + "A handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. This is the `section` argument's own handle when "
+            + "one was given, though Microsoft's own response can name a different section "
+            + "instead. Null when `section` was omitted and `section_name` created a new section."
         )
     )
 
@@ -346,8 +348,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The section to create the page in, as the `uri` of a section from an "
                     + "onenote_list_notebooks result: onenote:///sections/{id}. A handle from a "
-                    + "group notebook starts with onenote:///groups/{group}/ instead. A section "
-                    + "name, a notebook name and a web address are not handles."
+                    + "group or site notebook starts with onenote:///groups/{group}/ or "
+                    + "onenote:///sites/{site}/ instead. A section name, a notebook name and a web "
+                    + "address are not handles."
                 ),
             ),
         ] = None,

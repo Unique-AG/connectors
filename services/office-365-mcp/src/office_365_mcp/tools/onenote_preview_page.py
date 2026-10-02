@@ -35,11 +35,12 @@ Notes:
 _NOT_A_PAGE_HANDLE = (
     "onenote_preview_page takes a page handle. It looks like onenote:///pages/{id}, and it "
     + "comes from the `uri` of an onenote_list_pages row, or of what onenote_create_page just "
-    + "wrote. A handle from a group notebook starts with onenote:///groups/{group}/ instead. "
-    + "Copy it exactly. A section handle, which looks like onenote:///sections/{id}, is "
-    + "not a page handle: a section holds pages, and has no preview of its own. A page title, a "
-    + "web address, and a bare id are not handles either. Call onenote_list_pages and take a "
-    + "`uri` from its answer. This same value fails again, so do not retry it."
+    + "wrote. A handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+    + "onenote:///sites/{site}/ instead. Copy it exactly. A section handle, which looks like "
+    + "onenote:///sections/{id}, is not a page handle: a section holds pages, and has no preview "
+    + "of its own. A page title, a web address, and a bare id are not handles either. Call "
+    + "onenote_list_pages and take a `uri` from its answer. This same value fails again, so do not "
+    + "retry it."
 )
 
 GRAPH_NOT_FOUND = (
@@ -54,9 +55,9 @@ class PagePreview(BaseModel):
     page_uri: str = Field(
         description=(
             "The handle of the page this preview belongs to: onenote:///pages/{id}, echoed "
-            + "back from the `page` argument. A handle from a group notebook starts with "
-            + "onenote:///groups/{group}/ instead. Pass it to onenote_read_page to read the "
-            + "whole page."
+            + "back from the `page` argument. A handle from a group or site notebook starts with "
+            + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. Pass it to "
+            + "onenote_read_page to read the whole page."
         )
     )
     preview_text: str | None = Field(
@@ -118,8 +119,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The page to preview: the `uri` of a onenote_list_pages row or a "
                     + "onenote_create_page answer, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A handle from a group notebook starts with "
-                    + "onenote:///groups/{group}/ instead. A section handle is not a page handle."
+                    + "onenote:///pages/{id}. A handle from a group or site notebook starts with "
+                    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A section "
+                    + "handle is not a page handle."
                 ),
             ),
         ],

@@ -59,8 +59,8 @@ _UNNAMED_SECTION_GROUP = "an unnamed section group"
 
 _DESCRIPTION = """\
 Creates a new, empty section group directly under `parent`, a notebook or another section group. \
-The notebook can be the signed-in user's own, or one that a Microsoft 365 group owns. OneNote can \
-show the change to everyone who opens the notebook.
+The notebook can be the signed-in user's own, or one that a Microsoft 365 group or a SharePoint \
+site owns. OneNote can show the change to everyone who opens the notebook.
 
 Notes:
 - This tool asks the user to agree before it writes into a notebook that is shared with other \
@@ -79,10 +79,10 @@ _NOT_A_PARENT_HANDLE = (
     + "onenote_find_notebook_from_url answer, or from a onenote_create_notebook answer. A "
     + "section group handle looks like onenote:///sectiongroups/{id} and comes from the `uri` "
     + "of a section group in an onenote_list_sections result, or from this same tool's own "
-    + "answer. A handle from a group notebook starts with onenote:///groups/{group}/ instead. "
-    + "A section handle (onenote:///sections/{id}), a page handle, a plain name and a "
-    + "web address are none of them one of these. This same value fails again, so do not retry "
-    + "it."
+    + "answer. A handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+    + "onenote:///sites/{site}/ instead. A section handle (onenote:///sections/{id}), a page "
+    + "handle, a plain name and a web address are none of them one of these. This same value fails "
+    + "again, so do not retry it."
 )
 
 GRAPH_NOT_FOUND = (
@@ -98,9 +98,10 @@ class CreatedSectionGroup(BaseModel):
     uri: str = Field(
         description=(
             "This new section group's handle: onenote:///sectiongroups/{id}, with the id "
-            + "percent-encoded. A handle from a group notebook starts with "
-            + "onenote:///groups/{group}/ instead. Pass it to onenote_create_section to add a "
-            + "section to it, or to onenote_list_sections to see what is directly under it."
+            + "percent-encoded. A handle from a group or site notebook starts with "
+            + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. Pass it to "
+            + "onenote_create_section to add a section to it, or to onenote_list_sections to see "
+            + "what is directly under it."
         )
     )
     name: str | None = Field(
@@ -238,8 +239,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "onenote_find_notebook_from_url, or onenote_create_notebook. A section "
                     + "group's handle, onenote:///sectiongroups/{id}, comes from "
                     + "onenote_list_sections or from this same tool's own answer. A handle from a "
-                    + "group notebook starts with onenote:///groups/{group}/ instead. A section "
-                    + "group at any depth can be the parent."
+                    + "group or site notebook starts with onenote:///groups/{group}/ or "
+                    + "onenote:///sites/{site}/ instead. A section group at any depth can be the "
+                    + "parent."
                 ),
             ),
         ],

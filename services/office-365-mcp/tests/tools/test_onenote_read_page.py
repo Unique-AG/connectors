@@ -463,6 +463,7 @@ class TestWhatItRefuses:
 
         assert "onenote:///sections/{id}" in str(refused.value)
         assert "onenote:///groups/{group}/" in str(refused.value)
+        assert "onenote:///sites/{site}/" in str(refused.value)
 
 
 class TestGraphFailures:

@@ -201,9 +201,10 @@ class PageSummary(BaseModel):
     uri: str = Field(
         description=(
             "This page's handle: onenote:///pages/{id}, with the id percent-encoded. A handle from "
-            + "a group notebook starts with onenote:///groups/{group}/ instead. Pass it word for "
-            + "word to onenote_read_page to read the page, or to onenote_append_to_page to add to "
-            + "it. Never build one: a page id alone reaches nothing."
+            + "a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. Pass it word for word to onenote_read_page to "
+            + "read the page, or to onenote_append_to_page to add to it. Never build one: a page "
+            + "id alone reaches nothing."
         )
     )
     title: str | None = Field(
@@ -240,9 +241,10 @@ class PageSummary(BaseModel):
     section_uri: str | None = Field(
         description=(
             "The handle of the section that holds this page: onenote:///sections/{id}. A handle "
-            + "from a group notebook starts with onenote:///groups/{group}/ instead. Pass it to "
-            + "onenote_list_pages to see this page's siblings, or to onenote_create_page to add a "
-            + "page beside it. Null when Graph named no parent section for this page."
+            + "from a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. Pass it to onenote_list_pages to see this page's "
+            + "siblings, or to onenote_create_page to add a page beside it. Null when Graph named "
+            + "no parent section for this page."
         )
     )
     section_name: str | None = Field(
@@ -583,10 +585,11 @@ class OperationSummary(BaseModel):
     uri: str = Field(
         description=(
             "This operation's handle: onenote:///operations/{id}, with the id percent-encoded. "
-            + "A handle from a group notebook starts with onenote:///groups/{group}/ instead. "
-            + "Pass it to onenote_get_operation, and use that same handle for every poll. A later "
-            + "poll's own `uri` differs, because Microsoft appends the caller's id, and that value "
-            + "is not the one to reuse. Never build one: an operation id alone reaches nothing."
+            + "A handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. Pass it to onenote_get_operation, and use that "
+            + "same handle for every poll. A later poll's own `uri` differs, because Microsoft "
+            + "appends the caller's id, so do not reuse it. Never build one: an operation id "
+            + "alone reaches nothing."
         )
     )
     status: OperationState | None = Field(

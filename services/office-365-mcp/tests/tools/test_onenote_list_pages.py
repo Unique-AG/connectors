@@ -980,13 +980,16 @@ class TestItsArguments:
         assert "only without `section`" in described
         assert 15 <= len(described.split()) <= 60
 
-    async def test_the_section_argument_says_how_a_group_section_handle_starts(
+    async def test_the_section_argument_says_how_a_group_or_site_section_handle_starts(
         self, transport: httpx.AsyncClient
     ) -> None:
         properties = await self._properties(transport)
 
         described = cast("str", properties["section"]["description"])
-        assert "starts with onenote:///groups/{group}/" in described
+        assert (
+            "starts with onenote:///groups/{group}/ " + "or onenote:///sites/{site}/ instead"
+            in described
+        )
 
     def test_the_description_names_the_group_search(self) -> None:
         assert "notebooks of one group" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]

@@ -80,20 +80,22 @@ _UNNAMED_NOTEBOOK = "an unnamed notebook"
 _NOT_A_PAGE_HANDLE = (
     "onenote_copy_page takes a page handle in `page`. It looks like onenote:///pages/{id}, with "
     + "the id percent-encoded, for example "
-    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A handle from a group "
-    + "notebook starts with onenote:///groups/{group}/ instead. A section handle "
-    + "(onenote:///sections/{id}) is not a page handle: it names a whole section, not one page "
-    + "inside it. Take the `uri` from a onenote_list_pages row or a onenote_create_page answer, "
-    + "and copy it word for word. This same value fails again, so do not retry it."
+    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A handle from a group or "
+    + "site notebook starts with onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A "
+    + "section handle (onenote:///sections/{id}) is not a page handle: it names a whole section, "
+    + "not one page inside it. Take the `uri` from a onenote_list_pages row or a "
+    + "onenote_create_page answer, and copy it word for word. This same value fails again, so do "
+    + "not retry it."
 )
 
 _NOT_A_SECTION_HANDLE = (
     "onenote_copy_page takes a section handle in `to_section`. It looks like "
     + "onenote:///sections/{id}, and it comes from the `uri` of a section in an "
-    + "onenote_list_notebooks or onenote_list_sections result. A handle from a group notebook "
-    + "starts with onenote:///groups/{group}/ instead. A page handle "
-    + "(onenote:///pages/{id}) and a notebook handle (onenote:///notebooks/{id}) are neither one "
-    + "a section handle. Copy it word for word. This same value fails again, so do not retry it."
+    + "onenote_list_notebooks or onenote_list_sections result. A handle from a group or site "
+    + "notebook starts with onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A page "
+    + "handle (onenote:///pages/{id}) and a notebook handle (onenote:///notebooks/{id}) are "
+    + "neither one a section handle. Copy it word for word. This same value fails again, so do not "
+    + "retry it."
 )
 
 _NO_OPERATION_NAMED = (
@@ -246,8 +248,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The page to copy: the `uri` of a onenote_list_pages row or a "
                     + "onenote_create_page answer, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A handle from a group notebook starts with "
-                    + "onenote:///groups/{group}/ instead. A section handle is not a page handle."
+                    + "onenote:///pages/{id}. A handle from a group or site notebook starts with "
+                    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A section "
+                    + "handle is not a page handle."
                 ),
             ),
         ],
@@ -259,9 +262,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "The destination section, from the `uri` of a section in a "
                     + "onenote_list_notebooks or onenote_list_sections result, or a "
                     + "onenote_create_section answer. The shape is onenote:///sections/{id}. A "
-                    + "handle from a group notebook starts with onenote:///groups/{group}/ "
-                    + "instead. A page handle or a notebook handle is not a section handle. Copy "
-                    + "it word for word."
+                    + "handle from a group or site notebook starts with onenote:///groups/{group}/ "
+                    + "or onenote:///sites/{site}/ instead. A page handle or a notebook handle is "
+                    + "not a section handle. Copy it word for word."
                 ),
             ),
         ],

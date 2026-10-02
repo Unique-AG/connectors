@@ -1134,8 +1134,11 @@ class TestHowItDescribesItself:
         assert "This tool does not reach a notebook on a SharePoint site." in described
         assert "or in a Microsoft 365 team" not in described
 
-    def test_the_handle_fields_name_the_group_spelling(self) -> None:
-        spelling = "A handle from a group notebook starts with onenote:///groups/{group}/ instead."
+    def test_the_handle_fields_name_the_group_and_site_spellings(self) -> None:
+        spelling = (
+            "A handle from a group or site notebook starts with onenote:///groups/{group}/ "
+            + "or onenote:///sites/{site}/ instead."
+        )
 
         assert spelling in (lister.Notebook.model_fields["uri"].description or "")
         assert spelling in (lister.NotebookSection.model_fields["uri"].description or "")

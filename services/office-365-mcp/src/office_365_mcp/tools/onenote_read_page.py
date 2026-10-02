@@ -52,11 +52,12 @@ takes as `target`.
 _NOT_A_PAGE_HANDLE = (
     "onenote_read_page takes a page handle. It looks like onenote:///pages/{id}, and it comes "
     + "from the `uri` of an onenote_list_pages row, or of what onenote_create_page just wrote. "
-    + "A handle from a group notebook starts with onenote:///groups/{group}/ instead. Copy it "
-    + "exactly. A section handle, which looks like onenote:///sections/{id}, is not a "
-    + "page handle: a section holds pages, and has no content of its own to read. A page title, "
-    + "a web address, and a bare id are not handles either. Call onenote_list_pages and take a "
-    + "`uri` from its answer. This same value fails again, so do not retry it."
+    + "A handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+    + "onenote:///sites/{site}/ instead. Copy it exactly. A section handle, which looks like "
+    + "onenote:///sections/{id}, is not a page handle: a section holds pages, and has no content "
+    + "of its own to read. A page title, a web address, and a bare id are not handles either. Call "
+    + "onenote_list_pages and take a `uri` from its answer. This same value fails again, so do not "
+    + "retry it."
 )
 
 GRAPH_NOT_FOUND = (
@@ -205,8 +206,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The page to read: the `uri` of a onenote_list_pages row or a "
                     + "onenote_create_page answer, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A handle from a group notebook starts with "
-                    + "onenote:///groups/{group}/ instead. A section handle is not a page handle."
+                    + "onenote:///pages/{id}. A handle from a group or site notebook starts with "
+                    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A section "
+                    + "handle is not a page handle."
                 ),
             ),
         ],

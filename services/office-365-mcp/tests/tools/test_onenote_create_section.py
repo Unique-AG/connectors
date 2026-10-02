@@ -899,3 +899,15 @@ class TestANotebookThatBelongsToAGroup:
         calls = cast("Sequence[Call]", graph.calls)
         assert len(calls) > 0
         assert all(call.request.url.path.startswith("/v1.0/me/") for call in calls)
+
+    async def test_the_description_names_a_notebook_that_a_group_or_a_site_owns(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        mcp: FastMCP = FastMCP(name="description-under-test")
+        creator.register(mcp, transport)
+        tool = await mcp.get_tool(creator.TOOL_NAME)
+
+        assert tool is not None
+        assert "one that a Microsoft 365 group or a SharePoint site owns" in (
+            tool.description or ""
+        )

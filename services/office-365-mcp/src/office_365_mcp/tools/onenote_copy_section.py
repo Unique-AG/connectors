@@ -328,8 +328,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The section to copy: the `uri` of a section in a onenote_list_notebooks or "
                     + "onenote_list_sections result, copied word for word. The shape is "
-                    + "onenote:///sections/{id}. A handle from a group notebook starts with "
-                    + "onenote:///groups/{group}/ instead."
+                    + "onenote:///sections/{id}. A handle from a group or site notebook starts "
+                    + "with onenote:///groups/{group}/ or onenote:///sites/{site}/ instead."
                 ),
             ),
         ],
@@ -341,8 +341,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The destination notebook, as the `uri` of a onenote_list_notebooks or "
                     + "onenote_find_notebook_from_url result, or a onenote_create_notebook answer. "
-                    + "The shape is onenote:///notebooks/{id}. A handle from a group notebook "
-                    + "starts with onenote:///groups/{group}/ instead."
+                    + "The shape is onenote:///notebooks/{id}. A handle from a group or site "
+                    + "notebook starts with onenote:///groups/{group}/ or onenote:///sites/{site}/ "
+                    + "instead."
                 ),
             ),
         ] = None,
@@ -353,8 +354,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The destination section group, as the `uri` of a section group in a "
                     + "onenote_list_sections result, or a onenote_create_section_group answer. The "
-                    + "shape is onenote:///sectiongroups/{id}. A handle from a group notebook "
-                    + "starts with onenote:///groups/{group}/ instead."
+                    + "shape is onenote:///sectiongroups/{id}. A handle from a group or site "
+                    + "notebook starts with onenote:///groups/{group}/ or onenote:///sites/{site}/ "
+                    + "instead."
                 ),
             ),
         ] = None,

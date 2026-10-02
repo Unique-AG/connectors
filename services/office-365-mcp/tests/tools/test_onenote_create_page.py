@@ -696,15 +696,18 @@ class TestHowItDeclaresItself:
             + "support custom tags."
         ) in (tool.description or "")
 
-    async def test_the_description_and_the_section_argument_name_group_notebooks(
+    async def test_the_description_and_the_section_argument_name_group_and_site_notebooks(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
         section = cast("Mapping[str, object]", properties["section"])
-        assert "a notebook that a Microsoft 365 group owns" in (tool.description or "")
+        assert "a notebook that a Microsoft 365 group or a SharePoint site owns" in (
+            tool.description or ""
+        )
         assert "onenote:///groups/{group}/" in cast("str", section["description"])
+        assert "onenote:///sites/{site}/" in cast("str", section["description"])
 
     async def test_the_description_covers_section_name(self, transport: httpx.AsyncClient) -> None:
         _parameters, tool = await _registered(transport)
