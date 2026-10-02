@@ -10,7 +10,7 @@ from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared.handles import OnenotePageHandle, OnenoteSectionHandle
+from office_365_mcp.shared.handles import OnenoteOwner, OnenotePageHandle, OnenoteSectionHandle
 from office_365_mcp.shared.seam import READ_ONLY
 from office_365_mcp.tools import onenote_preview_page as previewer
 
@@ -22,7 +22,7 @@ _PREVIEW_PATH = "/me/onenote/pages/0-SYNTHETICPAGE0000%210001/preview()"
 _GROUP_PREVIEW_PATH = f"/groups/{GROUP_ID}/onenote/pages/0-SYNTHETICPAGE0000%210001/preview()"
 
 _PAGE = OnenotePageHandle(PAGE_ID).uri
-_GROUP_PAGE = OnenotePageHandle(PAGE_ID, group_id=GROUP_ID).uri
+_GROUP_PAGE = OnenotePageHandle(PAGE_ID, owner=OnenoteOwner("groups", GROUP_ID)).uri
 _SECTION = OnenoteSectionHandle(SECTION_ID).uri
 
 _IMAGE_URL = "https://graph.microsoft.com/v1.0/me/onenote/resources/res-1/content"

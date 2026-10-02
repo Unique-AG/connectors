@@ -22,6 +22,7 @@ from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnav
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOperationHandle,
+    OnenoteOwner,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
     onenote_notebook_handle,
@@ -37,11 +38,20 @@ _GROUP_ID = "5c6b7a81-2f0d-4a24-9b1e-8a9c3c470f9e"
 _SOURCE_GROUP_ID = "0f9e8a9c-3c47-4a24-9b1e-5c6b7a812f0d"
 
 _NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID).uri
-_GROUP_NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID, group_id=_SOURCE_GROUP_ID).uri
+_GROUP_NOTEBOOK_URI = OnenoteNotebookHandle(
+    _NOTEBOOK_ID, owner=OnenoteOwner("groups", _SOURCE_GROUP_ID)
+).uri
 
 _COPY_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}/copyNotebook"
 _NOTEBOOK_GET_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}"
 _SOURCE_GROUP_ROOT = f"/groups/{_SOURCE_GROUP_ID}/onenote"
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID, owner=_SITE).uri
 
 
 def _operation_payload(
@@ -429,7 +439,12 @@ class TestCopyingIntoAMicrosoft365Group:
         assert copy.call_count == 1
         assert len(graph.calls) == 1
         assert _sent(copy) == {}
-        assert answer.uri == OnenoteOperationHandle(_OPERATION_ID, group_id=_SOURCE_GROUP_ID).uri
+        assert (
+            answer.uri
+            == OnenoteOperationHandle(
+                _OPERATION_ID, owner=OnenoteOwner("groups", _SOURCE_GROUP_ID)
+            ).uri
+        )
 
     async def test_a_group_source_is_named_from_the_group_that_holds_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -657,3 +672,24 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
         properties = cast("Mapping[str, object]", tool.parameters["properties"])
         assert "maxLength" not in json.dumps(properties["new_name"])
+
+
+class TestNotebooksOfASharePointSite:
+    @pytest.mark.parametrize("to_group", [None, _GROUP_ID])
+    async def test_a_site_source_is_refused_before_any_graph_call(
+        self, client: GraphServiceClient, graph: respx.MockRouter, to_group: str | None
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await copy_notebook(
+                client,
+                notebook=_SITE_NOTEBOOK_URI,
+                to_group=to_group,
+                confirm=_never_asked,
+                answer_pending=True,
+            )
+
+        assert len(graph.calls) == 0, "a copy from a site notebook reached Graph"
+        message = str(refused.value)
+        assert message.startswith("onenote_copy_notebook ")
+        assert "notebook of a SharePoint site" in message
+        assert "This same call fails again" in message

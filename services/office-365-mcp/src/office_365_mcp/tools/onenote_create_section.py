@@ -197,7 +197,7 @@ async def _post_section(
     *,
     name: str,
 ) -> OnenoteSection | None:
-    root = onenote_root(client, handle.group_id)
+    root = onenote_root(client, handle.owner)
     section = OnenoteSection(display_name=name)
     request_configuration = RequestConfiguration[QueryParameters](options=no_retry())
     if isinstance(handle, OnenoteNotebookHandle):
@@ -216,7 +216,7 @@ def _answer(
         "Graph created a section it gave no id, which cannot be addressed"
     )
     return CreatedSection(
-        uri=OnenoteSectionHandle(section.id, group_id=handle.group_id).uri,
+        uri=OnenoteSectionHandle(section.id, owner=handle.owner).uri,
         name=section.display_name,
         is_default=section.is_default,
         web_url=web_url_of(section.links),

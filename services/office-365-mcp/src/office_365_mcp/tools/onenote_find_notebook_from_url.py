@@ -18,12 +18,13 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
+    OnenoteOwner,
     onenote_notebook_handle,
     onenote_page_handle,
     onenote_section_group_handle,
     onenote_section_handle,
 )
-from office_365_mcp.shared.notes import client_url_of, onenote_root, web_url_of
+from office_365_mcp.shared.notes import client_url_of, onenote_root, owner_named, web_url_of
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "onenote_find_notebook_from_url"
@@ -148,16 +149,17 @@ async def find_notebook_from_url(
     ):
         raise ToolError(_OWN_OTHER_HANDLE_NOT_A_WEB_ADDRESS)
 
+    owner = owner_named(group=group, site=None)
     with graph_errors(TOOL_NAME, step=STEP_NOTEBOOK_FROM_URL):
-        found = await _resolve(client, web_url, group)
+        found = await _resolve(client, web_url, owner)
     assert found is not None, "Graph answered getNotebookFromWebUrl with nothing"
-    return _answer(found, group)
+    return _answer(found, owner)
 
 
 async def _resolve(
-    client: GraphServiceClient, web_url: str, group_id: str | None
+    client: GraphServiceClient, web_url: str, owner: OnenoteOwner | None
 ) -> CopyNotebookModel | None:
-    builder = onenote_root(client, group_id).notebooks.get_notebook_from_web_url
+    builder = onenote_root(client, owner).notebooks.get_notebook_from_web_url
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
     request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
@@ -170,12 +172,12 @@ async def _resolve(
     )
 
 
-def _answer(found: CopyNotebookModel, group_id: str | None) -> FoundNotebook:
+def _answer(found: CopyNotebookModel, owner: OnenoteOwner | None) -> FoundNotebook:
     assert found.id is not None, (
         "Graph answered getNotebookFromWebUrl with a notebook that has no id"
     )
     return FoundNotebook(
-        uri=OnenoteNotebookHandle(found.id, group_id=group_id).uri,
+        uri=OnenoteNotebookHandle(found.id, owner=owner).uri,
         name=found.name,
         is_default=found.is_default,
         is_shared=found.is_shared,

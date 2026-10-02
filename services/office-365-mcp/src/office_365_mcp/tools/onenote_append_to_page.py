@@ -120,7 +120,7 @@ async def append_to_page(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        pre_read = await page_for_a_question(client, handle.page_id, group_id=handle.group_id)
+        pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         if answer_pending or pre_read.audience.reaches_others:
             with not_graph():
                 answer = await confirm(
@@ -132,7 +132,7 @@ async def append_to_page(
             with graph_step(STEP_APPEND_CONTENT):
                 await _append(client, handle, body_html=body_html)
             try:
-                summary = await page_summary(client, handle.page_id, group_id=handle.group_id)
+                summary = await page_summary(client, handle.page_id, owner=handle.owner)
             except GraphFailure as failure:
                 raise Advised(_WRITTEN_BUT_UNREAD) from failure
 
@@ -168,7 +168,7 @@ async def _append(client: GraphServiceClient, handle: OnenotePageHandle, *, body
         content=body_html,
     )
     patch = (
-        onenote_root(client, handle.group_id)
+        onenote_root(client, handle.owner)
         .pages.by_onenote_page_id(handle.page_id)
         .onenote_patch_content
     )

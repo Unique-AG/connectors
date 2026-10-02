@@ -3,7 +3,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
 from hashlib import sha256
-from typing import Literal, Protocol, Self, cast
+from typing import Literal, Protocol, Self, assert_never, cast
 from urllib.parse import unquote, urlsplit
 
 from kiota_abstractions.base_request_builder import BaseRequestBuilder
@@ -22,6 +22,7 @@ from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_section import OnenoteSection
 from msgraph.generated.models.operation_status import OperationStatus
 from msgraph.generated.models.section_group import SectionGroup
+from msgraph.generated.sites.item.onenote import onenote_request_builder as site_onenote
 from msgraph.generated.users.item.onenote import onenote_request_builder as user_onenote
 from msgraph.generated.users.item.onenote.notebooks.item.notebook_item_request_builder import (
     NotebookItemRequestBuilder,
@@ -52,6 +53,7 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOperationHandle,
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
@@ -84,13 +86,40 @@ _SectionGroupItemBuilder = section_group_item_request_builder.SectionGroupItemRe
 _SectionGroupQuery = _SectionGroupItemBuilder.SectionGroupItemRequestBuilderGetQueryParameters
 _PageQuery = OnenotePageItemRequestBuilder.OnenotePageItemRequestBuilderGetQueryParameters
 
-type OnenoteRoot = user_onenote.OnenoteRequestBuilder | group_onenote.OnenoteRequestBuilder
+type OnenoteRoot = (
+    user_onenote.OnenoteRequestBuilder
+    | group_onenote.OnenoteRequestBuilder
+    | site_onenote.OnenoteRequestBuilder
+)
 
 
-def onenote_root(client: GraphServiceClient, group_id: str | None) -> OnenoteRoot:
-    if group_id is None:
+def onenote_root(client: GraphServiceClient, owner: OnenoteOwner | None) -> OnenoteRoot:
+    if owner is None:
         return client.me.onenote
-    return client.groups.by_group_id(group_id).onenote
+    match owner.kind:
+        case "groups":
+            return client.groups.by_group_id(owner.owner_id).onenote
+        case "sites":
+            return client.sites.by_site_id(owner.owner_id).onenote
+        case _:
+            assert_never(owner.kind)
+
+
+def owner_named(*, group: str | None, site: str | None) -> OnenoteOwner | None:
+    assert group is None or site is None, "a OneNote item belongs to a group or a site, not both"
+    if group is not None:
+        return OnenoteOwner("groups", group)
+    if site is not None:
+        return OnenoteOwner("sites", site)
+    return None
+
+
+def in_a_site(*owners: OnenoteOwner | None) -> bool:
+    return any(owner is not None and owner.kind == "sites" for owner in owners)
+
+
+def group_id_of(owner: OnenoteOwner | None) -> str | None:
+    return owner.owner_id if owner is not None and owner.kind == "groups" else None
 
 
 async def get_with_query[M: Parsable](
@@ -250,23 +279,21 @@ class PageSummary(BaseModel):
     )
 
     @classmethod
-    def from_page(cls, page: OnenotePage, *, group_id: str | None = None) -> Self | None:
+    def from_page(cls, page: OnenotePage, *, owner: OnenoteOwner | None = None) -> Self | None:
         if page.id is None:
             return None
         section = page.parent_section
         section_id = section.id if section is not None else None
         notebook = page.parent_notebook
         return cls(
-            uri=OnenotePageHandle(page.id, group_id=group_id).uri,
+            uri=OnenotePageHandle(page.id, owner=owner).uri,
             title=page.title,
             created_at=page.created_date_time,
             last_modified_at=page.last_modified_date_time,
             web_url=web_url_of(page.links),
             client_url=client_url_of(page.links),
             section_uri=(
-                None
-                if section_id is None
-                else OnenoteSectionHandle(section_id, group_id=group_id).uri
+                None if section_id is None else OnenoteSectionHandle(section_id, owner=owner).uri
             ),
             section_name=section.display_name if section is not None else None,
             notebook_name=notebook.display_name if notebook is not None else None,
@@ -277,17 +304,17 @@ class PageSummary(BaseModel):
 
 
 async def page_summary(
-    client: GraphServiceClient, page_id: str, *, group_id: str | None = None
+    client: GraphServiceClient, page_id: str, *, owner: OnenoteOwner | None = None
 ) -> PageSummary:
     with graph_step(STEP_PAGE):
         found = await get_with_query(
             client,
-            onenote_root(client, group_id).pages.by_onenote_page_id(page_id),
+            onenote_root(client, owner).pages.by_onenote_page_id(page_id),
             _PageQuery(select=list(PAGE_FIELDS), expand=list(PAGE_EXPANSIONS)),
             OnenotePage,
         )
     assert found is not None, "Graph answered a page re-read with no page"
-    summary = PageSummary.from_page(found, group_id=group_id)
+    summary = PageSummary.from_page(found, owner=owner)
     assert summary is not None, "Graph re-read a page it gave no id, which cannot be addressed"
     return summary
 
@@ -301,16 +328,24 @@ class NotebookAudience:
     name: str | None
     is_shared: bool | None
     user_role: str | None
-    in_group: bool = False
+    owner: OnenoteOwner | None = None
 
     @property
     def reaches_others(self) -> bool:
-        return self.in_group or not (self.is_shared is False and self.user_role == OWNER_ROLE)
+        return self.owner is not None or not (
+            self.is_shared is False and self.user_role == OWNER_ROLE
+        )
 
     @property
     def reason(self) -> str:
-        if self.in_group:
-            return "which belongs to a Microsoft 365 group"
+        if self.owner is not None:
+            match self.owner.kind:
+                case "groups":
+                    return "which belongs to a Microsoft 365 group"
+                case "sites":
+                    return "which belongs to a SharePoint site"
+                case _:
+                    assert_never(self.owner.kind)
         if self.is_shared:
             return "which is shared with other people"
         if self.user_role is not None and self.user_role != OWNER_ROLE:
@@ -318,7 +353,7 @@ class NotebookAudience:
         return "whose sharing Microsoft did not report"
 
 
-def audience_of(notebook: Notebook, *, in_group: bool = False) -> NotebookAudience:
+def audience_of(notebook: Notebook, *, owner: OnenoteOwner | None = None) -> NotebookAudience:
     return NotebookAudience(
         notebook_id=notebook.id,
         name=notebook.display_name,
@@ -328,22 +363,22 @@ def audience_of(notebook: Notebook, *, in_group: bool = False) -> NotebookAudien
             if notebook.user_role is None
             else cast("str", cast("object", notebook.user_role.value))
         ),
-        in_group=in_group,
+        owner=owner,
     )
 
 
 async def notebook_audience(
-    client: GraphServiceClient, notebook_id: str, *, group_id: str | None = None
+    client: GraphServiceClient, notebook_id: str, *, owner: OnenoteOwner | None = None
 ) -> NotebookAudience:
     with graph_step(STEP_NOTEBOOK):
         found = await get_with_query(
             client,
-            onenote_root(client, group_id).notebooks.by_notebook_id(notebook_id),
+            onenote_root(client, owner).notebooks.by_notebook_id(notebook_id),
             _NotebookQuery(select=list(NOTEBOOK_AUDIENCE_FIELDS)),
             Notebook,
         )
     assert found is not None, "Graph answered a notebook read with no notebook"
-    return audience_of(found, in_group=group_id is not None)
+    return audience_of(found, owner=owner)
 
 
 async def default_notebook_audience(client: GraphServiceClient) -> NotebookAudience | None:
@@ -382,20 +417,20 @@ class ContainerAudience:
 
 
 async def _audience_of_notebook_id(
-    client: GraphServiceClient, notebook_id: str | None, *, group_id: str | None
+    client: GraphServiceClient, notebook_id: str | None, *, owner: OnenoteOwner | None
 ) -> NotebookAudience:
     if notebook_id is None:
-        return replace(UNKNOWN_AUDIENCE, in_group=group_id is not None)
-    return await notebook_audience(client, notebook_id, group_id=group_id)
+        return replace(UNKNOWN_AUDIENCE, owner=owner)
+    return await notebook_audience(client, notebook_id, owner=owner)
 
 
 async def section_container(
-    client: GraphServiceClient, section_id: str, *, group_id: str | None = None
+    client: GraphServiceClient, section_id: str, *, owner: OnenoteOwner | None = None
 ) -> ContainerAudience:
     with graph_step(STEP_SECTION):
         found = await get_with_query(
             client,
-            onenote_root(client, group_id).sections.by_onenote_section_id(section_id),
+            onenote_root(client, owner).sections.by_onenote_section_id(section_id),
             _SectionQuery(select=list(_CONTAINER_FIELDS), expand=["parentNotebook"]),
             OnenoteSection,
         )
@@ -404,17 +439,17 @@ async def section_container(
     notebook_id = parent.id if parent is not None else None
     return ContainerAudience(
         name=found.display_name,
-        notebook=await _audience_of_notebook_id(client, notebook_id, group_id=group_id),
+        notebook=await _audience_of_notebook_id(client, notebook_id, owner=owner),
     )
 
 
 async def section_group_container(
-    client: GraphServiceClient, section_group_id: str, *, group_id: str | None = None
+    client: GraphServiceClient, section_group_id: str, *, owner: OnenoteOwner | None = None
 ) -> ContainerAudience:
     with graph_step(STEP_SECTION_GROUP):
         found = await get_with_query(
             client,
-            onenote_root(client, group_id).section_groups.by_section_group_id(section_group_id),
+            onenote_root(client, owner).section_groups.by_section_group_id(section_group_id),
             _SectionGroupQuery(select=list(_CONTAINER_FIELDS), expand=["parentNotebook"]),
             SectionGroup,
         )
@@ -423,23 +458,23 @@ async def section_group_container(
     notebook_id = parent.id if parent is not None else None
     return ContainerAudience(
         name=found.display_name,
-        notebook=await _audience_of_notebook_id(client, notebook_id, group_id=group_id),
+        notebook=await _audience_of_notebook_id(client, notebook_id, owner=owner),
     )
 
 
 async def section_audience(
-    client: GraphServiceClient, section_id: str, *, group_id: str | None = None
+    client: GraphServiceClient, section_id: str, *, owner: OnenoteOwner | None = None
 ) -> NotebookAudience:
-    return (await section_container(client, section_id, group_id=group_id)).notebook
+    return (await section_container(client, section_id, owner=owner)).notebook
 
 
 async def container_audience(
     client: GraphServiceClient, handle: OnenoteNotebookHandle | OnenoteSectionGroupHandle
 ) -> ContainerAudience:
     if isinstance(handle, OnenoteNotebookHandle):
-        notebook = await notebook_audience(client, handle.notebook_id, group_id=handle.group_id)
+        notebook = await notebook_audience(client, handle.notebook_id, owner=handle.owner)
         return ContainerAudience(name=notebook.name, notebook=notebook)
-    return await section_group_container(client, handle.section_group_id, group_id=handle.group_id)
+    return await section_group_container(client, handle.section_group_id, owner=handle.owner)
 
 
 _PAGE_FOR_A_QUESTION_FIELDS: tuple[str, ...] = ("id", "title")
@@ -453,12 +488,12 @@ class PageForAQuestion:
 
 
 async def page_for_a_question(
-    client: GraphServiceClient, page_id: str, *, group_id: str | None = None
+    client: GraphServiceClient, page_id: str, *, owner: OnenoteOwner | None = None
 ) -> PageForAQuestion:
     with graph_step(STEP_PAGE):
         found = await get_with_query(
             client,
-            onenote_root(client, group_id).pages.by_onenote_page_id(page_id),
+            onenote_root(client, owner).pages.by_onenote_page_id(page_id),
             _PageQuery(
                 select=list(_PAGE_FOR_A_QUESTION_FIELDS),
                 expand=list(_PAGE_FOR_A_QUESTION_EXPANSIONS),
@@ -470,7 +505,7 @@ async def page_for_a_question(
     notebook_id = parent.id if parent is not None else None
     return PageForAQuestion(
         page=found,
-        audience=await _audience_of_notebook_id(client, notebook_id, group_id=group_id),
+        audience=await _audience_of_notebook_id(client, notebook_id, owner=owner),
     )
 
 
@@ -493,25 +528,27 @@ def resource_handle_of(
         return None
     family, encoded_id = match.groups()
     resolved_id = resource_id if resource_id is not None else unquote(encoded_id)
-    group_id = group_of_graph_url(location)
+    owner = owner_of_graph_url(location)
     kind = _RESOURCE_KIND_OF[family]
     if family == "pages":
-        return OnenotePageHandle(resolved_id, group_id=group_id).uri, kind
+        return OnenotePageHandle(resolved_id, owner=owner).uri, kind
     if family == "sections":
-        return OnenoteSectionHandle(resolved_id, group_id=group_id).uri, kind
-    return OnenoteNotebookHandle(resolved_id, group_id=group_id).uri, kind
+        return OnenoteSectionHandle(resolved_id, owner=owner).uri, kind
+    return OnenoteNotebookHandle(resolved_id, owner=owner).uri, kind
 
 
-_GROUP_ROOT = re.compile(r"/groups(?:/([^/]+)|\('([^'/]+)'\))/onenote/")
+_OWNER_ROOT = re.compile(r"/(groups|sites)(?:/([^/]+)|\('([^'/]+)'\))/onenote/")
 
 
-def group_of_graph_url(url: str) -> str | None:
-    match = _GROUP_ROOT.search(urlsplit(url).path)
+def owner_of_graph_url(url: str) -> OnenoteOwner | None:
+    match = _OWNER_ROOT.search(urlsplit(url).path)
     if match is None:
         return None
-    segment, key = match.groups()
-    group_id = unquote(segment if segment is not None else key)
-    return group_id if group_id.strip() else None
+    kind, segment, key = match.groups()
+    owner_id = unquote(segment if segment is not None else key)
+    if not owner_id.strip():
+        return None
+    return OnenoteOwner("groups" if kind == "groups" else "sites", owner_id)
 
 
 _RESOURCE_ID_IN_URL = re.compile(r"/onenote/resources/([^/?#]+)(?:/\$value|/content)?/?(?:[?#]|\Z)")
@@ -601,13 +638,13 @@ class OperationSummary(BaseModel):
     )
 
     @classmethod
-    def from_operation(cls, op: OnenoteOperation, *, group_id: str | None = None) -> Self:
+    def from_operation(cls, op: OnenoteOperation, *, owner: OnenoteOwner | None = None) -> Self:
         assert op.id is not None, "Graph answered with an operation that has no id"
         result = resource_handle_of(op.resource_location, op.resource_id)
         result_uri, result_kind = result if result is not None else (None, None)
         error = op.error
         return cls(
-            uri=OnenoteOperationHandle(op.id, group_id=group_id).uri,
+            uri=OnenoteOperationHandle(op.id, owner=owner).uri,
             status=(None if op.status is None else _STATUS_TEXT[op.status]),
             percent_complete=op.percent_complete,
             created_at=op.created_date_time,
@@ -619,9 +656,9 @@ class OperationSummary(BaseModel):
         )
 
     @classmethod
-    def accepted(cls, operation_id: str, *, group_id: str | None = None) -> Self:
+    def accepted(cls, operation_id: str, *, owner: OnenoteOwner | None = None) -> Self:
         return cls(
-            uri=OnenoteOperationHandle(operation_id, group_id=group_id).uri,
+            uri=OnenoteOperationHandle(operation_id, owner=owner).uri,
             status=None,
             percent_complete=None,
             created_at=None,
@@ -637,17 +674,17 @@ _JSON_MEDIA_TYPE = "application/json"
 
 
 def accepted_operation(
-    fetched: FetchedResponse, *, group_id: str | None = None
+    fetched: FetchedResponse, *, owner: OnenoteOwner | None = None
 ) -> OperationSummary | None:
     if fetched.content and fetched.media_type == _JSON_MEDIA_TYPE:
         node = JsonParseNodeFactory().get_root_parse_node(_JSON_MEDIA_TYPE, fetched.content)
         operation = node.get_object_value(OnenoteOperation)
         if operation.id is not None:
-            return OperationSummary.from_operation(operation, group_id=group_id)
+            return OperationSummary.from_operation(operation, owner=owner)
     operation_id = operation_id_in(fetched.headers.get("operation-location"))
     if operation_id is None:
         return None
-    return OperationSummary.accepted(operation_id, group_id=group_id)
+    return OperationSummary.accepted(operation_id, owner=owner)
 
 
 def write_state_for(*parts: str) -> str:

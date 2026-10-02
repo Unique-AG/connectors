@@ -33,6 +33,16 @@ _GROUP_ADDRESSES = [
     f"https://graph.microsoft.com/v1.0/groups('{GROUP_ID}')/onenote/resources/{RESOURCE_ID}/content",
 ]
 
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE_CONTENT_PATH = f"/sites/{_SITE_ID}/onenote/resources/{RESOURCE_ID}/content"
+_SITE_ADDRESSES = [
+    f"https://graph.microsoft.com/v1.0/sites/{_SITE_ID}/onenote/resources/{RESOURCE_ID}/$value",
+    f"https://graph.microsoft.com/v1.0/sites('{_SITE_ID}')/onenote/resources/{RESOURCE_ID}/content",
+]
+
 _BYTES = b"\x89PNG\r\nsynthetic-image-bytes"
 
 
@@ -138,6 +148,26 @@ class TestAGroupNotebook:
 
         with pytest.raises(GraphNotFound):
             _ = await _read(client, transport, resource=_GROUP_ADDRESSES[0])
+
+
+class TestASiteNotebook:
+    @pytest.mark.parametrize("address", _SITE_ADDRESSES)
+    async def test_a_site_address_fetches_the_content_under_the_site(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        address: str,
+    ) -> None:
+        site_content = graph.get(_SITE_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=_BYTES, headers={"Content-Type": "image/png"})
+        )
+
+        answer = await _read(client, transport, resource=address)
+
+        assert site_content.call_count == 1
+        assert graph.calls.call_count == 1, "nothing was read from /me"
+        assert answer.data == _BYTES
 
 
 class TestWhatComesBack:

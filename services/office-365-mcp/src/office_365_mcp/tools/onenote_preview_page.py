@@ -81,7 +81,7 @@ async def preview_page(client: GraphServiceClient, *, page: str) -> PagePreview:
 
     with graph_errors(TOOL_NAME, step=STEP_PREVIEW):
         fetched = await (
-            onenote_root(client, handle.group_id)
+            onenote_root(client, handle.owner)
             .pages.by_onenote_page_id(handle.page_id)
             .preview.get()
         )

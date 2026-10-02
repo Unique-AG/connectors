@@ -29,6 +29,7 @@ from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnav
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOperationHandle,
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
@@ -49,9 +50,13 @@ _OTHER_OWNER_ID = "0f9e8a9c-3c47-4a24-9b1e-5c6b7a812f0d"
 _SECTION_URI = OnenoteSectionHandle(_SECTION_ID).uri
 _NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID).uri
 _GROUP_URI = OnenoteSectionGroupHandle(_GROUP_ID).uri
-_OWNED_SECTION_URI = OnenoteSectionHandle(_SECTION_ID, group_id=_OWNER_ID).uri
-_OWNED_NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID, group_id=_OTHER_OWNER_ID).uri
-_OWNED_GROUP_URI = OnenoteSectionGroupHandle(_GROUP_ID, group_id=_OTHER_OWNER_ID).uri
+_OWNED_SECTION_URI = OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
+_OWNED_NOTEBOOK_URI = OnenoteNotebookHandle(
+    _NOTEBOOK_ID, owner=OnenoteOwner("groups", _OTHER_OWNER_ID)
+).uri
+_OWNED_GROUP_URI = OnenoteSectionGroupHandle(
+    _GROUP_ID, owner=OnenoteOwner("groups", _OTHER_OWNER_ID)
+).uri
 
 _SECTION_GET_PATH = f"/me/onenote/sections/{_SECTION_ID}"
 _COPY_TO_NOTEBOOK_PATH = f"/me/onenote/sections/{_SECTION_ID}/copyToNotebook"
@@ -61,6 +66,15 @@ _GROUP_GET_PATH = f"/me/onenote/sectionGroups/{_GROUP_ID}"
 
 _OWNER_ROOT = f"/groups/{_OWNER_ID}/onenote"
 _OTHER_OWNER_ROOT = f"/groups/{_OTHER_OWNER_ID}/onenote"
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_SECTION_URI = OnenoteSectionHandle(_SECTION_ID, owner=_SITE).uri
+_SITE_NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID, owner=_SITE).uri
+_SITE_GROUP_URI = OnenoteSectionGroupHandle(_GROUP_ID, owner=_SITE).uri
 
 
 def _notebook_payload(
@@ -1214,7 +1228,10 @@ class TestNotebooksOfAMicrosoft365Group:
 
         assert copy.call_count == 1
         assert _sent(copy) == {"id": _GROUP_ID, "groupId": _OTHER_OWNER_ID}
-        assert answer.uri == OnenoteOperationHandle(_OPERATION_ID, group_id=_OWNER_ID).uri
+        assert (
+            answer.uri
+            == OnenoteOperationHandle(_OPERATION_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
+        )
 
     @pytest.mark.parametrize(
         ("to_notebook", "to_section_group"),
@@ -1268,7 +1285,10 @@ class TestNotebooksOfAMicrosoft365Group:
 
         answer = await _copy(client, section=_OWNED_SECTION_URI)
 
-        assert answer.uri == OnenoteOperationHandle(_OPERATION_ID, group_id=_OWNER_ID).uri
+        assert (
+            answer.uri
+            == OnenoteOperationHandle(_OPERATION_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
+        )
 
     async def test_the_operation_handle_of_a_copy_posted_under_me_names_no_group(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1507,3 +1527,40 @@ class TestHowItDeclaresItself:
         assert "A handle from a group notebook starts with onenote:///groups/{group}/ instead." in (
             cast("str", field["description"])
         )
+
+
+class TestNotebooksOfASharePointSite:
+    @pytest.mark.parametrize(
+        ("section", "to_notebook", "to_section_group"),
+        [
+            (_SITE_SECTION_URI, _NOTEBOOK_URI, None),
+            (_SITE_SECTION_URI, None, _GROUP_URI),
+            (_SECTION_URI, _SITE_NOTEBOOK_URI, None),
+            (_SECTION_URI, None, _SITE_GROUP_URI),
+            (_OWNED_SECTION_URI, _SITE_NOTEBOOK_URI, None),
+            (_SITE_SECTION_URI, _OWNED_NOTEBOOK_URI, None),
+        ],
+    )
+    async def test_a_site_source_or_destination_is_refused_before_any_graph_call(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        section: str,
+        to_notebook: str | None,
+        to_section_group: str | None,
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await copy_section(
+                client,
+                section=section,
+                to_notebook=to_notebook,
+                to_section_group=to_section_group,
+                confirm=_agrees,
+                answer_pending=True,
+            )
+
+        assert len(graph.calls) == 0, "a copy from or into a site notebook reached Graph"
+        message = str(refused.value)
+        assert message.startswith("onenote_copy_section ")
+        assert "notebook of a SharePoint site" in message
+        assert "This same call fails again" in message

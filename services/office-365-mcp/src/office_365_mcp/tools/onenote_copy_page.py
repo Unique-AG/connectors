@@ -37,6 +37,8 @@ from office_365_mcp.shared.notes import (
     OperationSummary,
     accepted_operation,
     get_with_query,
+    group_id_of,
+    in_a_site,
     onenote_root,
     section_container,
     write_state_for,
@@ -102,6 +104,13 @@ _NO_OPERATION_NAMED = (
     + "— that starts a second, independent one."
 )
 
+_SITE_NOTEBOOK = (
+    "onenote_copy_page cannot copy this page. Microsoft Graph documents no copy from or into a "
+    + "notebook of a SharePoint site. To copy the content, read the page with onenote_read_page. "
+    + "Then write that content into a new page with onenote_create_page. This same call fails "
+    + "again, so do not retry it."
+)
+
 GRAPH_NOT_FOUND = (
     "Microsoft 365 could not start this copy. Both handles are well formed, so the argument is "
     + "not the problem: either the page named by `page` was deleted or moved to another section "
@@ -157,6 +166,8 @@ async def copy_page(
     section_handle = onenote_section_handle(to_section)
     if section_handle is None:
         raise ToolError(_NOT_A_SECTION_HANDLE)
+    if in_a_site(handle.owner, section_handle.owner):
+        raise ToolError(_SITE_NOTEBOOK)
 
     about = write_state_for("copy_page", handle.uri, section_handle.uri)
     fetched: FetchedResponse | None = None
@@ -164,7 +175,7 @@ async def copy_page(
     refused: str | None = None
     with graph_errors(TOOL_NAME):
         container = await section_container(
-            client, section_handle.section_id, group_id=section_handle.group_id
+            client, section_handle.section_id, owner=section_handle.owner
         )
         audience = container.notebook
         if answer_pending or audience.reaches_others:
@@ -183,7 +194,7 @@ async def copy_page(
     if refused is not None:
         raise ToolError(refused)
     assert fetched is not None, "a copy neither asked about nor refused sent nothing"
-    summary = accepted_operation(fetched, group_id=handle.group_id)
+    summary = accepted_operation(fetched, owner=handle.owner)
     if summary is None:
         raise ToolError(_NO_OPERATION_NAMED)
     return summary
@@ -192,7 +203,7 @@ async def copy_page(
 async def _page_title(client: GraphServiceClient, handle: OnenotePageHandle) -> str | None:
     page = await get_with_query(
         client,
-        onenote_root(client, handle.group_id).pages.by_onenote_page_id(handle.page_id),
+        onenote_root(client, handle.owner).pages.by_onenote_page_id(handle.page_id),
         _PageQuery(select=list(_AUDIENCE_PAGE_FIELDS)),
         OnenotePage,
     )
@@ -203,7 +214,7 @@ async def _page_title(client: GraphServiceClient, handle: OnenotePageHandle) -> 
 async def _copy(
     client: GraphServiceClient, handle: OnenotePageHandle, destination: OnenoteSectionHandle
 ) -> FetchedResponse:
-    root = onenote_root(client, handle.group_id)
+    root = onenote_root(client, handle.owner)
     builder = root.pages.by_onenote_page_id(handle.page_id).copy_to_section
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
@@ -211,7 +222,7 @@ async def _copy(
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
         "application/json",
         _copy_to_section_body.CopyToSectionPostRequestBody(
-            id=destination.section_id, group_id=destination.group_id
+            id=destination.section_id, group_id=group_id_of(destination.owner)
         ),
     )
     request.add_request_options([*no_retry(), *native_response()])

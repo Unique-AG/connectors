@@ -13,7 +13,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import GraphResponseTooLarge, download_to_file, graph_errors
-from office_365_mcp.shared.notes import group_of_graph_url, onenote_root, resource_id_in
+from office_365_mcp.shared.handles import OnenoteOwner
+from office_365_mcp.shared.notes import onenote_root, owner_of_graph_url, resource_id_in
 from office_365_mcp.shared.seam import READ_ONLY, FileFromGraph, graph_client_for_caller
 
 TOOL_NAME = "onenote_read_resource"
@@ -79,7 +80,7 @@ async def read_resource(
 
     try:
         content, media_type = await _fetch(
-            client, transport, resource_id, group_id=group_of_graph_url(resource)
+            client, transport, resource_id, owner=owner_of_graph_url(resource)
         )
     except GraphResponseTooLarge as refusal:
         refused = _too_large(refusal)
@@ -95,13 +96,13 @@ async def _fetch(
     transport: httpx.AsyncClient,
     resource_id: str,
     *,
-    group_id: str | None,
+    owner: OnenoteOwner | None,
 ) -> tuple[bytes, str]:
     with graph_errors(TOOL_NAME, step=STEP_RESOURCE_CONTENT):
         async with download_to_file(
             client,
             transport,
-            _content_request(client, resource_id, group_id=group_id),
+            _content_request(client, resource_id, owner=owner),
             directory=Path(gettempdir()),
             max_bytes=MAX_BYTES,
         ) as downloaded:
@@ -109,9 +110,9 @@ async def _fetch(
 
 
 def _content_request(
-    client: GraphServiceClient, resource_id: str, *, group_id: str | None
+    client: GraphServiceClient, resource_id: str, *, owner: OnenoteOwner | None
 ) -> RequestInformation:
-    builder = onenote_root(client, group_id).resources.by_onenote_resource_id(resource_id).content
+    builder = onenote_root(client, owner).resources.by_onenote_resource_id(resource_id).content
     request = RequestInformation(Method.GET, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/octet-stream, application/json")
     return request

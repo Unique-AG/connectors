@@ -19,7 +19,11 @@ from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphFailure, GraphForbidden
-from office_365_mcp.shared.handles import OnenoteNotebookHandle, onenote_notebook_handle
+from office_365_mcp.shared.handles import (
+    OnenoteNotebookHandle,
+    OnenoteOwner,
+    onenote_notebook_handle,
+)
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
 from office_365_mcp.tools import onenote_create_notebook as creator
@@ -194,10 +198,13 @@ class TestWhatItAnswers:
     ) -> None:
         answer = await _create(client, group=_GROUP_ID)
 
-        assert answer.uri == OnenoteNotebookHandle(_NOTEBOOK_ID, group_id=_GROUP_ID).uri
+        assert (
+            answer.uri
+            == OnenoteNotebookHandle(_NOTEBOOK_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
         parsed = onenote_notebook_handle(answer.uri)
         assert parsed is not None
-        assert parsed.group_id == _GROUP_ID
+        assert parsed.owner == OnenoteOwner("groups", _GROUP_ID)
         assert parsed.notebook_id == _NOTEBOOK_ID
 
     async def test_the_answer_is_read_off_graph_and_never_echoes_the_argument(

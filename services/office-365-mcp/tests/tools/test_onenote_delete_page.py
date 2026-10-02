@@ -27,6 +27,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import (
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionHandle,
     onenote_page_handle,
@@ -48,13 +49,22 @@ _NOTEBOOK_GET_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}"
 
 _GROUP_ID = "5c6b7a81-2f0d-4a24-9b1e-8a9c3c470f9e"
 
-_GROUP_PAGE_URI = OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
+_GROUP_PAGE_URI = OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
 
 _GROUP_PAGE_PATH = f"/groups/{_GROUP_ID}/onenote/pages/{_PAGE_ID}"
 
 _GROUP_NOTEBOOK_GET_PATH = f"/groups/{_GROUP_ID}/onenote/notebooks/{_NOTEBOOK_ID}"
 
 _GROUP_REASON = "which belongs to a Microsoft 365 group"
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_PAGE_URI = OnenotePageHandle(_PAGE_ID, owner=_SITE).uri
+_SITE_PAGE_PATH = f"/sites/{_SITE_ID}/onenote/pages/{_PAGE_ID}"
+_SITE_NOTEBOOK_GET_PATH = f"/sites/{_SITE_ID}/onenote/notebooks/{_NOTEBOOK_ID}"
 
 _SECTION = {"id": "SECTION1", "displayName": "General"}
 _NOTEBOOK = {"id": _NOTEBOOK_ID, "displayName": "Work"}
@@ -593,7 +603,10 @@ class TestAPageInAGroupNotebook:
 
         answer = await _delete(client, page=_GROUP_PAGE_URI)
 
-        assert answer.section_uri == OnenoteSectionHandle("SECTION1", group_id=_GROUP_ID).uri
+        assert (
+            answer.section_uri
+            == OnenoteSectionHandle("SECTION1", owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
         assert answer.deleted is True
 
     async def test_about_binds_the_full_group_handle(
@@ -696,6 +709,41 @@ def _modern_context(
             )
 
     return cast("Context", cast("object", _Client()))
+
+
+class TestAPageInASiteNotebook:
+    async def test_every_read_and_the_one_delete_go_to_the_site_after_a_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_SITE_PAGE_PATH).mock(
+            return_value=httpx.Response(
+                200, json=_page_payload(section=_SECTION, notebook=_NOTEBOOK)
+            )
+        )
+        _ = graph.get(_SITE_NOTEBOOK_GET_PATH).mock(
+            return_value=httpx.Response(
+                200, json=_notebook_payload(is_shared=False, user_role="Owner")
+            )
+        )
+        _ = graph.delete(_SITE_PAGE_PATH).mock(return_value=httpx.Response(204))
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        answer = await _delete(client, page=_SITE_PAGE_URI, confirm=capturing)
+
+        made = cast("Sequence[Call]", graph.calls)
+        assert [(call.request.method, call.request.url.path) for call in made] == [
+            ("GET", f"/v1.0{_SITE_PAGE_PATH}"),
+            ("GET", f"/v1.0{_SITE_NOTEBOOK_GET_PATH}"),
+            ("DELETE", f"/v1.0{_SITE_PAGE_PATH}"),
+        ]
+        assert len(asked) == 1
+        assert "which belongs to a SharePoint site" in asked[0]
+        assert answer.section_uri == OnenoteSectionHandle("SECTION1", owner=_SITE).uri
 
 
 class TestTheEraWithNoBackChannel:

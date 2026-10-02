@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
+    OnenoteOwner,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
 )
@@ -39,6 +40,7 @@ from office_365_mcp.shared.notes import (
     creator_name_of,
     get_with_query,
     onenote_root,
+    owner_named,
     web_url_of,
 )
 from office_365_mcp.shared.odata import odata_literal
@@ -255,7 +257,8 @@ async def list_notebooks(
 ) -> Notebooks:
     notebook_filter = _notebook_filter(name_contains, shared, role)
     orderby = None if order_by is None else [CONTAINER_ORDER_CLAUSES[order_by]]
-    root = onenote_root(client, group)
+    owner = owner_named(group=group, site=None)
+    root = onenote_root(client, owner)
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_NOTEBOOKS):
             first_notebooks = await get_with_query(
@@ -304,7 +307,7 @@ async def list_notebooks(
         notebooks_collected.items,
         sections_collected.items,
         groups_collected.items,
-        group_id=group,
+        owner=owner,
         capped=notebooks_collected.capped or sections_collected.capped or groups_collected.capped,
     )
 
@@ -328,17 +331,17 @@ def _assemble(
     sections: list[OnenoteSection],
     groups: list[SectionGroup],
     *,
-    group_id: str | None,
+    owner: OnenoteOwner | None,
     capped: bool,
 ) -> Notebooks:
     groups_by_id = {group.id: group for group in groups if group.id is not None}
     notebook_ids = {notebook.id for notebook in notebooks if notebook.id is not None}
-    sections_by_notebook = _sections_by_notebook(sections, groups_by_id, notebook_ids, group_id)
+    sections_by_notebook = _sections_by_notebook(sections, groups_by_id, notebook_ids, owner)
     return Notebooks(
         notebooks=[
             row
             for notebook in notebooks
-            if (row := _notebook_row(notebook, sections_by_notebook, group_id)) is not None
+            if (row := _notebook_row(notebook, sections_by_notebook, owner)) is not None
         ],
         capped=capped,
     )
@@ -347,12 +350,12 @@ def _assemble(
 def _notebook_row(
     notebook: GraphNotebook,
     sections_by_notebook: Mapping[str, list[NotebookSection]],
-    group_id: str | None,
+    owner: OnenoteOwner | None,
 ) -> Notebook | None:
     if notebook.id is None:
         return None
     return Notebook(
-        uri=OnenoteNotebookHandle(notebook.id, group_id=group_id).uri,
+        uri=OnenoteNotebookHandle(notebook.id, owner=owner).uri,
         name=notebook.display_name,
         is_default=notebook.is_default,
         is_shared=notebook.is_shared,
@@ -373,7 +376,7 @@ def _sections_by_notebook(
     sections: list[OnenoteSection],
     groups_by_id: Mapping[str, SectionGroup],
     notebook_ids: set[str],
-    group_id: str | None,
+    owner: OnenoteOwner | None,
 ) -> dict[str, list[NotebookSection]]:
     by_notebook: dict[str, list[NotebookSection]] = {}
     for section in sections:
@@ -386,11 +389,11 @@ def _sections_by_notebook(
         parent_group = section.parent_section_group
         section_group_id = parent_group.id if parent_group is not None else None
         row = NotebookSection(
-            uri=OnenoteSectionHandle(section.id, group_id=group_id).uri,
+            uri=OnenoteSectionHandle(section.id, owner=owner).uri,
             group_uri=(
                 None
                 if section_group_id is None
-                else OnenoteSectionGroupHandle(section_group_id, group_id=group_id).uri
+                else OnenoteSectionGroupHandle(section_group_id, owner=owner).uri
             ),
             name=section.display_name,
             group_path=_group_path(section_group_id, groups_by_id),

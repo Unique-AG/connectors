@@ -13,8 +13,14 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
-from office_365_mcp.shared.handles import OnenoteNotebookHandle
-from office_365_mcp.shared.notes import client_url_of, onenote_root, web_url_of, write_state_for
+from office_365_mcp.shared.handles import OnenoteNotebookHandle, OnenoteOwner
+from office_365_mcp.shared.notes import (
+    client_url_of,
+    onenote_root,
+    owner_named,
+    web_url_of,
+    write_state_for,
+)
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -121,6 +127,7 @@ async def create_notebook(
     answer_pending: bool = False,
 ) -> CreatedNotebook | InputRequiredResult:
     assert 1 <= len(name) <= MAX_NAME_CHARACTERS, f"name is bounded by the schema, got {len(name)}"
+    owner = owner_named(group=group, site=None)
     about = write_state_for("create_notebook", group or "", name)
 
     created: Notebook | None = None
@@ -133,7 +140,7 @@ async def create_notebook(
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
-            created = await onenote_root(client, group).notebooks.post(
+            created = await onenote_root(client, owner).notebooks.post(
                 Notebook(display_name=name),
                 request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
             )
@@ -143,7 +150,7 @@ async def create_notebook(
     if refused is not None:
         raise ToolError(refused)
     assert created is not None, "Graph answered a notebook create with no notebook"
-    return _answer(created, group)
+    return _answer(created, owner)
 
 
 def _question(name: str, group: str | None) -> str:
@@ -155,12 +162,12 @@ def _question(name: str, group: str | None) -> str:
     )
 
 
-def _answer(notebook: Notebook, group: str | None) -> CreatedNotebook:
+def _answer(notebook: Notebook, owner: OnenoteOwner | None) -> CreatedNotebook:
     assert notebook.id is not None, (
         "Graph created a notebook it gave no id, which cannot be addressed"
     )
     return CreatedNotebook(
-        uri=OnenoteNotebookHandle(notebook.id, group_id=group).uri,
+        uri=OnenoteNotebookHandle(notebook.id, owner=owner).uri,
         name=notebook.display_name,
         is_default=notebook.is_default,
         is_shared=notebook.is_shared,

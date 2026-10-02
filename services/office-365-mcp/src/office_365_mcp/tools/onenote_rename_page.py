@@ -131,7 +131,7 @@ async def rename_page(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        pre_read = await page_for_a_question(client, handle.page_id, group_id=handle.group_id)
+        pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         previous_title = pre_read.page.title
         if answer_pending or pre_read.audience.reaches_others:
             with not_graph():
@@ -142,7 +142,7 @@ async def rename_page(
             with graph_step(STEP_RENAME_PAGE):
                 await _rename(client, handle, title)
             try:
-                summary = await page_summary(client, handle.page_id, group_id=handle.group_id)
+                summary = await page_summary(client, handle.page_id, owner=handle.owner)
             except GraphFailure as failure:
                 raise Advised(_WRITTEN_BUT_UNREAD) from failure
 
@@ -172,7 +172,7 @@ async def _rename(client: GraphServiceClient, handle: OnenotePageHandle, title: 
         target="title", action=OnenotePatchActionType.Replace, content=escape(title)
     )
     patch = (
-        onenote_root(client, handle.group_id)
+        onenote_root(client, handle.owner)
         .pages.by_onenote_page_id(handle.page_id)
         .onenote_patch_content
     )

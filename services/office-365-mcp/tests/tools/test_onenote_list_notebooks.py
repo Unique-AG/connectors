@@ -12,6 +12,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
+    OnenoteOwner,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
     onenote_notebook_handle,
@@ -1054,13 +1055,13 @@ class TestAGroupsNotebooks:
         assert section.group_uri is not None
         assert notebook.uri.startswith(f"onenote:///groups/{_GROUP}/notebooks/")
         assert onenote_notebook_handle(notebook.uri) == OnenoteNotebookHandle(
-            _ENGINEERING, group_id=_GROUP
+            _ENGINEERING, owner=OnenoteOwner("groups", _GROUP)
         )
         assert onenote_section_handle(section.uri) == OnenoteSectionHandle(
-            _STANDUPS, group_id=_GROUP
+            _STANDUPS, owner=OnenoteOwner("groups", _GROUP)
         )
         assert onenote_section_group_handle(section.group_uri) == OnenoteSectionGroupHandle(
-            _OUTER_GROUP, group_id=_GROUP
+            _OUTER_GROUP, owner=OnenoteOwner("groups", _GROUP)
         )
 
     async def test_a_group_404_arrives_classified_as_not_found(

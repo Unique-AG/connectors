@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
@@ -68,7 +69,7 @@ def found(graph: respx.MockRouter) -> respx.Route:
 
 
 @pytest.fixture
-def found_in_group(graph: respx.MockRouter) -> respx.Route:
+def found_for_a_group(graph: respx.MockRouter) -> respx.Route:
     return graph.post(_GROUP_PATH).mock(return_value=httpx.Response(200, json=_notebook_payload()))
 
 
@@ -121,27 +122,27 @@ class TestWhatItAsks:
 
 class TestTheGroupRoute:
     async def test_a_group_asks_that_groups_route_and_never_the_users(
-        self, client: GraphServiceClient, found: respx.Route, found_in_group: respx.Route
+        self, client: GraphServiceClient, found: respx.Route, found_for_a_group: respx.Route
     ) -> None:
         _ = await _find(client, group=GROUP_ID)
 
-        assert found_in_group.call_count == 1
+        assert found_for_a_group.call_count == 1
         assert found.call_count == 0
 
     async def test_no_group_asks_the_users_route_and_never_a_groups(
-        self, client: GraphServiceClient, found: respx.Route, found_in_group: respx.Route
+        self, client: GraphServiceClient, found: respx.Route, found_for_a_group: respx.Route
     ) -> None:
         _ = await _find(client)
 
         assert found.call_count == 1
-        assert found_in_group.call_count == 0
+        assert found_for_a_group.call_count == 0
 
     async def test_the_group_route_sends_the_same_body_and_no_query_parameters(
-        self, client: GraphServiceClient, found_in_group: respx.Route
+        self, client: GraphServiceClient, found_for_a_group: respx.Route
     ) -> None:
         _ = await _find(client, group=GROUP_ID)
 
-        request = found_in_group.calls.last.request
+        request = found_for_a_group.calls.last.request
         assert cast("dict[str, object]", json.loads(request.content)) == {"webUrl": _WEB_URL}
         assert request.url.params == httpx.QueryParams()
         assert request.headers["accept"] == "application/json"
@@ -158,11 +159,14 @@ class TestTheGroupRoute:
 
         assert route.call_count == 2
 
-    @pytest.mark.usefixtures("found_in_group")
+    @pytest.mark.usefixtures("found_for_a_group")
     async def test_the_minted_handle_carries_the_group(self, client: GraphServiceClient) -> None:
         answer = await _find(client, group=GROUP_ID)
 
-        assert answer.uri == OnenoteNotebookHandle(NOTEBOOK_ID, group_id=GROUP_ID).uri
+        assert (
+            answer.uri
+            == OnenoteNotebookHandle(NOTEBOOK_ID, owner=OnenoteOwner("groups", GROUP_ID)).uri
+        )
         assert answer.uri.startswith(f"onenote:///groups/{GROUP_ID}/notebooks/")
 
     @pytest.mark.usefixtures("found")
@@ -174,7 +178,7 @@ class TestTheGroupRoute:
         assert answer.uri == OnenoteNotebookHandle(NOTEBOOK_ID).uri
         assert "/groups/" not in answer.uri
 
-    @pytest.mark.usefixtures("found_in_group")
+    @pytest.mark.usefixtures("found_for_a_group")
     async def test_the_rest_of_the_answer_is_mapped_as_for_the_user(
         self, client: GraphServiceClient
     ) -> None:
@@ -280,7 +284,7 @@ class TestWhatItRefuses:
     async def test_a_group_notebook_handle_is_refused_before_any_graph_call(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        handle = OnenoteNotebookHandle("1-ABC", group_id=GROUP_ID).uri
+        handle = OnenoteNotebookHandle("1-ABC", owner=OnenoteOwner("groups", GROUP_ID)).uri
 
         with pytest.raises(ToolError, match="needs no resolving"):
             _ = await _find(client, web_url=handle, group=GROUP_ID)
@@ -293,9 +297,9 @@ class TestWhatItRefuses:
             OnenoteSectionGroupHandle("1-ABC").uri,
             OnenoteSectionHandle("1-ABC").uri,
             OnenotePageHandle("1-ABC!0").uri,
-            OnenoteSectionGroupHandle("1-ABC", group_id=GROUP_ID).uri,
-            OnenoteSectionHandle("1-ABC", group_id=GROUP_ID).uri,
-            OnenotePageHandle("1-ABC!0", group_id=GROUP_ID).uri,
+            OnenoteSectionGroupHandle("1-ABC", owner=OnenoteOwner("groups", GROUP_ID)).uri,
+            OnenoteSectionHandle("1-ABC", owner=OnenoteOwner("groups", GROUP_ID)).uri,
+            OnenotePageHandle("1-ABC!0", owner=OnenoteOwner("groups", GROUP_ID)).uri,
         ],
     )
     async def test_a_page_section_or_group_handle_is_refused_before_any_graph_call(

@@ -28,6 +28,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import (
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionHandle,
     onenote_page_handle,
@@ -53,7 +54,7 @@ _NOTEBOOK_GET_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}"
 
 _GROUP_ID = "5c6b7a81-2f0d-4a24-9b1e-8a9c3c470f9e"
 
-_GROUP_PAGE_URI = OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
+_GROUP_PAGE_URI = OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
 
 _GROUP_GET_PATH = f"/groups/{_GROUP_ID}/onenote/pages/{_PAGE_ID}"
 
@@ -820,7 +821,10 @@ class TestAPageInAGroupNotebook:
         answer = await _rename(client, page=_GROUP_PAGE_URI)
 
         assert answer.page.uri == _GROUP_PAGE_URI
-        assert answer.page.section_uri == OnenoteSectionHandle("SECTION1", group_id=_GROUP_ID).uri
+        assert (
+            answer.page.section_uri
+            == OnenoteSectionHandle("SECTION1", owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
         assert answer.previous_title == "Meeting notes"
 
     async def test_about_binds_the_full_group_handle(

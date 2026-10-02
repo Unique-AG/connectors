@@ -13,6 +13,7 @@ from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOperationHandle,
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
@@ -27,10 +28,20 @@ _OPERATION_ID = "1-SYNTHETICOPERATION0000!0-ABCDEF"
 _GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
 
 _OPERATION_URI = OnenoteOperationHandle(_OPERATION_ID).uri
-_GROUP_OPERATION_URI = OnenoteOperationHandle(_OPERATION_ID, group_id=_GROUP_ID).uri
+_GROUP_OPERATION_URI = OnenoteOperationHandle(
+    _OPERATION_ID, owner=OnenoteOwner("groups", _GROUP_ID)
+).uri
 
 _GET_PATH = f"/me/onenote/operations/{_OPERATION_ID}"
 _GROUP_GET_PATH = f"/groups/{_GROUP_ID}/onenote/operations/{_OPERATION_ID}"
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_OPERATION_URI = OnenoteOperationHandle(_OPERATION_ID, owner=_SITE).uri
+_SITE_GET_PATH = f"/sites/{_SITE_ID}/onenote/operations/{_OPERATION_ID}"
 
 
 def _operation_payload(
@@ -300,7 +311,10 @@ class TestAGroupNotebook:
 
         answer = await _get(client, operation=_GROUP_OPERATION_URI)
 
-        assert answer.result_uri == OnenoteSectionHandle(section_id, group_id=_GROUP_ID).uri
+        assert (
+            answer.result_uri
+            == OnenoteSectionHandle(section_id, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
         assert answer.result_kind == "section"
 
     async def test_a_result_location_that_names_no_group_gives_a_result_handle_outside_any_group(
@@ -336,6 +350,32 @@ class TestAGroupNotebook:
 
         with pytest.raises(GraphNotFound):
             _ = await _get(client, operation=_GROUP_OPERATION_URI)
+
+
+class TestASiteNotebook:
+    async def test_a_site_handle_polls_the_operation_under_the_site(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_id = "1-COPIEDPAGE0000000000000000000000!0-ABCDEF"
+        route = graph.get(_SITE_GET_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=_operation_payload(
+                    status="Completed",
+                    resource_location=(
+                        f"https://graph.microsoft.com/v1.0/sites/{_SITE_ID}/onenote/pages/{page_id}"
+                    ),
+                    resource_id=page_id,
+                ),
+            )
+        )
+
+        answer = await _get(client, operation=_SITE_OPERATION_URI)
+
+        assert route.call_count == 1
+        assert len(graph.calls) == 1, "nothing was read from /me"
+        assert answer.uri == _SITE_OPERATION_URI
+        assert answer.result_uri == OnenotePageHandle(page_id, owner=_SITE).uri
 
 
 class TestWhatItRefuses:

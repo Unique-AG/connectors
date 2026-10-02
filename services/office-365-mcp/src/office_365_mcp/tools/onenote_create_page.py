@@ -166,12 +166,12 @@ async def _notebook_audience_for(
 ) -> NotebookAudience:
     if handle is None:
         return await default_notebook_audience(client) or UNKNOWN_AUDIENCE
-    return await section_audience(client, handle.section_id, group_id=handle.group_id)
+    return await section_audience(client, handle.section_id, owner=handle.owner)
 
 
 def _route(handle: OnenoteSectionHandle | None, section_name: str | None) -> tuple[str, ...]:
-    if handle is not None and handle.group_id is not None:
-        return ("group", handle.group_id, "section", handle.section_id)
+    if handle is not None and handle.owner is not None:
+        return (handle.owner.kind, handle.owner.owner_id, "section", handle.section_id)
     if handle is not None:
         return ("section", handle.section_id)
     if section_name is not None:
@@ -225,7 +225,7 @@ async def create_page(
     pages = (
         client.me.onenote.pages
         if handle is None
-        else onenote_root(client, handle.group_id)
+        else onenote_root(client, handle.owner)
         .sections.by_onenote_section_id(handle.section_id)
         .pages
     )
@@ -285,17 +285,17 @@ def _envelope(title: str, body_html: str, created_at: datetime) -> str:
 
 def _answer(page: OnenotePage, handle: OnenoteSectionHandle | None) -> CreatedPage:
     assert page.id is not None, "Graph created a page it gave no id, which cannot be addressed"
-    group_id = None if handle is None else handle.group_id
+    owner = None if handle is None else handle.owner
     parent = page.parent_section
     parent_id = parent.id if parent is not None else None
     if parent_id is not None:
-        section_uri = OnenoteSectionHandle(parent_id, group_id=group_id).uri
+        section_uri = OnenoteSectionHandle(parent_id, owner=owner).uri
     elif handle is not None:
         section_uri = handle.uri
     else:
         section_uri = None
     return CreatedPage(
-        uri=OnenotePageHandle(page.id, group_id=group_id).uri,
+        uri=OnenotePageHandle(page.id, owner=owner).uri,
         title=page.title,
         web_url=web_url_of(page.links),
         client_url=client_url_of(page.links),

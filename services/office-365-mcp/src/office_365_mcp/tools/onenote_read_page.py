@@ -103,7 +103,7 @@ async def onenote_read_page(
     refused: str | None = None
     content: bytes | None = None
     with graph_errors(TOOL_NAME):
-        summary = await page_summary(client, handle.page_id, group_id=handle.group_id)
+        summary = await page_summary(client, handle.page_id, owner=handle.owner)
 
         try:
             with graph_step(STEP_PAGE_CONTENT):
@@ -145,7 +145,7 @@ async def _content(
 def _content_request(
     client: GraphServiceClient, handle: OnenotePageHandle, *, include_ids: bool
 ) -> RequestInformation:
-    content = onenote_root(client, handle.group_id).pages.by_onenote_page_id(handle.page_id).content
+    content = onenote_root(client, handle.owner).pages.by_onenote_page_id(handle.page_id).content
     raw_query: dict[str, str] = {"includeIDs": "true"} if include_ids else {}
     request = request_with_query(
         Method.GET, content.url_template, content.path_parameters, query=raw_query

@@ -11,7 +11,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
-from office_365_mcp.shared.handles import OnenoteSectionHandle, onenote_page_handle
+from office_365_mcp.shared.handles import OnenoteOwner, OnenoteSectionHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
     NotebookAudience,
     onenote_root,
@@ -122,7 +122,7 @@ async def delete_page(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        pre_read = await page_for_a_question(client, handle.page_id, group_id=handle.group_id)
+        pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         found = pre_read.page
         with not_graph():
             answer = await confirm(_question(found, pre_read.audience), about)
@@ -131,7 +131,7 @@ async def delete_page(
         if refused is None and asked is None:
             with suppress(GraphNotFound), graph_step(STEP_DELETE_PAGE):
                 await (
-                    onenote_root(client, handle.group_id)
+                    onenote_root(client, handle.owner)
                     .pages.by_onenote_page_id(handle.page_id)
                     .delete()
                 )
@@ -141,7 +141,7 @@ async def delete_page(
     if refused is not None:
         raise ToolError(refused)
     assert found is not None, "a delete neither asked about nor refused deleted nothing"
-    return _answer(found, group_id=handle.group_id)
+    return _answer(found, owner=handle.owner)
 
 
 def _question(page: OnenotePage, audience: NotebookAudience) -> str:
@@ -163,14 +163,14 @@ def a_person_agrees(ctx: Context) -> Confirm:
     )
 
 
-def _answer(page: OnenotePage, *, group_id: str | None) -> DeletedPage:
+def _answer(page: OnenotePage, *, owner: OnenoteOwner | None) -> DeletedPage:
     section = page.parent_section
     section_id = section.id if section is not None else None
     notebook = page.parent_notebook
     return DeletedPage(
         title=page.title,
         section_uri=(
-            None if section_id is None else OnenoteSectionHandle(section_id, group_id=group_id).uri
+            None if section_id is None else OnenoteSectionHandle(section_id, owner=owner).uri
         ),
         section_name=section.display_name if section is not None else None,
         notebook_name=notebook.display_name if notebook is not None else None,

@@ -184,7 +184,7 @@ async def _post_section_group(
     *,
     name: str,
 ) -> SectionGroup | None:
-    root = onenote_root(client, handle.group_id)
+    root = onenote_root(client, handle.owner)
     if isinstance(handle, OnenoteNotebookHandle):
         return await root.notebooks.by_notebook_id(handle.notebook_id).section_groups.post(
             SectionGroup(display_name=name),
@@ -211,7 +211,7 @@ def _answer(
         "Graph created a section group it gave no id, which cannot be addressed"
     )
     return CreatedSectionGroup(
-        uri=OnenoteSectionGroupHandle(group.id, group_id=handle.group_id).uri,
+        uri=OnenoteSectionGroupHandle(group.id, owner=handle.owner).uri,
         name=group.display_name,
         created_at=group.created_date_time,
         parent_uri=handle.uri,

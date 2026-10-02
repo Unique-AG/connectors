@@ -10,6 +10,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import (
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionHandle,
     onenote_page_handle,
@@ -29,7 +30,15 @@ _GROUP_PAGE_PATH = f"/groups/{GROUP_ID}/onenote/pages/0-SYNTHETICPAGE0000%210001
 _GROUP_CONTENT_PATH = f"{_GROUP_PAGE_PATH}/content"
 
 _PAGE = OnenotePageHandle(PAGE_ID).uri
-_GROUP_PAGE = OnenotePageHandle(PAGE_ID, group_id=GROUP_ID).uri
+_GROUP_PAGE = OnenotePageHandle(PAGE_ID, owner=OnenoteOwner("groups", GROUP_ID)).uri
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_PAGE = OnenotePageHandle(PAGE_ID, owner=_SITE).uri
+_SITE_PAGE_PATH = f"/sites/{_SITE_ID}/onenote/pages/0-SYNTHETICPAGE0000%210001"
 _SECTION = OnenoteSectionHandle(SECTION_ID).uri
 
 _WEB_URL = "https://onenote.example.invalid/pages/sprint-notes"
@@ -262,7 +271,10 @@ class TestAGroupNotebook:
         answer = await _read(client, transport, page=_GROUP_PAGE)
 
         assert answer.page.uri == _GROUP_PAGE
-        assert answer.page.section_uri == OnenoteSectionHandle(SECTION_ID, group_id=GROUP_ID).uri
+        assert (
+            answer.page.section_uri
+            == OnenoteSectionHandle(SECTION_ID, owner=OnenoteOwner("groups", GROUP_ID)).uri
+        )
 
     @pytest.mark.usefixtures("group_content")
     async def test_a_404_on_the_group_page_is_a_graph_not_found(
@@ -302,6 +314,25 @@ class TestAGroupNotebook:
 
         with pytest.raises(GraphNotFound):
             _ = await _read(client, transport, page=_GROUP_PAGE)
+
+
+class TestASiteNotebook:
+    async def test_a_site_handle_reads_the_page_and_its_content_under_the_site(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        site_page = graph.get(_SITE_PAGE_PATH).mock(
+            return_value=httpx.Response(200, json=_page_payload())
+        )
+        site_content = graph.get(f"{_SITE_PAGE_PATH}/content").mock(
+            return_value=httpx.Response(200, content=_HTML, headers={"content-type": "text/html"})
+        )
+
+        answer = await _read(client, transport, page=_SITE_PAGE)
+
+        assert (site_page.call_count, site_content.call_count) == (1, 1)
+        assert graph.calls.call_count == 2, "nothing was read from /me"
+        assert answer.page.uri == _SITE_PAGE
+        assert answer.page.section_uri == OnenoteSectionHandle(SECTION_ID, owner=_SITE).uri
 
 
 class TestTheSizeCap:

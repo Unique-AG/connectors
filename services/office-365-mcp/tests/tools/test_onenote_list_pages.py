@@ -10,7 +10,7 @@ from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared.handles import OnenotePageHandle, OnenoteSectionHandle
+from office_365_mcp.shared.handles import OnenoteOwner, OnenotePageHandle, OnenoteSectionHandle
 from office_365_mcp.shared.notes import PAGE_EXPANSIONS, PAGE_FIELDS
 from office_365_mcp.tools import onenote_list_pages as lister
 
@@ -32,7 +32,7 @@ _GROUP_SECTION_PAGES_PATH = (
 )
 
 _SECTION = OnenoteSectionHandle(_SECTION_ID).uri
-_GROUP_SECTION = OnenoteSectionHandle(_SECTION_ID, group_id=_GROUP_ID).uri
+_GROUP_SECTION = OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
 
 _APP_ID = "WLID-000000004C12821A"
 
@@ -307,8 +307,11 @@ class TestTheGroupRoute:
         answer = await lister.list_pages(client, group=_GROUP_ID, limit=25)
 
         row = answer.pages[0]
-        assert row.uri == OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
-        assert row.section_uri == OnenoteSectionHandle(_SECTION_ID, group_id=_GROUP_ID).uri
+        assert row.uri == OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        assert (
+            row.section_uri
+            == OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
         assert row.uri.startswith(f"onenote:///groups/{_GROUP_ID}/pages/")
 
     async def test_a_row_of_a_call_with_no_group_names_no_group(
@@ -338,8 +341,8 @@ class TestTheGroupRoute:
 
         assert [row.title for row in answer.pages] == ["First", "Second"]
         assert [row.uri for row in answer.pages] == [
-            OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri,
-            OnenotePageHandle(_OTHER_PAGE_ID, group_id=_GROUP_ID).uri,
+            OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri,
+            OnenotePageHandle(_OTHER_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri,
         ]
 
     async def test_a_group_and_a_creating_app_go_out_on_one_call_to_the_group_route(
@@ -360,7 +363,10 @@ class TestTheGroupRoute:
         assert group_pages.calls.last.request.url.params["$filter"] == (
             "contains(tolower(title),'roadmap') and createdByAppId eq 'WLID-000000004C12821A'"
         )
-        assert answer.pages[0].uri == OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
+        assert (
+            answer.pages[0].uri
+            == OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
         assert answer.pages[0].created_by_app_id == _APP_ID
 
     async def test_a_group_section_handle_and_a_creating_app_go_out_on_one_call(
@@ -375,7 +381,10 @@ class TestTheGroupRoute:
         assert group_section_pages.calls.last.request.url.params["$filter"] == (
             "createdByAppId eq 'WLID-000000004C12821A'"
         )
-        assert answer.pages[0].uri == OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
+        assert (
+            answer.pages[0].uri
+            == OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
 
     async def test_a_section_handle_of_a_group_asks_that_groups_section_route(
         self,
@@ -402,8 +411,11 @@ class TestTheGroupRoute:
         answer = await lister.list_pages(client, section=_GROUP_SECTION, limit=25)
 
         row = answer.pages[0]
-        assert row.uri == OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
-        assert row.section_uri == OnenoteSectionHandle(_SECTION_ID, group_id=_GROUP_ID).uri
+        assert row.uri == OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        assert (
+            row.section_uri
+            == OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
 
     async def test_level_and_order_go_out_on_the_group_section_route(
         self, client: GraphServiceClient, group_section_pages: respx.Route

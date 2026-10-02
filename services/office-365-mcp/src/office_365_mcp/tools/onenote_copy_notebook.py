@@ -26,6 +26,7 @@ from office_365_mcp.shared.handles import OnenoteNotebookHandle, onenote_noteboo
 from office_365_mcp.shared.notes import (
     OperationSummary,
     accepted_operation,
+    in_a_site,
     notebook_audience,
     onenote_root,
     write_state_for,
@@ -73,6 +74,11 @@ _NO_OPERATION_NAMED = (
     + "copy — that starts a second, independent one."
 )
 
+_SITE_NOTEBOOK = (
+    "onenote_copy_notebook cannot copy this notebook. Microsoft Graph documents no copy from or "
+    + "into a notebook of a SharePoint site. This same call fails again, so do not retry it."
+)
+
 GRAPH_NOT_FOUND = (
     "Microsoft 365 could not start this copy. The handle is well formed, so the argument is not "
     + "the problem: the notebook was most likely deleted, or the signed-in user's access to it "
@@ -118,6 +124,8 @@ async def copy_notebook(
     handle = onenote_notebook_handle(notebook)
     if handle is None:
         raise ToolError(_NOT_A_NOTEBOOK_HANDLE)
+    if in_a_site(handle.owner):
+        raise ToolError(_SITE_NOTEBOOK)
 
     about = write_state_for("copy_notebook", handle.uri, to_group or "", new_name or "")
     fetched: FetchedResponse | None = None
@@ -125,7 +133,7 @@ async def copy_notebook(
     refused: str | None = None
     with graph_errors(TOOL_NAME):
         if answer_pending or to_group is not None:
-            source = await notebook_audience(client, handle.notebook_id, group_id=handle.group_id)
+            source = await notebook_audience(client, handle.notebook_id, owner=handle.owner)
             with not_graph():
                 answer = await confirm(_question(source.name, to_group, new_name), about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
@@ -139,7 +147,7 @@ async def copy_notebook(
     if refused is not None:
         raise ToolError(refused)
     assert fetched is not None, "a copy neither asked about nor refused sent nothing"
-    summary = accepted_operation(fetched, group_id=handle.group_id)
+    summary = accepted_operation(fetched, owner=handle.owner)
     if summary is None:
         raise ToolError(_NO_OPERATION_NAMED)
     return summary
@@ -151,7 +159,7 @@ async def _copy(
     new_name: str | None,
     to_group: str | None,
 ) -> FetchedResponse:
-    root = onenote_root(client, handle.group_id)
+    root = onenote_root(client, handle.owner)
     builder = root.notebooks.by_notebook_id(handle.notebook_id).copy_notebook
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")

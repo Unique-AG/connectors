@@ -43,6 +43,8 @@ from office_365_mcp.shared.notes import (
     accepted_operation,
     container_audience,
     get_with_query,
+    group_id_of,
+    in_a_site,
     onenote_root,
     write_state_for,
 )
@@ -122,6 +124,11 @@ _NO_OPERATION_NAMED = (
     + "copy — that starts a second, independent one."
 )
 
+_SITE_NOTEBOOK = (
+    "onenote_copy_section cannot copy this section. Microsoft Graph documents no copy from or "
+    + "into a notebook of a SharePoint site. This same call fails again, so do not retry it."
+)
+
 GRAPH_NOT_FOUND = (
     "Microsoft 365 could not start this copy. Every handle given is well formed, so the "
     + "argument is not the problem: either the section named by `section` was deleted or moved "
@@ -170,7 +177,7 @@ def _destination(
 async def _section_name(client: GraphServiceClient, handle: OnenoteSectionHandle) -> str | None:
     found = await get_with_query(
         client,
-        onenote_root(client, handle.group_id).sections.by_onenote_section_id(handle.section_id),
+        onenote_root(client, handle.owner).sections.by_onenote_section_id(handle.section_id),
         _SectionQuery(select=list(_SECTION_NAME_FIELDS)),
         OnenoteSection,
     )
@@ -214,6 +221,8 @@ async def copy_section(
     if handle is None:
         raise ToolError(_NOT_A_SECTION_HANDLE)
     destination = _destination(to_notebook, to_section_group)
+    if in_a_site(handle.owner, destination.owner):
+        raise ToolError(_SITE_NOTEBOOK)
 
     about = write_state_for("copy_section", handle.uri, destination.uri, new_name or "")
     fetched: FetchedResponse | None = None
@@ -241,7 +250,7 @@ async def copy_section(
     if refused is not None:
         raise ToolError(refused)
     assert fetched is not None, "a copy neither asked about nor refused sent nothing"
-    summary = accepted_operation(fetched, group_id=handle.group_id)
+    summary = accepted_operation(fetched, owner=handle.owner)
     if summary is None:
         raise ToolError(_NO_OPERATION_NAMED)
     return summary
@@ -264,7 +273,7 @@ async def _copy_to_notebook(
     destination: OnenoteNotebookHandle,
     new_name: str | None,
 ) -> FetchedResponse:
-    root = onenote_root(client, handle.group_id)
+    root = onenote_root(client, handle.owner)
     builder = root.sections.by_onenote_section_id(handle.section_id).copy_to_notebook
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
@@ -272,7 +281,7 @@ async def _copy_to_notebook(
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
         "application/json",
         _copy_to_notebook_body.CopyToNotebookPostRequestBody(
-            id=destination.notebook_id, group_id=destination.group_id, rename_as=new_name
+            id=destination.notebook_id, group_id=group_id_of(destination.owner), rename_as=new_name
         ),
     )
     request.add_request_options([*no_retry(), *native_response()])
@@ -285,7 +294,7 @@ async def _copy_to_section_group(
     destination: OnenoteSectionGroupHandle,
     new_name: str | None,
 ) -> FetchedResponse:
-    root = onenote_root(client, handle.group_id)
+    root = onenote_root(client, handle.owner)
     builder = root.sections.by_onenote_section_id(handle.section_id).copy_to_section_group
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
@@ -293,7 +302,9 @@ async def _copy_to_section_group(
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
         "application/json",
         _copy_to_section_group_body.CopyToSectionGroupPostRequestBody(
-            id=destination.section_group_id, group_id=destination.group_id, rename_as=new_name
+            id=destination.section_group_id,
+            group_id=group_id_of(destination.owner),
+            rename_as=new_name,
         ),
     )
     request.add_request_options([*no_retry(), *native_response()])

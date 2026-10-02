@@ -17,6 +17,7 @@ from respx.models import Call
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
@@ -43,8 +44,8 @@ _GROUP_GROUPS_PATH = f"/me/onenote/sectionGroups/{_GROUP_ID}/sectionGroups"
 _TEAM_ID = "5c6b7a81-2f0d-4a24-9b1e-8a9c3c470f9e"
 _TEAM_REASON = "which belongs to a Microsoft 365 group"
 
-_TEAM_NOTEBOOK = OnenoteNotebookHandle(_NOTEBOOK_ID, group_id=_TEAM_ID).uri
-_TEAM_GROUP = OnenoteSectionGroupHandle(_GROUP_ID, group_id=_TEAM_ID).uri
+_TEAM_NOTEBOOK = OnenoteNotebookHandle(_NOTEBOOK_ID, owner=OnenoteOwner("groups", _TEAM_ID)).uri
+_TEAM_GROUP = OnenoteSectionGroupHandle(_GROUP_ID, owner=OnenoteOwner("groups", _TEAM_ID)).uri
 
 _TEAM_NOTEBOOK_AUDIENCE_PATH = f"/groups/{_TEAM_ID}/onenote/notebooks/{_NOTEBOOK_ID}"
 _TEAM_GROUP_AUDIENCE_PATH = f"/groups/{_TEAM_ID}/onenote/sectionGroups/{_GROUP_ID}"
@@ -887,7 +888,12 @@ class TestANotebookThatBelongsToAGroup:
     ) -> None:
         answer = await _create(client, parent=_TEAM_NOTEBOOK)
 
-        assert answer.uri == OnenoteSectionGroupHandle(_CHILD_GROUP_ID, group_id=_TEAM_ID).uri
+        assert (
+            answer.uri
+            == OnenoteSectionGroupHandle(
+                _CHILD_GROUP_ID, owner=OnenoteOwner("groups", _TEAM_ID)
+            ).uri
+        )
         assert answer.parent_uri == _TEAM_NOTEBOOK
 
     @pytest.mark.usefixtures("team_group_audience", "team_group_groups")
@@ -896,7 +902,12 @@ class TestANotebookThatBelongsToAGroup:
     ) -> None:
         answer = await _create(client, parent=_TEAM_GROUP)
 
-        assert answer.uri == OnenoteSectionGroupHandle(_CHILD_GROUP_ID, group_id=_TEAM_ID).uri
+        assert (
+            answer.uri
+            == OnenoteSectionGroupHandle(
+                _CHILD_GROUP_ID, owner=OnenoteOwner("groups", _TEAM_ID)
+            ).uri
+        )
         assert answer.parent_uri == _TEAM_GROUP
 
     @pytest.mark.usefixtures("team_notebook_audience")

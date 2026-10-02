@@ -15,8 +15,18 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step, request_with_query
-from office_365_mcp.shared.handles import OnenoteSectionHandle, onenote_section_handle
-from office_365_mcp.shared.notes import PAGE_EXPANSIONS, PAGE_FIELDS, PageSummary, onenote_root
+from office_365_mcp.shared.handles import (
+    OnenoteOwner,
+    OnenoteSectionHandle,
+    onenote_section_handle,
+)
+from office_365_mcp.shared.notes import (
+    PAGE_EXPANSIONS,
+    PAGE_FIELDS,
+    PageSummary,
+    onenote_root,
+    owner_named,
+)
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
@@ -157,7 +167,7 @@ async def list_pages(
     if section is not None and group is not None:
         raise ToolError(_GROUP_WITH_A_SECTION)
     handle = _section_to_search(section)
-    owner = group if handle is None else handle.group_id
+    owner = owner_named(group=group, site=None) if handle is None else handle.owner
     if include_level_and_order and handle is None:
         raise ToolError(_PAGELEVEL_NEEDS_A_SECTION)
     _refuse_backwards_windows(modified_after, modified_before, created_after, created_before)
@@ -189,7 +199,7 @@ async def list_pages(
         pages=[
             row
             for page in collected.items
-            if (row := PageSummary.from_page(page, group_id=owner)) is not None
+            if (row := PageSummary.from_page(page, owner=owner)) is not None
         ],
         capped=collected.capped,
     )
@@ -267,7 +277,7 @@ def _filter(
 async def _first_page(
     client: GraphServiceClient,
     section: OnenoteSectionHandle | None,
-    group_id: str | None,
+    owner: OnenoteOwner | None,
     *,
     limit: int,
     query_filter: str | None,
@@ -276,7 +286,7 @@ async def _first_page(
     include_level_and_order: bool,
 ) -> OnenotePageCollectionResponse | None:
     raw_query: dict[str, str] = {"pagelevel": "true"} if include_level_and_order else {}
-    root = onenote_root(client, group_id)
+    root = onenote_root(client, owner)
     pages = (
         root.pages
         if section is None

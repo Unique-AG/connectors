@@ -405,6 +405,16 @@ _ONENOTE_SECTION_GROUP_ID = (
 _ONENOTE_OPERATION_ID = (
     "0-99999999-9999-4999-8999-999999999999!101-00000000-0000-4000-8000-000000000000"
 )
+_ONENOTE_GROUP = handles.OnenoteOwner("groups", _TEAM_ID)
+_SITE_ID = (
+    "contoso.sharepoint.invalid,11111111-2222-4333-8444-555555555555,"
+    + "66666666-7777-4888-8999-000000000000"
+)
+_ENCODED_SITE_ID = (
+    "contoso.sharepoint.invalid%2C11111111-2222-4333-8444-555555555555%2C"
+    + "66666666-7777-4888-8999-000000000000"
+)
+_ONENOTE_SITE = handles.OnenoteOwner("sites", _SITE_ID)
 
 
 class TestTheOnenoteHandleGrammar:
@@ -576,13 +586,13 @@ class TestOnenoteContainerHandle:
         assert handles.onenote_container_handle(section_group.uri) == section_group
 
     def test_a_group_notebook_uri_parses_as_a_group_notebook_handle(self) -> None:
-        notebook = handles.OnenoteNotebookHandle(_ONENOTE_NOTEBOOK_ID, group_id=_TEAM_ID)
+        notebook = handles.OnenoteNotebookHandle(_ONENOTE_NOTEBOOK_ID, owner=_ONENOTE_GROUP)
 
         assert handles.onenote_container_handle(notebook.uri) == notebook
 
     def test_a_group_section_group_uri_parses_as_a_group_section_group_handle(self) -> None:
         section_group = handles.OnenoteSectionGroupHandle(
-            _ONENOTE_SECTION_GROUP_ID, group_id=_TEAM_ID
+            _ONENOTE_SECTION_GROUP_ID, owner=_ONENOTE_GROUP
         )
 
         assert handles.onenote_container_handle(section_group.uri) == section_group
@@ -593,7 +603,7 @@ class TestOnenoteContainerHandle:
             handles.OnenoteSectionHandle(_ONENOTE_SECTION_ID).uri,
             handles.OnenotePageHandle(_ONENOTE_PAGE_ID).uri,
             handles.OnenoteOperationHandle(_ONENOTE_OPERATION_ID).uri,
-            handles.OnenoteSectionHandle(_ONENOTE_SECTION_ID, group_id=_TEAM_ID).uri,
+            handles.OnenoteSectionHandle(_ONENOTE_SECTION_ID, owner=_ONENOTE_GROUP).uri,
             "Work Notebook",
             "",
         ],
@@ -610,31 +620,39 @@ type _OnenoteHandle = (
     | handles.OnenoteOperationHandle
 )
 
-_GROUP_HANDLES: list[tuple[_OnenoteHandle, Callable[[str], _OnenoteHandle | None]]] = [
-    (
-        handles.OnenoteSectionHandle(_ONENOTE_SECTION_ID, group_id=_TEAM_ID),
-        handles.onenote_section_handle,
-    ),
-    (handles.OnenotePageHandle(_ONENOTE_PAGE_ID, group_id=_TEAM_ID), handles.onenote_page_handle),
-    (
-        handles.OnenoteNotebookHandle(_ONENOTE_NOTEBOOK_ID, group_id=_TEAM_ID),
-        handles.onenote_notebook_handle,
-    ),
-    (
-        handles.OnenoteSectionGroupHandle(_ONENOTE_SECTION_GROUP_ID, group_id=_TEAM_ID),
-        handles.onenote_section_group_handle,
-    ),
-    (
-        handles.OnenoteOperationHandle(_ONENOTE_OPERATION_ID, group_id=_TEAM_ID),
-        handles.onenote_operation_handle,
-    ),
-]
+type _Parse = Callable[[str], _OnenoteHandle | None]
+
+
+def _owned_handles(owner: handles.OnenoteOwner) -> list[tuple[_OnenoteHandle, _Parse]]:
+    return [
+        (
+            handles.OnenoteSectionHandle(_ONENOTE_SECTION_ID, owner=owner),
+            handles.onenote_section_handle,
+        ),
+        (handles.OnenotePageHandle(_ONENOTE_PAGE_ID, owner=owner), handles.onenote_page_handle),
+        (
+            handles.OnenoteNotebookHandle(_ONENOTE_NOTEBOOK_ID, owner=owner),
+            handles.onenote_notebook_handle,
+        ),
+        (
+            handles.OnenoteSectionGroupHandle(_ONENOTE_SECTION_GROUP_ID, owner=owner),
+            handles.onenote_section_group_handle,
+        ),
+        (
+            handles.OnenoteOperationHandle(_ONENOTE_OPERATION_ID, owner=owner),
+            handles.onenote_operation_handle,
+        ),
+    ]
+
+
+_GROUP_HANDLES = _owned_handles(_ONENOTE_GROUP)
+_SITE_HANDLES = _owned_handles(_ONENOTE_SITE)
 
 
 class TestTheGroupOnenoteHandleGrammar:
     @pytest.mark.parametrize(("handle", "parse"), _GROUP_HANDLES)
     def test_a_group_handle_round_trips_the_group_and_the_id(
-        self, handle: _OnenoteHandle, parse: Callable[[str], _OnenoteHandle | None]
+        self, handle: _OnenoteHandle, parse: _Parse
     ) -> None:
         assert parse(handle.uri) == handle
 
@@ -657,23 +675,23 @@ class TestTheGroupOnenoteHandleGrammar:
         ("handle", "uri"),
         [
             (
-                handles.OnenoteSectionHandle("s!1", group_id=_TEAM_ID),
+                handles.OnenoteSectionHandle("s!1", owner=_ONENOTE_GROUP),
                 f"onenote:///groups/{_TEAM_ID}/sections/s%211",
             ),
             (
-                handles.OnenotePageHandle("p!1", group_id=_TEAM_ID),
+                handles.OnenotePageHandle("p!1", owner=_ONENOTE_GROUP),
                 f"onenote:///groups/{_TEAM_ID}/pages/p%211",
             ),
             (
-                handles.OnenoteNotebookHandle("n!1", group_id=_TEAM_ID),
+                handles.OnenoteNotebookHandle("n!1", owner=_ONENOTE_GROUP),
                 f"onenote:///groups/{_TEAM_ID}/notebooks/n%211",
             ),
             (
-                handles.OnenoteSectionGroupHandle("g!1", group_id=_TEAM_ID),
+                handles.OnenoteSectionGroupHandle("g!1", owner=_ONENOTE_GROUP),
                 f"onenote:///groups/{_TEAM_ID}/sectiongroups/g%211",
             ),
             (
-                handles.OnenoteOperationHandle("o!1", group_id=_TEAM_ID),
+                handles.OnenoteOperationHandle("o!1", owner=_ONENOTE_GROUP),
                 f"onenote:///groups/{_TEAM_ID}/operations/o%211",
             ),
         ],
@@ -687,25 +705,27 @@ class TestTheGroupOnenoteHandleGrammar:
         parsed = handles.onenote_page_handle(f"onenote:///pages/{_ONENOTE_PAGE_ID}")
 
         assert parsed is not None
-        assert parsed.group_id is None
+        assert parsed.owner is None
 
     def test_the_group_segment_is_percent_encoded(self) -> None:
         awkward = "group/with?query#hash"
 
-        handle = handles.OnenoteSectionHandle(_ONENOTE_SECTION_ID, group_id=awkward)
+        handle = handles.OnenoteSectionHandle(
+            _ONENOTE_SECTION_ID, owner=handles.OnenoteOwner("groups", awkward)
+        )
 
         assert handle.uri.startswith("onenote:///groups/group%2Fwith%3Fquery%23hash/sections/")
         assert handles.onenote_section_handle(handle.uri) == handle
 
     def test_a_group_handle_is_not_the_handle_of_the_same_id_with_no_group(self) -> None:
         parsed = handles.onenote_page_handle(
-            handles.OnenotePageHandle(_ONENOTE_PAGE_ID, group_id=_TEAM_ID).uri
+            handles.OnenotePageHandle(_ONENOTE_PAGE_ID, owner=_ONENOTE_GROUP).uri
         )
 
         assert parsed != handles.OnenotePageHandle(_ONENOTE_PAGE_ID)
 
     def test_a_group_page_handle_is_not_a_section_handle(self) -> None:
-        page = handles.OnenotePageHandle(_ONENOTE_PAGE_ID, group_id=_TEAM_ID)
+        page = handles.OnenotePageHandle(_ONENOTE_PAGE_ID, owner=_ONENOTE_GROUP)
 
         assert handles.onenote_section_handle(page.uri) is None
         assert handles.onenote_notebook_handle(page.uri) is None
@@ -745,3 +765,92 @@ class TestTheGroupOnenoteHandleGrammar:
         assert handles.onenote_section_handle(uri) is None
         assert handles.onenote_section_group_handle(uri) is None
         assert handles.onenote_operation_handle(uri) is None
+
+
+_PARSERS: list[_Parse] = [
+    handles.onenote_section_handle,
+    handles.onenote_page_handle,
+    handles.onenote_notebook_handle,
+    handles.onenote_section_group_handle,
+    handles.onenote_operation_handle,
+]
+
+
+class TestTheSiteOnenoteHandleGrammar:
+    @pytest.mark.parametrize(("handle", "parse"), _SITE_HANDLES)
+    def test_a_site_handle_round_trips_the_site_and_the_id(
+        self, handle: _OnenoteHandle, parse: _Parse
+    ) -> None:
+        assert parse(handle.uri) == handle
+
+    @pytest.mark.parametrize(
+        ("handle", "uri"),
+        [
+            (
+                handles.OnenoteSectionHandle("s!1", owner=_ONENOTE_SITE),
+                f"onenote:///sites/{_ENCODED_SITE_ID}/sections/s%211",
+            ),
+            (
+                handles.OnenotePageHandle("p!1", owner=_ONENOTE_SITE),
+                f"onenote:///sites/{_ENCODED_SITE_ID}/pages/p%211",
+            ),
+            (
+                handles.OnenoteNotebookHandle("n!1", owner=_ONENOTE_SITE),
+                f"onenote:///sites/{_ENCODED_SITE_ID}/notebooks/n%211",
+            ),
+            (
+                handles.OnenoteSectionGroupHandle("g!1", owner=_ONENOTE_SITE),
+                f"onenote:///sites/{_ENCODED_SITE_ID}/sectiongroups/g%211",
+            ),
+            (
+                handles.OnenoteOperationHandle("o!1", owner=_ONENOTE_SITE),
+                f"onenote:///sites/{_ENCODED_SITE_ID}/operations/o%211",
+            ),
+        ],
+    )
+    def test_a_site_handle_puts_the_percent_encoded_site_before_the_family(
+        self, handle: _OnenoteHandle, uri: str
+    ) -> None:
+        assert handle.uri == uri
+
+    def test_a_site_id_with_commas_decodes_to_the_same_id(self) -> None:
+        parsed = handles.onenote_page_handle(
+            f"onenote:///sites/{_ENCODED_SITE_ID}/pages/{_ONENOTE_PAGE_ID}"
+        )
+
+        assert parsed is not None
+        assert parsed.owner == handles.OnenoteOwner("sites", _SITE_ID)
+        assert parsed.page_id == _ONENOTE_PAGE_ID
+
+    def test_a_site_handle_is_not_the_group_handle_of_the_same_owner_id(self) -> None:
+        site = handles.OnenotePageHandle(
+            _ONENOTE_PAGE_ID, owner=handles.OnenoteOwner("sites", _TEAM_ID)
+        )
+
+        parsed = handles.onenote_page_handle(site.uri)
+
+        assert parsed == site
+        assert parsed != handles.OnenotePageHandle(_ONENOTE_PAGE_ID, owner=_ONENOTE_GROUP)
+
+    @pytest.mark.parametrize("parse", _PARSERS)
+    @pytest.mark.parametrize(
+        "family", ["sections", "pages", "notebooks", "sectiongroups", "operations"]
+    )
+    def test_a_blank_site_is_not_a_handle_of_any_family(self, parse: _Parse, family: str) -> None:
+        assert parse(f"onenote:///sites/%20/{family}/x") is None
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            "onenote:///teams/x/pages/y",
+            "onenote:///users/x/pages/y",
+            "onenote:///site/x/pages/y",
+            "onenote:///sites/x",
+            "onenote:///sites//pages/x",
+            "onenote:///sites/a/b/pages/x",
+            "onenote:///sites/x/groups/y/pages/z",
+            f"https://graph.microsoft.com/v1.0/sites/{_SITE_ID}/onenote/pages/{_ONENOTE_PAGE_ID}",
+        ],
+    )
+    def test_it_refuses_a_page_handle_under_any_other_owner(self, uri: str) -> None:
+        assert handles.onenote_page_handle(uri) is None

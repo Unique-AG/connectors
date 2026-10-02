@@ -24,6 +24,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import (
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionHandle,
     onenote_page_handle,
@@ -52,7 +53,7 @@ _NOTEBOOK_ROUTE = f"/me/onenote/notebooks/{quote(_NOTEBOOK_ID, safe='')}"
 
 _GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
 _OTHER_GROUP_ID = "00000000-0000-4000-8000-0000000000bb"
-_GROUP_SECTION_URI = OnenoteSectionHandle(_SECTION_ID, group_id=_GROUP_ID).uri
+_GROUP_SECTION_URI = OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
 
 
 def _group_section_route(group_id: str = _GROUP_ID) -> str:
@@ -60,6 +61,15 @@ def _group_section_route(group_id: str = _GROUP_ID) -> str:
 
 
 _GROUP_SECTION_ROUTE = f"{_group_section_route()}/pages"
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_SECTION_URI = OnenoteSectionHandle(_SECTION_ID, owner=_SITE).uri
+_SITE_SECTION_ROUTE = f"/sites/{_SITE_ID}/onenote/sections/{quote(_SECTION_ID, safe='')}"
+_SITE_NOTEBOOK_ROUTE = f"/sites/{_SITE_ID}/onenote/notebooks/{quote(_NOTEBOOK_ID, safe='')}"
 
 _TITLE = "Q4 planning"
 _BODY_HTML = "<p>Ship the plan.</p>"
@@ -1307,11 +1317,13 @@ class TestAGroupSection:
 
         answer = await _create(client, section=_GROUP_SECTION_URI)
 
-        assert answer.uri == OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
+        assert (
+            answer.uri == OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
         assert answer.section_uri == _GROUP_SECTION_URI
         handle = onenote_page_handle(answer.uri)
         assert handle is not None
-        assert (handle.page_id, handle.group_id) == (_PAGE_ID, _GROUP_ID)
+        assert (handle.page_id, handle.owner) == (_PAGE_ID, OnenoteOwner("groups", _GROUP_ID))
 
     async def test_a_parent_section_graph_names_carries_the_group(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1323,7 +1335,10 @@ class TestAGroupSection:
 
         answer = await _create(client, section=_GROUP_SECTION_URI)
 
-        assert answer.section_uri == OnenoteSectionHandle(_OTHER_SECTION_ID, group_id=_GROUP_ID).uri
+        assert (
+            answer.section_uri
+            == OnenoteSectionHandle(_OTHER_SECTION_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
 
     async def test_the_about_digest_names_the_group(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1341,7 +1356,7 @@ class TestAGroupSection:
 
         assert bound == [
             write_state_for(
-                "create", "group", _GROUP_ID, "section", _SECTION_ID, _TITLE, _BODY_HTML
+                "create", "groups", _GROUP_ID, "section", _SECTION_ID, _TITLE, _BODY_HTML
             )
         ]
         assert bound[0] != write_state_for("create", "section", _SECTION_ID, _TITLE, _BODY_HTML)
@@ -1358,7 +1373,7 @@ class TestAGroupSection:
         )
         assert create.call_count == 0, "an unanswered question created the page anyway"
         assert state == write_state_for(
-            "create", "group", _GROUP_ID, "section", _SECTION_ID, _TITLE, _BODY_HTML
+            "create", "groups", _GROUP_ID, "section", _SECTION_ID, _TITLE, _BODY_HTML
         )
 
         answer = await _round(
@@ -1374,7 +1389,9 @@ class TestAGroupSection:
         )
 
         assert isinstance(answer, CreatedPage)
-        assert answer.uri == OnenotePageHandle(_PAGE_ID, group_id=_GROUP_ID).uri
+        assert (
+            answer.uri == OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
         assert create.call_count == 1
 
     async def test_an_agreement_for_one_group_creates_nothing_in_another(
@@ -1395,7 +1412,9 @@ class TestAGroupSection:
         with pytest.raises(ToolError, match="given for a different request"):
             _ = await _round(
                 client,
-                section=OnenoteSectionHandle(_SECTION_ID, group_id=_OTHER_GROUP_ID).uri,
+                section=OnenoteSectionHandle(
+                    _SECTION_ID, owner=OnenoteOwner("groups", _OTHER_GROUP_ID)
+                ).uri,
                 confirm=a_person_agrees(
                     _modern_context(
                         answers={key: ElicitResult(action="accept", content={"value": agree})},
@@ -1422,3 +1441,43 @@ class TestAGroupSection:
         ] == []
         assert "/groups/" not in answer.uri
         assert "/groups/" not in (answer.section_uri or "")
+
+
+class TestASiteSection:
+    async def test_it_asks_and_then_posts_html_once_to_the_site_route(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        section_read = graph.get(_SITE_SECTION_ROUTE).mock(
+            return_value=httpx.Response(
+                200, json={"id": _SECTION_ID, "parentNotebook": {"id": _NOTEBOOK_ID}}
+            )
+        )
+        notebook_read = graph.get(_SITE_NOTEBOOK_ROUTE).mock(
+            return_value=httpx.Response(
+                200, json=_notebook_payload(is_shared=False, user_role="Owner")
+            )
+        )
+        create = _creates(graph, f"{_SITE_SECTION_ROUTE}/pages", _page_payload())
+        asked: list[str] = []
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert create.call_count == 0, "the page was written before the person was asked"
+            asked.append(question)
+            bound.append(about)
+            return None
+
+        answer = await _create(client, section=_SITE_SECTION_URI, confirm=capturing)
+
+        assert len(asked) == 1, "a site notebook the user owns unshared was written unasked"
+        assert "which belongs to a SharePoint site" in asked[0]
+        assert (section_read.call_count, notebook_read.call_count, create.call_count) == (1, 1, 1)
+        assert len(_calls(graph)) == 3, "nothing was read from or written to /me"
+        assert answer.uri == OnenotePageHandle(_PAGE_ID, owner=_SITE).uri
+        assert answer.section_uri == _SITE_SECTION_URI
+        assert bound == [
+            write_state_for("create", "sites", _SITE_ID, "section", _SECTION_ID, _TITLE, _BODY_HTML)
+        ]
+        assert bound[0] != write_state_for(
+            "create", "groups", _SITE_ID, "section", _SECTION_ID, _TITLE, _BODY_HTML
+        )

@@ -12,6 +12,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
@@ -41,8 +42,8 @@ _OWNER_ID = "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
 
 _NOTEBOOK = OnenoteNotebookHandle(_NOTEBOOK_ID).uri
 _GROUP = OnenoteSectionGroupHandle(_GROUP_ID).uri
-_OWNED_NOTEBOOK = OnenoteNotebookHandle(_NOTEBOOK_ID, group_id=_OWNER_ID).uri
-_OWNED_GROUP = OnenoteSectionGroupHandle(_GROUP_ID, group_id=_OWNER_ID).uri
+_OWNED_NOTEBOOK = OnenoteNotebookHandle(_NOTEBOOK_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
+_OWNED_GROUP = OnenoteSectionGroupHandle(_GROUP_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
 
 _NOTEBOOK_SECTIONS_PATH = "/me/onenote/notebooks/0-SYNTHETICNOTEBOOK0001%210001/sections"
 _NOTEBOOK_GROUPS_PATH = "/me/onenote/notebooks/0-SYNTHETICNOTEBOOK0001%210001/sectionGroups"
@@ -56,6 +57,14 @@ _OWNED_NOTEBOOK_GROUPS_PATH = (
 )
 _OWNED_GROUP_SECTIONS_PATH = f"{_OWNED_ROOT}/sectionGroups/0-SYNTHETICGROUP0001%210001/sections"
 _OWNED_GROUP_GROUPS_PATH = f"{_OWNED_ROOT}/sectionGroups/0-SYNTHETICGROUP0001%210001/sectionGroups"
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_NOTEBOOK = OnenoteNotebookHandle(_NOTEBOOK_ID, owner=_SITE).uri
+_SITE_NOTEBOOK_PATH = f"/sites/{_SITE_ID}/onenote/notebooks/0-SYNTHETICNOTEBOOK0001%210001"
 
 
 def _creator(name: str | None) -> dict[str, object] | None:
@@ -393,10 +402,10 @@ class TestTheGroupRoute:
         answer = await lister.list_sections(client, parent=_OWNED_NOTEBOOK, limit=50)
 
         assert [row.uri for row in answer.sections] == [
-            OnenoteSectionHandle(_SECTION_ID, group_id=_OWNER_ID).uri
+            OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
         ]
         assert [row.uri for row in answer.section_groups] == [
-            OnenoteSectionGroupHandle(_CHILD_GROUP_ID, group_id=_OWNER_ID).uri
+            OnenoteSectionGroupHandle(_CHILD_GROUP_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
         ]
 
     async def test_the_rows_under_an_owned_section_group_carry_its_group(
@@ -410,10 +419,15 @@ class TestTheGroupRoute:
 
         answer = await lister.list_sections(client, parent=_OWNED_GROUP, limit=50)
 
-        assert answer.sections[0].uri == OnenoteSectionHandle(_SECTION_ID, group_id=_OWNER_ID).uri
+        assert (
+            answer.sections[0].uri
+            == OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
+        )
         assert (
             answer.section_groups[0].uri
-            == OnenoteSectionGroupHandle(_CHILD_GROUP_ID, group_id=_OWNER_ID).uri
+            == OnenoteSectionGroupHandle(
+                _CHILD_GROUP_ID, owner=OnenoteOwner("groups", _OWNER_ID)
+            ).uri
         )
 
     async def test_the_rows_under_a_parent_with_no_owner_name_no_group(
@@ -455,7 +469,7 @@ class TestTheGroupRoute:
 
         assert [row.name for row in answer.sections] == ["Late"]
         assert answer.sections[0].uri == (
-            OnenoteSectionHandle(_OTHER_SECTION_ID, group_id=_OWNER_ID).uri
+            OnenoteSectionHandle(_OTHER_SECTION_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
         )
         assert owned_notebook_sections.calls.last.request.url.params["$skiptoken"] == "second"
 
@@ -474,8 +488,10 @@ class TestTheGroupRoute:
     @pytest.mark.parametrize(
         "parent",
         [
-            OnenoteSectionHandle(_SECTION_ID, group_id=_OWNER_ID).uri,
-            OnenotePageHandle("0-SYNTHETICPAGE0001!0001", group_id=_OWNER_ID).uri,
+            OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri,
+            OnenotePageHandle(
+                "0-SYNTHETICPAGE0001!0001", owner=OnenoteOwner("groups", _OWNER_ID)
+            ).uri,
             f"onenote:///groups/{_OWNER_ID}/notebooks/",
             f"onenote:///groups/{_OWNER_ID}",
         ],
@@ -487,6 +503,30 @@ class TestTheGroupRoute:
             _ = await lister.list_sections(client, parent=parent, limit=50)
 
         assert len(graph.calls) == 0
+
+
+class TestTheSiteRoute:
+    async def test_a_site_notebook_parent_lists_under_the_site_and_its_rows_carry_the_site(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        sections = graph.get(f"{_SITE_NOTEBOOK_PATH}/sections").mock(
+            return_value=_page(_section_payload(_SECTION_ID))
+        )
+        section_groups = graph.get(f"{_SITE_NOTEBOOK_PATH}/sectionGroups").mock(
+            return_value=_page(_group_payload(_CHILD_GROUP_ID))
+        )
+
+        answer = await lister.list_sections(client, parent=_SITE_NOTEBOOK, limit=50)
+
+        assert (sections.call_count, section_groups.call_count) == (1, 1)
+        assert len(graph.calls) == 2, "nothing was read from /me"
+        assert answer.parent_uri == _SITE_NOTEBOOK
+        assert [row.uri for row in answer.sections] == [
+            OnenoteSectionHandle(_SECTION_ID, owner=_SITE).uri
+        ]
+        assert [row.uri for row in answer.section_groups] == [
+            OnenoteSectionGroupHandle(_CHILD_GROUP_ID, owner=_SITE).uri
+        ]
 
 
 class TestWhatItAnswers:

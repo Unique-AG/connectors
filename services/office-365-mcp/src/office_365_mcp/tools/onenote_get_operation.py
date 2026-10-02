@@ -65,13 +65,13 @@ async def get_operation(client: GraphServiceClient, *, operation: str) -> Operat
 
     with graph_errors(TOOL_NAME, step=STEP_OPERATION):
         found = await (
-            onenote_root(client, handle.group_id)
+            onenote_root(client, handle.owner)
             .operations.by_onenote_operation_id(handle.operation_id)
             .get()
         )
 
     assert found is not None, "Graph answered an operation read with no operation"
-    return OperationSummary.from_operation(found, group_id=handle.group_id)
+    return OperationSummary.from_operation(found, owner=handle.owner)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

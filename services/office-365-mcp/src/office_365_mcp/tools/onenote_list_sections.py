@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
+    OnenoteOwner,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
     onenote_container_handle,
@@ -257,12 +258,12 @@ async def list_sections(
         sections=[
             row
             for section in sections_collected.items
-            if (row := _section_row(section, handle.group_id)) is not None
+            if (row := _section_row(section, handle.owner)) is not None
         ],
         section_groups=[
             row
             for group in groups_collected.items
-            if (row := _section_group_row(group, handle.group_id)) is not None
+            if (row := _section_group_row(group, handle.owner)) is not None
         ],
         capped=sections_collected.capped or groups_collected.capped,
     )
@@ -291,7 +292,7 @@ async def _first_sections(
     query_filter: str | None,
     orderby: list[str] | None,
 ) -> OnenoteSectionCollectionResponse | None:
-    root = onenote_root(client, handle.group_id)
+    root = onenote_root(client, handle.owner)
     sections = (
         root.notebooks.by_notebook_id(handle.notebook_id).sections
         if isinstance(handle, OnenoteNotebookHandle)
@@ -319,7 +320,7 @@ async def _first_section_groups(
     query_filter: str | None,
     orderby: list[str] | None,
 ) -> SectionGroupCollectionResponse | None:
-    root = onenote_root(client, handle.group_id)
+    root = onenote_root(client, handle.owner)
     section_groups = (
         root.notebooks.by_notebook_id(handle.notebook_id).section_groups
         if isinstance(handle, OnenoteNotebookHandle)
@@ -335,11 +336,11 @@ async def _first_section_groups(
     )
 
 
-def _section_row(section: OnenoteSection, group_id: str | None) -> SectionRow | None:
+def _section_row(section: OnenoteSection, owner: OnenoteOwner | None) -> SectionRow | None:
     if section.id is None:
         return None
     return SectionRow(
-        uri=OnenoteSectionHandle(section.id, group_id=group_id).uri,
+        uri=OnenoteSectionHandle(section.id, owner=owner).uri,
         name=section.display_name,
         is_default=section.is_default,
         web_url=web_url_of(section.links),
@@ -348,11 +349,11 @@ def _section_row(section: OnenoteSection, group_id: str | None) -> SectionRow | 
     )
 
 
-def _section_group_row(group: SectionGroup, group_id: str | None) -> SectionGroupRow | None:
+def _section_group_row(group: SectionGroup, owner: OnenoteOwner | None) -> SectionGroupRow | None:
     if group.id is None:
         return None
     return SectionGroupRow(
-        uri=OnenoteSectionGroupHandle(group.id, group_id=group_id).uri,
+        uri=OnenoteSectionGroupHandle(group.id, owner=owner).uri,
         name=group.display_name,
         created_by=creator_name_of(group.created_by),
         last_modified_at=group.last_modified_date_time,
