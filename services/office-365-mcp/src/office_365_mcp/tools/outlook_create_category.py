@@ -11,6 +11,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry
+from office_365_mcp.shared.categories import CategoryName
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
 
 TOOL_NAME = "outlook_create_category"
@@ -59,7 +61,8 @@ alone, so this tool never asks anybody to agree. A new category is on no message
 If this deployment exposes outlook_mark_mail, that tool puts a category on a message.
 
 Notes:
-- Microsoft refuses a duplicate name, and the same name fails again.
+- Each category name is unique in the list. Microsoft refuses a name that the list already has. \
+If you call this tool again with the same arguments, the call will fail the same way.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 outlook_list_categories does not show a category named `name`.
 """
@@ -96,10 +99,7 @@ def _answer(category: OutlookCategory) -> CreatedCategory:
     assert category.display_name is not None, (
         "Graph created a category with no display name, which is the only name a category has"
     )
-    return CreatedCategory(
-        name=category.display_name,
-        color=None if category.color is None else str.__str__(category.color),
-    )
+    return CreatedCategory(name=category.display_name, color=spelled(category.color))
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -113,9 +113,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     )
     async def outlook_create_category(
         name: Annotated[
-            str,
+            CategoryName,
             Field(
-                min_length=1,
                 description=(
                     "The new category's name, as the user writes it. The name must be unique in "
                     "the user's list of categories and cannot change after this call. The "

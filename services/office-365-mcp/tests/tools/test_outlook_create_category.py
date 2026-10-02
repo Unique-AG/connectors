@@ -7,6 +7,7 @@ import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ValidationError
 from fastmcp.tools import FunctionTool, Tool
 from msgraph.generated.models.category_color import CategoryColor
 from msgraph.graph_service_client import GraphServiceClient
@@ -227,9 +228,24 @@ class TestHowItDeclaresItself:
         parameters, _tool = await _registered(transport)
         assert parameters["required"] == ["name"]
 
-    async def test_the_name_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
+    async def test_the_name_cannot_be_empty_or_only_whitespace(
+        self, transport: httpx.AsyncClient
+    ) -> None:
         parameters, _tool = await _registered(transport)
-        assert _property(parameters, "name")["minLength"] == 1
+        name = _property(parameters, "name")
+        assert name["minLength"] == 1
+        assert name["pattern"] == r"\S"
+
+    @pytest.mark.parametrize("blank", ["", "   ", "\t\n"], ids=["empty", "spaces", "tab-newline"])
+    async def test_a_blank_name_never_reaches_graph(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter, blank: str
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run({"name": blank})
+
+        assert len(graph.calls) == 0, "a blank category name reached Graph"
 
     async def test_the_color_defaults_to_none(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)
@@ -315,7 +331,12 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""
-        assert "Microsoft refuses a duplicate name, and the same name fails again" in description
+        assert "Each category name is unique in the list" in description
+        assert "Microsoft refuses a name that the list already has" in description
+        assert (
+            "If you call this tool again with the same arguments, the call will fail the same way"
+            in description
+        )
         assert "confirmed on a test tenant" not in description
         assert "bad request" not in description
 
