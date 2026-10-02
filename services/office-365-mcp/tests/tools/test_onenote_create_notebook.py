@@ -25,7 +25,7 @@ from office_365_mcp.shared.handles import (
     OnenoteOwner,
     onenote_notebook_handle,
 )
-from office_365_mcp.shared.notes import write_state_for
+from office_365_mcp.shared.notes import named_owner_refused, write_state_for
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm, GraphAdviceMiddleware
 from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import onenote_create_notebook as creator
@@ -47,15 +47,6 @@ _SITE_ID = (
 _SITE_NOTEBOOKS_PATH = f"/sites/{_SITE_ID}/onenote/notebooks"
 
 _NAME = "My Notebook"
-
-_OWNER_REFUSED = (
-    "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
-    + "Most likely, the signed-in user is not a member of that group or site, or the id is "
-    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also fails "
-    + "without `group` and `site`, ask a Microsoft 365 administrator to grant the delegated "
-    + "permission Notes.Create. If the user already has access, ask an administrator to examine "
-    + "the OneNote permissions of this connector. This same call fails again, so do not retry it."
-)
 
 
 def _notebook_payload(
@@ -355,7 +346,7 @@ class TestGraphFailures:
         with pytest.raises(Advised) as advised:
             _ = await _create(client, group=owner.get("group"), site=owner.get("site"))
 
-        assert str(advised.value).startswith(_OWNER_REFUSED)
+        assert str(advised.value).startswith(named_owner_refused("Notes.Create"))
         assert "are not the problem" not in str(advised.value)
         assert isinstance(advised.value.__cause__, GraphForbidden)
 
@@ -370,7 +361,7 @@ class TestGraphFailures:
 
         told = await _told_through_the_advice(client, site=_SITE_ID)
 
-        assert told.startswith(_OWNER_REFUSED)
+        assert told.startswith(named_owner_refused("Notes.Create"))
         assert site_notebooks.call_count == 1
 
     async def test_a_404_for_a_group_reaches_the_client_as_the_not_found_text(

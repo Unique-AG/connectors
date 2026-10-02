@@ -18,6 +18,7 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
 )
+from office_365_mcp.shared.notes import named_owner_refused
 from office_365_mcp.shared.seam import READ_ONLY, Advised
 from office_365_mcp.tools import onenote_find_notebook_from_url as finder
 
@@ -433,22 +434,11 @@ class TestGraphFailures:
             _ = await _find(client, **owner)
 
         assert str(refused.value) == (
-            f"{finder._OWNER_REFUSED} "  # pyright: ignore[reportPrivateUsage]
+            f"{named_owner_refused('Notes.Read')} "
             + "(HTTP 403, Graph error code accessDenied, Graph request id req-7)"
         )
         assert "are not the problem" not in str(refused.value)
         assert isinstance(refused.value.__cause__, GraphForbidden)
-
-    def test_the_advice_for_a_refused_owner_is_the_canonical_text(self) -> None:
-        assert finder._OWNER_REFUSED == (  # pyright: ignore[reportPrivateUsage]
-            "Microsoft 365 refused this request for the `group` or the `site` that this call "
-            + "named. Most likely, the signed-in user is not a member of that group or site, or "
-            + "the id is wrong. Ask the user for the correct id, or ask them to get access. If "
-            + "this tool also fails without `group` and `site`, ask a Microsoft 365 administrator "
-            + "to grant the delegated permission Notes.Read. If the user already has access, ask "
-            + "an administrator to examine the OneNote permissions of this connector. This same "
-            + "call fails again, so do not retry it."
-        )
 
 
 class TestWhatItRefuses:

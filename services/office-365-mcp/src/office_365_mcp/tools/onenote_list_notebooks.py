@@ -40,6 +40,7 @@ from office_365_mcp.shared.notes import (
     created_by_contains,
     creator_name_of,
     get_with_query,
+    named_owner_refused,
     onenote_root,
     owner_named,
     web_url_of,
@@ -65,15 +66,6 @@ GRAPH_NOT_FOUND = (
     + "This same id fails again, so do not retry it. If this call named no `group` and no "
     + "`site`, Microsoft most likely found no OneNote for this account, and no other argument "
     + "fixes that."
-)
-
-_OWNER_REFUSED = (
-    "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
-    + "Most likely, the signed-in user is not a member of that group or site, or the id is "
-    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also fails "
-    + "without `group` and `site`, ask a Microsoft 365 administrator to grant the delegated "
-    + "permission Notes.Read. If the user already has access, ask an administrator to examine "
-    + "the OneNote permissions of this connector. This same call fails again, so do not retry it."
 )
 
 _GROUP_AND_SITE = (
@@ -281,7 +273,10 @@ async def list_notebooks(
     orderby = None if order_by is None else [CONTAINER_ORDER_CLAUSES[order_by]]
     owner = owner_named(group=group, site=site)
     root = onenote_root(client, owner)
-    with owner_refused(owner is not None, _OWNER_REFUSED), graph_errors(TOOL_NAME):
+    with (
+        owner_refused(owner is not None, named_owner_refused("Notes.Read")),
+        graph_errors(TOOL_NAME),
+    ):
         with graph_step(STEP_NOTEBOOKS):
             first_notebooks = await get_with_query(
                 client,

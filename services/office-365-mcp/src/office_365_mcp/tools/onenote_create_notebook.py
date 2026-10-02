@@ -16,6 +16,7 @@ from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
 from office_365_mcp.shared.handles import OnenoteNotebookHandle, OnenoteOwner
 from office_365_mcp.shared.notes import (
     client_url_of,
+    named_owner_refused,
     onenote_root,
     owner_named,
     web_url_of,
@@ -66,15 +67,6 @@ _GROUP_AND_SITE = (
     "onenote_create_notebook takes at most one of `group` and `site`. A notebook belongs to one "
     + "group or one site, never to both. The same combination fails again, so do not retry it as "
     + "it is."
-)
-
-_OWNER_REFUSED = (
-    "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
-    + "Most likely, the signed-in user is not a member of that group or site, or the id is "
-    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also fails "
-    + "without `group` and `site`, ask a Microsoft 365 administrator to grant the delegated "
-    + "permission Notes.Create. If the user already has access, ask an administrator to examine "
-    + "the OneNote permissions of this connector. This same call fails again, so do not retry it."
 )
 
 GRAPH_NOT_FOUND = (
@@ -168,7 +160,7 @@ async def create_notebook(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with (
-        owner_refused(owner is not None, _OWNER_REFUSED),
+        owner_refused(owner is not None, named_owner_refused("Notes.Create")),
         graph_errors(TOOL_NAME, step=STEP_CREATE_NOTEBOOK),
     ):
         if answer_pending or owner is not None:

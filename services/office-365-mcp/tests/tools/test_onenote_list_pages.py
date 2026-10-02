@@ -11,7 +11,12 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import OnenoteOwner, OnenotePageHandle, OnenoteSectionHandle
-from office_365_mcp.shared.notes import OWNED_REFUSED, PAGE_EXPANSIONS, PAGE_FIELDS
+from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
+    PAGE_EXPANSIONS,
+    PAGE_FIELDS,
+    named_owner_refused,
+)
 from office_365_mcp.shared.seam import Advised
 from office_365_mcp.tools import onenote_list_pages as lister
 
@@ -44,15 +49,6 @@ _GROUP_SECTION = OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", 
 _SITE_SECTION = OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("sites", _SITE_ID)).uri
 
 _APP_ID = "WLID-000000004C12821A"
-
-_OWNER_REFUSED = (
-    "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
-    + "Most likely, the signed-in user is not a member of that group or site, or the id is "
-    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also fails "
-    + "without `group` and `site`, ask a Microsoft 365 administrator to grant the delegated "
-    + "permission Notes.Read. If the user already has access, ask an administrator to examine "
-    + "the OneNote permissions of this connector. This same call fails again, so do not retry it."
-)
 
 
 def _page_payload(
@@ -826,7 +822,8 @@ class TestGraphFailures:
             _ = await lister.list_pages(client, group=group, site=site, limit=25)
 
         assert str(refused.value) == (
-            _OWNER_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+            named_owner_refused("Notes.Read")
+            + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
         )
         assert "are not the problem" not in str(refused.value)
         assert isinstance(refused.value.__cause__, GraphForbidden)

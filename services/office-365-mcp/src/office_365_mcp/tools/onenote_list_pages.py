@@ -24,6 +24,7 @@ from office_365_mcp.shared.notes import (
     PAGE_FIELDS,
     PageSummary,
     get_with_query,
+    named_owner_refused,
     onenote_root,
     owner_named,
 )
@@ -50,15 +51,6 @@ GRAPH_NOT_FOUND = (
     + "signed-in user can reach. Ask the user for the correct id. This same id fails again, so "
     + "do not retry it. If it named none of these, Microsoft found no OneNote for this account "
     + "to list pages from at all. No other argument here fixes that."
-)
-
-_OWNER_REFUSED = (
-    "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
-    + "Most likely, the signed-in user is not a member of that group or site, or the id is "
-    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also fails "
-    + "without `group` and `site`, ask a Microsoft 365 administrator to grant the delegated "
-    + "permission Notes.Read. If the user already has access, ask an administrator to examine "
-    + "the OneNote permissions of this connector. This same call fails again, so do not retry it."
 )
 
 MAX_PAGES = 100
@@ -202,7 +194,7 @@ async def list_pages(
     order_clause = _ORDER_BY_CLAUSES[order_by] if order_by is not None else None
 
     with (
-        owner_refused(group is not None or site is not None, _OWNER_REFUSED),
+        owner_refused(group is not None or site is not None, named_owner_refused("Notes.Read")),
         owner_refused(handle is not None and handle.owner is not None, OWNED_REFUSED),
         graph_errors(TOOL_NAME),
         graph_step(STEP_PAGES),

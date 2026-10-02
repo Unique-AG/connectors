@@ -133,6 +133,18 @@ OWNED_REFUSED = (
 )
 
 
+def named_owner_refused(permission: str) -> str:
+    return (
+        "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
+        + "Most likely, the signed-in user is not a member of that group or site, or the id is "
+        + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also "
+        + "fails without `group` and `site`, ask a Microsoft 365 administrator to grant the "
+        + f"delegated permission {permission}. If the user already has access, ask an "
+        + "administrator to examine the OneNote permissions of this connector. This same call "
+        + "fails again, so do not retry it."
+    )
+
+
 def group_id_of(owner: OnenoteOwner | None) -> str | None:
     return owner.owner_id if owner is not None and owner.kind == "groups" else None
 

@@ -26,6 +26,7 @@ from office_365_mcp.shared.handles import (
 )
 from office_365_mcp.shared.notes import (
     client_url_of,
+    named_owner_refused,
     onenote_root,
     owner_named,
     owner_of_graph_url,
@@ -61,15 +62,6 @@ _GROUP_AND_SITE = (
     "onenote_find_notebook_from_url takes at most one of `group` and `site`. A notebook belongs "
     + "to one group or one site, never to both. The same combination fails again, so do not retry "
     + "it as it is."
-)
-
-_OWNER_REFUSED = (
-    "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
-    + "Most likely, the signed-in user is not a member of that group or site, or the id is "
-    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also fails "
-    + "without `group` and `site`, ask a Microsoft 365 administrator to grant the delegated "
-    + "permission Notes.Read. If the user already has access, ask an administrator to examine "
-    + "the OneNote permissions of this connector. This same call fails again, so do not retry it."
 )
 
 _OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS = (
@@ -183,7 +175,7 @@ async def find_notebook_from_url(
 
     named = owner_named(group=group, site=site)
     with (
-        owner_refused(named is not None, _OWNER_REFUSED),
+        owner_refused(named is not None, named_owner_refused("Notes.Read")),
         graph_errors(TOOL_NAME, step=STEP_NOTEBOOK_FROM_URL),
     ):
         found = await _resolve(client, web_url, named)

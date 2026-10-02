@@ -470,6 +470,27 @@ class TestOwnedRefused:
         )
 
 
+class TestNamedOwnerRefused:
+    def test_it_sends_the_user_for_the_id_or_access_and_names_the_permission(self) -> None:
+        assert notes.named_owner_refused("Notes.Read") == (
+            "Microsoft 365 refused this request for the `group` or the `site` that this call "
+            + "named. Most likely, the signed-in user is not a member of that group or site, or "
+            + "the id is wrong. Ask the user for the correct id, or ask them to get access. If "
+            + "this tool also fails without `group` and `site`, ask a Microsoft 365 administrator "
+            + "to grant the delegated permission Notes.Read. If the user already has access, ask "
+            + "an administrator to examine the OneNote permissions of this connector. This same "
+            + "call fails again, so do not retry it."
+        )
+
+    def test_it_changes_only_the_permission_name(self) -> None:
+        created = notes.named_owner_refused("Notes.Create")
+
+        assert created == notes.named_owner_refused("Notes.Read").replace(
+            "Notes.Read", "Notes.Create"
+        )
+        assert "Notes.Read" not in created
+
+
 class TestNotebookAudience:
     async def test_it_sends_the_exact_select(
         self, client: GraphServiceClient, graph: respx.MockRouter
