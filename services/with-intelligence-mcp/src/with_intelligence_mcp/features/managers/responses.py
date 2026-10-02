@@ -2,14 +2,13 @@ from typing import Literal, Self
 
 from pydantic import Field
 
-from with_intelligence_mcp.features.investors import ClassificationAttributes
 from with_intelligence_mcp.features.managers.api_responses import (
     ManagerAumAttributes,
     ManagerContactAttributes,
     ManagerExtendedAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import html_to_markdown
+from with_intelligence_mcp.utils import html_to_markdown, names, when_either, when_present
 
 
 class ManagerAumResponse(OmitNoneModel):
@@ -96,35 +95,31 @@ class ManagerProfileResponse(OmitNoneModel):
             location=_location(attributes),
             sec_number=attributes.sec_number,
             sec_registered_firm=attributes.sec_registered_firm,
-            types=_when_present(attributes, "types", _names(attributes.types)),
-            aums=_when_present(
-                attributes, "aums", [_aum(entry) for entry in attributes.aums or []]
+            types=when_present(attributes, "types", names(attributes.types)),
+            aums=when_present(attributes, "aums", [_aum(entry) for entry in attributes.aums or []]),
+            asset_classes=when_present(
+                attributes, "fund_asset_classes", names(attributes.fund_asset_classes)
             ),
-            asset_classes=_when_present(
-                attributes, "fund_asset_classes", _names(attributes.fund_asset_classes)
-            ),
-            strategies=_when_either(
+            strategies=when_either(
                 attributes,
                 "funds_primary_strategies",
                 "funds_secondary_strategies",
-                _names(attributes.funds_primary_strategies)
-                + _names(attributes.funds_secondary_strategies),
+                names(attributes.funds_primary_strategies)
+                + names(attributes.funds_secondary_strategies),
             ),
-            investment_regions=_when_present(
-                attributes, "funds_investment_regions", _names(attributes.funds_investment_regions)
+            investment_regions=when_present(
+                attributes, "funds_investment_regions", names(attributes.funds_investment_regions)
             ),
-            administrators=_when_present(
-                attributes, "administrator", _names(attributes.administrator)
+            administrators=when_present(
+                attributes, "administrator", names(attributes.administrator)
             ),
-            auditors=_when_present(attributes, "auditor", _names(attributes.auditor)),
-            custodians=_when_present(attributes, "custodian", _names(attributes.custodian)),
-            legal_advisors=_when_present(
-                attributes, "legal_advisor", _names(attributes.legal_advisor)
+            auditors=when_present(attributes, "auditor", names(attributes.auditor)),
+            custodians=when_present(attributes, "custodian", names(attributes.custodian)),
+            legal_advisors=when_present(
+                attributes, "legal_advisor", names(attributes.legal_advisor)
             ),
-            prime_brokers=_when_present(
-                attributes, "prime_broker", _names(attributes.prime_broker)
-            ),
-            contacts=_when_present(attributes, "contacts", _contact_names(attributes.contacts)),
+            prime_brokers=when_present(attributes, "prime_broker", names(attributes.prime_broker)),
+            contacts=when_present(attributes, "contacts", _contact_names(attributes.contacts)),
         )
 
 
@@ -155,12 +150,6 @@ class ManagerNotEntitledResponse(OmitNoneModel):
     hint: str | None = None
 
 
-def _names(values: list[ClassificationAttributes] | None) -> list[str]:
-    if values is None:
-        return []
-    return [value.name for value in values if value.name]
-
-
 def _contact_names(values: list[ManagerContactAttributes] | None) -> list[str]:
     if values is None:
         return []
@@ -182,15 +171,3 @@ def _location(attributes: ManagerExtendedAttributes) -> str | None:
         attributes.country.name if attributes.country else None,
     ]
     return ", ".join(part for part in parts if part) or None
-
-
-def _when_present[T](attributes: ManagerExtendedAttributes, field: str, value: T) -> T | None:
-    return value if field in attributes.model_fields_set else None
-
-
-def _when_either[T](
-    attributes: ManagerExtendedAttributes, first: str, second: str, value: T
-) -> T | None:
-    if first in attributes.model_fields_set or second in attributes.model_fields_set:
-        return value
-    return None

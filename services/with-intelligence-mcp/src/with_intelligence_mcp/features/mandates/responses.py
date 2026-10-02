@@ -2,13 +2,12 @@ from typing import Self
 
 from pydantic import Field
 
-from with_intelligence_mcp.features.investors.api_responses import ClassificationAttributes
 from with_intelligence_mcp.features.mandates.api_responses import (
     MandateExtendedAttributes,
     MandateNoteAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import html_to_markdown
+from with_intelligence_mcp.utils import html_to_markdown, names
 
 
 class MandateAmountResponse(OmitNoneModel):
@@ -119,22 +118,22 @@ class MandateResponse(OmitNoneModel):
             service=attributes.service.name if attributes.service else None,
             amount=_amount(attributes),
             asset_classes=(
-                _names(attributes.asset_class)
+                names(attributes.asset_class)
                 if "asset_class" in attributes.model_fields_set
                 else None
             ),
             strategies=(
-                _names(attributes.primary_strategies) + _names(attributes.secondary_strategies)
+                names(attributes.primary_strategies) + names(attributes.secondary_strategies)
                 if strategies_available
                 else None
             ),
             structures=(
-                _names(attributes.fund_structures)
+                names(attributes.fund_structures)
                 if "fund_structures" in attributes.model_fields_set
                 else None
             ),
             market_focuses=(
-                _names(attributes.market_focuses)
+                names(attributes.market_focuses)
                 if "market_focuses" in attributes.model_fields_set
                 else None
             ),
@@ -171,10 +170,6 @@ class InvestorMandatesResponse(OmitNoneModel):
     has_more: bool = Field(
         default=False, description="True when another page of mandates is available."
     )
-
-
-def _names(values: list[ClassificationAttributes]) -> list[str]:
-    return [value.name for value in values if value.name]
 
 
 def _amount(attributes: MandateExtendedAttributes) -> MandateAmountResponse | None:

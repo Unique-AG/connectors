@@ -3,8 +3,8 @@ from typing import Literal, Self
 from pydantic import Field
 
 from with_intelligence_mcp.features.consultants.api_responses import ConsultantExtendedAttributes
-from with_intelligence_mcp.features.investors import ClassificationAttributes
 from with_intelligence_mcp.models import OmitNoneModel
+from with_intelligence_mcp.utils import names, when_either, when_present
 
 
 class ConsultantProfileResponse(OmitNoneModel):
@@ -47,21 +47,21 @@ class ConsultantProfileResponse(OmitNoneModel):
             email=address.email if address else None,
             phone=address.phone if address else None,
             location=_location(attributes),
-            services=_when_present(attributes, "services", _names(attributes.services)),
-            asset_classes=_when_present(
-                attributes, "funds_asset_classes", _names(attributes.funds_asset_classes)
+            services=when_present(attributes, "services", names(attributes.services)),
+            asset_classes=when_present(
+                attributes, "funds_asset_classes", names(attributes.funds_asset_classes)
             ),
-            strategies=_when_either(
+            strategies=when_either(
                 attributes,
                 "funds_primary_strategies",
                 "funds_secondary_strategies",
-                _names(attributes.funds_primary_strategies)
-                + _names(attributes.funds_secondary_strategies),
+                names(attributes.funds_primary_strategies)
+                + names(attributes.funds_secondary_strategies),
             ),
-            investment_regions=_when_present(
+            investment_regions=when_present(
                 attributes,
                 "funds_investment_regions",
-                _names(attributes.funds_investment_regions),
+                names(attributes.funds_investment_regions),
             ),
         )
 
@@ -93,12 +93,6 @@ class ConsultantNotEntitledResponse(OmitNoneModel):
     hint: str | None = None
 
 
-def _names(values: list[ClassificationAttributes] | None) -> list[str]:
-    if values is None:
-        return []
-    return [value.name for value in values if value.name]
-
-
 def _location(attributes: ConsultantExtendedAttributes) -> str | None:
     address = attributes.address
     if address is None:
@@ -110,15 +104,3 @@ def _location(attributes: ConsultantExtendedAttributes) -> str | None:
     ]
     joined = ", ".join(part for part in parts if part)
     return joined or None
-
-
-def _when_present[T](attributes: ConsultantExtendedAttributes, field: str, value: T) -> T | None:
-    return value if field in attributes.model_fields_set else None
-
-
-def _when_either[T](
-    attributes: ConsultantExtendedAttributes, first: str, second: str, value: T
-) -> T | None:
-    if first in attributes.model_fields_set or second in attributes.model_fields_set:
-        return value
-    return None

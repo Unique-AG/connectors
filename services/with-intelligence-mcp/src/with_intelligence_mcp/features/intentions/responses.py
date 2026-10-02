@@ -10,7 +10,7 @@ from with_intelligence_mcp.features.intentions.api_responses import (
 )
 from with_intelligence_mcp.features.investors import ClassificationAttributes
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import html_to_markdown
+from with_intelligence_mcp.utils import html_to_markdown, names, when_present
 
 
 class IntentionAmountResponse(OmitNoneModel):
@@ -96,14 +96,14 @@ class IntentionResponse(OmitNoneModel):
             strategies=_strategy_names(strategies.primary_strategy, strategies.secondary_strategies)
             if strategies
             else None,
-            structures=_when_present(attributes, "structures", _names(attributes.structures)),
-            themes=_when_present(attributes, "themes", _names(attributes.themes)),
+            structures=when_present(attributes, "structures", names(attributes.structures)),
+            themes=when_present(attributes, "themes", names(attributes.themes)),
             allocation_amount=_amount(attributes.allocation_amount),
             ticket_size=_amount(attributes.ticket_size),
             note=html_to_markdown(attributes.note),
             preference_only=attributes.preference_only,
             search_consultant=attributes.search_consultant,
-            preferences=_when_present(
+            preferences=when_present(
                 attributes,
                 "preferences",
                 [_preference(entry) for entry in attributes.preferences or []],
@@ -138,19 +138,13 @@ class InvestorIntentionsResponse(OmitNoneModel):
     )
 
 
-def _names(values: list[ClassificationAttributes] | None) -> list[str]:
-    if values is None:
-        return []
-    return [value.name for value in values if value.name]
-
-
 def _strategy_names(
     primary: ClassificationAttributes | None,
     secondary: list[ClassificationAttributes] | None,
 ) -> list[str]:
-    names = [primary.name] if primary and primary.name else []
-    names.extend(_names(secondary))
-    return names
+    collected = [primary.name] if primary and primary.name else []
+    collected.extend(names(secondary))
+    return collected
 
 
 def _amount(attributes: IntentionAmountAttributes | None) -> IntentionAmountResponse | None:
@@ -170,7 +164,3 @@ def _preference(attributes: IntentionPreferenceAttributes) -> IntentionPreferenc
         sentiment=attributes.sentiment,
         type=attributes.type,
     )
-
-
-def _when_present[T](attributes: IntentionExtendedAttributes, field: str, value: T) -> T | None:
-    return value if field in attributes.model_fields_set else None

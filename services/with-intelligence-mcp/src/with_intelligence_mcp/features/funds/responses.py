@@ -1,11 +1,10 @@
-from collections.abc import Sequence
-from typing import Literal, Protocol, Self
+from typing import Literal, Self
 
 from pydantic import Field
 
 from with_intelligence_mcp.features.funds.api_responses import FundExtendedAttributes
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import html_to_markdown
+from with_intelligence_mcp.utils import html_to_markdown, names, when_either, when_present
 
 
 class FundProfileResponse(OmitNoneModel):
@@ -132,37 +131,37 @@ class FundProfileResponse(OmitNoneModel):
             is_liquidated=attributes.is_liquidated,
             inferred=attributes.inferred,
             strategy=html_to_markdown(attributes.strategy_description),
-            strategies=_when_either(
+            strategies=when_either(
                 attributes,
                 "primary_strategies",
                 "secondary_strategies",
-                _names(attributes.primary_strategies) + _names(attributes.secondary_strategies),
+                names(attributes.primary_strategies) + names(attributes.secondary_strategies),
             ),
-            asset_classes=_when_present(
-                attributes, "asset_classes", _names(attributes.asset_classes)
+            asset_classes=when_present(
+                attributes, "asset_classes", names(attributes.asset_classes)
             ),
-            approaches=_when_present(attributes, "approaches", _names(attributes.approaches)),
-            structures=_when_present(
-                attributes, "fund_structures", _names(attributes.fund_structures)
+            approaches=when_present(attributes, "approaches", names(attributes.approaches)),
+            structures=when_present(
+                attributes, "fund_structures", names(attributes.fund_structures)
             ),
-            fund_types=_when_present(attributes, "fund_type", _names(attributes.fund_type)),
-            capital_structures=_when_present(
-                attributes, "capital_structures", _names(attributes.capital_structures)
+            fund_types=when_present(attributes, "fund_type", names(attributes.fund_type)),
+            capital_structures=when_present(
+                attributes, "capital_structures", names(attributes.capital_structures)
             ),
-            investment_regions=_when_present(
-                attributes, "investment_regions", _names(attributes.investment_regions)
+            investment_regions=when_present(
+                attributes, "investment_regions", names(attributes.investment_regions)
             ),
             primary_investment_region=(
                 attributes.primary_investment_region.name
                 if attributes.primary_investment_region
                 else None
             ),
-            domiciles=_when_either(
+            domiciles=when_either(
                 attributes,
                 "domiciles_offshore",
                 "domiciles_onshore",
                 (
-                    _names(attributes.domiciles_offshore) + _names(attributes.domiciles_onshore)
+                    names(attributes.domiciles_offshore) + names(attributes.domiciles_onshore)
                     or None
                 ),
             ),
@@ -220,28 +219,6 @@ class FundNotEntitledResponse(OmitNoneModel):
     status: Literal["not_entitled"] = "not_entitled"
     searched_for: str
     hint: str | None = None
-
-
-class _Named(Protocol):
-    name: str | None
-
-
-def _names(values: Sequence[_Named] | None) -> list[str]:
-    if values is None:
-        return []
-    return [value.name for value in values if value.name]
-
-
-def _when_present[T](attributes: FundExtendedAttributes, field: str, value: T) -> T | None:
-    return value if field in attributes.model_fields_set else None
-
-
-def _when_either[T](
-    attributes: FundExtendedAttributes, first: str, second: str, value: T
-) -> T | None:
-    if first in attributes.model_fields_set or second in attributes.model_fields_set:
-        return value
-    return None
 
 
 def _lock_up(value: str | None) -> str | None:
