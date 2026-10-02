@@ -6,13 +6,14 @@ import pytest
 import respx
 from fastmcp import FastMCP
 from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.calendar import CalendarSummary
 from office_365_mcp.shared.handles import CalendarHandle
 from office_365_mcp.tools import outlook_list_calendar_groups as lister
 
-from .conftest import GRAPH_V1
+from .conftest import GRAPH_V1, ME
 
 _GROUPS = "/me/calendarGroups"
 
@@ -21,6 +22,7 @@ _OTHER_ID = "AAMkGROUPSYNTHETIC-other-0002="
 _MINE_CLASS_ID = "0006f0b7-0000-0000-c000-000000000046"
 _OTHER_CLASS_ID = "0006f0b8-0000-0000-c000-000000000046"
 _OWNER = {"name": "Ada Lovelace", "address": "ada@example.invalid"}
+_DELEGATOR = {"name": "Alex Wilber", "address": "alexw@example.invalid"}
 
 _OWN_CALENDAR_ID = "AAMkCALSYNTHETIC-own-0001="
 _TEAM_CALENDAR_ID = "AAMkCALSYNTHETIC-team-0002="
@@ -45,11 +47,16 @@ def _group_payload(
     }
 
 
-def _calendar_payload(calendar_id: str, *, name: str | None = "Calendar") -> dict[str, object]:
+def _calendar_payload(
+    calendar_id: str,
+    *,
+    name: str | None = "Calendar",
+    owner: Mapping[str, object] | None = _OWNER,
+) -> dict[str, object]:
     return {
         "id": calendar_id,
         "name": name,
-        "owner": _OWNER,
+        "owner": owner,
         "canEdit": True,
         "canViewPrivateItems": False,
         "isDefaultCalendar": False,
@@ -91,6 +98,11 @@ def _resolved(node: object, *, root: Mapping[str, object]) -> Mapping[str, objec
 
 
 @pytest.fixture
+def signed_in(graph: respx.MockRouter) -> respx.Route:
+    return graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
+
+
+@pytest.fixture
 def groups(graph: respx.MockRouter) -> respx.Route:
     return graph.get(_GROUPS).mock(
         return_value=_page(
@@ -113,12 +125,14 @@ def mine(graph: respx.MockRouter) -> respx.Route:
 @pytest.fixture
 def other(graph: respx.MockRouter) -> respx.Route:
     return graph.get(_calendars_of(_OTHER_ID)).mock(
-        return_value=_page(_calendar_payload(_SHARED_CALENDAR_ID, name="Alex Wilber"))
+        return_value=_page(
+            _calendar_payload(_SHARED_CALENDAR_ID, name="Alex Wilber", owner=_DELEGATOR)
+        )
     )
 
 
 class TestTheRequestsItSends:
-    @pytest.mark.usefixtures("mine", "other")
+    @pytest.mark.usefixtures("signed_in", "mine", "other")
     async def test_it_asks_for_the_groups_with_no_query_option_at_all(
         self, client: GraphServiceClient, groups: respx.Route
     ) -> None:
@@ -128,7 +142,7 @@ class TestTheRequestsItSends:
         assert request.url.query == b""
         assert "Prefer" not in request.headers
 
-    @pytest.mark.usefixtures("groups")
+    @pytest.mark.usefixtures("signed_in", "groups")
     async def test_it_asks_for_the_calendars_of_each_group_by_the_id_of_the_group(
         self, client: GraphServiceClient, mine: respx.Route, other: respx.Route
     ) -> None:
@@ -137,7 +151,7 @@ class TestTheRequestsItSends:
         assert mine.call_count == 1
         assert other.call_count == 1
 
-    @pytest.mark.usefixtures("groups")
+    @pytest.mark.usefixtures("signed_in", "groups")
     async def test_the_calendar_reads_send_no_query_option_either(
         self, client: GraphServiceClient, mine: respx.Route, other: respx.Route
     ) -> None:
@@ -146,6 +160,21 @@ class TestTheRequestsItSends:
         assert mine.calls.last.request.url.query == b""
         assert other.calls.last.request.url.query == b""
 
+    @pytest.mark.usefixtures("groups", "mine", "other")
+    async def test_it_reads_the_user_once_and_then_the_groups_and_each_calendar_listing(
+        self, client: GraphServiceClient, graph: respx.MockRouter, signed_in: respx.Route
+    ) -> None:
+        _ = await lister.list_calendar_groups(client)
+
+        assert signed_in.call_count == 1
+        assert [call.request.url.path for call in cast("Sequence[Call]", graph.calls)] == [
+            "/v1.0/me",
+            f"/v1.0{_GROUPS}",
+            f"/v1.0{_GROUPS}/{_MINE_ID}/calendars",
+            f"/v1.0{_GROUPS}/{_OTHER_ID}/calendars",
+        ]
+
+    @pytest.mark.usefixtures("signed_in")
     async def test_a_mailbox_with_no_group_asks_for_no_calendars(
         self, client: GraphServiceClient, groups: respx.Route, mine: respx.Route
     ) -> None:
@@ -159,7 +188,7 @@ class TestTheRequestsItSends:
 
 
 class TestWhatItAnswers:
-    @pytest.mark.usefixtures("groups", "mine", "other")
+    @pytest.mark.usefixtures("signed_in", "groups", "mine", "other")
     async def test_each_group_carries_its_name_and_its_own_calendars(
         self, client: GraphServiceClient
     ) -> None:
@@ -169,7 +198,7 @@ class TestWhatItAnswers:
         assert [calendar.name for calendar in answer.groups[0].calendars] == ["Calendar", "Team"]
         assert [calendar.name for calendar in answer.groups[1].calendars] == ["Alex Wilber"]
 
-    @pytest.mark.usefixtures("groups", "mine", "other")
+    @pytest.mark.usefixtures("signed_in", "groups", "mine", "other")
     async def test_each_calendar_carries_the_handle_that_addresses_it(
         self, client: GraphServiceClient
     ) -> None:
@@ -183,7 +212,7 @@ class TestWhatItAnswers:
             CalendarHandle(_SHARED_CALENDAR_ID).uri
         ]
 
-    @pytest.mark.usefixtures("groups", "mine", "other")
+    @pytest.mark.usefixtures("signed_in", "groups", "mine", "other")
     async def test_a_calendar_row_has_the_shape_that_outlook_list_calendars_answers(
         self, client: GraphServiceClient
     ) -> None:
@@ -197,22 +226,30 @@ class TestWhatItAnswers:
         assert calendar.can_view_private_items is False
         assert calendar.is_default is False
 
-    @pytest.mark.usefixtures("groups", "mine", "other")
-    async def test_is_mine_is_null_because_the_tool_does_not_read_the_user(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+    @pytest.mark.usefixtures("signed_in", "groups", "mine", "other")
+    async def test_a_calendar_that_the_user_owns_is_mine_and_one_that_another_person_owns_is_not(
+        self, client: GraphServiceClient
     ) -> None:
-        me = graph.get("/me")
-
         answer = await lister.list_calendar_groups(client)
 
         assert [calendar.is_mine for group in answer.groups for calendar in group.calendars] == [
-            None,
-            None,
-            None,
+            True,
+            True,
+            False,
         ]
-        assert me.call_count == 0
 
-    @pytest.mark.usefixtures("groups", "mine", "other")
+    @pytest.mark.usefixtures("signed_in", "groups", "other")
+    async def test_a_calendar_graph_named_no_owner_for_is_unknown_and_not_somebody_elses(
+        self, client: GraphServiceClient, mine: respx.Route
+    ) -> None:
+        mine.mock(return_value=_page(_calendar_payload(_OWN_CALENDAR_ID, owner=None)))
+
+        row = (await lister.list_calendar_groups(client)).groups[0].calendars[0]
+
+        assert row.owner is None
+        assert row.is_mine is None
+
+    @pytest.mark.usefixtures("signed_in", "groups", "mine", "other")
     async def test_a_group_row_holds_the_name_and_the_calendars_and_nothing_else(
         self, client: GraphServiceClient
     ) -> None:
@@ -220,7 +257,7 @@ class TestWhatItAnswers:
 
         assert set(answer.groups[0].model_dump()) == {"name", "calendars"}
 
-    @pytest.mark.usefixtures("other")
+    @pytest.mark.usefixtures("signed_in", "other")
     async def test_a_group_graph_reported_no_name_for_is_still_listed(
         self, client: GraphServiceClient, groups: respx.Route, mine: respx.Route
     ) -> None:
@@ -235,7 +272,7 @@ class TestWhatItAnswers:
             CalendarHandle(_OWN_CALENDAR_ID).uri
         ]
 
-    @pytest.mark.usefixtures("other")
+    @pytest.mark.usefixtures("signed_in", "other")
     async def test_a_group_with_no_calendar_answers_an_empty_list(
         self, client: GraphServiceClient, groups: respx.Route, mine: respx.Route
     ) -> None:
@@ -247,7 +284,7 @@ class TestWhatItAnswers:
         assert answer.groups[0].calendars == []
         assert answer.capped is False
 
-    @pytest.mark.usefixtures("mine", "other")
+    @pytest.mark.usefixtures("signed_in", "mine", "other")
     async def test_the_pages_of_the_groups_are_followed_rather_than_read_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -265,7 +302,7 @@ class TestWhatItAnswers:
         assert [group.name for group in answer.groups] == ["My Calendars", "Other calendars"]
         assert answer.capped is False, "the walk reached the end of the groups"
 
-    @pytest.mark.usefixtures("groups", "other")
+    @pytest.mark.usefixtures("signed_in", "groups", "other")
     async def test_the_pages_of_a_groups_calendars_are_followed_rather_than_read_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -285,7 +322,7 @@ class TestWhatItAnswers:
         assert [calendar.name for calendar in answer.groups[0].calendars] == ["Calendar", "Team"]
         assert answer.capped is False
 
-    @pytest.mark.usefixtures("mine", "other")
+    @pytest.mark.usefixtures("signed_in", "mine", "other")
     async def test_a_cap_that_left_more_groups_on_offer_says_capped(
         self,
         client: GraphServiceClient,
@@ -307,7 +344,7 @@ class TestWhatItAnswers:
         assert [group.name for group in answer.groups] == ["My Calendars"]
         assert answer.capped is True
 
-    @pytest.mark.usefixtures("groups", "other")
+    @pytest.mark.usefixtures("signed_in", "groups", "other")
     async def test_a_cap_that_left_more_calendars_in_a_group_on_offer_says_capped(
         self,
         client: GraphServiceClient,
@@ -366,7 +403,8 @@ class TestTheSchemaItPublishes:
         described = tool.description or ""
         assert "outlook_list_calendars" in described
         assert "`calendar_ref` to outlook_list_events" in described
-        assert "`is_mine` is null in every row" in described
+        assert "which of them the user owns" in described
+        assert "`is_mine` is null" not in described
 
     async def test_every_field_of_the_answer_says_what_it_is(
         self, transport: httpx.AsyncClient
@@ -394,6 +432,21 @@ class TestTheSchemaItPublishes:
 
 
 class TestGraphFailures:
+    async def test_a_refused_identity_read_stops_before_the_groups_are_asked_for(
+        self, client: GraphServiceClient, signed_in: respx.Route, groups: respx.Route
+    ) -> None:
+        signed_in.mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await lister.list_calendar_groups(client)
+
+        assert groups.call_count == 0
+
+    @pytest.mark.usefixtures("signed_in")
     async def test_a_refused_group_listing_stops_before_any_calendar_is_asked_for(
         self, client: GraphServiceClient, groups: respx.Route, mine: respx.Route
     ) -> None:
@@ -404,7 +457,7 @@ class TestGraphFailures:
 
         assert mine.call_count == 0
 
-    @pytest.mark.usefixtures("groups", "other")
+    @pytest.mark.usefixtures("signed_in", "groups", "other")
     async def test_a_refused_calendar_listing_arrives_classified_for_the_tool_to_explain(
         self, client: GraphServiceClient, mine: respx.Route
     ) -> None:
@@ -413,5 +466,5 @@ class TestGraphFailures:
         with pytest.raises(GraphForbidden):
             _ = await lister.list_calendar_groups(client)
 
-    def test_the_permission_is_the_one_microsoft_documents_as_least_privileged(self) -> None:
-        assert lister.GRAPH_PERMISSIONS == ("Calendars.ReadBasic",)
+    def test_the_permissions_are_the_least_privileged_ones_that_microsoft_documents(self) -> None:
+        assert lister.GRAPH_PERMISSIONS == ("Calendars.ReadBasic", "User.Read")

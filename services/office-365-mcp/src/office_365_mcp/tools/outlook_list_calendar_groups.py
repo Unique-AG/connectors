@@ -5,6 +5,7 @@ import httpx
 from fastmcp import FastMCP
 from msgraph.generated.models.calendar import Calendar
 from msgraph.generated.models.calendar_group import CalendarGroup
+from msgraph.generated.models.user import User
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -15,6 +16,7 @@ from office_365_mcp.graph_client import (
     graph_errors,
     graph_step,
 )
+from office_365_mcp.shared import identity
 from office_365_mcp.shared.calendar import CalendarSummary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -24,19 +26,17 @@ STEP_GROUPS = "calendar_groups"
 
 STEP_CALENDARS = "calendars"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.ReadBasic",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.ReadBasic", identity.GRAPH_PERMISSION)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 _DESCRIPTION = """\
 Lists the calendar groups of the signed-in user, with the calendars in each group. \
 outlook_list_calendars lists every calendar without the groups. This tool shows how the groups \
-hold the calendars.
+hold the calendars, and which of them the user owns.
 
 Notes:
 - Pass the `uri` of a calendar as `calendar_ref` to outlook_list_events.
-- `is_mine` is null in every row, because this tool does not read the user. To find out whether \
-the user owns a calendar, call outlook_list_calendars.
 """
 
 
@@ -55,11 +55,14 @@ class CalendarGroupSummary(BaseModel):
     )
 
     @classmethod
-    def from_group(cls, group: CalendarGroup, *, calendars: list[Calendar]) -> Self:
+    def from_group(
+        cls, group: CalendarGroup, *, calendars: list[Calendar], signed_in: User
+    ) -> Self:
         return cls(
             name=group.name,
             calendars=[
-                CalendarSummary.from_calendar(calendar, signed_in=None) for calendar in calendars
+                CalendarSummary.from_calendar(calendar, signed_in=signed_in)
+                for calendar in calendars
             ],
         )
 
@@ -82,6 +85,7 @@ class CalendarGroups(BaseModel):
 
 async def list_calendar_groups(client: GraphServiceClient) -> CalendarGroups:
     with graph_errors(TOOL_NAME):
+        user = await identity.signed_in_user(client)
         with graph_step(STEP_GROUPS):
             first_page = await client.me.calendar_groups.get()
             assert first_page is not None, (
@@ -93,7 +97,9 @@ async def list_calendar_groups(client: GraphServiceClient) -> CalendarGroups:
         for group in groups.items:
             calendars = await _calendars_in(client, group)
             capped = capped or calendars.capped
-            summaries.append(CalendarGroupSummary.from_group(group, calendars=calendars.items))
+            summaries.append(
+                CalendarGroupSummary.from_group(group, calendars=calendars.items, signed_in=user)
+            )
 
     return CalendarGroups(groups=summaries, capped=capped)
 
