@@ -6,7 +6,7 @@ import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
-from fastmcp.exceptions import ToolError
+from fastmcp.exceptions import ToolError, ValidationError
 from fastmcp.tools import Tool
 from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
@@ -374,6 +374,41 @@ class TestWhatItRefuses:
 
         assert _addressed(_sent(fill), "ccRecipients") == [_CAROL]
 
+    async def test_an_address_repeated_in_cc_is_refused_whatever_its_case(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+
+        with pytest.raises(ToolError, match="twice in `cc`") as raised:
+            _ = await _reply_all(client, cc=[_CAROL, _CAROL.upper()])
+
+        assert _NOT_CREATED in str(raised.value)
+        assert (
+            "If you call this tool again with the same arguments, the call will fail the same way."
+        ) in str(raised.value)
+        assert len(graph.calls) == 0
+
+    async def test_a_repeat_that_differs_only_by_padding_is_refused_too(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+
+        with pytest.raises(ToolError, match="twice in `cc`"):
+            _ = await _reply_all(client, cc=[_CAROL, f"  {_CAROL}  "])
+
+        assert len(graph.calls) == 0
+
+    async def test_a_bad_entry_is_refused_as_a_bad_address_and_not_as_a_repeat(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+
+        with pytest.raises(ToolError, match="not one email address") as raised:
+            _ = await _reply_all(client, cc=["Carol", "Carol"])
+
+        assert "twice" not in str(raised.value)
+        assert len(graph.calls) == 0
+
 
 class TestTheSchemaItPublishes:
     async def test_it_takes_six_arguments_and_the_message_and_text_are_required(
@@ -414,6 +449,22 @@ class TestTheSchemaItPublishes:
         cc = _properties(parameters)["cc"]
         assert cc["default"] == []
         assert "maxItems" not in cc
+
+    async def test_a_category_name_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
+        parameters, _tool = await _registered(transport)
+
+        items = cast("Mapping[str, object]", _properties(parameters)["categories"]["items"])
+        assert items["minLength"] == 1
+
+    async def test_a_blank_category_name_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run({**replier.GRAPH_CALL_EXAMPLE, "categories": [""]})
+
+        assert len(graph.calls) == 0, "a blank category name reached Graph"
 
     async def test_the_category_argument_promises_the_lister_only_where_it_exists(
         self, transport: httpx.AsyncClient
