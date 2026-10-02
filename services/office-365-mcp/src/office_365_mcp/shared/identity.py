@@ -8,6 +8,7 @@ from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.user import User
 from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
+from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
 
@@ -26,6 +27,25 @@ STEP = "signed_in_user"
 PROFILE = ["id", "displayName", "mail", "userPrincipalName", "jobTitle"]
 
 type _MeQuery = UserItemRequestBuilder.UserItemRequestBuilderGetQueryParameters
+
+
+class Person(BaseModel, frozen=True):
+    user_id: str = Field(
+        pattern=ENTRA_OBJECT_ID_PATTERN,
+        description=(
+            "The Microsoft Entra object id of the person, as a GUID. Copy it from the `user_id` of "
+            + "get_me, of a teams_list_chat_members row, or of a teams_list_chats member. Never "
+            + "build it from a name or an email address."
+        ),
+    )
+    name: str = Field(
+        min_length=1,
+        description=(
+            "The name of the person. Copy the `display_name` from the same result as `user_id`. If "
+            + "that result has no display name, copy its sign-in name or its email address. This "
+            + "tool shows the name to the user in its question and never sends it to Microsoft 365."
+        ),
+    )
 
 
 async def signed_in_user(client: GraphServiceClient) -> User:

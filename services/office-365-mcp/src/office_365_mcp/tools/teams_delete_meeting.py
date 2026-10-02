@@ -53,8 +53,8 @@ _REFUSED = f"{_NOTHING_DELETED} {_FAILS_THE_SAME_WAY}"
 
 _DESCRIPTION = """\
 Deletes one Teams online meeting that the signed-in user organizes. This tool sends its change \
-to the Teams online meeting only, and never to a calendar event. For a meeting on a calendar, use \
-outlook_cancel_event. This tool deletes the meeting immediately, and nothing here can restore it.
+to the Teams online meeting only, and never to a calendar event. This tool deletes the meeting \
+immediately, and nothing here can restore it.
 
 Notes:
 - This tool asks the user to agree before it deletes anything, every time. This tool deletes \
@@ -167,9 +167,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The meeting to delete, as the `meeting_uri` handle from teams_list_chats: "
-                    + "`teams:///meetings/{join_web_url}`. Copy it word for word. A "
-                    + "`teams:///transcripts/...` handle is not valid here."
+                    "The meeting to delete, as the `meeting_uri` handle from teams_list_chats or "
+                    + "teams_create_meeting: `teams:///meetings/{join_web_url}`. Copy it word for "
+                    + "word. A `teams:///transcripts/...` handle is not valid here."
                 ),
             ),
         ],

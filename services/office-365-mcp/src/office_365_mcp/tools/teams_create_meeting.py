@@ -19,10 +19,15 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
-from office_365_mcp.shared.calendar import counted_people
 from office_365_mcp.shared.handles import meeting_uri_for
-from office_365_mcp.shared.identity import ENTRA_OBJECT_ID_PATTERN
-from office_365_mcp.shared.meetings import attendee_ids, meeting_participants, meeting_times
+from office_365_mcp.shared.identity import Person
+from office_365_mcp.shared.meetings import (
+    attendee_ids,
+    distinct_people,
+    meeting_participants,
+    meeting_times,
+    named_people,
+)
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_IDEMPOTENT,
@@ -41,7 +46,7 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "subject": "Pricing review",
     "starts_at": "2026-03-02T14:00:00Z",
     "ends_at": "2026-03-02T15:00:00Z",
-    "attendees": ["00000000-0000-4000-8000-000000000002"],
+    "attendees": [{"user_id": "00000000-0000-4000-8000-000000000002", "name": "Grace Hopper"}],
 }
 
 _EXTERNAL_ID_NAMESPACE = uuid.UUID("e0f61b25-5f82-4ac9-846f-8df11567971a")
@@ -57,14 +62,13 @@ _REFUSED = f"{_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
 _DESCRIPTION = """\
 Creates one Teams online meeting as the signed-in user, with the attendees that the user names. \
 The meeting is standalone. It is on no calendar, and this tool sends no invitation. To share the \
-meeting, send its join link with teams_send_chat_message or outlook_draft_mail.
+meeting, use the `join_web_url` of the answer. teams_read_meeting reads the meeting later.
 
 Notes:
 - This tool asks the user to agree before it creates anything, every time. This tool creates \
 nothing unless the user agrees.
-- Microsoft documents a calendar event as the way to read the transcript of a meeting later. If \
-the user will want a transcript, or wants the meeting on a calendar, use outlook_create_event \
-with `online_meeting`.
+- Microsoft documents a calendar event with an online meeting as the way to read the transcript of \
+a meeting later. If the user will want a transcript or a calendar entry, tell the user this first.
 - This call is safe to repeat after a timeout. The same request returns the same meeting, and it \
 creates no second meeting.
 """
@@ -117,7 +121,7 @@ class _Draft:
     subject: str
     starts_at: datetime
     ends_at: datetime
-    attendees: tuple[str, ...]
+    attendees: tuple[Person, ...]
 
 
 async def create_meeting(
@@ -126,7 +130,7 @@ async def create_meeting(
     subject: str,
     starts_at: str,
     ends_at: str,
-    attendees: Sequence[str],
+    attendees: Sequence[Person],
     confirm: Confirm,
 ) -> CreatedMeeting | InputRequiredResult:
     draft = _drafted(subject, starts_at, ends_at, attendees)
@@ -152,7 +156,7 @@ async def create_meeting(
     return _answer(created)
 
 
-def _drafted(subject: str, starts_at: str, ends_at: str, attendees: Sequence[str]) -> _Draft:
+def _drafted(subject: str, starts_at: str, ends_at: str, attendees: Sequence[Person]) -> _Draft:
     times = meeting_times(TOOL_NAME, starts_at, ends_at, tail=_REFUSED)
     if isinstance(times, str):
         raise ToolError(times)
@@ -161,7 +165,7 @@ def _drafted(subject: str, starts_at: str, ends_at: str, attendees: Sequence[str
         subject=subject,
         starts_at=opens,
         ends_at=closes,
-        attendees=tuple(sorted({attendee.lower() for attendee in attendees})),
+        attendees=distinct_people(attendees),
     )
 
 
@@ -171,18 +175,14 @@ def _external_id(draft: _Draft) -> str:
             draft.subject,
             draft.starts_at.astimezone(UTC).isoformat(),
             draft.ends_at.astimezone(UTC).isoformat(),
-            list(draft.attendees),
+            [attendee.user_id for attendee in draft.attendees],
         ]
     )
     return str(uuid.uuid5(_EXTERNAL_ID_NAMESPACE, canonical))
 
 
 def _question(draft: _Draft) -> str:
-    attendees = (
-        f"{counted_people(draft.attendees)}: {', '.join(draft.attendees)}"
-        if draft.attendees
-        else "no attendee"
-    )
+    attendees = named_people(draft.attendees) if draft.attendees else "no attendee"
     return (
         f"Create the Teams meeting {cut_for_a_question(draft.subject)!r} from "
         + f"{draft.starts_at.isoformat()} to {draft.ends_at.isoformat()} with {attendees}? The "
@@ -198,7 +198,7 @@ def _body(
         subject=draft.subject,
         start_date_time=draft.starts_at.astimezone(UTC),
         end_date_time=draft.ends_at.astimezone(UTC),
-        participants=meeting_participants(draft.attendees),
+        participants=meeting_participants([attendee.user_id for attendee in draft.attendees]),
     )
 
 
@@ -263,14 +263,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         attendees: Annotated[
-            list[Annotated[str, Field(pattern=ENTRA_OBJECT_ID_PATTERN)]],
+            list[Person],
             Field(
                 description=(
-                    "These are the Microsoft Entra object ids of the people to add as attendees, "
-                    + "one GUID for each entry. Copy each id from the `user_id` of get_me, of a "
-                    + "teams_list_chats member, or of a teams_list_chat_members row. Never build "
-                    + "an id from a name or an email address. Pass an empty list for a meeting "
-                    + "with no attendee."
+                    "These are the people to add as attendees, with one entry for each person. "
+                    + "Pass an empty list for a meeting with no attendee."
                 ),
             ),
         ],

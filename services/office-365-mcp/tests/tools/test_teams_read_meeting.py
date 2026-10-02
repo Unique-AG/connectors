@@ -11,7 +11,7 @@ from fastmcp.tools import FunctionTool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared import handles
+from office_365_mcp.shared import handles, meetings
 from office_365_mcp.shared.seam import READ_ONLY
 from office_365_mcp.tools import teams_read_meeting as reader
 
@@ -483,16 +483,17 @@ class TestHowItDeclaresItself:
             _ = cast("reader.MeetingAttendance", await tool.fn(meeting_uri=uri, client=client))
 
         message = str(refused.value)
+        assert message == meetings.not_a_meeting_handle(
+            reader.TOOL_NAME,
+            tail="If you call this tool again with this value, the call will fail the same way.",
+        )
         assert (
             "teams_read_meeting takes the `meeting_uri` handle from teams_list_chats or "
             + "teams_create_meeting, and this value is not one."
         ) in message
-        assert "A meeting handle looks like teams:///meetings/{join_web_url}." in message
-        assert "A `teams:///transcripts/...` handle belongs to teams_read_transcript." in message
-        assert "Copy the `meeting_uri` word for word." in message
-        assert (
-            "If you call this tool again with this value, the call will fail the same way."
-        ) in message
+        assert "\n  teams:///meetings/{join_web_url}\n" in message
+        assert "A `teams:///transcripts/...` handle is not a meeting handle." in message
+        assert "Copy the `meeting_uri` of a tool result word for word." in message
         assert not graph.calls
 
     async def test_the_description_names_its_siblings_and_the_organizer_rule(
@@ -500,19 +501,41 @@ class TestHowItDeclaresItself:
     ) -> None:
         tool = await _registered(transport)
 
-        description = tool.description or ""
-        assert "from the `meeting_uri` that teams_list_chats reports." in description
-        assert "teams_list_meeting_transcripts is the sibling tool for the words" in description
-        assert "teams_list_meeting_recordings is the sibling tool for the recordings." in (
-            description
-        )
-        assert "\n\nNotes:\n- " in description
+        description = " ".join((tool.description or "").split())
+        assert (
+            "from the `meeting_uri` that teams_list_chats or teams_create_meeting reports."
+        ) in description
+        assert (
+            "teams_update_meeting changes a meeting that the signed-in user organizes, and "
+            + "teams_delete_meeting deletes one."
+        ) in description
+        assert "teams_list_meeting_transcripts" not in description
+        assert "teams_list_meeting_recordings" not in description
+        assert "\n\nNotes:\n- " in (tool.description or "")
         assert "- Microsoft Graph gives attendance reports to the meeting organizer only." in (
             description
         )
         assert "`not_ready` means wait" in description
         assert "Calling it again returns the same records." in description
         assert 45 <= len(description.split()) <= 210
+
+    def test_the_answer_names_the_tools_for_the_other_artifacts_of_the_meeting(self) -> None:
+        meeting_uri = str(reader.MeetingDetails.model_fields["meeting_uri"].description)
+
+        assert (
+            "Pass it verbatim to teams_list_meeting_transcripts or teams_list_meeting_recordings "
+            + "for the other artifacts of this meeting."
+        ) in meeting_uri
+
+    async def test_the_handle_names_both_tools_that_report_one(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        meeting_uri = _property(cast("Mapping[str, object]", tool.parameters), "meeting_uri")
+        assert "The meeting handle from teams_list_chats or teams_create_meeting:" in str(
+            meeting_uri["description"]
+        )
 
     def test_the_answer_bounds_what_it_promises_to_what_microsoft_returns(self) -> None:
         reports = str(reader.MeetingAttendance.model_fields["reports"].description)

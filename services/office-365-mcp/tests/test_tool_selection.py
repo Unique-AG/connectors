@@ -322,11 +322,13 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_list_meeting_recordings": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
     "teams_create_meeting": {
-        "attendees": ("get_me", "teams_list_chats", "teams_list_chat_members")
+        "attendees": ("get_me", "teams_list_chats", "teams_list_chat_members"),
+        "user_id": ("get_me", "teams_list_chats", "teams_list_chat_members"),
     },
     "teams_update_meeting": {
         "meeting_uri": ("teams_list_chats", "teams_create_meeting"),
         "attendees": ("get_me", "teams_list_chats", "teams_list_chat_members"),
+        "user_id": ("get_me", "teams_list_chats", "teams_list_chat_members"),
     },
     "teams_delete_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
     "teams_create_chat": {"members": ("teams_list_chat_members", "teams_list_chats")},
@@ -434,7 +436,8 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "teams_send_channel_message_with_files": frozenset({"message", "name"}),
     "teams_react_to_message": frozenset({"reaction"}),
     "teams_edit_message": frozenset({"message", "name"}),
-    "teams_create_meeting": frozenset({"subject", "starts_at", "ends_at"}),
+    "teams_create_meeting": frozenset({"subject", "starts_at", "ends_at", "name"}),
+    "teams_update_meeting": frozenset({"name"}),
     "teams_create_chat": frozenset({"chat_type", "topic"}),
     "teams_rename_chat": frozenset({"topic"}),
     "teams_search_messages": frozenset(
@@ -616,7 +619,15 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
 
 
 _NAMES_ONLY_ITS_PRESETS_TOOLS: frozenset[str] = frozenset(
-    {"teams_react_to_message", "teams_edit_message", "teams_delete_message"}
+    {
+        "teams_react_to_message",
+        "teams_edit_message",
+        "teams_delete_message",
+        "teams_read_meeting",
+        "teams_create_meeting",
+        "teams_update_meeting",
+        "teams_delete_meeting",
+    }
 )
 
 

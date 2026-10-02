@@ -21,6 +21,8 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import meeting_handle, meeting_uri_for
+from office_365_mcp.shared.identity import Person
+from office_365_mcp.shared.meetings import not_a_meeting_handle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm, Confirmed
 from office_365_mcp.tools import teams_update_meeting as updater
 from office_365_mcp.tools.teams_update_meeting import (
@@ -43,24 +45,42 @@ _MEETING = f"/me/onlineMeetings/{MEETING_ID}"
 
 _URI = meeting_uri_for(JOIN_WEB_URL) or ""
 
-_GRACE = "00000000-0000-4000-8000-000000000003"
+_GRACE_ID = "00000000-0000-4000-8000-000000000003"
+_DAVE_ID = "00000000-0000-4000-8000-000000000004"
+_GRACE = Person(user_id=_GRACE_ID, name="Grace Hopper")
+_BOB = Person(user_id=OTHER_USER_ID, name="Bob Kelso")
 
 _NOTHING_CHANGED = "No meeting was changed."
+_FAILS_THE_SAME_WAY = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
+
+
+def _invitee(
+    user_id: str | None, *, name: str | None = None, upn: str | None = None
+) -> dict[str, object]:
+    return {
+        "upn": upn,
+        "role": "attendee",
+        "identity": {"user": {"id": user_id, "displayName": name}},
+    }
+
+
+_BOB_INVITEE = _invitee(OTHER_USER_ID, name="Bob Kelso", upn="bob@contoso.invalid")
+_CAROL_INVITEE = _invitee(None, upn="carol@fabrikam.com")
 
 
 def _stored(
     *,
     subject: str | None = "Pricing review",
     organizer: str | None = SIGNED_IN_USER_ID,
-    attendees: Sequence[str] | None = (OTHER_USER_ID,),
+    attendees: Sequence[Mapping[str, object]] | None = (_BOB_INVITEE,),
 ) -> dict[str, object]:
     participants: dict[str, object] = {
         "organizer": {"identity": {"user": {"id": organizer}}, "role": "presenter"},
     }
     if attendees is not None:
-        participants["attendees"] = [
-            {"identity": {"user": {"id": attendee}}, "role": "attendee"} for attendee in attendees
-        ]
+        participants["attendees"] = [dict(attendee) for attendee in attendees]
     return {**meeting_payload(subject=subject), "participants": participants}
 
 
@@ -105,7 +125,7 @@ async def _update(
     subject: str | None = None,
     starts_at: str | None = None,
     ends_at: str | None = None,
-    attendees: Sequence[str] | None = None,
+    attendees: Sequence[Person] | None = None,
     confirm: Confirm = _agrees,
 ) -> UpdatedMeeting | InputRequiredResult:
     return await update_meeting(
@@ -220,15 +240,26 @@ class TestWhatItSendsToGraph:
     ) -> None:
         patch = _ready(graph)
 
-        _ = await _update(client, attendees=[OTHER_USER_ID, _GRACE])
+        _ = await _update(client, attendees=[_GRACE, _BOB])
 
         assert _sent(patch) == {
             "participants": {
                 "attendees": [
                     {"identity": {"user": {"id": OTHER_USER_ID}}},
-                    {"identity": {"user": {"id": _GRACE}}},
+                    {"identity": {"user": {"id": _GRACE_ID}}},
                 ]
             }
+        }
+
+    async def test_an_invitee_with_no_entra_id_never_goes_back_to_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _ready(graph, _stored(attendees=[_BOB_INVITEE, _CAROL_INVITEE]))
+
+        _ = await _update(client, attendees=[_BOB])
+
+        assert _sent(patch) == {
+            "participants": {"attendees": [{"identity": {"user": {"id": OTHER_USER_ID}}}]}
         }
 
     async def test_an_empty_attendee_list_reaches_graph_as_an_empty_list(
@@ -246,7 +277,13 @@ class TestWhatItSendsToGraph:
         patch = _ready(graph)
         shouted = "ABCDEF00-0000-4000-8000-000000000004"
 
-        _ = await _update(client, attendees=[shouted, shouted.lower()])
+        _ = await _update(
+            client,
+            attendees=[
+                Person(user_id=shouted, name="Eve"),
+                Person(user_id=shouted.lower(), name="E"),
+            ],
+        )
 
         assert _sent(patch) == {
             "participants": {"attendees": [{"identity": {"user": {"id": shouted.lower()}}}]}
@@ -422,8 +459,10 @@ class TestThePersonBeforeTheChange:
         assert question.startswith("Change the Teams meeting 'Pricing review':")
         assert "'Pricing review (moved)'" in question
         assert "2026-03-02T15:00:00+01:00 until 2026-03-02T16:00:00+01:00" in question
-        assert f"1 person: {_GRACE}" in question
-        assert "is no longer an attendee" in question
+        assert "the attendee list to 1 person: 'Grace Hopper'?" in question
+        assert question.endswith(" It removes 'Bob Kelso'.")
+        assert _GRACE_ID not in question
+        assert OTHER_USER_ID not in question
 
     async def test_the_question_says_when_nobody_stays_on_the_attendee_list(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -438,6 +477,86 @@ class TestThePersonBeforeTheChange:
         _ = await _update(client, attendees=[], confirm=capturing)
 
         assert "the attendee list to nobody" in asked[0]
+        assert asked[0].endswith(" It removes 'Bob Kelso'.")
+
+    async def test_the_question_names_who_the_change_removes(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph, _stored(attendees=[_BOB_INVITEE, _CAROL_INVITEE]))
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _update(client, attendees=[_BOB, _GRACE], confirm=capturing)
+
+        assert asked == [
+            "Change the Teams meeting 'Pricing review': the attendee list to 2 people: "
+            + "'Bob Kelso', 'Grace Hopper'? It removes 'carol@fabrikam.com'."
+        ]
+
+    @pytest.mark.parametrize(
+        ("invitee", "named"),
+        [
+            pytest.param(_BOB_INVITEE, "'Bob Kelso'", id="display-name"),
+            pytest.param(_CAROL_INVITEE, "'carol@fabrikam.com'", id="upn-only"),
+            pytest.param(_invitee(_DAVE_ID), f"'{_DAVE_ID}'", id="id-only"),
+            pytest.param({"role": "attendee"}, "an invitee with no name", id="nothing"),
+        ],
+    )
+    async def test_a_removed_invitee_is_named_by_name_then_upn_then_id(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        invitee: Mapping[str, object],
+        named: str,
+    ) -> None:
+        _ = _ready(graph, _stored(attendees=[invitee]))
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _update(client, attendees=[_GRACE], confirm=capturing)
+
+        assert asked[0].endswith(f"? It removes {named}.")
+
+    @pytest.mark.parametrize(
+        "attendees",
+        [pytest.param([_BOB], id="same-list"), pytest.param([_BOB, _GRACE], id="one-more")],
+    )
+    async def test_a_change_that_removes_nobody_says_nothing_about_removal(
+        self, client: GraphServiceClient, graph: respx.MockRouter, attendees: list[Person]
+    ) -> None:
+        _ = _ready(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _update(client, attendees=attendees, confirm=capturing)
+
+        assert asked[0].endswith("?")
+        assert "removes" not in asked[0]
+
+    async def test_a_change_that_leaves_the_attendees_alone_says_nothing_about_them(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph, _stored(attendees=[_CAROL_INVITEE]))
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _update(client, subject="Pricing review (moved)", confirm=capturing)
+
+        assert asked == [
+            "Change the Teams meeting 'Pricing review': the subject to 'Pricing review (moved)'?"
+        ]
 
     def test_the_binding_differs_for_every_change(self) -> None:
         handle = meeting_handle(_URI)
@@ -464,6 +583,28 @@ class TestThePersonBeforeTheChange:
         removes = about(handle, change("A", None, None, []))
 
         assert keeps != removes
+
+    def test_the_same_ids_under_other_names_bind_the_same_way(self) -> None:
+        handle = meeting_handle(_URI)
+        assert handle is not None
+        about = updater._about  # pyright: ignore[reportPrivateUsage]
+        change = updater._change  # pyright: ignore[reportPrivateUsage]
+
+        named = about(handle, change(None, None, None, [_BOB, _GRACE]))
+        renamed = about(
+            handle,
+            change(
+                None,
+                None,
+                None,
+                [
+                    Person(user_id=_GRACE_ID.upper(), name="Admiral Hopper"),
+                    Person(user_id=OTHER_USER_ID, name="bob@contoso.invalid"),
+                ],
+            ),
+        )
+
+        assert named == renamed
 
 
 class TestTheEraWithNoBackChannel:
@@ -552,7 +693,11 @@ class TestTheHandle:
         with pytest.raises(ToolError, match="not one") as refused:
             _ = await _update(client, meeting_uri=meeting_uri, subject="Pricing review (moved)")
 
+        assert str(refused.value) == not_a_meeting_handle(
+            updater.TOOL_NAME, tail=f"{_NOTHING_CHANGED} {_FAILS_THE_SAME_WAY}"
+        )
         assert "teams:///meetings/{join_web_url}" in str(refused.value)
+        assert "A `teams:///transcripts/...` handle is not a meeting handle." in str(refused.value)
         assert _NOTHING_CHANGED in str(refused.value)
         assert len(graph.calls) == 0
 
@@ -592,7 +737,8 @@ class TestTheHandle:
         _key, _state, _agrees_with, question = _the_question(answer)
         assert "'Pricing review (moved)'" in question
         assert "2026-03-02T15:00:00+01:00 until 2026-03-02T16:00:00+01:00" in question
-        assert _GRACE in question
+        assert "'Grace Hopper'" in question
+        assert _GRACE_ID not in question
         assert patch.call_count == 0
 
 
@@ -629,7 +775,9 @@ class TestWhatItAnswers:
     ) -> None:
         _ = _resolves(graph)
         _ = _me(graph)
-        _ = _patches(graph, _stored(subject="Pricing review (moved)", attendees=[_GRACE]))
+        _ = _patches(
+            graph, _stored(subject="Pricing review (moved)", attendees=[_invitee(_GRACE_ID)])
+        )
 
         answer = await _update(client, subject="Pricing review (moved)")
 
@@ -639,7 +787,7 @@ class TestWhatItAnswers:
                 "subject": "Pricing review (moved)",
                 "start": "2026-02-10T14:00:00Z",
                 "end": "2026-02-10T15:00:00Z",
-                "attendee_ids": [_GRACE],
+                "attendee_ids": [_GRACE_ID],
             }
         )
 
@@ -696,9 +844,23 @@ class TestHowItDeclaresItself:
         ) in description
         assert (
             "This tool sends its change to the Teams online meeting only, and never to a calendar "
-            + "event. For a meeting on a calendar, use outlook_update_event."
+            + "event."
         ) in description
+        assert "outlook_update_event" not in description
         assert "This call is safe to repeat after a timeout." in description
+
+    async def test_the_description_says_the_new_list_replaces_and_who_it_removes(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = " ".join((tool.description or "").split())
+        assert (
+            "- Before you change `attendees`, read the current list with teams_read_meeting. The "
+            + "new list replaces the current list. An invitee without a Microsoft Entra id cannot "
+            + "be in the new list, so the change removes that invitee. The question to the user "
+            + "names each person that the change removes."
+        ) in description
 
     async def test_the_description_keeps_the_house_length(
         self, transport: httpx.AsyncClient
@@ -729,16 +891,27 @@ class TestHowItDeclaresItself:
         }
         assert all(15 <= length <= 60 for length in lengths.values()), lengths
 
-    async def test_the_attendees_name_every_tool_that_reports_an_id(
+    async def test_the_handle_names_both_tools_that_report_one(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
         properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+        assert "the `meeting_uri` handle from teams_list_chats or teams_create_meeting:" in str(
+            properties["meeting_uri"]["description"]
+        )
+
+    async def test_the_attendees_name_every_tool_that_reports_an_id(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        definitions = cast("Mapping[str, Mapping[str, object]]", tool.parameters["$defs"])
+        person = cast("Mapping[str, Mapping[str, object]]", definitions["Person"]["properties"])
         assert (
-            "Copy each id from the `user_id` of get_me, of a teams_list_chats member, or of a "
-            + "teams_list_chat_members row."
-        ) in " ".join(str(properties["attendees"]["description"]).split())
+            "Copy it from the `user_id` of get_me, of a teams_list_chat_members row, or of a "
+            + "teams_list_chats member. Never build it from a name or an email address."
+        ) in str(person["user_id"]["description"])
 
     async def test_the_attendees_say_what_an_empty_list_and_an_omitted_list_do(
         self, transport: httpx.AsyncClient
@@ -757,7 +930,10 @@ class TestHowItDeclaresItself:
 
         with pytest.raises(ValidationError, match="match pattern"):
             _ = await tool.run(
-                {**updater.GRAPH_CALL_EXAMPLE, "attendees": ["jane@example.invalid"]}
+                {
+                    **updater.GRAPH_CALL_EXAMPLE,
+                    "attendees": [{"user_id": "jane@example.invalid", "name": "Jane"}],
+                }
             )
 
         assert len(graph.calls) == 0, "an attendee the schema refuses reached Graph"

@@ -20,6 +20,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import meeting_handle, meeting_uri_for
+from office_365_mcp.shared.meetings import not_a_meeting_handle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Confirm, Confirmed
 from office_365_mcp.tools import teams_delete_meeting as deleter
 from office_365_mcp.tools.teams_delete_meeting import (
@@ -43,6 +44,9 @@ _MEETING = f"/me/onlineMeetings/{MEETING_ID}"
 _URI = meeting_uri_for(JOIN_WEB_URL) or ""
 
 _NOTHING_DELETED = "No meeting was deleted."
+_FAILS_THE_SAME_WAY = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
 
 
 def _stored(
@@ -356,7 +360,11 @@ class TestTheHandle:
         with pytest.raises(ToolError, match="not one") as refused:
             _ = await _delete(client, meeting_uri=meeting_uri)
 
+        assert str(refused.value) == not_a_meeting_handle(
+            deleter.TOOL_NAME, tail=f"{_NOTHING_DELETED} {_FAILS_THE_SAME_WAY}"
+        )
         assert "teams:///meetings/{join_web_url}" in str(refused.value)
+        assert "A `teams:///transcripts/...` handle is not a meeting handle." in str(refused.value)
         assert _NOTHING_DELETED in str(refused.value)
         assert len(graph.calls) == 0
 
@@ -469,8 +477,9 @@ class TestHowItDeclaresItself:
         ) in description
         assert (
             "This tool sends its change to the Teams online meeting only, and never to a calendar "
-            + "event. For a meeting on a calendar, use outlook_cancel_event."
+            + "event."
         ) in description
+        assert "outlook_cancel_event" not in description
         assert (
             "If a call times out, do not call this tool again first. Before you call again, make "
             + "sure that teams_read_meeting does not already show the change."
@@ -493,3 +502,6 @@ class TestHowItDeclaresItself:
         assert set(cast("Sequence[str]", tool.parameters["required"])) == {"meeting_uri"}
         assert set(deleter.GRAPH_CALL_EXAMPLE) == set(properties)
         assert 15 <= len(str(properties["meeting_uri"]["description"]).split()) <= 60
+        assert "the `meeting_uri` handle from teams_list_chats or teams_create_meeting:" in str(
+            properties["meeting_uri"]["description"]
+        )

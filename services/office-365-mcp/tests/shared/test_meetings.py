@@ -19,6 +19,7 @@ from msgraph.generated.models.user import User
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.shared import handles, meetings
+from office_365_mcp.shared.identity import Person
 
 _MEETINGS = "/me/onlineMeetings"
 
@@ -262,6 +263,47 @@ class TestTheAttendees:
         assert meetings.attendee_ids(MeetingParticipants(attendees=[])) == []
 
 
+class TestThePeopleTheUserNames:
+    def test_each_person_appears_once_by_id_sorted_and_in_lowercase(self) -> None:
+        people = meetings.distinct_people(
+            [
+                Person(user_id=_OTHER_ATTENDEE_ID, name="Grace"),
+                Person(user_id=_ATTENDEE_ID.upper(), name="Ada"),
+                Person(user_id=_ATTENDEE_ID, name="Ada Lovelace"),
+            ]
+        )
+
+        assert people == (
+            Person(user_id=_ATTENDEE_ID, name="Ada"),
+            Person(user_id=_OTHER_ATTENDEE_ID, name="Grace"),
+        )
+
+    def test_no_person_is_no_person(self) -> None:
+        assert meetings.distinct_people([]) == ()
+
+    def test_the_question_counts_the_people_and_quotes_each_name(self) -> None:
+        named = meetings.named_people(
+            [
+                Person(user_id=_ATTENDEE_ID, name="Ada"),
+                Person(user_id=_OTHER_ATTENDEE_ID, name="Bob"),
+            ]
+        )
+
+        assert named == "2 people: 'Ada', 'Bob'"
+
+    def test_one_person_is_counted_once_and_named_without_the_id(self) -> None:
+        named = meetings.named_people([Person(user_id=_ATTENDEE_ID, name="Ada")])
+
+        assert named == "1 person: 'Ada'"
+        assert _ATTENDEE_ID not in named
+
+    def test_a_long_name_is_cut_for_the_question(self) -> None:
+        named = meetings.named_people([Person(user_id=_ATTENDEE_ID, name="A" * 500)])
+
+        assert len(named) < 500
+        assert named.endswith("…'")
+
+
 class TestTheMeetingRefusals:
     def test_the_handle_refusal_names_both_sources_and_the_one_shape(self) -> None:
         refused = meetings.not_a_meeting_handle(_TOOL, tail=_TAIL)
@@ -271,6 +313,7 @@ class TestTheMeetingRefusals:
             + "teams_create_meeting, and this value is not one."
         )
         assert "\n  teams:///meetings/{join_web_url}\n" in refused
+        assert "A `teams:///transcripts/...` handle is not a meeting handle." in refused
         assert "Copy the `meeting_uri` of a tool result word for word." in refused
         assert refused.endswith(_TAIL)
 

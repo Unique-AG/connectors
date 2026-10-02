@@ -9,21 +9,26 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
+from msgraph.generated.models.meeting_participant_info import MeetingParticipantInfo
 from msgraph.generated.models.online_meeting import OnlineMeeting
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.calendar import confirmation_id_for, counted_people
+from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.handles import MeetingHandle, meeting_handle
+from office_365_mcp.shared.identity import Person
 from office_365_mcp.shared.meetings import (
     attendee_ids,
+    distinct_people,
     meeting_participants,
     meeting_times,
+    named_people,
     not_a_meeting_handle,
     not_the_organizer,
     organized_by,
+    participant_id,
     resolve_meeting,
 )
 from office_365_mcp.shared.prose import cut_for_a_question
@@ -57,14 +62,15 @@ _REFUSED = f"{_NOTHING_CHANGED} {_FAILS_THE_SAME_WAY}"
 _DESCRIPTION = """\
 Changes the subject, the time, or the attendee list of one Teams online meeting that the \
 signed-in user organizes. This tool sends its change to the Teams online meeting only, and never \
-to a calendar event. For a meeting on a calendar, use outlook_update_event. teams_read_meeting \
-shows the meeting as it is now.
+to a calendar event. teams_read_meeting shows the meeting as it is now.
 
 Notes:
 - This tool asks the user to agree before it changes anything, every time. This tool changes \
 nothing unless the user agrees.
-- Before you change `attendees`, read the current list with teams_read_meeting. The new list must \
-hold everyone who stays.
+- Before you change `attendees`, read the current list with teams_read_meeting. The new list \
+replaces the current list. An invitee without a Microsoft Entra id cannot be in the new list, so \
+the change removes that invitee. The question to the user names each person that the change \
+removes.
 - This call is safe to repeat after a timeout. A second call with the same arguments leaves the \
 meeting in the same state.
 """
@@ -90,8 +96,6 @@ _ONE_TIME_ONLY = (
     + f"takes a new time only as a start and an end together. {_NOTHING_CHANGED} Give both, or "
     + "omit both to keep the current time."
 )
-
-_LEFT_OUT = "A person who is not in the new list is no longer an attendee."
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not find this meeting when this tool sent the change. "
@@ -140,7 +144,7 @@ class _Change:
     subject: str | None
     starts_at: datetime | None
     ends_at: datetime | None
-    attendees: tuple[str, ...] | None
+    attendees: tuple[Person, ...] | None
 
 
 async def update_meeting(
@@ -150,7 +154,7 @@ async def update_meeting(
     subject: str | None = None,
     starts_at: str | None = None,
     ends_at: str | None = None,
-    attendees: Sequence[str] | None = None,
+    attendees: Sequence[Person] | None = None,
     confirm: Confirm,
 ) -> UpdatedMeeting | InputRequiredResult:
     handle = meeting_handle(meeting_uri)
@@ -195,7 +199,7 @@ def _change(
     subject: str | None,
     starts_at: str | None,
     ends_at: str | None,
-    attendees: Sequence[str] | None,
+    attendees: Sequence[Person] | None,
 ) -> _Change:
     if subject is None and starts_at is None and ends_at is None and attendees is None:
         raise ToolError(_NOTHING_TO_CHANGE)
@@ -213,9 +217,7 @@ def _change(
         subject=subject,
         starts_at=opens,
         ends_at=closes,
-        attendees=None
-        if attendees is None
-        else tuple(sorted({attendee.lower() for attendee in attendees})),
+        attendees=None if attendees is None else distinct_people(attendees),
     )
 
 
@@ -231,7 +233,7 @@ def _about(handle: MeetingHandle, change: _Change) -> str:
         repr(change.subject),
         repr(None if starts_at is None else starts_at.isoformat()),
         repr(None if ends_at is None else ends_at.isoformat()),
-        repr(None if change.attendees is None else list(change.attendees)),
+        repr(None if change.attendees is None else _ids(change.attendees)),
     )
 
 
@@ -245,14 +247,37 @@ def _question(meeting: OnlineMeeting, change: _Change) -> str:
         )
     if change.attendees is not None:
         changes.append(
-            f"the attendee list to {counted_people(change.attendees)}: "
-            + ", ".join(change.attendees)
+            f"the attendee list to {named_people(change.attendees)}"
             if change.attendees
             else "the attendee list to nobody"
         )
     name = repr(cut_for_a_question(meeting.subject)) if meeting.subject else "that has no subject"
-    left_out = f" {_LEFT_OUT}" if change.attendees is not None else ""
-    return f"Change the Teams meeting {name}: {' and '.join(changes)}?{left_out}"
+    removed = [] if change.attendees is None else _removed(meeting, change.attendees)
+    removes = f" It removes {', '.join(removed)}." if removed else ""
+    return f"Change the Teams meeting {name}: {' and '.join(changes)}?{removes}"
+
+
+def _removed(meeting: OnlineMeeting, attendees: tuple[Person, ...]) -> list[str]:
+    staying = set(_ids(attendees))
+    participants = meeting.participants
+    current = (participants.attendees if participants is not None else None) or []
+    return [
+        _invitee_name(invitee)
+        for invitee in current
+        if (user_id := participant_id(invitee)) is None or user_id.lower() not in staying
+    ]
+
+
+def _invitee_name(invitee: MeetingParticipantInfo) -> str:
+    user = invitee.identity.user if invitee.identity is not None else None
+    name = (
+        (user.display_name if user is not None else None) or invitee.upn or participant_id(invitee)
+    )
+    return repr(cut_for_a_question(name)) if name else "an invitee with no name"
+
+
+def _ids(attendees: tuple[Person, ...]) -> list[str]:
+    return [attendee.user_id for attendee in attendees]
 
 
 def _body(change: _Change) -> OnlineMeeting:
@@ -260,7 +285,9 @@ def _body(change: _Change) -> OnlineMeeting:
         subject=change.subject,
         start_date_time=_utc(change.starts_at),
         end_date_time=_utc(change.ends_at),
-        participants=None if change.attendees is None else meeting_participants(change.attendees),
+        participants=None
+        if change.attendees is None
+        else meeting_participants(_ids(change.attendees)),
     )
 
 
@@ -293,9 +320,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The meeting to change, as the `meeting_uri` handle from teams_list_chats: "
-                    + "`teams:///meetings/{join_web_url}`. Copy it word for word. A "
-                    + "`teams:///transcripts/...` handle is not valid here."
+                    "The meeting to change, as the `meeting_uri` handle from teams_list_chats or "
+                    + "teams_create_meeting: `teams:///meetings/{join_web_url}`. Copy it word for "
+                    + "word. A `teams:///transcripts/...` handle is not valid here."
                 ),
             ),
         ],
@@ -332,14 +359,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         attendees: Annotated[
-            list[Annotated[str, Field(pattern=identity.ENTRA_OBJECT_ID_PATTERN)]] | None,
+            list[Person] | None,
             Field(
                 description=(
-                    "The full new attendee list, one Microsoft Entra object id for each person. It "
-                    + "replaces the current list. Copy each id from the `user_id` of get_me, of a "
-                    + "teams_list_chats member, or of a teams_list_chat_members row. Never build "
-                    + "an id from a name or an email address. An empty list removes every "
-                    + "attendee. Omit it to keep the current attendees."
+                    "The full new attendee list, with one entry for each person who is an attendee "
+                    + "after the change. An empty list removes every attendee. Omit it to keep the "
+                    + "current attendees."
                 ),
             ),
         ] = None,

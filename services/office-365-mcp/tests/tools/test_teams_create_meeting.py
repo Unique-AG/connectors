@@ -21,6 +21,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphUnavailable
 from office_365_mcp.shared.handles import meeting_uri_for
+from office_365_mcp.shared.identity import Person
 from office_365_mcp.shared.seam import WRITE_IDEMPOTENT, Confirm, Confirmed
 from office_365_mcp.tools import teams_create_meeting as creator
 from office_365_mcp.tools.teams_create_meeting import (
@@ -36,7 +37,9 @@ _CREATE_PATH = "/me/onlineMeetings/createOrGet"
 _SUBJECT = "Pricing review"
 _STARTS_AT = "2026-03-02T14:00:00+01:00"
 _ENDS_AT = "2026-03-02T15:00:00+01:00"
-_GRACE = "00000000-0000-4000-8000-000000000003"
+_GRACE_ID = "00000000-0000-4000-8000-000000000003"
+_GRACE = Person(user_id=_GRACE_ID, name="Grace Hopper")
+_BOB = Person(user_id=OTHER_USER_ID, name="Bob Kelso")
 
 _NOTHING_CREATED = "No meeting was created."
 
@@ -74,7 +77,7 @@ async def _create(
     subject: str = _SUBJECT,
     starts_at: str = _STARTS_AT,
     ends_at: str = _ENDS_AT,
-    attendees: Sequence[str] = (OTHER_USER_ID,),
+    attendees: Sequence[Person] = (_BOB,),
     confirm: Confirm = _agrees,
 ) -> CreatedMeeting | InputRequiredResult:
     return await create_meeting(
@@ -98,7 +101,7 @@ async def _external_id_of(
     subject: str = _SUBJECT,
     starts_at: str = _STARTS_AT,
     ends_at: str = _ENDS_AT,
-    attendees: Sequence[str] = (OTHER_USER_ID,),
+    attendees: Sequence[Person] = (_BOB,),
 ) -> object:
     route = _posts(graph)
     _ = await _create(
@@ -115,6 +118,11 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
     return cast("Mapping[str, object]", tool.parameters), tool
 
 
+def _person_schema(parameters: Mapping[str, object]) -> Mapping[str, Mapping[str, object]]:
+    definitions = cast("Mapping[str, Mapping[str, object]]", parameters["$defs"])
+    return cast("Mapping[str, Mapping[str, object]]", definitions["Person"]["properties"])
+
+
 class TestThePersonBeforeTheCreate:
     async def test_a_refusal_creates_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -129,8 +137,11 @@ class TestThePersonBeforeTheCreate:
     @pytest.mark.parametrize(
         ("attendees", "named"),
         [
-            ([_GRACE], f"1 person: {_GRACE}"),
-            ([_GRACE.upper(), OTHER_USER_ID], f"2 people: {OTHER_USER_ID}, {_GRACE}"),
+            ([_GRACE], "1 person: 'Grace Hopper'"),
+            (
+                [Person(user_id=_GRACE_ID.upper(), name="Grace Hopper"), _BOB],
+                "2 people: 'Bob Kelso', 'Grace Hopper'",
+            ),
         ],
         ids=["one", "two"],
     )
@@ -138,7 +149,7 @@ class TestThePersonBeforeTheCreate:
         self,
         client: GraphServiceClient,
         graph: respx.MockRouter,
-        attendees: list[str],
+        attendees: list[Person],
         named: str,
     ) -> None:
         _ = _posts(graph)
@@ -154,6 +165,22 @@ class TestThePersonBeforeTheCreate:
             f"Create the Teams meeting {_SUBJECT!r} from {_STARTS_AT} to {_ENDS_AT} with "
             + f"{named}? The meeting is on no calendar, and this tool sends no invitation."
         ]
+
+    async def test_the_question_names_people_and_shows_no_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _create(client, attendees=[_BOB, _GRACE], confirm=capturing)
+
+        assert "'Bob Kelso', 'Grace Hopper'" in asked[0]
+        assert OTHER_USER_ID not in asked[0]
+        assert _GRACE_ID not in asked[0]
 
     async def test_the_question_says_when_the_meeting_has_no_attendee(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -319,7 +346,7 @@ class TestTheEraWithNoBackChannel:
         with pytest.raises(ToolError, match="given for a different request"):
             _ = await _create(
                 client,
-                attendees=[OTHER_USER_ID, _GRACE],
+                attendees=[_BOB, _GRACE],
                 confirm=a_person_agrees(
                     _modern_context(
                         answers={
@@ -331,6 +358,28 @@ class TestTheEraWithNoBackChannel:
             )
 
         assert post.call_count == 0, "a meeting went out under an answer nobody gave for it"
+
+    async def test_the_same_ids_under_other_names_still_create_the_meeting_the_user_agreed_to(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+        key, state, agrees_with = _the_question(
+            await _create(client, confirm=a_person_agrees(_modern_context()))
+        )
+
+        _ = await _create(
+            client,
+            attendees=[Person(user_id=OTHER_USER_ID, name="Bob")],
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": agrees_with})},
+                    state=state,
+                )
+            ),
+        )
+
+        assert post.call_count == 1
+        assert _sent_body(post)["externalId"] == state
 
 
 class TestWhatItAsksGraphFor:
@@ -349,7 +398,7 @@ class TestWhatItAsksGraphFor:
     ) -> None:
         post = _posts(graph)
 
-        _ = await _create(client, attendees=[OTHER_USER_ID, _GRACE])
+        _ = await _create(client, attendees=[_GRACE, _BOB])
 
         body = _sent_body(post)
         assert body["subject"] == _SUBJECT
@@ -358,9 +407,11 @@ class TestWhatItAsksGraphFor:
         assert body["participants"] == {
             "attendees": [
                 {"identity": {"user": {"id": OTHER_USER_ID}}},
-                {"identity": {"user": {"id": _GRACE}}},
+                {"identity": {"user": {"id": _GRACE_ID}}},
             ]
         }
+        assert "Grace Hopper" not in json.dumps(body)
+        assert "Bob Kelso" not in json.dumps(body)
 
     async def test_the_external_id_is_the_same_for_the_same_request(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -383,21 +434,41 @@ class TestWhatItAsksGraphFor:
     async def test_the_external_id_ignores_the_order_and_the_case_of_the_attendees(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        given = await _external_id_of(client, graph, attendees=[OTHER_USER_ID, _GRACE])
+        given = await _external_id_of(client, graph, attendees=[_BOB, _GRACE])
         shuffled = await _external_id_of(
-            client, graph, attendees=[_GRACE.upper(), OTHER_USER_ID.upper()]
+            client,
+            graph,
+            attendees=[
+                Person(user_id=_GRACE_ID.upper(), name=_GRACE.name),
+                Person(user_id=OTHER_USER_ID.upper(), name=_BOB.name),
+            ],
         )
 
         assert given == shuffled
 
+    async def test_the_external_id_is_the_same_for_the_same_people_under_other_names(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        given = await _external_id_of(client, graph, attendees=[_BOB, _GRACE])
+        renamed = await _external_id_of(
+            client,
+            graph,
+            attendees=[
+                Person(user_id=OTHER_USER_ID, name="bob@contoso.invalid"),
+                Person(user_id=_GRACE_ID, name="Admiral Hopper"),
+            ],
+        )
+
+        assert given == renamed
+
     @pytest.mark.parametrize(
         ("subject", "starts_at", "ends_at", "attendees"),
         [
-            ("Pricing review, part two", _STARTS_AT, _ENDS_AT, [OTHER_USER_ID]),
-            (_SUBJECT, "2026-03-02T14:30:00+01:00", _ENDS_AT, [OTHER_USER_ID]),
-            (_SUBJECT, _STARTS_AT, "2026-03-02T15:30:00+01:00", [OTHER_USER_ID]),
-            (_SUBJECT, _STARTS_AT, _ENDS_AT, [_GRACE]),
-            (_SUBJECT, _STARTS_AT, _ENDS_AT, [OTHER_USER_ID, _GRACE]),
+            ("Pricing review, part two", _STARTS_AT, _ENDS_AT, [_BOB]),
+            (_SUBJECT, "2026-03-02T14:30:00+01:00", _ENDS_AT, [_BOB]),
+            (_SUBJECT, _STARTS_AT, "2026-03-02T15:30:00+01:00", [_BOB]),
+            (_SUBJECT, _STARTS_AT, _ENDS_AT, [Person(user_id=_GRACE_ID, name=_BOB.name)]),
+            (_SUBJECT, _STARTS_AT, _ENDS_AT, [_BOB, _GRACE]),
             (_SUBJECT, _STARTS_AT, _ENDS_AT, []),
         ],
         ids=["subject", "start", "end", "other-attendee", "more-attendees", "no-attendee"],
@@ -409,7 +480,7 @@ class TestWhatItAsksGraphFor:
         subject: str,
         starts_at: str,
         ends_at: str,
-        attendees: list[str],
+        attendees: list[Person],
     ) -> None:
         original = await _external_id_of(client, graph)
         other = await _external_id_of(
@@ -428,7 +499,9 @@ class TestWhatItAsksGraphFor:
     ) -> None:
         post = _posts(graph)
 
-        _ = await _create(client, attendees=[OTHER_USER_ID, OTHER_USER_ID.upper()])
+        _ = await _create(
+            client, attendees=[_BOB, Person(user_id=OTHER_USER_ID.upper(), name="Bob")]
+        )
 
         participants = cast("Mapping[str, object]", _sent_body(post)["participants"])
         assert participants["attendees"] == [{"identity": {"user": {"id": OTHER_USER_ID}}}]
@@ -503,7 +576,7 @@ class TestWhatItAnswers:
     async def test_the_answer_reports_the_meeting_microsoft_stored(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _posts(graph, _stored(attendees=[OTHER_USER_ID, _GRACE]))
+        _ = _posts(graph, _stored(attendees=[OTHER_USER_ID, _GRACE_ID]))
 
         answer = await _create(client)
 
@@ -513,7 +586,7 @@ class TestWhatItAnswers:
         assert answer.subject == _SUBJECT
         assert answer.start is not None and answer.start.isoformat() == "2026-03-02T13:00:00+00:00"
         assert answer.end is not None and answer.end.isoformat() == "2026-03-02T14:00:00+00:00"
-        assert answer.attendee_ids == [OTHER_USER_ID, _GRACE]
+        assert answer.attendee_ids == [OTHER_USER_ID, _GRACE_ID]
 
     async def test_the_answer_leaves_the_organizer_out_of_the_attendees(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -599,8 +672,19 @@ class TestHowItDeclaresItself:
 
         description = " ".join((tool.description or "").split())
         assert "It is on no calendar, and this tool sends no invitation." in description
-        assert "teams_send_chat_message or outlook_draft_mail" in description
-        assert "use outlook_create_event with `online_meeting`" in description
+        assert "To share the meeting, use the `join_web_url` of the answer." in description
+        assert (
+            "Microsoft documents a calendar event with an online meeting as the way to read the "
+            + "transcript of a meeting later."
+        ) in description
+        assert "teams_send_chat_message" not in description
+        assert "outlook_draft_mail" not in description
+        assert "outlook_create_event" not in description
+
+    def test_the_answer_says_to_give_the_join_link_to_the_user(self) -> None:
+        join_web_url = str(CreatedMeeting.model_fields["join_web_url"].description)
+
+        assert "Give this link to the user." in join_web_url
 
     async def test_the_description_says_a_repeat_creates_no_second_meeting(
         self, transport: httpx.AsyncClient
@@ -632,11 +716,20 @@ class TestHowItDeclaresItself:
     ) -> None:
         parameters, _tool = await _registered(transport)
 
-        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        person = _person_schema(parameters)
         assert (
-            "Copy each id from the `user_id` of get_me, of a teams_list_chats member, or of a "
-            + "teams_list_chat_members row."
-        ) in " ".join(str(properties["attendees"]["description"]).split())
+            "Copy it from the `user_id` of get_me, of a teams_list_chat_members row, or of a "
+            + "teams_list_chats member. Never build it from a name or an email address."
+        ) in str(person["user_id"]["description"])
+
+    async def test_the_name_is_only_for_the_question_and_never_reaches_microsoft(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        name = str(_person_schema(parameters)["name"]["description"])
+        assert "Copy the `display_name` from the same result as `user_id`." in name
+        assert "never sends it to Microsoft 365" in name
 
     async def test_an_attendee_by_email_address_never_reaches_graph(
         self, transport: httpx.AsyncClient, graph: respx.MockRouter
@@ -645,10 +738,25 @@ class TestHowItDeclaresItself:
 
         with pytest.raises(ValidationError, match="match pattern"):
             _ = await tool.run(
-                {**creator.GRAPH_CALL_EXAMPLE, "attendees": ["jane@example.invalid"]}
+                {
+                    **creator.GRAPH_CALL_EXAMPLE,
+                    "attendees": [{"user_id": "jane@example.invalid", "name": "Jane"}],
+                }
             )
 
         assert len(graph.calls) == 0, "an attendee the schema refuses reached Graph"
+
+    async def test_an_attendee_with_no_name_never_reaches_graph(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError, match="at least 1 character"):
+            _ = await tool.run(
+                {**creator.GRAPH_CALL_EXAMPLE, "attendees": [{"user_id": _GRACE_ID, "name": ""}]}
+            )
+
+        assert len(graph.calls) == 0
 
     async def test_an_empty_subject_never_reaches_graph(
         self, transport: httpx.AsyncClient, graph: respx.MockRouter

@@ -33,8 +33,11 @@ from msgraph.generated.users.item.online_meetings.online_meetings_request_builde
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import CollectedItems, GraphCollection, collect_pages, graph_step
+from office_365_mcp.shared.calendar import counted_people
 from office_365_mcp.shared.handles import MeetingHandle
+from office_365_mcp.shared.identity import Person
 from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.window import as_utc
 
 # This is the least-privileged permission for the resolve filter, and it needs no admin consent.
@@ -127,17 +130,31 @@ def meeting_participants(attendees: Sequence[str]) -> MeetingParticipants:
     )
 
 
+def participant_id(participant: MeetingParticipantInfo) -> str | None:
+    identity = participant.identity
+    user = identity.user if identity is not None else None
+    return user.id if user is not None else None
+
+
 def attendee_ids(participants: MeetingParticipants | None) -> list[str] | None:
     attendees = None if participants is None else participants.attendees
     if attendees is None:
         return None
-    return [
-        attendee.identity.user.id
-        for attendee in attendees
-        if attendee.identity is not None
-        and attendee.identity.user is not None
-        and attendee.identity.user.id is not None
-    ]
+    return [user_id for attendee in attendees if (user_id := participant_id(attendee)) is not None]
+
+
+def distinct_people(people: Sequence[Person]) -> tuple[Person, ...]:
+    first_named: dict[str, str] = {}
+    for person in people:
+        _ = first_named.setdefault(person.user_id.lower(), person.name)
+    return tuple(
+        Person(user_id=user_id, name=first_named[user_id]) for user_id in sorted(first_named)
+    )
+
+
+def named_people(people: Sequence[Person]) -> str:
+    names = [repr(cut_for_a_question(person.name)) for person in people]
+    return f"{counted_people(names)}: {', '.join(names)}"
 
 
 def not_a_meeting_handle(tool: str, *, tail: str) -> str:
@@ -145,8 +162,9 @@ def not_a_meeting_handle(tool: str, *, tail: str) -> str:
         f"{tool} takes the `meeting_uri` handle from teams_list_chats or teams_create_meeting, "
         + "and this value is not one. A meeting handle has exactly one shape:\n"
         + "  teams:///meetings/{join_web_url}\n"
-        + "with the join URL percent-encoded. Copy the `meeting_uri` of a tool result word for "
-        + f"word. {tail}"
+        + "with the join URL percent-encoded. A `teams:///transcripts/...` handle is not a "
+        + "meeting handle. Copy the `meeting_uri` of a tool result word for word. "
+        + tail
     )
 
 

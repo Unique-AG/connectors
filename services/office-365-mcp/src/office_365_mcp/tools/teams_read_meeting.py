@@ -15,7 +15,13 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import MeetingHandle, meeting_handle
-from office_365_mcp.shared.meetings import MEETING_PERMISSION, resolve_meeting, settled
+from office_365_mcp.shared.meetings import (
+    MEETING_PERMISSION,
+    not_a_meeting_handle,
+    participant_id,
+    resolve_meeting,
+    settled,
+)
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import as_utc
 
@@ -37,9 +43,9 @@ AttendanceStatus = Literal["available", "not_ready", "no_report", "meeting_not_f
 
 _DESCRIPTION = """\
 Reads one Teams meeting of the signed-in user and its attendance, from the `meeting_uri` that \
-teams_list_chats reports. It returns the meeting details, the attendance reports newest first, and \
-who attended the newest session and for how long. teams_list_meeting_transcripts is the sibling \
-tool for the words, and teams_list_meeting_recordings is the sibling tool for the recordings.
+teams_list_chats or teams_create_meeting reports. It returns the meeting details, the attendance \
+reports newest first, and who attended the newest session and for how long. teams_update_meeting \
+changes a meeting that the signed-in user organizes, and teams_delete_meeting deletes one.
 
 Notes:
 - Microsoft Graph gives attendance reports to the meeting organizer only.
@@ -48,12 +54,8 @@ Notes:
 same records.\
 """
 
-_NOT_A_MEETING_HANDLE = (
-    "teams_read_meeting takes the `meeting_uri` handle from teams_list_chats or "
-    + "teams_create_meeting, and this value is not one. A meeting handle looks like "
-    + "teams:///meetings/{join_web_url}. A `teams:///transcripts/...` handle belongs to "
-    + "teams_read_transcript. Copy the `meeting_uri` word for word. If you call this tool again "
-    + "with this value, the call will fail the same way."
+_NOT_A_MEETING_HANDLE = not_a_meeting_handle(
+    TOOL_NAME, tail="If you call this tool again with this value, the call will fail the same way."
 )
 
 
@@ -73,7 +75,7 @@ class MeetingInvitee(BaseModel):
 
     @classmethod
     def from_participant(cls, participant: MeetingParticipantInfo) -> Self:
-        return cls(user_id=_user_id(participant), upn=participant.upn)
+        return cls(user_id=participant_id(participant), upn=participant.upn)
 
 
 class MeetingDetails(BaseModel):
@@ -132,7 +134,7 @@ class MeetingDetails(BaseModel):
             subject=meeting.subject,
             started_at=meeting.start_date_time,
             ended_at=meeting.end_date_time,
-            organizer_user_id=_user_id(organizer) if organizer is not None else None,
+            organizer_user_id=participant_id(organizer) if organizer is not None else None,
             attendees=[MeetingInvitee.from_participant(invitee) for invitee in invitees],
         )
 
@@ -330,12 +332,6 @@ async def teams_read_meeting(
     )
 
 
-def _user_id(participant: MeetingParticipantInfo) -> str | None:
-    identity = participant.identity
-    user = identity.user if identity is not None else None
-    return user.id if user is not None else None
-
-
 def _began_at(report: AttendanceReportSummary) -> datetime:
     began = report.started_at
     return as_utc(began) if began is not None else datetime.min.replace(tzinfo=UTC)
@@ -356,8 +352,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The meeting handle from teams_list_chats: `teams:///meetings/{join_web_url}`. "
-                    + "Copy it verbatim. A `teams:///transcripts/...` handle is not valid here."
+                    "The meeting handle from teams_list_chats or teams_create_meeting: "
+                    + "`teams:///meetings/{join_web_url}`. Copy it verbatim. A "
+                    + "`teams:///transcripts/...` handle is not valid here."
                 ),
             ),
         ],
