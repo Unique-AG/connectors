@@ -321,18 +321,47 @@ class TestHowItDeclaresItself:
     def test_it_asks_for_the_permission_that_can_write_mailbox_settings(self) -> None:
         assert GRAPH_PERMISSIONS == ("MailboxSettings.ReadWrite",)
 
+    async def test_the_description_is_a_lead_and_a_few_notes_of_the_house_length(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = tool.description or ""
+        lead, separator, notes = description.partition("\n\nNotes:\n")
+        assert separator, "the description has no Notes section"
+        assert lead.strip() != ""
+        assert 1 <= len([line for line in notes.splitlines() if line.startswith("- ")]) <= 4
+        assert 45 <= len(description.split()) <= 210
+
     async def test_it_names_the_tool_a_rule_handle_comes_from(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
-        assert "outlook_get_mailbox_settings reports" in (tool.description or "")
+        assert "outlook_get_mailbox_settings lists the rules" in (tool.description or "")
+        assert "the handle of each rule in `uri`" in (tool.description or "")
 
-    async def test_it_says_re_enabling_is_a_click_in_outlook_and_not_offered_here(
+    async def test_it_names_the_tools_that_turn_a_rule_on_and_create_one_behind_the_guard(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
-        described = tool.description or ""
-        assert "cannot enable a rule" in described
-        assert "clicks once in Outlook" in described
+        description = " ".join((tool.description or "").split())
+        assert (
+            "If this deployment exposes outlook_update_mail_rule, that tool can turn a rule on "
+            "again."
+        ) in description
+        assert (
+            "If this deployment exposes outlook_create_mail_rule, that tool creates a rule."
+        ) in description
+        assert "clicks once in Outlook" not in description
+        assert "\N{EM DASH}" not in description
+
+    async def test_it_says_it_refuses_a_read_only_rule_and_is_safe_to_repeat(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "This tool refuses a read-only rule." in description
+        assert "This call is safe to repeat after a timeout." in description
