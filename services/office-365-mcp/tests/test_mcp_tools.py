@@ -654,6 +654,8 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_share_calendar",
         "outlook_unshare_calendar",
         "outlook_delete_calendar",
+        "outlook_create_contact",
+        "outlook_update_contact",
         "onenote_create_page",
         "onenote_append_to_page",
         "onenote_create_notebook",

@@ -1,10 +1,52 @@
-from typing import Self
+from typing import Annotated, Self
 
 from msgraph.generated.models.contact import Contact
 from msgraph.generated.models.email_address import EmailAddress
 from pydantic import BaseModel, Field
 
 from office_365_mcp.shared.handles import ContactHandle
+
+PhoneNumber = Annotated[str, Field(min_length=1, pattern=r"\S")]
+
+GIVEN_NAME_FIELD = (
+    "The given name, or first name, of the person, such as `Alex`, as the user writes it."
+)
+
+SURNAME_FIELD = (
+    "The family name, or last name, of the person, such as `Wilber`, as the user writes it."
+)
+
+COMPANY_NAME_FIELD = (
+    "The name of the company of the person, such as `Contoso`, as the user writes it."
+)
+
+JOB_TITLE_FIELD = (
+    "The job title of the person at the company, such as `Marketing Manager`, as the user "
+    + "writes it."
+)
+
+MOBILE_PHONE_FIELD = (
+    "The mobile telephone number of the person, as text, such as `+1 425 555 0110`. A contact "
+    + "holds one mobile number."
+)
+
+
+_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
+
+
+def not_one_address(entry: str, *, nothing_happened: str) -> str:
+    return (
+        "Each email address of a contact must be one SMTP address, such as `alexw@example.com`. "
+        + f"A name is not an address. This entry is not one address: {entry!r}. "
+        + f"{nothing_happened} {_AGAIN}"
+    )
+
+
+def repeated_entry(entry: str, *, nothing_happened: str) -> str:
+    return (
+        f"The address {entry!r} is in one list twice. A change of case does not make a second "
+        + f"address. {nothing_happened} Remove the repeat, and then call again. {_AGAIN}"
+    )
 
 
 class ContactEmailAddress(BaseModel):

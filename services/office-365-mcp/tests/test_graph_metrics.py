@@ -777,6 +777,8 @@ GRAPH_STEPS = frozenset(
         "rooms",
         "contacts",
         "contact",
+        "create_contact",
+        "update_contact",
         "notebook",
         "notebooks",
         "section",

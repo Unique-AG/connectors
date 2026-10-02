@@ -452,6 +452,18 @@
           ]
         },
         {
+          "name": "outlook_create_contact",
+          "permissions": [
+            "Contacts.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_update_contact",
+          "permissions": [
+            "Contacts.ReadWrite"
+          ]
+        },
+        {
           "name": "sharepoint_search_files",
           "permissions": [
             "Files.Read.All"
@@ -660,6 +672,8 @@
         "outlook_delete_calendar",
         "outlook_list_contacts",
         "outlook_read_contact",
+        "outlook_create_contact",
+        "outlook_update_contact",
         "sharepoint_search_files",
         "sharepoint_browse_folder",
         "sharepoint_read_file",
@@ -937,6 +951,12 @@
           "outlook_list_contacts",
           "outlook_read_contact"
         ],
+        "outlook-contacts-write": [
+          "outlook_list_contacts",
+          "outlook_read_contact",
+          "outlook_create_contact",
+          "outlook_update_contact"
+        ],
         "sharepoint-search": [
           "sharepoint_search_files",
           "sharepoint_browse_folder"
@@ -1028,6 +1048,7 @@
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
         "Contacts.Read",
+        "Contacts.ReadWrite",
         "Files.Read.All",
         "Notes.Read",
         "Notes.Create",
@@ -1064,7 +1085,8 @@
         "Notes.Create": false,
         "Notes.ReadWrite": false,
         "Place.Read.All": true,
-        "Contacts.Read": false
+        "Contacts.Read": false,
+        "Contacts.ReadWrite": false
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",

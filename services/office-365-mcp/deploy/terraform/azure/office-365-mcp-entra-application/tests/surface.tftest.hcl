@@ -43,6 +43,7 @@ mock_provider "azuread" {
         "Notes.ReadWrite"                  = "d3333333-3333-3333-3333-333333333333"
         "Place.Read.All"                   = "f1111111-1111-1111-1111-111111111111"
         "Contacts.Read"                    = "f2222222-2222-2222-2222-222222222222"
+        "Contacts.ReadWrite"               = "f3333333-3333-3333-3333-333333333333"
       }
     }
   }
@@ -444,6 +445,27 @@ run "preset_outlook_contacts" {
   assert {
     condition     = length(local.admin_consent) == 0
     error_message = "Microsoft marks the delegated Contacts.Read as AdminConsentRequired: No, and this composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_outlook_contacts_write" {
+  variables {
+    tools_preset = "outlook-contacts-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Contacts.Read,Contacts.ReadWrite"
+    error_message = "outlook-contacts-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 5
+    error_message = "outlook-contacts-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "Microsoft marks the delegated Contacts.ReadWrite as AdminConsentRequired: No, and this composed ${join(",", local.admin_consent)}"
   }
 }
 

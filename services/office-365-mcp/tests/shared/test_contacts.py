@@ -3,12 +3,24 @@ import json
 import pytest
 from kiota_serialization_json.json_parse_node_factory import JsonParseNodeFactory
 from msgraph.generated.models.contact import Contact
+from pydantic import TypeAdapter, ValidationError
 from pydantic.alias_generators import to_camel
 
-from office_365_mcp.shared.contacts import SUMMARY_FIELDS, ContactEmailAddress, ContactSummary
+from office_365_mcp.shared.contacts import (
+    SUMMARY_FIELDS,
+    ContactEmailAddress,
+    ContactSummary,
+    PhoneNumber,
+    not_one_address,
+    repeated_entry,
+)
 from office_365_mcp.shared.handles import ContactHandle, contact_handle
 
 _CONTACT_ID = "AAMkAGI2SYNTHETIC-contact-0001="
+
+_SAME_FAILURE = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
 
 
 def _parsed(payload: dict[str, object]) -> Contact:
@@ -95,3 +107,55 @@ def test_an_address_with_no_name_keeps_the_address() -> None:
 def test_a_contact_with_no_id_is_a_broken_graph_answer() -> None:
     with pytest.raises(AssertionError, match="no id"):
         _ = ContactSummary.from_contact(_parsed({"displayName": "Alex Wilber"}))
+
+
+def test_the_refusal_names_the_entry_and_what_did_not_happen() -> None:
+    refusal = not_one_address("Alex Wilber", nothing_happened="No contact was created.")
+
+    assert "must be one SMTP address" in refusal
+    assert "'Alex Wilber'" in refusal
+    assert "No contact was created." in refusal
+
+
+def test_the_refusal_of_an_entry_ends_with_the_canonical_retry_sentence() -> None:
+    refusal = not_one_address("alexw@", nothing_happened="Nothing was changed.")
+
+    assert refusal.endswith(_SAME_FAILURE)
+
+
+def test_the_refusal_of_a_repeat_names_the_entry_and_the_case_rule() -> None:
+    refusal = repeated_entry("ALEXW@example.invalid", nothing_happened="Nothing was changed.")
+
+    assert "'ALEXW@example.invalid'" in refusal
+    assert "A change of case does not make a second address." in refusal
+    assert "Nothing was changed." in refusal
+
+
+def test_the_refusal_of_a_repeat_ends_with_the_canonical_retry_sentence() -> None:
+    refusal = repeated_entry("alexw@example.invalid", nothing_happened="No contact was created.")
+
+    assert refusal.endswith(_SAME_FAILURE)
+
+
+class TestThePhoneNumber:
+    def test_a_list_of_numbers_is_accepted(self) -> None:
+        assert TypeAdapter(list[PhoneNumber]).validate_python(["+1 425 555 0109"]) == [
+            "+1 425 555 0109"
+        ]
+
+    def test_a_number_with_spaces_around_a_visible_character_is_kept_as_given(self) -> None:
+        assert TypeAdapter(list[PhoneNumber]).validate_python([" +1 425 555 0109 "]) == [
+            " +1 425 555 0109 "
+        ]
+
+    @pytest.mark.parametrize("number", ["", "  ", "\t"], ids=["empty", "spaces", "tab"])
+    def test_a_number_with_no_visible_character_is_refused(self, number: str) -> None:
+        with pytest.raises(ValidationError):
+            _ = TypeAdapter(list[PhoneNumber]).validate_python([number])
+
+    def test_the_schema_inlines_a_minimum_length_of_one_and_a_visible_character(self) -> None:
+        schema = TypeAdapter(list[PhoneNumber]).json_schema()
+
+        assert schema["items"]["minLength"] == 1
+        assert schema["items"]["pattern"] == "\\S"
+        assert "$ref" not in json.dumps(schema)

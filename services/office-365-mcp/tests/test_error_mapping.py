@@ -77,6 +77,7 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "outlook_cancel_event",
         "outlook_copy_mail",
         "outlook_create_category",
+        "outlook_create_contact",
         "outlook_create_event",
         "outlook_create_event_on_behalf",
         "outlook_create_folder",

@@ -73,8 +73,10 @@ _ContactQuery = ContactItemRequestBuilder.ContactItemRequestBuilderGetQueryParam
 
 _DESCRIPTION = """\
 Reads one contact of the signed-in user in full, given the `uri` of an outlook_list_contacts \
-row. The answer holds every field of the row. It also holds the department, the postal \
-addresses, the birthday, the categories, and the notes about the person.
+row. If this deployment exposes outlook_create_contact or outlook_update_contact, you can also \
+use a `uri` that one of them returns. The answer holds every field of the row. It also holds \
+the department, the postal addresses, the birthday, the categories, and the notes about the \
+person.
 
 Notes:
 - A contact is a record in the mailbox of the user. It is not the directory entry of the \
@@ -319,7 +321,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The handle of one contact, word for word, from the `uri` of an "
-                    + "outlook_list_contacts row. The only readable shape is "
+                    + "outlook_list_contacts row. If this deployment exposes "
+                    + "outlook_create_contact or outlook_update_contact, you can also use a `uri` "
+                    + "that one of them returns. The only readable shape is "
                     + "outlook:///contacts/{contact_id}. A name, an email address, and an "
                     + "Outlook web link are not contact handles."
                 ),

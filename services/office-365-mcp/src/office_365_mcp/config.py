@@ -89,6 +89,7 @@ class ToolsPreset(StrEnum):
     OUTLOOK_CALENDAR_ROOMS = "outlook-calendar-rooms"
     OUTLOOK_GROUP_CALENDAR = "outlook-group-calendar"
     OUTLOOK_CONTACTS = "outlook-contacts"
+    OUTLOOK_CONTACTS_WRITE = "outlook-contacts-write"
     SHAREPOINT_SEARCH = "sharepoint-search"
     SHAREPOINT_READ = "sharepoint-read"
     ONENOTE_READ = "onenote-read"

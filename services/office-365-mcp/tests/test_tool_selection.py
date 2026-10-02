@@ -322,6 +322,9 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "outlook_unshare_calendar": {"share_ref": ("outlook_list_calendar_shares",)},
     "outlook_delete_calendar": {"calendar_ref": ("outlook_list_calendars",)},
     "outlook_read_contact": {"uri": ("outlook_list_contacts",)},
+    "outlook_update_contact": {
+        "uri": ("outlook_list_contacts", "outlook_read_contact", "outlook_create_contact")
+    },
     "sharepoint_read_file": {"file": ("sharepoint_search_files", "sharepoint_browse_folder")},
     "onenote_read_page": {"page": ("onenote_list_pages",)},
     "onenote_append_to_page": {"page": ("onenote_list_pages", "onenote_create_page")},
@@ -815,6 +818,12 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         3,
     ),
     (ToolsPreset.OUTLOOK_CONTACTS, ("User.Read", "Contacts.Read"), 0, 3),
+    (
+        ToolsPreset.OUTLOOK_CONTACTS_WRITE,
+        ("User.Read", "Contacts.Read", "Contacts.ReadWrite"),
+        0,
+        5,
+    ),
     (ToolsPreset.SHAREPOINT_SEARCH, ("User.Read", "Files.Read.All"), 1, 3),
     (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 4),
     (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read"), 0, 9),

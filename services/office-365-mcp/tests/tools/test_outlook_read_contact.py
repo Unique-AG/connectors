@@ -321,7 +321,18 @@ class TestHowItDeclaresItself:
         assert "given the `uri` of an outlook_list_contacts row" in description
         assert "It is not the directory entry of the person." in description
 
-    async def test_the_handle_argument_names_its_one_shape_and_its_minter(
+    async def test_the_description_names_the_writers_only_if_they_are_exposed(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert (
+            "If this deployment exposes outlook_create_contact or outlook_update_contact, you "
+            "can also use a `uri` that one of them returns."
+        ) in description
+
+    async def test_the_handle_argument_names_its_one_shape_and_its_minters(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
@@ -329,7 +340,11 @@ class TestHowItDeclaresItself:
         properties = cast("Mapping[str, Mapping[str, str]]", tool.parameters["properties"])
         described = properties["uri"]["description"]
         assert "outlook:///contacts/{contact_id}" in described
-        assert "outlook_list_contacts" in described
+        assert "from the `uri` of an outlook_list_contacts row" in described
+        assert (
+            "If this deployment exposes outlook_create_contact or outlook_update_contact, you "
+            "can also use a `uri` that one of them returns."
+        ) in described
 
     async def test_the_notes_are_untrusted_data(self, transport: httpx.AsyncClient) -> None:
         tool = await _registered(transport)
