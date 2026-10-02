@@ -54,8 +54,9 @@ _DRAFT_FIELDS: tuple[str, ...] = ("toRecipients", "ccRecipients", "subject", "is
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = (
-    "Sends a draft from outlook_draft_mail, outlook_draft_reply or outlook_draft_reply_all onto "
-    "the wire. This cannot be undone, and asks the person to approve before sending."
+    "Sends a draft from outlook_draft_mail, outlook_draft_reply, outlook_draft_reply_all or "
+    "outlook_update_draft onto the wire. This cannot be undone, and asks the person to approve "
+    "before sending."
 )
 
 _NOT_A_DRAFT_HANDLE = (
@@ -134,6 +135,10 @@ def a_person_agrees(ctx: Context) -> _Confirm:
         question = (
             f"Send the draft {draft.subject or '(no subject)'!r} to "
             f"{', '.join(everyone) or 'nobody'}{identity}? Sending cannot be undone."
+        )
+        assert draft.change_key is not None, (
+            "Graph answered the draft read with no changeKey, "
+            "so an accept cannot be bound to this version of the draft"
         )
         about = hashlib.sha256(json.dumps([question, draft.change_key]).encode()).hexdigest()
         return await confirm(question, about)

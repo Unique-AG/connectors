@@ -52,6 +52,13 @@ _CHANGE_KEY = "CQAAABYAAAC4SYNTHETIC-version-0001"
 
 _NOTHING_SENT = "Nothing was sent, and the draft is untouched and still in Drafts."
 
+_DRAFTING_TOOLS = (
+    "outlook_draft_mail",
+    "outlook_draft_reply",
+    "outlook_draft_reply_all",
+    "outlook_update_draft",
+)
+
 
 def _refusal_of(answer: Confirmed) -> str:
     assert isinstance(answer, str) and answer, f"the confirmation answered {answer!r}"
@@ -68,7 +75,7 @@ def _draft(
     cc: Sequence[Mapping[str, object]] = (),
     subject: str | None = _SUBJECT,
     is_draft: bool | None = True,
-    change_key: str = _CHANGE_KEY,
+    change_key: str | None = _CHANGE_KEY,
 ) -> dict[str, object]:
     return {
         "id": _DRAFT_ID,
@@ -78,6 +85,10 @@ def _draft(
         "toRecipients": [dict(one) for one in (to or [_recipient("Ada Lovelace", _ADA)])],
         "ccRecipients": [dict(one) for one in cc],
     }
+
+
+def _versioned() -> Message:
+    return Message(subject=_SUBJECT, change_key=_CHANGE_KEY)
 
 
 def _reads(graph: respx.MockRouter, payload: dict[str, object]) -> respx.Route:
@@ -186,12 +197,12 @@ class TestHowTheQuestionReachesAPerson:
     async def test_agreeing_answers_with_no_refusal(self) -> None:
         confirm = a_person_agrees(self._context(AcceptedElicitation(data=sender.SEND)))
 
-        assert await confirm(Message(subject="Invoice 4471"), None) is None
+        assert await confirm(_versioned(), None) is None
 
     async def test_declining_refuses_and_says_the_draft_survives(self) -> None:
         confirm = a_person_agrees(self._context(DeclinedElicitation()))
 
-        refusal = await confirm(Message(subject="Invoice 4471"), None)
+        refusal = await confirm(_versioned(), None)
 
         assert isinstance(refusal, str)
         assert refusal.startswith(_NOTHING_SENT), refusal
@@ -199,17 +210,17 @@ class TestHowTheQuestionReachesAPerson:
     async def test_cancelling_refuses_too(self) -> None:
         confirm = a_person_agrees(self._context(CancelledElicitation()))
 
-        assert "did not agree" in _refusal_of(await confirm(Message(subject="Invoice 4471"), None))
+        assert "did not agree" in _refusal_of(await confirm(_versioned(), None))
 
     async def test_answering_anything_but_send_refuses(self) -> None:
         confirm = a_person_agrees(self._context(AcceptedElicitation(data="do not send")))
 
-        assert "did not agree" in _refusal_of(await confirm(Message(subject="Invoice 4471"), None))
+        assert "did not agree" in _refusal_of(await confirm(_versioned(), None))
 
     async def test_a_client_that_cannot_ask_sends_nothing(self) -> None:
         confirm = a_person_agrees(self._context(MCPError(METHOD_NOT_FOUND, "Method not found")))
 
-        answer = _refusal_of(await confirm(Message(subject="Invoice 4471"), None))
+        answer = _refusal_of(await confirm(_versioned(), None))
 
         assert "does not support elicitation" in answer
         assert answer.startswith(_NOTHING_SENT), answer
@@ -228,7 +239,7 @@ class TestHowTheQuestionReachesAPerson:
     async def test_no_refusal_is_ever_raised(self, answer: object) -> None:
         confirm = a_person_agrees(self._context(answer))
 
-        refusal = await confirm(Message(subject="Invoice 4471"), None)
+        refusal = await confirm(_versioned(), None)
 
         assert isinstance(refusal, str) and refusal
 
@@ -245,7 +256,7 @@ class TestHowTheQuestionReachesAPerson:
 
         confirm = a_person_agrees(cast("Context", cast("object", _Client())))
 
-        _ = await confirm(Message(subject="Invoice 4471"), "alex@example.invalid")
+        _ = await confirm(_versioned(), "alex@example.invalid")
 
         assert len(asked) == 1
         assert "alex@example.invalid" in asked[0]
@@ -265,7 +276,7 @@ class TestHowTheQuestionReachesAPerson:
 
         confirm = a_person_agrees(cast("Context", cast("object", _Client())))
 
-        _ = await confirm(Message(subject="Invoice 4471"), None)
+        _ = await confirm(_versioned(), None)
 
         assert len(asked) == 1
         assert "@" not in asked[0]
@@ -511,6 +522,19 @@ class TestTheEraWithNoBackChannel:
 
         assert first_question == second_question
         assert first_state != second_state
+
+    async def test_a_draft_read_with_no_change_key_fails_the_call_and_sends_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _draft(change_key=None))
+        send = _sends(graph)
+
+        with pytest.raises(AssertionError, match="no changeKey"):
+            _ = await send_draft(
+                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+            )
+
+        assert send.call_count == 0, "an accept bound to the bare question reached the mailbox"
 
 
 class TestWhatItAsksGraphFor:
@@ -951,3 +975,13 @@ class TestHowItDeclaresItself:
         lowered = (tool.description or "").casefold()
         assert "approve" in lowered
         assert "outlook_draft_mail" in lowered
+
+    @pytest.mark.parametrize("name", _DRAFTING_TOOLS)
+    async def test_the_description_and_the_draft_ref_name_every_tool_that_hands_back_a_draft(
+        self, transport: httpx.AsyncClient, name: str
+    ) -> None:
+        parameters, tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, str]]", parameters["properties"])
+        assert name in (tool.description or "")
+        assert name in properties["draft_ref"]["description"]

@@ -303,6 +303,20 @@ class TestTheWholeConfirmationOverARealClient:
         assert "given for a different request" in refusal, refusal
         assert _posts(graph) == [], f"a draft edited after the question posted {_posts(graph)}"
 
+    async def test_a_draft_read_with_no_change_key_is_never_asked_about_or_sent(
+        self, an_agreeing_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        unversioned = {key: value for key, value in _DRAFT.items() if key != "changeKey"}
+        _ = graph.get(_DRAFT_PATH).mock(return_value=httpx.Response(200, json=unversioned))
+
+        result = await an_agreeing_client.session.call_tool(
+            sender.TOOL_NAME, dict(sender.GRAPH_CALL_EXAMPLE), allow_input_required=True
+        )
+
+        assert isinstance(result, CallToolResult), "a draft with no version was asked about"
+        assert result.is_error, "an accept that binds to the bare question was possible"
+        assert _posts(graph) == [], f"a draft with no version posted {_posts(graph)}"
+
     async def test_a_client_pinned_to_the_handshake_era_still_asks_and_sends(
         self, app: Starlette, graph: respx.MockRouter
     ) -> None:
