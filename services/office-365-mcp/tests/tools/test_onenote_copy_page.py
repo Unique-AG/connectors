@@ -34,8 +34,8 @@ from office_365_mcp.shared.handles import (
     OnenotePageHandle,
     OnenoteSectionHandle,
 )
-from office_365_mcp.shared.notes import OperationSummary, write_state_for
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
+from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary, write_state_for
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm
 from office_365_mcp.tools import onenote_copy_page as copier
 from office_365_mcp.tools.onenote_copy_page import a_person_agrees, copy_page
 
@@ -1253,6 +1253,42 @@ class TestNotebooksOfAMicrosoft365Group:
             _ = await _copy(client, page=_GROUP_PAGE_URI, to_section=_GROUP_SECTION_URI)
 
         assert copy.call_count == 1, "no_retry means one attempt, however Graph answers"
+
+    @pytest.mark.parametrize(
+        ("page", "to_section", "copy_path"),
+        [
+            (_GROUP_PAGE_URI, _SECTION_URI, _GROUP_COPY_PATH),
+            (_PAGE_URI, _GROUP_SECTION_URI, _COPY_PATH),
+        ],
+        ids=["group-page", "group-section"],
+    )
+    async def test_a_403_on_an_owned_copy_arrives_as_the_owned_advice_with_the_diagnostics(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        page: str,
+        to_section: str,
+        copy_path: str,
+    ) -> None:
+        _private(graph)
+        _ = _group_destination_reads(graph)
+        _ = _page_gets(graph, _page_payload())
+        copy = graph.post(copy_path).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _copy(client, page=page, to_section=to_section)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert copy.call_count == 1
 
 
 class TestHowItDeclaresItself:

@@ -38,6 +38,7 @@ from office_365_mcp.shared.handles import (
     onenote_section_handle,
 )
 from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
     NotebookAudience,
     OperationSummary,
     accepted_operation,
@@ -53,6 +54,7 @@ from office_365_mcp.shared.seam import (
     Confirm,
     answer_pending,
     graph_client_for_caller,
+    owner_refused,
     person_confirms,
 )
 
@@ -238,7 +240,8 @@ async def copy_section(
     fetched: FetchedResponse | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    owned = handle.owner is not None or destination.owner is not None
+    with owner_refused(owned, OWNED_REFUSED), graph_errors(TOOL_NAME):
         container = await container_audience(client, destination)
         audience = container.notebook
         if answer_pending or audience.reaches_others:

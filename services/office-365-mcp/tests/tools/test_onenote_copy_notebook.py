@@ -27,7 +27,7 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionHandle,
     onenote_notebook_handle,
 )
-from office_365_mcp.shared.notes import OperationSummary, write_state_for
+from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary, write_state_for
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm
 from office_365_mcp.tools import onenote_copy_notebook as copier
 from office_365_mcp.tools.onenote_copy_notebook import a_person_agrees, copy_notebook
@@ -395,6 +395,49 @@ class TestGraphFailures:
         assert "do not retry it" in message
         assert "(HTTP 403" in message
         assert isinstance(refused.value.__cause__, GraphForbidden)
+
+    async def test_a_403_for_a_group_source_without_to_group_arrives_as_the_owned_advice(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        copy = graph.post(f"{_SOURCE_GROUP_ROOT}/notebooks/{_NOTEBOOK_ID}/copyNotebook").mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _copy(client, notebook=_GROUP_NOTEBOOK_URI)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert copy.call_count == 1
+
+    async def test_a_403_for_a_group_source_with_to_group_is_advised_about_the_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph, path=f"{_SOURCE_GROUP_ROOT}/notebooks/{_NOTEBOOK_ID}")
+        copy = graph.post(f"{_SOURCE_GROUP_ROOT}/notebooks/{_NOTEBOOK_ID}/copyNotebook").mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _copy(
+                client, notebook=_GROUP_NOTEBOOK_URI, to_group=_GROUP_ID, confirm=_agrees
+            )
+
+        message = str(refused.value)
+        assert message.startswith(
+            "Microsoft 365 refused this request for the `to_group` that this call named."
+        )
+        assert OWNED_REFUSED not in message
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert copy.call_count == 1
 
 
 def _group_source_copies(graph: respx.MockRouter) -> respx.Route:

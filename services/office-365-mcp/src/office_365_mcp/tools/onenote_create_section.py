@@ -20,6 +20,7 @@ from office_365_mcp.shared.handles import (
     onenote_container_handle,
 )
 from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
     ContainerAudience,
     client_url_of,
     container_audience,
@@ -32,6 +33,7 @@ from office_365_mcp.shared.seam import (
     Confirm,
     answer_pending,
     graph_client_for_caller,
+    owner_refused,
     person_confirms,
 )
 
@@ -159,7 +161,8 @@ async def create_section(
     created: OnenoteSection | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    owned_notebook = isinstance(handle, OnenoteNotebookHandle) and handle.owner is not None
+    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors(TOOL_NAME):
         container = await container_audience(client, handle)
         if answer_pending or container.notebook.reaches_others:
             with not_graph():

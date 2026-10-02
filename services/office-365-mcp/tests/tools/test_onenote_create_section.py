@@ -22,8 +22,8 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
 )
-from office_365_mcp.shared.notes import write_state_for
-from office_365_mcp.shared.seam import Confirm
+from office_365_mcp.shared.notes import OWNED_REFUSED, write_state_for
+from office_365_mcp.shared.seam import Advised, Confirm
 from office_365_mcp.tools import onenote_create_section as creator
 from office_365_mcp.tools.onenote_create_section import a_person_agrees, create_section
 
@@ -391,6 +391,58 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await _create(client, parent=_NOTEBOOK)
+
+    @pytest.mark.parametrize(
+        ("parent", "path"),
+        [
+            (_TEAM_NOTEBOOK, _TEAM_NOTEBOOK_SECTIONS_PATH),
+            (_SITE_NOTEBOOK, _SITE_NOTEBOOK_SECTIONS_PATH),
+        ],
+        ids=["group", "site"],
+    )
+    @pytest.mark.usefixtures("team_notebook_audience", "site_notebook_audience")
+    async def test_a_403_under_an_owned_notebook_arrives_as_the_owned_advice_with_the_diagnostics(
+        self, client: GraphServiceClient, graph: respx.MockRouter, parent: str, path: str
+    ) -> None:
+        post = graph.post(path).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _create(client, parent=parent)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert post.call_count == 1
+
+    @pytest.mark.parametrize(
+        ("parent", "path"),
+        [
+            (_TEAM_GROUP, _TEAM_GROUP_SECTIONS_PATH),
+            (_SITE_GROUP, _SITE_GROUP_SECTIONS_PATH),
+        ],
+        ids=["group", "site"],
+    )
+    @pytest.mark.usefixtures("team_group_audience", "site_group_audience")
+    async def test_a_403_under_an_owned_section_group_stays_a_forbidden(
+        self, client: GraphServiceClient, graph: respx.MockRouter, parent: str, path: str
+    ) -> None:
+        post = graph.post(path).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await _create(client, parent=parent)
+
+        assert post.call_count == 1
 
     async def test_a_404_on_the_notebook_audience_read_is_a_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter, notebook_sections: respx.Route

@@ -24,6 +24,7 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.handles import OnenoteNotebookHandle, onenote_notebook_handle
 from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
     OperationSummary,
     accepted_operation,
     in_a_site,
@@ -153,7 +154,11 @@ async def copy_notebook(
     fetched: FetchedResponse | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with owner_refused(to_group is not None, _OWNER_REFUSED), graph_errors(TOOL_NAME):
+    with (
+        owner_refused(handle.owner is not None, OWNED_REFUSED),
+        owner_refused(to_group is not None, _OWNER_REFUSED),
+        graph_errors(TOOL_NAME),
+    ):
         if answer_pending or to_group is not None:
             source = await notebook_audience(client, handle.notebook_id, owner=handle.owner)
             with not_graph():

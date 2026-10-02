@@ -5,7 +5,8 @@ from typing import cast
 import httpx
 import pytest
 import respx
-from fastmcp import Context, FastMCP
+from fastmcp import Client, Context, FastMCP
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.elicitation import (
     AcceptedElicitation,
@@ -34,8 +35,9 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
 )
-from office_365_mcp.shared.notes import OperationSummary, write_state_for
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
+from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary, write_state_for
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm, GraphAdviceMiddleware
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import onenote_copy_section as copier
 from office_365_mcp.tools.onenote_copy_section import a_person_agrees, copy_section
 
@@ -1432,6 +1434,78 @@ class TestNotebooksOfAMicrosoft365Group:
             )
 
         assert copy.call_count == 1, "no_retry means one attempt, however Graph answers"
+
+    @pytest.mark.parametrize(
+        ("section", "to_notebook", "to_section_group", "copy_path"),
+        [
+            (
+                _OWNED_SECTION_URI,
+                _NOTEBOOK_URI,
+                None,
+                f"{_OWNER_ROOT}/sections/{_SECTION_ID}/copyToNotebook",
+            ),
+            (_SECTION_URI, _OWNED_NOTEBOOK_URI, None, _COPY_TO_NOTEBOOK_PATH),
+            (_SECTION_URI, None, _OWNED_GROUP_URI, _COPY_TO_GROUP_PATH),
+        ],
+        ids=["group-section", "group-notebook", "group-section-group"],
+    )
+    async def test_a_403_on_an_owned_copy_arrives_as_the_owned_advice_with_the_diagnostics(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        section: str,
+        to_notebook: str | None,
+        to_section_group: str | None,
+        copy_path: str,
+    ) -> None:
+        _private_notebook(graph)
+        _ = _owned_section_group_read(graph)
+        _ = _owned_notebook_read(graph)
+        _ = _section_name_route(graph)
+        copy = graph.post(copy_path).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _copy(
+                client, section=section, to_notebook=to_notebook, to_section_group=to_section_group
+            )
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert copy.call_count == 1
+
+    async def test_a_403_for_a_group_source_reaches_the_client_as_the_owned_advice(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _private_notebook(graph)
+        copy = graph.post(f"{_OWNER_ROOT}/sections/{_SECTION_ID}/copyToNotebook").mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+        advice = GraphAdviceMiddleware(
+            graph_advice(resolve(preset=None, enabled=[copier.TOOL_NAME]))
+        )
+        server: FastMCP[None] = FastMCP("copier", middleware=[advice])
+
+        @server.tool(name=copier.TOOL_NAME, annotations=WRITE_ADDITIVE)
+        async def copy_the_section() -> str:
+            return (await _copy(client, section=_OWNED_SECTION_URI)).uri
+
+        async with Client(FastMCPTransport(server)) as mcp_client:
+            with pytest.raises(ToolError) as raised:
+                _ = await mcp_client.call_tool(copier.TOOL_NAME, {})
+
+        assert str(raised.value).startswith(OWNED_REFUSED)
+        assert "grant the delegated" not in str(raised.value)
+        assert copy.call_count == 1
 
 
 class TestHowItDeclaresItself:
