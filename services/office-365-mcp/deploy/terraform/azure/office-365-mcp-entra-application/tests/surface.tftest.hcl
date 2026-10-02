@@ -41,6 +41,7 @@ mock_provider "azuread" {
         "Notes.Read"                       = "d1111111-1111-1111-1111-111111111111"
         "Notes.Create"                     = "d2222222-2222-2222-2222-222222222222"
         "Notes.ReadWrite"                  = "d3333333-3333-3333-3333-333333333333"
+        "Place.Read.All"                   = "f1111111-1111-1111-1111-111111111111"
       }
     }
   }
@@ -379,6 +380,27 @@ run "preset_outlook_calendar_delegate" {
   assert {
     condition     = length(local.admin_consent) == 0
     error_message = "every delegated Calendars permission is AdminConsentRequired: No, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_outlook_calendar_rooms" {
+  variables {
+    tools_preset = "outlook-calendar-rooms"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadBasic,Place.Read.All,Calendars.ReadWrite"
+    error_message = "outlook-calendar-rooms composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 18
+    error_message = "outlook-calendar-rooms resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Place.Read.All"]
+    error_message = "Microsoft marks the delegated Place.Read.All as AdminConsentRequired: Yes, and no Calendars permission needs an administrator; this composed ${join(",", local.admin_consent)}"
   }
 }
 

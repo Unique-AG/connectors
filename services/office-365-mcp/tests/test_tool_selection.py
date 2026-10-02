@@ -795,6 +795,19 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         18,
     ),
     (
+        ToolsPreset.OUTLOOK_CALENDAR_ROOMS,
+        (
+            "User.Read",
+            "Calendars.Read",
+            "Calendars.Read.Shared",
+            "Calendars.ReadBasic",
+            "Calendars.ReadWrite",
+            "Place.Read.All",
+        ),
+        1,
+        18,
+    ),
+    (
         ToolsPreset.OUTLOOK_GROUP_CALENDAR,
         ("User.Read", "Team.ReadBasic.All", "Calendars.Read"),
         0,

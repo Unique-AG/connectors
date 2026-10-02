@@ -774,6 +774,7 @@ GRAPH_STEPS = frozenset(
         "unshare_calendar",
         "get_schedule",
         "find_meeting_times",
+        "rooms",
         "notebook",
         "notebooks",
         "section",

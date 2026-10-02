@@ -371,6 +371,12 @@
           ]
         },
         {
+          "name": "outlook_find_rooms",
+          "permissions": [
+            "Place.Read.All"
+          ]
+        },
+        {
           "name": "outlook_create_event",
           "permissions": [
             "Calendars.ReadWrite"
@@ -629,6 +635,7 @@
         "outlook_list_group_events",
         "outlook_check_availability",
         "outlook_suggest_meeting_times",
+        "outlook_find_rooms",
         "outlook_create_event",
         "outlook_create_event_on_behalf",
         "outlook_update_event",
@@ -889,6 +896,25 @@
           "outlook_respond_to_invite",
           "outlook_create_event_on_behalf"
         ],
+        "outlook-calendar-rooms": [
+          "outlook_list_calendars",
+          "outlook_list_events",
+          "outlook_read_event",
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times",
+          "outlook_list_time_zones",
+          "outlook_list_event_instances",
+          "outlook_list_reminders",
+          "outlook_list_calendar_groups",
+          "outlook_list_calendar_shares",
+          "outlook_list_event_attachments",
+          "outlook_read_event_attachment",
+          "outlook_create_event",
+          "outlook_update_event",
+          "outlook_cancel_event",
+          "outlook_respond_to_invite",
+          "outlook_find_rooms"
+        ],
         "outlook-group-calendar": [
           "teams_list_my_teams",
           "outlook_list_group_events"
@@ -980,6 +1006,7 @@
         "Calendars.Read",
         "Calendars.Read.Shared",
         "Calendars.ReadBasic",
+        "Place.Read.All",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
         "Files.Read.All",
@@ -1016,7 +1043,8 @@
         "Files.Read.All": true,
         "Notes.Read": false,
         "Notes.Create": false,
-        "Notes.ReadWrite": false
+        "Notes.ReadWrite": false,
+        "Place.Read.All": true
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",
