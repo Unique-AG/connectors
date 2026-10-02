@@ -28,7 +28,7 @@ from office_365_mcp.shared.handles import (
     onenote_notebook_handle,
 )
 from office_365_mcp.shared.notes import OperationSummary, write_state_for
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm
 from office_365_mcp.tools import onenote_copy_notebook as copier
 from office_365_mcp.tools.onenote_copy_notebook import a_person_agrees, copy_notebook
 
@@ -242,6 +242,16 @@ class TestWhatItRefuses:
         with pytest.raises(ToolError, match="onenote_find_notebook_from_url"):
             _ = await _copy(client, notebook="My notebook")
 
+    async def test_the_refusal_names_the_group_and_site_shapes(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _copy(client, notebook="My notebook")
+
+        message = str(refused.value)
+        assert "onenote:///groups/{group}/" in message
+        assert "onenote:///sites/{site}/" in message
+
 
 class TestWhatItAnswers:
     async def test_the_answer_is_the_operation_graph_started_from_the_body(
@@ -317,7 +327,7 @@ class TestGraphFailures:
         with pytest.raises(GraphNotFound):
             _ = await _copy(client)
 
-    async def test_a_403_is_a_forbidden(
+    async def test_a_403_without_to_group_stays_a_forbidden(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = graph.post(_COPY_PATH).mock(
@@ -351,6 +361,34 @@ class TestGraphFailures:
         assert "onenote_list_notebooks" in copier.GRAPH_NOT_FOUND
         assert "onenote_find_notebook_from_url" in copier.GRAPH_NOT_FOUND
 
+    def test_not_found_advice_names_to_group_as_a_cause(self) -> None:
+        assert "`to_group`" in copier.GRAPH_NOT_FOUND
+        assert "teams_list_my_teams" in copier.GRAPH_NOT_FOUND
+        assert "the argument is not the problem" not in copier.GRAPH_NOT_FOUND
+
+    async def test_a_403_with_to_group_is_advised_about_the_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _notebook_route(graph)
+        _ = graph.post(_COPY_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "ErrorAccessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _copy(client, to_group=_GROUP_ID, confirm=_agrees)
+
+        message = str(refused.value)
+        assert message.startswith(
+            "Microsoft 365 refused this request for the `to_group` that this call named."
+        )
+        assert "not a member of that group" in message
+        assert "Notes.Create" in message
+        assert "do not retry it" in message
+        assert "(HTTP 403" in message
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+
 
 def _group_source_copies(graph: respx.MockRouter) -> respx.Route:
     location = f"https://graph.microsoft.com/v1.0{_SOURCE_GROUP_ROOT}/operations/{_OPERATION_ID}"
@@ -374,7 +412,9 @@ class TestCopyingIntoAMicrosoft365Group:
 
         _ = await _copy(client, to_group=_GROUP_ID, confirm=capturing)
 
-        assert asked == [f"Copy the notebook 'Work' into the Microsoft 365 group {_GROUP_ID!r}?"]
+        assert asked == [
+            f"Copy the notebook 'Work' into the Microsoft 365 group with the id {_GROUP_ID!r}?"
+        ]
         assert _sent(copy) == {"groupId": _GROUP_ID}
 
     async def test_to_group_and_a_new_name_reach_the_question_and_the_body(
@@ -479,6 +519,7 @@ class TestCopyingIntoAMicrosoft365Group:
         assert isinstance(request, ElicitRequest)
         assert isinstance(request.params, ElicitRequestFormParams)
         assert "Work" in request.params.message
+        assert f"the Microsoft 365 group with the id {_GROUP_ID!r}" in request.params.message
         assert copy.call_count == 0
 
     async def test_the_second_round_copies_under_the_id_it_was_agreed_to_by(
@@ -632,6 +673,18 @@ class TestHowItDeclaresItself:
         assert "a copy into the user's own onedrive starts without a question" in description
         assert "do not call this tool again first" in description
         assert "onenote_get_operation" in description
+        assert "the question names the group only by its id" in description
+
+    async def test_the_timed_out_note_lists_the_notebooks_of_the_target_group(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert (
+            "If this call named a `to_group`, pass that id to onenote_list_notebooks as `group`."
+            in description
+        )
 
     async def test_the_to_group_description_names_where_the_id_comes_from(
         self, transport: httpx.AsyncClient

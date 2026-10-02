@@ -36,6 +36,7 @@ from office_365_mcp.shared.seam import (
     Confirm,
     answer_pending,
     graph_client_for_caller,
+    owner_refused,
     person_confirms,
 )
 
@@ -61,9 +62,11 @@ _OWN_ONEDRIVE = "your own OneDrive"
 _NOT_A_NOTEBOOK_HANDLE = (
     "onenote_copy_notebook takes a notebook handle in `notebook`. It looks like "
     + "onenote:///notebooks/{id}, and it comes from the `uri` of a onenote_list_notebooks or "
-    + "onenote_find_notebook_from_url result. A section handle (onenote:///sections/{id}) and a "
-    + "section group handle (onenote:///sectiongroups/{id}) are neither one a notebook handle. "
-    + "Copy it word for word. This same value fails again, so do not retry it."
+    + "onenote_find_notebook_from_url result. A handle from a group or site notebook starts with "
+    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A section handle "
+    + "(onenote:///sections/{id}) and a section group handle (onenote:///sectiongroups/{id}) are "
+    + "neither one a notebook handle. Copy it word for word. This same value fails again, so do "
+    + "not retry it."
 )
 
 _NO_OPERATION_NAMED = (
@@ -80,11 +83,21 @@ _SITE_NOTEBOOK = (
 )
 
 GRAPH_NOT_FOUND = (
-    "Microsoft 365 could not start this copy. The handle is well formed, so the argument is not "
-    + "the problem: the notebook was most likely deleted, or the signed-in user's access to it "
-    + "was removed, since it was found. Find it again with onenote_list_notebooks or "
-    + "onenote_find_notebook_from_url, and take a fresh `uri` from that result. This same handle "
-    + "fails the same way every time, so do not retry it unchanged."
+    "Microsoft 365 did not start this copy. The `notebook` handle is well formed. Most likely, "
+    + "the notebook was deleted, or the signed-in user lost access to it. Find it again with "
+    + "onenote_list_notebooks or onenote_find_notebook_from_url, and take a fresh `uri` from that "
+    + "result. If this call named a `to_group`, the id can also name no group that the user can "
+    + "reach. Take that id from teams_list_my_teams, or ask the user for it. This same call fails "
+    + "again, so do not retry it unchanged."
+)
+
+_OWNER_REFUSED = (
+    "Microsoft 365 refused this request for the `to_group` that this call named. Most likely, the "
+    + "signed-in user is not a member of that group, or the id is wrong. Ask the user for the "
+    + "correct id, or ask them to get access. If this tool works without `to_group`, the "
+    + "permissions of this connector are not the problem. If it fails without it too, ask a "
+    + "Microsoft 365 administrator to grant the delegated permission Notes.Create. This same call "
+    + "fails again, so do not retry it."
 )
 
 _DESCRIPTION = """\
@@ -95,15 +108,19 @@ the answer is the operation that tracks it. Pass the answer's `uri` to onenote_g
 
 Notes:
 - This tool asks the user to agree before it writes into a Microsoft 365 group. A copy into the \
-user's own OneDrive starts without a question.
+user's own OneDrive starts without a question. The question names the group only by its id. \
+Before you call this tool, tell the user which group that id names.
 - If a call times out, do not call this tool again first: a second call starts a second copy. \
-Before you call again, make sure that onenote_list_notebooks does not show the copy.
+Before you call again, make sure that onenote_list_notebooks does not show the copy. If this call \
+named a `to_group`, pass that id to onenote_list_notebooks as `group`.
 """
 
 
 def _question(name: str | None, to_group: str | None, new_name: str | None) -> str:
     notebook = name or _UNNAMED_NOTEBOOK
-    where = _OWN_ONEDRIVE if to_group is None else f"the Microsoft 365 group {to_group!r}"
+    where = (
+        _OWN_ONEDRIVE if to_group is None else f"the Microsoft 365 group with the id {to_group!r}"
+    )
     renamed = f", renamed {new_name!r}" if new_name is not None else ""
     return f"Copy the notebook {notebook!r} into {where}{renamed}?"
 
@@ -131,7 +148,7 @@ async def copy_notebook(
     fetched: FetchedResponse | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with owner_refused(to_group is not None, _OWNER_REFUSED), graph_errors(TOOL_NAME):
         if answer_pending or to_group is not None:
             source = await notebook_audience(client, handle.notebook_id, owner=handle.owner)
             with not_graph():
