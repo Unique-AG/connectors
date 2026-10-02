@@ -19,10 +19,17 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName, merged_categories
 from office_365_mcp.shared.handles import MailDraftHandle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress, MailImportance, copied_and_marked
+from office_365_mcp.shared.mail import (
+    AddressFault,
+    MailAddress,
+    MailImportance,
+    copied_and_marked,
+    one_address_each,
+    repeated_address,
+)
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -82,6 +89,24 @@ def _bad_address(argument: str, value: str) -> str:
     )
 
 
+def _repeated(argument: str, address: str) -> str:
+    return (
+        f"outlook_draft_mail was given {address!r} twice in `{argument}`, and this tool lists "
+        + "each address once. A change of case does not make a second address. No draft was "
+        + "created. Remove the repeat and call again. If you call this tool again with the same "
+        + "arguments, the call will fail the same way."
+    )
+
+
+def _in_to_and_cc(address: str) -> str:
+    return (
+        f"outlook_draft_mail was given {address!r} in both `to` and `cc`. Each address belongs "
+        + "in one of the two lists. No draft was created. Decide which list the person belongs "
+        + "in, and call again with the address in that list only. If you call this tool again "
+        + "with the same arguments, the call will fail the same way."
+    )
+
+
 class MailDraft(BaseModel):
     uri: str = Field(
         description=(
@@ -135,8 +160,12 @@ async def draft_mail(
     mailbox: str | None = None,
 ) -> MailDraft | InputRequiredResult:
     assert len(to) >= 1, "the schema admits no empty To list"
-    primary = _one_address_each(to, argument="to")
-    copied = _one_address_each(cc, argument="cc")
+    primary = _addresses(to, argument="to")
+    copied = _addresses(cc, argument="cc")
+    in_both = repeated_address((*primary, *copied))
+    if in_both is not None:
+        raise ToolError(_in_to_and_cc(in_both))
+    named = merged_categories((), add=categories, remove=())
     reached = graph_mailbox(client, mailbox)
 
     if mailbox is not None:
@@ -147,7 +176,7 @@ async def draft_mail(
                 to=primary,
                 cc=copied,
                 importance=importance,
-                categories=categories,
+                categories=named,
             ),
             _about(
                 mailbox,
@@ -156,7 +185,7 @@ async def draft_mail(
                 to=primary,
                 cc=copied,
                 importance=importance,
-                categories=categories,
+                categories=named,
             ),
         )
         if isinstance(answer, InputRequiredResult):
@@ -173,7 +202,7 @@ async def draft_mail(
                     to_recipients=_recipients(primary),
                     cc_recipients=_recipients(copied),
                     importance=None if importance is None else Importance(importance),
-                    categories=list(categories) or None,
+                    categories=named or None,
                 ),
                 request_configuration=RequestConfiguration[QueryParameters](
                     options=no_retry(), headers=immutable_id_headers()
@@ -184,12 +213,15 @@ async def draft_mail(
     return _answer(draft)
 
 
-def _one_address_each(addresses: Sequence[str], *, argument: str) -> list[str]:
-    trimmed = [address.strip() for address in addresses]
-    for address in trimmed:
-        if ONE_ADDRESS.match(address) is None:
-            raise ToolError(_bad_address(argument, address))
-    return trimmed
+def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
+    checked = one_address_each(addresses)
+    if isinstance(checked, AddressFault):
+        raise ToolError(
+            _repeated(argument, checked.entry)
+            if checked.repeated
+            else _bad_address(argument, checked.entry)
+        )
+    return checked
 
 
 def _recipients(addresses: Sequence[str]) -> list[Recipient]:
@@ -260,7 +292,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The To recipients, one SMTP address per entry, from the user or "
-                    + "outlook_find_recipient."
+                    + "outlook_find_recipient. List each address once."
                 ),
             ),
         ],
@@ -286,7 +318,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str],
             Field(
                 default=[],
-                description="The Cc recipients, under the same rule as `to`.",
+                description=(
+                    "The Cc recipients, under the same rule as `to`. An address in `to` cannot "
+                    + "also be in `cc`."
+                ),
             ),
         ],
         categories: Annotated[

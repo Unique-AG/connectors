@@ -29,6 +29,7 @@ _WEB_LINK = "https://outlook.office365.invalid/owa/?ItemID=synthetic-draft"
 
 _ADA = "ada@example.invalid"
 _GRACE = "grace@example.invalid"
+_PAM = "pam@example.invalid"
 
 _SUBJECT = "Invoice 4471"
 _BODY = "Sending this over for review."
@@ -36,6 +37,10 @@ _BODY = "Sending this over for review."
 _SHARED_MAILBOX = "alex@example.invalid"
 
 _NOT_CREATED = "No draft was created."
+
+_RETRY_SENTENCE = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
 
 
 async def _agrees(question: str, about: str) -> Confirmed:
@@ -108,6 +113,12 @@ async def _draft(client: GraphServiceClient, **overrides: object) -> MailDraft:
     )
     assert isinstance(answer, MailDraft), "the confirmation asked instead of answering"
     return answer
+
+
+def _creates_in_shared(graph: respx.MockRouter) -> respx.Route:
+    return graph.post(f"/users/{_SHARED_MAILBOX}/messages").mock(
+        return_value=httpx.Response(201, json=_created())
+    )
 
 
 def _sent(route: respx.Route) -> dict[str, object]:
@@ -194,6 +205,15 @@ class TestWhatItSendsToGraph:
         sent = _sent(route)
         assert sent["importance"] == "high"
         assert sent["categories"] == ["Finance", "Q3"]
+
+    async def test_a_category_named_twice_in_other_case_is_sent_once_in_its_first_spelling(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates(graph, _created())
+
+        _ = await _draft(client, categories=["Red", "red", "Blue"])
+
+        assert _sent(route)["categories"] == ["Red", "Blue"]
 
     async def test_a_draft_with_no_importance_and_no_category_sends_neither(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -299,16 +319,65 @@ class TestTheAddressesItRefuses:
         with pytest.raises(AssertionError):
             _ = await _draft(client, to=[])
 
+    @pytest.mark.parametrize(
+        ("argument", "entries", "reported"),
+        [
+            ("to", [_ADA, _GRACE, f" {_ADA.upper()} "], _ADA.upper()),
+            ("cc", [_GRACE, _PAM, f" {_GRACE.upper()} "], _GRACE.upper()),
+        ],
+    )
+    async def test_an_address_repeated_in_one_list_is_refused_whatever_its_case(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        argument: str,
+        entries: list[str],
+        reported: str,
+    ) -> None:
+        route = _creates_in_shared(graph)
+
+        with pytest.raises(ToolError) as raised:
+            _ = await _draft(client, mailbox=_SHARED_MAILBOX, **{argument: entries})
+
+        assert str(raised.value) == (
+            f"outlook_draft_mail was given {reported!r} twice in `{argument}`, and this tool "
+            + "lists each address once. A change of case does not make a second address. No "
+            + "draft was created. Remove the repeat and call again. "
+            + _RETRY_SENTENCE
+        )
+        assert route.call_count == 0
+        assert len(graph.calls) == 0
+
+    async def test_an_address_in_both_to_and_cc_is_refused_whatever_its_case(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates_in_shared(graph)
+
+        with pytest.raises(ToolError) as raised:
+            _ = await _draft(
+                client, to=[_ADA, _GRACE], cc=[_PAM, _GRACE.upper()], mailbox=_SHARED_MAILBOX
+            )
+
+        assert str(raised.value) == (
+            f"outlook_draft_mail was given {_GRACE.upper()!r} in both `to` and `cc`. Each "
+            + "address belongs in one of the two lists. No draft was created. Decide which list "
+            + "the person belongs in, and call again with the address in that list only. "
+            + _RETRY_SENTENCE
+        )
+        assert route.call_count == 0
+        assert len(graph.calls) == 0
+
     async def test_eleven_recipients_on_each_line_all_reach_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         route = _creates(graph, _created())
         many = [f"person{number}@example.invalid" for number in range(11)]
+        copies = [f"copy{number}@example.invalid" for number in range(11)]
 
-        _ = await _draft(client, to=many, cc=many)
+        _ = await _draft(client, to=many, cc=copies)
 
         assert _addressed(_sent(route), "toRecipients") == many
-        assert _addressed(_sent(route), "ccRecipients") == many
+        assert _addressed(_sent(route), "ccRecipients") == copies
 
 
 class TestTheSchemaItPublishes:
@@ -409,6 +478,17 @@ class TestTheSchemaItPublishes:
         cc = cast("Mapping[str, object]", properties["cc"])
         assert cc["default"] == []
         assert "maxItems" not in cc
+
+    async def test_the_recipient_arguments_say_each_address_belongs_in_one_place_once(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        assert "List each address once." in cast("str", properties["to"]["description"])
+        assert "An address in `to` cannot also be in `cc`." in cast(
+            "str", properties["cc"]["description"]
+        )
 
     async def test_two_calls_do_not_share_one_cc_list(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -642,6 +722,28 @@ class TestThePersonBeforeTheDraftIsCreated:
         assert "It is tagged Finance, Q3." in question
         sentences = re.split(r"(?<=[.?])\s+", question)
         assert max(len(sentence.split()) for sentence in sentences) <= 20, sentences
+
+    async def test_a_category_named_twice_in_other_case_is_asked_about_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _creates_in_shared(graph)
+        asked: list[str] = []
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            bound.append(about)
+            return None
+
+        _ = await _draft(
+            client, categories=["Red", "red"], mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+        _ = await _draft(client, categories=["Red"], mailbox=_SHARED_MAILBOX, confirm=capturing)
+
+        assert "It is tagged Red." in asked[0]
+        assert asked[0] == asked[1]
+        assert bound[0] == bound[1]
+        assert _sent(route)["categories"] == ["Red"]
 
     async def test_the_question_says_nothing_of_an_importance_or_a_category_not_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
