@@ -160,9 +160,9 @@ class CalendarEvent(EventSummary):
     )
     has_attachments: bool | None = Field(
         description=(
-            "This says whether the event carries at least one attachment. This connector reads "
-            + "no attachment, and no tool here does. A file can exist, and its contents are out "
-            + "of reach. This field is null when Graph did not say."
+            "This says whether the event carries at least one attachment. If this deployment "
+            + "exposes outlook_list_event_attachments, pass the `uri` of this event to that "
+            + "tool to list the attachments. This field is null when Graph did not say."
         )
     )
     response_requested: bool | None = Field(

@@ -1,3 +1,4 @@
+import re
 from collections.abc import Mapping, Sequence
 from typing import cast
 
@@ -466,6 +467,23 @@ class TestWhatItAnswers:
 
         assert "outlook_respond_to_invite can propose a new time" in described
         assert "proposes no time" not in described
+        assert 15 <= len(described.split()) <= 60
+
+    def test_the_attachment_field_names_the_tool_that_lists_them_only_as_optional(self) -> None:
+        described = reader.CalendarEvent.model_fields["has_attachments"].description or ""
+
+        assert "reads no attachment" not in described
+        assert "out of reach" not in described
+        sentences = re.split(r"(?<=[.!?])\s+", described)
+        naming = [
+            sentence for sentence in sentences if "outlook_list_event_attachments" in sentence
+        ]
+        assert naming, "the description no longer says how to list the attachments"
+        for sentence in naming:
+            assert sentence.startswith(
+                "If this deployment exposes outlook_list_event_attachments, "
+            )
+        assert "`uri` of this event" in described
         assert 15 <= len(described.split()) <= 60
 
     async def test_an_attachment_is_a_boolean_and_nothing_else(
