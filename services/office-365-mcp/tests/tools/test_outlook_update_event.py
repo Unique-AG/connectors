@@ -7,7 +7,7 @@ import httpx
 import pytest
 import respx
 from fastmcp import Context, FastMCP
-from fastmcp.exceptions import ToolError
+from fastmcp.exceptions import ToolError, ValidationError
 from fastmcp.tools import Tool
 from mcp.types import ElicitRequest, ElicitRequestFormParams, ElicitResult, InputRequiredResult
 from mcp.types.version import LATEST_MODERN_VERSION
@@ -405,6 +405,18 @@ class TestThePersonBetweenTheRequestAndTheChange:
         _ = await _update(client, subject="Renamed", confirm=counting)
 
         assert asked == [], "a subject-only change on a private event interrupted the user"
+        assert patch.call_count == 1
+
+    async def test_empty_attendee_lists_on_an_event_with_nobody_on_it_are_never_put_to_a_person(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[]))
+        patch = _updates(graph)
+        asked = _Asked()
+
+        _ = await _update(client, attendees=[], optional_attendees=[], confirm=asked)
+
+        assert asked.questions == [], "a private event with no attendee interrupted the user"
         assert patch.call_count == 1
 
     async def test_a_change_on_an_event_that_already_has_attendees_is_put_to_a_person(
@@ -1322,6 +1334,10 @@ class TestHowItDeclaresItself:
         description = " ".join(((await _tool(transport)).description or "").split())
 
         assert "This tool changes nothing unless the user agrees." in description
+        assert (
+            "This tool changes an event without that agreement only when the event has no "
+            + "attendee, gets no attendee, and gets no new location."
+        ) in description
         assert "If a call times out, do not call this tool again first." in description
 
     async def test_the_description_says_how_much_of_a_series_a_uri_reaches(
@@ -1400,6 +1416,26 @@ class TestHowItDeclaresItself:
         described = str(_object(_object(parameters["properties"])["add_categories"])["description"])
         assert LIST_CATEGORIES_GUARD in described
         assert "outlook_list_categories" not in described.replace(LIST_CATEGORIES_GUARD, "")
+
+    @pytest.mark.parametrize("argument", ["add_categories", "remove_categories"])
+    async def test_a_category_name_cannot_be_empty(
+        self, transport: httpx.AsyncClient, argument: str
+    ) -> None:
+        parameters = await _parameters(transport)
+
+        names = _object(_object(_object(parameters["properties"])[argument])["items"])
+        assert names["minLength"] == 1
+
+    @pytest.mark.parametrize("argument", ["add_categories", "remove_categories"])
+    async def test_a_blank_category_name_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter, argument: str
+    ) -> None:
+        tool = await _tool(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run({"uri": _URI, argument: [""]})
+
+        assert len(graph.calls) == 0, "a blank category name reached Graph"
 
 
 class TestTheNothingToChangeRefusal:

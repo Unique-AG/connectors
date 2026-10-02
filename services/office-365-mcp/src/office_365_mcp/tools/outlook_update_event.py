@@ -51,7 +51,12 @@ from office_365_mcp.shared.calendar import (
     wall_clock,
     zone_named,
 )
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, merged_categories
+from office_365_mcp.shared.categories import (
+    LIST_CATEGORIES_GUARD,
+    CategoryName,
+    merged_categories,
+    named_in_both,
+)
 from office_365_mcp.shared.handles import event_handle
 from office_365_mcp.shared.mail import AddressFault, one_address_each, repeated_address
 from office_365_mcp.shared.seam import (
@@ -94,8 +99,7 @@ _DESCRIPTION = """\
 Changes one existing event that the signed-in user organizes. This tool can change the subject, \
 the time, the location, the body, and the attendee lists. It can also change the free-busy \
 status, the categories, the importance, the sensitivity, and the reminder, or add a Teams \
-meeting. Other arguments set whether the attendees see the attendee list, send a response, or \
-propose a new time. A change that reaches an attendee can mail the attendee a notice. \
+meeting. A change that reaches an attendee can mail the attendee a notice. \
 outlook_cancel_event cancels an event that the user organizes.
 
 Notes:
@@ -103,12 +107,13 @@ Notes:
 value. `attendees` and `optional_attendees` replace the whole attendee list. `add_categories` \
 and `remove_categories` change only the names that they give.
 - This tool asks the user to agree before it changes an event that has or gets an attendee, or \
-that gets a new location. This tool changes nothing unless the user agrees.
+that gets a new location. This tool changes nothing unless the user agrees. This tool changes \
+an event without that agreement only when the event has no attendee, gets no attendee, and \
+gets no new location.
 - The `uri` of a series master changes every occurrence. The `uri` of one occurrence changes only \
 that date.
-- If a call times out, do not call this tool again first. A notice can already be out to the \
-attendees. Before you call again, make sure that outlook_read_event does not already show the \
-change.
+- If a call times out, do not call this tool again first. A notice can already be out. Before \
+you call again, make sure that outlook_read_event does not already show the change.
 """
 
 _NOT_A_HANDLE = (
@@ -427,8 +432,7 @@ def _attendees_given_together(
 
 
 def _categories_given_apart(add: Sequence[str], remove: Sequence[str]) -> None:
-    removed = {name.casefold() for name in remove}
-    both = next((name for name in add if name.casefold() in removed), None)
+    both = named_in_both(add, remove)
     if both is not None:
         raise ToolError(_in_both_lists(both))
 
@@ -633,7 +637,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         add_categories: Annotated[
-            list[str],
+            list[CategoryName],
             Field(
                 default=[],
                 description=(
@@ -645,7 +649,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         remove_categories: Annotated[
-            list[str],
+            list[CategoryName],
             Field(
                 default=[],
                 description=(
