@@ -11,10 +11,6 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.identity import Identity
-from msgraph.generated.models.identity_set import IdentitySet
-from msgraph.generated.models.meeting_participant_info import MeetingParticipantInfo
-from msgraph.generated.models.meeting_participants import MeetingParticipants
 from msgraph.generated.models.online_meeting import OnlineMeeting
 from msgraph.generated.users.item.online_meetings.create_or_get import (
     create_or_get_post_request_body,
@@ -26,6 +22,7 @@ from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
 from office_365_mcp.shared.calendar import counted_people
 from office_365_mcp.shared.handles import meeting_uri_for
 from office_365_mcp.shared.identity import ENTRA_OBJECT_ID_PATTERN
+from office_365_mcp.shared.meetings import attendee_ids, meeting_participants, meeting_times
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_IDEMPOTENT,
@@ -55,6 +52,7 @@ _NOTHING_CREATED = "No meeting was created."
 _FAILS_THE_SAME_WAY = (
     "If you call this tool again with the same arguments, the call will fail the same way."
 )
+_REFUSED = f"{_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
 
 _DESCRIPTION = """\
 Creates one Teams online meeting as the signed-in user, with the attendees that the user names. \
@@ -70,32 +68,6 @@ with `online_meeting`.
 - This call is safe to repeat after a timeout. The same request returns the same meeting, and it \
 creates no second meeting.
 """
-
-
-def _no_offset(argument: str, value: str) -> str:
-    return (
-        f"teams_create_meeting received {value!r} in `{argument}`. This time has no offset, so it "
-        + "does not name one instant. Add the offset of the zone of the user, for example "
-        + "`2026-03-02T14:00:00+01:00`, or add `Z` for UTC. If the zone is not clear, ask the "
-        + f"user. {_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
-    )
-
-
-def _not_a_time(argument: str, value: str) -> str:
-    return (
-        f"teams_create_meeting received {value!r} in `{argument}`. This value is not an ISO-8601 "
-        + "date and time. Write the date, the time, and an offset, for example "
-        + "`2026-03-02T14:00:00+01:00`. Calculate the date and the time from what the user said. "
-        + "If the day or the hour is ambiguous, ask the user. "
-        + f"{_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
-    )
-
-
-_ENDS_BEFORE_IT_STARTS = (
-    "teams_create_meeting received an `ends_at` that is not after `starts_at`. A meeting must "
-    + "end after it starts. A meeting that runs past midnight ends on the next day. Make sure "
-    + f"that the date of `ends_at` is correct. {_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
-)
 
 
 class CreatedMeeting(BaseModel):
@@ -181,26 +153,16 @@ async def create_meeting(
 
 
 def _drafted(subject: str, starts_at: str, ends_at: str, attendees: Sequence[str]) -> _Draft:
-    opens = _instant("starts_at", starts_at)
-    closes = _instant("ends_at", ends_at)
-    if closes <= opens:
-        raise ToolError(_ENDS_BEFORE_IT_STARTS)
+    times = meeting_times(TOOL_NAME, starts_at, ends_at, tail=_REFUSED)
+    if isinstance(times, str):
+        raise ToolError(times)
+    opens, closes = times
     return _Draft(
         subject=subject,
         starts_at=opens,
         ends_at=closes,
         attendees=tuple(sorted({attendee.lower() for attendee in attendees})),
     )
-
-
-def _instant(argument: str, value: str) -> datetime:
-    try:
-        moment = datetime.fromisoformat(value)
-    except ValueError:
-        raise ToolError(_not_a_time(argument, value)) from None
-    if moment.utcoffset() is None:
-        raise ToolError(_no_offset(argument, value))
-    return moment
 
 
 def _external_id(draft: _Draft) -> str:
@@ -236,32 +198,19 @@ def _body(
         subject=draft.subject,
         start_date_time=draft.starts_at.astimezone(UTC),
         end_date_time=draft.ends_at.astimezone(UTC),
-        participants=MeetingParticipants(
-            attendees=[
-                MeetingParticipantInfo(identity=IdentitySet(user=Identity(id=attendee)))
-                for attendee in draft.attendees
-            ]
-        ),
+        participants=meeting_participants(draft.attendees),
     )
 
 
 def _answer(created: OnlineMeeting | None) -> CreatedMeeting:
     assert created is not None, "Graph answered createOrGet with no meeting"
-    participants = created.participants
-    attendees = [] if participants is None else participants.attendees or []
     return CreatedMeeting(
         meeting_uri=meeting_uri_for(created.join_web_url),
         join_web_url=created.join_web_url,
         subject=created.subject,
         start=created.start_date_time,
         end=created.end_date_time,
-        attendee_ids=[
-            attendee.identity.user.id
-            for attendee in attendees
-            if attendee.identity is not None
-            and attendee.identity.user is not None
-            and attendee.identity.user.id is not None
-        ],
+        attendee_ids=attendee_ids(created.participants) or [],
     )
 
 

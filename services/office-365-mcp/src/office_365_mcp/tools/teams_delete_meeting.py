@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Annotated
@@ -16,8 +14,14 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.handles import MeetingHandle, meeting_handle
-from office_365_mcp.shared.meetings import organized_by, resolve_meeting
+from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.handles import meeting_handle
+from office_365_mcp.shared.meetings import (
+    not_a_meeting_handle,
+    not_the_organizer,
+    organized_by,
+    resolve_meeting,
+)
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
@@ -45,6 +49,7 @@ _NOTHING_DELETED = "No meeting was deleted."
 _FAILS_THE_SAME_WAY = (
     "If you call this tool again with the same arguments, the call will fail the same way."
 )
+_REFUSED = f"{_NOTHING_DELETED} {_FAILS_THE_SAME_WAY}"
 
 _DESCRIPTION = """\
 Deletes one Teams online meeting that the signed-in user organizes. This tool sends its change \
@@ -58,13 +63,7 @@ nothing unless the user agrees.
 teams_read_meeting does not already show the change.
 """
 
-_NOT_A_MEETING_HANDLE = (
-    "teams_delete_meeting takes the `meeting_uri` handle from teams_list_chats, and this value is "
-    + "not one. A meeting handle has exactly one shape:\n"
-    + "  teams:///meetings/{join_web_url}\n"
-    + "with the join URL percent-encoded. Copy the `meeting_uri` of a tool result word for word. "
-    + f"{_NOTHING_DELETED} {_FAILS_THE_SAME_WAY}"
-)
+_NOT_A_MEETING_HANDLE = not_a_meeting_handle(TOOL_NAME, tail=_REFUSED)
 
 _NO_SUCH_MEETING = (
     "Microsoft 365 has no meeting with this handle that the signed-in user can see. "
@@ -73,11 +72,7 @@ _NO_SUCH_MEETING = (
     + f"Call teams_list_chats and use the `meeting_uri` that it reports. {_FAILS_THE_SAME_WAY}"
 )
 
-_NOT_THE_ORGANIZER = (
-    "Microsoft 365 does not name the signed-in user as the organizer of this meeting. This tool "
-    + f"deletes only a meeting that the signed-in user organizes. {_NOTHING_DELETED} "
-    + _FAILS_THE_SAME_WAY
-)
+_NOT_THE_ORGANIZER = not_the_organizer("deletes", tail=_REFUSED)
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not find this meeting when this tool sent the delete. "
@@ -125,7 +120,7 @@ async def delete_meeting(
             refused = _NOT_THE_ORGANIZER
         else:
             with not_graph():
-                answer = await confirm(_question(found), _about(handle))
+                answer = await confirm(_question(found), confirmation_id_for(handle.uri))
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
             if refused is None and asked is None:
@@ -144,10 +139,6 @@ async def delete_meeting(
     return DeletedMeeting(
         meeting_uri=handle.uri, subject=found.subject, start=found.start_date_time
     )
-
-
-def _about(handle: MeetingHandle) -> str:
-    return hashlib.sha256(json.dumps([handle.uri]).encode()).hexdigest()
 
 
 def _question(meeting: OnlineMeeting) -> str:

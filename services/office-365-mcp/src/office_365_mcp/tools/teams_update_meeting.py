@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -11,19 +9,23 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.identity import Identity
-from msgraph.generated.models.identity_set import IdentitySet
-from msgraph.generated.models.meeting_participant_info import MeetingParticipantInfo
-from msgraph.generated.models.meeting_participants import MeetingParticipants
 from msgraph.generated.models.online_meeting import OnlineMeeting
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.calendar import counted_people
+from office_365_mcp.shared.calendar import confirmation_id_for, counted_people
 from office_365_mcp.shared.handles import MeetingHandle, meeting_handle
-from office_365_mcp.shared.meetings import organized_by, resolve_meeting
+from office_365_mcp.shared.meetings import (
+    attendee_ids,
+    meeting_participants,
+    meeting_times,
+    not_a_meeting_handle,
+    not_the_organizer,
+    organized_by,
+    resolve_meeting,
+)
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
@@ -50,6 +52,7 @@ _NOTHING_CHANGED = "No meeting was changed."
 _FAILS_THE_SAME_WAY = (
     "If you call this tool again with the same arguments, the call will fail the same way."
 )
+_REFUSED = f"{_NOTHING_CHANGED} {_FAILS_THE_SAME_WAY}"
 
 _DESCRIPTION = """\
 Changes the subject, the time, or the attendee list of one Teams online meeting that the \
@@ -66,13 +69,7 @@ hold everyone who stays.
 meeting in the same state.
 """
 
-_NOT_A_MEETING_HANDLE = (
-    "teams_update_meeting takes the `meeting_uri` handle from teams_list_chats, and this value is "
-    + "not one. A meeting handle has exactly one shape:\n"
-    + "  teams:///meetings/{join_web_url}\n"
-    + "with the join URL percent-encoded. Copy the `meeting_uri` of a tool result word for word. "
-    + f"{_NOTHING_CHANGED} {_FAILS_THE_SAME_WAY}"
-)
+_NOT_A_MEETING_HANDLE = not_a_meeting_handle(TOOL_NAME, tail=_REFUSED)
 
 _NO_SUCH_MEETING = (
     "Microsoft 365 has no meeting with this handle that the signed-in user can see. "
@@ -80,11 +77,7 @@ _NO_SUCH_MEETING = (
     + f"`meeting_uri` that it reports. {_FAILS_THE_SAME_WAY}"
 )
 
-_NOT_THE_ORGANIZER = (
-    "Microsoft 365 does not name the signed-in user as the organizer of this meeting. This tool "
-    + f"changes only a meeting that the signed-in user organizes. {_NOTHING_CHANGED} "
-    + _FAILS_THE_SAME_WAY
-)
+_NOT_THE_ORGANIZER = not_the_organizer("changes", tail=_REFUSED)
 
 _NOTHING_TO_CHANGE = (
     "teams_update_meeting received no change. The call left out `subject`, `starts_at` with "
@@ -98,12 +91,6 @@ _ONE_TIME_ONLY = (
     + "omit both to keep the current time."
 )
 
-_ENDS_BEFORE_IT_STARTS = (
-    "teams_update_meeting received an `ends_at` that is not after `starts_at`. A meeting must "
-    + "end after it starts. A meeting that runs past midnight ends on the next day. Make sure "
-    + f"that the date of `ends_at` is correct. {_NOTHING_CHANGED} {_FAILS_THE_SAME_WAY}"
-)
-
 _LEFT_OUT = "A person who is not in the new list is no longer an attendee."
 
 GRAPH_NOT_FOUND = (
@@ -111,24 +98,6 @@ GRAPH_NOT_FOUND = (
     + f"{_NOTHING_CHANGED} The meeting was there a moment before, so a person or another call "
     + "probably deleted it. Call teams_read_meeting to see if the meeting is still there."
 )
-
-
-def _no_offset(argument: str, value: str) -> str:
-    return (
-        f"teams_update_meeting received {value!r} in `{argument}`. This time has no offset, so it "
-        + "does not name one instant. Add the offset of the zone of the user, for example "
-        + "`2026-03-02T14:00:00+01:00`, or add `Z` for UTC. If the zone is not clear, ask the "
-        + f"user. {_NOTHING_CHANGED} {_FAILS_THE_SAME_WAY}"
-    )
-
-
-def _not_a_time(argument: str, value: str) -> str:
-    return (
-        f"teams_update_meeting received {value!r} in `{argument}`. This value is not an ISO-8601 "
-        + "date and time. Write the date, the time, and an offset, for example "
-        + "`2026-03-02T14:00:00+01:00`. If the day or the hour is ambiguous, ask the user. "
-        + f"{_NOTHING_CHANGED} {_FAILS_THE_SAME_WAY}"
-    )
 
 
 class UpdatedMeeting(BaseModel):
@@ -232,10 +201,14 @@ def _change(
         raise ToolError(_NOTHING_TO_CHANGE)
     if (starts_at is None) != (ends_at is None):
         raise ToolError(_ONE_TIME_ONLY)
-    opens = None if starts_at is None else _instant("starts_at", starts_at)
-    closes = None if ends_at is None else _instant("ends_at", ends_at)
-    if opens is not None and closes is not None and closes <= opens:
-        raise ToolError(_ENDS_BEFORE_IT_STARTS)
+    times = (
+        None
+        if starts_at is None or ends_at is None
+        else meeting_times(TOOL_NAME, starts_at, ends_at, tail=_REFUSED)
+    )
+    if isinstance(times, str):
+        raise ToolError(times)
+    opens, closes = (None, None) if times is None else times
     return _Change(
         subject=subject,
         starts_at=opens,
@@ -246,16 +219,6 @@ def _change(
     )
 
 
-def _instant(argument: str, value: str) -> datetime:
-    try:
-        moment = datetime.fromisoformat(value)
-    except ValueError:
-        raise ToolError(_not_a_time(argument, value)) from None
-    if moment.utcoffset() is None:
-        raise ToolError(_no_offset(argument, value))
-    return moment
-
-
 def _utc(moment: datetime | None) -> datetime | None:
     return None if moment is None else moment.astimezone(UTC)
 
@@ -263,17 +226,13 @@ def _utc(moment: datetime | None) -> datetime | None:
 def _about(handle: MeetingHandle, change: _Change) -> str:
     starts_at = _utc(change.starts_at)
     ends_at = _utc(change.ends_at)
-    return hashlib.sha256(
-        json.dumps(
-            [
-                handle.uri,
-                change.subject,
-                None if starts_at is None else starts_at.isoformat(),
-                None if ends_at is None else ends_at.isoformat(),
-                None if change.attendees is None else list(change.attendees),
-            ]
-        ).encode()
-    ).hexdigest()
+    return confirmation_id_for(
+        handle.uri,
+        repr(change.subject),
+        repr(None if starts_at is None else starts_at.isoformat()),
+        repr(None if ends_at is None else ends_at.isoformat()),
+        repr(None if change.attendees is None else list(change.attendees)),
+    )
 
 
 def _question(meeting: OnlineMeeting, change: _Change) -> str:
@@ -301,34 +260,17 @@ def _body(change: _Change) -> OnlineMeeting:
         subject=change.subject,
         start_date_time=_utc(change.starts_at),
         end_date_time=_utc(change.ends_at),
-        participants=None
-        if change.attendees is None
-        else MeetingParticipants(
-            attendees=[
-                MeetingParticipantInfo(identity=IdentitySet(user=Identity(id=attendee)))
-                for attendee in change.attendees
-            ]
-        ),
+        participants=None if change.attendees is None else meeting_participants(change.attendees),
     )
 
 
 def _answer(handle: MeetingHandle, updated: OnlineMeeting) -> UpdatedMeeting:
-    participants = updated.participants
-    attendees = None if participants is None else participants.attendees
     return UpdatedMeeting(
         meeting_uri=handle.uri,
         subject=updated.subject,
         start=updated.start_date_time,
         end=updated.end_date_time,
-        attendee_ids=None
-        if attendees is None
-        else [
-            attendee.identity.user.id
-            for attendee in attendees
-            if attendee.identity is not None
-            and attendee.identity.user is not None
-            and attendee.identity.user.id is not None
-        ],
+        attendee_ids=attendee_ids(updated.participants),
     )
 
 
@@ -393,11 +335,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[Annotated[str, Field(pattern=identity.ENTRA_OBJECT_ID_PATTERN)]] | None,
             Field(
                 description=(
-                    "The full new attendee list, as the Microsoft Entra object id of each person. "
-                    + "This list replaces the current attendee list. Copy each id from the "
-                    + "`user_id` of get_me, of a teams_list_chats member, or of a "
-                    + "teams_list_chat_members row. Never build an id from a name or an email "
-                    + "address. Omit it to keep the current attendees."
+                    "The full new attendee list, one Microsoft Entra object id for each person. It "
+                    + "replaces the current list. Copy each id from the `user_id` of get_me, of a "
+                    + "teams_list_chats member, or of a teams_list_chat_members row. Never build "
+                    + "an id from a name or an email address. An empty list removes every "
+                    + "attendee. Omit it to keep the current attendees."
                 ),
             ),
         ] = None,

@@ -5,7 +5,7 @@ rest on this, so it
 is tested here once rather than once per lister. Every payload is synthesised.
 """
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import httpx
 import pytest
@@ -166,3 +166,119 @@ class TestWhoOrganizesTheMeeting:
 
     def test_a_user_with_no_id_organizes_nothing(self) -> None:
         assert not meetings.organized_by(_organized_by(_ORGANIZER_ID), User())
+
+
+_TOOL = "teams_example_meeting_tool"
+_TAIL = "No meeting was changed. The call will fail the same way."
+_STARTS_AT = "2026-03-02T14:00:00+01:00"
+
+
+class TestTheMeetingTimes:
+    def test_two_times_with_an_offset_are_two_instants(self) -> None:
+        times = meetings.meeting_times(_TOOL, _STARTS_AT, "2026-03-02T15:00:00Z", tail=_TAIL)
+
+        assert times == (
+            datetime(2026, 3, 2, 14, tzinfo=timezone(timedelta(hours=1))),
+            datetime(2026, 3, 2, 15, tzinfo=UTC),
+        )
+
+    @pytest.mark.parametrize(
+        ("starts_at", "ends_at", "argument"),
+        [
+            pytest.param("2026-03-02T14:00:00", "2026-03-02T15:00:00Z", "starts_at", id="start"),
+            pytest.param(_STARTS_AT, "2026-03-02", "ends_at", id="end"),
+        ],
+    )
+    def test_a_time_with_no_offset_is_refused_by_its_argument(
+        self, starts_at: str, ends_at: str, argument: str
+    ) -> None:
+        refused = meetings.meeting_times(_TOOL, starts_at, ends_at, tail=_TAIL)
+
+        assert isinstance(refused, str)
+        assert refused.startswith(f"{_TOOL} received ")
+        assert f"`{argument}`. This time has no offset" in refused
+        assert "or add `Z` for UTC." in refused
+        assert refused.endswith(_TAIL)
+
+    @pytest.mark.parametrize("starts_at", ["tomorrow at 2", "1772719200", "02/03/2026 14:00"])
+    def test_a_value_that_is_not_iso_8601_is_refused(self, starts_at: str) -> None:
+        refused = meetings.meeting_times(_TOOL, starts_at, "2026-03-02T15:00:00Z", tail=_TAIL)
+
+        assert isinstance(refused, str)
+        assert f"{_TOOL} received {starts_at!r} in `starts_at`." in refused
+        assert "This value is not an ISO-8601 date and time." in refused
+        assert "Calculate the date and the time from what the user said." in refused
+        assert refused.endswith(_TAIL)
+
+    @pytest.mark.parametrize("ends_at", [_STARTS_AT, "2026-03-02T12:59:00Z"])
+    def test_an_end_that_is_not_after_the_start_is_refused(self, ends_at: str) -> None:
+        refused = meetings.meeting_times(_TOOL, _STARTS_AT, ends_at, tail=_TAIL)
+
+        assert isinstance(refused, str)
+        assert f"{_TOOL} received an `ends_at` that is not after `starts_at`." in refused
+        assert "A meeting that runs past midnight ends on the next day." in refused
+        assert refused.endswith(_TAIL)
+
+
+_OTHER_ATTENDEE_ID = "00000000-0000-4000-8000-000000000003"
+
+
+class TestTheAttendees:
+    def test_each_id_becomes_one_attendee_and_none_becomes_the_organizer(self) -> None:
+        participants = meetings.meeting_participants([_ATTENDEE_ID, _OTHER_ATTENDEE_ID])
+
+        assert participants.organizer is None
+        assert meetings.attendee_ids(participants) == [_ATTENDEE_ID, _OTHER_ATTENDEE_ID]
+
+    def test_no_id_becomes_an_empty_attendee_list_and_not_a_missing_one(self) -> None:
+        assert meetings.meeting_participants([]).attendees == []
+
+    def test_the_ids_come_from_the_attendees_and_leave_the_organizer_out(self) -> None:
+        assert meetings.attendee_ids(_organized_by(_ORGANIZER_ID).participants) == [_ATTENDEE_ID]
+
+    def test_an_attendee_that_names_no_user_id_is_left_out(self) -> None:
+        participants = MeetingParticipants(
+            attendees=[
+                MeetingParticipantInfo(),
+                MeetingParticipantInfo(identity=IdentitySet()),
+                MeetingParticipantInfo(identity=IdentitySet(user=Identity())),
+                MeetingParticipantInfo(identity=IdentitySet(user=Identity(id=_ATTENDEE_ID))),
+            ]
+        )
+
+        assert meetings.attendee_ids(participants) == [_ATTENDEE_ID]
+
+    @pytest.mark.parametrize(
+        "participants",
+        [
+            pytest.param(None, id="no-participants"),
+            pytest.param(MeetingParticipants(), id="no-attendee-list"),
+        ],
+    )
+    def test_no_attendee_list_is_none(self, participants: MeetingParticipants | None) -> None:
+        assert meetings.attendee_ids(participants) is None
+
+    def test_an_empty_attendee_list_is_an_empty_list(self) -> None:
+        assert meetings.attendee_ids(MeetingParticipants(attendees=[])) == []
+
+
+class TestTheMeetingRefusals:
+    def test_the_handle_refusal_names_both_sources_and_the_one_shape(self) -> None:
+        refused = meetings.not_a_meeting_handle(_TOOL, tail=_TAIL)
+
+        assert refused.startswith(
+            f"{_TOOL} takes the `meeting_uri` handle from teams_list_chats or "
+            + "teams_create_meeting, and this value is not one."
+        )
+        assert "\n  teams:///meetings/{join_web_url}\n" in refused
+        assert "Copy the `meeting_uri` of a tool result word for word." in refused
+        assert refused.endswith(_TAIL)
+
+    def test_the_organizer_refusal_says_what_the_tool_does_only_for_the_organizer(self) -> None:
+        refused = meetings.not_the_organizer("changes", tail=_TAIL)
+
+        assert refused.startswith(
+            "Microsoft 365 does not name the signed-in user as the organizer of this meeting."
+        )
+        assert "This tool changes only a meeting that the signed-in user organizes." in refused
+        assert refused.endswith(_TAIL)

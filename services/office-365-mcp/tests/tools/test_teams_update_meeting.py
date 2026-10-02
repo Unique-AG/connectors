@@ -454,6 +454,17 @@ class TestThePersonBeforeTheChange:
             handle, change("A", "2026-03-02T15:00:00Z", "2026-03-02T16:00:00Z", None)
         )
 
+    def test_keeping_the_attendees_and_removing_every_attendee_bind_differently(self) -> None:
+        handle = meeting_handle(_URI)
+        assert handle is not None
+        about = updater._about  # pyright: ignore[reportPrivateUsage]
+        change = updater._change  # pyright: ignore[reportPrivateUsage]
+
+        keeps = about(handle, change("A", None, None, None))
+        removes = about(handle, change("A", None, None, []))
+
+        assert keeps != removes
+
 
 class TestTheEraWithNoBackChannel:
     async def test_the_first_round_asks_and_never_patches(
@@ -728,6 +739,16 @@ class TestHowItDeclaresItself:
             "Copy each id from the `user_id` of get_me, of a teams_list_chats member, or of a "
             + "teams_list_chat_members row."
         ) in " ".join(str(properties["attendees"]["description"]).split())
+
+    async def test_the_attendees_say_what_an_empty_list_and_an_omitted_list_do(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+        description = " ".join(str(properties["attendees"]["description"]).split())
+        assert "An empty list removes every attendee." in description
+        assert "Omit it to keep the current attendees." in description
 
     async def test_an_attendee_by_email_address_never_reaches_graph(
         self, transport: httpx.AsyncClient, graph: respx.MockRouter

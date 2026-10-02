@@ -525,6 +525,17 @@ class TestWhatItAnswers:
         assert not isinstance(answer, InputRequiredResult)
         assert answer.attendee_ids == []
 
+    async def test_an_answer_with_no_attendee_list_reports_an_empty_list(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        organizer_only = {"organizer": {"identity": {"user": {"id": SIGNED_IN_USER_ID}}}}
+        _ = _posts(graph, {**_stored(), "participants": organizer_only})
+
+        answer = await _create(client)
+
+        assert not isinstance(answer, InputRequiredResult)
+        assert answer.attendee_ids == []
+
     async def test_an_existing_meeting_graph_returns_with_200_is_answered_the_same_way(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

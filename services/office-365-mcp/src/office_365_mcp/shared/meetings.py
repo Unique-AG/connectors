@@ -16,10 +16,15 @@ Every artifact API stops working once the meeting expires, roughly 60 days after
 (https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams#meeting-expiration).
 """
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
+from msgraph.generated.models.identity import Identity
+from msgraph.generated.models.identity_set import IdentitySet
+from msgraph.generated.models.meeting_participant_info import MeetingParticipantInfo
+from msgraph.generated.models.meeting_participants import MeetingParticipants
 from msgraph.generated.models.online_meeting import OnlineMeeting
 from msgraph.generated.models.user import User
 from msgraph.generated.users.item.online_meetings.online_meetings_request_builder import (
@@ -95,6 +100,63 @@ def organized_by(meeting: OnlineMeeting, user: User) -> bool:
     return named is not None and user.id is not None and named.casefold() == user.id.casefold()
 
 
+def meeting_times(
+    tool: str, starts_at: str, ends_at: str, *, tail: str
+) -> tuple[datetime, datetime] | str:
+    opens = _instant(tool, "starts_at", starts_at, tail=tail)
+    if isinstance(opens, str):
+        return opens
+    closes = _instant(tool, "ends_at", ends_at, tail=tail)
+    if isinstance(closes, str):
+        return closes
+    if closes <= opens:
+        return (
+            f"{tool} received an `ends_at` that is not after `starts_at`. A meeting must end "
+            + "after it starts. A meeting that runs past midnight ends on the next day. Make sure "
+            + f"that the date of `ends_at` is correct. {tail}"
+        )
+    return opens, closes
+
+
+def meeting_participants(attendees: Sequence[str]) -> MeetingParticipants:
+    return MeetingParticipants(
+        attendees=[
+            MeetingParticipantInfo(identity=IdentitySet(user=Identity(id=attendee)))
+            for attendee in attendees
+        ]
+    )
+
+
+def attendee_ids(participants: MeetingParticipants | None) -> list[str] | None:
+    attendees = None if participants is None else participants.attendees
+    if attendees is None:
+        return None
+    return [
+        attendee.identity.user.id
+        for attendee in attendees
+        if attendee.identity is not None
+        and attendee.identity.user is not None
+        and attendee.identity.user.id is not None
+    ]
+
+
+def not_a_meeting_handle(tool: str, *, tail: str) -> str:
+    return (
+        f"{tool} takes the `meeting_uri` handle from teams_list_chats or teams_create_meeting, "
+        + "and this value is not one. A meeting handle has exactly one shape:\n"
+        + "  teams:///meetings/{join_web_url}\n"
+        + "with the join URL percent-encoded. Copy the `meeting_uri` of a tool result word for "
+        + f"word. {tail}"
+    )
+
+
+def not_the_organizer(verb: str, *, tail: str) -> str:
+    return (
+        "Microsoft 365 does not name the signed-in user as the organizer of this meeting. This "
+        + f"tool {verb} only a meeting that the signed-in user organizes. {tail}"
+    )
+
+
 async def newest_of[T: MeetingArtifact](
     first_page: GraphCollection[T],
     client: GraphServiceClient,
@@ -136,6 +198,26 @@ def _told_apart[T: MeetingArtifact](artifacts: list[T]) -> list[T]:
             seen.add(identifier)
         kept.append(artifact)
     return kept
+
+
+def _instant(tool: str, argument: str, value: str, *, tail: str) -> datetime | str:
+    try:
+        moment = datetime.fromisoformat(value)
+    except ValueError:
+        return (
+            f"{tool} received {value!r} in `{argument}`. This value is not an ISO-8601 date and "
+            + "time. Write the date, the time, and an offset, for example "
+            + "`2026-03-02T14:00:00+01:00`. Calculate the date and the time from what the user "
+            + f"said. If the day or the hour is ambiguous, ask the user. {tail}"
+        )
+    if moment.utcoffset() is None:
+        return (
+            f"{tool} received {value!r} in `{argument}`. This time has no offset, so it does not "
+            + "name one instant. Add the offset of the zone of the user, for example "
+            + "`2026-03-02T14:00:00+01:00`, or add `Z` for UTC. If the zone is not clear, ask the "
+            + f"user. {tail}"
+        )
+    return moment
 
 
 def _settled_by(moment: datetime | None, now: datetime) -> bool:
