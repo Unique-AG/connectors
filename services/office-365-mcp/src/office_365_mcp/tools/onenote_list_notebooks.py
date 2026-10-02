@@ -4,6 +4,7 @@ from typing import Annotated, Literal, cast
 
 import httpx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from msgraph.generated.models.notebook import Notebook as GraphNotebook
 from msgraph.generated.models.notebook_collection_response import NotebookCollectionResponse
 from msgraph.generated.models.onenote_section import OnenoteSection
@@ -44,7 +45,7 @@ from office_365_mcp.shared.notes import (
     web_url_of,
 )
 from office_365_mcp.shared.odata import odata_literal
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 
 TOOL_NAME = "onenote_list_notebooks"
 
@@ -60,8 +61,25 @@ GRAPH_NOT_FOUND = (
     "Microsoft 365 will not list these notebooks. If this call named a `group`, the id most "
     + "likely names no group that the signed-in user can reach. Take the id from "
     + "teams_list_my_teams, or ask the user for it. This same id fails again, so do not retry "
-    + "it. If this call named no `group`, Microsoft most likely found no OneNote for this "
-    + "account, and no other argument fixes that."
+    + "it. If this call named a `site`, the id most likely names no site that the signed-in "
+    + "user can reach. Ask the user for the correct id. This same id fails again, so do not "
+    + "retry it. If this call named no `group` and no `site`, Microsoft most likely found no "
+    + "OneNote for this account, and no other argument fixes that."
+)
+
+_OWNER_REFUSED = (
+    "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
+    + "Most likely, the signed-in user is not a member of that group or site, or the id is "
+    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool works "
+    + "without `group` and `site`, the permissions of this connector are not the problem. If it "
+    + "fails without them too, ask a Microsoft 365 administrator to grant the delegated "
+    + "permission Notes.Read. This same call fails again, so do not retry it."
+)
+
+_GROUP_AND_SITE = (
+    "onenote_list_notebooks takes at most one of `group` and `site`. A notebook belongs to one "
+    + "group or one site, never to both. The same combination fails again, so do not retry it as "
+    + "it is."
 )
 
 _NOTEBOOK_FIELDS: tuple[str, ...] = (
@@ -99,7 +117,7 @@ Lists every notebook the signed-in user owns or that somebody else shares with t
 section of each. This is the starting point for OneNote: notebook and section handles come from \
 here. A section group appears only through a section's `group_uri`. onenote_list_sections lists \
 section groups as rows. Pass `group` to list the notebooks of one Microsoft 365 group or team \
-instead. This tool does not reach a notebook on a SharePoint site.
+instead. Pass `site` to list the notebooks of one SharePoint site instead.
 
 Notes:
 - `capped` true means a safety cap cut the listing short.
@@ -228,11 +246,11 @@ class Notebook(BaseModel):
 class Notebooks(BaseModel):
     notebooks: list[Notebook] = Field(
         description=(
-            "Every notebook this call found. With no `group`, these are the signed-in user's "
-            + "own notebooks and the ones shared with them. With `group`, these are the "
-            + "notebooks of that group. `capped` true can leave this list incomplete. Empty when "
-            + "no notebook matches. A notebook with no id from Microsoft is left out. It never "
-            + "gets a handle that fails."
+            "Every notebook this call found. With `group` or `site`, these are the notebooks of "
+            + "that group or site. With neither, these are the user's own notebooks and the ones "
+            + "shared with them. `capped` true can leave this list incomplete. Empty when no "
+            + "notebook matches. A notebook with no id is left out. It never gets a handle that "
+            + "fails."
         )
     )
     capped: bool = Field(
@@ -250,17 +268,20 @@ async def list_notebooks(
     client: GraphServiceClient,
     *,
     group: str | None = None,
+    site: str | None = None,
     name_contains: str | None = None,
     created_by: str | None = None,
     shared: bool | None = None,
     role: _Role | None = None,
     order_by: ContainerOrderBy | None = None,
 ) -> Notebooks:
+    if group is not None and site is not None:
+        raise ToolError(_GROUP_AND_SITE)
     notebook_filter = _notebook_filter(name_contains, shared, role)
     orderby = None if order_by is None else [CONTAINER_ORDER_CLAUSES[order_by]]
-    owner = owner_named(group=group, site=None)
+    owner = owner_named(group=group, site=site)
     root = onenote_root(client, owner)
-    with graph_errors(TOOL_NAME):
+    with owner_refused(owner is not None, _OWNER_REFUSED), graph_errors(TOOL_NAME):
         with graph_step(STEP_NOTEBOOKS):
             first_notebooks = await get_with_query(
                 client,
@@ -444,6 +465,19 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
+        site: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The SharePoint site whose notebooks this call lists, as its Graph site id. "
+                    + "The id is a host name and two ids, joined by commas, and not "
+                    + "percent-encoded. Ask the user for it. Pass at most one of `group` and "
+                    + "`site`. Omit both to list every notebook the user owns or that somebody "
+                    + "shares with them."
+                ),
+            ),
+        ] = None,
         name_contains: Annotated[
             str | None,
             Field(
@@ -494,7 +528,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "default order. `name_asc`/`name_desc` sorts by display name. "
                     + "`created_desc`/`created_asc` sorts by when an item was created. "
                     + "`last_modified_desc`/`last_modified_asc` sorts by when it last changed. "
-                    + "Omit it to keep the default order."
+                    + "Omit it to keep the default order, ascending by name."
                 ),
             ),
         ] = None,
@@ -503,6 +537,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await list_notebooks(
             client,
             group=group,
+            site=site,
             name_contains=name_contains,
             created_by=created_by,
             shared=shared,

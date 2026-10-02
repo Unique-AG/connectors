@@ -6,6 +6,7 @@ import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
@@ -20,6 +21,7 @@ from office_365_mcp.shared.handles import (
     onenote_section_handle,
 )
 from office_365_mcp.shared.notes import ContainerOrderBy
+from office_365_mcp.shared.seam import Advised
 from office_365_mcp.tools import onenote_list_notebooks as lister
 
 from .conftest import GRAPH_V1
@@ -32,6 +34,14 @@ _GROUP = "3f8c1a52-7d4e-4b9a-9c31-0e6f2a8b7d14"
 _GROUP_NOTEBOOKS = f"/groups/{_GROUP}/onenote/notebooks"
 _GROUP_SECTIONS = f"/groups/{_GROUP}/onenote/sections"
 _GROUP_SECTION_GROUPS = f"/groups/{_GROUP}/onenote/sectionGroups"
+
+_SITE = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE_NOTEBOOKS = f"/sites/{_SITE}/onenote/notebooks"
+_SITE_SECTIONS = f"/sites/{_SITE}/onenote/sections"
+_SITE_SECTION_GROUPS = f"/sites/{_SITE}/onenote/sectionGroups"
 
 _NOTEBOOK_SELECT = (
     "id,displayName,isDefault,isShared,userRole,createdBy,createdDateTime,"
@@ -168,6 +178,23 @@ def group_sections_route(graph: respx.MockRouter) -> respx.Route:
 @pytest.fixture
 def group_section_groups_route(graph: respx.MockRouter) -> respx.Route:
     return graph.get(_GROUP_SECTION_GROUPS).mock(return_value=_page(_group_payload(_OUTER_GROUP)))
+
+
+@pytest.fixture
+def site_notebooks_route(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_SITE_NOTEBOOKS).mock(return_value=_page(_notebook_payload(_ENGINEERING)))
+
+
+@pytest.fixture
+def site_sections_route(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_SITE_SECTIONS).mock(
+        return_value=_page(_section_payload(_STANDUPS, group_id=_OUTER_GROUP))
+    )
+
+
+@pytest.fixture
+def site_section_groups_route(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_SITE_SECTION_GROUPS).mock(return_value=_page(_group_payload(_OUTER_GROUP)))
 
 
 class TestWhatItAsks:
@@ -1077,6 +1104,113 @@ class TestAGroupsNotebooks:
             _ = await lister.list_notebooks(client, group=_GROUP)
 
 
+class TestASitesNotebooks:
+    async def test_site_sends_each_of_the_three_requests_to_that_sites_route(
+        self,
+        client: GraphServiceClient,
+        site_notebooks_route: respx.Route,
+        site_sections_route: respx.Route,
+        site_section_groups_route: respx.Route,
+    ) -> None:
+        _ = await lister.list_notebooks(client, site=_SITE)
+
+        assert site_notebooks_route.call_count == 1
+        assert site_sections_route.call_count == 1
+        assert site_section_groups_route.call_count == 1
+
+    @pytest.mark.usefixtures(
+        "site_notebooks_route", "site_sections_route", "site_section_groups_route"
+    )
+    async def test_site_never_calls_the_signed_in_users_own_route(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        own = graph.get(url__regex=r".*/me/onenote/.*").mock(return_value=_page())
+
+        _ = await lister.list_notebooks(client, site=_SITE)
+
+        assert own.call_count == 0
+
+    @pytest.mark.usefixtures(
+        "site_notebooks_route", "site_sections_route", "site_section_groups_route"
+    )
+    async def test_every_handle_in_a_site_answer_carries_the_site(
+        self, client: GraphServiceClient
+    ) -> None:
+        result = await lister.list_notebooks(client, site=_SITE)
+
+        notebook = result.notebooks[0]
+        section = notebook.sections[0]
+        assert section.group_uri is not None
+        assert notebook.uri.startswith("onenote:///sites/")
+        assert section.uri.startswith("onenote:///sites/")
+        assert section.group_uri.startswith("onenote:///sites/")
+        assert onenote_notebook_handle(notebook.uri) == OnenoteNotebookHandle(
+            _ENGINEERING, owner=OnenoteOwner("sites", _SITE)
+        )
+        assert onenote_section_handle(section.uri) == OnenoteSectionHandle(
+            _STANDUPS, owner=OnenoteOwner("sites", _SITE)
+        )
+        assert onenote_section_group_handle(section.group_uri) == OnenoteSectionGroupHandle(
+            _OUTER_GROUP, owner=OnenoteOwner("sites", _SITE)
+        )
+
+    async def test_group_and_site_together_are_refused_before_any_graph_call(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="takes at most one of `group` and `site`") as raised:
+            _ = await lister.list_notebooks(client, group=_GROUP, site=_SITE)
+
+        assert "never to both" in str(raised.value)
+        assert "do not retry it as it is" in str(raised.value)
+        assert len(graph.calls) == 0
+
+    async def test_a_site_404_arrives_classified_as_not_found(
+        self, client: GraphServiceClient, site_notebooks_route: respx.Route
+    ) -> None:
+        site_notebooks_route.mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "gone"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await lister.list_notebooks(client, site=_SITE)
+
+
+class TestAnOwnerThatRefusesTheCaller:
+    @pytest.mark.parametrize(
+        ("group", "site", "path"),
+        [(_GROUP, None, _GROUP_NOTEBOOKS), (None, _SITE, _SITE_NOTEBOOKS)],
+        ids=["group", "site"],
+    )
+    async def test_a_403_for_a_named_owner_raises_the_canonical_advice_with_diagnostics(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        group: str | None,
+        site: str | None,
+        path: str,
+    ) -> None:
+        _ = graph.get(path).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(Advised) as raised:
+            _ = await lister.list_notebooks(client, group=group, site=site)
+
+        message = str(raised.value)
+        assert message.startswith(
+            "Microsoft 365 refused this request for the `group` or the `site` that this call "
+            + "named. Most likely, the signed-in user is not a member of that group or site, or "
+            + "the id is wrong."
+        )
+        assert "grant the delegated permission Notes.Read" in message
+        assert "This same call fails again, so do not retry it." in message
+        assert message.endswith("(HTTP 403, Graph error code accessDenied)")
+
+
 class TestHowItDescribesItself:
     async def _tool(self, transport: httpx.AsyncClient) -> Tool:
         mcp: FastMCP = FastMCP(name="schema-under-test")
@@ -1089,13 +1223,14 @@ class TestHowItDescribesItself:
         tool = await self._tool(transport)
         return cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
 
-    async def test_it_takes_the_group_and_the_five_narrowing_and_ordering_arguments(
+    async def test_it_takes_the_group_the_site_and_the_five_narrowing_and_ordering_arguments(
         self, transport: httpx.AsyncClient
     ) -> None:
         properties = await self._properties(transport)
 
         assert set(properties) == {
             "group",
+            "site",
             "name_contains",
             "created_by",
             "shared",
@@ -1121,7 +1256,25 @@ class TestHowItDescribesItself:
         assert "teams_list_my_teams" in described
         assert "Omit it to list every notebook the user owns" in described
 
-    async def test_the_description_offers_group_and_keeps_the_sharepoint_limit(
+    async def test_site_is_optional_and_never_empty(self, transport: httpx.AsyncClient) -> None:
+        tool = await self._tool(transport)
+        properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+
+        assert "site" not in tool.parameters.get("required", [])
+        assert cast("list[Mapping[str, object]]", properties["site"]["anyOf"])[0]["minLength"] == 1
+
+    async def test_site_says_whose_notebooks_it_lists_and_how_its_id_is_spelled(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        properties = await self._properties(transport)
+
+        described = cast("str", properties["site"]["description"])
+        assert "The SharePoint site whose notebooks this call lists" in described
+        assert "a host name and two ids, joined by commas, and not percent-encoded" in described
+        assert "Ask the user for it." in described
+        assert "Pass at most one of `group` and `site`." in described
+
+    async def test_the_description_offers_group_and_site_and_drops_the_sharepoint_limit(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await self._tool(transport)
@@ -1131,7 +1284,8 @@ class TestHowItDescribesItself:
             "Pass `group` to list the notebooks of one Microsoft 365 group or team instead."
             in described
         )
-        assert "This tool does not reach a notebook on a SharePoint site." in described
+        assert "Pass `site` to list the notebooks of one SharePoint site instead." in described
+        assert "does not reach a notebook on a SharePoint site" not in described
         assert "or in a Microsoft 365 team" not in described
 
     def test_the_handle_fields_name_the_group_and_site_spellings(self) -> None:
@@ -1151,12 +1305,32 @@ class TestHowItDescribesItself:
         assert "teams_list_my_teams" in advice
         assert "fails again" in advice
 
+    def test_a_not_found_names_the_site_and_says_the_same_id_fails_again(self) -> None:
+        advice = lister.GRAPH_NOT_FOUND
+
+        assert "If this call named a `site`, the id most likely names no site" in advice
+        assert "Ask the user for the correct id. This same id fails again, so do not retry it." in (
+            advice
+        )
+        assert "If this call named no `group` and no `site`," in advice
+
+    def test_the_notebooks_answer_names_the_group_and_the_site(self) -> None:
+        described = lister.Notebooks.model_fields["notebooks"].description or ""
+
+        assert "With `group` or `site`, these are the notebooks of that group or site." in described
+
     async def test_order_by_offers_the_six_orders(self, transport: httpx.AsyncClient) -> None:
         properties = await self._properties(transport)
 
         offered = json.dumps(properties["order_by"])
         for order in _ORDERS:
             assert f'"{order}"' in offered
+
+    async def test_order_by_names_the_default_order(self, transport: httpx.AsyncClient) -> None:
+        properties = await self._properties(transport)
+
+        described = cast("str", properties["order_by"]["description"])
+        assert "Omit it to keep the default order, ascending by name." in described
 
     async def test_created_by_says_a_notebook_keeps_every_section(
         self, transport: httpx.AsyncClient
