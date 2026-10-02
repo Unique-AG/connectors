@@ -34,7 +34,10 @@ from backstop_mcp.features.collection_scan import (
     ScanCoverageResponse,
     project_fields,
 )
-from backstop_mcp.features.custom_fields import ResolvedCustomFieldValueResponse
+from backstop_mcp.features.custom_fields import (
+    ResolvedCustomFieldValueResponse,
+    StoredCustomFieldValueResponse,
+)
 from backstop_mcp.features.opportunities.api_responses import (
     OpportunityResource,
     OpportunityStageAttributes,
@@ -544,8 +547,36 @@ class SearchOpportunityRowResponse(OmitNoneModel):
     investor: InvestorFromOpportunityResponse | None = Field(
         default=None, description="Investor contact chip when the include arrived."
     )
+    investor_representative: str | None = Field(
+        default=None,
+        description=(
+            "Login of the colleague who represents the investor organization, which puts the "
+            "deal in that colleague's pipeline. Absent when the organization has no "
+            "representative."
+        ),
+    )
+    representative: str | None = Field(
+        default=None,
+        description=(
+            "Login stored as the representative on the deal itself. Often blank; a blank "
+            "value does not mean the deal is unowned — read `investor_representative`."
+        ),
+    )
     product: ProductFromOpportunityResponse | None = Field(
-        default=None, description="Product chip when the include arrived."
+        default=None,
+        description=(
+            "Linked fund when the include arrived. Often absent. Strategy labels such as "
+            "converts are an opportunity custom field, read from `custom_field_values`."
+        ),
+    )
+    custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every opportunity custom field with a value on this deal, as stored text — no "
+            "catalog needed. Absent when the call set `exclude_custom_fields`. A field "
+            "missing here has no value on this deal: leave the cell blank, do not look it "
+            "up again with get_opportunities_by_ids."
+        ),
     )
 
     @classmethod
@@ -555,6 +586,9 @@ class SearchOpportunityRowResponse(OmitNoneModel):
         *,
         investor: InvestorFromOpportunityResponse | None,
         product: ProductFromOpportunityResponse | None,
+        investor_representative: str | None = None,
+        representative: str | None = None,
+        custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = None,
     ) -> Self:
         return cls(
             id=deal.id,
@@ -576,7 +610,10 @@ class SearchOpportunityRowResponse(OmitNoneModel):
             days_in_current_stage=deal.days_in_current_stage,
             date_entered_current_stage=deal.date_entered_current_stage,
             investor=investor,
+            investor_representative=investor_representative,
+            representative=representative,
             product=product,
+            custom_field_values=custom_field_values,
         )
 
     def project(self, *, fields: frozenset[str]) -> Self:
@@ -594,15 +631,20 @@ class SearchOpportunitiesResolvedResponse(OmitNoneModel):
         description="`rows` returns deal bodies; `aggregate` returns counts grouped by `group_by`."
     )
     coverage: ScanCoverageResponse = Field(
-        description="How much of the matching set was scanned, and whether it was truncated."
+        description=(
+            "`visible_count` is Backstop's total before the client-side filters (stage, linked "
+            "fund, open/closed, custom fields). An empty `rows` list means nothing matched "
+            "those filters. `truncated` is the scan ceiling. Rows mode returns every match."
+        )
     )
     rows: tuple[SearchOpportunityRowResponse, ...] = Field(
         default=(),
         description=(
             "Matching deals after client-side filters. Empty in aggregate mode. `id` is always "
             "present so the row can be handed to get_opportunities_by_ids. Amounts are already "
-            "on this walk — select them with `fields`. Opportunity custom fields and stage "
-            "history are not; fetch those ids with get_opportunities_by_ids."
+            "on this walk — select them with `fields`. Custom-field values are on every row "
+            "unless the call set `exclude_custom_fields`. Stage history is not on this "
+            "walk; fetch those ids with get_opportunities_by_ids."
         ),
     )
     aggregates: tuple[AggregateBucketResponse, ...] = Field(
@@ -612,7 +654,9 @@ class SearchOpportunitiesResolvedResponse(OmitNoneModel):
     custom_fields_unavailable: bool = Field(
         default=False,
         description=(
-            "True when the custom-field catalog failed to load. Search rows have no "
-            "`custom_field_values`; `get_opportunities_by_ids` would miss the same fields."
+            "True when the custom-field catalog failed to load. `custom_field_values` on the "
+            "rows is the stored text and is still there. "
+            "get_opportunities_by_ids cannot resolve field types while this is true — an "
+            "empty resolved list there means the catalog missed, not that the deal has none."
         ),
     )

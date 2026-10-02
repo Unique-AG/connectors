@@ -181,7 +181,7 @@ class TestGetProductInvestors:
         params = recorded_params(accounts)[0]
         assert params["filter[product.id][eq]"] == _PRODUCT_ID
         assert params["include"] == "owner,investorType"
-        assert set(params["fields"].split(",")) == _EXPECTED_FIELDS
+        assert set(params["fields"].split(",")) == _EXPECTED_FIELDS | {"regularCustomFieldValues"}
         assert len(result.products) == 1
         listing = result.products[0]
         assert listing.product.id == _PRODUCT_ID
@@ -199,6 +199,119 @@ class TestGetProductInvestors:
         assert "product_id" not in payload
         investor_payload = object_dict(object_list(tool_payload(result)["investors"])[0])
         assert "latest_value_totals" not in investor_payload
+        assert "custom_field_values" not in payload
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_exclude_custom_fields_does_not_request_them(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
+        accounts = respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(
+                _account(
+                    _ACCOUNT_ID,
+                    name="Europe feeder",
+                    regularCustomFieldValues=[
+                        {"definitionId": 8689949, "name": "Investor Location", "value": "Europe"},
+                    ],
+                ),
+            )
+        )
+
+        result = tool_model(
+            await get_product_investors(
+                ctx_never_elicit(),
+                products=[_PRODUCT_ID],
+                exclude_custom_fields=True,
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+                get_latest_account_values_query=make_get_latest_account_values_query(client),
+            ),
+            ProductInvestorsResolvedResponse,
+        )
+
+        assert set(recorded_params(accounts)[0]["fields"].split(",")) == _EXPECTED_FIELDS
+        assert _accounts(result)[0].custom_field_values is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_investor_type_publishes_name_and_classification_separately(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(
+                _account(_ACCOUNT_ID, owner_id=_OWNER_ID, investor_type_id="10", name="Endowment"),
+                included=[
+                    _owner(_OWNER_ID, name="Tailspin Investments"),
+                    resource(
+                        "10",
+                        "investor-types",
+                        name="",
+                        classificationType="Endowment/Foundation",
+                        investorType="Endowment",
+                    ),
+                ],
+            )
+        )
+
+        result = tool_model(
+            await get_product_investors(
+                ctx_never_elicit(),
+                products=[_PRODUCT_ID],
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+                get_latest_account_values_query=make_get_latest_account_values_query(client),
+            ),
+            ProductInvestorsResolvedResponse,
+        )
+
+        investor_type = _accounts(result)[0].investor_type
+        assert investor_type is not None
+        assert investor_type.name is None
+        assert investor_type.classification_type == "Endowment/Foundation"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_custom_fields_are_published_on_each_account_by_default(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
+        accounts = respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(
+                _account(
+                    _ACCOUNT_ID,
+                    owner_id=_OWNER_ID,
+                    name="Europe feeder",
+                    regularCustomFieldValues=[
+                        {"definitionId": 8689949, "name": "Investor Location", "value": "Europe"},
+                    ],
+                ),
+                _account("2", name="Blank location"),
+                included=[_owner(_OWNER_ID, name="Tailspin Investments")],
+            )
+        )
+
+        result = tool_model(
+            await get_product_investors(
+                ctx_never_elicit(),
+                products=[_PRODUCT_ID],
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+                get_latest_account_values_query=make_get_latest_account_values_query(client),
+            ),
+            ProductInvestorsResolvedResponse,
+        )
+
+        params = recorded_params(accounts)[0]
+        assert "regularCustomFieldValues" in params["fields"]
+        listing_payload = object_dict(object_list(tool_payload(result)["products"])[0])
+        rows = [object_dict(item) for item in object_list(listing_payload["accounts"])]
+        assert rows[0]["custom_field_values"] == [
+            {"definition_id": "8689949", "name": "Investor Location", "value": "Europe"}
+        ]
+        assert "custom_field_values" not in rows[1]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -411,7 +524,12 @@ class TestGetProductInvestors:
             )
         )
         properties = object_dict(schema["properties"])
-        assert set(properties) == {"products", "include_closed", "include_latest_value"}
+        assert set(properties) == {
+            "products",
+            "include_closed",
+            "include_latest_value",
+            "exclude_custom_fields",
+        }
         assert schema["required"] == ["products"]
         products = object_dict(properties["products"])
         assert products["minItems"] == 1
@@ -433,6 +551,12 @@ class TestGetProductInvestors:
         assert "ask whether to pull latest" in doc
         assert "include_latest_value=true" in doc
         assert "latest_value_totals" in doc
+        assert "Investor Location" not in doc
+        assert "Which field that is differs by tenant" in " ".join(doc.split())
+        assert "ask the user which to use" in " ".join(doc.split())
+        assert "weighted by latest value" in " ".join(doc.split())
+        assert "us_domiciled" in doc
+        assert "exclude_custom_fields" in doc
 
     @pytest.mark.asyncio
     @respx.mock

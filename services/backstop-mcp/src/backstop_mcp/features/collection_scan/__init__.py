@@ -13,7 +13,6 @@ from backstop_mcp.features.collection_scan.responses import (
 )
 from backstop_mcp.features.collection_scan.scan_coverage import (
     ERROR_DISCLAIMER,
-    ROW_CAP_DISCLAIMER,
     scan_coverage,
 )
 
@@ -21,7 +20,6 @@ __all__ = [
     "AggregateBucketDto",
     "AggregateBucketResponse",
     "ERROR_DISCLAIMER",
-    "ROW_CAP_DISCLAIMER",
     "ScanCoverageResponse",
     "project_fields",
     "scan_coverage",

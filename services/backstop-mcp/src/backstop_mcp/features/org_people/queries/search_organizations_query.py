@@ -10,27 +10,26 @@ after the fetch. `filter[email][eq]` is the primary email only.
 
 A custom-field-only call reads the collection. Large tenants have thousands of
 organizations; a sparse page carrying `regularCustomFieldValues` takes seconds, and the
-per-user gate allows five concurrent requests, so the in-memory walk requests later
-pages in parallel. `parallel` stays off when every predicate is a server filter — that
-walk stops at `max_rows`.
+per-user gate allows five concurrent requests, so the walk requests later pages in
+parallel. Every match is returned; the scan ceiling is the only limit.
 """
 
 import logging
 from collections.abc import Sequence
-from typing import NamedTuple, cast
 
 from opentelemetry import trace
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.collection_scan import scan_coverage
-from backstop_mcp.features.org_people.api_responses import (
-    OrganizationAttributes,
-    OrganizationResource,
+from backstop_mcp.features.custom_fields import (
+    CustomFieldMatch,
+    normalize_matches,
+    satisfies_every,
+    stored_custom_field_values,
 )
+from backstop_mcp.features.org_people.api_responses import OrganizationResource
 from backstop_mcp.features.org_people.responses import (
-    MatchedCustomFieldResponse,
-    OrganizationCustomFieldColumnResponse,
     SearchOrganizationRowResponse,
     SearchOrganizationsResolvedResponse,
 )
@@ -44,13 +43,6 @@ _tracer = trace.get_tracer(__name__)
 MAX_ORGANIZATION_SCAN_RECORDS = 10_000
 
 _PAGE_SIZE = 500
-
-
-class OrganizationCustomFieldMatch(NamedTuple):
-    """One custom-field predicate: definition id, then the stored values that satisfy it (OR)."""
-
-    definition_id: str
-    values: tuple[str, ...]
 
 
 class SearchOrganizationsQuery:
@@ -76,9 +68,8 @@ class SearchOrganizationsQuery:
         website: str | None = None,
         ria: bool | None = None,
         internal_organization: bool | None = None,
-        custom_fields: Sequence[OrganizationCustomFieldMatch] = (),
-        custom_field_columns: Sequence[str] = (),
-        max_rows: int,
+        custom_fields: Sequence[CustomFieldMatch] = (),
+        exclude_custom_fields: bool = False,
         fields: frozenset[str],
     ) -> SearchOrganizationsResolvedResponse:
         """Read the server-filtered collection, then apply predicates Backstop rejects."""
@@ -91,10 +82,7 @@ class SearchOrganizationsQuery:
         country = self._text(country)
         state = self._text(state)
         website = self._text(website)
-        predicates = self._predicates(custom_fields)
-        columns = tuple(
-            dict.fromkeys(item.strip() for item in custom_field_columns if item.strip())
-        )
+        predicates = normalize_matches(custom_fields)
         should_filter_in_memory = self._has_in_memory_predicate(
             legal_name=legal_name,
             city=city,
@@ -115,11 +103,11 @@ class SearchOrganizationsQuery:
                     email=email,
                     other_id=other_id,
                     matching_domain=matching_domain,
-                    include_custom_fields=bool(predicates) or bool(columns),
+                    exclude_custom_fields=exclude_custom_fields,
                 ),
-                max_records=MAX_ORGANIZATION_SCAN_RECORDS if should_filter_in_memory else max_rows,
-                page_size=_PAGE_SIZE if should_filter_in_memory else min(max_rows, _PAGE_SIZE),
-                parallel=should_filter_in_memory,
+                max_records=MAX_ORGANIZATION_SCAN_RECORDS,
+                page_size=_PAGE_SIZE,
+                parallel=True,
             )
             selected, dropped = self._select(
                 pages.items,
@@ -131,7 +119,6 @@ class SearchOrganizationsQuery:
                 ria=ria,
                 internal_organization=internal_organization,
                 predicates=predicates,
-                columns=columns,
             )
             if should_filter_in_memory:
                 selected = tuple(sorted(selected, key=self._name_order))
@@ -148,25 +135,15 @@ class SearchOrganizationsQuery:
                 },
             )
             projected = fields | {"id"}
-            if predicates:
+            if not exclude_custom_fields:
                 projected = projected | {"custom_field_values"}
-            if columns:
-                projected = projected | {"custom_field_columns"}
             return self._to_response(
                 selected,
                 fields=projected,
-                max_rows=max_rows,
                 rows_scanned=len(pages.items),
                 rows_dropped=dropped,
                 total_count=pages.total_count,
-                truncated_by_row_cap=self._row_cap(
-                    kept=len(selected),
-                    total_count=pages.total_count,
-                    max_rows=max_rows,
-                    memory=should_filter_in_memory,
-                    fetched=len(pages.items),
-                ),
-                ceiling_clamped=should_filter_in_memory and pages.truncated,
+                ceiling_clamped=pages.truncated,
             )
 
     def _query_params(
@@ -176,7 +153,7 @@ class SearchOrganizationsQuery:
         email: str | None,
         other_id: str | None,
         matching_domain: str | None,
-        include_custom_fields: bool,
+        exclude_custom_fields: bool,
     ) -> dict[str, object]:
         wire_fields = [
             "name",
@@ -191,7 +168,7 @@ class SearchOrganizationsQuery:
             "ria",
             "internalOrganization",
         ]
-        if include_custom_fields:
+        if not exclude_custom_fields:
             wire_fields.append("regularCustomFieldValues")
         params: dict[str, object] = {
             "sort": "name",
@@ -218,8 +195,7 @@ class SearchOrganizationsQuery:
         website: str | None,
         ria: bool | None,
         internal_organization: bool | None,
-        predicates: tuple[OrganizationCustomFieldMatch, ...],
-        columns: tuple[str, ...],
+        predicates: tuple[CustomFieldMatch, ...],
     ) -> tuple[tuple[SearchOrganizationRowResponse, ...], int]:
         selected: list[SearchOrganizationRowResponse] = []
         dropped = 0
@@ -235,7 +211,6 @@ class SearchOrganizationsQuery:
                     ria=ria,
                     internal_organization=internal_organization,
                     predicates=predicates,
-                    columns=columns,
                 )
             except ValidationError as exc:
                 dropped += 1
@@ -260,8 +235,7 @@ class SearchOrganizationsQuery:
         website: str | None,
         ria: bool | None,
         internal_organization: bool | None,
-        predicates: tuple[OrganizationCustomFieldMatch, ...],
-        columns: tuple[str, ...],
+        predicates: tuple[CustomFieldMatch, ...],
     ) -> SearchOrganizationRowResponse | None:
         attributes = resource.attributes
         if not self._matches_text(attributes.legal_name, legal_name):
@@ -281,8 +255,7 @@ class SearchOrganizationsQuery:
             and attributes.internal_organization is not internal_organization
         ):
             return None
-        matched = self._matched_custom_fields(attributes, predicates)
-        if matched is None:
+        if not satisfies_every(attributes.regular_custom_field_values, predicates):
             return None
         return SearchOrganizationRowResponse(
             id=resource.id,
@@ -297,8 +270,8 @@ class SearchOrganizationsQuery:
             matching_domains=attributes.matching_domains,
             ria=attributes.ria,
             internal_organization=attributes.internal_organization,
-            custom_field_values=matched or None,
-            custom_field_columns=self._column_values(attributes, columns) or None,
+            custom_field_values=stored_custom_field_values(attributes.regular_custom_field_values)
+            or None,
         )
 
     def _to_response(
@@ -306,11 +279,9 @@ class SearchOrganizationsQuery:
         selected: tuple[SearchOrganizationRowResponse, ...],
         *,
         fields: frozenset[str],
-        max_rows: int,
         rows_scanned: int,
         rows_dropped: int,
         total_count: int | None,
-        truncated_by_row_cap: bool,
         ceiling_clamped: bool,
     ) -> SearchOrganizationsResolvedResponse:
         coverage = scan_coverage(
@@ -319,7 +290,6 @@ class SearchOrganizationsQuery:
             rows_dropped=rows_dropped,
             ceiling=MAX_ORGANIZATION_SCAN_RECORDS,
             ceiling_clamped=ceiling_clamped,
-            truncated_by_row_cap=truncated_by_row_cap,
             # One `paginate` call: a failed page raises rather than returning a short list.
             partial_due_to_error=False,
         )
@@ -334,23 +304,9 @@ class SearchOrganizationsQuery:
                     else None
                 ),
             )
-            for row in selected[:max_rows]
+            for row in selected
         )
         return SearchOrganizationsResolvedResponse(coverage=coverage, rows=rows)
-
-    def _predicates(
-        self, custom_fields: Sequence[OrganizationCustomFieldMatch]
-    ) -> tuple[OrganizationCustomFieldMatch, ...]:
-        normalized = (
-            OrganizationCustomFieldMatch(
-                definition_id=predicate.definition_id.strip(),
-                values=tuple(value.strip() for value in predicate.values if value.strip()),
-            )
-            for predicate in custom_fields
-        )
-        return tuple(
-            predicate for predicate in normalized if predicate.definition_id and predicate.values
-        )
 
     def _has_in_memory_predicate(
         self,
@@ -362,7 +318,7 @@ class SearchOrganizationsQuery:
         website: str | None,
         ria: bool | None,
         internal_organization: bool | None,
-        predicates: tuple[OrganizationCustomFieldMatch, ...],
+        predicates: tuple[CustomFieldMatch, ...],
     ) -> bool:
         return any(
             value is not None
@@ -377,100 +333,6 @@ class SearchOrganizationsQuery:
             )
         ) or bool(predicates)
 
-    def _matched_custom_fields(
-        self,
-        attributes: OrganizationAttributes,
-        predicates: tuple[OrganizationCustomFieldMatch, ...],
-    ) -> tuple[MatchedCustomFieldResponse, ...] | None:
-        """Values that satisfy every predicate, or None when one predicate misses.
-
-        An empty predicate list matches every organization and publishes no values.
-        """
-        if not predicates:
-            return ()
-        matched: list[MatchedCustomFieldResponse] = []
-        for predicate in predicates:
-            needles = tuple(value.casefold() for value in predicate.values)
-            hits: list[MatchedCustomFieldResponse] = []
-            for value in attributes.regular_custom_field_values:
-                if value.definition_id != predicate.definition_id:
-                    continue
-                text = next(
-                    (
-                        found
-                        for needle in needles
-                        if (found := self._matching_text(value.value, needle)) is not None
-                    ),
-                    None,
-                )
-                if text is None:
-                    continue
-                hits.append(
-                    MatchedCustomFieldResponse(
-                        definition_id=predicate.definition_id,
-                        name=value.name,
-                        value=text,
-                    )
-                )
-            if not hits:
-                return None
-            matched.extend(hits)
-        return tuple(matched)
-
-    def _column_values(
-        self, attributes: OrganizationAttributes, columns: tuple[str, ...]
-    ) -> tuple[OrganizationCustomFieldColumnResponse, ...]:
-        """Stored values for the requested definitions, in request order; unset ones are absent."""
-        by_definition = {
-            value.definition_id: value for value in attributes.regular_custom_field_values
-        }
-        published: list[OrganizationCustomFieldColumnResponse] = []
-        for definition_id in columns:
-            value = by_definition.get(definition_id)
-            if value is None:
-                continue
-            text = self._display_text(value.value)
-            if text is None:
-                continue
-            published.append(
-                OrganizationCustomFieldColumnResponse(
-                    definition_id=definition_id, name=value.name, value=text
-                )
-            )
-        return tuple(published)
-
-    def _display_text(self, stored: object) -> str | None:
-        if isinstance(stored, bool):
-            return "true" if stored else "false"
-        if isinstance(stored, str):
-            return stored.strip() or None
-        if isinstance(stored, int | float):
-            return str(stored)
-        if isinstance(stored, list):
-            parts = [
-                text
-                for item in cast("list[object]", stored)
-                if (text := self._display_text(item)) is not None
-            ]
-            return "; ".join(parts) or None
-        return None
-
-    def _matching_text(self, stored: object, needle: str) -> str | None:
-        if isinstance(stored, bool):
-            text = "true" if stored else "false"
-            return text if text == needle else None
-        if isinstance(stored, str):
-            return stored if stored.casefold() == needle else None
-        if isinstance(stored, int | float):
-            text = str(stored)
-            return text if text.casefold() == needle else None
-        if isinstance(stored, list):
-            for item in cast("list[object]", stored):
-                text = self._matching_text(item, needle)
-                if text is not None:
-                    return text
-        return None
-
     @staticmethod
     def _text(value: str | None) -> str | None:
         if value is None:
@@ -481,21 +343,6 @@ class SearchOrganizationsQuery:
     @staticmethod
     def _name_order(row: SearchOrganizationRowResponse) -> str:
         return (row.name or "").casefold()
-
-    @staticmethod
-    def _row_cap(
-        *,
-        kept: int,
-        total_count: int | None,
-        max_rows: int,
-        memory: bool,
-        fetched: int,
-    ) -> bool:
-        if memory:
-            return kept > max_rows
-        if total_count is not None:
-            return total_count > max_rows
-        return fetched >= max_rows
 
     @staticmethod
     def _matches_text(haystack: str | None, needle: str | None) -> bool:

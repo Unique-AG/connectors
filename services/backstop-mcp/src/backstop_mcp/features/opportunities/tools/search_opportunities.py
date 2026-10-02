@@ -1,19 +1,21 @@
 """`search_opportunities`: firm-wide pipeline walk over `GET /opportunities`.
 
-`filter[representative.name][eq]` is the only working server-side filter and takes a **login**
-from `list_system_users`, not a display name. Stage, product, and open/closed are client-side.
+`filter[representative.name][eq]` is the only representative filter Backstop accepts, and it is
+the deal-level field, often blank. `representative` here is the colleague's pipeline: the investor
+organization's representative, matched in memory. Every filter is client-side.
 """
 
 import logging
+from collections.abc import Sequence
 from typing import Annotated, Literal
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from pydantic import Field
+from pydantic import BaseModel, Field
 
+from backstop_mcp.features.custom_fields import CustomFieldMatch
 from backstop_mcp.features.opportunities import (
-    MAX_OPPORTUNITY_SCAN_RECORDS,
     OpportunityGroupBy,
     SearchMode,
     SearchOpportunitiesQuery,
@@ -22,13 +24,10 @@ from backstop_mcp.features.opportunities import (
 from backstop_mcp.features.opportunities.dependencies import (
     get_search_opportunities_query_factory,
 )
-from backstop_mcp.models import published_output_schema
+from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
 
 logger = logging.getLogger(__name__)
 
-
-_DEFAULT_MAX_ROWS = 100
-_MAX_ROWS = 1_000
 
 SearchRowField = Literal[
     "id",
@@ -50,11 +49,45 @@ SearchRowField = Literal[
     "days_in_current_stage",
     "date_entered_current_stage",
     "investor",
+    "investor_representative",
+    "representative",
     "product",
 ]
 _DEFAULT_FIELDS: frozenset[str] = frozenset(
     {"id", "name", "stage", "is_open", "expected_investment_date", "investor", "product"}
 )
+
+
+class OpportunityCustomFieldFilter(BaseModel):
+    """One custom-field predicate. Several predicates AND together."""
+
+    definition_id: CoercedId = Field(
+        description=(
+            "Custom-field definition id from list_custom_fields for opportunities. "
+            "Not the field label: two definitions can share a name."
+        )
+    )
+    values: list[NonEmptyStr] = Field(
+        min_length=1,
+        description=(
+            "Stored values that satisfy this predicate, OR. Each is compared whole and "
+            "case-insensitively against the select options list_custom_fields returns — "
+            "pass the exact option (`Convert Arb`), not a substring (`Converts`). A list "
+            "value matches when any element equals one of these. A missing value does not "
+            "match — this filter cannot mean 'the field is empty'."
+        ),
+    )
+
+
+def _predicates(
+    custom_fields: Sequence[OpportunityCustomFieldFilter] | None,
+) -> tuple[CustomFieldMatch, ...]:
+    if not custom_fields:
+        return ()
+    return tuple(
+        CustomFieldMatch(definition_id=item.definition_id, values=tuple(item.values))
+        for item in custom_fields
+    )
 
 
 @tool(
@@ -72,10 +105,10 @@ async def search_opportunities(
         Field(
             description=(
                 "Backstop **login** (`user_name` from list_system_users), not a display name. "
-                "This is the only server-side filter. A display name such as 'Jane Doe' "
-                "returns 0 rows; the login 'jdoe' returns that colleague's book. A disabled "
-                "login returns empty — check list_system_users before concluding there is "
-                "no pipeline."
+                "Keeps deals whose investor organization is represented by that login — the "
+                "colleague's pipeline — including deals with no representative on the deal "
+                "itself. It does not match the deal-level representative. A display name "
+                "such as 'Jane Doe' returns 0 rows. Applied after the server-side read."
             )
         ),
     ] = None,
@@ -95,13 +128,39 @@ async def search_opportunities(
         list[str] | None,
         Field(
             description=(
-                "Product short names (exact, e.g. NWON) or display-name substrings. "
+                "Linked fund: short names (exact, e.g. NWON) or display-name substrings. "
                 "Several values are OR, so onshore and offshore can be one walk, e.g. "
                 '["NWON", "NWOF"]. Resolve names with get_product '
-                "first when unsure. Applied after the server-side read."
+                "first when unsure. This is not the strategy. Converts, dispersion, and "
+                "long vol are opportunity custom fields — filter those with `custom_fields`. "
+                "Applied after the server-side read."
             )
         ),
     ] = None,
+    custom_fields: Annotated[
+        list[OpportunityCustomFieldFilter] | None,
+        Field(
+            description=(
+                "Opportunity custom-field predicates, AND. Each is a definition id from "
+                "list_custom_fields(entity_types=['opportunities']) plus the exact stored "
+                "option. This is how a strategy question is answered: the Product field "
+                "option `Convert Arb`, not a deal name containing Converts, and not the "
+                "linked-fund `product` argument. Applied after the server-side read."
+            )
+        ),
+    ] = None,
+    exclude_custom_fields: Annotated[
+        bool,
+        Field(
+            description=(
+                "Every row's custom fields come back as `custom_field_values` by default "
+                "(Opportunity Type, and so on), so one walk answers the table. Leave this "
+                "false. Set it true only to retry a call that timed out, to see whether "
+                "reading the custom fields is what made it slow. Refused together with "
+                "`custom_fields`, which needs them."
+            )
+        ),
+    ] = False,
     mode: Annotated[
         SearchMode,
         Field(description="`rows` (default) or `aggregate` for counts without row bodies."),
@@ -118,18 +177,6 @@ async def search_opportunities(
             )
         ),
     ] = None,
-    max_rows: Annotated[
-        int,
-        Field(
-            ge=1,
-            le=_MAX_ROWS,
-            description=(
-                f"Row-body cap in rows mode. Does not limit the walk, which reads up to "
-                f"{MAX_OPPORTUNITY_SCAN_RECORDS} rows and says so in `coverage`, or the "
-                "aggregate counts."
-            ),
-        ),
-    ] = _DEFAULT_MAX_ROWS,
     fields: Annotated[
         list[SearchRowField] | None,
         Field(
@@ -147,23 +194,49 @@ async def search_opportunities(
 ) -> SearchOpportunitiesResolvedResponse:
     """Walk the firm-wide pipeline.
 
-    Never infer strategy or product from the deal name. Filter with `product`; the `product`
-    chip is on every row by default, and `mode="aggregate", group_by="product"` counts by it.
-    A short name matches exactly; a display-name substring matches every vehicle whose name
-    contains it. Several `product` values are OR.
+    `product` matches the linked fund. A short name matches exactly; a display-name
+    substring matches every vehicle whose name contains it. Several `product` values are
+    OR. `mode="aggregate", group_by="product"` counts that linked fund. The chip is often
+    empty, and then every open deal is `(unattributed)`.
 
-    Use for coverage questions, stuck-in-stage, closing windows, and product pipeline. Pass
-    `representative` as a **login** from list_system_users — a display name silently returns
-    zero rows.     Stage, product, and open/closed are applied after the server-side read.
+    A strategy question (converts, dispersion, long vol) is an opportunity custom field.
+    list_custom_fields(entity_types=["opportunities"]), then `custom_fields` with that
+    definition id and the exact option (`Convert Arb`, not `Converts` or `Convertibles`).
+    The other table columns are on each row's `custom_field_values`. If a call times out,
+    retry once with `exclude_custom_fields=true` to see whether reading them is the cause;
+    otherwise leave it false. That walk is the full match. Do not select deals because the
+    name contains the strategy word, and do not call get_opportunities_by_ids to re-read
+    fields this walk already returned.
 
-    For 'what changed stage since X', select `previous_stage` and
-    `date_entered_current_stage` and keep rows whose `date_entered_current_stage` is on or
-    after X. That covers the latest move per deal; earlier moves need get_opportunities_by_ids.
-    This walk does not return full stage history or custom-field values. For those, call
-    get_opportunities_by_ids with the ids — `id` is always projected so that handoff works.
-    `custom_fields_unavailable` is still set: a catalog miss here is the same miss that
-    get_opportunities_by_ids would report.
-    Amounts are on this walk; select them with `fields`.
+    "Current investor", "prospect", and "former investor" are an organization status
+    custom field (Investor Status on search_organizations), not `is_open` and not a
+    stage. `is_open` means the deal is still in the pipeline. After this walk, check
+    Investor Status on each distinct `investor.id` with get_organization. Keep only the
+    status the user named.
+
+    Prospect, Grade, and Investor Type are organization fields on this CRM, not deal
+    fields. Before choosing between search_organizations and this tool, call
+    list_custom_fields for both organizations and opportunities, and search the collection
+    where the user's words exist. A prospect is not an opportunity stage.
+
+    A colleague's pipeline is the representative on the investor organization, not the
+    representative stored on the deal. Pass that **login** from list_system_users as
+    `representative`; it matches `investor_representative` on each row. The deal-level
+    `representative` is often blank, so do not filter or group on it. Strategy on a deal
+    stays the opportunity custom field; do not infer it from the deal name. A display name
+    silently returns zero rows. Every filter is applied after the server-side read.
+    `coverage.visible_count` is Backstop's total before those filters. An empty `rows`
+    list means nothing matched.
+
+    A stage-change question ("what moved stage since X") stays on this tool. Select
+    `previous_stage` and `date_entered_current_stage` and keep rows whose
+    `date_entered_current_stage` is inside the window, including deals that closed — do not
+    pass `is_open`. Do not ask the user for those field names, and do not walk
+    get_opportunities_by_ids for this question. Those two fields are the latest move per
+    deal only; say so. `id` is always projected. `custom_fields_unavailable` means the
+    catalog missed: stored values on this row are still the text Backstop sent, and
+    get_opportunities_by_ids would not resolve types. Amounts are on this walk; select
+    them with `fields`.
 
     For one party's deals, call get_opportunities instead — that is one cheap sub-collection,
     not this walk. This tool has no `party_id`. `mode=aggregate` with `group_by` answers a
@@ -172,20 +245,30 @@ async def search_opportunities(
 
     For deals with no activity in 30/60/90 days, pass each distinct `investor.id` and
     `investor.search_type` to get_last_activity_for_parties and bucket by its
-    `days_since_last_activity`. Days in stage is not activity. "Prospect" as an investor
-    status is an organization field (search_organizations), not a stage here.
+    `days_since_last_activity`. Days in stage is not activity.
 
     Call like: {"representative": "jdoe", "is_open": true}
+    A colleague's pipeline: {"representative": "jdoe", "is_open": true, "fields": ["name",
+    "stage", "requested_amount", "investor", "investor_representative", "representative"]}
+    Converts in the open pipeline: {"is_open": true, "custom_fields": [{"definition_id":
+    "<Product id from list_custom_fields>", "values": ["Convert Arb"]}],
+    "fields": ["name", "stage", "requested_amount", "expected_investment_date", "investor"]}
     Product pipeline: {"product": ["NWON", "NWOF"], "is_open": true}
-    Stage changes: {"is_open": true, "fields": ["name", "stage", "previous_stage",
-    "date_entered_current_stage", "investor"]}
+    Stage changes: {"fields": ["name", "stage", "previous_stage",
+    "date_entered_current_stage", "is_open", "investor"]}
     """
     if mode == "aggregate" and group_by is None:
         raise ValueError("group_by is required when mode is aggregate")
     if mode == "rows" and group_by is not None:
         raise ValueError("group_by is only used when mode is aggregate")
 
+    if custom_fields and exclude_custom_fields:
+        raise ValueError(
+            "exclude_custom_fields cannot be combined with custom_fields: the filter reads them"
+        )
+
     products = tuple(product or ())
+    predicates = _predicates(custom_fields)
     logger.info(
         "opportunities.search.start",
         extra={
@@ -193,6 +276,8 @@ async def search_opportunities(
             "mode": mode,
             "stage": stage,
             "product": products,
+            "custom_fields": len(predicates),
+            "exclude_custom_fields": exclude_custom_fields,
         },
     )
     return await search_opportunities_query.run(
@@ -200,8 +285,9 @@ async def search_opportunities(
         is_open=is_open,
         stage=stage,
         products=products,
+        custom_fields=predicates,
+        exclude_custom_fields=exclude_custom_fields,
         mode=mode,
         group_by=group_by,
-        max_rows=max_rows,
         fields=(frozenset(fields) if fields else _DEFAULT_FIELDS) | {"id"},
     )

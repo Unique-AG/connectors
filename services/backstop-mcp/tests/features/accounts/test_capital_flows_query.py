@@ -57,7 +57,6 @@ class TestCapitalFlowsAttribution:
         result = await make_get_capital_flows_query(client).run(
             start_date=date(2026, 1, 1),
             end_date=date(2026, 12, 31),
-            max_rows=50,
         )
 
         assert result.unattributed_count == 0
