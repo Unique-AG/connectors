@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Annotated, ClassVar, Literal, Self, cast, get_args
@@ -1107,14 +1105,6 @@ def forwarding_question(
         f"{verb} the inbox rule {cut_for_a_question(name)!r}? {' '.join(reach)} {scope} This "
         + "connector cannot recall a message that the rule sends."
     )
-
-
-def rule_confirmation_id(*parts: BaseModel | str | int | bool | list[str] | None) -> str:
-    canonical = [
-        part.model_dump(mode="json", exclude_none=True) if isinstance(part, BaseModel) else part
-        for part in parts
-    ]
-    return hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()
 
 
 def inbox_rules(client: GraphServiceClient) -> MessageRulesRequestBuilder:

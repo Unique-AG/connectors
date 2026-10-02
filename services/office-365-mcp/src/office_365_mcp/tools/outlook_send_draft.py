@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from typing import Annotated
@@ -26,6 +24,7 @@ from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     WRITE_DESTRUCTIVE,
     Confirmed,
+    confirmation_digest,
     graph_client_for_caller,
     graph_mailbox,
     person_confirms,
@@ -155,7 +154,7 @@ def a_person_agrees(ctx: Context) -> _Confirm:
             "Graph answered the draft read with no changeKey, "
             "so an accept cannot be bound to this version of the draft"
         )
-        about = hashlib.sha256(json.dumps([question, draft.change_key]).encode()).hexdigest()
+        about = confirmation_digest(question, draft.change_key)
         return await confirm(question, about)
 
     return asked

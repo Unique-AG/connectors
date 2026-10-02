@@ -24,7 +24,6 @@ from office_365_mcp.shared.rules import (
     inbox_rules,
     not_one_address,
     predicates_for,
-    rule_confirmation_id,
     rule_folders,
     unusable_addresses,
     unusable_folders,
@@ -32,6 +31,7 @@ from office_365_mcp.shared.rules import (
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
+    confirmation_digest,
     graph_client_for_caller,
     person_confirms,
 )
@@ -98,7 +98,7 @@ async def create_mail_rule(
     if unusable_folders(actions):
         raise ToolError(f"{_NOTHING_CREATED} {NOT_A_RULE_FOLDER}")
 
-    about = rule_confirmation_id(
+    about = confirmation_digest(
         TOOL_NAME, display_name, sequence, is_enabled, conditions, exceptions, actions
     )
     asked: InputRequiredResult | None = None

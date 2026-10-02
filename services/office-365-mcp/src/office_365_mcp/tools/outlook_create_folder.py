@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Mapping
 from typing import Annotated
 
@@ -22,6 +20,7 @@ from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
     Confirmed,
+    confirmation_digest,
     graph_client_for_caller,
     graph_mailbox,
     person_confirms,
@@ -149,8 +148,7 @@ def _question(mailbox: str, name: str, parent: MailFolderHandle | None) -> str:
 
 
 def _about(mailbox: str, name: str, parent: MailFolderHandle | None) -> str:
-    bound = [mailbox, name, None if parent is None else parent.folder_id]
-    return hashlib.sha256(json.dumps(bound).encode()).hexdigest()
+    return confirmation_digest(mailbox, name, None if parent is None else parent.folder_id)
 
 
 async def _post_folder(

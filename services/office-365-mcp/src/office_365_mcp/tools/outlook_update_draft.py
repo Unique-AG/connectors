@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Annotated
@@ -33,6 +31,7 @@ from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
+    confirmation_digest,
     graph_client_for_caller,
     graph_mailbox,
     person_confirms,
@@ -354,7 +353,7 @@ def _categories(categories: Sequence[str] | None) -> str:
 
 
 def _about(mailbox: str, *, handle: MailDraftHandle, change: DraftChange) -> str:
-    bound = [
+    return confirmation_digest(
         mailbox,
         handle.draft_id,
         change.subject,
@@ -363,8 +362,7 @@ def _about(mailbox: str, *, handle: MailDraftHandle, change: DraftChange) -> str
         change.cc,
         change.importance,
         change.categories,
-    ]
-    return hashlib.sha256(json.dumps(bound).encode()).hexdigest()
+    )
 
 
 def _patch_body(change: DraftChange) -> Message:

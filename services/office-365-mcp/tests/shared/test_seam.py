@@ -1,4 +1,8 @@
 import asyncio
+import hashlib
+import json
+import pathlib
+import re
 from collections.abc import Mapping
 from typing import cast
 
@@ -25,6 +29,7 @@ from mcp.types import (
     TextContent,
 )
 from mcp.types.version import LATEST_HANDSHAKE_VERSION, LATEST_MODERN_VERSION
+from pydantic import BaseModel
 
 from office_365_mcp.graph_client import (
     GraphFailure,
@@ -42,6 +47,7 @@ from office_365_mcp.shared.seam import (
     GraphAdviceMiddleware,
     TokenExchangeFailed,
     ToolAdvice,
+    confirmation_digest,
     person_confirms,
 )
 
@@ -727,3 +733,63 @@ class TestWhatTheMiddlewareLeavesAlone:
             _ = await blind.on_call_tool(context, refuse)
 
         assert raised.value is delivered
+
+
+class _Parcel(BaseModel):
+    weight: int | None = None
+    label: str | None = None
+
+
+class TestTheAgreementBinding:
+    def test_the_same_parts_give_the_same_id(self) -> None:
+        first = confirmation_digest("tool", 1, True, _Parcel(weight=3), None)
+        second = confirmation_digest("tool", 1, True, _Parcel(weight=3).model_copy(), None)
+
+        assert first == second
+
+    def test_a_change_of_any_part_gives_another_id(self) -> None:
+        bound = {
+            confirmation_digest("tool", 1, True, _Parcel(weight=3)),
+            confirmation_digest("tool", 2, True, _Parcel(weight=3)),
+            confirmation_digest("tool", 1, False, _Parcel(weight=3)),
+            confirmation_digest("tool", 1, True, _Parcel(label="box")),
+            confirmation_digest("other", 1, True, _Parcel(weight=3)),
+        }
+
+        assert len(bound) == 5
+
+    def test_a_list_of_names_is_one_part_of_the_id(self) -> None:
+        bound = {
+            confirmation_digest("tool", []),
+            confirmation_digest("tool", ["forward_to"]),
+            confirmation_digest("tool", ["forward_to", "delete"]),
+            confirmation_digest("tool", ["forward_to"], ["delete"]),
+        }
+
+        assert len(bound) == 4
+
+    def test_the_order_of_the_keys_of_a_mapping_does_not_change_the_id(self) -> None:
+        assert confirmation_digest("tool", {"a": 1, "b": [2]}) == confirmation_digest(
+            "tool", {"b": [2], "a": 1}
+        )
+
+    def test_the_id_is_a_sha256_of_the_canonical_parts(self) -> None:
+        canonical = json.dumps(["tool", {"weight": 3}], sort_keys=True)
+
+        assert confirmation_digest("tool", _Parcel(weight=3)) == (
+            hashlib.sha256(canonical.encode()).hexdigest()
+        )
+
+
+_TOOLS = pathlib.Path(__file__).parents[2] / "src" / "office_365_mcp" / "tools"
+
+_INLINE_DIGEST = re.compile(r"sha256\(\s*json\.dumps")
+
+
+class TestNoToolSpellsItsOwnAgreementDigest:
+    def test_every_tool_binds_an_agreement_through_the_seam(self) -> None:
+        sources = sorted(_TOOLS.glob("*.py"))
+        spellers = [source.name for source in sources if _INLINE_DIGEST.search(source.read_text())]
+
+        assert sources
+        assert spellers == []

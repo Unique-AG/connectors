@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Mapping
 from typing import Annotated
 
@@ -25,6 +23,7 @@ from office_365_mcp.shared.seam import (
     WRITE_IDEMPOTENT,
     Confirm,
     Confirmed,
+    confirmation_digest,
     graph_client_for_caller,
     graph_mailbox,
     person_confirms,
@@ -176,8 +175,7 @@ def _question(mailbox: str, current: str, name: str) -> str:
 
 
 def _about(mailbox: str, handle: MailFolderHandle, name: str) -> str:
-    bound = [mailbox, handle.folder_id, name]
-    return hashlib.sha256(json.dumps(bound).encode()).hexdigest()
+    return confirmation_digest(mailbox, handle.folder_id, name)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

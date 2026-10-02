@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from typing import Annotated, Literal
@@ -40,6 +38,7 @@ from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
     Confirmed,
+    confirmation_digest,
     graph_client_for_caller,
     graph_mailbox,
     person_confirms,
@@ -394,8 +393,7 @@ def _categories_text(verb: str, names: Sequence[str]) -> str | None:
 
 
 def _about(mailbox: str, handles: Sequence[MailMessageHandle], change: MarkChange) -> str:
-    bound = [mailbox, asdict(change), [handle.uri for handle in handles]]
-    return hashlib.sha256(json.dumps(bound).encode()).hexdigest()
+    return confirmation_digest(mailbox, asdict(change), [handle.uri for handle in handles])
 
 
 def a_person_agrees(ctx: Context) -> Confirm:

@@ -21,12 +21,12 @@ from office_365_mcp.shared.rules import (
     actions_of,
     conditions_of,
     read_rule,
-    rule_confirmation_id,
     rule_of,
 )
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
+    confirmation_digest,
     graph_client_for_caller,
     person_confirms,
 )
@@ -127,7 +127,7 @@ async def delete_mail_rule(
             refused = f"{_NOTHING_DELETED} {READ_ONLY_RULE}"
         if refused is None:
             question = _question(handle, rule)
-            about = rule_confirmation_id(TOOL_NAME, handle.uri, question, MailRule.from_rule(rule))
+            about = confirmation_digest(TOOL_NAME, handle.uri, question, MailRule.from_rule(rule))
             with not_graph():
                 answer = await confirm(question, about)
             asked = answer if isinstance(answer, InputRequiredResult) else None

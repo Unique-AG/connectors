@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Annotated
@@ -44,6 +42,7 @@ from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
     Confirmed,
+    confirmation_digest,
     graph_client_for_caller,
     graph_mailbox,
     person_confirms,
@@ -351,8 +350,9 @@ def _about(
     importance: MailImportance | None,
     categories: Sequence[str],
 ) -> str:
-    bound = [mailbox, message_id, body_html, addressed, copied, importance, categories]
-    return hashlib.sha256(json.dumps(bound).encode()).hexdigest()
+    return confirmation_digest(
+        mailbox, message_id, body_html, addressed, copied, importance, categories
+    )
 
 
 async def _create(reached: UserItemRequestBuilder, handle: MailMessageHandle) -> Message:

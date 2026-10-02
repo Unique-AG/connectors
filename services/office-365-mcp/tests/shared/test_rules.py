@@ -1,6 +1,4 @@
 import dataclasses
-import hashlib
-import json
 from collections.abc import Mapping
 from typing import cast, get_args
 
@@ -39,7 +37,6 @@ from office_365_mcp.shared.rules import (
     merged_actions,
     not_one_address,
     predicates_for,
-    rule_confirmation_id,
     unusable_addresses,
     unusable_folders,
 )
@@ -870,39 +867,3 @@ class TestTheRefusalTexts:
     def test_a_rule_with_no_action_left_asks_for_an_action_in_actions(self) -> None:
         assert NO_RULE_ACTION.startswith("This call gives the rule no action.")
         assert "Give at least one action in `actions`" in NO_RULE_ACTION
-
-
-class TestTheAgreementBinding:
-    def test_the_same_parts_give_the_same_id(self) -> None:
-        first = rule_confirmation_id("tool", 1, True, _EVERY_ACTION, None)
-        second = rule_confirmation_id("tool", 1, True, _EVERY_ACTION.model_copy(), None)
-
-        assert first == second
-
-    def test_a_change_of_any_part_gives_another_id(self) -> None:
-        bound = {
-            rule_confirmation_id("tool", 1, True, _EVERY_ACTION),
-            rule_confirmation_id("tool", 2, True, _EVERY_ACTION),
-            rule_confirmation_id("tool", 1, False, _EVERY_ACTION),
-            rule_confirmation_id("tool", 1, True, RuleActionsInput(forward_to=[_ERIN])),
-            rule_confirmation_id("other", 1, True, _EVERY_ACTION),
-        }
-
-        assert len(bound) == 5
-
-    def test_a_list_of_names_is_one_part_of_the_id(self) -> None:
-        bound = {
-            rule_confirmation_id("tool", []),
-            rule_confirmation_id("tool", ["forward_to"]),
-            rule_confirmation_id("tool", ["forward_to", "delete"]),
-            rule_confirmation_id("tool", ["forward_to"], ["delete"]),
-        }
-
-        assert len(bound) == 4
-
-    def test_the_id_is_a_sha256_of_the_canonical_parts(self) -> None:
-        canonical = json.dumps(["tool", {"mark_as_read": True}], sort_keys=True)
-
-        assert rule_confirmation_id("tool", RuleActionsInput(mark_as_read=True)) == (
-            hashlib.sha256(canonical.encode()).hexdigest()
-        )

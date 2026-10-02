@@ -29,7 +29,6 @@ from office_365_mcp.shared.rules import (
     not_one_address,
     predicates_for,
     read_rule,
-    rule_confirmation_id,
     rule_folders,
     rule_of,
     unusable_addresses,
@@ -38,6 +37,7 @@ from office_365_mcp.shared.rules import (
 from office_365_mcp.shared.seam import (
     WRITE_IDEMPOTENT,
     Confirm,
+    confirmation_digest,
     graph_client_for_caller,
     person_confirms,
 )
@@ -182,7 +182,7 @@ async def update_mail_rule(
         )
         question = _question(handle, current, change)
         if refused is None and question is not None:
-            about = rule_confirmation_id(
+            about = confirmation_digest(
                 TOOL_NAME,
                 handle.uri,
                 *parts,
