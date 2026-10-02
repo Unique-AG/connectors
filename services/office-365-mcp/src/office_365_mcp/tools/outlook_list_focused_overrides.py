@@ -1,16 +1,12 @@
 from collections.abc import Mapping
-from typing import Literal, Self
 
 import httpx
 from fastmcp import FastMCP
-from msgraph.generated.models.inference_classification_override import (
-    InferenceClassificationOverride,
-)
-from msgraph.generated.models.inference_classification_type import InferenceClassificationType
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
+from office_365_mcp.shared.focused_inbox import FocusedOverride
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_focused_overrides"
@@ -20,8 +16,6 @@ STEP = "focused_overrides"
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
-
-type ClassifyAs = Literal["focused", "other"]
 
 _DESCRIPTION = """\
 Lists the senders for which the signed-in user chose a fixed inbox tab in Outlook, Focused or \
@@ -33,39 +27,6 @@ Notes:
 that is not listed has no fixed tab, and Outlook decides the tab for its mail.
 - An empty list means that the user fixed no sender. A listed sender has exactly one row.
 """
-
-
-class FocusedOverride(BaseModel):
-    sender_address: str = Field(
-        description=(
-            "The SMTP address of the sender. Each address has at most one row. Use this value "
-            "as `sender` in outlook_set_focused_override."
-        )
-    )
-    sender_name: str | None = Field(
-        description=(
-            "The display name that Outlook stores with the address. It is null when Graph gives "
-            "no name."
-        )
-    )
-    classify_as: ClassifyAs | None = Field(
-        description=(
-            "The tab that holds all future mail from this sender. `focused` means the Focused "
-            "tab. `other` means the Other tab. It is null when Graph gives none."
-        )
-    )
-
-    @classmethod
-    def from_override(cls, override: InferenceClassificationOverride) -> Self:
-        sender = override.sender_email_address
-        assert sender is not None and sender.address is not None, (
-            "Graph returned an override with no sender address"
-        )
-        return cls(
-            sender_address=sender.address,
-            sender_name=sender.name,
-            classify_as=_reported(override.classify_as),
-        )
 
 
 class FocusedOverrides(BaseModel):
@@ -93,16 +54,6 @@ async def list_focused_overrides(client: GraphServiceClient) -> FocusedOverrides
         overrides=[FocusedOverride.from_override(override) for override in collected.items],
         capped=collected.capped,
     )
-
-
-def _reported(classify_as: InferenceClassificationType | None) -> ClassifyAs | None:
-    match classify_as:
-        case None:
-            return None
-        case InferenceClassificationType.Focused:
-            return "focused"
-        case InferenceClassificationType.Other:
-            return "other"
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
