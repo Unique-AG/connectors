@@ -766,6 +766,37 @@ class TestHowItDeclaresItself:
         assert "refuses a role" not in description
         assert "does not allow" not in description
 
+    async def test_the_description_says_a_share_takes_effect_only_after_an_outlook_step(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "This tool adds the share immediately after the user agrees." in description
+        assert (
+            "Microsoft documents that a share takes effect only after the person accepts an "
+            "invitation or adds the calendar in an Outlook client. "
+            "So do not tell the user that the person can see the calendar now."
+        ) in description
+        assert "Microsoft does not document whether the person gets a message about the share." in (
+            description
+        )
+
+    async def test_the_share_handle_points_to_the_description_for_when_the_person_can_see_it(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        answer = cast("Mapping[str, object]", tool.output_schema)
+        properties = cast("Mapping[str, Mapping[str, str]]", answer["properties"])
+        uri = properties["uri"]["description"]
+        assert (
+            "The person can see the calendar only after the Outlook step that the tool "
+            "description names."
+        ) in uri
+        assert "invitation" not in uri
+        assert 15 <= len(uri.split()) <= 60
+
     async def test_the_description_says_a_timeout_is_not_a_reason_to_share_again(
         self, transport: httpx.AsyncClient
     ) -> None:
