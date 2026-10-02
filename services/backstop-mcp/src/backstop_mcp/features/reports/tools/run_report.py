@@ -88,13 +88,9 @@ async def run_report(
     need from the data and what the columns mean — do not invent a schema or a column's
     meaning.
 
-    A quoted report name, or "pull my X report", is this tool with that exact string. Do not
-    rebuild it with get_capital_flows. This tool cannot filter by product or date. For a cut
-    of the report (one fund, a date range), follow `next_offset` to the end, then keep rows
-    by the product column and the effective-date column the report returned. Resolve a short
-    name with get_product when that column holds the legal name. Keep every transaction type
-    inside the cut. A follow-up that moves to other feeders replaces the product set; run
-    both only when the user asks for both.
+    A saved report is this tool by exact name. It cannot filter by product or date. Follow
+    `next_offset` to the end, then filter by the report's own columns. Resolve a short
+    name with get_product when that column holds the legal name.
 
     One page per call. `total` is the full row count; `next_offset` is present when more
     rows remain. Continuation must repeat the same `as_of_date` (the default is today). Do

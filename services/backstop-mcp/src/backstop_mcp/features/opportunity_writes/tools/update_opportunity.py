@@ -49,7 +49,7 @@ async def update_opportunity(
     `backfill_opportunity_stage_history` appends historical rows and does not move anything.
 
     Call like: {"opportunity": {"opportunity_id": "<id from get_opportunities>",
-    "stage": "IDD", "probability": 0.3}}
+    "stage": "<stage name from get_opportunities>", "probability": 0.3}}
     """
     logger.info(
         "opportunity_writes.update.start",

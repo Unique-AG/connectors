@@ -477,7 +477,7 @@ class OrgPeopleResolvedResponse(OmitNoneModel):
     people: tuple[PersonAtOrganizationResponse, ...] = Field(
         description=(
             "People the CRM links to this organization through employment relationships. "
-            "`numberOfEmployees` on the organization record is not this list and is often 0 "
+            "`numberOfEmployees` on the organization record is not this list and may be 0 "
             "while people are still on file. Each row's `employment` is the status at this "
             "organization. Call `get_person` for the full record."
         )
@@ -576,7 +576,7 @@ class SearchOrganizationRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Every custom field with a value on this organization — group or label rows "
-            "by these (Grade, Investor Type, Investor Status). Absent when the call set "
+            "by these (the fields a table is grouped or labelled by). Absent when the call set "
             "`exclude_custom_fields`. A field missing here has no value on this "
             "organization: group it as blank, do not look it up again."
         ),

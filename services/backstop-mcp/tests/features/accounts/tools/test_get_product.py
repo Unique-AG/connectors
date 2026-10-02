@@ -45,14 +45,14 @@ def _product(
 
 
 def _strategy_value() -> list[dict[str, object]]:
-    return [{"definitionId": "501", "value": "Convertible Arbitrage"}]
+    return [{"definitionId": "501", "value": "Alpha"}]
 
 
 def _definition() -> dict[str, object]:
     return resource(
         "501",
         "custom-field-definitions",
-        name="Strategy",
+        name="Flavor",
         entityType="ProductBean",
         fieldType="select",
         tabName="Product",
@@ -72,7 +72,7 @@ class TestGetProduct:
     def test_is_registered(self) -> None:
         assert get_product in TOOLS
         doc = get_product.__doc__ or ""
-        assert "Strategy" in doc
+        assert "custom_field_names" in doc
         assert "search" in doc
         assert "get_product_investors" in doc
 
@@ -102,7 +102,7 @@ class TestGetProduct:
             result = tool_model(
                 await get_product(
                     ctx_never_elicit(),
-                    custom_field_names=["Strategy"],
+                    custom_field_names=["Flavor"],
                     client=client,
                     custom_fields=custom_fields_service(client),
                     get_product_query=make_get_product_query(client),
@@ -120,8 +120,8 @@ class TestGetProduct:
         assert rows[0]["id"] == _PRODUCT_ID
         assert rows[0]["short_name"] == "NDSP"
         fields = [object_dict(item) for item in object_list(rows[0]["custom_field_values"])]
-        assert fields[0]["name"] == "Strategy"
-        assert fields[0]["value"] == "Convertible Arbitrage"
+        assert fields[0]["name"] == "Flavor"
+        assert fields[0]["value"] == "Alpha"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -163,7 +163,7 @@ class TestGetProduct:
             result = tool_model(
                 await get_product(
                     ctx_never_elicit(),
-                    custom_field_names=["Strategy"],
+                    custom_field_names=["Flavor"],
                     client=client,
                     custom_fields=custom_fields_service(client),
                     get_product_query=make_get_product_query(client),
@@ -180,7 +180,7 @@ class TestGetProduct:
         rows = [object_dict(item) for item in object_list(payload["products"])]
         assert len(rows) == 1
         fields = [object_dict(item) for item in object_list(rows[0]["custom_field_values"])]
-        assert fields[0]["value"] == "Convertible Arbitrage"
+        assert fields[0]["value"] == "Alpha"
 
     @pytest.mark.asyncio
     @respx.mock

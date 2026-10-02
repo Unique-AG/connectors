@@ -148,9 +148,9 @@ async def get_person(
     Exactly one of party_id or search must be provided.
 
     Title, department, location, and email are `job_title`, `department`, the `locations`
-    include, and `email`. Do not ask the user for Backstop field names. get_people_for_party
-    leaves department off; call this when the prompt asks for it. Interaction date and count
-    come from search_activities rows where this person is an attendee.
+    include, and `email`. Do not ask the user for standard field names such as `job_title`
+    or `department`. get_people_for_party leaves department off; call this when the prompt
+    asks for it.
 
     Call like: {"party_id": "<id from prior resolve echo>", "include": ["locations", "company"]}
 
