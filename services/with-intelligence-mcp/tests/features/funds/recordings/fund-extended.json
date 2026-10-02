@@ -1,0 +1,19 @@
+{
+  "id": 1,
+  "name": "Example Global Macro Fund",
+  "fund_type": { "id": 1, "name": "Single Manager" },
+  "investment_regions": [{ "id": 5, "name": "Global" }],
+  "fund_status": {
+    "id": "ACTIVE",
+    "name": "Active",
+    "sub_status": { "id": "OPEN_TO_INVESTMENT", "name": "Open to investment" }
+  },
+  "management_company": { "id": 10, "name": "Example Manager" },
+  "lock_up": "None",
+  "investment_min_size": 10000000,
+  "investment_min_currency": "USD",
+  "latest_aum": 500,
+  "currency": { "id": 840, "short_name": "USD" },
+  "domiciles_offshore": null,
+  "strategy_description": "<p>Trades liquid markets.</p>"
+}

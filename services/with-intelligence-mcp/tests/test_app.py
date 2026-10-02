@@ -93,6 +93,11 @@ class TestMcpEndpoint:
             "get_people_for_investor",
             "get_investments",
             "get_mandates",
+            "get_intentions",
+            "get_articles",
+            "get_fund",
+            "get_manager",
+            "get_consultant",
         ]
 
     async def test_tools_publish_typed_output_schemas_and_closed_world_annotations(self) -> None:

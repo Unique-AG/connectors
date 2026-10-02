@@ -2,6 +2,7 @@
 
 from with_intelligence_mcp.features.investors.api_responses import (
     ClassificationAttributes,
+    CurrencyAttributes,
     InvestorExtendedAttributes,
     InvestorListItemAttributes,
 )
@@ -34,6 +35,7 @@ from with_intelligence_mcp.features.investors.search_investors_by_name import (
 __all__ = [
     "ClassificationAttributes",
     "ConsultantResponse",
+    "CurrencyAttributes",
     "GetInvestorQuery",
     "InvestorAmbiguousResponse",
     "InvestorCandidateResponse",
