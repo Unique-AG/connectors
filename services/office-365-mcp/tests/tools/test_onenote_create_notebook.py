@@ -5,7 +5,8 @@ from typing import cast
 import httpx
 import pytest
 import respx
-from fastmcp import Context, FastMCP
+from fastmcp import Client, Context, FastMCP
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.elicitation import (
     AcceptedElicitation,
@@ -18,14 +19,15 @@ from mcp.types import METHOD_NOT_FOUND, ElicitResult, InputRequiredResult, Input
 from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_365_mcp.graph_client import GraphFailure, GraphForbidden
+from office_365_mcp.graph_client import GraphFailure, GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOwner,
     onenote_notebook_handle,
 )
 from office_365_mcp.shared.notes import write_state_for
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm, GraphAdviceMiddleware
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import onenote_create_notebook as creator
 from office_365_mcp.tools.onenote_create_notebook import a_person_agrees, create_notebook
 
@@ -37,7 +39,23 @@ _GROUP_ID = "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
 
 _GROUP_NOTEBOOKS_PATH = f"/groups/{_GROUP_ID}/onenote/notebooks"
 
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+
+_SITE_NOTEBOOKS_PATH = f"/sites/{_SITE_ID}/onenote/notebooks"
+
 _NAME = "My Notebook"
+
+_OWNER_REFUSED = (
+    "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
+    + "Most likely, the signed-in user is not a member of that group or site, or the id is "
+    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool works "
+    + "without `group` and `site`, the permissions of this connector are not the problem. If it "
+    + "fails without them too, ask a Microsoft 365 administrator to grant the delegated "
+    + "permission Notes.Create. This same call fails again, so do not retry it."
+)
 
 
 def _notebook_payload(
@@ -77,6 +95,13 @@ def group_notebooks(graph: respx.MockRouter) -> respx.Route:
     )
 
 
+@pytest.fixture
+def site_notebooks(graph: respx.MockRouter) -> respx.Route:
+    return graph.post(_SITE_NOTEBOOKS_PATH).mock(
+        return_value=httpx.Response(201, json=_notebook_payload(is_default=False))
+    )
+
+
 async def _agrees(question: str, about: str) -> str | None:
     assert question
     assert about
@@ -94,13 +119,30 @@ async def _create(
     *,
     name: str = _NAME,
     group: str | None = None,
+    site: str | None = None,
     confirm: Confirm = _agrees,
 ) -> creator.CreatedNotebook:
-    answer = await create_notebook(client, name=name, group=group, confirm=confirm)
+    answer = await create_notebook(client, name=name, group=group, site=site, confirm=confirm)
     assert isinstance(answer, creator.CreatedNotebook), (
         "this call was answered with a question, not a notebook"
     )
     return answer
+
+
+async def _told_through_the_advice(
+    client: GraphServiceClient, *, group: str | None = None, site: str | None = None
+) -> str:
+    advice = GraphAdviceMiddleware(graph_advice(resolve(preset=None, enabled=[creator.TOOL_NAME])))
+    server: FastMCP[None] = FastMCP("creator", middleware=[advice])
+
+    @server.tool(name=creator.TOOL_NAME, annotations=WRITE_ADDITIVE)
+    async def create() -> str:
+        return (await _create(client, group=group, site=site)).uri
+
+    async with Client(FastMCPTransport(server)) as mcp_client:
+        with pytest.raises(ToolError) as raised:
+            _ = await mcp_client.call_tool(creator.TOOL_NAME, {})
+    return str(raised.value)
 
 
 def _sent(route: respx.Route) -> dict[str, object]:
@@ -143,6 +185,33 @@ class TestWhatItSendsToGraph:
         assert group_notebooks.call_count == 1
         assert notebooks.call_count == 0
         assert _sent(group_notebooks)["displayName"] == "Team Notes"
+
+    async def test_a_site_create_posts_once_under_that_sites_onenote_and_never_under_me(
+        self, client: GraphServiceClient, notebooks: respx.Route, site_notebooks: respx.Route
+    ) -> None:
+        _ = await _create(client, name="Site Notes", site=_SITE_ID)
+
+        assert site_notebooks.call_count == 1
+        assert notebooks.call_count == 0
+        assert _sent(site_notebooks)["displayName"] == "Site Notes"
+
+    async def test_a_group_and_a_site_together_are_refused_before_any_question_or_graph_call(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        with pytest.raises(ToolError, match="at most one of `group` and `site`") as refused:
+            _ = await _create(client, group=_GROUP_ID, site=_SITE_ID, confirm=counting)
+
+        assert asked == []
+        assert len(graph.calls) == 0
+        assert "never to both" in str(refused.value)
+        assert "do not retry it" in str(refused.value)
 
     @pytest.mark.usefixtures("retry_sleeps")
     async def test_a_create_graph_declines_is_never_sent_a_second_time(
@@ -207,6 +276,22 @@ class TestWhatItAnswers:
         assert parsed.owner == OnenoteOwner("groups", _GROUP_ID)
         assert parsed.notebook_id == _NOTEBOOK_ID
 
+    @pytest.mark.usefixtures("site_notebooks")
+    async def test_a_site_create_answers_with_a_handle_that_carries_the_site(
+        self, client: GraphServiceClient
+    ) -> None:
+        answer = await _create(client, site=_SITE_ID)
+
+        assert answer.uri.startswith("onenote:///sites/")
+        assert (
+            answer.uri
+            == OnenoteNotebookHandle(_NOTEBOOK_ID, owner=OnenoteOwner("sites", _SITE_ID)).uri
+        )
+        parsed = onenote_notebook_handle(answer.uri)
+        assert parsed is not None
+        assert parsed.owner == OnenoteOwner("sites", _SITE_ID)
+        assert parsed.notebook_id == _NOTEBOOK_ID
+
     async def test_the_answer_is_read_off_graph_and_never_echoes_the_argument(
         self, client: GraphServiceClient, notebooks: respx.Route
     ) -> None:
@@ -252,6 +337,63 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await _create(client)
+
+    @pytest.mark.parametrize(
+        ("owner", "path"),
+        [({"site": _SITE_ID}, _SITE_NOTEBOOKS_PATH), ({"group": _GROUP_ID}, _GROUP_NOTEBOOKS_PATH)],
+        ids=["site", "group"],
+    )
+    async def test_a_403_for_a_named_owner_is_advised_with_the_owner_text(
+        self, client: GraphServiceClient, graph: respx.MockRouter, owner: dict[str, str], path: str
+    ) -> None:
+        _ = graph.post(path).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(Advised) as advised:
+            _ = await _create(client, group=owner.get("group"), site=owner.get("site"))
+
+        assert str(advised.value).startswith(_OWNER_REFUSED)
+        assert isinstance(advised.value.__cause__, GraphForbidden)
+
+    async def test_a_403_for_a_site_reaches_the_client_as_the_owner_text(
+        self, client: GraphServiceClient, site_notebooks: respx.Route
+    ) -> None:
+        site_notebooks.mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        told = await _told_through_the_advice(client, site=_SITE_ID)
+
+        assert told.startswith(_OWNER_REFUSED)
+        assert site_notebooks.call_count == 1
+
+    async def test_a_404_for_a_group_reaches_the_client_as_the_not_found_text(
+        self, client: GraphServiceClient, group_notebooks: respx.Route
+    ) -> None:
+        group_notebooks.mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _create(client, group=_GROUP_ID)
+        told = await _told_through_the_advice(client, group=_GROUP_ID)
+
+        assert told.startswith(creator.GRAPH_NOT_FOUND)
+
+    def test_the_not_found_text_covers_a_group_a_site_and_neither(self) -> None:
+        advice = creator.GRAPH_NOT_FOUND
+
+        assert "For a `group` or a `site`" in advice
+        assert "Take a group id from teams_list_my_teams" in advice
+        assert "This same id fails again, so do not retry it." in advice
+        assert "Without `group` or `site`, Microsoft most likely found no OneNote" in advice
 
     async def test_a_409_duplicate_name_is_a_generic_graph_failure(
         self, client: GraphServiceClient, notebooks: respx.Route
@@ -313,6 +455,23 @@ class TestThePersonBetweenTheCreateAndTheGroup:
         assert posts_when_asked == [0], "the group notebook was created before the question"
         assert group_notebooks.call_count == 1
 
+    async def test_a_site_create_asks_once_before_it_posts(
+        self, client: GraphServiceClient, notebooks: respx.Route, site_notebooks: respx.Route
+    ) -> None:
+        posts_when_asked: list[int] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert question
+            assert about
+            posts_when_asked.append(site_notebooks.call_count)
+            return None
+
+        _ = await _create(client, site=_SITE_ID, confirm=counting)
+
+        assert posts_when_asked == [0], "the site notebook was created before the question"
+        assert site_notebooks.call_count == 1
+        assert notebooks.call_count == 0
+
     async def test_a_refusal_creates_nothing(
         self, client: GraphServiceClient, notebooks: respx.Route, group_notebooks: respx.Route
     ) -> None:
@@ -322,8 +481,17 @@ class TestThePersonBetweenTheCreateAndTheGroup:
         assert group_notebooks.call_count == 0
         assert notebooks.call_count == 0
 
+    async def test_a_refusal_for_a_site_creates_nothing(
+        self, client: GraphServiceClient, notebooks: respx.Route, site_notebooks: respx.Route
+    ) -> None:
+        with pytest.raises(ToolError, match="No notebook was created"):
+            _ = await _create(client, site=_SITE_ID, confirm=_refuses)
+
+        assert site_notebooks.call_count == 0
+        assert notebooks.call_count == 0
+
     @pytest.mark.usefixtures("group_notebooks")
-    async def test_the_question_names_the_notebook_the_group_and_who_can_open_it(
+    async def test_the_question_names_the_notebook_the_group_id_and_who_can_open_it(
         self, client: GraphServiceClient
     ) -> None:
         asked: list[str] = []
@@ -336,12 +504,32 @@ class TestThePersonBetweenTheCreateAndTheGroup:
         _ = await _create(client, name="Team Notes", group=_GROUP_ID, confirm=capturing)
 
         assert asked == [
-            f"Create the notebook 'Team Notes' in the Microsoft 365 group {_GROUP_ID!r}, which "
-            + "every member of the group can open?"
+            "Create the notebook 'Team Notes' in the Microsoft 365 group with the id "
+            + f"{_GROUP_ID!r}? Every member of the group can open it."
         ]
 
-    @pytest.mark.usefixtures("group_notebooks")
-    async def test_about_binds_the_group_and_the_name(self, client: GraphServiceClient) -> None:
+    @pytest.mark.usefixtures("site_notebooks")
+    async def test_the_question_names_the_notebook_the_site_id_and_who_can_open_it(
+        self, client: GraphServiceClient
+    ) -> None:
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, name="Site Notes", site=_SITE_ID, confirm=capturing)
+
+        assert asked == [
+            "Create the notebook 'Site Notes' in the SharePoint site with the id "
+            + f"{_SITE_ID!r}? Other people with access to the site can open it."
+        ]
+
+    @pytest.mark.usefixtures("group_notebooks", "site_notebooks")
+    async def test_about_binds_the_owner_kind_the_owner_and_the_name(
+        self, client: GraphServiceClient
+    ) -> None:
         bound: list[str] = []
 
         async def capturing(question: str, about: str) -> str | None:
@@ -352,11 +540,14 @@ class TestThePersonBetweenTheCreateAndTheGroup:
         _ = await _create(client, name="Same", group=_GROUP_ID, confirm=capturing)
         _ = await _create(client, name="Same", group=_GROUP_ID, confirm=capturing)
         _ = await _create(client, name="Different", group=_GROUP_ID, confirm=capturing)
+        _ = await _create(client, name="Same", site=_SITE_ID, confirm=capturing)
 
         assert bound[0] == bound[1]
         assert bound[2] != bound[0]
-        assert bound[0] == write_state_for("create_notebook", _GROUP_ID, "Same")
-        assert write_state_for("create_notebook", "another-group", "Same") != bound[0]
+        assert bound[0] == write_state_for("create_notebook", "groups", _GROUP_ID, "Same")
+        assert bound[3] == write_state_for("create_notebook", "sites", _SITE_ID, "Same")
+        assert write_state_for("create_notebook", "groups", "another-group", "Same") != bound[0]
+        assert write_state_for("create_notebook", "sites", _GROUP_ID, "Same") != bound[0]
 
     @pytest.mark.parametrize(
         "answer",
@@ -461,7 +652,9 @@ class TestTheEraWithNoBackChannel:
         )
 
         assert isinstance(answer, InputRequiredResult)
-        assert answer.request_state == write_state_for("create_notebook", _GROUP_ID, _NAME)
+        assert answer.request_state == write_state_for(
+            "create_notebook", "groups", _GROUP_ID, _NAME
+        )
         assert group_notebooks.call_count == 0
 
     async def test_the_second_round_creates_what_was_agreed_to(
@@ -511,6 +704,22 @@ class TestTheEraWithNoBackChannel:
 
         assert notebooks.call_count == 0
         assert group_notebooks.call_count == 0
+
+    async def test_an_agreement_for_a_group_does_not_cover_a_site_with_the_same_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        key, state = await _first_round(client)
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await create_notebook(
+                client,
+                name=_NAME,
+                site=_GROUP_ID,
+                confirm=a_person_agrees(_modern_context(answers={key: _AGREED}, state=state)),
+                answer_pending=True,
+            )
+
+        assert len(graph.calls) == 0
 
     async def test_a_second_round_decline_creates_nothing(
         self, client: GraphServiceClient, group_notebooks: respx.Route
@@ -587,6 +796,26 @@ class TestHowRegisterWiresTheQuestion:
         assert isinstance(created, creator.CreatedNotebook)
         assert notebooks.call_count == 1
 
+    async def test_register_passes_the_site_and_asks_for_it(
+        self,
+        transport: httpx.AsyncClient,
+        client: GraphServiceClient,
+        notebooks: respx.Route,
+        site_notebooks: respx.Route,
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+        assert isinstance(tool, FunctionTool)
+
+        asked = cast(
+            "creator.CreatedNotebook | InputRequiredResult",
+            await tool.fn(name=_NAME, site=_SITE_ID, ctx=_modern_context(), client=client),
+        )
+
+        assert isinstance(asked, InputRequiredResult)
+        assert asked.request_state == write_state_for("create_notebook", "sites", _SITE_ID, _NAME)
+        assert site_notebooks.call_count == 0
+        assert notebooks.call_count == 0
+
     async def test_register_honors_a_pending_decline_without_a_group(
         self,
         transport: httpx.AsyncClient,
@@ -627,12 +856,12 @@ class TestHowItDeclaresItself:
         properties = cast("dict[str, object]", parameters["properties"])
         assert set(creator.GRAPH_CALL_EXAMPLE) <= set(properties)
 
-    async def test_it_takes_a_name_and_an_optional_group_and_no_others(
+    async def test_it_takes_a_name_and_an_optional_group_or_site_and_no_others(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
         properties = cast("dict[str, object]", parameters["properties"])
-        assert set(properties) == {"name", "group"}
+        assert set(properties) == {"name", "group", "site"}
         assert parameters["required"] == ["name"]
 
     async def test_group_is_never_empty_and_says_where_to_take_its_id(
@@ -647,6 +876,41 @@ class TestHowItDeclaresItself:
         assert "A team id is a group id." in described
         assert "teams_list_my_teams" in described
         assert "Omit it to create the notebook in the user's own OneNote." in described
+        assert 15 <= len(described.split()) <= 60
+
+    async def test_site_is_never_empty_and_says_how_its_id_looks(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+
+        site = properties["site"]
+        assert cast("list[Mapping[str, object]]", site["anyOf"])[0]["minLength"] == 1
+        described = cast("str", site["description"])
+        assert described.startswith("The SharePoint site that owns the new notebook")
+        assert "a host name and two ids, joined by commas, and not percent-encoded" in described
+        assert "Pass at most one of `group` and `site`." in described
+        assert "Omit both to create the notebook in the user's own OneNote." in described
+        assert 15 <= len(described.split()) <= 60
+
+    async def test_the_name_states_its_limits_in_60_words_or_fewer(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+
+        described = cast("str", properties["name"]["description"])
+        assert "unique in the OneNote of its owner" in described
+        assert "at most 128 characters long" in described
+        assert "Microsoft refuses a bad name and creates nothing." in described
+        assert "Read it from the answer" not in described
+        assert 15 <= len(described.split()) <= 60
+
+    def test_the_stored_name_has_its_home_on_the_answer_field(self) -> None:
+        stored = creator.CreatedNotebook.model_fields["name"].description or ""
+
+        assert "What Microsoft stored, read from its response" in stored
+        assert "not from the `name` argument" in stored
 
     @pytest.mark.parametrize("word", ["client", "ctx", "context", "token", "graph"])
     async def test_no_wiring_of_this_server_is_published_as_an_argument(
@@ -670,36 +934,61 @@ class TestHowItDeclaresItself:
         assert annotations.destructive_hint is WRITE_ADDITIVE["destructiveHint"]
         assert annotations.idempotent_hint is WRITE_ADDITIVE["idempotentHint"]
 
-    async def test_the_description_says_it_never_asks_without_a_group_and_asks_with_one(
+    async def test_the_description_says_it_never_asks_without_an_owner_and_asks_with_one(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""
+        flat = " ".join(description.split())
         assert (
-            "Without `group`, a new notebook belongs to the user alone and starts unshared, so "
-            + "this tool never asks anybody to agree."
-        ) in " ".join(description.split())
+            "Without `group` or `site`, a new notebook belongs to the user alone and starts "
+            + "unshared, so this tool never asks anybody to agree."
+        ) in flat
         assert "never asks" in description.casefold()
         assert "unshared" in description.casefold()
-        assert "asks the user to agree before it creates a notebook in a group" in description
+        assert (
+            "This tool asks the user to agree before it creates a notebook in a group or a site. "
+            + "Other people can open that notebook."
+        ) in flat
+        assert "The question shows only the id of the group or the site." in flat
+        assert "tell the user which group or site that id names" in flat
 
-    async def test_the_retry_advice_looks_under_the_same_group(
+    async def test_the_description_has_a_lead_and_notes_in_the_house_shape(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""
-        assert "onenote_list_notebooks with the same `group`" in description
+        lead, separator, notes = description.partition("\n\nNotes:\n")
+        bullets = [line for line in notes.splitlines() if line.startswith("- ")]
+        assert separator, "the description has no Notes section"
+        assert 45 <= len(description.split()) <= 210
+        assert 1 <= len(bullets) <= 4
+        assert "`group`" in lead
+        assert "`site`" in lead
+        assert "SharePoint site" in lead
+        assert "onenote_copy_notebook" in lead
 
-    def test_the_answer_scopes_its_always_claims_to_a_create_without_a_group(self) -> None:
+    async def test_the_retry_advice_looks_under_the_same_group_or_site(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = " ".join((tool.description or "").split())
+        assert "onenote_list_notebooks with the same `group` or `site`" in description
+
+    def test_the_answer_scopes_its_always_claims_to_a_create_without_an_owner(self) -> None:
         fields = creator.CreatedNotebook.model_fields
 
-        assert "Without `group`, a brand-new notebook is always unshared" in (
+        assert "Without `group` or `site`, a brand-new notebook is always unshared" in (
             fields["is_shared"].description or ""
         )
-        assert 'Without `group`, a notebook this call created is always "Owner"' in (
+        assert 'Without `group` or `site`, a notebook this call created is always "Owner"' in (
             fields["user_role"].description or ""
+        )
+        assert "Without `group` or `site`, this is possible only when the user had no notebook" in (
+            fields["is_default"].description or ""
         )
         assert (
             "A handle from a group or site notebook starts with onenote:///groups/{group}/ "
