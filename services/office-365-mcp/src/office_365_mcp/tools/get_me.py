@@ -20,10 +20,13 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 _DESCRIPTION = """\
-Returns the signed-in user's own Microsoft 365 profile: id, display name, email, sign-in name, \
-and job title. This tool applies when a request depends on who "I", "me", or "my" refers to. \
-It describes only the caller. Resolve someone else's address with a directory or contacts \
-lookup instead.\
+Returns the signed-in user's own Microsoft 365 profile. The profile holds the id, display name, \
+given name, surname, email, sign-in name, job title, office location, telephone numbers, and \
+preferred language. This tool applies when a request depends on who "I", "me", or "my" refers to.
+
+Notes:
+- This tool describes only the caller. If this deployment exposes outlook_find_recipient, that \
+tool finds the address of somebody else.
 """
 
 
@@ -46,6 +49,18 @@ class SignedInUser(BaseModel):
             + "incomplete account."
         )
     )
+    given_name: str | None = Field(
+        description=(
+            "The user's given name (Graph `givenName`). It is null if the directory has none on "
+            + "file."
+        )
+    )
+    surname: str | None = Field(
+        description=(
+            "The user's family name (Graph `surname`). It is null if the directory has none on "
+            + "file."
+        )
+    )
     email: str | None = Field(
         description=(
             "The user's canonical primary SMTP address (Graph `mail`). The address is null for "
@@ -65,6 +80,30 @@ class SignedInUser(BaseModel):
             + "file."
         )
     )
+    office_location: str | None = Field(
+        description=(
+            "The user's office location from the directory (Graph `officeLocation`). It is null "
+            + "if the directory has none on file."
+        )
+    )
+    business_phones: list[str] = Field(
+        description=(
+            "The user's business telephone numbers (Graph `businessPhones`). Microsoft 365 holds "
+            + "one number at most. The list is empty if the directory has none on file."
+        )
+    )
+    mobile_phone: str | None = Field(
+        description=(
+            "The user's mobile telephone number (Graph `mobilePhone`). It is null if the "
+            + "directory has none on file."
+        )
+    )
+    preferred_language: str | None = Field(
+        description=(
+            "The user's preferred language as a language and region code, for example `en-US` "
+            + "(Graph `preferredLanguage`). It is null if the directory has none on file."
+        )
+    )
 
     @classmethod
     def from_user(cls, user: User) -> Self:
@@ -72,9 +111,15 @@ class SignedInUser(BaseModel):
         return cls(
             user_id=user.id,
             display_name=user.display_name,
+            given_name=user.given_name,
+            surname=user.surname,
             email=user.mail,
             user_principal_name=user.user_principal_name,
             job_title=user.job_title,
+            office_location=user.office_location,
+            business_phones=user.business_phones or [],
+            mobile_phone=user.mobile_phone,
+            preferred_language=user.preferred_language,
         )
 
 

@@ -6,9 +6,10 @@ from urllib.parse import quote
 import httpx
 import pytest
 import respx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from mcp.types import InputRequiredResult
+from mcp.types import ElicitResult, InputRequiredResult, InputResponse
+from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
@@ -21,6 +22,7 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle
 from office_365_mcp.shared.mail import WellKnownFolder
 from office_365_mcp.shared.seam import Confirm, Confirmed
+from office_365_mcp.tools import outlook_copy_mail as copier
 from office_365_mcp.tools import outlook_move_mail as mover
 
 _FIRST_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
@@ -139,6 +141,11 @@ def _paths(route: respx.Route) -> list[str]:
 
 def _sent_body(route: respx.Route) -> Mapping[str, object]:
     return cast("Mapping[str, object]", json.loads(route.calls.last.request.content))
+
+
+def _posted(graph: respx.MockRouter) -> list[str]:
+    calls = cast("Sequence[Call]", graph.calls)
+    return [call.request.url.path for call in calls if call.request.method == "POST"]
 
 
 @pytest.fixture
@@ -937,6 +944,90 @@ class TestThePersonBeforeAnotherMailboxLosesMail:
             )
 
         assert bound[0] == bound[1]
+
+    async def test_the_same_request_binds_a_different_agreement_than_a_copy(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route(method="POST").mock(return_value=_moved(_FIRST_MOVED_ID))
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return None
+
+        refs = [MailMessageHandle(_FIRST_ID).uri]
+        _ = await _move(
+            client,
+            message_refs=refs,
+            destination="archive",
+            mailbox=_MAILBOX,
+            confirm=capturing,
+        )
+        _ = await copier.copy_mail(
+            client,
+            message_refs=refs,
+            confirm=capturing,
+            destination="archive",
+            mailbox=_MAILBOX,
+        )
+
+        assert len(set(bound)) == 2
+
+
+class _ModernRequest:
+    protocol_version: str = LATEST_MODERN_VERSION
+
+
+def _modern_context(
+    *, answers: Mapping[str, InputResponse] | None = None, state: str | None = None
+) -> Context:
+    class _Client:
+        request_context: _ModernRequest = _ModernRequest()
+        input_responses: Mapping[str, InputResponse] | None = answers
+        request_state: str | None = state
+
+        async def elicit(self, message: str, response_type: object = None) -> object:
+            raise AssertionError(
+                f"a connection with no back-channel was asked {message!r} over it, "
+                + f"expecting {response_type!r} back"
+            )
+
+    return cast("Context", cast("object", _Client()))
+
+
+class TestAnAnswerGivenForACopy:
+    async def test_an_answer_bound_to_a_copy_moves_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route(method="POST").mock(return_value=_moved(_FIRST_MOVED_ID))
+        refs = [MailMessageHandle(_FIRST_ID).uri]
+        asked = await copier.copy_mail(
+            client,
+            message_refs=refs,
+            confirm=copier.a_person_agrees(_modern_context()),
+            destination="archive",
+            mailbox=_MAILBOX,
+        )
+        assert isinstance(asked, InputRequiredResult), "the copy was never put to anybody"
+        (key,) = asked.input_requests or {}
+        assert asked.request_state, "the copy question is bound to nothing"
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await mover.move_mail(
+                client,
+                message_refs=refs,
+                confirm=mover.a_person_agrees(
+                    _modern_context(
+                        answers={key: ElicitResult(action="accept", content={"value": "move"})},
+                        state=asked.request_state,
+                    )
+                ),
+                destination="archive",
+                mailbox=_MAILBOX,
+            )
+
+        assert _posted(graph) == []
 
 
 class TestWhatItSaysAboutItself:

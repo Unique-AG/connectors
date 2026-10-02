@@ -19,7 +19,13 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared import kql
-from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailSummary
+from office_365_mcp.shared.mail import (
+    SUMMARY_FIELDS,
+    MailImportance,
+    MailSummary,
+    carries_category,
+    has_flag_state,
+)
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     READ_ONLY,
@@ -39,10 +45,17 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 
 MAX_RESULTS = 1000
 
-_DESCRIPTION = (
-    "Searches the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one, by "
-    "keyword, sender, recipient, subject, or attachment file name."
-)
+_KQL_IMPORTANCE: Mapping[MailImportance, str] = {"low": "low", "normal": "medium", "high": "high"}
+
+_DESCRIPTION = """\
+Searches the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one, by \
+keyword, sender, recipient, subject, or attachment file name. To list the newest mail of one \
+folder, use outlook_list_mail.
+
+Notes:
+- `received_after`, `received_before`, `importance`, `has_attachments`, `flagged`, and \
+`category` narrow a search with AND. They are not criteria, so they cannot start a search alone.
+"""
 
 
 class MailSearchResults(BaseModel):
@@ -50,7 +63,10 @@ class MailSearchResults(BaseModel):
         description="The matches, in the index's own order, not necessarily newest first."
     )
     more_may_exist: bool = Field(
-        description="True if the answer fills limit, so more matches can exist."
+        description=(
+            "True if Graph returned `limit` messages, so more matches can exist. The tool "
+            "computes this before it applies `flagged`, `has_attachments`, and `category`."
+        )
     )
 
 
@@ -68,11 +84,12 @@ CRITERIA: tuple[str, ...] = tuple(field.name for field in fields(SearchCriteria)
 
 _NO_CRITERIA = (
     f"outlook_search_mail needs at least one of {', '.join(CRITERIA[:-1])} or {CRITERIA[-1]}. "
-    + "Graph answers a criteria-free search with an arbitrary slice of the mailbox. This slice is "
-    + "a sample of what the user can read, not an answer. Add the words or the person the "
-    + "question is about. `received_after` and `received_before` narrow a search and are not "
-    + "criteria: a date range with nothing to search for is outlook_list_mail, which orders by "
-    + "receipt and reaches drafts this index does not."
+    + "Graph answers a search with no criteria with an arbitrary slice of the mailbox. This slice "
+    + "is a sample of what the user can read, not an answer. Add the words or the person the "
+    + "question is about. `received_after`, `received_before`, `importance`, `has_attachments`, "
+    + "`flagged`, and `category` narrow a search and are not criteria. To list the newest mail of "
+    + "one folder by date or by these filters, use outlook_list_mail. It orders by receipt and "
+    + "reaches drafts that this index does not."
 )
 
 _WINDOW_RUNS_BACKWARDS = (
@@ -90,6 +107,10 @@ async def search_mail(
     *,
     received_after: date | datetime | None = None,
     received_before: date | datetime | None = None,
+    importance: MailImportance | None = None,
+    flagged: bool | None = None,
+    has_attachments: bool | None = None,
+    category: str | None = None,
     limit: int,
     mailbox: str | None = None,
 ) -> MailSearchResults:
@@ -99,7 +120,13 @@ async def search_mail(
         raise ToolError(_NO_CRITERIA)
     if runs_backwards(received_after, received_before):
         raise ToolError(_WINDOW_RUNS_BACKWARDS)
-    search = " AND ".join([asked, *_window_terms(received_after, received_before)])
+    search = " AND ".join(
+        [
+            asked,
+            *_window_terms(received_after, received_before),
+            *_importance_terms(importance),
+        ]
+    )
     reached = graph_mailbox(client, mailbox)
 
     with graph_errors(TOOL_NAME):
@@ -114,12 +141,13 @@ async def search_mail(
                 )
             )
         found = [message for message in (page.value if page is not None else None) or []]
-        stable = await _stable_ids(reached, found)
+        kept = _narrowed(found, flagged=flagged, has_attachments=has_attachments, category=category)
+        stable = await _stable_ids(reached, kept)
 
     return MailSearchResults(
         messages=[
             MailSummary.from_message(message, message_id=stable[message.id])
-            for message in found
+            for message in kept
             if message.id is not None and message.id in stable
         ],
         more_may_exist=len(found) >= limit,
@@ -176,6 +204,28 @@ def _window_terms(
     if received_before is not None:
         terms.append(_closing_term(received_before))
     return terms
+
+
+def _importance_terms(importance: MailImportance | None) -> list[str]:
+    if importance is None:
+        return []
+    return [f"importance:{_KQL_IMPORTANCE[importance]}"]
+
+
+def _narrowed(
+    found: list[Message],
+    *,
+    flagged: bool | None,
+    has_attachments: bool | None,
+    category: str | None,
+) -> list[Message]:
+    return [
+        message
+        for message in found
+        if (flagged is None or has_flag_state(message, flagged))
+        and (has_attachments is None or message.has_attachments is has_attachments)
+        and (category is None or carries_category(message, category))
+    ]
 
 
 def _opening_term(received_after: date | datetime) -> str:
@@ -245,6 +295,49 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | datetime | None,
             Field(description="Only mail received on or before this date or moment."),
         ] = None,
+        importance: Annotated[
+            MailImportance | None,
+            Field(
+                description=(
+                    "Only mail with this importance: `low`, `normal`, or `high`. Graph applies "
+                    "this filter inside the search, together with the other arguments."
+                )
+            ),
+        ] = None,
+        flagged: Annotated[
+            bool | None,
+            Field(
+                description=(
+                    "Set to true for only the mail flagged for follow-up. Set to false for only "
+                    "the mail that is not flagged. A completed follow-up counts as not flagged. "
+                    "A message for which Microsoft 365 reports no flag matches neither value. "
+                    "The tool applies this filter to the page that Graph returns, so the result "
+                    "can hold fewer than `limit` messages."
+                )
+            ),
+        ] = None,
+        has_attachments: Annotated[
+            bool | None,
+            Field(
+                description=(
+                    "Set to true for only the mail that has attachments. Set to false for only "
+                    "the mail that has none. Inline attachments do not count. The tool applies "
+                    "this filter to the page that Graph returns, so the result can hold fewer "
+                    "than `limit` messages."
+                )
+            ),
+        ] = None,
+        category: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Only mail with this Outlook category. The match uses the category name and "
+                    "ignores case. The tool applies this filter to the page that Graph returns, "
+                    "so the result can hold fewer than `limit` messages."
+                ),
+            ),
+        ] = None,
         limit: Annotated[
             int,
             Field(
@@ -268,6 +361,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
             received_after=received_after,
             received_before=received_before,
+            importance=importance,
+            flagged=flagged,
+            has_attachments=has_attachments,
+            category=category,
             limit=limit,
             mailbox=mailbox,
         )

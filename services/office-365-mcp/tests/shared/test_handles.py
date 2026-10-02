@@ -192,6 +192,10 @@ _DRAFT_ID = "AAMkAGI2THVSYNTHETIC-0003_def="
 _RULE_ID = "AQAAAJSYNTHETIC0004="
 _CALENDAR_ID = "AAMkSYNTHETIC-cal-0005="
 _EVENT_ID = "AAMkAGI2SYNTHETIC-immutable-0006="
+_PERMISSION_ID = "RXhjaGFuZ2VQdWJsaXNoZWRVc2VyLlNZTlRIRVRJQy0wMDA3"
+_ATTACHMENT_ID = "AAMkAGI2SYNTHETIC-attachment-0008="
+_MAIL_ATTACHMENT_URI = handles.MailAttachmentHandle(_MAIL_ID, _ATTACHMENT_ID).uri
+_EVENT_ATTACHMENT_URI = handles.EventAttachmentHandle(_CALENDAR_ID, _EVENT_ID, _ATTACHMENT_ID).uri
 
 
 class TestTheMailHandleGrammar:
@@ -235,6 +239,7 @@ class TestTheMailHandleGrammar:
             f"outlook:///rules/{_RULE_ID}",
             f"outlook:///calendars/{_CALENDAR_ID}",
             f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
+            _MAIL_ATTACHMENT_URI,
             # The Teams scheme, and the schemes a polymorphic reader would advertise.
             _CHAT_URI,
             "mail:///messages/AAMkAGI2",
@@ -272,6 +277,7 @@ class TestTheMailHandleGrammar:
             f"outlook:///rules/{_RULE_ID}",
             f"outlook:///calendars/{_CALENDAR_ID}",
             f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
+            _MAIL_ATTACHMENT_URI,
             "outlook:///drafts/%20",
             "",
         ],
@@ -293,6 +299,51 @@ class TestTheMailHandleGrammar:
     )
     def test_what_is_not_a_mail_rule_handle(self, uri: str) -> None:
         assert handles.mail_rule_handle(uri) is None
+
+    def test_a_mail_attachment_handle_round_trips_both_ids(self) -> None:
+        handle = handles.MailAttachmentHandle(_MAIL_ID, _ATTACHMENT_ID)
+
+        assert handles.mail_attachment_handle(handle.uri) == handle
+
+    def test_a_mail_attachment_handle_nests_under_the_handle_of_its_message(self) -> None:
+        uri = handles.MailAttachmentHandle(_MAIL_ID, _ATTACHMENT_ID).uri
+
+        assert uri.startswith(handles.MailMessageHandle(_MAIL_ID).uri + "/attachments/")
+
+    def test_the_message_id_comes_first_in_a_mail_attachment_handle(self) -> None:
+        handle = handles.MailAttachmentHandle(_MAIL_ID, _ATTACHMENT_ID)
+
+        assert handles.mail_attachment_handle(handle.uri) != handles.MailAttachmentHandle(
+            _ATTACHMENT_ID, _MAIL_ID
+        )
+
+    def test_either_id_of_a_mail_attachment_handle_is_percent_encoded(self) -> None:
+        awkward = "AAMk/with/slashes?and=query#hash"
+
+        uri = handles.MailAttachmentHandle(awkward, awkward).uri
+
+        assert uri.count("/") == 6
+        assert handles.mail_attachment_handle(uri) == handles.MailAttachmentHandle(awkward, awkward)
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            f"outlook:///messages/{_MAIL_ID}",
+            f"outlook:///drafts/{_DRAFT_ID}/attachments/{_ATTACHMENT_ID}",
+            _EVENT_ATTACHMENT_URI,
+            "outlook:///messages/a-message/attachments/",
+            "outlook:///messages//attachments/an-attachment",
+            "outlook:///messages/%20/attachments/an-attachment",
+            "outlook:///messages/a-message/attachments/%20",
+            "outlook:///messages/a-message/attachments/a/b",
+            "outlook:///messages/a-message/files/an-attachment",
+            "mail:///messages/a-message/attachments/an-attachment",
+            _CHAT_URI,
+            "",
+        ],
+    )
+    def test_what_is_not_a_mail_attachment_handle(self, uri: str) -> None:
+        assert handles.mail_attachment_handle(uri) is None
 
     def test_a_mail_handle_is_not_a_teams_handle_of_any_family(self) -> None:
         """The scheme is the boundary between the two products, so every Teams parser refuses
@@ -345,6 +396,7 @@ class TestTheCalendarHandleGrammar:
             f"outlook:///drafts/{_DRAFT_ID}",
             f"outlook:///rules/{_RULE_ID}",
             f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
+            f"outlook:///calendarpermissions/{_CALENDAR_ID}/{_PERMISSION_ID}",
             _CHAT_URI,
             "calendar:///calendars/AAMkSYNTHETIC",
             "outlook:///calendars/",
@@ -363,6 +415,8 @@ class TestTheCalendarHandleGrammar:
             f"outlook:///calendars/{_CALENDAR_ID}",
             f"outlook:///messages/{_MAIL_ID}",
             f"outlook:///drafts/{_DRAFT_ID}",
+            f"outlook:///calendarpermissions/{_CALENDAR_ID}/{_PERMISSION_ID}",
+            _EVENT_ATTACHMENT_URI,
             "outlook:///events/only-one-id",
             "outlook:///events//an-event",
             "outlook:///events/a-calendar/%20",
@@ -388,6 +442,153 @@ class TestTheCalendarHandleGrammar:
         uri = handles.EventHandle(_CALENDAR_ID, _EVENT_ID).uri
 
         assert handles.transcript_handle(uri) is None
+
+    def test_an_event_attachment_handle_round_trips_all_three_ids(self) -> None:
+        handle = handles.EventAttachmentHandle(_CALENDAR_ID, _EVENT_ID, _ATTACHMENT_ID)
+
+        assert handles.event_attachment_handle(handle.uri) == handle
+
+    def test_an_event_attachment_handle_nests_under_the_handle_of_its_event(self) -> None:
+        uri = handles.EventAttachmentHandle(_CALENDAR_ID, _EVENT_ID, _ATTACHMENT_ID).uri
+
+        assert uri.startswith(handles.EventHandle(_CALENDAR_ID, _EVENT_ID).uri + "/attachments/")
+
+    def test_the_calendar_id_comes_first_in_an_event_attachment_handle(self) -> None:
+        handle = handles.EventAttachmentHandle(_CALENDAR_ID, _EVENT_ID, _ATTACHMENT_ID)
+
+        assert handles.event_attachment_handle(handle.uri) != (
+            handles.EventAttachmentHandle(_EVENT_ID, _CALENDAR_ID, _ATTACHMENT_ID)
+        )
+
+    def test_each_id_of_an_event_attachment_handle_is_percent_encoded(self) -> None:
+        awkward = "AAMk/with/slashes?and=query#hash"
+
+        uri = handles.EventAttachmentHandle(awkward, awkward, awkward).uri
+
+        assert uri.count("/") == 7
+        assert handles.event_attachment_handle(uri) == handles.EventAttachmentHandle(
+            awkward, awkward, awkward
+        )
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
+            _MAIL_ATTACHMENT_URI,
+            "outlook:///events/an-event/attachments/an-attachment",
+            "outlook:///events/a-calendar/an-event/attachments/",
+            "outlook:///events//an-event/attachments/an-attachment",
+            "outlook:///events/%20/an-event/attachments/an-attachment",
+            "outlook:///events/a-calendar/%20/attachments/an-attachment",
+            "outlook:///events/a-calendar/an-event/attachments/%20",
+            "outlook:///events/a-calendar/an-event/attachments/a/b",
+            "outlook:///events/a-calendar/an-event/files/an-attachment",
+            "calendar:///events/a-calendar/an-event/attachments/an-attachment",
+            _CHAT_URI,
+            "",
+        ],
+    )
+    def test_what_is_not_an_event_attachment_handle(self, uri: str) -> None:
+        assert handles.event_attachment_handle(uri) is None
+
+    def test_a_calendar_permission_handle_round_trips_both_ids(self) -> None:
+        handle = handles.CalendarPermissionHandle(_CALENDAR_ID, _PERMISSION_ID)
+
+        assert handles.calendar_permission_handle(handle.uri) == handle
+
+    def test_the_calendar_id_comes_first_in_a_calendar_permission_handle(self) -> None:
+        handle = handles.CalendarPermissionHandle(_CALENDAR_ID, _PERMISSION_ID)
+
+        assert handles.calendar_permission_handle(handle.uri) != (
+            handles.CalendarPermissionHandle(_PERMISSION_ID, _CALENDAR_ID)
+        )
+
+    def test_either_id_of_a_calendar_permission_handle_is_percent_encoded(self) -> None:
+        awkward = "AAMk/with/slashes?and=query#hash"
+
+        uri = handles.CalendarPermissionHandle(awkward, awkward).uri
+
+        assert uri.count("/") == 5
+        assert handles.calendar_permission_handle(uri) == handles.CalendarPermissionHandle(
+            awkward, awkward
+        )
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
+            f"outlook:///calendars/{_CALENDAR_ID}",
+            f"outlook:///messages/{_MAIL_ID}",
+            f"outlook:///rules/{_RULE_ID}",
+            _EVENT_ATTACHMENT_URI,
+            "outlook:///calendarpermissions/only-one-id",
+            "outlook:///calendarpermissions//a-permission",
+            "outlook:///calendarpermissions/a-calendar/%20",
+            "outlook:///calendarpermissions/a/b/c",
+            "calendar:///calendarpermissions/a-calendar/a-permission",
+            _CHAT_URI,
+            "",
+        ],
+    )
+    def test_what_is_not_a_calendar_permission_handle(self, uri: str) -> None:
+        assert handles.calendar_permission_handle(uri) is None
+
+    def test_a_calendar_permission_handle_is_not_a_handle_of_another_family(self) -> None:
+        uri = handles.CalendarPermissionHandle(_CALENDAR_ID, _PERMISSION_ID).uri
+
+        assert handles.event_handle(uri) is None
+        assert handles.calendar_handle(uri) is None
+        assert handles.transcript_handle(uri) is None
+        assert handles.drive_file_handle(uri) is None
+
+
+_CONTACT_ID = "AAMkAGI2SYNTHETIC-contact-0009="
+
+
+class TestTheContactHandleGrammar:
+    def test_a_contact_handle_round_trips_its_id(self) -> None:
+        handle = handles.ContactHandle(_CONTACT_ID)
+
+        assert handles.contact_handle(handle.uri) == handle
+
+    def test_the_id_is_percent_encoded_so_a_separator_inside_it_cannot_end_the_segment(
+        self,
+    ) -> None:
+        awkward = "AAMk/with/slashes?and=query#hash"
+
+        uri = handles.ContactHandle(awkward).uri
+
+        assert "/" not in uri.removeprefix("outlook:///contacts/")
+        assert handles.contact_handle(uri) == handles.ContactHandle(awkward)
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            f"outlook:///messages/{_CONTACT_ID}",
+            f"outlook:///folders/{_FOLDER_ID}",
+            f"outlook:///calendars/{_CALENDAR_ID}",
+            f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
+            _MAIL_ATTACHMENT_URI,
+            _CHAT_URI,
+            "people:///contacts/AAMkAGI2",
+            "outlook:///contacts/",
+            "outlook:///contacts/%20",
+            "outlook:///contacts/a/b",
+            "outlook:///contacts",
+            "alexw@example.invalid",
+            "",
+        ],
+    )
+    def test_what_is_not_a_contact_handle(self, uri: str) -> None:
+        assert handles.contact_handle(uri) is None
+
+    def test_a_contact_handle_is_not_a_handle_of_another_family(self) -> None:
+        uri = handles.ContactHandle(_CONTACT_ID).uri
+
+        assert handles.mail_message_handle(uri) is None
+        assert handles.mail_folder_handle(uri) is None
+        assert handles.calendar_handle(uri) is None
+        assert handles.message_handle(uri) is None
 
 
 _ONENOTE_SECTION_ID = (

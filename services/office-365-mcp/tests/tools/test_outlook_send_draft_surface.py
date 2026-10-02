@@ -66,9 +66,12 @@ _ME = {
     "userPrincipalName": "ada@corp.example.invalid",
 }
 
+_CHANGE_KEY = "CQAAABYAAAC4SYNTHETIC-version-0001"
+
 _DRAFT: Mapping[str, object] = {
     "id": _DRAFT_ID,
     "isDraft": True,
+    "changeKey": _CHANGE_KEY,
     "subject": _SUBJECT,
     "toRecipients": [{"emailAddress": {"name": "Ada Lovelace", "address": _ADA}}],
     "ccRecipients": [{"emailAddress": {"name": "Pam Beesly", "address": _PAM}}],
@@ -247,6 +250,72 @@ class TestTheWholeConfirmationOverARealClient:
 
         assert "given for a different request" in refusal, refusal
         assert _posts(graph) == [], f"an accept nothing was bound to posted {_posts(graph)}"
+
+    async def test_an_accept_for_the_draft_as_it_was_asked_about_sends_it_once(
+        self, an_agreeing_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        first = await an_agreeing_client.session.call_tool(
+            sender.TOOL_NAME, dict(sender.GRAPH_CALL_EXAMPLE), allow_input_required=True
+        )
+
+        assert isinstance(first, InputRequiredResult), "the question was never put to anybody"
+        requests = first.input_requests or {}
+        (key,) = requests
+        agrees = _the_word_for_yes(requests[key])
+
+        second = await an_agreeing_client.session.call_tool(
+            sender.TOOL_NAME,
+            dict(sender.GRAPH_CALL_EXAMPLE),
+            input_responses={key: CarriedAnswer(action="accept", content={"value": agrees})},
+            request_state=first.request_state,
+            allow_input_required=True,
+        )
+
+        assert isinstance(second, CallToolResult), "the bound accept asked again instead"
+        assert not second.is_error, second.content
+        assert _posts(graph) == [_SEND_ROUTE], f"a bound accept posted {_posts(graph)}"
+
+    async def test_an_accept_for_a_draft_edited_after_the_question_sends_nothing(
+        self, an_agreeing_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        first = await an_agreeing_client.session.call_tool(
+            sender.TOOL_NAME, dict(sender.GRAPH_CALL_EXAMPLE), allow_input_required=True
+        )
+
+        assert isinstance(first, InputRequiredResult), "the question was never put to anybody"
+        requests = first.input_requests or {}
+        (key,) = requests
+        agrees = _the_word_for_yes(requests[key])
+        edited = {**_DRAFT, "changeKey": "CQAAABYAAAC4SYNTHETIC-version-0002"}
+        _ = graph.get(_DRAFT_PATH).mock(return_value=httpx.Response(200, json=edited))
+
+        second = await an_agreeing_client.session.call_tool(
+            sender.TOOL_NAME,
+            dict(sender.GRAPH_CALL_EXAMPLE),
+            input_responses={key: CarriedAnswer(action="accept", content={"value": agrees})},
+            request_state=first.request_state,
+            allow_input_required=True,
+        )
+
+        assert isinstance(second, CallToolResult), "the stale accept asked again instead"
+        assert second.is_error, "an accept for the draft before the edit was read as agreement"
+        refusal = " ".join(block.text for block in second.content if isinstance(block, TextContent))
+        assert "given for a different request" in refusal, refusal
+        assert _posts(graph) == [], f"a draft edited after the question posted {_posts(graph)}"
+
+    async def test_a_draft_read_with_no_change_key_is_never_asked_about_or_sent(
+        self, an_agreeing_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        unversioned = {key: value for key, value in _DRAFT.items() if key != "changeKey"}
+        _ = graph.get(_DRAFT_PATH).mock(return_value=httpx.Response(200, json=unversioned))
+
+        result = await an_agreeing_client.session.call_tool(
+            sender.TOOL_NAME, dict(sender.GRAPH_CALL_EXAMPLE), allow_input_required=True
+        )
+
+        assert isinstance(result, CallToolResult), "a draft with no version was asked about"
+        assert result.is_error, "an accept that binds to the bare question was possible"
+        assert _posts(graph) == [], f"a draft with no version posted {_posts(graph)}"
 
     async def test_a_client_pinned_to_the_handshake_era_still_asks_and_sends(
         self, app: Starlette, graph: respx.MockRouter

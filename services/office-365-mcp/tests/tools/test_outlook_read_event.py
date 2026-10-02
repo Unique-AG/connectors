@@ -1,3 +1,4 @@
+import re
 from collections.abc import Mapping, Sequence
 from typing import cast
 
@@ -35,9 +36,28 @@ _HANDLE = EventHandle(_CALENDAR_ID, _EVENT_ID)
 _SELECTED = (
     "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,"
     + "showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,"
-    + "attendees,webLink,body,hasAttachments,responseRequested,allowNewTimeProposals,"
-    + "hideAttendees,originalStartTimeZone,originalEndTimeZone"
+    + "attendees,webLink,categories,importance,body,hasAttachments,responseRequested,"
+    + "allowNewTimeProposals,hideAttendees,originalStartTimeZone,originalEndTimeZone,recurrence"
 )
+
+_SERIES_MASTER_ID = "AAMkSYNTHETIC-series-0001="
+
+_MASTER_PATH = "/me/calendars/AAMkSYNTHETIC-cal-0001%3D/events/AAMkSYNTHETIC-series-0001%3D"
+
+_WEEKLY_UNTIL_JUNE: Mapping[str, object] = {
+    "pattern": {
+        "type": "weekly",
+        "interval": 2,
+        "daysOfWeek": ["monday", "thursday"],
+        "firstDayOfWeek": "monday",
+    },
+    "range": {
+        "type": "endDate",
+        "startDate": "2026-03-02",
+        "endDate": "2026-06-29",
+        "recurrenceTimeZone": "W. Europe Standard Time",
+    },
+}
 
 # Graph fills this year in `responseStatus.time` when nobody answered yet.
 _NEVER_ANSWERED = "0001-01-01T00:00:00Z"
@@ -72,17 +92,26 @@ def _payload(
     hide_attendees: bool | None = False,
     original_start_zone: str | None = "W. Europe Standard Time",
     original_end_zone: str | None = "W. Europe Standard Time",
+    event_id: str = _EVENT_ID,
+    kind: str = "occurrence",
+    series_master_id: str | None = _SERIES_MASTER_ID,
+    categories: Sequence[str] = (),
+    importance: str | None = "normal",
+    recurrence: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     return {
-        "id": _EVENT_ID,
+        "id": event_id,
         "subject": "Pricing review",
         "bodyPreview": "Microsoft Teams meeting Join on your computer or mobile app",
         "start": {"dateTime": "2026-03-04T13:00:00.0000000", "timeZone": "UTC"},
         "end": {"dateTime": "2026-03-04T14:00:00.0000000", "timeZone": "UTC"},
         "isAllDay": False,
         "isCancelled": False,
-        "type": "occurrence",
-        "seriesMasterId": "AAMkSYNTHETIC-series-0001=",
+        "type": kind,
+        "seriesMasterId": series_master_id,
+        "categories": list(categories),
+        "importance": importance,
+        "recurrence": None if recurrence is None else dict(recurrence),
         "sensitivity": "normal",
         "showAs": "busy",
         "location": {"displayName": "Conf Room Synthetic"},
@@ -126,7 +155,7 @@ class TestWhatItAsksGraphFor:
         assert sent == f"/v1.0{_PATH}", "both ids are percent-encoded, each as one path segment"
         assert route.call_count == 1, "one event, one request"
 
-    async def test_it_selects_the_listing_fields_and_the_seven_a_full_read_adds(
+    async def test_it_selects_the_listing_fields_and_the_eight_a_full_read_adds(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Graph returns none of these on a projection that does not name them."""
@@ -148,7 +177,7 @@ class TestWhatItAsksGraphFor:
         selected = route.calls.last.request.url.params["$select"].split(",")
         assert [field for field in SUMMARY_FIELDS if field not in selected] == []
 
-    async def test_it_never_asks_for_an_attachment_or_the_recurrence_rule(
+    async def test_it_never_asks_for_an_attachment(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         route = _reads(graph, _payload(body=_body("Agenda attached.")))
@@ -157,7 +186,16 @@ class TestWhatItAsksGraphFor:
 
         selected = route.calls.last.request.url.params["$select"]
         assert "attachments" not in selected
-        assert "recurrence" not in selected
+
+    async def test_it_asks_for_the_recurrence_rule_that_a_listing_never_does(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _reads(graph, _payload(body=_body("Agenda attached.")))
+
+        _ = await _read(client)
+
+        assert "recurrence" in route.calls.last.request.url.params["$select"].split(",")
+        assert "recurrence" not in SUMMARY_FIELDS
 
     async def test_it_prefers_a_text_body_and_declares_the_immutable_id_space(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -424,6 +462,30 @@ class TestWhatItAnswers:
         assert answer.allow_new_time_proposals is False
         assert answer.hide_attendees is True
 
+    def test_the_proposal_field_names_the_tool_that_can_propose_a_new_time(self) -> None:
+        described = reader.CalendarEvent.model_fields["allow_new_time_proposals"].description or ""
+
+        assert "outlook_respond_to_invite can propose a new time" in described
+        assert "proposes no time" not in described
+        assert 15 <= len(described.split()) <= 60
+
+    def test_the_attachment_field_names_the_tool_that_lists_them_only_as_optional(self) -> None:
+        described = reader.CalendarEvent.model_fields["has_attachments"].description or ""
+
+        assert "reads no attachment" not in described
+        assert "out of reach" not in described
+        sentences = re.split(r"(?<=[.!?])\s+", described)
+        naming = [
+            sentence for sentence in sentences if "outlook_list_event_attachments" in sentence
+        ]
+        assert naming, "the description no longer says how to list the attachments"
+        for sentence in naming:
+            assert sentence.startswith(
+                "If this deployment exposes outlook_list_event_attachments, "
+            )
+        assert "`uri` of this event" in described
+        assert 15 <= len(described.split()) <= 60
+
     async def test_an_attachment_is_a_boolean_and_nothing_else(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -483,6 +545,120 @@ class TestWhatItAnswers:
         assert answer.owner_is_organizer is False
         assert answer.attendee_count == 1
         assert answer.web_link == "https://outlook.office365.invalid/owa/?itemid=synthetic"
+
+    async def test_it_reports_the_categories_and_the_importance_graph_holds(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(
+            graph,
+            _payload(
+                body=_body("Agenda."), categories=["Budget", "Blue category"], importance="high"
+            ),
+        )
+
+        answer = await _read(client)
+
+        assert answer.categories == ["Budget", "Blue category"]
+        assert answer.importance == "high"
+
+    async def test_an_occurrence_carries_the_handle_of_its_series_master(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _payload(body=_body("Agenda.")))
+
+        answer = await _read(client)
+
+        assert answer.series_master_uri == EventHandle(_CALENDAR_ID, _SERIES_MASTER_ID).uri
+        assert answer.recurrence is None
+
+    async def test_the_series_master_handle_reads_the_master_and_its_rule(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _payload(body=_body("Agenda.")))
+        master = graph.get(_MASTER_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=_payload(
+                    body=_body("Agenda."),
+                    event_id=_SERIES_MASTER_ID,
+                    kind="seriesMaster",
+                    series_master_id=None,
+                    recurrence=_WEEKLY_UNTIL_JUNE,
+                ),
+            )
+        )
+        occurrence = await _read(client)
+        assert occurrence.series_master_uri is not None
+
+        answer = await reader.read_event(client, uri=occurrence.series_master_uri)
+
+        assert master.call_count == 1
+        assert answer.kind == "seriesMaster"
+        assert answer.in_series is True
+        assert answer.series_master_uri is None
+        assert answer.recurrence is not None
+        assert "recurrence" in master.calls.last.request.url.params["$select"].split(",")
+
+    async def test_a_series_master_reports_its_recurrence_rule_as_graph_holds_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(
+            graph,
+            _payload(
+                body=_body("Agenda."),
+                kind="seriesMaster",
+                series_master_id=None,
+                recurrence=_WEEKLY_UNTIL_JUNE,
+            ),
+        )
+
+        answer = await _read(client)
+
+        assert answer.recurrence is not None
+        pattern = answer.recurrence.pattern
+        assert pattern is not None
+        assert (pattern.kind, pattern.interval, pattern.days_of_week) == (
+            "weekly",
+            2,
+            ["monday", "thursday"],
+        )
+        assert pattern.first_day_of_week == "monday"
+        assert (pattern.day_of_month, pattern.month, pattern.index) == (None, None, None)
+        dates = answer.recurrence.range
+        assert dates is not None
+        assert (dates.kind, dates.start_date, dates.end_date) == (
+            "endDate",
+            "2026-03-02",
+            "2026-06-29",
+        )
+        assert dates.recurrence_time_zone == "W. Europe Standard Time"
+        assert dates.number_of_occurrences is None
+        assert answer.series_master_uri is None
+
+    async def test_a_single_event_names_no_series_master_and_no_rule(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(
+            graph, _payload(body=_body("Agenda."), kind="singleInstance", series_master_id=None)
+        )
+
+        answer = await _read(client)
+
+        assert answer.series_master_uri is None
+        assert answer.in_series is False
+        assert answer.recurrence is None
+
+    async def test_an_event_with_no_category_and_no_importance_reports_none(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        payload = _payload(body=_body("Agenda."), importance=None)
+        del payload["categories"]
+        _ = _reads(graph, payload)
+
+        answer = await _read(client)
+
+        assert answer.categories == []
+        assert answer.importance is None
 
 
 class TestWhatItRefuses:

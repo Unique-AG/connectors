@@ -1,5 +1,7 @@
+import hashlib
+import json
 import re
-from collections.abc import Awaitable, Callable, Iterator, Mapping
+from collections.abc import Awaitable, Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import TracebackType
 from typing import cast, override
@@ -30,6 +32,7 @@ from mcp.types import (
 from mcp.types.version import MODERN_PROTOCOL_VERSIONS
 from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
+from pydantic import BaseModel
 
 from office_365_mcp.graph_client import (
     GraphFailure,
@@ -102,6 +105,9 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "Notes.Read",
         "Notes.Create",
         "Notes.ReadWrite",
+        "Place.Read.All",
+        "Contacts.Read",
+        "Contacts.ReadWrite",
     }
 )
 
@@ -177,7 +183,17 @@ type Confirmed = str | InputRequiredResult | None
 
 type Confirm = Callable[[str, str], Awaitable[Confirmed]]
 
+type DigestPart = str | int | bool | None | Sequence[DigestPart] | Mapping[str, DigestPart]
+
 _CONFIRMATION = "confirm"
+
+
+def confirmation_digest(*parts: BaseModel | DigestPart) -> str:
+    canonical = [
+        part.model_dump(mode="json", exclude_none=True) if isinstance(part, BaseModel) else part
+        for part in parts
+    ]
+    return hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()
 
 
 def _modern_protocol(ctx: Context) -> bool:

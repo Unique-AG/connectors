@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncGenerator, Iterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ from starlette.applications import Starlette
 from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.shared.handles import MailMessageHandle
+from office_365_mcp.tools import outlook_copy_mail as copy
 from office_365_mcp.tools import outlook_mark_mail as mark
 from office_365_mcp.tools import outlook_move_mail as move
 
@@ -52,9 +54,32 @@ class _Tool:
 
 _MARK = _Tool(mark.TOOL_NAME, {"is_read": True}, "change", "PATCH")
 _MOVE = _Tool(move.TOOL_NAME, {"destination": "archive"}, "move", "POST")
+_COPY = _Tool(copy.TOOL_NAME, {"destination": "archive"}, "copy", "POST")
 
-_EITHER_TOOL = pytest.mark.parametrize(
-    "tool", [pytest.param(_MARK, id="mark"), pytest.param(_MOVE, id="move")]
+_EACH_TOOL = pytest.mark.parametrize(
+    "tool",
+    [
+        pytest.param(_MARK, id="mark"),
+        pytest.param(_MOVE, id="move"),
+        pytest.param(_COPY, id="copy"),
+    ],
+)
+
+_MARKS: Sequence[Mapping[str, object]] = (
+    {"is_read": True},
+    {"flagged": True},
+    {"flag_status": "flagged"},
+    {"flag_status": "complete"},
+    {"flag_starts_at": "2026-03-02T09:00", "flag_time_zone": "Europe/Berlin"},
+    {"flag_starts_at": "2026-03-02T09:00", "flag_time_zone": "UTC"},
+    {
+        "flag_starts_at": "2026-03-02T09:00",
+        "flag_due_at": "2026-03-06T17:00",
+        "flag_time_zone": "Europe/Berlin",
+    },
+    {"add_categories": ["Red"]},
+    {"add_categories": ["Red", "Blue"]},
+    {"remove_categories": ["Red"]},
 )
 
 
@@ -150,7 +175,7 @@ def _arguments(tool: _Tool, *, mailbox: str | None) -> dict[str, object]:
 
 @pytest.mark.usefixtures("obo")
 class TestTheWholeConfirmationOverARealClient:
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_an_agreed_change_to_another_mailbox_writes_each_message_after_one_question(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:
@@ -166,7 +191,7 @@ class TestTheWholeConfirmationOverARealClient:
         assert len(written) == len(_REFS), f"an agreed change wrote {written}"
         assert all(f"/users/{_MAILBOX}/messages/" in path for path in written), written
 
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_a_person_who_says_no_leaves_the_other_mailbox_alone(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:
@@ -179,7 +204,7 @@ class TestTheWholeConfirmationOverARealClient:
         assert len(person.questions) == 1
         assert _writes(graph, tool) == [], f"a declined change wrote {_writes(graph, tool)}"
 
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_the_own_mailbox_asks_nobody_and_writes(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:
@@ -194,7 +219,7 @@ class TestTheWholeConfirmationOverARealClient:
             "the own mailbox was held back by a question"
         )
 
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_a_client_pinned_to_the_handshake_era_still_asks_and_writes(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:
@@ -208,7 +233,7 @@ class TestTheWholeConfirmationOverARealClient:
         assert len(person.questions) == 1, f"the person was asked {person.questions}"
         assert len(_writes(graph, tool)) == len(_REFS), "a handshake-era change wrote too few"
 
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_a_handshake_era_refusal_writes_nothing(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:
@@ -234,7 +259,7 @@ class TestTheWholeConfirmationOverARealClient:
         assert "They stay recoverable in Deleted Items." in person.questions[0]
         assert len(_writes(graph, _MOVE)) == len(_REFS)
 
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_an_accept_that_omits_the_request_state_writes_nothing(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:
@@ -263,3 +288,46 @@ class TestTheWholeConfirmationOverARealClient:
         assert _writes(graph, tool) == [], (
             f"an accept nothing was bound to wrote {_writes(graph, tool)}"
         )
+
+    async def test_a_different_mark_binds_a_different_request_state(
+        self, app: Starlette, graph: respx.MockRouter
+    ) -> None:
+        person = _Person(agrees=True, word=_MARK.agree)
+
+        async with _connected(app, person) as client:
+            asked = [
+                await client.session.call_tool(
+                    _MARK.name,
+                    {"message_refs": list(_REFS), "mailbox": _MAILBOX, **mark},
+                    allow_input_required=True,
+                )
+                for mark in _MARKS
+            ]
+
+        states = {
+            answer.request_state for answer in asked if isinstance(answer, InputRequiredResult)
+        }
+        assert len(states) == len(_MARKS), f"{len(_MARKS)} marks bound {len(states)} states"
+        assert _writes(graph, _MARK) == []
+
+    async def test_an_agreed_category_change_reads_each_message_before_it_writes_it(
+        self, app: Starlette, graph: respx.MockRouter
+    ) -> None:
+        person = _Person(agrees=True, word=_MARK.agree)
+        read = graph.route(method="GET").mock(
+            return_value=httpx.Response(200, json={"id": "synthetic", "categories": ["Red"]})
+        )
+        arguments = {"message_refs": list(_REFS), "mailbox": _MAILBOX, "add_categories": ["Blue"]}
+
+        async with _connected(app, person) as client:
+            result = await client.call_tool(_MARK.name, arguments)
+
+        assert result.structured_content is not None, "the agreed change answered nothing"
+        assert len(person.questions) == 1
+        assert read.call_count == len(_REFS)
+        patches = [
+            cast("Mapping[str, object]", json.loads(call.request.content))
+            for call in cast("Sequence[respx.models.Call]", graph.calls)
+            if call.request.method == "PATCH"
+        ]
+        assert [patch["categories"] for patch in patches] == [["Red", "Blue"]] * len(_REFS)

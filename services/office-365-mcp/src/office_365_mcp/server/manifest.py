@@ -38,6 +38,9 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Notes.Read": False,
     "Notes.Create": False,
     "Notes.ReadWrite": False,
+    "Place.Read.All": True,
+    "Contacts.Read": False,
+    "Contacts.ReadWrite": False,
 }
 
 _LABEL_WIDTH = 17

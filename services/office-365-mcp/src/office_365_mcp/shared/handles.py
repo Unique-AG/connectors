@@ -1,12 +1,11 @@
 """The handle grammar: every shape this connector mints, the parser, and the speller.
 
-Four schemes, one per product. `teams:///` addresses Microsoft Teams, `outlook:///` addresses a
-mailbox, `sharepoint:///` addresses a file or a folder in OneDrive or SharePoint, and `onenote:///`
+Four schemes, one per product. `teams:///` addresses Microsoft Teams, and `outlook:///` addresses a
+mailbox. `sharepoint:///` addresses a file or a folder in OneDrive or SharePoint. `onenote:///`
 addresses a OneNote notebook, section group, section, page or long-running operation. If a mail
-shape used the Teams scheme, it has to answer
-`MessageHandle.permission` below, and that answer reaches `teams_read_message`'s declared
-permissions and, from there, the consent screen of every `teams` deployment. The scheme is the
-cheapest place to keep the products apart.
+shape used the Teams scheme, it has to answer `MessageHandle.permission` below. That answer reaches
+the declared permissions of `teams_read_message` and, from there, the consent screen of every
+`teams` deployment. The scheme is the cheapest place to keep the products apart.
 
 This is the only module that spells or parses these URIs. tests/test_layering.py enforces that.
 A second speller does not look like a disagreement. It looks like a handle that one tool produced
@@ -34,18 +33,19 @@ carry `:` and `@` (`19:...@thread.v2`). The parser rejects half-encoded input, s
 handle comes back as "not a handle" rather than as a truncated URL Graph ignores.
 
 Each mail `outlook:///` family is one segment, because Outlook addresses each of these by a single
-opaque id. There are four mail families rather than one. Graph gives them all one id space, but
-this connector keeps them apart: a draft is a message with `isDraft` set. Splitting them into four
-families keeps a message that a reader found from being spelled as a draft and handed to the tool
-that sends.
+opaque id. The exception is an attachment. It adds `attachments/{attachment_id}` under its message
+or its event, because every Graph route to an attachment goes through that parent. There are four
+mail families rather than one. Graph gives them all one id space, but this connector keeps them
+apart: a draft is a message with `isDraft` set. Splitting them into four families keeps a message
+that a reader found from being spelled as a draft and handed to the tool that sends.
 
 A calendar is one segment: Graph says container types such as `calendar` support no immutable id,
 "but their regular IDs were already constant"
 (https://learn.microsoft.com/en-us/graph/outlook-immutable-id).
 
-An event is two segments, the calendar id first: the read route is
-`/me/calendars/{calendar_id}/events/{event_id}`, and Microsoft says an id from another mailbox
-"would return an error"
+An event is two segments, the calendar id first. The read route is
+`/me/calendars/{calendar_id}/events/{event_id}`, and Microsoft says that an id from another
+mailbox returns an error
 (https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars).
 """
 
@@ -119,6 +119,17 @@ class MailMessageHandle:
 
 
 @dataclass(frozen=True, slots=True)
+class MailAttachmentHandle:
+    message_id: str
+    attachment_id: str
+
+    @property
+    def uri(self) -> str:
+        message = MailMessageHandle(self.message_id).uri
+        return f"{message}/attachments/{_segment(self.attachment_id)}"
+
+
+@dataclass(frozen=True, slots=True)
 class MailFolderHandle:
     """This identifies a mail folder by its Graph id. That id is what reaches a folder that no
     well-known name covers.
@@ -180,6 +191,40 @@ class EventHandle:
     @property
     def uri(self) -> str:
         return f"outlook:///events/{_segment(self.calendar_id)}/{_segment(self.event_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class EventAttachmentHandle:
+    calendar_id: str
+    event_id: str
+    attachment_id: str
+
+    @property
+    def uri(self) -> str:
+        event = EventHandle(self.calendar_id, self.event_id).uri
+        return f"{event}/attachments/{_segment(self.attachment_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarPermissionHandle:
+    calendar_id: str
+    permission_id: str
+
+    @property
+    def uri(self) -> str:
+        return (
+            f"outlook:///calendarpermissions/{_segment(self.calendar_id)}"
+            + f"/{_segment(self.permission_id)}"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ContactHandle:
+    contact_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"outlook:///contacts/{_segment(self.contact_id)}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,11 +301,15 @@ _REPLY_HANDLE = re.compile(
 _MEETING_HANDLE = re.compile(r"\Ateams:///meetings/([^/]+)\Z")
 _TRANSCRIPT_HANDLE = re.compile(r"\Ateams:///transcripts/([^/]+)/([^/]+)\Z")
 _MAIL_MESSAGE_HANDLE = re.compile(r"\Aoutlook:///messages/([^/]+)\Z")
+_MAIL_ATTACHMENT_HANDLE = re.compile(r"\Aoutlook:///messages/([^/]+)/attachments/([^/]+)\Z")
 _MAIL_FOLDER_HANDLE = re.compile(r"\Aoutlook:///folders/([^/]+)\Z")
 _MAIL_DRAFT_HANDLE = re.compile(r"\Aoutlook:///drafts/([^/]+)\Z")
 _MAIL_RULE_HANDLE = re.compile(r"\Aoutlook:///rules/([^/]+)\Z")
 _CALENDAR_HANDLE = re.compile(r"\Aoutlook:///calendars/([^/]+)\Z")
 _EVENT_HANDLE = re.compile(r"\Aoutlook:///events/([^/]+)/([^/]+)\Z")
+_EVENT_ATTACHMENT_HANDLE = re.compile(r"\Aoutlook:///events/([^/]+)/([^/]+)/attachments/([^/]+)\Z")
+_CALENDAR_PERMISSION_HANDLE = re.compile(r"\Aoutlook:///calendarpermissions/([^/]+)/([^/]+)\Z")
+_CONTACT_HANDLE = re.compile(r"\Aoutlook:///contacts/([^/]+)\Z")
 _DRIVE_FILE_HANDLE = re.compile(r"\Asharepoint:///files/([^/]+)/([^/]+)\Z")
 _DRIVE_FOLDER_HANDLE = re.compile(r"\Asharepoint:///folders/([^/]+)/([^/]+)\Z")
 _ONENOTE_SECTION_HANDLE = re.compile(r"\Aonenote:///sections/([^/]+)\Z")
@@ -321,6 +370,11 @@ def mail_message_handle(uri: str) -> MailMessageHandle | None:
     return None if message_id is None else MailMessageHandle(message_id)
 
 
+def mail_attachment_handle(uri: str) -> MailAttachmentHandle | None:
+    ids = _two_ids(_MAIL_ATTACHMENT_HANDLE, uri)
+    return None if ids is None else MailAttachmentHandle(*ids)
+
+
 def mail_folder_handle(uri: str) -> MailFolderHandle | None:
     folder_id = _single_id(_MAIL_FOLDER_HANDLE, uri)
     return None if folder_id is None else MailFolderHandle(folder_id)
@@ -349,6 +403,21 @@ def event_handle(uri: str) -> EventHandle | None:
     if not calendar_id.strip() or not event_id.strip():
         return None
     return EventHandle(calendar_id, event_id)
+
+
+def event_attachment_handle(uri: str) -> EventAttachmentHandle | None:
+    ids = _three_ids(_EVENT_ATTACHMENT_HANDLE, uri)
+    return None if ids is None else EventAttachmentHandle(*ids)
+
+
+def calendar_permission_handle(uri: str) -> CalendarPermissionHandle | None:
+    ids = _two_ids(_CALENDAR_PERMISSION_HANDLE, uri)
+    return None if ids is None else CalendarPermissionHandle(*ids)
+
+
+def contact_handle(uri: str) -> ContactHandle | None:
+    contact_id = _single_id(_CONTACT_HANDLE, uri)
+    return None if contact_id is None else ContactHandle(contact_id)
 
 
 def drive_file_handle(uri: str) -> DriveFileHandle | None:
@@ -422,6 +491,16 @@ def _two_ids(pattern: re.Pattern[str], uri: str) -> tuple[str, str] | None:
     if not drive_id.strip() or not item_id.strip():
         return None
     return drive_id, item_id
+
+
+def _three_ids(pattern: re.Pattern[str], uri: str) -> tuple[str, str, str] | None:
+    match = pattern.match(uri)
+    if match is None:
+        return None
+    calendar_id, event_id, attachment_id = (unquote(part) for part in match.groups())
+    if not calendar_id.strip() or not event_id.strip() or not attachment_id.strip():
+        return None
+    return calendar_id, event_id, attachment_id
 
 
 def _single_id(pattern: re.Pattern[str], uri: str) -> str | None:

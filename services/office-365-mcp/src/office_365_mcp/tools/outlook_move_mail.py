@@ -1,6 +1,4 @@
-import hashlib
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from typing import Annotated
 
 import httpx
@@ -9,8 +7,6 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.mail_folder import MailFolder
-from msgraph.generated.models.mail_search_folder import MailSearchFolder
 from msgraph.generated.users.item.messages.item.move.move_post_request_body import (
     MovePostRequestBody,
 )
@@ -19,14 +15,19 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.handles import (
-    MailFolderHandle,
-    MailMessageHandle,
-    mail_folder_handle,
-    mail_message_handle,
-)
+from office_365_mcp.shared.handles import MailMessageHandle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import WellKnownFolder
+from office_365_mcp.shared.mail import (
+    MailDestination,
+    MailFault,
+    MessageAttempt,
+    WellKnownFolder,
+    destination_asked_for,
+    mail_batch_confirmation_id,
+    message_handles,
+    raise_when_no_message_succeeded,
+    resolve_destination,
+)
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -40,7 +41,6 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_move_mail"
 
-STEP_DESTINATION = "destination_folder"
 STEP_MOVE = "move_message"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
@@ -65,15 +65,6 @@ GRAPH_NOT_FOUND = (
     + "returns. If the search does not find the message, tell the user that the message is not "
     + "in this mailbox now.\n\n"
     + "If you call this tool again with the same arguments, the call will fail the same way."
-)
-
-_SEARCH_FOLDER_ONLY: frozenset[str] = frozenset(
-    MailSearchFolder().get_field_deserializers()
-) - frozenset(MailFolder().get_field_deserializers())
-
-assert _SEARCH_FOLDER_ONLY, (
-    "MailSearchFolder declares no property of its own, so the destination check below accepts "
-    "every search folder silently"
 )
 
 
@@ -144,6 +135,15 @@ _SEARCH_FOLDER_DESTINATION = (
     + "folder whose query matches it."
 )
 
+_REFUSALS: Mapping[MailFault, str] = {
+    MailFault.BOTH_DESTINATIONS: _BOTH_DESTINATIONS,
+    MailFault.NO_DESTINATION: _NO_DESTINATION,
+    MailFault.NOT_A_FOLDER_HANDLE: _NOT_A_FOLDER_HANDLE,
+    MailFault.NOT_A_MESSAGE_HANDLE: _NOT_A_MESSAGE_HANDLE,
+    MailFault.SEARCH_FOLDER: _SEARCH_FOLDER_DESTINATION,
+    MailFault.HIDDEN_FOLDER: _HIDDEN_DESTINATION,
+}
+
 
 class MovedMessage(BaseModel):
     uri: str = Field(
@@ -181,23 +181,6 @@ class MailMoved(BaseModel):
     )
 
 
-@dataclass(frozen=True, slots=True)
-class _Destination:
-    folder_id: str
-    name: str
-
-
-@dataclass(frozen=True, slots=True)
-class _Unusable:
-    refusal: str
-
-
-@dataclass(frozen=True, slots=True)
-class _Attempt:
-    result: MovedMessage
-    failure: GraphFailure | None
-
-
 async def move_mail(
     client: GraphServiceClient,
     *,
@@ -208,28 +191,35 @@ async def move_mail(
     mailbox: str | None = None,
 ) -> MailMoved | InputRequiredResult:
     assert len(message_refs) >= 1, "the schema admits no empty batch"
-    handles = _message_handles(message_refs)
-    wanted = _destination_asked_for(destination, folder_ref)
+    handles = message_handles(message_refs)
+    if isinstance(handles, MailFault):
+        raise ToolError(_REFUSALS[handles])
+    wanted = destination_asked_for(destination, folder_ref)
+    if isinstance(wanted, MailFault):
+        raise ToolError(_REFUSALS[wanted])
     reached = graph_mailbox(client, mailbox)
 
     answer: Confirmed = None
-    attempts: list[_Attempt] = []
+    attempts: list[MessageAttempt[MovedMessage]] = []
     with graph_errors(TOOL_NAME):
-        target = await _destination(reached, wanted)
-        if not isinstance(target, _Unusable):
+        target = await resolve_destination(reached, wanted)
+        if not isinstance(target, MailFault):
             if mailbox is not None:
                 with not_graph():
                     answer = await confirm(
-                        _question(mailbox, len(handles), target), _about(mailbox, handles, target)
+                        _question(mailbox, len(handles), target),
+                        mail_batch_confirmation_id(
+                            TOOL_NAME, mailbox=mailbox, handles=handles, target=target
+                        ),
                     )
             if answer is None:
                 attempts = [
                     await _move_one(reached, handle=handle, into=target) for handle in handles
                 ]
-                _raise_when_nothing_moved(attempts)
+                raise_when_no_message_succeeded(attempts)
 
-    if isinstance(target, _Unusable):
-        raise ToolError(target.refusal)
+    if isinstance(target, MailFault):
+        raise ToolError(_REFUSALS[target])
     if isinstance(answer, InputRequiredResult):
         return answer
     if answer is not None:
@@ -237,7 +227,7 @@ async def move_mail(
     return _answer(target, attempts)
 
 
-def _question(mailbox: str, count: int, target: _Destination) -> str:
+def _question(mailbox: str, count: int, target: MailDestination) -> str:
     messages = f"{count} {'message' if count == 1 else 'messages'}"
     if target.folder_id == _DELETED_ITEMS:
         return (
@@ -252,64 +242,13 @@ def _question(mailbox: str, count: int, target: _Destination) -> str:
     )
 
 
-def _about(mailbox: str, handles: Sequence[MailMessageHandle], target: _Destination) -> str:
-    parts = (mailbox, target.folder_id, *(handle.uri for handle in handles))
-    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
-
-
 def a_person_agrees(ctx: Context) -> Confirm:
     return person_confirms(ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_MOVED)
 
 
-def _message_handles(message_refs: Sequence[str]) -> tuple[MailMessageHandle, ...]:
-    handles: list[MailMessageHandle] = []
-    for ref in message_refs:
-        handle = mail_message_handle(ref)
-        if handle is None:
-            raise ToolError(_NOT_A_MESSAGE_HANDLE)
-        handles.append(handle)
-    return tuple(handles)
-
-
-def _destination_asked_for(
-    destination: WellKnownFolder | None, folder_ref: str | None
-) -> WellKnownFolder | MailFolderHandle:
-    if destination is not None and folder_ref is not None:
-        raise ToolError(_BOTH_DESTINATIONS)
-    if destination is not None:
-        return destination
-    if folder_ref is None:
-        raise ToolError(_NO_DESTINATION)
-    handle = mail_folder_handle(folder_ref)
-    if handle is None:
-        raise ToolError(_NOT_A_FOLDER_HANDLE)
-    return handle
-
-
-async def _destination(
-    reached: UserItemRequestBuilder, wanted: WellKnownFolder | MailFolderHandle
-) -> _Destination | _Unusable:
-    if not isinstance(wanted, MailFolderHandle):
-        return _Destination(folder_id=wanted, name=wanted)
-    with graph_step(STEP_DESTINATION):
-        folder = await reached.mail_folders.by_mail_folder_id(wanted.folder_id).get()
-    assert folder is not None, "Graph answered a mail folder read with no folder"
-    if _is_search_folder(folder):
-        return _Unusable(_SEARCH_FOLDER_DESTINATION)
-    if folder.is_hidden:
-        return _Unusable(_HIDDEN_DESTINATION)
-    return _Destination(folder_id=wanted.folder_id, name=folder.display_name or wanted.uri)
-
-
-def _is_search_folder(folder: MailFolder) -> bool:
-    if isinstance(folder, MailSearchFolder):
-        return True
-    return bool(_SEARCH_FOLDER_ONLY & frozenset(folder.additional_data or {}))
-
-
 async def _move_one(
-    reached: UserItemRequestBuilder, *, handle: MailMessageHandle, into: _Destination
-) -> _Attempt:
+    reached: UserItemRequestBuilder, *, handle: MailMessageHandle, into: MailDestination
+) -> MessageAttempt[MovedMessage]:
     try:
         with graph_step(STEP_MOVE):
             moved = await reached.messages.by_message_id(handle.message_id).move.post(
@@ -317,14 +256,14 @@ async def _move_one(
                 request_configuration=_move_request(),
             )
     except GraphFailure as failure:
-        return _Attempt(
+        return MessageAttempt(
             result=MovedMessage(uri=handle.uri, new_uri=None, moved=False, error=str(failure)),
             failure=failure,
         )
     assert moved is not None and moved.id is not None, (
         "Graph answered a move with no message, so there is no new id to hand back"
     )
-    return _Attempt(
+    return MessageAttempt(
         result=MovedMessage(
             uri=handle.uri, new_uri=MailMessageHandle(moved.id).uri, moved=True, error=None
         ),
@@ -336,15 +275,7 @@ def _move_request() -> RequestConfiguration[QueryParameters]:
     return RequestConfiguration[QueryParameters](headers=immutable_id_headers(), options=no_retry())
 
 
-def _raise_when_nothing_moved(attempts: Sequence[_Attempt]) -> None:
-    if any(attempt.result.moved for attempt in attempts):
-        return
-    failed = next((attempt.failure for attempt in attempts if attempt.failure is not None), None)
-    if failed is not None:
-        raise failed
-
-
-def _answer(target: _Destination, attempts: Sequence[_Attempt]) -> MailMoved:
+def _answer(target: MailDestination, attempts: Sequence[MessageAttempt[MovedMessage]]) -> MailMoved:
     results = [attempt.result for attempt in attempts]
     return MailMoved(
         destination=target.name,

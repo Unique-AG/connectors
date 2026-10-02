@@ -34,13 +34,12 @@ from office_365_mcp.shared.calendar import (
     CalendarSummary,
     EventSummary,
     calendar_of,
-    spelled,
     window_bounds,
     zone_named,
 )
 from office_365_mcp.shared.handles import calendar_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.odata import odata_literal, spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import runs_backwards
 

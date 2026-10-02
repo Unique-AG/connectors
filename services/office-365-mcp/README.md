@@ -94,17 +94,25 @@ When only one tool owns a fact, that fact does not belong in `shared/`. Examples
 - a request
 - a refusal
 
-**`handles.py` writes one URL segment for each handle family. Four families use two segments
-instead of one.**
+**`handles.py` writes one URL segment for each handle family. Some families use two or more
+segments instead of one.**
 
-Every `teams:///` family, and every `outlook:///` mail family, names a single id. A calendar handle
-also names a single id. Microsoft states that a container type has no immutable id, because its
-regular ids "were already constant".
+Each `outlook:///` mail family names a single id. An attachment handle is the exception, because
+every Graph route to an attachment goes through its message or its event. So a mail attachment
+handle names two ids, and an event attachment handle names three. A calendar handle also names a
+single id. Microsoft states that a container type has no immutable id, because its regular ids
+"were already constant". A contact handle, `outlook:///contacts/{contact}`, also names a single
+id.
 
 An event handle is `outlook:///events/{calendar}/{event}`, two segments. An event id is meaningful
 only next to the calendar it was read from. Graph answers a different id for the same meeting in a
 delegated copy. The read request needs both halves: `/me/calendars/{calendar}/events/{event}`.
 `teams:///transcripts/{a}/{b}` uses the same two-segment shape, for the same reason.
+
+A calendar-share handle is `outlook:///calendarpermissions/{calendar}/{permission}`, two segments.
+A permission id means something only under its calendar, so the handle names both. The tools
+`outlook_list_calendar_shares` and `outlook_share_calendar` mint it. The tool
+`outlook_unshare_calendar` parses it.
 
 This layout follows seven layering rules:
 

@@ -18,13 +18,13 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.calendar import (
     EventTime,
+    WorkingHoursSummary,
     event_time,
-    repeated_address,
-    spelled,
     wall_clock,
     zone_named,
 )
-from office_365_mcp.shared.mail import ONE_ADDRESS
+from office_365_mcp.shared.mail import AddressFault, one_address_each
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_check_availability"
@@ -46,10 +46,16 @@ DEFAULT_INTERVAL_MINUTES = 30
 
 _FALLBACK_ZONE = ZoneInfo("UTC")
 
-_DESCRIPTION = (
-    "Reads free/busy status for one or more mailboxes over a time window; read-only, it does "
-    "not book, invite, or change anything."
-)
+_DESCRIPTION = """\
+Reads the free/busy status and the working hours of one or more mailboxes over a time window. \
+This tool only reads, and nothing here books, invites, or changes anything. \
+outlook_suggest_meeting_times is the tool that asks Microsoft to suggest meeting times.
+
+Notes:
+- `working_hours` holds the standing weekly hours of the owner. It does not depend on the \
+window, and it does not mark any slot as free or busy.
+- Before you offer a free slot to the user, compare the slot with `working_hours`.
+"""
 
 _ENDS_BEFORE_STARTS = (
     "outlook_check_availability read nothing, because `ends_at` is not after `starts_at`. Both "
@@ -106,7 +112,7 @@ class FreeBusySlot(BaseModel):
     @classmethod
     def from_item(cls, item: ScheduleItem, *, zone: ZoneInfo) -> FreeBusySlot:
         return cls(
-            status=None if item.status is None else spelled(item.status),
+            status=spelled(item.status),
             start=event_time(item.start, zone=zone),
             end=event_time(item.end, zone=zone),
             subject=item.subject,
@@ -140,6 +146,13 @@ class MailboxSchedule(BaseModel):
             + "empty."
         )
     )
+    working_hours: WorkingHoursSummary | None = Field(
+        description=(
+            "The standing weekly working hours of the mailbox owner. The times use the zone in "
+            + "`working_hours.time_zone`, and not the zone of the window. This field is null "
+            + "when Graph gives none."
+        )
+    )
 
     @classmethod
     def from_information(cls, info: ScheduleInformation, *, zone: ZoneInfo) -> MailboxSchedule:
@@ -153,6 +166,7 @@ class MailboxSchedule(BaseModel):
                 if error is None
                 else ScheduleError(response_code=error.response_code, message=error.message)
             ),
+            working_hours=WorkingHoursSummary.from_working_hours(info.working_hours),
         )
 
 
@@ -212,14 +226,12 @@ async def check_availability(
 
 
 def _addresses(addresses: Sequence[str]) -> tuple[str, ...]:
-    trimmed = tuple(address.strip() for address in addresses)
-    for address in trimmed:
-        if ONE_ADDRESS.match(address) is None:
-            raise ToolError(_bad_address(address))
-    again = repeated_address(trimmed)
-    if again is not None:
-        raise ToolError(_repeated(again))
-    return trimmed
+    checked = one_address_each(addresses)
+    if isinstance(checked, AddressFault):
+        raise ToolError(
+            _repeated(checked.entry) if checked.repeated else _bad_address(checked.entry)
+        )
+    return checked
 
 
 def _moment(argument: str, value: str) -> datetime:

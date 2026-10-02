@@ -41,6 +41,9 @@ mock_provider "azuread" {
         "Notes.Read"                       = "d1111111-1111-1111-1111-111111111111"
         "Notes.Create"                     = "d2222222-2222-2222-2222-222222222222"
         "Notes.ReadWrite"                  = "d3333333-3333-3333-3333-333333333333"
+        "Place.Read.All"                   = "f1111111-1111-1111-1111-111111111111"
+        "Contacts.Read"                    = "f2222222-2222-2222-2222-222222222222"
+        "Contacts.ReadWrite"               = "f3333333-3333-3333-3333-333333333333"
       }
     }
   }
@@ -238,7 +241,7 @@ run "preset_outlook_mailbox" {
   }
 
   assert {
-    condition     = length(local.tools) == 3
+    condition     = length(local.tools) == 4
     error_message = "outlook-mailbox resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
@@ -251,6 +254,22 @@ run "preset_outlook_write" {
   assert {
     condition     = join(",", local.permissions) == "User.Read,Mail.Read,Mail.Read.Shared,People.Read,Mail.ReadWrite,Mail.ReadWrite.Shared"
     error_message = "outlook-write composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_outlook_delete" {
+  variables {
+    tools_preset = "outlook-delete"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,Mail.Read.Shared,People.Read,Mail.ReadWrite,Mail.ReadWrite.Shared"
+    error_message = "outlook-delete composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 22
+    error_message = "outlook-delete resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
 
@@ -276,6 +295,22 @@ run "preset_outlook_automate" {
   }
 }
 
+run "preset_outlook_rules" {
+  variables {
+    tools_preset = "outlook-rules"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,MailboxSettings.Read,MailboxSettings.ReadWrite,Mail.ReadBasic"
+    error_message = "outlook-rules composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 10
+    error_message = "outlook-rules resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+}
+
 run "preset_outlook_calendar" {
   variables {
     tools_preset = "outlook-calendar"
@@ -287,7 +322,7 @@ run "preset_outlook_calendar" {
   }
 
   assert {
-    condition     = length(local.tools) == 6
+    condition     = length(local.tools) == 13
     error_message = "outlook-calendar resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
@@ -303,8 +338,29 @@ run "preset_outlook_calendar_write" {
   }
 
   assert {
-    condition     = length(local.tools) == 10
+    condition     = length(local.tools) == 17
     error_message = "outlook-calendar-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+}
+
+run "preset_outlook_calendar_manage" {
+  variables {
+    tools_preset = "outlook-calendar-manage"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadBasic,Calendars.ReadWrite"
+    error_message = "outlook-calendar-manage composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 22
+    error_message = "outlook-calendar-manage resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "every delegated Calendars permission is AdminConsentRequired: No, and this needs ${join(",", local.admin_consent)}"
   }
 }
 
@@ -319,13 +375,97 @@ run "preset_outlook_calendar_delegate" {
   }
 
   assert {
-    condition     = length(local.tools) == 11
+    condition     = length(local.tools) == 18
     error_message = "outlook-calendar-delegate resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 
   assert {
     condition     = length(local.admin_consent) == 0
     error_message = "every delegated Calendars permission is AdminConsentRequired: No, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_outlook_calendar_rooms" {
+  variables {
+    tools_preset = "outlook-calendar-rooms"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadBasic,Place.Read.All,Calendars.ReadWrite"
+    error_message = "outlook-calendar-rooms composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 18
+    error_message = "outlook-calendar-rooms resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Place.Read.All"]
+    error_message = "Microsoft marks the delegated Place.Read.All as AdminConsentRequired: Yes, and no Calendars permission needs an administrator; this composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_outlook_group_calendar" {
+  variables {
+    tools_preset = "outlook-group-calendar"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Team.ReadBasic.All,Calendars.Read"
+    error_message = "outlook-group-calendar composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 3
+    error_message = "outlook-group-calendar resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "the group calendar view takes Calendars.Read in place of Group.Read.All, so it needs no administrator, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_outlook_contacts" {
+  variables {
+    tools_preset = "outlook-contacts"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Contacts.Read"
+    error_message = "outlook-contacts composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 3
+    error_message = "outlook-contacts resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "Microsoft marks the delegated Contacts.Read as AdminConsentRequired: No, and this composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_outlook_contacts_write" {
+  variables {
+    tools_preset = "outlook-contacts-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Contacts.Read,Contacts.ReadWrite"
+    error_message = "outlook-contacts-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 5
+    error_message = "outlook-contacts-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "Microsoft marks the delegated Contacts.ReadWrite as AdminConsentRequired: No, and this composed ${join(",", local.admin_consent)}"
   }
 }
 

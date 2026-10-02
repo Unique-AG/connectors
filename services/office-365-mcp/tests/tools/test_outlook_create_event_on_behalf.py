@@ -3,6 +3,7 @@
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from typing import Annotated, cast
 
 import httpx
@@ -32,9 +33,15 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.calendar import (
     CALENDAR_FIELDS,
     NOBODY_INVITED_BUT_A_PLACE,
+    NOBODY_INVITED_BUT_A_ROOM,
     EventDraft,
+    EventImportance,
+    EventSensitivity,
+    RecurrenceRule,
+    ShowAs,
     transaction_id_for,
 )
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle, event_handle
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
 from office_365_mcp.tools import outlook_create_event_on_behalf as creator
@@ -61,6 +68,7 @@ _OWNER = "alex@example.invalid"
 _ADA = "ada@example.invalid"
 _GRACE = "grace@example.invalid"
 _PAM = "pam@example.invalid"
+_ROOM = "room3@example.invalid"
 
 _SUBJECT = "Pricing review"
 _STARTS_AT = "2026-03-02T14:00"
@@ -86,6 +94,8 @@ _DRAFT = EventDraft(
 
 # What the answer is bound to and what Graph is told to dedupe on: one string for both.
 _TRANSACTION = transaction_id_for(_CALENDAR_ID, _DRAFT)
+
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
 
 
 def _calendar_payload(
@@ -137,9 +147,11 @@ def _created_payload(
     join_url: str | None = None,
     transaction_id: str | None = "SYNTHETIC-transaction-0001",
     web_link: str | None = _WEB_LINK,
+    stored: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Graph's 201. Microsoft renders both bounds in UTC when nothing asks for another zone."""
     return {
+        **(stored or {}),
         "id": event_id,
         "subject": subject,
         "start": dict(start)
@@ -307,6 +319,19 @@ async def _called(
         location=cast("str | None", arguments.get("location")),
         all_day=cast("bool", arguments.get("all_day", False)),
         online_meeting=cast("bool", arguments.get("online_meeting", False)),
+        room_addresses=cast("Sequence[str]", arguments.get("room_addresses", ())),
+        categories=cast("Sequence[str]", arguments.get("categories", ())),
+        show_as=cast("ShowAs | None", arguments.get("show_as")),
+        importance=cast("EventImportance | None", arguments.get("importance")),
+        sensitivity=cast("EventSensitivity | None", arguments.get("sensitivity")),
+        is_reminder_on=cast("bool | None", arguments.get("is_reminder_on")),
+        reminder_minutes_before_start=cast(
+            "int | None", arguments.get("reminder_minutes_before_start")
+        ),
+        hide_attendees=cast("bool | None", arguments.get("hide_attendees")),
+        response_requested=cast("bool | None", arguments.get("response_requested")),
+        allow_new_time_proposals=cast("bool | None", arguments.get("allow_new_time_proposals")),
+        recurrence=cast("RecurrenceRule | None", arguments.get("recurrence")),
         confirm=cast("Confirm", arguments["confirm"]),
     )
 
@@ -481,10 +506,31 @@ class TestWhatItSendsToGraph:
 
         assert "attendees" not in _sent(create)
 
+    async def test_nothing_it_sends_carries_an_attachment_because_no_argument_offers_one(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, attendees=[_ADA])
+
+        assert "attachments" not in _sent(create)
+
     @pytest.mark.parametrize(
-        "absent", ["hideAttendees", "recurrence", "responseRequested", "attachments"]
+        "absent",
+        [
+            "showAs",
+            "categories",
+            "importance",
+            "sensitivity",
+            "isReminderOn",
+            "reminderMinutesBeforeStart",
+            "hideAttendees",
+            "responseRequested",
+            "allowNewTimeProposals",
+            "recurrence",
+        ],
     )
-    async def test_nothing_it_sends_carries_a_property_no_argument_offers(
+    async def test_an_option_the_call_leaves_out_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, absent: str
     ) -> None:
         create = _ready(graph)
@@ -492,6 +538,79 @@ class TestWhatItSendsToGraph:
         _ = await _create(client, attendees=[_ADA])
 
         assert absent not in _sent(create)
+
+    @pytest.mark.parametrize(
+        ("argument", "value", "key"),
+        [
+            ("show_as", "tentative", "showAs"),
+            ("categories", ["Budget"], "categories"),
+            ("importance", "low", "importance"),
+            ("sensitivity", "confidential", "sensitivity"),
+            ("is_reminder_on", True, "isReminderOn"),
+            ("reminder_minutes_before_start", 30, "reminderMinutesBeforeStart"),
+            ("hide_attendees", True, "hideAttendees"),
+            ("response_requested", False, "responseRequested"),
+            ("allow_new_time_proposals", False, "allowNewTimeProposals"),
+        ],
+    )
+    async def test_each_option_reaches_graph_under_its_own_property(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        argument: str,
+        value: object,
+        key: str,
+    ) -> None:
+        create = _ready(graph)
+        chosen: dict[str, object] = {argument: value}
+
+        _ = await _create(client, **chosen)
+
+        assert _sent(create)[key] == value
+
+    async def test_each_room_reaches_graph_as_a_resource_attendee_after_the_people(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(
+            client, attendees=[_ADA], optional_attendees=[_GRACE], room_addresses=[_ROOM]
+        )
+
+        assert _invited(_sent(create)) == [
+            (_ADA, "required"),
+            (_GRACE, "optional"),
+            (_ROOM, "resource"),
+        ]
+
+    async def test_an_option_set_is_another_transaction(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, room_addresses=[_ROOM])
+
+        assert _sent(create)["transactionId"] != _TRANSACTION
+
+    async def test_a_category_that_repeats_in_another_case_reaches_graph_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, categories=["Red", "red"])
+
+        assert _sent(create)["categories"] == ["Red"]
+
+    async def test_a_category_that_repeats_in_another_case_sends_the_id_of_the_category_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, categories=["Red", "red"])
+        repeated = _sent(create)["transactionId"]
+        _ = await _create(client, categories=["Red"])
+
+        assert repeated == _sent(create)["transactionId"]
 
     async def test_two_identical_calls_send_one_transaction_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -692,6 +811,8 @@ class TestThePersonBetweenTheRequestAndTheCalendar:
         assert "Teams meeting" not in question
         assert "all-day" not in question
         assert "body of" not in question
+        assert "booking" not in question
+        assert "reminder" not in question
 
     async def test_the_details_sit_after_the_time_in_the_sentence_that_asks(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -718,6 +839,89 @@ class TestThePersonBetweenTheRequestAndTheCalendar:
 
         assert with_a_place.endswith(f"? {NOBODY_INVITED_BUT_A_PLACE}")
         assert with_nowhere.endswith("? There are no invitations: nobody else is told about it.")
+
+    async def test_a_room_with_nobody_invited_says_the_request_reaches_the_room_mailbox(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, room_addresses=[_ROOM])
+
+        assert f"booking the room {_ROOM}" in question
+        assert question.endswith(f"? {NOBODY_INVITED_BUT_A_ROOM}")
+        assert NOBODY_INVITED_BUT_A_PLACE not in question
+
+    async def test_rooms_with_nobody_invited_are_all_named_before_the_request_text(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, room_addresses=[_ROOM, "room4@example.invalid"])
+
+        assert f"booking the rooms {_ROOM}, room4@example.invalid? " in question
+        assert question.endswith(f"? {NOBODY_INVITED_BUT_A_ROOM}")
+
+    async def test_a_room_and_a_place_with_nobody_invited_are_asked_about_as_a_room(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, location="Room 3", room_addresses=[_ROOM])
+
+        assert "at 'Room 3'" in question
+        assert question.endswith(f"? {NOBODY_INVITED_BUT_A_ROOM}")
+
+    async def test_a_room_beside_the_invited_people_is_named_before_the_invitations(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, attendees=[_ADA], room_addresses=[_ROOM])
+
+        creates, _mark, invitations = question.partition("? ")
+        assert creates.endswith(f"booking the room {_ROOM}")
+        assert "to 1 person" in invitations
+        assert NOBODY_INVITED_BUT_A_ROOM not in question
+        assert NOBODY_INVITED_BUT_A_PLACE not in question
+
+    async def test_a_category_that_repeats_in_another_case_is_named_once_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, categories=["Red", "red"])
+
+        assert "tagged 'Red'" in question
+        assert "Red, red" not in question
+
+    @pytest.mark.parametrize(
+        ("argument", "value", "said"),
+        [
+            ("show_as", "oof", "shown as out of office"),
+            ("categories", ["Budget"], "tagged 'Budget'"),
+            ("importance", "high", "with high importance"),
+            ("sensitivity", "personal", "marked as personal"),
+            ("is_reminder_on", True, "with a reminder"),
+            ("reminder_minutes_before_start", 1, "with a reminder 1 minute before the start"),
+            ("hide_attendees", False, "with the attendee list visible to every attendee"),
+            ("response_requested", True, "with a response requested"),
+            ("allow_new_time_proposals", True, "with new time proposals allowed"),
+        ],
+    )
+    async def test_the_question_names_each_option_the_call_sets(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        argument: str,
+        value: object,
+        said: str,
+    ) -> None:
+        _ = _ready(graph)
+        chosen: dict[str, object] = {argument: value}
+
+        question = await _asked(client, **chosen)
+
+        assert said in question
 
     async def test_a_location_of_nothing_but_whitespace_is_no_place_anywhere(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1237,6 +1441,40 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
+    async def test_a_room_entry_that_is_not_one_address_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        with pytest.raises(ToolError, match="`room_addresses`"):
+            _ = await _create(client, room_addresses=["Room 3"])
+
+        assert len(graph.calls) == 0
+
+    async def test_the_same_room_twice_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        with pytest.raises(ToolError, match="more than once in `room_addresses`"):
+            _ = await _create(client, room_addresses=[_ROOM, _ROOM.upper()])
+
+        assert len(graph.calls) == 0
+
+    @pytest.mark.parametrize("argument", ["attendees", "optional_attendees"])
+    async def test_a_room_that_is_also_a_person_on_the_event_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter, argument: str
+    ) -> None:
+        _ = _ready(graph)
+        listed: dict[str, object] = {argument: [_ROOM.upper()]}
+
+        with pytest.raises(ToolError, match="each address once") as raised:
+            _ = await _create(client, room_addresses=[_ROOM], **listed)
+
+        assert len(graph.calls) == 0
+        assert "NO EVENT WAS CREATED" in str(raised.value)
+        assert str(raised.value).endswith(_RETRY)
+
     async def test_twenty_one_attendees_reach_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -1252,6 +1490,129 @@ class TestWhatItRefuses:
     ) -> None:
         with pytest.raises(AssertionError):
             _ = await _create(client, subject="")
+
+
+_EVERY_OTHER_TUESDAY = RecurrenceRule(
+    pattern_type="weekly",
+    interval=2,
+    days_of_week=("tuesday",),
+    range_type="endDate",
+    end_date=date(2026, 6, 30),
+)
+
+
+class TestASeries:
+    async def test_a_rule_reaches_the_shared_calendar_as_the_recurrence_of_the_event(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, attendees=[_ADA], recurrence=_EVERY_OTHER_TUESDAY)
+
+        assert _sent(create)["recurrence"] == {
+            "pattern": {
+                "type": "weekly",
+                "interval": 2,
+                "daysOfWeek": ["tuesday"],
+                "firstDayOfWeek": "sunday",
+            },
+            "range": {"type": "endDate", "startDate": "2026-03-02", "endDate": "2026-06-30"},
+        }
+
+    async def test_the_question_names_the_rule_under_the_owners_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, attendees=[_ADA], recurrence=_EVERY_OTHER_TUESDAY)
+
+        assert question.startswith(
+            f"Create {_SUBJECT!r} on the calendar of {_OWNER_NAME!r}, as {_OWNER_NAME!r}, from "
+            + f"{_STARTS_AT} to {_ENDS_AT} UTC, repeating every 2 weeks on Tuesday until "
+            + "2026-06-30?"
+        )
+
+    async def test_the_answer_is_bound_to_an_id_that_carries_the_rule(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+        series = EventDraft(
+            subject=_SUBJECT,
+            starts_at=_STARTS_AT,
+            ends_at=_ENDS_AT,
+            time_zone="UTC",
+            attendees=(),
+            optional_attendees=(),
+            body_html=None,
+            location=None,
+            all_day=False,
+            online_meeting=False,
+            recurrence=_EVERY_OTHER_TUESDAY,
+        )
+
+        _ = await _create(client, recurrence=_EVERY_OTHER_TUESDAY)
+
+        assert _sent(create)["transactionId"] == transaction_id_for(_CALENDAR_ID, series)
+        assert _sent(create)["transactionId"] != _TRANSACTION
+
+    async def test_a_rule_it_cannot_send_never_reaches_graph_and_says_what_to_add(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        with pytest.raises(ToolError) as raised:
+            _ = await _create(
+                client,
+                recurrence=RecurrenceRule(pattern_type="relativeYearly", range_type="noEnd"),
+            )
+
+        assert str(raised.value) == (
+            "outlook_create_event_on_behalf cannot send this `recurrence`. The `relativeYearly` "
+            + "pattern needs `days_of_week` and `month`. Add `days_of_week` and `month` to "
+            + "`recurrence`. NO EVENT WAS CREATED and nobody was invited. "
+            + _RETRY
+        )
+        assert len(graph.calls) == 0
+
+    async def test_the_schema_root_stays_one_object_and_the_rule_is_a_nested_object(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        assert parameters["type"] == "object"
+        assert not {"anyOf", "oneOf", "allOf", "not"} & set(parameters)
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        assert properties["recurrence"]["anyOf"] == [
+            {"$ref": "#/$defs/RecurrenceRule"},
+            {"type": "null"},
+        ]
+
+    @pytest.mark.parametrize(
+        ("key", "value"), [("week_index", "second"), ("firstDayOfWeek", "monday")]
+    )
+    async def test_a_misspelled_key_in_the_rule_never_reaches_this_tool(
+        self,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        key: str,
+        value: str,
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run(
+                {
+                    **creator.GRAPH_CALL_EXAMPLE,
+                    "recurrence": {
+                        "pattern_type": "relativeMonthly",
+                        "days_of_week": ["monday"],
+                        key: value,
+                        "range_type": "noEnd",
+                    },
+                }
+            )
+
+        assert len(graph.calls) == 0, "a rule with a misspelled key reached Graph"
 
 
 class TestTheRetryItRefuses:
@@ -1487,6 +1848,62 @@ class TestWhatItAnswers:
 
         assert answer.location == "Room 3 (Zurich)"
 
+    async def test_the_options_are_read_off_the_201_rather_than_the_arguments(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(
+            graph,
+            created=_created_payload(
+                stored={
+                    "showAs": "busy",
+                    "categories": ["Budget"],
+                    "importance": "normal",
+                    "sensitivity": "normal",
+                    "isReminderOn": True,
+                    "reminderMinutesBeforeStart": 15,
+                    "hideAttendees": False,
+                    "responseRequested": True,
+                    "allowNewTimeProposals": True,
+                }
+            ),
+        )
+
+        answer = await _create(
+            client,
+            show_as="free",
+            categories=["Holiday"],
+            importance="high",
+            sensitivity="private",
+            is_reminder_on=False,
+            reminder_minutes_before_start=30,
+            hide_attendees=True,
+            response_requested=False,
+            allow_new_time_proposals=False,
+        )
+
+        assert (answer.show_as, answer.importance, answer.sensitivity) == (
+            "busy",
+            "normal",
+            "normal",
+        )
+        assert answer.categories == ["Budget"]
+        assert (answer.is_reminder_on, answer.reminder_minutes_before_start) == (True, 15)
+        assert (answer.hide_attendees, answer.response_requested) == (False, True)
+        assert answer.allow_new_time_proposals is True
+
+    async def test_options_graph_did_not_return_answer_null_and_no_category(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        answer = await _create(client)
+
+        assert (answer.show_as, answer.importance, answer.sensitivity) == (None, None, None)
+        assert answer.categories == []
+        assert (answer.is_reminder_on, answer.reminder_minutes_before_start) == (None, None)
+        assert (answer.hide_attendees, answer.response_requested) == (None, None)
+        assert answer.allow_new_time_proposals is None
+
     async def test_a_response_that_is_not_an_event_is_refused_rather_than_answered(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -1553,18 +1970,62 @@ class TestTheSchemaItPublishes:
             "location",
             "all_day",
             "online_meeting",
+            "room_addresses",
+            "categories",
+            "show_as",
+            "importance",
+            "sensitivity",
+            "is_reminder_on",
+            "reminder_minutes_before_start",
+            "hide_attendees",
+            "response_requested",
+            "allow_new_time_proposals",
+            "recurrence",
         }
 
-    @pytest.mark.parametrize(
-        "word", ["recur", "repeat", "attach", "hide", "series", "cancel", "user", "mailbox"]
-    )
-    async def test_no_argument_offers_a_series_an_attachment_or_another_mailbox(
+    @pytest.mark.parametrize("word", ["repeat", "attach", "series", "cancel", "user", "mailbox"])
+    async def test_no_argument_offers_an_attachment_a_cancel_or_another_mailbox(
         self, transport: httpx.AsyncClient, word: str
     ) -> None:
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert not [name for name in properties if word in name.casefold()]
+
+    async def test_the_one_argument_that_makes_the_event_repeat_is_the_recurrence(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert [name for name in properties if "recur" in name.casefold()] == ["recurrence"]
+
+    async def test_the_one_argument_that_hides_anything_hides_the_attendee_list(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert [name for name in properties if "hide" in name.casefold()] == ["hide_attendees"]
+
+    @pytest.mark.parametrize(
+        ("argument", "alias"),
+        [
+            ("show_as", "ShowAs"),
+            ("importance", "EventImportance"),
+            ("sensitivity", "EventSensitivity"),
+        ],
+    )
+    async def test_each_choice_is_the_enum_the_own_calendar_create_publishes(
+        self, transport: httpx.AsyncClient, argument: str, alias: str
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        choices = cast("Sequence[Mapping[str, object]]", properties[argument]["anyOf"])
+        assert choices == [{"$ref": f"#/$defs/{alias}"}, {"type": "null"}]
+        defined = cast("Mapping[str, Mapping[str, object]]", parameters["$defs"])
+        assert "unknown" not in cast("Sequence[str]", defined[alias]["enum"])
 
     async def test_the_optional_list_defaults_to_empty_and_neither_list_has_a_size_bound(
         self, transport: httpx.AsyncClient
@@ -1660,6 +2121,33 @@ class TestTheSchemaItPublishes:
             cast("Mapping[str, object]", properties["calendar_ref"]).get("description", "")
         )
         assert "outlook_list_calendars" in described
+
+    async def test_the_category_argument_promises_the_lister_only_where_it_exists(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        described = cast("str", properties["categories"]["description"])
+        assert LIST_CATEGORIES_GUARD in described
+        assert "outlook_list_categories" not in described.replace(LIST_CATEGORIES_GUARD, "")
+
+    async def test_a_category_name_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        items = cast("Mapping[str, object]", properties["categories"]["items"])
+        assert items["minLength"] == 1
+
+    async def test_a_blank_category_name_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run({**creator.GRAPH_CALL_EXAMPLE, "categories": [""]})
+
+        assert len(graph.calls) == 0, "a blank category name reached Graph"
 
 
 class TestHowItDeclaresItself:
