@@ -25,6 +25,7 @@ from backstop_mcp.dependencies import (
     get_backstop_client_factory,
     get_engine,
     get_session_factory,
+    get_tenant_guidance_config,
 )
 from backstop_mcp.features.auth import cleanup_lifespan
 from backstop_mcp.features.system_users import find_system_user_by_user_name
@@ -32,6 +33,11 @@ from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.instructions import INSTRUCTIONS
 from backstop_mcp.server.session_revoked import SessionRevokedToUnauthorizedMiddleware
+from backstop_mcp.server.tenant_guidance import (
+    check_guidance_targets,
+    compose_instructions,
+    with_tool_guidance,
+)
 from backstop_mcp.server.tools import TOOLS
 from backstop_mcp.teardown import close_singletons
 
@@ -39,7 +45,9 @@ logger = logging.getLogger(__name__)
 
 
 def create_app() -> Starlette:
-    """Build the ASGI app: logging, metrics, the MCP server and its tools, login, and readiness."""
+    """Build the ASGI app: logging, metrics, the MCP server, its tools, and this
+    deployment's tenant guidance, login, and readiness.
+    """
     config = get_app_config()
     auth_config = get_auth_config()
 
@@ -61,15 +69,29 @@ def create_app() -> Starlette:
         finally:
             await close_singletons()
 
+    guidance = get_tenant_guidance_config().tenant_guidance
     mcp = FastMCP(
         "Backstop MCP",
         version=config.version,
         auth=auth_provider,
         lifespan=lifespan,
-        instructions=INSTRUCTIONS,
+        instructions=compose_instructions(INSTRUCTIONS, guidance),
     )
-    for fn in TOOLS:
-        mcp.add_tool(fn)
+    registered = tuple(mcp.add_tool(fn) for fn in TOOLS)
+    check_guidance_targets(guidance, registered)
+    if guidance.tools:
+        for tool in registered:
+            mcp.local_provider.remove_tool(tool.name)
+        for tool in registered:
+            entry = guidance.tools.get(tool.name)
+            mcp.add_tool(tool if entry is None else with_tool_guidance(tool, entry))
+    logger.info(
+        "tenant_guidance.applied",
+        extra={
+            "server_instructions_chars": len(guidance.server_instructions or ""),
+            "tools": sorted(guidance.tools),
+        },
+    )
 
     # Mounts /probe, /health, /metrics and returns HTTP request-metrics middleware.
     ops_middleware = setup_ops(mcp)

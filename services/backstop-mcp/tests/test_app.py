@@ -7,11 +7,13 @@ testing `create_app` itself, which is where the wiring lives that is easiest to 
 These tests drive the app through Starlette's `TestClient` so the lifespan actually runs.
 """
 
+import json
 from collections.abc import Iterator
 from typing import Protocol, cast
 
 import pytest
 from cryptography.fernet import Fernet
+from fastmcp import Client, FastMCP
 from mcp.server.auth.provider import AccessToken
 from mcp.server.transport_security import DEFAULT_MAX_REQUEST_BODY_SIZE
 from starlette.testclient import TestClient
@@ -80,6 +82,16 @@ def _set_app_env(monkeypatch: pytest.MonkeyPatch, postgres: PostgresContainer) -
     monkeypatch.setenv("BACKSTOP_BASE_URL", _BASE_URL)
     monkeypatch.setenv("DB_URL", url)
     monkeypatch.setenv("BACKSTOP_MCP_ENCRYPTION_KEY", Fernet.generate_key().decode())
+    monkeypatch.delenv("BACKSTOP_MCP_TENANT_GUIDANCE", raising=False)
+
+
+async def _published_tool_names(app: object) -> list[str]:
+    state = getattr(app, "state", None)
+    server = getattr(state, "fastmcp_server", None)
+    assert isinstance(server, FastMCP)
+    async with Client(cast("FastMCP[object]", server)) as client:
+        listed = await client.list_tools()
+    return [tool.name for tool in listed]
 
 
 @pytest.fixture
@@ -361,3 +373,53 @@ class TestConfigTranslation:
             "system_user_ttl_minutes",
             "time_zone_ttl_minutes",
         }
+
+
+class TestTenantGuidance:
+    def test_an_unknown_tool_stops_startup(
+        self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _set_app_env(monkeypatch, postgres_container)
+        monkeypatch.setenv(
+            "BACKSTOP_MCP_TENANT_GUIDANCE",
+            json.dumps({"tools": {"not_a_tool": {"description": "Contoso note."}}}),
+        )
+
+        with pytest.raises(ValueError, match="not_a_tool"):
+            create_app()
+
+    async def test_tools_stay_in_registry_order_without_an_overlay(
+        self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _set_app_env(monkeypatch, postgres_container)
+
+        app = create_app()
+
+        assert await _published_tool_names(app) == [fn.__name__ for fn in TOOLS]
+
+    async def test_tools_stay_in_registry_order_with_one_overlay(
+        self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _set_app_env(monkeypatch, postgres_container)
+        middle = TOOLS[len(TOOLS) // 2]
+        monkeypatch.setenv(
+            "BACKSTOP_MCP_TENANT_GUIDANCE",
+            json.dumps({"tools": {middle.__name__: {"description": "Contoso note."}}}),
+        )
+
+        app = create_app()
+
+        assert await _published_tool_names(app) == [fn.__name__ for fn in TOOLS]
+
+    async def test_tools_stay_in_registry_order_with_every_tool_overlaid(
+        self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _set_app_env(monkeypatch, postgres_container)
+        monkeypatch.setenv(
+            "BACKSTOP_MCP_TENANT_GUIDANCE",
+            json.dumps({"tools": {fn.__name__: {"description": "Contoso note."} for fn in TOOLS}}),
+        )
+
+        app = create_app()
+
+        assert await _published_tool_names(app) == [fn.__name__ for fn in TOOLS]
