@@ -1,9 +1,9 @@
 """HTML→Markdown gist conversion: convert, squeeze markdownify's own conversion artifacts, and
 truncate at a word boundary to a caller-supplied budget.
 
-Note what a gist is *not*: the first ~300 chars of a meeting note are usually its attendee
-table, so the gist answers "who" far better than "what was discussed" — nothing here tries to
-summarize. See `extract_gist_from_html` for the library choice this rests on.
+A gist is a prefix, not a summary: it keeps whatever the body starts with, which may be a
+table rather than the discussion. See `extract_gist_from_html` for the library choice this
+rests on.
 """
 
 import logging
@@ -68,15 +68,9 @@ def _squeeze(markdown: str) -> str:
 def _drop_synthetic_table_headers(markdown: str) -> str:
     """Remove markdownify's blank `|  |  |  |` header row plus its `| --- | --- |` separator.
 
-    That pair is markdownify's own artifact for a `<table>` with no `<th>` cells (a plain
-    layout table using only `<td>`), and it always emits it as the first two lines of the
-    table's block of pipe-table lines — never anywhere deeper. So a genuine blank spacer row or
-    a row of `-` placeholder cells further down in a real table must not be mistaken for it, and
-    a real `<th>` header (whose cells hold actual text) never matches the blank-row shape in the
-    first place. Detecting table blocks first (contiguous runs of pipe-table lines, verified
-    empirically to be how markdownify delimits adjacent tables) and only inspecting each block's
-    first two lines is what tells the synthetic artifact apart from structurally identical rows
-    that happen to appear later.
+    markdownify emits that pair only as the first two lines of a `<th>`-less table's block of
+    contiguous pipe-table lines, so only those two lines are checked — identical rows deeper in
+    a table are real content and are kept.
     """
     lines = markdown.split("\n")
     kept: list[str] = []

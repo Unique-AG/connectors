@@ -1,9 +1,9 @@
 """Published party-write responses.
 
-A write reports the id, the resource type, and the extra fields a measured trap
-requires: the phone Backstop stored (it rewrites numbers), and location ids when
-addresses were created or updated. Person and organization PATCHes also echo the
-re-read record — same top-level scalars as `get_person` / `get_organization`.
+A write reports the id, the resource type, the phone Backstop stored (it rewrites
+numbers), and location ids when addresses were created or updated. Person and
+organization PATCHes also echo the re-read record — same top-level scalars as
+`get_person` / `get_organization`.
 """
 
 from datetime import date
@@ -66,10 +66,6 @@ class CreatedPersonResponse(OmitNoneModel):
             "not the requested one."
         ),
     )
-    warnings: tuple[str, ...] = Field(
-        default=(),
-        description="Silent-failure notes. Empty when the write landed as asked.",
-    )
     url: str | None = Field(default=None, description=_PERSON_URL_DESCRIPTION)
 
 
@@ -86,10 +82,6 @@ class CreatedOrganizationResponse(OmitNoneModel):
     name: str | None = Field(
         default=None,
         description="Organization name READ BACK after the write.",
-    )
-    warnings: tuple[str, ...] = Field(
-        default=(),
-        description="Silent-failure notes. Empty when the write landed as asked.",
     )
     url: str | None = Field(default=None, description=_ORGANIZATION_URL_DESCRIPTION)
 
@@ -109,8 +101,7 @@ class DeletedPersonResponse(OmitNoneModel):
     deleted_location_ids: tuple[str, ...] = Field(
         default=(),
         description=(
-            "Contact-location ids removed before the person. Empty when the person had "
-            "none. From `include=contactLocations` — not `include=locations`."
+            "Contact-location ids removed before the person. Empty when the person had none."
         ),
     )
 
@@ -133,8 +124,7 @@ class DeletedOrganizationResponse(OmitNoneModel):
         default=(),
         description=(
             "Contact-location ids removed before the organization. Empty when the "
-            "organization had none. From `include=contactLocations` — not "
-            "`include=locations`."
+            "organization had none."
         ),
     )
 
@@ -166,14 +156,9 @@ class UpdatedPersonResponse(OmitNoneModel):
     location_ids: tuple[str, ...] = Field(
         default=(),
         description=(
-            "Backstop `contact-locations` ids created or updated on this call. Echo them "
-            "as `locations[].location_id`. From `get_person` with "
-            "`include=contactLocations` — not `include=locations`."
+            "Ids this call created or patched. Echo them as `locations[].location_id` "
+            "on a later update. They are not ids to read back from `get_person`."
         ),
-    )
-    warnings: tuple[str, ...] = Field(
-        default=(),
-        description="Silent-failure notes. Empty when the write landed as asked.",
     )
     url: str | None = Field(default=None, description=_PERSON_URL_DESCRIPTION)
 
@@ -197,14 +182,9 @@ class UpdatedOrganizationResponse(OmitNoneModel):
     location_ids: tuple[str, ...] = Field(
         default=(),
         description=(
-            "Backstop `contact-locations` ids created or updated on this call. Echo them "
-            "as `locations[].location_id`. From `get_organization` with "
-            "`include=contactLocations` — not `include=locations`."
+            "Ids this call created or patched. Echo them as `locations[].location_id` "
+            "on a later update. They are not ids to read back from `get_organization`."
         ),
-    )
-    warnings: tuple[str, ...] = Field(
-        default=(),
-        description="Silent-failure notes. Empty when the write landed as asked.",
     )
     url: str | None = Field(default=None, description=_ORGANIZATION_URL_DESCRIPTION)
 
@@ -249,10 +229,6 @@ class CreatedEmploymentResponse(OmitNoneModel):
         description=(
             "Always true. One POST also created the reverse mirror row (person→org and org→person)."
         ),
-    )
-    warnings: tuple[str, ...] = Field(
-        default=(),
-        description="Silent-failure notes. Empty when the write landed as asked.",
     )
 
 

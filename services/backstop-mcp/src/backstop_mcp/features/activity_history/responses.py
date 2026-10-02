@@ -1,8 +1,7 @@
 """Wire response models for an activity-history tool payload.
 
-Standing caveats (documents excluded from the token budget concerns, same-day email-vs-activity
-ordering, the meaning of `activity_types`) belong in the tool description, not in this payload —
-see the design doc's "Token budget" section. This module carries no prose `notes` field.
+Standing caveats (same-day email-vs-activity ordering, the meaning of `activity_types`) belong
+in the tool description, not in this payload. This module carries no prose `notes` field.
 
 Neither `resource_type` nor `resource_id` is surfaced on its own on history rows:
 `activity_id` is already the composite `{resourceType}_{resourceId}` (see
@@ -106,7 +105,7 @@ _DESCRIPTION_ROW_CAP_DISCLAIMER = (
 )
 
 
-def _plain_text(html: str | None, *, max_chars: int) -> str | None:
+def _markdown(html: str | None, *, max_chars: int) -> str | None:
     if not html:
         return None
     text = extract_gist_from_html(html, max_chars=max_chars).text
@@ -297,8 +296,9 @@ class AttendeeResponse(OmitNoneModel):
     id: str | None = Field(
         default=None,
         description=(
-            "Backstop people id. Pass it as party_id with search_type people to get_person. "
-            "Present on get_activity_detail and on get_activity_history meeting and call rows."
+            "Backstop people id of an attendee. Pass it as party_id with search_type people "
+            "to get_person. Present on get_activity_detail and on get_activity_history "
+            "meeting and call rows."
         ),
     )
     name: str | None = Field(default=None, description="Display name of the attendee.")
@@ -350,8 +350,8 @@ class ActivityRecordResponse(OmitNoneModel):
     resource_id: str | None = Field(
         default=None,
         description=(
-            "Backstop resource id when present. Distinct from `activity_id`; used internally "
-            "for related fetches."
+            "Id of the underlying meeting-or-call, note, or document record, when Backstop "
+            "sends one. Not a `get_activity_detail` handle — pass `activity_id` there."
         ),
     )
     url: str | None = Field(
@@ -454,7 +454,7 @@ class EmailRecordResponse(OmitNoneModel):
             "Handle for this email on the `/emails` collection. Emails have no body on this "
             "tool — subject and addresses only. Do not pass this to `get_activity_detail`: "
             "history email ids are not `/entity-activity-details` ids. Use `search_activities` "
-            "for the body and attachment list."
+            "for the body; it reports `attachments_count`, not file names."
         ),
     )
     occurred_at: datetime | None = Field(
@@ -613,9 +613,9 @@ class ActivityDetailResponse(OmitNoneModel):
 
     `type`, `title`, `body` and `attachments` come from `entity-activity-details`; `start`/`stop`/
     `location`/`time_zone` and `attendees` come from `/meeting-or-calls/{resource_id}`, which is
-    only fetched for a meeting-or-calls handle (it 404s for a note or document — see
-    `queries/get_activity_detail_query.py`). Meeting fields are therefore absent for a note
-    or document because nobody asked, not because Backstop returned nothing. The attachment
+    fetched for a meeting-or-calls handle, or for a bare id whose detail `type` is meeting or
+    call (it 404s for a note or document — see `queries/get_activity_detail_query.py`). Meeting
+    fields are therefore absent for a note or document because nobody asked. The attachment
     list is this tool's one unique capability versus `search_activities`, which only
     publishes a count.
     """
@@ -728,8 +728,8 @@ class SearchActivitiesUnavailableResponse(OmitNoneModel):
     status: Literal["unavailable"] = Field(
         default="unavailable",
         description=(
-            "Always 'unavailable': POST /entity-activities failed. This is not an empty "
-            "result — the search may 404 or refuse the credential on another tenant."
+            "Always 'unavailable': the activity search did not answer. This is not an empty "
+            "result and not 'no activity'."
         ),
     )
     fallback_tool: Literal["get_activity_history"] = Field(
@@ -758,15 +758,14 @@ class SearchActivitiesRowResponse(OmitNoneModel):
     id: str = Field(
         description=(
             "Same value as `activity_id`. Pass either to get_activity_detail. Distinct from "
-            "the composite `meeting-or-calls_{id}` get_activity_history returns, which also "
+            "the composite `meeting-or-calls_<id>` get_activity_history returns, which also "
             "works there. History email ids do not. Never invent one."
         )
     )
     activity_id: str = Field(
         description=(
-            "Pass this to get_activity_detail. Same value as `id` — the id "
-            "`/entity-activity-details` uses. A get_activity_history `activity_id` "
-            "(`meeting-or-calls_76537547`) also works. History email ids do not."
+            "Pass this to get_activity_detail. Same value as `id`. A get_activity_history "
+            "`activity_id` (`meeting-or-calls_<id>`) also works. History email ids do not."
         )
     )
     url: str | None = Field(
@@ -774,8 +773,8 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         description=(
             "Canonical CRM UI URL for this activity. Not in the default fieldset — select "
             "`url` to get it, since one URL per row is dead weight on a wide sweep. Omitted "
-            "when this deployment has no UI origin, or when the row's `type` has no CRM page "
-            "(a bare `meeting_call` cannot choose meetings vs calls). Echo it; never invent one."
+            "when this deployment has no UI origin, or when the row's `type` has no CRM page. "
+            "Echo it; never invent one."
         ),
     )
     type: str | None = Field(
@@ -824,16 +823,16 @@ class SearchActivitiesRowResponse(OmitNoneModel):
     short_description: str | None = Field(
         default=None,
         description=(
-            "Plain-text snippet from Backstop's shortDescription (HTML entities decoded). "
-            "Full body is `description` when include_description was set."
+            "Markdown snippet converted from Backstop's short description, cut at a word "
+            "boundary to 400 characters. Full body is `description` when include_description "
+            "was set."
         ),
     )
     description: str | None = Field(
         default=None,
         description=(
-            "Plain-text body from formattedDescription. Only present when include_description "
-            "was true. `attachments_count` is a count only — pass `activity_id` to "
-            "`get_activity_detail` for the file list."
+            "Full body converted to markdown, not truncated. Only present when "
+            "include_description was true."
         ),
     )
     attachments_count: int | None = Field(
@@ -844,7 +843,11 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         ),
     )
     author: AttendeeResponse | None = Field(
-        default=None, description="Who authored this activity, when Backstop publishes one."
+        default=None,
+        description=(
+            "Who authored this activity, when Backstop publishes one. The author is a CRM "
+            "user: `id` is a system-user id, not a people id — do not pass it to get_person."
+        ),
     )
     attendees: tuple[str, ...] | None = Field(
         default=None,
@@ -883,17 +886,18 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         A row the caller cannot identify is no use.
 
         The two description fields are the only ones whose published shape is not their stored
-        shape: Backstop sends HTML and this publishes plain text, truncated. They are computed
-        here only when selected, since flattening a note body is the expensive part of a row.
+        shape: Backstop sends HTML and this publishes markdown (`short_description` truncated).
+        They are computed here only when selected, since converting a note body is the
+        expensive part of a row.
         """
         include = fields | {"id", "activity_id"}
         overrides: dict[str, object] = {"activity_id": row.id, "url": url}
         if "short_description" in include:
-            overrides["short_description"] = _plain_text(
+            overrides["short_description"] = _markdown(
                 row.short_description, max_chars=_SHORT_DESCRIPTION_MAX_CHARS
             )
         if "description" in include:
-            overrides["description"] = _plain_text(row.description, max_chars=_FULL_BODY_MAX_CHARS)
+            overrides["description"] = _markdown(row.description, max_chars=_FULL_BODY_MAX_CHARS)
         return project_fields(row, fields=include, into=cls, overrides=overrides)
 
 

@@ -97,8 +97,9 @@ async def get_product(
         Field(
             description=(
                 "Product short name (`NGUP`) or display name — same lookup as `product`. "
-                "Use this the way get_person uses `search`. Duplicate short names are "
-                "ambiguous. Omit together with `product_id` and `product` to walk the catalog."
+                "Products resolve on `/products`, not party quick-search. Duplicate short "
+                "names are ambiguous. Omit all three of `product_id`, `product`, and "
+                "`search` to read the whole catalog in one tool call (the walk is paginated)."
             ),
         ),
     ] = None,
@@ -119,8 +120,8 @@ async def get_product(
     """Product identity and custom-field values — Strategy, Domicile, Fee Structure, and the rest.
 
     Pass a trusted `product_id`, or `search` / `product` (short name or display name) for one
-    product. `search` is the same name lookup as on get_person. Omit all three to walk the
-    catalog in one request (a client-obtained tenant had ~72 products). That is how you answer
+    product; `search` and `product` are the same lookup. Omit all three to walk the whole
+    catalog in one tool call. That is how you answer
     "which of our products are Convertible Arbitrage": walk with
     `custom_field_names=["Strategy"]` and read the values. Do not iterate
     `get_product_investors` or `get_time_series` for this —
@@ -133,14 +134,14 @@ async def get_product(
         raise ValueError("Pass at most one of product_id or product/search")
 
     if product_id is None and name is None:
-        # Overlap the product walk with a schema-cache warm. Each of the ~72 rows then joins
-        # against a filled catalog; the load return is unused because `_record` reads the cache.
+        # Overlap the product walk with a schema-cache warm. Each row then joins against a
+        # filled catalog; the load return is unused because `_record` reads the cache.
         catalog, _ = await asyncio.gather(
             get_product_query.catalog(),
             custom_fields.load_catalog(),
         )
-        # Concurrently: the catalog is ~72 rows and each row is a catalog join, so a sequential
-        # comprehension is 72 awaits in a row for work that has no ordering between rows.
+        # Concurrently: each row is a catalog join, and there is no ordering between rows, so a
+        # sequential comprehension would await them one by one for nothing.
         products = await asyncio.gather(
             *(
                 _record(

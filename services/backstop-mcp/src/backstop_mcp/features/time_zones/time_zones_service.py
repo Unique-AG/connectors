@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class TimeZonesService:
-    """Process-wide time-zone catalog.
+    """Process-wide time zones.
 
     Zones come from a real Backstop fetch and live in one in-memory dict keyed by zone id.
     A meeting's `timeZone` is a `/time-zones` `shortName`, so callers use `resolve_short_name`

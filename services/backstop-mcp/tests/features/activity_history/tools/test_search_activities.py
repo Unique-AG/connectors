@@ -69,7 +69,7 @@ class TestSearchActivities:
         assert "fallback only" in doc
         assert "get_activity_history" in doc
         assert "10000" in doc
-        assert "visible to you" in doc
+        assert "this credential can see" in doc
         assert "get_activity_detail" in doc
         assert "activity_id" in doc
         assert "history email ids do not" in doc

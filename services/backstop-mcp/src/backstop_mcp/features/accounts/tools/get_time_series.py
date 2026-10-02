@@ -127,19 +127,18 @@ async def get_time_series(
     are an inclusive window; omit both to paginate the whole series. Newest first. A long
     daily series belongs in a window, not an unbounded walk.
 
-    **`values` is the balance.** It is not the answer to every money question —
-    `startingValues`, `totalInvested`, and `earnings` are also money about an account.
-    **`aums` is the product's total assets under management**, not one investor's balance.
+    **`values` is the balance** published by `get_accounts_for_party` as `balance`. It is
+    not the answer to every money question — `startingValues`, `totalInvested`, and
+    `earnings` are also money about an account.
+    **`aums` is assets under management**, not one investor's balance.
 
     A dated point with no `value` is "not in yet" (Backstop's UI shows `-`), a published `0.0`
     is a real zero, and an unused fee series of zeroes is not "this account has no NAV".
     `valueStatus` (accounts) and `source` (product `aums`) are passed through when Backstop
     sends them and omitted when it does not.
 
-    Do not call `/accounts/{id}/analytics` for these figures: on this API it returns empty
-    envelopes. Do not loop this tool over every account in a fund — that reconstitutes the
-    fan-out this connector removed. For a fund-level number, call this once on the product's
-    `aums`.
+    Do not loop this over every account in a fund. The fund-level number is the product's
+    `aums`. Sizing is `get_product_investors`.
     """
     entity_id = entity_id.strip()
     if not entity_id:

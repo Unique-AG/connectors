@@ -94,8 +94,9 @@ class GetOpportunitiesByIdsQuery:
                 return_exceptions=True,
             ),
         )
-        # `_get_one` reports a 404, a Backstop error status, an unreadable body and a transport
-        # failure against its own id, so what reaches here is a revoked credential, cancellation, or
+        # `_fetch_one_opportunity` reports a 404, a Backstop error, an unreadable body, and a
+        # transport failure against its own id. What reaches here is a revoked credential,
+        # cancellation, or
         # a bug — none of which the other ids survive either. Gathered with `return_exceptions` so
         # every request settles before one of them raises.
         fetched: list[_FetchedOne] = []

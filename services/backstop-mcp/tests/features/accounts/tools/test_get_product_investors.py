@@ -429,7 +429,7 @@ class TestGetProductInvestors:
         assert "aums" in doc
         assert "one call per (account, series)" in doc
         assert "not one investor's balance" in doc
-        assert "fan-out" in doc
+        assert "once per account" in doc
         assert "ask whether to pull latest" in doc
         assert "include_latest_value=true" in doc
         assert "latest_value_totals" in doc

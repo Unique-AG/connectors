@@ -132,8 +132,8 @@ class AccountOwnerDto(BaseModel):
         `contacts` resource, and `organizations` is the answer a caller can act on. The id is taken
         from the *same* reference as the type, never mixed — `resourceId` is what exists in the
         collection `resourceType` names, and every description tells the model to echo this id back
-        as a `party_id`. On this instance the two happen to be equal; a projection that assumed so
-        would hand back an unusable id the day they are not.
+        as a `party_id`. The envelope id and `resourceId` are not guaranteed equal; mixing them
+        would hand back an unusable id.
         """
         parsed = (
             owner
@@ -349,12 +349,11 @@ class HoldingRowDto(BaseModel):
 
     `balance_as_of` and `balance_status` are the difference between the two source endpoints, and
     the reason they are published rather than smoothed over. On `table-api` both are `None`: the
-    balance matched the **newest** `/accounts/{id}/values` point exactly on a measured account,
-    including when that point was an `ESTIMATE`, and the endpoint does not say which. On
-    `accounts-api` the balance is the newest point that carries a **number**, which can be months
-    older than the newest point — so the same field means "current" on one path and "last known"
-    on the other, and only the date says which. `figure_errors` separates "the request failed"
-    from "Backstop publishes no number", which are otherwise the same `None`.
+    endpoint does not say which values point the balance came from. On `accounts-api` the balance
+    is the newest point that carries a number, which can be older than the newest point — so the
+    same field means "current" on one path and "last known" on the other, and only the date says
+    which. `figure_errors` separates "the request failed" from "Backstop publishes no number",
+    which are otherwise the same `None`.
 
     `account_id` is the id every follow-up call needs. A table row without an account is skipped
     by the query, not projected as a hollow row.

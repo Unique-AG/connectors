@@ -9,16 +9,20 @@ from backstop_mcp.backstop_client import IncludedResource
 from backstop_mcp.features.accounts.api_responses import AccountAttributes, OwnerAttributes
 from backstop_mcp.models import OmitNoneModel
 
-# Scan ceiling per collection. 1,244 subscriptions since 2020 on this instance, so this is
-# ~8x headroom; past it the walk stops and says so rather than accumulating every row of a
-# collection this tool cannot filter server-side.
+# Scan ceiling per collection. Past it the walk stops and says so rather than accumulating every
+# row of a collection this tool cannot filter server-side.
 MAX_CAPITAL_FLOW_SCAN_RECORDS = 10_000
 
 
 class CapitalFlowPartyResponse(OmitNoneModel):
     """An account or owning party on a flow row."""
 
-    id: str = Field(description="Backstop id. Echo it; never invent one.")
+    id: str = Field(
+        description=(
+            "Backstop id. On an owner this is the contacts envelope id — pass it as "
+            "`owner_id` on a later `get_capital_flows` call. Echo it; never invent one."
+        )
+    )
     name: str | None = Field(default=None, description="Name as published on the include.")
     resource_type: str | None = Field(
         default=None, description="JSON:API type: accounts, contacts, organizations, or people."

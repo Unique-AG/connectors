@@ -26,7 +26,7 @@ def test_accepts_trusted_ids() -> None:
 
 
 def test_rejects_is_key_employee() -> None:
-    with pytest.raises(ValidationError, match="cannot be written"):
+    with pytest.raises(ValidationError, match="read-only"):
         _ADAPTER.validate_python(
             {
                 "party_id": "p1",

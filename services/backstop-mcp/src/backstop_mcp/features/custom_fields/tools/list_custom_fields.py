@@ -43,8 +43,9 @@ async def list_custom_fields(
             description=(
                 "Required. Standard Backstop entity types whose custom-field definitions to "
                 "list: organizations, people, accounts, opportunities, products, or party. "
-                "There is no name-substring filter — pass the types and read names from the "
-                "result."
+                "`party` is fields shared by people and organizations (PartyBean); "
+                "`organizations` or `people` alone misses them. There is no name-substring "
+                "filter — pass the types and read names from the result."
             ),
         ),
     ],

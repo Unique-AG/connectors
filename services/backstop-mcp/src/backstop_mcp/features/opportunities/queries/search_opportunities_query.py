@@ -42,8 +42,7 @@ logger = logging.getLogger(__name__)
 
 # Scan ceiling. `GET /opportunities` has no wall of its own, and `parallel=True` builds one
 # coroutine per page from `meta.totalResourceCount` and accumulates every row — so an unbounded
-# walk is bounded only by the tenant. 1,206 rows measured here, so this is ~16x headroom on this
-# instance and a stated limit on one 50x larger, reported through `scan_coverage`.
+# walk is bounded only by the tenant. `scan_coverage` reports when this ceiling is hit.
 MAX_OPPORTUNITY_SCAN_RECORDS = 20_000
 
 type SearchMode = Literal["rows", "aggregate"]

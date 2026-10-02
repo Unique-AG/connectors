@@ -122,12 +122,7 @@ class OpportunityStageResponse(OmitNoneModel):
 
 
 class StageChangeResponse(OmitNoneModel):
-    """One move in a deal's stage history: which stage it entered, and when.
-
-    Validated from a side-loaded `opportunity-stage-history` entry's `attributes`. That entry
-    points at its stage through Backstop's inline `ResourceRef` format, which is resolved to
-    `stage`/`stage_id` before validation rather than modelled here.
-    """
+    """One move in a deal's stage history: which stage it entered, and when."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
         frozen=True, extra="ignore", populate_by_name=True
@@ -156,11 +151,7 @@ class OpportunityResponse(OmitNoneModel):
     """One deal in the pipeline for a person or organization.
 
     Amounts are in `currency`; `probability` is a fraction, not a percentage. The stage timings
-    (`days_open`, `days_in_current_stage`) are Backstop's own counters, carried through as they
-    are stored.
-
-    Every wire field is optional: a record missing one is still a deal worth reporting, and no
-    field below was measured as load-bearing enough to drop the record over.
+    (`days_open`, `days_in_current_stage`) are Backstop's own counters.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
@@ -264,7 +255,7 @@ class OpportunityResponse(OmitNoneModel):
     date_entered_current_stage: LenientDate = Field(
         default=None,
         validation_alias="dateEnteredCurrentStage",
-        description="Day the deal entered `stage`. Deals are returned newest-first by this day.",
+        description="Day the deal entered `stage`.",
     )
     custom_field_values: tuple[ResolvedCustomFieldValueResponse, ...] = Field(
         default=(),
@@ -432,13 +423,10 @@ _INVESTOR_SEARCH_TYPES: dict[str, Literal["organizations", "people"]] = {
 
 
 class InvestorFromOpportunityResponse(OmitNoneModel):
-    """The investor on a deal. The include arrives as a `contacts` resource."""
+    """The investor on a deal."""
 
     id: str = Field(
-        description=(
-            "Backstop contacts id of the investor — the same number as its organization or "
-            "person id. Echo it with `search_type` as a party; never invent one."
-        )
+        description=("Contacts id of the investor. Echo it with `search_type`; never invent one.")
     )
     search_type: Literal["organizations", "people"] | None = Field(
         default=None,
@@ -613,7 +601,7 @@ class SearchOpportunitiesResolvedResponse(OmitNoneModel):
         description=(
             "Matching deals after client-side filters. Empty in aggregate mode. `id` is always "
             "present so the row can be handed to get_opportunities_by_ids. Amounts are already "
-            "on this walk — select them with `fields`. Master Pipeline custom fields and stage "
+            "on this walk — select them with `fields`. Opportunity custom fields and stage "
             "history are not; fetch those ids with get_opportunities_by_ids."
         ),
     )
@@ -623,5 +611,8 @@ class SearchOpportunitiesResolvedResponse(OmitNoneModel):
     )
     custom_fields_unavailable: bool = Field(
         default=False,
-        description=_CUSTOM_FIELDS_UNAVAILABLE_DESCRIPTION,
+        description=(
+            "True when the custom-field catalog failed to load. Search rows have no "
+            "`custom_field_values`; `get_opportunities_by_ids` would miss the same fields."
+        ),
     )

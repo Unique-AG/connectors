@@ -173,10 +173,9 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "The argument is `party_id`. Trusted Backstop Party ID from a prior "
-                "resolve echo. Sent as entityId with resourceType from `search_type`. Always "
-                "pass together with `search_type` — `party_id` alone is rejected. Never invent "
-                "one. Exactly one of `party_id` or `search` when scoping to a party."
+                "Trusted Backstop party id from a prior resolve echo. Always pass together "
+                "with `search_type` — `party_id` alone is rejected. Never invent one. Exactly "
+                "one of `party_id` or `search` when scoping to a party."
             ),
         ),
     ] = None,
@@ -209,7 +208,7 @@ async def search_activities(
             default=None,
             description=(
                 "Pass every id `list_activity_tags` returned for the term; the list is OR. "
-                "Tag names carry prefixes (for example 'AT: Tail Hedging'), so requiring an "
+                "Tag names carry prefixes (for example 'XY: Follow-up'), so requiring an "
                 "exact name misses the tag. REST get_activity_history `activity_tag_ids` is AND."
             ),
         ),
@@ -229,9 +228,8 @@ async def search_activities(
         Field(
             default=False,
             description=(
-                "Opt in to full note text (~25× row size). Capped at 50 rows, refused with "
-                "`mode=aggregate`, and refused on a wide sweep (no party, no tags, no "
-                "authors)."
+                "Opt in to the full body text (much larger rows). Caps rows at 50; refused "
+                "with `mode=aggregate` and on a wide sweep (no party, no tags, no authors)."
             ),
         ),
     ] = False,
@@ -263,8 +261,7 @@ async def search_activities(
             le=_MAX_ROWS,
             description=(
                 f"Maximum row bodies to return in rows mode. Aggregate mode scans up to the "
-                f"{MAX_RETRIEVABLE} ceiling on a scoped search and is refused on a wide sweep. "
-                "include_description caps this at 50 and is refused in aggregate mode."
+                f"{MAX_RETRIEVABLE} ceiling on a scoped search and is refused on a wide sweep."
             ),
         ),
     ] = _DEFAULT_MAX_ROWS,
@@ -298,22 +295,17 @@ async def search_activities(
     "party_id": "<id from prior resolve echo>",
     "types": ["meeting_call", "meeting", "note"]}
 
-    This is the primary activity tool; `get_activity_history` is fallback only. It reads
-    `POST /entity-activities` (a search; the swagger summary calls it a create) and may 404
-    or refuse the credential (a 401 that still authenticates on other endpoints) on another
-    tenant — that is not "no activity exists" and not a reason to retry this tool. The
-    failure payload names `get_activity_history`, which is party-scoped only. `results: []`
-    with status resolved is genuinely none in that window.
+    This is the primary activity tool; `get_activity_history` is fallback only. This search
+    may be unavailable (`status` `unavailable`); that is not "no activity". Use
+    get_activity_history (party-scoped) instead, not a retry of this tool. An empty `rows`
+    list with status resolved is genuinely none in that window.
 
-    Counts are visible to you, not firm-wide. `totalCount` saturates at 10000; this tool clamps
-    `pageNum × pageSize` before requesting so it never provokes that 500, and returns the
-    partial set with a disclaimer. Tag filters here are OR; REST tag filters are AND.
+    Counts cover only what this credential can see. A set larger than the 10000 ceiling
+    comes back partial, with a disclaimer on `coverage`.
 
-    `mode=aggregate` with `group_by` answers a counting question without row bodies. Aggregate
-    and `include_description` are refused on a wide sweep (no party, no tags, no authors) —
-    that walk hits the 10000 ceiling. A party missing from a firm-wide row sample is not
+    `mode=aggregate` with `group_by` answers a counting question without row bodies.
+    A party missing from a firm-wide row sample is not
     inactive; for "who has had no activity since X" use get_last_activity_for_parties.
-    `include_description` is opt-in, capped, and refused in aggregate mode.
     `attachments_count` is a count only — pass the row `activity_id` (or `id`) to
     `get_activity_detail` for the names. Do not assume what the files are. Meeting, call,
     note, and document rows from `get_activity_history` use the

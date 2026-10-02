@@ -5,11 +5,7 @@ Open means the `closedDate` key is absent.
 
 The listing asks for `fields=` and pages in parallel. `fields=` drops the whole `relationships`
 block — except for the relationships named in `include=`, which keep their `data` linkage.
-
-`closedDate` has to stay in `ACCOUNT_LISTING_FIELDS` and stay meaningful: open is *the key was
-absent on the wire*, so a `fields=` set that materialized it as null would report every account
-closed. It does not — of 200 rows fetched this way the key was absent on 8 and null on 0,
-matching what the same accounts return unfiltered.
+Why `closedDate` stays meaningful under `fields=` is noted on `ACCOUNT_LISTING_FIELDS`.
 """
 
 from backstop_mcp.backstop_client import BackstopClient, Included

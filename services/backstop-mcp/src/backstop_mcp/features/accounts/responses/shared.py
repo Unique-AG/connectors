@@ -51,10 +51,7 @@ class ProductRefResponse(OmitNoneModel):
     name: str | None = Field(default=None, description="Product name as Backstop stores it.")
     short_name: str | None = Field(
         default=None,
-        description=(
-            "`productShortName` (e.g. 'NGUP'). Tenants may call this a fund, vehicle, or "
-            "share class."
-        ),
+        description=("`productShortName` (e.g. 'NGUP'). Tenants may call this a fund or vehicle."),
     )
 
     @classmethod
@@ -73,8 +70,8 @@ class OwnerResponse(OmitNoneModel):
     resource_type: str | None = Field(
         default=None,
         description=(
-            "What the owner is: `organizations`, `people`, or `contacts`. Organization owners "
-            "arrive as contacts whose type is `organizations`."
+            "What the owner is: `organizations` or `people`, or `contacts` when Backstop did "
+            "not say which. Echo it with `id`."
         ),
     )
 
@@ -368,9 +365,9 @@ class ProductCandidateResponse(CandidateResponse):
     )
     id: str = Field(
         description=(
-            "Backstop product id. Echo it as a `products` entry on `get_product_investors`, or "
-            "as `entity_id` with `entity_type='products'` on `get_time_series` — never invent "
-            "one."
+            "Backstop product id. Echo it as a `products` entry on `get_product_investors`, as "
+            "`product_id` on `get_product`, or as `entity_id` with `entity_type='products'` on "
+            "`get_time_series` — never invent one."
         )
     )
     name: str | None = Field(
@@ -398,8 +395,8 @@ class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
     """Returned when more than one product matched and none was chosen.
 
     Show each candidate's `label` to the user, then retry with that `id` as a `products`
-    entry on `get_product_investors`, or as `entity_id` with `entity_type='products'` on
-    `get_time_series`. Never invent one.
+    entry on `get_product_investors`, as `product_id` on `get_product`, or as `entity_id` with
+    `entity_type='products'` on `get_time_series`. Never invent one.
     """
 
     scope: str = Field(description="Collection the query was resolved against. Always 'products'.")
@@ -407,8 +404,9 @@ class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
         default_factory=list,
         description=(
             "The matching products. Show `label` to the user, then retry with the chosen "
-            "`id`s as `products` entries on `get_product_investors` (several are fine), or as "
-            "`entity_id` with `entity_type='products'` on `get_time_series` — never invent one."
+            "`id`s as `products` entries on `get_product_investors` (several are fine), as "
+            "`product_id` on `get_product`, or as `entity_id` with `entity_type='products'` on "
+            "`get_time_series` — never invent one."
         ),
     )
 

@@ -1,31 +1,11 @@
 """Resolve a Backstop product from a trusted id, a short name, or a name.
 
-Do not route this through `ResolvePartyQuery`. That primitive is trusted id or `/quick-search` of a
-display name. Product callers also type `productShortName` (`NGUP`), and that path is not covered:
-
-- `GET /quick-search?filter[searchTypes][eq]=PRODUCT` for `NGUP` is empty.
-- `GET /products?filter[shortName][eq]=…` is `400`.
-- Searching the same string as `ORGANIZATION` can hit a CRM company whose id no account
-  `filter[product.id]` accepts.
-
-A trusted `product_id` is read straight from `GET /products/{id}?fields=name,configuration`, and
-a 404 is the `not_found`. That is one 300-byte request that cannot be defeated by catalog size,
-which is what an echoed id needs — from a prior resolve, or handed back by
-`get_accounts_for_party`.
-
-A name or short name has no by-id equivalent. `/products` accepts `filter[name][like]`, but
-`shortName` is not a filter field (`filter[shortName][eq]` is 400), so a LIKE on a short name
-like `NGUP` returns empty. Name search therefore tries `filter[name][like]` first (one request
-for "Dispersion"), and only walks the unfiltered catalog when that misses — which is what
-`productShortName` needs. Duplicate short names elicit once. The
-same response hydrates `short_name`.
-
-Walking the catalog to the end is what lets `not_found` mean *absent* instead of *not on this
-page*. The catalog is small enough for that: a client-obtained tenant returned 72 in one
-page, all with a `productShortName`, a few of them duplicated. Past `_LARGE_CATALOG` the
-assumption is no longer safe — re-reading the whole catalog per search starts costing real
-requests, and a TTL cache like the opportunity-stage vocabulary would be the answer. So that
-case warns rather than passing silently.
+Not `ResolvePartyQuery`: `/quick-search` misses `productShortName` (`NGUP`), and
+`filter[shortName]` is not a `/products` filter (400). A trusted id is one
+`GET /products/{id}?fields=name,configuration`; a 404 is `not_found`. A name tries
+`filter[name][like]` first and walks the whole catalog only when that misses, so a short name
+still resolves and `not_found` means *absent*, not *not on this page*. Past `_LARGE_CATALOG`
+that per-search walk stops being cheap, so it logs a warning.
 """
 
 import logging
@@ -63,8 +43,7 @@ _PRODUCTS_PATH = "/products"
 _PRODUCT_FIELDS = "name,configuration"
 _PRODUCT_INDEX_PAGE_SIZE = 200
 
-# Two full pages. This instance returns 72, so anything past this is a different kind of tenant
-# and the "re-read the catalog every call" trade stops paying for itself.
+# Two full pages. Past this the "re-read the catalog every call" trade stops paying for itself.
 _LARGE_CATALOG = 400
 
 _FAMILY_CAP = 6

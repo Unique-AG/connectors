@@ -9,14 +9,12 @@ class TestInstructions:
         assert "get_time_series" in INSTRUCTIONS
         assert "get_product_investors" in INSTRUCTIONS
         assert "not on get_product_investors" in INSTRUCTIONS
-        assert "get_product (`search`" in INSTRUCTIONS
+        assert "omit all three selectors" in INSTRUCTIONS
         assert "assets under management" in INSTRUCTIONS
         assert "get_people_for_party" in INSTRUCTIONS
         assert "numberOfEmployees" in INSTRUCTIONS
         assert "search_activities" in INSTRUCTIONS
         assert "get_activity_history" in INSTRUCTIONS
-        assert "filtered search" in INSTRUCTIONS
-        assert "one year before end_date" in INSTRUCTIONS
         assert "always start with search_activities" in INSTRUCTIONS
         assert "do not start with it" in INSTRUCTIONS
         assert "get_activity_detail" in INSTRUCTIONS
@@ -35,19 +33,12 @@ class TestInstructions:
         assert "takes that login, not a display name" in INSTRUCTIONS
         assert "get_opportunities_by_ids" in INSTRUCTIONS
         assert "custom_fields_unavailable" in INSTRUCTIONS
-        assert 'not "no value recorded"' in INSTRUCTIONS
-        assert "opportunity values" in INSTRUCTIONS
-        assert "before answering anything the row cannot support" in INSTRUCTIONS
         assert "say Backstop does not record it" in INSTRUCTIONS
         assert "get_capital_flows" in INSTRUCTIONS
         assert "account.id" in INSTRUCTIONS
         assert "get_tasks_for_party" in INSTRUCTIONS
-        assert "not on get_people_for_party" in INSTRUCTIONS
         assert "attachment list" in INSTRUCTIONS
         assert "row's `id`" in INSTRUCTIONS
-        assert "History email ids" in INSTRUCTIONS
-        assert "/emails" in INSTRUCTIONS
-        assert "falls back internally" in INSTRUCTIONS
         assert "log_activity" in INSTRUCTIONS
         assert "attach_file" in INSTRUCTIONS
         assert INSTRUCTIONS.index("log_activity") < INSTRUCTIONS.index("attach_file")
@@ -59,11 +50,7 @@ class TestInstructions:
         assert "contact_source_id" in INSTRUCTIONS
         assert "list_contact_categories" in INSTRUCTIONS
         assert "category_ids" in INSTRUCTIONS
-        assert "not a custom field" in INSTRUCTIONS
-        assert "is_key_employee" in INSTRUCTIONS
-        assert "isKeyEmployee" in INSTRUCTIONS
-        assert "isKeyRelationship" in INSTRUCTIONS
-        assert "cannot be set or cleared" in INSTRUCTIONS
+        assert "Key employee is read-only" in INSTRUCTIONS
         assert "CRM UI" in INSTRUCTIONS
         assert "delete_activity" in INSTRUCTIONS
         assert "delete_person" in INSTRUCTIONS
@@ -72,16 +59,19 @@ class TestInstructions:
         assert "no recycle bin" in INSTRUCTIONS
         assert "all test records" in INSTRUCTIONS
         assert "search-then-delete" in INSTRUCTIONS
-        assert "update_activity" in INSTRUCTIONS
+        assert "exact name, short name, or id is one vehicle" in INSTRUCTIONS
+        assert "read `source` and `data_caveat`" in INSTRUCTIONS
 
     def test_state_the_party_identity_model_before_any_tool(self) -> None:
         """`party_id` + `search_type` is the precondition of half the tools; say it once, first."""
-        assert "`party_id` alone is rejected" in INSTRUCTIONS
+        assert "Omission is rejected only on tools that say so" in INSTRUCTIONS
         assert "two separate arguments" in INSTRUCTIONS
         assert "a contacts or employees id is not a people id" in INSTRUCTIONS
         assert "candidates" in INSTRUCTIONS
         assert "not_found" in INSTRUCTIONS
-        assert INSTRUCTIONS.index("`party_id` alone is rejected") < INSTRUCTIONS.index("get_person")
+        assert INSTRUCTIONS.index("Omission is rejected only on tools that say so") < (
+            INSTRUCTIONS.index("get_person")
+        )
 
     def test_carry_the_write_and_auxiliary_tools(self) -> None:
         for tool in (
@@ -100,8 +90,11 @@ class TestInstructions:
             "parse_backstop_link",
         ):
             assert tool in INSTRUCTIONS, tool
-        assert "only way to move a stage" in INSTRUCTIONS
+        assert "Stage moves only via update_opportunity" in INSTRUCTIONS
         assert "a repeated call makes a second record" in INSTRUCTIONS
         assert "`records[].status`" in INSTRUCTIONS
+        assert "applied_count == total_count" in INSTRUCTIONS
         assert "no endpoint that lists reports" in INSTRUCTIONS
         assert "Never hand-write a Backstop URL" in INSTRUCTIONS
+        assert "no tool that loads the account by id" in INSTRUCTIONS
+        assert "backfill_opportunity_stage_history" in INSTRUCTIONS

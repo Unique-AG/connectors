@@ -4,12 +4,11 @@ Two collection walks: `/hedge-fund-account-subscriptions?include=fundAccount.own
 `/hedge-fund-account-redemptions?include=originalSubscription.fundAccount.owner`. A redemption
 has no `fundAccount` of its own — it reaches an account only through
 `originalSubscription`. Missing that chain is reported as `unattributed`, not dropped.
-`filter[transactionDate]` is mandatory; an unfiltered read is 400. Actuals only
+`filter[transactionDate]` is required. Actuals only
 (`status=COMPLETED`), and how many rows that excluded is reported rather than swallowed.
 
 Neither collection takes a product or account filter, so a walk is the whole window. Each is
-capped at `MAX_CAPITAL_FLOW_SCAN_RECORDS` — the measured size is ~1,244 subscriptions since
-2020, so the cap is headroom on this instance and a wall on a tenant where it is not.
+capped at `MAX_CAPITAL_FLOW_SCAN_RECORDS`, and hitting the cap is reported as `scan_truncated`.
 """
 
 import asyncio

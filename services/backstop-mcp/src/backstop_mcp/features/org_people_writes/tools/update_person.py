@@ -51,14 +51,10 @@ async def update_person(
     `last_name` cannot be cleared. `job_title` is at most 140 characters. Custom fields go
     through `update_custom_field_values`. Email corrections go through `email` / `email2` /
     `email3`; `contact-emails` has no write endpoint. Category ids come from
-    `list_contact_categories`. Location ids come from `get_person`
-    with `include=contactLocations`, not `include=locations`. `locations` creates or patches
-    each address; `delete_location_ids` removes them. Creating an address is folded
-    into this tool: `destructive_hint` is already true, which over-warns rather than
-    under-warns. `is_key_employee` cannot be written through these tools — personal API
-    tokens do not persist `isKeyRelationship`; set Key employee in the CRM UI.
-    `PATCH /people` ignores `isKeyEmployee`.
-    The response `person` is the record READ BACK — same top-level fields as `get_person`.
+    `list_contact_categories`. Location ids are `included.locations[].id` from
+    `get_person` with `include=["locations"]`. `locations` creates or patches each
+    address; `delete_location_ids` removes them. `is_key_employee` is rejected — set
+    Key employee in the CRM UI. The response `person` is the record read back.
     Omit a field to leave it unchanged. Never invent an id.
 
     Call like: {"person": {"search_type": "people", "party_id": "<id from get_person>",

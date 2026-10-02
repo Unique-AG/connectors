@@ -38,8 +38,10 @@ async def update_activity(
     """Patch a CRM note, meeting, call, task, email, or document.
 
     Required on `activity`: `kind`, `activity_id`, and at least one field to change. Omit a
-    field to leave it unchanged. Never invent an id — echo a create, a `search_activities`
-    row, or a `get_activity_history` handle. Author is not a parameter. Email PATCH accepts
+    field to leave it unchanged. Never invent an id. Note, meeting, call, and document ids
+    come from a create echo, a `search_activities` row, or a history handle. Email ids come
+    from `attach_file` or a history email `activity_id`. Task ids come from the create echo
+    or `get_tasks_for_party`. Author is not a parameter. Email PATCH accepts
     only `display_subject` and `activity_tag_ids`; parsed subject/from/to are not editable.
     The document file blob is not replaced here.
 
