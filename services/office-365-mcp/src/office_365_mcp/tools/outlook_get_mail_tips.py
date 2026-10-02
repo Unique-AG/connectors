@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.mail import AddressFault, one_address_each
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_get_mail_tips"
@@ -169,7 +170,7 @@ class RecipientMailTips(BaseModel):
             external_member_count=tips.external_member_count,
             is_moderated=tips.is_moderated,
             max_message_size=tips.max_message_size,
-            recipient_scope=None if scope is None else [str.__str__(item) for item in scope],
+            recipient_scope=None if scope is None else [spelled(item) for item in scope],
             total_member_count=tips.total_member_count,
             error=(
                 None if error is None else RecipientError(code=error.code, message=error.message)

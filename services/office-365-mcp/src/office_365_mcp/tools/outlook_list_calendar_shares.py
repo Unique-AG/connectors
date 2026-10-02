@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
 from office_365_mcp.shared.handles import CalendarPermissionHandle, calendar_handle
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_calendar_shares"
@@ -112,9 +113,9 @@ class CalendarShare(BaseModel):
             uri=CalendarPermissionHandle(calendar_id, permission.id).uri,
             name=None if person is None else person.name,
             address=None if person is None else person.address,
-            role=None if permission.role is None else str.__str__(permission.role),
+            role=spelled(permission.role),
             allowed_roles=[
-                str.__str__(role)
+                spelled(role)
                 for role in cast("list[CalendarRoleType | None]", permission.allowed_roles or [])
                 if role is not None
             ],

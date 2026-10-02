@@ -21,6 +21,7 @@ from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_
 from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.handles import CalendarHandle, CalendarPermissionHandle, calendar_handle
 from office_365_mcp.shared.mail import ONE_ADDRESS
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -210,7 +211,7 @@ async def share_calendar(
         calendar_uri=handle.uri,
         address=recipient,
         name=None if created.email_address is None else created.email_address.name,
-        role=None if created.role is None else str.__str__(created.role),
+        role=spelled(created.role),
     )
 
 

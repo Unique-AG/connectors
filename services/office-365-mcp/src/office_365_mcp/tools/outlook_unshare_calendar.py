@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
 from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.handles import CalendarHandle, calendar_permission_handle
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
@@ -174,7 +175,7 @@ def _question(
     held = (
         "Microsoft did not report the role of this person."
         if permission.role is None
-        else f"This person has the role {str.__str__(permission.role)} on it now."
+        else f"This person has the role {spelled(permission.role)} on it now."
     )
     return (
         f"Stop sharing the calendar {title!r} with {who or _NO_ADDRESS}? {held} This person then "
