@@ -23,6 +23,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress, MailImportance
@@ -453,8 +454,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "The full new list of category names, one name for each entry, exactly as "
-                    + "the user names it or as outlook_list_categories reports it. An empty list "
-                    + "removes every category."
+                    + "the user names it. "
+                    + LIST_CATEGORIES_GUARD
+                    + " An empty list removes every category."
                 )
             ),
         ] = None,

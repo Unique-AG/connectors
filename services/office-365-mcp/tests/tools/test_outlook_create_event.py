@@ -46,6 +46,7 @@ from office_365_mcp.shared.calendar import (
     RecurrenceRule,
     ShowAs,
 )
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import CalendarHandle, event_handle
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
 from office_365_mcp.tools import outlook_create_event as creator
@@ -2323,6 +2324,17 @@ class TestTheSchemaItPublishes:
         properties = _object(parameters["properties"])
         assert _object(properties["all_day"])["default"] is False
         assert _object(properties["online_meeting"])["default"] is False
+
+    async def test_the_category_argument_promises_the_lister_only_where_it_exists(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        described = cast(
+            "str", _object(_object(parameters["properties"])["categories"])["description"]
+        )
+        assert LIST_CATEGORIES_GUARD in described
+        assert "outlook_list_categories" not in described.replace(LIST_CATEGORIES_GUARD, "")
 
 
 class TestHowItDeclaresItself:

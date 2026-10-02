@@ -14,6 +14,7 @@ from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphUnavailable
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import mail_draft_handle, mail_message_handle
 from office_365_mcp.shared.mail import MailImportance
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
@@ -349,7 +350,9 @@ class TestTheSchemaItPublishes:
         categories = properties["categories"]
         assert categories["default"] == []
         assert "maxItems" not in categories
-        assert "outlook_list_categories" in cast("str", categories["description"])
+        described = cast("str", categories["description"])
+        assert LIST_CATEGORIES_GUARD in described
+        assert "outlook_list_categories" not in described.replace(LIST_CATEGORIES_GUARD, "")
 
     @pytest.mark.parametrize("word", ["bcc", "blind", "file", "upload", "drive", "url"])
     async def test_no_argument_offers_a_blind_copy_a_fetch_or_markup(

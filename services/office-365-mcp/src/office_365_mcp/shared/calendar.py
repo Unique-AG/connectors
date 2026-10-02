@@ -41,6 +41,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from office_365_mcp.graph_client import graph_step
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import MailAddress
@@ -108,8 +109,9 @@ SHOW_AS_FIELD = _SHOW_AS + _DEFAULT_WHEN_NULL
 SHOW_AS_CHANGE_FIELD = _SHOW_AS + _KEPT_WHEN_NULL
 
 CATEGORIES_FIELD = (
-    "One category name for each entry, exactly as the user names it or as outlook_list_categories "
-    + "reports it. An empty list adds no category to the event."
+    "One category name for each entry, exactly as the user names it. "
+    + LIST_CATEGORIES_GUARD
+    + " An empty list adds no category to the event."
 )
 
 _IMPORTANCE = "The importance of the event: `low`, `normal`, or `high`."
@@ -1200,18 +1202,6 @@ class EventPatch:
     allow_new_time_proposals: bool | None = None
     body_html: str | None = None
     online_meeting: bool = False
-
-
-def merged_categories(
-    current: Sequence[str], *, add: Sequence[str], remove: Sequence[str]
-) -> list[str]:
-    removed = {name.casefold() for name in remove}
-    merged: dict[str, str] = {}
-    for name in (*current, *add):
-        key = name.casefold()
-        if key not in removed and key not in merged:
-            merged[key] = name
-    return list(merged.values())
 
 
 def patch_changes(patch: EventPatch) -> list[str]:

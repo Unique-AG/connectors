@@ -15,6 +15,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphNotFound, GraphThrottled, GraphUnavailable
 from office_365_mcp.shared.calendar import EventImportance, EventSensitivity, ShowAs
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import EventHandle
 from office_365_mcp.shared.seam import Confirm
 from office_365_mcp.tools.outlook_update_event import (
@@ -1331,6 +1332,15 @@ class TestHowItDeclaresItself:
         parameters = await _parameters(transport)
 
         assert _object(_object(parameters["properties"])[argument])["default"] == []
+
+    async def test_the_add_argument_promises_the_lister_only_where_it_exists(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters = await _parameters(transport)
+
+        described = str(_object(_object(parameters["properties"])["add_categories"])["description"])
+        assert LIST_CATEGORIES_GUARD in described
+        assert "outlook_list_categories" not in described.replace(LIST_CATEGORIES_GUARD, "")
 
 
 class TestTheNothingToChangeRefusal:

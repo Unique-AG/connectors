@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import MailMessageHandle, mail_draft_handle, mail_message_handle
 from office_365_mcp.shared.mail import MailImportance
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
@@ -413,6 +414,15 @@ class TestTheSchemaItPublishes:
         cc = _properties(parameters)["cc"]
         assert cc["default"] == []
         assert "maxItems" not in cc
+
+    async def test_the_category_argument_promises_the_lister_only_where_it_exists(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        described = cast("str", _properties(parameters)["categories"]["description"])
+        assert LIST_CATEGORIES_GUARD in described
+        assert "outlook_list_categories" not in described.replace(LIST_CATEGORIES_GUARD, "")
 
 
 class TestHowItDeclaresItself:

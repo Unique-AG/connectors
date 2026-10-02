@@ -69,7 +69,6 @@ from office_365_mcp.shared.calendar import (
     event_patch_body,
     event_time,
     is_midnight,
-    merged_categories,
     patch_changes,
     providers_without_teams,
     recurrence_refusal,
@@ -1223,35 +1222,6 @@ class TestThePatchBody:
             "onlineMeetingProvider": "teamsForBusiness",
             "@odata.type": "#microsoft.graph.event",
         }
-
-
-class TestTheCategoryMerge:
-    def test_a_new_name_comes_after_the_names_the_event_has(self) -> None:
-        assert merged_categories(["Budget"], add=["Blue category"], remove=[]) == [
-            "Budget",
-            "Blue category",
-        ]
-
-    def test_a_name_the_event_has_in_another_case_keeps_its_own_spelling(self) -> None:
-        assert merged_categories(["Budget"], add=["BUDGET"], remove=[]) == ["Budget"]
-
-    def test_a_removed_name_goes_whatever_its_case(self) -> None:
-        assert merged_categories(["Budget", "Blue category"], add=[], remove=["BLUE CATEGORY"]) == [
-            "Budget"
-        ]
-
-    def test_a_name_added_twice_is_added_once(self) -> None:
-        assert merged_categories([], add=["Budget", "budget"], remove=[]) == ["Budget"]
-
-    def test_removing_every_name_leaves_an_empty_list(self) -> None:
-        assert merged_categories(["Budget"], add=[], remove=["Budget"]) == []
-
-    def test_the_current_list_is_left_as_it_was(self) -> None:
-        current = ["Budget"]
-
-        _ = merged_categories(current, add=["Blue category"], remove=["Budget"])
-
-        assert current == ["Budget"]
 
 
 class TestWhatAPatchSays:

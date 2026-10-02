@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import ZONE_NAME, wall_clock
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, merged_categories
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import FlagMoment, MailImportance
@@ -346,18 +347,6 @@ def _status_of(change: MarkChange) -> FollowupFlagStatus | None:
     return None
 
 
-def _merged_categories(
-    current: Sequence[str], *, add: Sequence[str], remove: Sequence[str]
-) -> list[str]:
-    removed = {name.casefold() for name in remove}
-    merged: dict[str, str] = {}
-    for name in (*current, *add):
-        key = name.casefold()
-        if key not in removed and key not in merged:
-            merged[key] = name
-    return list(merged.values())
-
-
 def _question(mailbox: str, count: int, change: MarkChange) -> str:
     return (
         f"Change {count} {'message' if count == 1 else 'messages'} in the mailbox "
@@ -471,7 +460,7 @@ async def _categories_after(
             )
         )
     assert current is not None, "Graph answered a message read with no message"
-    return _merged_categories(
+    return merged_categories(
         current.categories or [], add=change.add_categories, remove=change.remove_categories
     )
 
@@ -548,10 +537,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 default=[],
                 description=(
-                    "The category names to add to each message, exactly as "
-                    + "outlook_list_categories reports them. This tool keeps the other "
-                    + "categories of the message. It does not add a name that the message "
-                    + "already has. This match ignores case."
+                    "The category names to add to each message, exactly as the user names them. "
+                    + LIST_CATEGORIES_GUARD
+                    + " This tool keeps the other categories of the message. It does not add a "
+                    + "name that the message already has. This match ignores case."
                 ),
             ),
         ],

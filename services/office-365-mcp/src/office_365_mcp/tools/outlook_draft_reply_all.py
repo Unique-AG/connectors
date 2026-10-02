@@ -33,6 +33,7 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
 )
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress, MailImportance
@@ -454,9 +455,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 default=[],
                 description=(
-                    "One category name for each entry, exactly as the user names it or as "
-                    + "outlook_list_categories reports it. An empty list adds no category to "
-                    + "the draft."
+                    "One category name for each entry, exactly as the user names it. "
+                    + LIST_CATEGORIES_GUARD
+                    + " An empty list adds no category to the draft."
                 ),
             ),
         ],

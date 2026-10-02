@@ -44,7 +44,6 @@ from office_365_mcp.shared.calendar import (
     event_of,
     event_patch_body,
     invited_attendee,
-    merged_categories,
     patch_changes,
     providers_without_teams,
     repeated_address,
@@ -53,6 +52,7 @@ from office_365_mcp.shared.calendar import (
     wall_clock,
     zone_named,
 )
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, merged_categories
 from office_365_mcp.shared.handles import event_handle
 from office_365_mcp.shared.mail import ONE_ADDRESS
 from office_365_mcp.shared.seam import (
@@ -625,10 +625,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 default=[],
                 description=(
-                    "The category names to add to the event, exactly as the user names them or "
-                    + "as outlook_list_categories reports them. This tool keeps the other "
-                    + "categories of the event. It does not add a name that the event already "
-                    + "has. This match ignores case."
+                    "The category names to add to the event, exactly as the user names them. "
+                    + LIST_CATEGORIES_GUARD
+                    + " This tool keeps the other categories of the event. It does not add a "
+                    + "name that the event already has. This match ignores case."
                 ),
             ),
         ],

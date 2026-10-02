@@ -40,6 +40,7 @@ from office_365_mcp.shared.calendar import (
     ShowAs,
     transaction_id_for,
 )
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle, event_handle
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
 from office_365_mcp.tools import outlook_create_event_on_behalf as creator
@@ -2022,6 +2023,16 @@ class TestTheSchemaItPublishes:
             cast("Mapping[str, object]", properties["calendar_ref"]).get("description", "")
         )
         assert "outlook_list_calendars" in described
+
+    async def test_the_category_argument_promises_the_lister_only_where_it_exists(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        described = cast("str", properties["categories"]["description"])
+        assert LIST_CATEGORIES_GUARD in described
+        assert "outlook_list_categories" not in described.replace(LIST_CATEGORIES_GUARD, "")
 
 
 class TestHowItDeclaresItself:

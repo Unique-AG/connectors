@@ -28,6 +28,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import MailRuleHandle, mail_folder_handle
 from office_365_mcp.shared.mail import ONE_ADDRESS, WellKnownFolder
 from office_365_mcp.shared.odata import spelled
@@ -705,7 +706,8 @@ class RuleConditionsInput(BaseModel):
         min_length=1,
         description=(
             "The names of the categories that an incoming message must have for the condition or "
-            + "the exception to apply. outlook_list_categories lists the names."
+            + "the exception to apply. "
+            + LIST_CATEGORIES_GUARD
         ),
     )
     from_addresses: list[str] | None = Field(
@@ -914,8 +916,8 @@ class RuleActionsInput(BaseModel):
         min_length=1,
         description=(
             "The names of the categories to put on each matching message. "
-            + "outlook_list_categories lists the names that the mailbox has. Omit it to put no "
-            + "category on the messages."
+            + LIST_CATEGORIES_GUARD
+            + " Omit it to put no category on the messages."
         ),
     )
     copy_to_folder: str | None = Field(

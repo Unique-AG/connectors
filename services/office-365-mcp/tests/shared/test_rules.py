@@ -21,6 +21,7 @@ from msgraph.generated.models.sensitivity import Sensitivity
 from msgraph.generated.models.size_range import SizeRange
 from pydantic import BaseModel
 
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle, MailRuleHandle
 from office_365_mcp.shared.rules import (
     InboxRule,
@@ -291,6 +292,18 @@ class TestTheModelCoversWhatMicrosoftDefines:
         description = model.model_fields[name].description or ""
 
         assert 15 <= len(description.split()) <= 60
+
+    @pytest.mark.parametrize(
+        ("model", "name"),
+        [(RuleConditionsInput, "categories"), (RuleActionsInput, "assign_categories")],
+    )
+    def test_a_category_field_promises_the_lister_only_where_it_exists(
+        self, model: type[BaseModel], name: str
+    ) -> None:
+        description = model.model_fields[name].description or ""
+
+        assert LIST_CATEGORIES_GUARD in description
+        assert "outlook_list_categories" not in description.replace(LIST_CATEGORIES_GUARD, "")
 
 
 class TestAnInboxRule:

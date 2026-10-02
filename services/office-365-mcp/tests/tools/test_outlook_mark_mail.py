@@ -27,6 +27,7 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.calendar import ZONE_NAME
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import MailMessageHandle
 from office_365_mcp.shared.mail import FlagMoment, MailImportance
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm, Confirmed
@@ -1411,7 +1412,9 @@ class TestHowItDeclaresItself:
         tool = await _registered(transport)
 
         arguments = _arguments(tool)
-        assert "outlook_list_categories" in str(arguments["add_categories"]["description"])
+        described = str(arguments["add_categories"]["description"])
+        assert LIST_CATEGORIES_GUARD in described
+        assert "outlook_list_categories" not in described.replace(LIST_CATEGORIES_GUARD, "")
         assert arguments["add_categories"]["default"] == []
         assert arguments["remove_categories"]["default"] == []
         assert cast("list[str]", tool.parameters["required"]) == ["message_refs"]
