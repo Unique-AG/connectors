@@ -1,4 +1,14 @@
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, merged_categories
+import json
+
+import pytest
+from pydantic import TypeAdapter, ValidationError
+
+from office_365_mcp.shared.categories import (
+    LIST_CATEGORIES_GUARD,
+    CategoryName,
+    merged_categories,
+    named_in_both,
+)
 
 
 class TestTheCategoryMerge:
@@ -28,6 +38,40 @@ class TestTheCategoryMerge:
         _ = merged_categories(current, add=["Blue category"], remove=["Budget"])
 
         assert current == ["Budget"]
+
+
+class TestTheNameInBothLists:
+    def test_lists_with_no_name_in_common_give_none(self) -> None:
+        assert named_in_both(["Budget"], ["Blue category"]) is None
+
+    @pytest.mark.parametrize(
+        ("add", "remove"),
+        [([], []), (["Budget"], []), ([], ["Budget"])],
+        ids=["both-empty", "nothing-removed", "nothing-added"],
+    )
+    def test_an_empty_list_gives_none(self, add: list[str], remove: list[str]) -> None:
+        assert named_in_both(add, remove) is None
+
+    def test_a_name_that_differs_only_in_case_comes_back_as_the_add_list_spells_it(self) -> None:
+        assert named_in_both(["Budget"], ["BUDGET"]) == "Budget"
+
+    def test_the_first_match_in_the_add_list_wins(self) -> None:
+        assert named_in_both(["Red", "Blue", "Green"], ["green", "BLUE"]) == "Blue"
+
+
+class TestTheCategoryName:
+    def test_a_list_of_names_is_accepted(self) -> None:
+        assert TypeAdapter(list[CategoryName]).validate_python(["Red"]) == ["Red"]
+
+    def test_an_empty_name_is_refused(self) -> None:
+        with pytest.raises(ValidationError):
+            _ = TypeAdapter(list[CategoryName]).validate_python([""])
+
+    def test_the_schema_inlines_a_minimum_length_of_one(self) -> None:
+        schema = TypeAdapter(list[CategoryName]).json_schema()
+
+        assert schema["items"]["minLength"] == 1
+        assert "$ref" not in json.dumps(schema)
 
 
 class TestTheListerGuard:
