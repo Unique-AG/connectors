@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Mapping
 from typing import Annotated
 
@@ -31,7 +29,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
-from office_365_mcp.shared.handles import MessageHandle, message_handle
+from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.handles import MessageHandle, message_handle, not_a_message_handle
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
@@ -52,7 +51,12 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (_CHAT_SEND, _CHANNEL_SEND)
 
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (_CHAT_SEND,)
 
-CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_read_message",)
+CHANGE_SHOWN_BY: tuple[str, ...] = (
+    "teams_read_message",
+    "teams_list_chat_messages",
+    "teams_browse_channel",
+    "teams_list_message_replies",
+)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000",
@@ -65,25 +69,14 @@ _EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
 _DESCRIPTION = """\
 Adds or removes one reaction on one Teams message, as the signed-in user. The message can be a \
 chat message, a channel post, or a reply to a channel post. Everyone in the conversation can see \
-the change. teams_read_message shows the reactions that a message has.
+the change. teams_list_chat_messages and teams_read_message show the reactions of a message.
 
 Notes:
 - This tool asks the user to agree before it changes a reaction, every time. This tool changes \
 nothing unless the user agrees.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
-teams_read_message does not already show the change.
+the conversation does not already show the change.
 """
-
-_BAD_HANDLE = """\
-teams_react_to_message takes the `uri` handle of a Teams message from another Teams tool, and \
-this value is not one. A message handle has one of exactly three shapes:
-  teams:///chats/{chat_id}/messages/{message_id}
-  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
-  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}
-The ids are percent-encoded, for example \
-teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool result \
-word for word. No reaction was changed. If you call this tool again with this value, the call \
-will fail the same way."""
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not find this message, and no reaction was changed. The handle is well "
@@ -98,8 +91,8 @@ GRAPH_NOT_FOUND = (
 class ChangedReaction(BaseModel):
     uri: str = Field(
         description=(
-            "The handle of the message that this call changed. Pass this handle to "
-            + "teams_read_message to see the reactions that the message has now."
+            "The handle of the message that this call changed. For a chat message, "
+            + "teams_list_chat_messages shows the reactions that the message has now."
         )
     )
     reaction: str = Field(
@@ -128,7 +121,8 @@ async def react_to_message(
     with graph_errors(TOOL_NAME, step=STEP_REACT):
         with not_graph():
             answer = await confirm(
-                _question(handle, reaction, remove=remove), _about(handle, reaction, remove=remove)
+                _question(handle, reaction, remove=remove),
+                confirmation_id_for(handle.uri, reaction, repr(remove)),
             )
         asked = answer if isinstance(answer, InputRequiredResult) else None
         refused = answer if isinstance(answer, str) else None
@@ -146,10 +140,6 @@ def _question(handle: MessageHandle, reaction: str, *, remove: bool) -> str:
     shown = cut_for_a_question(reaction)
     change = f"Remove the reaction {shown!r} from" if remove else f"Add the reaction {shown!r} to"
     return f"{change} the Teams message {handle.uri}? {_EVERYONE_SEES_IT}"
-
-
-def _about(handle: MessageHandle, reaction: str, *, remove: bool) -> str:
-    return hashlib.sha256(json.dumps([handle.uri, reaction, remove]).encode()).hexdigest()
 
 
 def _permission(handle: MessageHandle) -> str:
@@ -263,7 +253,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     ) -> ChangedReaction | InputRequiredResult:
         handle = message_handle(uri)
         if handle is None:
-            raise ToolError(_BAD_HANDLE)
+            raise ToolError(not_a_message_handle(TOOL_NAME, _NOTHING_CHANGED))
         await narrowed_to(ctx, _permission(handle))
         return await react_to_message(
             client,

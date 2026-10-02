@@ -22,6 +22,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import MessageHandle, message_handle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Confirmed
+from office_365_mcp.tools import PRESETS, TOOL_NAMES, graph_advice, resolve
 from office_365_mcp.tools import teams_react_to_message as reactor
 from office_365_mcp.tools.teams_react_to_message import (
     ChangedReaction,
@@ -271,16 +272,29 @@ class TestThePersonBeforeTheChange:
         assert _REPLY_HANDLE.uri in asked[0]
         assert "Everyone in the conversation can see this change." in asked[0]
 
-    def test_the_binding_differs_for_another_reaction_another_action_and_another_message(
-        self,
+    async def test_the_binding_differs_for_another_reaction_another_action_and_another_message(
+        self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        about = reactor._about  # pyright: ignore[reportPrivateUsage]
+        bound: list[str] = []
 
-        bound = about(_CHAT_HANDLE, _THUMBS_UP, remove=False)
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return _NOTHING_CHANGED
 
-        assert bound != about(_CHAT_HANDLE, _HEART, remove=False)
-        assert bound != about(_CHAT_HANDLE, _THUMBS_UP, remove=True)
-        assert bound != about(_CHANNEL_HANDLE, _THUMBS_UP, remove=False)
+        for handle, reaction, remove in (
+            (_CHAT_HANDLE, _THUMBS_UP, False),
+            (_CHAT_HANDLE, _HEART, False),
+            (_CHAT_HANDLE, _THUMBS_UP, True),
+            (_CHANNEL_HANDLE, _THUMBS_UP, False),
+        ):
+            with pytest.raises(ToolError, match=_NOTHING_CHANGED):
+                _ = await react_to_message(
+                    client, handle=handle, reaction=reaction, remove=remove, confirm=capturing
+                )
+
+        assert len(bound) == len(set(bound)) == 4
+        assert len(graph.calls) == 0
 
 
 class TestTheEraWithNoBackChannel:
@@ -512,8 +526,23 @@ class TestHowItDeclaresItself:
         assert handle.chat_id is not None
         assert reactor.GRAPH_CALL_NARROWS_TO == ("ChatMessage.Send",)
 
-    def test_teams_read_message_shows_the_change(self) -> None:
-        assert reactor.CHANGE_SHOWN_BY == ("teams_read_message",)
+    def test_the_read_tools_whose_rows_carry_reactions_show_the_change(self) -> None:
+        assert reactor.CHANGE_SHOWN_BY == (
+            "teams_read_message",
+            "teams_list_chat_messages",
+            "teams_browse_channel",
+            "teams_list_message_replies",
+        )
+
+    @pytest.mark.parametrize(
+        "preset", [preset for preset, tools in PRESETS.items() if reactor.TOOL_NAME in tools]
+    )
+    def test_every_preset_that_holds_it_also_holds_a_tool_that_shows_the_change(
+        self, preset: str
+    ) -> None:
+        advice = graph_advice(resolve(preset=preset, enabled=None))
+
+        assert advice[reactor.TOOL_NAME].shown_by, preset
 
     async def test_it_announces_itself_as_a_destructive_write_that_is_not_idempotent(
         self, transport: httpx.AsyncClient
@@ -539,9 +568,20 @@ class TestHowItDeclaresItself:
         ) in " ".join(description.split())
         assert (
             "If a call times out, do not call this tool again first. Before you call again, make "
-            + "sure that teams_read_message does not already show the change."
+            + "sure that the conversation does not already show the change."
         ) in " ".join(description.split())
         assert "Everyone in the conversation can see the change." in " ".join(description.split())
+        assert (
+            "teams_list_chat_messages and teams_read_message show the reactions of a message."
+        ) in " ".join(description.split())
+
+    async def test_the_retry_note_names_no_tool(self, transport: httpx.AsyncClient) -> None:
+        tool = await _registered(transport)
+
+        lines = (tool.description or "").splitlines()
+        retry = [line for line in lines if line.startswith("- If a call times out")]
+        assert len(retry) == 1, lines
+        assert not [name for name in TOOL_NAMES if name in retry[0]], retry[0]
 
     async def test_the_arguments_are_uri_reaction_and_remove_and_nothing_else(
         self, transport: httpx.AsyncClient

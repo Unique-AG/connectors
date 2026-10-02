@@ -1,6 +1,11 @@
+from typing import cast
+
 import httpx
 import pytest
 import respx
+from fastmcp import Context, FastMCP
+from fastmcp.exceptions import ToolError
+from fastmcp.tools import FunctionTool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
@@ -932,6 +937,46 @@ class TestTheFailuresItPassesOn:
 
         with pytest.raises(GraphForbidden):
             _ = await teams_read_message.teams_read_message(client, handle=_CHANNEL_HANDLE)
+
+
+class TestTheRefusalOfAValueThatIsNotAMessageHandle:
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            "19:release@thread.v2",
+            "teams:///chats/19%3Arelease%40thread.v2",
+            "outlook:///messages/AAMkSYNTHETIC",
+        ],
+    )
+    async def test_it_shows_the_three_shapes_and_no_stale_claim(
+        self,
+        transport: httpx.AsyncClient,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        uri: str,
+    ) -> None:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        teams_read_message.register(mcp, transport)
+        tool = await mcp.get_tool(teams_read_message.TOOL_NAME)
+        assert isinstance(tool, FunctionTool)
+
+        with pytest.raises(ToolError) as refused:
+            _ = cast("object", await tool.fn(uri=uri, ctx=cast("Context", object()), client=client))
+
+        text = str(refused.value)
+        assert text.startswith("teams_read_message takes the `uri` handle of a Teams message")
+        assert "teams:///chats/{chat_id}/messages/{message_id}" in text
+        assert "teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}" in text
+        assert (
+            "teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}"
+        ) in text
+        assert (
+            "teams_search_messages, teams_browse_channel, teams_list_message_replies and "
+            + "teams_list_chat_messages give a message handle."
+        ) in text
+        assert "teams_browse_channel produced" not in text
+        assert "no mail, files or sites" not in text
+        assert len(graph.calls) == 0
 
 
 class TestTheAdviceForAReplyItCannotRead:

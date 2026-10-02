@@ -25,6 +25,7 @@ from office_365_mcp.shared.handles import (
     CHAT_PERMISSION,
     MessageHandle,
     message_handle,
+    not_a_message_handle,
 )
 from office_365_mcp.shared.messages import TeamsMessage
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narrowed_to
@@ -48,20 +49,6 @@ _DESCRIPTION = (
     "edit or delete status — from a handle another tool produced."
 )
 
-_BAD_HANDLE = (
-    "teams_read_message takes a `uri` handle that teams_search_messages or teams_browse_channel "
-    + "produced, and this "
-    + "is not one. A readable handle has one of exactly three shapes:\n"
-    + "  teams:///chats/{chat_id}/messages/{message_id}\n"
-    + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}\n"
-    + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}\n"
-    + "with the ids percent-encoded, for example "
-    + "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool "
-    + "result rather than assembling one. This reader serves Teams messages only: no mail, files "
-    + "or sites are addressable in this connector at all. Retrying this value will fail "
-    + "identically."
-)
-
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this message. The handle is well formed, so this is not a bad "
     + "argument. It is also not evidence that the message does not exist. Graph answers "
@@ -80,6 +67,11 @@ GRAPH_NOT_FOUND = (
     + "there is no route to its full text, and a second browse returns the same window. Report "
     + "the search snippet with its sender and date. Say that this tool did not retrieve the "
     + "full text. Then stop looking."
+)
+
+_HANDLE_SOURCES = (
+    "teams_search_messages, teams_browse_channel, teams_list_message_replies and "
+    + "teams_list_chat_messages give a message handle."
 )
 
 _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
@@ -166,6 +158,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     ) -> TeamsMessage:
         handle = message_handle(uri)
         if handle is None:
-            raise ToolError(_BAD_HANDLE)
+            raise ToolError(not_a_message_handle(TOOL_NAME, _HANDLE_SOURCES))
         await narrowed_to(ctx, handle.permission)
         return await teams_read_message(client, handle=handle)

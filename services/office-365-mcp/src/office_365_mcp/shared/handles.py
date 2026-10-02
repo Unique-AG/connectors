@@ -267,10 +267,17 @@ _ONENOTE_SECTION_GROUP_HANDLE = re.compile(r"\Aonenote:///sectiongroups/([^/]+)\
 _ONENOTE_OPERATION_HANDLE = re.compile(r"\Aonenote:///operations/([^/]+)\Z")
 
 
+_MESSAGE_HANDLE_SHAPES = """\
+A message handle has one of exactly three shapes:
+  teams:///chats/{chat_id}/messages/{message_id}
+  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
+  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}
+The ids are percent-encoded, for example \
+teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool result \
+word for word."""
+
+
 def message_handle(uri: str) -> MessageHandle | None:
-    """`uri` as a message handle, or None if it is not one this connector can read. None rather than
-    an exception carrying advice: what to tell a caller about a malformed handle is each reader
-    tool's own wording."""
     chat = _CHAT_HANDLE.match(uri)
     if chat is not None:
         chat_id, message_id = (unquote(part) for part in chat.groups())
@@ -293,6 +300,20 @@ def message_handle(uri: str) -> MessageHandle | None:
             MessageHandle(message_id=message_id, team_id=team_id, channel_id=channel_id)
         )
     return None
+
+
+def not_a_message_handle(tool: str, outcome: str) -> str:
+    return " ".join(
+        part
+        for part in (
+            f"{tool} takes the `uri` handle of a Teams message from another Teams tool, and this "
+            + "value is not one.",
+            _MESSAGE_HANDLE_SHAPES,
+            outcome,
+            "If you call this tool again with this value, the call will fail the same way.",
+        )
+        if part
+    )
 
 
 def meeting_handle(uri: str) -> MeetingHandle | None:
