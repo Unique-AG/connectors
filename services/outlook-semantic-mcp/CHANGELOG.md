@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.6.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.2...outlook-semantic-mcp@3.6.3) (2026-10-01)
+
+
+### Dependencies
+
+* bump lru-cache in /  ([#1103](https://github.com/Unique-AG/connectors/issues/1103)) ([ba5d168](https://github.com/Unique-AG/connectors/commit/ba5d16814d5ea26cac5e918da9c9328e13178431))
+
 ## [3.6.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.1...outlook-semantic-mcp@3.6.2) (2026-09-25)
 
 
