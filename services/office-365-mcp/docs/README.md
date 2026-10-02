@@ -120,13 +120,18 @@ the text names that tool. If not, the text tells the model to ask the user.
 
 The handles of a notebook that a Microsoft 365 group or team owns start with
 `onenote:///groups/{group}/`. The handles of a notebook that a SharePoint site owns start with
-`onenote:///sites/{site}/`. A team id is a group id, and `teams_list_my_teams` lists the teams of
-the user. Every write into a group or site notebook asks the user to agree first.
+`onenote:///sites/{site}/`. Every write into a group or site notebook asks the user to agree first.
 
-The question that asks the user to agree names a group or a site by its id only. To name it, a
-OneNote tool needs a permission to read groups or sites. The OneNote tools do not hold that
-permission. `teams_list_my_teams` gives the name of each team that the user is a member of. No tool
-of this connector finds the id of a site, so the user gives it.
+The OneNote tools hold no permission to read groups or sites. As a result, the questions of
+`onenote_create_notebook` and `onenote_copy_notebook` name the group or the site by its id only. The
+other OneNote writes name the notebook and say that it belongs to a group or a site.
+
+`teams_list_my_teams` gives the id and the name of each team that the user is a member of. A team id
+is a group id. No OneNote preset includes this tool. In a deployment with only OneNote tools, the
+user gives the group id. No tool of this connector finds the id of a site, so the user gives it.
+
+Microsoft can refuse a call for a group or site notebook with HTTP 403. Then the tool tells the
+model to ask the user to get access.
 
 ## Presets
 
