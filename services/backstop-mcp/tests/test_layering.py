@@ -62,7 +62,9 @@
 5. **Feature model layers flow downward.** A `*Attributes` class lives in `api_responses*`, a
    `*Dto` class in `internal_dto*`, and a `*Response` class in `responses*`. Imports among those
    three modules run one way only (`responses` → `internal_dto` → `api_responses`) within a
-   feature. No model declares `extra="forbid"`. `*Attributes` declare `extra="ignore"`;
+   feature. No model declares `extra="forbid"`. Operator configuration in `config.py` is the
+   one place `extra="forbid"` is expected, because an unknown overlay key is a deployment
+   typo that must fail startup rather than be ignored. `*Attributes` declare `extra="ignore"`;
    `extra="allow"` is only where passthrough is the point (`PersonRecordResponse`,
    `OrganizationRecordResponse`). `features/<feature>/tools/` declare their own models — a
    tool's wire contract lives beside it — and are exempt from the layer filenames and
@@ -1056,7 +1058,7 @@ class TestFeatureModelLayers:
             + "\n  ".join(violations)
         )
 
-    @pytest.mark.parametrize("source", sorted(_SRC.rglob("*.py")), ids=_source_id)
+    @pytest.mark.parametrize("source", _governed_model_sources(), ids=_source_id)
     def test_no_model_declares_extra_forbid(self, source: pathlib.Path) -> None:
         violations = _extra_forbid_violations(source.read_text(), source)
         assert not violations, 'no model may declare extra="forbid":\n  ' + "\n  ".join(violations)

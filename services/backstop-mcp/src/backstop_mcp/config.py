@@ -1,3 +1,4 @@
+import json
 import os
 import ssl
 from datetime import timedelta
@@ -7,12 +8,15 @@ from typing import Annotated, ClassVar, Self, TypedDict, cast
 from urllib.parse import urlparse
 
 from pydantic import (
+    BaseModel,
     BeforeValidator,
+    ConfigDict,
     Field,
     HttpUrl,
     PostgresDsn,
     PrivateAttr,
     SecretStr,
+    StringConstraints,
     TypeAdapter,
     field_validator,
     model_validator,
@@ -564,3 +568,52 @@ class EncryptionConfig(BaseSettings):
         if self.encryption_key is None:
             raise ValueError("BACKSTOP_MCP_ENCRYPTION_KEY not set")
         return self
+
+
+ServerGuidanceText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2500)
+]
+ToolGuidanceText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=800)
+]
+ParameterGuidanceText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)
+]
+
+
+class ToolGuidance(BaseModel):
+    """Tenant text appended to one tool's description and to some of its parameters."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+    description: ToolGuidanceText | None = None
+    parameters: dict[str, ParameterGuidanceText] = Field(default_factory=dict)
+
+
+class TenantGuidance(BaseModel):
+    """What one deployment adds to the shipped, tenant-neutral tool documentation."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+    server_instructions: ServerGuidanceText | None = None
+    tools: dict[str, ToolGuidance] = Field(default_factory=dict)
+
+
+class TenantGuidanceConfig(BaseSettings):
+    """`BACKSTOP_MCP_TENANT_GUIDANCE`: a JSON `TenantGuidance`. Unset means none."""
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="BACKSTOP_MCP_")
+
+    tenant_guidance: Annotated[TenantGuidance, NoDecode] = Field(default_factory=TenantGuidance)
+
+    @field_validator("tenant_guidance", mode="before")
+    @classmethod
+    def _parse_tenant_guidance(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        if value.strip() == "":
+            return {}
+        try:
+            return cast("object", json.loads(value))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"BACKSTOP_MCP_TENANT_GUIDANCE is not valid JSON: {exc}") from exc
