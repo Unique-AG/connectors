@@ -90,8 +90,8 @@ class DriveItemSummary(BaseModel):
     )
     last_modified_at: datetime | None = Field(
         description=(
-            "When the item last changed, as Graph reported it. This is the field the date "
-            + "arguments of sharepoint_search_files bound."
+            "When the item last changed, as Graph reported it. The date limits of a SharePoint "
+            + "file search apply to this field."
         )
     )
     last_modified_by: str | None = Field(

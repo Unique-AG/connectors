@@ -62,7 +62,7 @@ class ThreadReplies(BaseModel):
     messages: list[TeamsMessage] = Field(
         description=(
             "The replies to the post, oldest first, without system events. Each `uri` is a reply "
-            + "handle that teams_read_message reads. The post itself is not in this list."
+            + "handle. The post itself is not in this list."
         )
     )
     more_replies: bool = Field(
@@ -131,9 +131,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The channel post to read, as the `uri` of a teams_browse_channel or "
-                    + "teams_search_messages message. Copy it word for word. A chat handle and a "
-                    + "reply handle are not valid here."
+                    "The channel post to read, as the `uri` of a channel post that another Teams "
+                    + "tool returned. Copy it word for word. A chat handle and a reply handle are "
+                    + "not valid here."
                 ),
             ),
         ],

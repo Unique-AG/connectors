@@ -232,6 +232,15 @@ class TestHowItDeclaresItself:
             assert 15 <= len(description.split()) <= 60, name
             assert all(len(sentence.split()) <= 25 for sentence in _sentences(description)), name
 
+    async def test_the_channel_id_description_does_not_send_the_model_to_a_search_tool(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        description = cast("str", _property(parameters, "channel_id")["description"])
+        assert "exactly as teams_list_channels reported it" in description
+        assert "teams_search_messages" not in description
+
     async def test_the_description_points_to_sharepoint_browse_folder_for_the_contents(
         self, transport: httpx.AsyncClient
     ) -> None:

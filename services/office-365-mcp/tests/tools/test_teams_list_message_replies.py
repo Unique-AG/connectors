@@ -10,6 +10,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import message_handle
+from office_365_mcp.tools import TOOL_NAMES
 from office_365_mcp.tools import teams_list_message_replies as lister
 
 from .conftest import GRAPH_V1, message_payload
@@ -342,8 +343,9 @@ class TestHowItDeclaresItself:
         assert properties["limit"]["maximum"] == 50
         assert properties["limit"]["default"] == 20
         described = cast("str", properties["uri"]["description"])
-        assert "teams_browse_channel" in described
-        assert "teams_search_messages" in described
+        assert "as the `uri` of a channel post that another Teams tool returned." in described
+        assert "Copy it word for word." in described
+        assert not [name for name in TOOL_NAMES if name in described], described
 
     async def test_the_description_names_the_sibling_and_the_request_limit(
         self, transport: httpx.AsyncClient
@@ -376,3 +378,14 @@ class TestHowItDeclaresItself:
             "messages",
             "more_replies",
         }
+
+    async def test_the_replies_field_names_no_tool(self, transport: httpx.AsyncClient) -> None:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        lister.register(mcp, transport)
+        tool = await mcp.get_tool(lister.TOOL_NAME)
+        assert tool is not None, "register left the tool off the server"
+
+        schema = cast("Mapping[str, Mapping[str, Mapping[str, object]]]", tool.output_schema)
+        described = cast("str", schema["properties"]["messages"]["description"])
+        assert "oldest first" in described
+        assert not [name for name in TOOL_NAMES if name in described], described

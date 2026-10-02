@@ -639,6 +639,19 @@ _NAMES_ONLY_ITS_PRESETS_TOOLS: frozenset[str] = frozenset(
     }
 )
 
+_NAMES_ONLY_ITS_PRESETS_SCHEMAS: frozenset[str] = _NAMES_ONLY_ITS_PRESETS_TOOLS | frozenset(
+    {
+        "teams_list_chat_messages",
+        "teams_list_chat_members",
+        "teams_list_message_replies",
+        "teams_get_channel_files_folder",
+        "teams_send_chat_message",
+        "teams_send_channel_message",
+        "teams_send_chat_message_with_files",
+        "teams_send_channel_message_with_files",
+    }
+)
+
 
 def _descriptions(schema: Mapping[str, object]) -> list[str]:
     found: list[str] = []
@@ -669,9 +682,9 @@ class TestAToolNamesOnlyTheToolsOfItsPresets:
     def test_every_listed_tool_is_registered_by_some_preset(self) -> None:
         registered = {tool for tools in PRESETS.values() for tool in tools}
 
-        assert not _NAMES_ONLY_ITS_PRESETS_TOOLS - registered, (
-            f"no preset registers {sorted(_NAMES_ONLY_ITS_PRESETS_TOOLS - registered)}, so the "
-            + "check below asserts nothing about it"
+        assert not _NAMES_ONLY_ITS_PRESETS_SCHEMAS - registered, (
+            f"no preset registers {sorted(_NAMES_ONLY_ITS_PRESETS_SCHEMAS - registered)}, so the "
+            + "checks below assert nothing about it"
         )
 
     @pytest.mark.parametrize("preset", list(ToolsPreset))
@@ -685,7 +698,7 @@ class TestAToolNamesOnlyTheToolsOfItsPresets:
             listed = [
                 tool
                 for tool in await mcp.list_tools()
-                if tool.name in _NAMES_ONLY_ITS_PRESETS_TOOLS
+                if tool.name in _NAMES_ONLY_ITS_PRESETS_SCHEMAS
             ]
 
         unregistered = {
@@ -693,7 +706,16 @@ class TestAToolNamesOnlyTheToolsOfItsPresets:
             for tool in listed
             if (
                 named := _tools_named_in(
-                    [tool.description or "", *_descriptions(tool.parameters)], besides=tool.name
+                    [
+                        *(
+                            [tool.description or ""]
+                            if tool.name in _NAMES_ONLY_ITS_PRESETS_TOOLS
+                            else []
+                        ),
+                        *_descriptions(tool.parameters),
+                        *_descriptions(tool.output_schema or {}),
+                    ],
+                    besides=tool.name,
                 )
                 - set(selection.tools)
             )

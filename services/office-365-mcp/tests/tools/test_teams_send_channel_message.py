@@ -936,8 +936,9 @@ class TestHowItDeclaresItself:
         reply_to_id = (await _listed(transport))["reply_to_id"]
 
         described = str(reply_to_id["description"])
-        assert "teams_browse_channel" in described
-        assert "teams_read_message" in described
+        assert "from a channel message that another Teams tool returned." in described
+        assert "teams_browse_channel" not in described
+        assert "teams_read_message" not in described
         assert "Give the id of a post, never the id of a reply." in described
         assert "To answer a reply, give the `reply_to_id` of that reply." in described
         text = cast("Sequence[Mapping[str, object]]", reply_to_id["anyOf"])[0]

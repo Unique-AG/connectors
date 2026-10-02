@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager
 from typing import cast
 
@@ -13,10 +13,12 @@ from office_365_mcp.shared import files
 from office_365_mcp.shared.files import (
     STEP_DRIVE_ITEM,
     AttachableFile,
+    DriveItemSummary,
     attachable_files,
     attachment_handles,
 )
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
+from office_365_mcp.tools import TOOL_NAMES
 
 _DRIVE_ID = "b!SYNTHETICDRIVE0000"
 _ITEM_ID = "01SYNTHETICFILE0000"
@@ -59,6 +61,17 @@ def _item(
 
 def _reads(graph: respx.MockRouter, payload: dict[str, object]) -> respx.Route:
     return graph.get(_ITEM_PATH).mock(return_value=httpx.Response(200, json=payload))
+
+
+class TestDriveItemSummarySchema:
+    def test_the_modified_time_says_the_date_limits_of_a_file_search_apply_to_it(self) -> None:
+        properties = cast(
+            "Mapping[str, Mapping[str, object]]", DriveItemSummary.model_json_schema()["properties"]
+        )
+
+        described = str(properties["last_modified_at"]["description"])
+        assert "The date limits of a SharePoint file search apply to this field." in described
+        assert not [name for name in TOOL_NAMES if name in described], described
 
 
 class TestAttachmentHandles:

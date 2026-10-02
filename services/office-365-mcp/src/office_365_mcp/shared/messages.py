@@ -555,9 +555,9 @@ CHANNEL_ID_FIELD: str = (
 )
 
 REPLY_TO_ID_FIELD: str = (
-    "The `message_id` of the channel post to reply to, as teams_browse_channel or "
-    + "teams_read_message reports it. Give the id of a post, never the id of a reply. To answer a "
-    + "reply, give the `reply_to_id` of that reply. Omit this parameter to start a new post."
+    "The `message_id` of the channel post to reply to, from a channel message that another Teams "
+    + "tool returned. Give the id of a post, never the id of a reply. To answer a reply, give the "
+    + "`reply_to_id` of that reply. Omit this parameter to start a new post."
 )
 
 CHANNEL_SUBJECT_FIELD: str = (
