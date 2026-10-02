@@ -7,6 +7,7 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
+from msgraph.generated.models.user import User
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -24,6 +25,8 @@ from office_365_mcp.shared.messages import (
     TeamsMessage,
     get_message,
     message_in_question,
+    not_the_sender,
+    sent_by,
 )
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
@@ -48,7 +51,11 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (
 )
 
 _CHAT_PERMISSIONS: tuple[str, ...] = (_CHAT_WRITE, identity.GRAPH_PERMISSION)
-_CHANNEL_PERMISSIONS: tuple[str, ...] = (_CHANNEL_WRITE, CHANNEL_PERMISSION)
+_CHANNEL_PERMISSIONS: tuple[str, ...] = (
+    _CHANNEL_WRITE,
+    CHANNEL_PERMISSION,
+    identity.GRAPH_PERMISSION,
+)
 
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = _CHAT_PERMISSIONS
 
@@ -66,17 +73,20 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _AGREE = "delete"
 _DECLINE = "do not delete"
 _NOTHING_DELETED = "No message was deleted."
-
-_ALREADY_DELETED = (
-    f"This message is already deleted. {_NOTHING_DELETED} If you call this tool again with this "
-    + "handle, the call will fail the same way."
+_REFUSED = (
+    f"{_NOTHING_DELETED} If you call this tool again with this handle, the call will fail the same "
+    + "way."
 )
+
+_ALREADY_DELETED = f"This message is already deleted. {_REFUSED}"
+
+_NOT_THE_SENDER = not_the_sender("deletes", tail=_REFUSED)
 
 _DESCRIPTION = """\
 Deletes one Teams message as the signed-in user. The message can be a chat message, a channel \
-post, or a reply to a channel post. This is a soft delete: Teams shows the message as deleted. \
-Everyone in the conversation can see the change. teams_edit_message replaces the text of a \
-message instead.
+post, or a reply to a channel post. The message must be one that the signed-in user sent. This \
+is a soft delete: Teams shows the message as deleted. Everyone in the conversation can see the \
+change. teams_edit_message replaces the text of a message instead.
 
 Notes:
 - This tool asks the user to agree before it deletes a message, every time. This tool deletes \
@@ -121,14 +131,18 @@ async def delete_message(
         found = await get_message(client, handle)
         assert found is not None, "Graph answered a message read with no message"
         current = TeamsMessage.from_message(found, handle=handle)
-        refused = _ALREADY_DELETED if current.deleted_at is not None else None
-        if refused is None:
-            with not_graph():
-                answer = await confirm(_question(current), _about(handle))
-            asked = answer if isinstance(answer, InputRequiredResult) else None
-            refused = answer if isinstance(answer, str) else None
-        if refused is None and asked is None:
-            await _soft_delete(client, handle)
+        if current.deleted_at is not None:
+            refused = _ALREADY_DELETED
+        else:
+            user = await identity.signed_in_user(client)
+            refused = None if sent_by(current, user) else _NOT_THE_SENDER
+            if refused is None:
+                with not_graph():
+                    answer = await confirm(_question(current), _about(handle))
+                asked = answer if isinstance(answer, InputRequiredResult) else None
+                refused = answer if isinstance(answer, str) else None
+            if refused is None and asked is None:
+                await _soft_delete(client, handle, user)
 
     if asked is not None:
         return asked
@@ -149,10 +163,10 @@ def _permissions(handle: MessageHandle) -> tuple[str, ...]:
     return _CHAT_PERMISSIONS if handle.chat_id is not None else _CHANNEL_PERMISSIONS
 
 
-async def _soft_delete(client: GraphServiceClient, handle: MessageHandle) -> None:
+async def _soft_delete(client: GraphServiceClient, handle: MessageHandle, user: User) -> None:
     once = RequestConfiguration[QueryParameters](options=no_retry())
     if handle.chat_id is not None:
-        user_id = (await identity.signed_in_user(client)).id
+        user_id = user.id
         assert user_id is not None, "signed_in_user answers only a user that has an id"
         chat = client.users.by_user_id(user_id).chats.by_chat_id(handle.chat_id)
         with graph_step(STEP_DELETE):

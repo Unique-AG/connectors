@@ -29,7 +29,7 @@ from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirmed
 from office_365_mcp.tools import teams_edit_message as editor
 from office_365_mcp.tools.teams_edit_message import EditedMessage, a_person_agrees, edit_message
 
-from .conftest import message_payload
+from .conftest import ME, OTHER_USER_ID, message_payload
 
 _CHAT_ID = "19:release@thread.v2"
 _TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
@@ -62,8 +62,37 @@ _ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelac
 
 _NOTHING_CHANGED = "No message was changed."
 
-_CHAT_PERMISSIONS = ("Chat.ReadWrite",)
-_CHANNEL_PERMISSIONS = ("ChannelMessage.ReadWrite", "ChannelMessage.Read.All")
+_CHAT_PERMISSIONS = ("Chat.ReadWrite", "User.Read")
+_CHANNEL_PERMISSIONS = ("ChannelMessage.ReadWrite", "ChannelMessage.Read.All", "User.Read")
+
+_LETTERED_ID = "9f8e7d6c-5b4a-4c3d-8e2f-1a0b9c8d7e6f"
+
+_NOT_THE_SENDER = (
+    "Microsoft 365 does not name the signed-in user as the sender of this message. This tool "
+    + "changes only a message that the signed-in user sent. No message was changed. If you "
+    + "call this tool again with this handle, the call will fail the same way."
+)
+
+
+def _sent_by(user_id: str) -> dict[str, object]:
+    return {
+        "user": {
+            "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+            "id": user_id,
+            "displayName": "Grace Hopper",
+            "userIdentityType": "aadUser",
+        }
+    }
+
+
+_FROM_AN_APPLICATION: dict[str, object] = {
+    "application": {
+        "@odata.type": "#microsoft.graph.teamworkApplicationIdentity",
+        "id": _LETTERED_ID,
+        "displayName": "Release bot",
+        "applicationIdentityType": "bot",
+    }
+}
 
 
 async def _agrees(question: str, about: str) -> Confirmed:
@@ -85,9 +114,14 @@ def _asking(asked: list[str]) -> Callable[[str, str], Awaitable[Confirmed]]:
     return capturing
 
 
+def _me(graph: respx.MockRouter) -> respx.Route:
+    return graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
+
+
 def _reads(
     graph: respx.MockRouter, message: Mapping[str, object] = _CURRENT
 ) -> Mapping[str, respx.Route]:
+    _ = _me(graph)
     return {
         endpoint: graph.get(endpoint).mock(return_value=httpx.Response(200, json=message))
         for endpoint in _EVERY_ENDPOINT
@@ -206,7 +240,9 @@ class TestTheRequestItMakes:
         assert {path: route.call_count for path, route in routes.items()} == {
             path: 1 if path == endpoint else 0 for path in _EVERY_ENDPOINT
         }
-        assert _methods(graph) == ["GET", "PATCH"], "one edit costs one read and one write"
+        assert _methods(graph) == ["GET", "GET", "PATCH"], (
+            "one edit reads the message and the signed-in user, then writes once"
+        )
         assert _body(routes[endpoint]) == {
             "body": {"content": _TEXT, "contentType": "text"},
             "mentions": [],
@@ -276,7 +312,7 @@ class TestThePersonBeforeTheChange:
             _ = await edit_message(client, handle=_CHAT_HANDLE, message=_TEXT, confirm=_refuses)
 
         assert all(route.call_count == 0 for route in routes.values())
-        assert _methods(graph) == ["GET"]
+        assert _methods(graph) == ["GET", "GET"]
 
     async def test_a_decline_changes_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -332,8 +368,8 @@ class TestThePersonBeforeTheChange:
 
         _ = await edit_message(client, handle=handle, message=_TEXT, confirm=watching)
 
-        assert calls_when_asked == [["GET"]], "asked before the read, or after the change"
-        assert _methods(graph) == ["GET", "PATCH"]
+        assert calls_when_asked == [["GET", "GET"]], "asked before the reads, or after the change"
+        assert _methods(graph) == ["GET", "GET", "PATCH"]
         assert routes[endpoint].call_count == 1
 
     async def test_the_question_names_the_sender_the_current_text_the_new_text_and_who_sees_it(
@@ -410,11 +446,6 @@ class TestThePersonBeforeTheChange:
                 f"of the Teams message from {_SENDER!r} that has no text with",
                 id="no-text",
             ),
-            pytest.param(
-                message_payload(content=f"<p>{_CURRENT_TEXT}</p>", sender=None),
-                f"of the Teams message that says {_CURRENT_TEXT!r} with",
-                id="no-sender",
-            ),
         ],
     )
     async def test_the_question_says_what_the_message_lacks(
@@ -481,6 +512,49 @@ class TestThePersonBeforeTheChange:
         assert all(route.call_count == 0 for route in routes.values())
         assert _methods(graph) == ["GET"]
 
+    @pytest.mark.parametrize(
+        "sender",
+        [
+            pytest.param(_sent_by(OTHER_USER_ID), id="another-person"),
+            pytest.param(None, id="no-sender"),
+            pytest.param(_FROM_AN_APPLICATION, id="application"),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "handle", [_CHAT_HANDLE, _CHANNEL_HANDLE, _REPLY_HANDLE], ids=["chat", "post", "reply"]
+    )
+    async def test_a_message_that_the_signed_in_user_did_not_send_is_refused_before_any_question(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        sender: Mapping[str, object] | None,
+        handle: MessageHandle,
+    ) -> None:
+        routes = _every_endpoint(graph)
+        _ = _reads(graph, message_payload(content=f"<p>{_CURRENT_TEXT}</p>", sender=sender))
+        session = _Session(modern=False, elicited=AcceptedElicitation(data="edit"))
+
+        with pytest.raises(ToolError) as refused:
+            _ = await edit_message(
+                client, handle=handle, message=_TEXT, confirm=a_person_agrees(session.context)
+            )
+
+        assert str(refused.value) == _NOT_THE_SENDER
+        assert session.asked == []
+        assert all(route.call_count == 0 for route in routes.values())
+        assert _methods(graph) == ["GET", "GET"]
+
+    async def test_a_sender_id_that_differs_only_in_letter_case_is_the_signed_in_user(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _edits(graph)
+        _ = _reads(graph, message_payload(sender=_sent_by(_LETTERED_ID.upper())))
+        _ = graph.get("/me").mock(return_value=httpx.Response(200, json={**ME, "id": _LETTERED_ID}))
+
+        _ = await edit_message(client, handle=_CHAT_HANDLE, message=_TEXT, confirm=_agrees)
+
+        assert route.call_count == 1
+
     def test_the_binding_differs_for_another_text_another_mention_and_another_message(
         self,
     ) -> None:
@@ -545,7 +619,9 @@ class TestTheEraWithNoBackChannel:
         )
 
         assert route.call_count == 1, "the agreed change did not happen exactly once"
-        assert _methods(graph) == ["GET", "GET", "PATCH"], "each round reads, and one writes"
+        assert _methods(graph) == ["GET", "GET", "GET", "GET", "PATCH"], (
+            "each round reads the message and the signed-in user, and one round writes"
+        )
         assert answer == EditedMessage(uri=_CHAT_HANDLE.uri, text=_TEXT, mentions=[_JANE])
 
     @pytest.mark.parametrize(
@@ -732,17 +808,18 @@ class TestHowRegisterWiresTheHandle:
 
 
 class TestHowItDeclaresItself:
-    def test_it_declares_the_read_write_permission_of_each_surface_and_the_channel_read(
+    def test_it_declares_the_write_permission_of_each_surface_the_identity_and_channel_reads(
         self,
     ) -> None:
         assert editor.GRAPH_PERMISSIONS == (
             "Chat.ReadWrite",
             "ChannelMessage.ReadWrite",
+            "User.Read",
             "ChannelMessage.Read.All",
         )
         assert set(_CHAT_PERMISSIONS) | set(_CHANNEL_PERMISSIONS) == set(editor.GRAPH_PERMISSIONS)
 
-    def test_its_example_call_is_narrowed_to_the_chat_permission(self) -> None:
+    def test_its_example_call_is_narrowed_to_the_chat_permissions(self) -> None:
         example = cast("Mapping[str, str]", editor.GRAPH_CALL_EXAMPLE)
         handle = message_handle(example["uri"])
 
@@ -765,12 +842,13 @@ class TestHowItDeclaresItself:
         assert annotations.idempotent_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["idempotentHint"]
         assert annotations.open_world_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["openWorldHint"]
 
-    async def test_the_description_says_it_asks_every_time_and_what_the_edit_replaces_or_removes(
+    async def test_the_description_says_whose_message_it_changes_that_it_asks_and_what_it_removes(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
         description = " ".join((tool.description or "").split())
+        assert "The message must be one that the signed-in user sent." in description
         assert (
             "This tool asks the user to agree before it changes a message, every time. This tool "
             + "changes nothing unless the user agrees."

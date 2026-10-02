@@ -25,6 +25,7 @@ from msgraph.generated.models.chat_message_type import ChatMessageType
 from msgraph.generated.models.identity import Identity
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.teamwork_user_identity_type import TeamworkUserIdentityType
+from msgraph.generated.models.user import User
 from msgraph.generated.teams.item.channels.item.messages.item.chat_message_item_request_builder import (  # noqa: E501
     ChatMessageItemRequestBuilder as ChannelMessageRequestBuilder,
 )
@@ -641,6 +642,18 @@ EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
 
 def message_in_question(message: TeamsMessage) -> str:
     sender = message.sender.display_name if message.sender is not None else None
-    sent_by = "" if sender is None else f" from {cut_for_a_question(sender)!r}"
+    sent_from = "" if sender is None else f" from {cut_for_a_question(sender)!r}"
     says = "has no text" if message.text is None else f"says {cut_for_a_question(message.text)!r}"
-    return f"the Teams message{sent_by} that {says}"
+    return f"the Teams message{sent_from} that {says}"
+
+
+def sent_by(message: TeamsMessage, user: User) -> bool:
+    sender = None if message.sender is None else message.sender.user_id
+    return sender is not None and user.id is not None and sender.casefold() == user.id.casefold()
+
+
+def not_the_sender(verb: str, *, tail: str) -> str:
+    return (
+        "Microsoft 365 does not name the signed-in user as the sender of this message. This tool "
+        + f"{verb} only a message that the signed-in user sent. {tail}"
+    )

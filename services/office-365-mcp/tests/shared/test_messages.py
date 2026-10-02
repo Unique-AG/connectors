@@ -7,6 +7,7 @@ from msgraph.generated.models.chat_message_from_identity_set import ChatMessageF
 from msgraph.generated.models.chat_message_importance import ChatMessageImportance
 from msgraph.generated.models.identity import Identity
 from msgraph.generated.models.item_body import ItemBody
+from msgraph.generated.models.user import User
 from pydantic import ValidationError
 
 from office_365_mcp.shared.files import AttachableFile
@@ -20,9 +21,11 @@ from office_365_mcp.shared.messages import (
     TeamsMessage,
     mention_fields,
     message_in_question,
+    not_the_sender,
     outgoing_message,
     send_binding,
     send_question,
+    sent_by,
     subject_on_a_reply,
     unknown_enum_headers,
 )
@@ -471,6 +474,64 @@ class TestMessageInQuestion:
 
         assert long not in said
         assert f"{'a' * PREVIEW_CHARACTERS}…" in said
+
+
+_SENDER_ID = "9f8e7d6c-5b4a-4c3d-8e2f-1a0b9c8d7e6f"
+
+
+def _sent(sender: ChatMessageFromIdentitySet | None) -> TeamsMessage:
+    return TeamsMessage.from_message(
+        ChatMessage(id="1770000000000", from_=sender),
+        handle=MessageHandle("1770000000000", chat_id=_CHAT_ID),
+    )
+
+
+def _sent_by_user(user_id: str | None) -> TeamsMessage:
+    return _sent(ChatMessageFromIdentitySet(user=Identity(id=user_id, display_name="Grace Hopper")))
+
+
+class TestWhoSentTheMessage:
+    def test_the_sender_is_the_signed_in_user(self) -> None:
+        assert sent_by(_sent_by_user(_SENDER_ID), User(id=_SENDER_ID))
+
+    def test_another_person_is_not_the_signed_in_user(self) -> None:
+        assert not sent_by(_sent_by_user(_JANE.user_id), User(id=_SENDER_ID))
+
+    def test_the_ids_compare_without_case(self) -> None:
+        assert sent_by(_sent_by_user(_SENDER_ID.upper()), User(id=_SENDER_ID))
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            pytest.param(_sent(None), id="no-sender"),
+            pytest.param(
+                _sent(
+                    ChatMessageFromIdentitySet(
+                        application=Identity(id=_SENDER_ID, display_name="Release bot")
+                    )
+                ),
+                id="application",
+            ),
+            pytest.param(_sent_by_user(None), id="no-id"),
+        ],
+    )
+    def test_a_message_that_names_no_user_is_not_sent_by_the_user(
+        self, message: TeamsMessage
+    ) -> None:
+        assert not sent_by(message, User(id=_SENDER_ID))
+
+    def test_a_user_with_no_id_sent_nothing(self) -> None:
+        assert not sent_by(_sent_by_user(_SENDER_ID), User())
+
+
+class TestNotTheSender:
+    def test_the_refusal_says_what_the_tool_does_only_for_the_sender(self) -> None:
+        refused = not_the_sender("changes", tail="No message was changed.")
+
+        assert refused == (
+            "Microsoft 365 does not name the signed-in user as the sender of this message. This "
+            + "tool changes only a message that the signed-in user sent. No message was changed."
+        )
 
 
 class TestUnknownEnumHeaders:

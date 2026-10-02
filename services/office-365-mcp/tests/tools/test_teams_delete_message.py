@@ -32,7 +32,7 @@ from office_365_mcp.tools.teams_delete_message import (
     delete_message,
 )
 
-from .conftest import ME, SIGNED_IN_USER_ID, message_payload
+from .conftest import ME, OTHER_USER_ID, SIGNED_IN_USER_ID, message_payload
 
 _CHAT_ID = "19:release@thread.v2"
 _TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
@@ -68,7 +68,36 @@ _TEXT = "Ship it Monday"
 _CURRENT = message_payload(content=f"<p>{_TEXT}</p>")
 
 _CHAT_PERMISSIONS = ("Chat.ReadWrite", "User.Read")
-_CHANNEL_PERMISSIONS = ("ChannelMessage.ReadWrite", "ChannelMessage.Read.All")
+_CHANNEL_PERMISSIONS = ("ChannelMessage.ReadWrite", "ChannelMessage.Read.All", "User.Read")
+
+_LETTERED_ID = "9f8e7d6c-5b4a-4c3d-8e2f-1a0b9c8d7e6f"
+
+_NOT_THE_SENDER = (
+    "Microsoft 365 does not name the signed-in user as the sender of this message. This tool "
+    + "deletes only a message that the signed-in user sent. No message was deleted. If you "
+    + "call this tool again with this handle, the call will fail the same way."
+)
+
+
+def _sent_by(user_id: str) -> dict[str, object]:
+    return {
+        "user": {
+            "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+            "id": user_id,
+            "displayName": "Grace Hopper",
+            "userIdentityType": "aadUser",
+        }
+    }
+
+
+_FROM_AN_APPLICATION: dict[str, object] = {
+    "application": {
+        "@odata.type": "#microsoft.graph.teamworkApplicationIdentity",
+        "id": _LETTERED_ID,
+        "displayName": "Release bot",
+        "applicationIdentityType": "bot",
+    }
+}
 
 
 async def _agrees(question: str, about: str) -> Confirmed:
@@ -213,6 +242,7 @@ class TestTheRequestItMakes:
     async def test_the_message_is_read_with_the_message_types_graph_hides_by_default(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _me(graph)
         route = _reads(graph)[_CHAT_MESSAGE]
 
         with pytest.raises(ToolError, match=_NOTHING_DELETED):
@@ -220,32 +250,33 @@ class TestTheRequestItMakes:
 
         assert route.calls.last.request.headers["prefer"] == "include-unknown-enum-members"
 
-    async def test_a_chat_delete_reads_the_message_then_the_signed_in_user_then_posts(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+    @pytest.mark.parametrize(
+        ("handle", "read", "endpoint"),
+        [
+            pytest.param(_CHAT_HANDLE, _CHAT_MESSAGE, _CHAT_DELETE, id="chat"),
+            pytest.param(_CHANNEL_HANDLE, _CHANNEL_MESSAGE, _CHANNEL_DELETE, id="post"),
+            pytest.param(_REPLY_HANDLE, _REPLY_MESSAGE, _REPLY_DELETE, id="reply"),
+        ],
+    )
+    async def test_a_delete_reads_the_message_then_the_signed_in_user_once_then_posts(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        handle: MessageHandle,
+        read: str,
+        endpoint: str,
     ) -> None:
         me = _me(graph)
-        read = _reads(graph)[_CHAT_MESSAGE]
-        delete = graph.post(_CHAT_DELETE).mock(return_value=httpx.Response(204))
-
-        _ = await delete_message(client, handle=_CHAT_HANDLE, confirm=_agrees)
-
-        assert [call.request for call in cast("Sequence[Call]", graph.calls)] == [
-            read.calls.last.request,
-            me.calls.last.request,
-            delete.calls.last.request,
-        ]
-
-    @pytest.mark.parametrize("handle", [_CHANNEL_HANDLE, _REPLY_HANDLE], ids=["post", "reply"])
-    async def test_a_channel_delete_costs_one_read_and_one_post_and_never_reads_the_signed_in_user(
-        self, client: GraphServiceClient, graph: respx.MockRouter, handle: MessageHandle
-    ) -> None:
-        me = _me(graph)
-        _ = _every_endpoint(graph)
+        message = _reads(graph)[read]
+        delete = graph.post(endpoint).mock(return_value=httpx.Response(204))
 
         _ = await delete_message(client, handle=handle, confirm=_agrees)
 
-        assert me.call_count == 0
-        assert _methods(graph) == ["GET", "POST"]
+        assert [call.request for call in cast("Sequence[Call]", graph.calls)] == [
+            message.calls.last.request,
+            me.calls.last.request,
+            delete.calls.last.request,
+        ]
 
 
 class TestThePersonBeforeTheChange:
@@ -258,7 +289,7 @@ class TestThePersonBeforeTheChange:
         with pytest.raises(ToolError, match=_NOTHING_DELETED):
             _ = await delete_message(client, handle=_CHAT_HANDLE, confirm=_refuses)
 
-        assert _methods(graph) == ["GET"]
+        assert _methods(graph) == ["GET", "GET"]
 
     async def test_a_decline_over_the_back_channel_deletes_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -278,6 +309,7 @@ class TestThePersonBeforeTheChange:
     async def test_agreeing_over_the_back_channel_deletes_the_message(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _me(graph)
         routes = _every_endpoint(graph)
         session = _Session(modern=False, elicited=AcceptedElicitation(data="delete"))
 
@@ -288,19 +320,10 @@ class TestThePersonBeforeTheChange:
         assert routes[_REPLY_DELETE].call_count == 1
 
     @pytest.mark.parametrize(
-        ("handle", "writes"),
-        [
-            pytest.param(_CHAT_HANDLE, ["GET", "POST"], id="chat"),
-            pytest.param(_CHANNEL_HANDLE, ["POST"], id="post"),
-            pytest.param(_REPLY_HANDLE, ["POST"], id="reply"),
-        ],
+        "handle", [_CHAT_HANDLE, _CHANNEL_HANDLE, _REPLY_HANDLE], ids=["chat", "post", "reply"]
     )
-    async def test_the_read_happens_before_the_question_and_the_write_after_it(
-        self,
-        client: GraphServiceClient,
-        graph: respx.MockRouter,
-        handle: MessageHandle,
-        writes: list[str],
+    async def test_the_reads_happen_before_the_question_and_the_write_after_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter, handle: MessageHandle
     ) -> None:
         _ = _me(graph)
         _ = _every_endpoint(graph)
@@ -313,12 +336,13 @@ class TestThePersonBeforeTheChange:
 
         _ = await delete_message(client, handle=handle, confirm=watching)
 
-        assert calls_when_asked == [["GET"]], "asked before the read, or after the delete"
-        assert _methods(graph) == ["GET", *writes]
+        assert calls_when_asked == [["GET", "GET"]], "asked before the reads, or after the delete"
+        assert _methods(graph) == ["GET", "GET", "POST"]
 
     async def test_the_question_names_the_sender_the_text_and_who_sees_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _me(graph)
         _ = _every_endpoint(graph)
         asked: list[str] = []
 
@@ -334,6 +358,7 @@ class TestThePersonBeforeTheChange:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         text = " ".join(["word"] * 100)
+        _ = _me(graph)
         _ = _every_endpoint(graph)
         _ = _reads(graph, message_payload(content=text))
         asked: list[str] = []
@@ -351,11 +376,6 @@ class TestThePersonBeforeTheChange:
                 f"Delete the Teams message from {_SENDER!r} that has no text?",
                 id="no-text",
             ),
-            pytest.param(
-                message_payload(content=f"<p>{_TEXT}</p>", sender=None),
-                f"Delete the Teams message that says {_TEXT!r}?",
-                id="no-sender",
-            ),
         ],
     )
     async def test_the_question_says_what_the_message_lacks(
@@ -365,6 +385,7 @@ class TestThePersonBeforeTheChange:
         message: Mapping[str, object],
         named: str,
     ) -> None:
+        _ = _me(graph)
         _ = _every_endpoint(graph)
         _ = _reads(graph, message)
         asked: list[str] = []
@@ -396,6 +417,51 @@ class TestThePersonBeforeTheChange:
         assert all(route.call_count == 0 for route in routes.values())
         assert _methods(graph) == ["GET"]
 
+    @pytest.mark.parametrize(
+        "sender",
+        [
+            pytest.param(_sent_by(OTHER_USER_ID), id="another-person"),
+            pytest.param(None, id="no-sender"),
+            pytest.param(_FROM_AN_APPLICATION, id="application"),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "handle", [_CHAT_HANDLE, _CHANNEL_HANDLE, _REPLY_HANDLE], ids=["chat", "post", "reply"]
+    )
+    async def test_a_message_that_the_signed_in_user_did_not_send_is_refused_before_any_question(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        sender: Mapping[str, object] | None,
+        handle: MessageHandle,
+    ) -> None:
+        me = _me(graph)
+        routes = _every_endpoint(graph)
+        _ = _reads(graph, message_payload(content=f"<p>{_TEXT}</p>", sender=sender))
+        session = _Session(modern=False, elicited=AcceptedElicitation(data="delete"))
+
+        with pytest.raises(ToolError) as refused:
+            _ = await delete_message(
+                client, handle=handle, confirm=a_person_agrees(session.context)
+            )
+
+        assert str(refused.value) == _NOT_THE_SENDER
+        assert session.asked == []
+        assert me.call_count == 1
+        assert all(route.call_count == 0 for route in routes.values())
+        assert _methods(graph) == ["GET", "GET"]
+
+    async def test_a_sender_id_that_differs_only_in_letter_case_is_the_signed_in_user(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = _every_endpoint(graph)
+        _ = _reads(graph, message_payload(sender=_sent_by(_LETTERED_ID.upper())))
+        _ = graph.get("/me").mock(return_value=httpx.Response(200, json={**ME, "id": _LETTERED_ID}))
+
+        _ = await delete_message(client, handle=_CHANNEL_HANDLE, confirm=_agrees)
+
+        assert routes[_CHANNEL_DELETE].call_count == 1
+
     def test_the_binding_differs_for_another_message(self) -> None:
         about = deleter._about  # pyright: ignore[reportPrivateUsage]
 
@@ -420,7 +486,9 @@ class TestTheEraWithNoBackChannel:
         _key, _state, agrees_with, question = _the_question(answer)
         assert agrees_with == "delete"
         assert repr(_TEXT) in question
-        assert _methods(graph) == ["GET"], "an unanswered question deleted the message anyway"
+        assert _methods(graph) == ["GET", "GET"], (
+            "an unanswered question deleted the message anyway"
+        )
 
     async def test_the_second_round_deletes_the_message_the_answer_was_bound_to(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -444,7 +512,7 @@ class TestTheEraWithNoBackChannel:
             ),
         )
 
-        assert me.call_count == 1
+        assert me.call_count == 2, "each round reads the signed-in user once"
         assert routes[_CHAT_DELETE].call_count == 1, "the agreed delete did not happen once"
         assert answer == DeletedMessage(uri=_CHAT_HANDLE.uri, deleted=True)
 
@@ -546,6 +614,7 @@ class TestTheFailuresItPassesOn:
     async def test_a_refused_delete_is_a_forbidden(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _me(graph)
         _ = _reads(graph)
         _ = graph.post(_CHANNEL_DELETE).mock(
             return_value=httpx.Response(
@@ -597,8 +666,11 @@ class TestTheFailuresItPassesOn:
         assert me.call_count == 0
         assert all(route.call_count == 0 for route in routes.values())
 
+    @pytest.mark.parametrize(
+        "handle", [_CHAT_HANDLE, _CHANNEL_HANDLE, _REPLY_HANDLE], ids=["chat", "post", "reply"]
+    )
     async def test_a_refused_identity_read_posts_nothing(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+        self, client: GraphServiceClient, graph: respx.MockRouter, handle: MessageHandle
     ) -> None:
         _ = graph.get("/me").mock(
             return_value=httpx.Response(
@@ -608,7 +680,7 @@ class TestTheFailuresItPassesOn:
         routes = _every_endpoint(graph)
 
         with pytest.raises(GraphForbidden):
-            _ = await delete_message(client, handle=_CHAT_HANDLE, confirm=_agrees)
+            _ = await delete_message(client, handle=handle, confirm=_agrees)
 
         assert all(route.call_count == 0 for route in routes.values())
 
@@ -642,7 +714,7 @@ class TestHowRegisterWiresTheHandle:
 
         assert isinstance(answer, InputRequiredResult)
         assert session.narrowed == [permissions]
-        assert _methods(graph) == ["GET"]
+        assert _methods(graph) == ["GET", "GET"]
 
     @pytest.mark.parametrize(
         "uri",
@@ -728,6 +800,7 @@ class TestHowItDeclaresItself:
     @pytest.mark.parametrize(
         "sentence",
         [
+            "The message must be one that the signed-in user sent.",
             "This is a soft delete: Teams shows the message as deleted.",
             "Everyone in the conversation can see the change.",
             "This tool asks the user to agree before it deletes a message, every time. This tool "

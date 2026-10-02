@@ -111,6 +111,7 @@
           "permissions": [
             "Chat.ReadWrite",
             "ChannelMessage.ReadWrite",
+            "User.Read",
             "ChannelMessage.Read.All"
           ]
         },

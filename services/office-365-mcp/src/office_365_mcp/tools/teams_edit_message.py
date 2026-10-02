@@ -11,6 +11,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, not_graph
+from office_365_mcp.shared import identity
 from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.handles import (
     CHANNEL_PERMISSION,
@@ -25,7 +26,9 @@ from office_365_mcp.shared.messages import (
     get_message,
     mention_fields,
     message_in_question,
+    not_the_sender,
     outgoing_message,
+    sent_by,
 )
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -43,10 +46,19 @@ STEP_EDIT = "edit_message"
 _CHAT_READ_WRITE = "Chat.ReadWrite"
 _CHANNEL_READ_WRITE = "ChannelMessage.ReadWrite"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = (_CHAT_READ_WRITE, _CHANNEL_READ_WRITE, CHANNEL_PERMISSION)
+GRAPH_PERMISSIONS: tuple[str, ...] = (
+    _CHAT_READ_WRITE,
+    _CHANNEL_READ_WRITE,
+    identity.GRAPH_PERMISSION,
+    CHANNEL_PERMISSION,
+)
 
-_CHAT_PERMISSIONS: tuple[str, ...] = (_CHAT_READ_WRITE,)
-_CHANNEL_PERMISSIONS: tuple[str, ...] = (_CHANNEL_READ_WRITE, CHANNEL_PERMISSION)
+_CHAT_PERMISSIONS: tuple[str, ...] = (_CHAT_READ_WRITE, identity.GRAPH_PERMISSION)
+_CHANNEL_PERMISSIONS: tuple[str, ...] = (
+    _CHANNEL_READ_WRITE,
+    CHANNEL_PERMISSION,
+    identity.GRAPH_PERMISSION,
+)
 
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = _CHAT_PERMISSIONS
 
@@ -58,17 +70,20 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _AGREE = "edit"
 _DECLINE = "do not edit"
 _NOTHING_CHANGED = "No message was changed."
-
-_ALREADY_DELETED = (
-    f"This message is deleted, and a deleted message cannot be changed. {_NOTHING_CHANGED} If you "
-    + "call this tool again with this handle, the call will fail the same way."
+_REFUSED = (
+    f"{_NOTHING_CHANGED} If you call this tool again with this handle, the call will fail the same "
+    + "way."
 )
+
+_ALREADY_DELETED = f"This message is deleted, and a deleted message cannot be changed. {_REFUSED}"
+
+_NOT_THE_SENDER = not_the_sender("changes", tail=_REFUSED)
 
 _DESCRIPTION = """\
 Replaces the text of one Teams message, as the signed-in user. The message can be a chat \
-message, a channel post, or a reply to a channel post. Everyone in the conversation can see the \
-change. teams_send_chat_message and teams_send_channel_message send a new message, and \
-teams_delete_message removes one.
+message, a channel post, or a reply to a channel post. The message must be one that the \
+signed-in user sent. Everyone in the conversation can see the change. teams_send_chat_message \
+and teams_send_channel_message send a new message, and teams_delete_message removes one.
 
 Notes:
 - This tool asks the user to agree before it changes a message, every time. This tool changes \
@@ -126,6 +141,8 @@ async def edit_message(
         assert found is not None, "Graph answered a message read with no message"
         current = TeamsMessage.from_message(found, handle=handle)
         refused = _ALREADY_DELETED if current.deleted_at is not None else None
+        if refused is None and not sent_by(current, await identity.signed_in_user(client)):
+            refused = _NOT_THE_SENDER
         if refused is None:
             with not_graph():
                 answer = await confirm(
