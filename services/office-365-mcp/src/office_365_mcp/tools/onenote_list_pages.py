@@ -364,7 +364,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The SharePoint site whose pages this call searches, as its Graph site id. "
-                    + "It is a host name and two ids, joined by commas, and it is not "
+                    + "The id is a host name and two ids, joined by commas, and not "
                     + "percent-encoded. Ask the user for it. Pass it only without `section`. "
                     + "Pass at most one of `group` and `site`."
                 ),

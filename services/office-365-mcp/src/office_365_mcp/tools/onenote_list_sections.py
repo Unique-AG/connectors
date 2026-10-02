@@ -63,10 +63,17 @@ _SECTION_FIELDS: tuple[str, ...] = (
     "displayName",
     "isDefault",
     "createdBy",
+    "createdDateTime",
     "lastModifiedDateTime",
     "links",
 )
-_SECTION_GROUP_FIELDS: tuple[str, ...] = ("id", "displayName", "createdBy", "lastModifiedDateTime")
+_SECTION_GROUP_FIELDS: tuple[str, ...] = (
+    "id",
+    "displayName",
+    "createdBy",
+    "createdDateTime",
+    "lastModifiedDateTime",
+)
 _SECTION_EXPANSIONS: tuple[str, ...] = ("parentNotebook($select=id,displayName)",)
 
 _SectionsBuilder = _notebook_sections_module.SectionsRequestBuilder
@@ -137,6 +144,11 @@ class SectionRow(BaseModel):
             + "This connector cannot read a page from it."
         )
     )
+    created_at: datetime | None = Field(
+        description=(
+            "When this section was created, as Graph reported it. Null when Graph recorded none."
+        )
+    )
     created_by: str | None = Field(
         description=(
             "The display name of the person who created this section, as Graph reported it. "
@@ -163,6 +175,12 @@ class SectionGroupRow(BaseModel):
     )
     name: str | None = Field(
         description="The section group's display name. Null when Graph did not report one."
+    )
+    created_at: datetime | None = Field(
+        description=(
+            "When this section group was created, as Graph reported it. Null when Graph "
+            + "recorded none."
+        )
     )
     created_by: str | None = Field(
         description=(
@@ -348,6 +366,7 @@ def _section_row(section: OnenoteSection, owner: OnenoteOwner | None) -> Section
         name=section.display_name,
         is_default=section.is_default,
         web_url=web_url_of(section.links),
+        created_at=section.created_date_time,
         created_by=creator_name_of(section.created_by),
         last_modified_at=section.last_modified_date_time,
     )
@@ -359,6 +378,7 @@ def _section_group_row(group: SectionGroup, owner: OnenoteOwner | None) -> Secti
     return SectionGroupRow(
         uri=OnenoteSectionGroupHandle(group.id, owner=owner).uri,
         name=group.display_name,
+        created_at=group.created_date_time,
         created_by=creator_name_of(group.created_by),
         last_modified_at=group.last_modified_date_time,
     )

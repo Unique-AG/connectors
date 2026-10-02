@@ -90,6 +90,7 @@ _SECTION_FIELDS: tuple[str, ...] = (
     "displayName",
     "isDefault",
     "createdBy",
+    "createdDateTime",
     "lastModifiedDateTime",
     "links",
 )
@@ -156,6 +157,11 @@ class NotebookSection(BaseModel):
         description=(
             "The address that opens this section in OneNote on the web, for a person to follow. "
             + "This connector cannot read a page from it."
+        )
+    )
+    created_at: datetime | None = Field(
+        description=(
+            "When this section was created, as Graph reported it. Null when Graph recorded none."
         )
     )
     created_by: str | None = Field(
@@ -416,6 +422,7 @@ def _sections_by_notebook(
             group_path=_group_path(section_group_id, groups_by_id),
             is_default=section.is_default,
             web_url=web_url_of(section.links),
+            created_at=section.created_date_time,
             created_by=creator_name_of(section.created_by),
             last_modified_at=section.last_modified_date_time,
         )

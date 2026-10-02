@@ -97,7 +97,7 @@ the text names that tool. If not, the text tells the model to ask the user.
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `onenote_list_notebooks` | Read | `Notes.Read` | No | Every notebook that the user owns, or that is shared with the user, with each notebook's sections. With `group`, the notebooks of one Microsoft 365 group or team. With `site`, the notebooks of one SharePoint site. `created_by` keeps the notebooks of one creator. `order_by` sorts the notebooks and their sections. |
+| `onenote_list_notebooks` | Read | `Notes.Read` | No | Every notebook that the user owns, or that is shared with the user, with each notebook's sections. With `group`, the notebooks of one Microsoft 365 group or team. With `site`, the notebooks of one SharePoint site. Each notebook and each section shows `created_at` and `created_by`. `created_by` keeps the notebooks of one creator. `order_by` sorts the notebooks and their sections by name, by `created_at`, or by `last_modified_at`. |
 | `onenote_list_pages` | Read | `Notes.Read` | No | Finds pages by title, or by the app that created them, across notebooks or in one section. With `group` or `site`, it searches the notebooks of one group or one SharePoint site. Microsoft Graph has no full-text search for OneNote. |
 | `onenote_read_page` | Read | `Notes.Read` | No | Reads the HTML of one page, exactly as Microsoft stores it. |
 | `onenote_create_page` | Write, adds | `Notes.Create` | No | Writes a new page into the signed-in user's OneNote, or into a section of a group or site notebook. No attachments or images. |
@@ -106,7 +106,7 @@ the text names that tool. If not, the text tells the model to ask the user.
 | `onenote_read_resource` | Read | `Notes.Read` | No | Fetches the bytes of one image or file that is embedded in a page, with its real media type. |
 | `onenote_find_notebook_from_url` | Read | `Notes.Read` | No | Resolves a OneNote web address into a notebook handle. With `group` or `site`, it resolves the address of a group or site notebook. |
 | `onenote_list_recent_notebooks` | Read | `Notes.Read` | No | Notebooks that the signed-in user opened recently, per Microsoft's own record. |
-| `onenote_list_sections` | Read | `Notes.Read` | No | Sections and section groups directly under one notebook or section group, one level at a time. `created_by` keeps the rows of one creator. `order_by` sorts the rows. |
+| `onenote_list_sections` | Read | `Notes.Read` | No | Sections and section groups directly under one notebook or section group, one level at a time. Each row shows `created_at` and `created_by`. `created_by` keeps the rows of one creator. `order_by` sorts the rows by name, by `created_at`, or by `last_modified_at`. |
 | `onenote_create_notebook` | Write, adds | `Notes.Create` | No | Creates a new, empty notebook for the signed-in user. With `group` or `site`, the notebook belongs to a Microsoft 365 group or a SharePoint site. The tool asks the user to agree before it creates a notebook for a group or a site. |
 | `onenote_create_section` | Write, adds | `Notes.Create` | No | Creates a new, empty section directly under a notebook or section group. |
 | `onenote_create_section_group` | Write, adds | `Notes.Create` | No | Creates a new, empty section group directly under a notebook or another section group. |

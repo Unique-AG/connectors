@@ -1237,8 +1237,7 @@ class TestItsArguments:
 
         described = cast("str", properties["site"]["description"])
         assert described.startswith("The SharePoint site whose pages this call searches")
-        assert "a host name and two ids, joined by commas" in described
-        assert "not percent-encoded" in described
+        assert "a host name and two ids, joined by commas, and not percent-encoded" in described
         assert "Ask the user for it." in described
         assert "only without `section`" in described
         assert "at most one of `group` and `site`" in described

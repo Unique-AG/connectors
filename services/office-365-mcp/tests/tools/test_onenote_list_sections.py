@@ -77,6 +77,7 @@ def _section_payload(
     *,
     name: str | None = "Planning",
     is_default: bool | None = True,
+    created: str | None = "2026-01-05T09:00:00Z",
     created_by: str | None = None,
     last_modified: str | None = "2026-02-10T14:00:00Z",
     web_url: str | None = "https://onenote.example.invalid/sections/planning",
@@ -86,6 +87,7 @@ def _section_payload(
         "id": section_id,
         "displayName": name,
         "isDefault": is_default,
+        "createdDateTime": created,
         "createdBy": _creator(created_by),
         "lastModifiedDateTime": last_modified,
         "links": {"oneNoteWebUrl": {"href": web_url} if web_url is not None else None},
@@ -101,12 +103,14 @@ def _group_payload(
     group_id: str | None,
     *,
     name: str | None = "Archive",
+    created: str | None = "2026-01-05T09:00:00Z",
     created_by: str | None = None,
     last_modified: str | None = "2026-02-10T14:00:00Z",
 ) -> dict[str, object]:
     return {
         "id": group_id,
         "displayName": name,
+        "createdDateTime": created,
         "createdBy": _creator(created_by),
         "lastModifiedDateTime": last_modified,
     }
@@ -204,6 +208,7 @@ class TestWhatItAsks:
             "displayName",
             "isDefault",
             "createdBy",
+            "createdDateTime",
             "lastModifiedDateTime",
             "links",
         ]
@@ -240,6 +245,7 @@ class TestWhatItAsks:
             "id",
             "displayName",
             "createdBy",
+            "createdDateTime",
             "lastModifiedDateTime",
         ]
         assert params["$top"] == "7"
@@ -687,6 +693,50 @@ class TestTheCreator:
         answer = await lister.list_sections(client, parent=_NOTEBOOK, limit=50)
 
         assert answer.section_groups[0].created_by is None
+
+
+class TestTheCreationTime:
+    @pytest.mark.usefixtures("notebook_groups")
+    async def test_a_section_reports_when_it_was_created(
+        self, client: GraphServiceClient, notebook_sections: respx.Route
+    ) -> None:
+        notebook_sections.mock(return_value=_page(_section_payload(_SECTION_ID)))
+
+        answer = await lister.list_sections(client, parent=_NOTEBOOK, limit=50)
+
+        assert answer.sections[0].created_at is not None
+        assert answer.sections[0].created_at.isoformat() == "2026-01-05T09:00:00+00:00"
+
+    @pytest.mark.usefixtures("notebook_groups")
+    async def test_a_section_with_no_creation_time_reports_null(
+        self, client: GraphServiceClient, notebook_sections: respx.Route
+    ) -> None:
+        notebook_sections.mock(return_value=_page(_section_payload(_SECTION_ID, created=None)))
+
+        answer = await lister.list_sections(client, parent=_NOTEBOOK, limit=50)
+
+        assert answer.sections[0].created_at is None
+
+    @pytest.mark.usefixtures("notebook_sections")
+    async def test_a_section_group_reports_when_it_was_created(
+        self, client: GraphServiceClient, notebook_groups: respx.Route
+    ) -> None:
+        notebook_groups.mock(return_value=_page(_group_payload(_CHILD_GROUP_ID)))
+
+        answer = await lister.list_sections(client, parent=_NOTEBOOK, limit=50)
+
+        assert answer.section_groups[0].created_at is not None
+        assert answer.section_groups[0].created_at.isoformat() == "2026-01-05T09:00:00+00:00"
+
+    @pytest.mark.usefixtures("notebook_sections")
+    async def test_a_section_group_with_no_creation_time_reports_null(
+        self, client: GraphServiceClient, notebook_groups: respx.Route
+    ) -> None:
+        notebook_groups.mock(return_value=_page(_group_payload(_CHILD_GROUP_ID, created=None)))
+
+        answer = await lister.list_sections(client, parent=_NOTEBOOK, limit=50)
+
+        assert answer.section_groups[0].created_at is None
 
 
 class TestTheCreatorFilter:

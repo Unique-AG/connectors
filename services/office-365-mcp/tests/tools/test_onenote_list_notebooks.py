@@ -47,7 +47,7 @@ _NOTEBOOK_SELECT = (
     "id,displayName,isDefault,isShared,userRole,createdBy,createdDateTime,"
     + "lastModifiedDateTime,links"
 )
-_SECTION_SELECT = "id,displayName,isDefault,createdBy,lastModifiedDateTime,links"
+_SECTION_SELECT = "id,displayName,isDefault,createdBy,createdDateTime,lastModifiedDateTime,links"
 _SECTION_GROUP_SELECT = "id,displayName"
 _HIERARCHY_EXPAND = "parentNotebook,parentSectionGroup"
 
@@ -113,6 +113,7 @@ def _section_payload(
     *,
     display_name: str | None = "Standups",
     is_default: bool | None = False,
+    created: str | None = "2026-01-05T00:00:00Z",
     created_by: str | None = None,
     modified: str | None = "2026-02-10T00:00:00Z",
     web_url: str | None = "https://onenote.invalid/sections/standups",
@@ -123,6 +124,7 @@ def _section_payload(
         "id": section_id,
         "displayName": display_name,
         "isDefault": is_default,
+        "createdDateTime": created,
         "createdBy": _creator(created_by),
         "lastModifiedDateTime": modified,
         "links": None if web_url is None else {"oneNoteWebUrl": {"href": web_url}},
@@ -673,6 +675,30 @@ class TestNotebookAndSectionGroupHandles:
         assert result.notebooks[0].sections[0].group_uri == (
             OnenoteSectionGroupHandle(_OUTER_GROUP).uri
         )
+
+
+class TestTheCreationTime:
+    @pytest.mark.usefixtures("groups_route", "notebooks_route")
+    async def test_a_section_reports_when_it_was_created(
+        self, client: GraphServiceClient, sections_route: respx.Route
+    ) -> None:
+        sections_route.mock(return_value=_page(_section_payload(_STANDUPS)))
+
+        result = await lister.list_notebooks(client)
+
+        created_at = result.notebooks[0].sections[0].created_at
+        assert created_at is not None
+        assert created_at.isoformat() == "2026-01-05T00:00:00+00:00"
+
+    @pytest.mark.usefixtures("groups_route", "notebooks_route")
+    async def test_a_section_with_no_creation_time_reports_null(
+        self, client: GraphServiceClient, sections_route: respx.Route
+    ) -> None:
+        sections_route.mock(return_value=_page(_section_payload(_STANDUPS, created=None)))
+
+        result = await lister.list_notebooks(client)
+
+        assert result.notebooks[0].sections[0].created_at is None
 
 
 class TestTheCreator:
