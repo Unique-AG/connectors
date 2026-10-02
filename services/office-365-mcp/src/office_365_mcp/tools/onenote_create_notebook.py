@@ -16,6 +16,7 @@ from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
 from office_365_mcp.shared.handles import OnenoteNotebookHandle, OnenoteOwner
 from office_365_mcp.shared.notes import (
     client_url_of,
+    group_and_site_refused,
     named_owner_refused,
     onenote_root,
     owner_named,
@@ -62,12 +63,6 @@ name of that group or site, tell it to the user before you call.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 onenote_list_notebooks with the same `group` or `site` does not show a notebook named `name`.
 """
-
-_GROUP_AND_SITE = (
-    "onenote_create_notebook takes at most one of `group` and `site`. A notebook belongs to one "
-    + "group or one site, never to both. The same combination fails again, so do not retry it as "
-    + "it is."
-)
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 will not create this notebook. For a `group` or a `site`, the id most likely "
@@ -148,7 +143,7 @@ async def create_notebook(
 ) -> CreatedNotebook | InputRequiredResult:
     assert 1 <= len(name) <= MAX_NAME_CHARACTERS, f"name is bounded by the schema, got {len(name)}"
     if group is not None and site is not None:
-        raise ToolError(_GROUP_AND_SITE)
+        raise ToolError(group_and_site_refused(TOOL_NAME))
     owner = owner_named(group=group, site=site)
     about = (
         write_state_for("create_notebook", "", name)

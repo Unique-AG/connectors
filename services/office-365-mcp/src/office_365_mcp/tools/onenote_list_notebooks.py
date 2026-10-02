@@ -40,6 +40,7 @@ from office_365_mcp.shared.notes import (
     created_by_contains,
     creator_name_of,
     get_with_query,
+    group_and_site_refused,
     named_owner_refused,
     onenote_root,
     owner_named,
@@ -66,12 +67,6 @@ GRAPH_NOT_FOUND = (
     + "This same id fails again, so do not retry it. If this call named no `group` and no "
     + "`site`, Microsoft most likely found no OneNote for this account, and no other argument "
     + "fixes that."
-)
-
-_GROUP_AND_SITE = (
-    "onenote_list_notebooks takes at most one of `group` and `site`. A notebook belongs to one "
-    + "group or one site, never to both. The same combination fails again, so do not retry it as "
-    + "it is."
 )
 
 _NOTEBOOK_FIELDS: tuple[str, ...] = (
@@ -274,7 +269,7 @@ async def list_notebooks(
     order_by: ContainerOrderBy | None = None,
 ) -> Notebooks:
     if group is not None and site is not None:
-        raise ToolError(_GROUP_AND_SITE)
+        raise ToolError(group_and_site_refused(TOOL_NAME))
     notebook_filter = _notebook_filter(name_contains, shared, role)
     orderby = None if order_by is None else [CONTAINER_ORDER_CLAUSES[order_by]]
     owner = owner_named(group=group, site=site)

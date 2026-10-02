@@ -1590,12 +1590,12 @@ class TestHowItDeclaresItself:
 
         assert "can each be in a notebook of a Microsoft 365 group" in (tool.description or "")
 
-    async def test_the_description_says_neither_side_can_be_in_a_site(
+    async def test_the_description_leaves_the_site_refusal_to_the_handle_arguments(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
 
-        assert "Neither one can be in a notebook of a SharePoint site." in (tool.description or "")
+        assert "SharePoint site" not in (tool.description or "")
 
     @pytest.mark.parametrize("argument", ["section", "to_notebook", "to_section_group"])
     async def test_each_handle_argument_names_the_group_and_site_shapes(

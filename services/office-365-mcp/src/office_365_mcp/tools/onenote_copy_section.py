@@ -38,6 +38,7 @@ from office_365_mcp.shared.handles import (
     onenote_section_handle,
 )
 from office_365_mcp.shared.notes import (
+    COPY_HANDLE_OWNERS,
     OWNED_REFUSED,
     NotebookAudience,
     OperationSummary,
@@ -85,16 +86,11 @@ _UNNAMED_SECTION = "an unnamed section"
 _UNNAMED_SECTION_GROUP = "an unnamed section group"
 _UNNAMED_NOTEBOOK = "an unnamed notebook"
 
-_HANDLE_OWNERS = (
-    "A handle from a group notebook starts with onenote:///groups/{group}/ instead. This tool "
-    + "refuses a handle from a site notebook, which starts with onenote:///sites/{site}/."
-)
-
 _NOT_A_SECTION_HANDLE = (
     "onenote_copy_section takes a section handle in `section`. It looks like "
     + "onenote:///sections/{id}, and it comes from the `uri` of a section in an "
     + "onenote_list_notebooks or onenote_list_sections result. "
-    + _HANDLE_OWNERS
+    + COPY_HANDLE_OWNERS
     + " A notebook handle (onenote:///notebooks/{id}) and a section group handle "
     + "(onenote:///sectiongroups/{id}) are neither one a section handle. Copy it word for word. "
     + "This same value fails again, so do not retry it."
@@ -111,7 +107,7 @@ _NOT_A_NOTEBOOK_HANDLE = (
     "onenote_copy_section takes a notebook handle in `to_notebook`, if given at all. It looks "
     + "like onenote:///notebooks/{id}, and it comes from the `uri` of a onenote_list_notebooks, "
     + "onenote_find_notebook_from_url or onenote_create_notebook result. "
-    + _HANDLE_OWNERS
+    + COPY_HANDLE_OWNERS
     + " A section handle or a section group handle is not a notebook handle. Copy it word for "
     + "word, or pass `to_section_group` instead. A corrected call succeeds. The same call fails "
     + "the same way."
@@ -121,7 +117,7 @@ _NOT_A_SECTION_GROUP_HANDLE = (
     "onenote_copy_section takes a section group handle in `to_section_group`, if given at all. "
     + "It looks like onenote:///sectiongroups/{id}, and it comes from the `uri` of a section "
     + "group in a onenote_list_sections result or a onenote_create_section_group answer. "
-    + _HANDLE_OWNERS
+    + COPY_HANDLE_OWNERS
     + " A notebook handle or a section handle is not a section group handle. Copy it word for "
     + "word, or pass `to_notebook` instead. A corrected call succeeds. The same call fails the "
     + "same way."
@@ -153,9 +149,8 @@ GRAPH_NOT_FOUND = (
 
 _DESCRIPTION = """\
 Starts a copy of one section into another notebook or section group. The section and the \
-destination can each be in a notebook of a Microsoft 365 group. Neither one can be in a notebook \
-of a SharePoint site. This call does not copy the section itself: Microsoft runs the copy, and the \
-answer is the operation that tracks it. Pass the \
+destination can each be in a notebook of a Microsoft 365 group. This call does not copy the \
+section itself: Microsoft runs the copy, and the answer is the operation that tracks it. Pass the \
 answer's `uri` to onenote_get_operation until `status` reads Completed or Failed.
 
 Notes:
@@ -342,7 +337,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "The section to copy: the `uri` of a section in a onenote_list_notebooks or "
                     + "onenote_list_sections result, copied word for word. The shape is "
                     + "onenote:///sections/{id}. "
-                    + _HANDLE_OWNERS
+                    + COPY_HANDLE_OWNERS
                 ),
             ),
         ],
@@ -355,7 +350,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "The destination notebook, as the `uri` of a onenote_list_notebooks or "
                     + "onenote_find_notebook_from_url result, or a onenote_create_notebook answer. "
                     + "The shape is onenote:///notebooks/{id}. "
-                    + _HANDLE_OWNERS
+                    + COPY_HANDLE_OWNERS
                 ),
             ),
         ] = None,
@@ -367,7 +362,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "The destination section group, as the `uri` of a section group in a "
                     + "onenote_list_sections result, or a onenote_create_section_group answer. The "
                     + "shape is onenote:///sectiongroups/{id}. "
-                    + _HANDLE_OWNERS
+                    + COPY_HANDLE_OWNERS
                 ),
             ),
         ] = None,

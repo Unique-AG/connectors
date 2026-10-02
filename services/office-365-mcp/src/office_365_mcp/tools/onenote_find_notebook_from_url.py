@@ -26,6 +26,7 @@ from office_365_mcp.shared.handles import (
 )
 from office_365_mcp.shared.notes import (
     client_url_of,
+    group_and_site_refused,
     named_owner_refused,
     onenote_root,
     owner_named,
@@ -57,12 +58,6 @@ answer.
 - If a later call on an onenote:///notebooks/ handle answers not found, call this tool again with \
 `group` or `site`.
 """
-
-_GROUP_AND_SITE = (
-    "onenote_find_notebook_from_url takes at most one of `group` and `site`. A notebook belongs "
-    + "to one group or one site, never to both. The same combination fails again, so do not retry "
-    + "it as it is."
-)
 
 _OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS = (
     "onenote_find_notebook_from_url takes a web address or Microsoft's own `onenote:` client "
@@ -163,7 +158,7 @@ async def find_notebook_from_url(
 ) -> FoundNotebook:
     assert len(web_url) >= 1, "web_url must not be empty"
     if group is not None and site is not None:
-        raise ToolError(_GROUP_AND_SITE)
+        raise ToolError(group_and_site_refused(TOOL_NAME))
     if onenote_notebook_handle(web_url) is not None:
         raise ToolError(_OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS)
     if (

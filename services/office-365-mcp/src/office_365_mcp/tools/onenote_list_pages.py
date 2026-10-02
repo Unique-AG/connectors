@@ -24,6 +24,7 @@ from office_365_mcp.shared.notes import (
     PAGE_FIELDS,
     PageSummary,
     get_with_query,
+    group_and_site_refused,
     named_owner_refused,
     onenote_root,
     owner_named,
@@ -116,11 +117,6 @@ _GROUP_WITH_A_SECTION = (
     + "again, so do not retry it as it is."
 )
 
-_GROUP_WITH_A_SITE = (
-    "onenote_list_pages takes at most one of `group` and `site`. A notebook belongs to one group "
-    + "or one site, never to both. The same combination fails again, so do not retry it as it is."
-)
-
 _MODIFIED_WINDOW_RUNS_BACKWARDS = (
     "onenote_list_pages found nothing, because `modified_before` falls before `modified_after`, "
     + "and no section or notebook holds a window that runs backwards. A date covers the whole of "
@@ -175,7 +171,7 @@ async def list_pages(
     assert 1 <= limit <= MAX_PAGES, f"limit must be within 1..{MAX_PAGES}, got {limit}"
     assert skip >= 0, f"skip must not be negative, got {skip}"
     if group is not None and site is not None:
-        raise ToolError(_GROUP_WITH_A_SITE)
+        raise ToolError(group_and_site_refused(TOOL_NAME))
     if section is not None and (group is not None or site is not None):
         raise ToolError(_GROUP_WITH_A_SECTION)
     handle = _section_to_search(section)

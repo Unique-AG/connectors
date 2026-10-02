@@ -111,6 +111,13 @@ def onenote_root(client: GraphServiceClient, owner: OnenoteOwner | None) -> Onen
             assert_never(owner.kind)
 
 
+def group_and_site_refused(tool: str) -> str:
+    return (
+        f"{tool} takes at most one of `group` and `site`. A notebook belongs to one group or one "
+        + "site, never to both. The same combination fails again, so do not retry it as it is."
+    )
+
+
 def owner_named(*, group: str | None, site: str | None) -> OnenoteOwner | None:
     assert group is None or site is None, "a OneNote item belongs to a group or a site, not both"
     if group is not None:
@@ -122,6 +129,12 @@ def owner_named(*, group: str | None, site: str | None) -> OnenoteOwner | None:
 
 def in_a_site(*owners: OnenoteOwner | None) -> bool:
     return any(owner is not None and owner.kind == "sites" for owner in owners)
+
+
+COPY_HANDLE_OWNERS = (
+    "A handle from a group notebook starts with onenote:///groups/{group}/ instead. This tool "
+    + "refuses a handle from a site notebook, which starts with onenote:///sites/{site}/."
+)
 
 
 OWNED_REFUSED = (

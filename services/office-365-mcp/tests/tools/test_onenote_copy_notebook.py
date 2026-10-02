@@ -774,12 +774,12 @@ class TestHowItDeclaresItself:
             in description
         )
 
-    async def test_the_description_says_a_site_notebook_cannot_be_copied(
+    async def test_the_description_leaves_the_site_refusal_to_the_notebook_argument(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
 
-        assert "This tool cannot copy a notebook of a SharePoint site." in (tool.description or "")
+        assert "SharePoint site" not in (tool.description or "")
 
     async def test_the_to_group_description_names_where_the_id_comes_from(
         self, transport: httpx.AsyncClient
