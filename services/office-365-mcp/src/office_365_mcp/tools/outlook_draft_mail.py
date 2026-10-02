@@ -19,7 +19,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName
 from office_365_mcp.shared.handles import MailDraftHandle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress, MailImportance, copied_and_marked
@@ -290,7 +290,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         categories: Annotated[
-            list[str],
+            list[CategoryName],
             Field(
                 default=[],
                 description=(

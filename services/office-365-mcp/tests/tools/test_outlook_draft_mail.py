@@ -8,7 +8,7 @@ import pytest
 import respx
 from fastmcp import Client, FastMCP
 from fastmcp.client.transports import FastMCPTransport
-from fastmcp.exceptions import ToolError
+from fastmcp.exceptions import ToolError, ValidationError
 from fastmcp.tools import Tool
 from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
@@ -353,6 +353,23 @@ class TestTheSchemaItPublishes:
         described = cast("str", categories["description"])
         assert LIST_CATEGORIES_GUARD in described
         assert "outlook_list_categories" not in described.replace(LIST_CATEGORIES_GUARD, "")
+
+    async def test_a_category_name_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        items = cast("Mapping[str, object]", properties["categories"]["items"])
+        assert items["minLength"] == 1
+
+    async def test_a_blank_category_name_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run({**drafter.GRAPH_CALL_EXAMPLE, "categories": ["Red", ""]})
+
+        assert len(graph.calls) == 0, "a blank category name reached Graph"
 
     @pytest.mark.parametrize("word", ["bcc", "blind", "file", "upload", "drive", "url"])
     async def test_no_argument_offers_a_blind_copy_a_fetch_or_markup(
