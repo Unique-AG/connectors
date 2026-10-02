@@ -65,10 +65,10 @@ class TestInstructions:
         assert "all test records" in INSTRUCTIONS
         assert "search-then-delete" in INSTRUCTIONS
         assert "exact name, short name, or id is one vehicle" in INSTRUCTIONS
-        assert "groups on a location field from `custom_field_values`" in INSTRUCTIONS
+        assert "geographical breakdown" not in INSTRUCTIONS
         assert "If no field or several fields could be it, ask the user which one." in INSTRUCTIONS
         assert "Investor Location" not in INSTRUCTIONS
-        assert "`us_domiciled` stays the US/non-US flag." in INSTRUCTIONS
+        assert "us_domiciled" not in INSTRUCTIONS
         assert "read `source` and `data_caveat`" in INSTRUCTIONS
 
     def test_route_the_september_feedback_questions(self) -> None:

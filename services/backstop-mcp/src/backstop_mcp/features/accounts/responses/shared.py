@@ -299,8 +299,7 @@ class AccountRowResponse(OmitNoneModel):
         default=None,
         description=(
             "US/non-US flag. True when Backstop marks the account as domiciled in the United "
-            "States. It is not a geographical breakdown: that is the tenant's location "
-            "custom field in `custom_field_values`, weighted by latest value."
+            "States."
         ),
     )
     is_open: bool = Field(
@@ -310,18 +309,14 @@ class AccountRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Only present when `include_latest_value=true` was passed on "
-            "`get_product_investors`. For any other date, use `get_time_series`. A "
-            "geographical breakdown weights each account by this amount."
+            "`get_product_investors`. For any other date, use `get_time_series`."
         ),
     )
     custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
         default=None,
         description=(
             "Every account custom field with a value. Absent when the call set "
-            "`exclude_custom_fields`. A field missing here has no value on this account — "
-            "group it as blank. Field names differ by tenant: for a geographical breakdown "
-            "pick the location or region field by its `name`, and ask the user when it is "
-            "unclear."
+            "`exclude_custom_fields`. A field missing here has no value on this account."
         ),
     )
 

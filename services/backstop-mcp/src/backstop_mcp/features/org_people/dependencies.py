@@ -14,6 +14,7 @@ from backstop_mcp.features.org_people.queries import (
     GetPeopleForOrganizationQuery,
     GetPersonQuery,
     SearchOrganizationsQuery,
+    SearchPeopleQuery,
 )
 from backstop_mcp.features.ui_links import (
     BuildEntityLinkUtil,
@@ -48,6 +49,14 @@ def get_search_organizations_query_factory(
     build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> SearchOrganizationsQuery:
     return SearchOrganizationsQuery(client=client, build_entity_link_util=build_entity_link_util)
+
+
+@lru_cache(maxsize=1)
+def get_search_people_query_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
+) -> SearchPeopleQuery:
+    return SearchPeopleQuery(client=client, build_entity_link_util=build_entity_link_util)
 
 
 @lru_cache(maxsize=1)

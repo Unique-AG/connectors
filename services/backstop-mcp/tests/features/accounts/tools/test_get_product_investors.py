@@ -552,11 +552,9 @@ class TestGetProductInvestors:
         assert "include_latest_value=true" in doc
         assert "latest_value_totals" in doc
         assert "Investor Location" not in doc
-        assert "Which field that is differs by tenant" in " ".join(doc.split())
-        assert "ask the user which to use" in " ".join(doc.split())
-        assert "weighted by latest value" in " ".join(doc.split())
-        assert "us_domiciled" in doc
-        assert "exclude_custom_fields" in doc
+        assert "geographical" not in doc
+        assert "us_domiciled" not in doc
+        assert "exclude_custom_fields" not in doc
 
     @pytest.mark.asyncio
     @respx.mock

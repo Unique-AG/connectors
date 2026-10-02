@@ -35,6 +35,7 @@ __all__ = [
     "OrganizationAttributes",
     "OrganizationResource",
     "PersonAttributes",
+    "PersonResource",
 ]
 
 
@@ -199,3 +200,4 @@ class EmployeeAttributes(BaseModel):
 
 EmployeeResource = BackstopApiResource[EmployeeAttributes]
 OrganizationResource = BackstopApiResource[OrganizationAttributes]
+PersonResource = BackstopApiResource[PersonAttributes]

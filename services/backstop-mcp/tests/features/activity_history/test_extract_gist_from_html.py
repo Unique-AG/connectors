@@ -4,9 +4,20 @@ Each test targets one behaviour called out in the design: table rows survive as 
 rows while markdownify's synthetic empty header is squeezed out, entities decode, blank-line
 runs collapse, short input is left alone, long input truncates on a real word boundary and
 reports the correct pre-truncation length, and the `max_chars` boundary itself is exact.
+A conversion that raises returns the original HTML.
 """
 
+import importlib
+
+import pytest
+
 from backstop_mcp.features.activity_history import Gist, extract_gist_from_html
+
+# The package exports the function under the same name as this module, which hides the
+# module on the package. importlib still returns the module.
+_gist_module = importlib.import_module(
+    "backstop_mcp.features.activity_history.extract_gist_from_html"
+)
 
 
 class TestTableConversion:
@@ -223,3 +234,49 @@ class TestTruncation:
                 # the first word) — the documented fallback is a hard cut, so this is at most
                 # a prefix of "alpha", never a boundary-respecting cut of anything longer.
                 assert words[0].startswith(gist.text)
+
+
+class TestDeeplyNestedHtml:
+    """markdownify recurses per tag and raises RecursionError near 500 levels. One such body
+    must still convert: a table above the deep wrappers stays a pipe row, and the buried
+    text is kept.
+    """
+
+    def test_nesting_past_markdownify_recursion_limit_still_converts(self) -> None:
+        depth = 600
+        html = (
+            "<table><tr><td>Allstate</td><td>Aaron</td></tr></table>"
+            + ("<div>" * depth)
+            + "buried note"
+            + ("</div>" * depth)
+        )
+
+        gist = extract_gist_from_html(html, max_chars=500)
+
+        assert "| Allstate | Aaron |" in gist.text
+        assert "buried note" in gist.text
+        assert gist.truncated is False
+
+    def test_conversion_failure_returns_the_original_html(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        html = "<table><tr><td>Allstate</td><td>Aaron</td></tr></table>"
+
+        def _boom(_html: str) -> str:
+            raise RuntimeError("markdownify broke")
+
+        monkeypatch.setattr(_gist_module, "markdownify", _boom)
+
+        gist = extract_gist_from_html(html, max_chars=20)
+
+        assert gist == Gist(text=html, truncated=False, full_length=len(html))
+
+
+class TestNoBudget:
+    def test_omitting_max_chars_returns_the_whole_body(self) -> None:
+        words = " ".join(f"word{i}" for i in range(100))
+        html = f"<p>{words}</p>"
+
+        gist = extract_gist_from_html(html)
+
+        assert gist == Gist(text=words, truncated=False, full_length=len(words))
