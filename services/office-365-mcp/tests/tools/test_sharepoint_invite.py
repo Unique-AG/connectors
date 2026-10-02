@@ -497,7 +497,7 @@ class TestThePersonBeforeTheInvite:
         assert "invitation" not in question
         assert _MESSAGE not in question
         assert "Microsoft sends them no mail about it." in question
-        assert question.endswith("No tool here can take the access back.")
+        assert question.endswith("No tool here can remove the access.")
 
     async def test_the_question_shows_how_the_message_opens(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1093,7 +1093,7 @@ class TestHowItDeclaresItself:
         description = " ".join((tool.description or "").split())
         assert "sends each of them the invitation immediately" in description
         assert "nothing here can recall it" in description
-        assert "No tool here can take the access back." in description
+        assert "No tool here can remove the access." in description
 
     async def test_the_description_names_the_tool_for_a_link_that_names_nobody(
         self, transport: httpx.AsyncClient

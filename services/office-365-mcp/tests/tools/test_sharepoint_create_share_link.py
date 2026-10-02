@@ -853,7 +853,7 @@ class TestHowItDeclaresItself:
             "This tool asks the user to agree before it creates anything, every time.",
             "If this connector already made a link of this kind to the item, Microsoft returns "
             + "that link and makes no second one.",
-            "An administrator can turn off links that work with no sign-in.",
+            "An administrator can block links that work with no sign-in.",
             "This call is safe to repeat after a timeout.",
             "This tool sends the link to nobody.",
         ],

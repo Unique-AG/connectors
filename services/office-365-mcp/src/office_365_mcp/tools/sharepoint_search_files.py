@@ -338,10 +338,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             SortBy | None,
             Field(
                 description=(
-                    "Sort the matches by this file property instead of by relevance. "
-                    + "`last_modified` puts the newest change first. `created` puts the newest "
-                    + "file first. `name` sorts A to Z by file name. `size` puts the largest "
-                    + "file first. Omit it to sort by relevance."
+                    "How to sort the matches. `last_modified` puts the newest change first. "
+                    + "`created` puts the newest file first. `name` sorts A to Z by file name. "
+                    + "`size` puts the largest file first. Omit it to sort by relevance."
                 )
             ),
         ] = None,

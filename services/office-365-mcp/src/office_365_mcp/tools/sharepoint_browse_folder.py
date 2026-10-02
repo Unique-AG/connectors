@@ -55,10 +55,8 @@ search index. If the user names one folder and wants everything in it, indexed o
 this tool instead.
 
 Notes:
-- Without `order_by`, this tool returns items in the order that Microsoft returns them. With \
-`order_by`, this tool reads up to 1000 items of the level, sorts them, and then applies `limit`.
-- If the level holds more than 1000 items, `order_covers_level` is false. Then the order applies \
-to the first 1000 items that Microsoft returned and not to the whole level.
+- With `order_by`, this tool reads up to 1000 items of the level and sorts them. Then it applies \
+`limit`.
 """
 
 _NOT_A_FOLDER_HANDLE = (
@@ -78,16 +76,16 @@ class DriveFolderLevel(BaseModel):
             "The files and folders inside the folder, in the order that Microsoft returned them "
             + "or that `order_by` names. A folder entry can hold more items than this list "
             + "shows. Call this tool again with its `uri` to reach them. An empty list means "
-            + "that the folder holds nothing. This tool leaves out an item that Graph reports "
+            + "that the folder holds nothing. This tool does not list an item that Graph reports "
             + "with no drive."
         )
     )
     capped: bool = Field(
         description=(
-            "This value is true when `limit` or the cap of 1000 items stops the list before "
-            + "this level ends. To get more of the list, raise `limit` up to 1000. When the "
-            + "level ends on its own, this value is false. This value says nothing about the "
-            + "items inside a folder, because this call never looks inside one."
+            "When `limit` or the cap of 1000 items stops the list before this level ends, this "
+            + "value is true. To get more of the list, raise `limit` up to 1000. When the level "
+            + "ends on its own, this value is false. This value says nothing about the items "
+            + "inside a folder, because this call never looks inside one."
         )
     )
     order_covers_level: bool | None = Field(

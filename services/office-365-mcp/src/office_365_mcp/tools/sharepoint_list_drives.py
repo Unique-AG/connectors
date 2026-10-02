@@ -97,8 +97,8 @@ class DriveList(BaseModel):
     drives: list[DriveSummary] = Field(
         description=(
             "The drives of the signed-in user, in the order Microsoft returned them. Most users "
-            + "have one. An empty list means that Graph reported no drive. This tool leaves out a "
-            + "drive that Graph reports with no id, because this tool cannot address that drive."
+            + "have one. An empty list means that Graph reported no drive. This tool does not list "
+            + "a drive that Graph reports with no id, because this tool cannot address that drive."
         )
     )
     capped: bool = Field(

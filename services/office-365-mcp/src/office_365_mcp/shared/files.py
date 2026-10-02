@@ -279,11 +279,10 @@ async def summary_after_write(
 def item_access_refused(nothing_happened: str) -> str:
     return (
         "Microsoft 365 refused this request for the signed-in user. "
-        + f"{nothing_happened} It is possible that the user does not have the necessary access "
-        + "to an item that this request uses. A policy of the organization can also refuse the "
-        + "request. Tell the user about the refusal. The owner of the item can give the user "
-        + "more access. If you call this tool again with the same arguments, the call will fail "
-        + "the same way."
+        + f"{nothing_happened} The user can lack the necessary access to an item that this "
+        + "request uses. A policy of the organization can also refuse the request. Tell the "
+        + "user about the refusal. The owner of the item can give the user more access. If you "
+        + "call this tool again with the same arguments, the call will fail the same way."
     )
 
 

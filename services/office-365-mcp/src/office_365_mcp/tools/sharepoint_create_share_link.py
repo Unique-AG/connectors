@@ -71,7 +71,7 @@ Notes:
 - This tool asks the user to agree before it creates anything, every time.
 - This call is safe to repeat after a timeout. If this connector already made a link of this \
 kind to the item, Microsoft returns that link and makes no second one.
-- An administrator can turn off links that work with no sign-in.
+- An administrator can block links that work with no sign-in.
 """
 
 _NOT_AN_ITEM_HANDLE = (
@@ -102,8 +102,8 @@ GRAPH_NOT_FOUND = (
 
 GRAPH_FORBIDDEN = (
     item_access_refused(_NOTHING_CREATED)
-    + " An administrator can turn off links that work with no sign-in. If `audience` was "
-    + "`anonymous`, ask the user if a link for the organization is good enough."
+    + " An administrator can block links that work with no sign-in. If `audience` was "
+    + "`anonymous`, ask the user if a link for the organization is enough."
 )
 
 

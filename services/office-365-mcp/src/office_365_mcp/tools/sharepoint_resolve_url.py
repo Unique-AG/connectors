@@ -63,11 +63,11 @@ GRAPH_NOT_FOUND = (
 )
 
 GRAPH_FORBIDDEN = (
-    "Microsoft 365 refused to give the signed-in user the item that this link opens. It is "
-    + "possible that the user does not have access to the item yet. This tool does not accept the "
-    + "sharing invitation of a link, so it gets the user no new access. Ask the user to open the "
-    + "link in a browser. After that, a second call can find the item. Before that, a call with "
-    + "the same arguments will fail the same way."
+    "Microsoft 365 refused to give the signed-in user the item that this link opens. The user "
+    + "can still lack access to the item. This tool does not accept the sharing invitation of a "
+    + "link, so it gets the user no new access. Ask the user to open the link in a browser. After "
+    + "that, a second call can find the item. Before that, a call with the same arguments will "
+    + "fail the same way."
 )
 
 _ItemQuery = DriveItemRequestBuilder.DriveItemRequestBuilderGetQueryParameters

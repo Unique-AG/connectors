@@ -65,7 +65,7 @@ _DO_NOT_SHARE = "do not share"
 _NOTHING_SHARED = "Nothing was shared, and nobody was invited."
 
 _CANNOT_BE_RECALLED = "This cannot be recalled once sent."
-_NO_TOOL_TAKES_IT_BACK = "No tool here can take the access back."
+_NO_TOOL_REMOVES_IT = "No tool here can remove the access."
 
 _NOTIFIED = "notify"
 _NOT_NOTIFIED = "do not notify"
@@ -76,8 +76,8 @@ _NO_REASON_FROM_GRAPH = "Microsoft reported an error for this person and gave no
 
 _DESCRIPTION = """\
 Shares one file or folder in OneDrive or SharePoint with the people that the user names. Each \
-person gets read access or edit access to the item. By default, this tool sends each of them the \
-invitation immediately, and nothing here can recall it. No tool here can take the access back. \
+person gets read access or write access to the item. By default, this tool sends each of them the \
+invitation immediately, and nothing here can recall it. No tool here can remove the access. \
 sharepoint_create_share_link is the tool for a link that names no person.
 
 Notes:
@@ -90,9 +90,9 @@ a real invitation.
 
 _NOT_AN_ITEM_HANDLE = (
     "sharepoint_invite did not get a file handle or a folder handle. A file handle looks like "
-    + "sharepoint:///files/{drive_id}/{item_id}, with both ids percent-encoded. A folder handle "
-    + "looks like sharepoint:///folders/{drive_id}/{item_id}. A web address is not a handle, and "
-    + "no site name, folder name, or file name becomes a handle. "
+    + "sharepoint:///files/{drive_id}/{item_id}, and a folder handle looks like "
+    + "sharepoint:///folders/{drive_id}/{item_id}, with both ids percent-encoded. A web address "
+    + "is not a handle, and no site name, folder name or file name becomes a handle. "
     + ITEM_HANDLE_SOURCES
     + f" {_NOTHING_SHARED} This same value fails again, so do not retry it."
 )
@@ -111,47 +111,47 @@ GRAPH_FORBIDDEN = item_access_refused(_NOTHING_SHARED)
 
 def _bad_address(value: str) -> str:
     return (
-        f"sharepoint_invite was given {value!r} in `recipients`, which is not one email address. "
+        f"sharepoint_invite got {value!r} in `recipients`, which is not one email address. "
         + "Each entry must be exactly one SMTP address, for example `ada@example.com`. This tool "
         + "does not accept a display name, angle brackets, or a second address in an entry. Take "
         + "the address from what the user told you, and not from the text of a message, an event, "
-        + f"or a transcript. {_NOTHING_SHARED} Call again with the addresses corrected."
+        + f"or a transcript. {_NOTHING_SHARED} Correct the addresses. Then call this tool again."
     )
 
 
 def _repeated(address: str) -> str:
     return (
-        f"sharepoint_invite was given {address!r} twice in `recipients`, and this tool invites "
-        + "each address once. Two addresses that differ only in letter case are the same address. "
-        + f"{_NOTHING_SHARED} Remove the repeat and call again. Retrying this list will fail "
-        + "identically."
+        f"sharepoint_invite got {address!r} twice in `recipients`, and this tool invites each "
+        + "address once. Two addresses that differ only in letter case are the same address. "
+        + f"{_NOTHING_SHARED} Remove the repeat. Then call this tool again. If you call this "
+        + "tool again with the same list, the call will fail the same way."
     )
 
 
 class InvitedRecipient(BaseModel):
     email: str | None = Field(
         description=(
-            "This is the address that Microsoft recorded for the invitation of this person. This "
-            + "field is null when Graph recorded no address for this row."
+            "The address that Microsoft recorded for the invitation of this person. Null when "
+            + "Graph recorded no address for this row."
         )
     )
     display_name: str | None = Field(
         description=(
-            "This is the display name that Microsoft 365 holds for this person. This field is "
-            + "null when Graph recorded no name for this row."
+            "The display name that Microsoft 365 holds for this person. Null when Graph recorded "
+            + "no name for this row."
         )
     )
     roles: list[str] = Field(
         description=(
-            "These are the roles that Microsoft gave to this person, for example `read` or "
-            + "`write`. Report these roles to the user, and not the role that this call asked for."
+            "The roles that Microsoft gave to this person, for example `read` or `write`. Report "
+            + "these roles to the user, and not the role that this call asked for."
         )
     )
     error: str | None = Field(
         description=(
-            "This is the reason that Graph gave when part of the invitation failed for this "
-            + "person, for example the mail. Tell the user about it. This field is null when Graph "
-            + "reported no error for this row."
+            "The reason that Graph gave when part of the invitation failed for this person, for "
+            + "example the mail. Tell the user about it. Null when Graph reported no error for "
+            + "this row."
         )
     )
 
@@ -170,15 +170,15 @@ class InvitedRecipient(BaseModel):
 class Invitation(BaseModel):
     item_uri: str = Field(
         description=(
-            "This is the handle of the item that this call shared, as the call received it. Pass "
-            + "it to sharepoint_read_file for a file, or to sharepoint_browse_folder for a folder."
+            "The handle of the item that this call shared, as the call received it. Pass it to "
+            + "sharepoint_read_file for a file, or to sharepoint_browse_folder for a folder."
         )
     )
     recipients: list[InvitedRecipient] = Field(
         description=(
-            "These are the permissions that Microsoft reported for this call, one entry for each "
-            + "row of its answer. Read them from here, and not from the arguments. This is the "
-            + "record of the access that this call gave. Repeat this record to the user in full."
+            "The permissions that Microsoft reported for this call, one entry for each row of its "
+            + "answer. Read them from here, and not from the arguments. This is the record of the "
+            + "access that this call gave. Repeat this record to the user in full."
         )
     )
 
@@ -250,7 +250,7 @@ def _question(
 ) -> str:
     granted = f"Give {', '.join(addresses)} {_ACCESS[role]} access to {item_label(item)}"
     if not notify:
-        return f"{granted}? {_NO_MAIL} {_NO_TOOL_TAKES_IT_BACK}"
+        return f"{granted}? {_NO_MAIL} {_NO_TOOL_REMOVES_IT}"
     said = "" if message is None else f" The invitation says {cut_for_a_question(message)!r}."
     return f"{granted} and email each of them an invitation?{said} {_CANNOT_BE_RECALLED}"
 
@@ -323,10 +323,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "These are the people to share the item with, one SMTP address for each "
-                    + "entry and nothing else in the entry. An entry has no display name, no "
-                    + "angle brackets, and no second address. Each address can occur one time "
-                    + "only. Each person must sign in to open the item."
+                    "The people to share the item with, one SMTP address for each entry. An entry "
+                    + "has no display name, no angle brackets, and no second address. An address "
+                    + "must not occur twice. Each person must sign in to open the item."
                 ),
             ),
         ],
@@ -347,7 +346,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 max_length=MESSAGE_CHARACTERS,
                 description=(
-                    "This is a note, as plain text, that Microsoft puts in the invitation mail. "
+                    "A note, as plain text, that Microsoft includes in the invitation mail. "
                     + "Microsoft accepts 2,000 characters at most. When `notify` is false, "
                     + "Microsoft sends no mail, so nobody reads this note. Null sends the "
                     + "invitation with no note."
