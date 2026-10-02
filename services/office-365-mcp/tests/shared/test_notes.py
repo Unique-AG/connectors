@@ -1078,6 +1078,25 @@ class TestGetWithQuery:
 
         assert route.call_count == 1
 
+    async def test_a_raw_query_option_reaches_the_wire_beside_the_typed_ones(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get(f"/me/onenote/sections/{_AUDIENCE_SECTION_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_ID})
+        )
+
+        _ = await notes.get_with_query(
+            client,
+            notes.onenote_root(client, None).sections.by_onenote_section_id(_AUDIENCE_SECTION_ID),
+            _SectionQuery(select=["id"]),
+            OnenoteSection,
+            query={"pagelevel": "true"},
+        )
+
+        params = route.calls.last.request.url.params
+        assert params["pagelevel"] == "true"
+        assert params["$select"] == "id"
+
 
 _APPEND_TO_BODY = OnenotePatchContentCommand(
     target="body",

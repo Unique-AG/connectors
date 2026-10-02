@@ -5,8 +5,6 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.method import Method
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_page_collection_response import (
     OnenotePageCollectionResponse,
 )
@@ -14,7 +12,7 @@ from msgraph.generated.users.item.onenote.pages.pages_request_builder import Pag
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step, request_with_query
+from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import (
     OnenoteOwner,
     OnenoteSectionHandle,
@@ -24,6 +22,7 @@ from office_365_mcp.shared.notes import (
     PAGE_EXPANSIONS,
     PAGE_FIELDS,
     PageSummary,
+    get_with_query,
     onenote_root,
     owner_named,
 )
@@ -325,12 +324,8 @@ async def _first_page(
         orderby=[order_by] if order_by is not None else None,
         skip=skip if skip > 0 else None,
     )
-    request = request_with_query(
-        Method.GET, pages.url_template, pages.path_parameters, query=raw_query, typed=typed
-    )
-    request.headers.try_add("Accept", "application/json")
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, OnenotePageCollectionResponse, {"XXX": ODataError}
+    return await get_with_query(
+        client, pages, typed, OnenotePageCollectionResponse, query=raw_query
     )
 
 

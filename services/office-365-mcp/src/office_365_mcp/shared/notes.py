@@ -133,9 +133,15 @@ async def get_with_query[M: Parsable](
     builder: BaseRequestBuilder,
     typed: TypedQueryParameters,
     model: ParsableFactory[M],
+    *,
+    query: Mapping[str, str] | None = None,
 ) -> M | None:
     request = request_with_query(
-        Method.GET, builder.url_template, builder.path_parameters, query={}, typed=typed
+        Method.GET,
+        builder.url_template,
+        builder.path_parameters,
+        query={} if query is None else query,
+        typed=typed,
     )
     request.headers.try_add("Accept", "application/json")
     return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
