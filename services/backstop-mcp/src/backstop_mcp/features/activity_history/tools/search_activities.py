@@ -49,9 +49,6 @@ from backstop_mcp.utils import date_window
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MAX_ROWS = 100
-_DESCRIPTION_MAX_ROWS = 50
-_MAX_ROWS = 1_000
 _DEFAULT_FIELDS: frozenset[str] = frozenset(
     {
         "id",
@@ -228,8 +225,9 @@ async def search_activities(
         Field(
             default=False,
             description=(
-                "Opt in to the full body text (much larger rows). Caps rows at 50; refused "
-                "with `mode=aggregate` and on a wide sweep (no party, no tags, no authors)."
+                "Opt in to the full body text (much larger rows) on every matching row. "
+                "Refused with `mode=aggregate` and on a wide sweep (no party, no tags, no "
+                "authors)."
             ),
         ),
     ] = False,
@@ -238,7 +236,7 @@ async def search_activities(
         Field(
             default="rows",
             description=(
-                "`rows` returns activity bodies, capped by `max_rows`. `aggregate` returns "
+                "`rows` returns every matching activity. `aggregate` returns "
                 "counts grouped by `group_by` so a counting question never pays for row bodies."
             ),
         ),
@@ -253,18 +251,6 @@ async def search_activities(
             ),
         ),
     ] = None,
-    max_rows: Annotated[
-        int,
-        Field(
-            default=_DEFAULT_MAX_ROWS,
-            ge=1,
-            le=_MAX_ROWS,
-            description=(
-                f"Maximum row bodies to return in rows mode. Aggregate mode scans up to the "
-                f"{MAX_RETRIEVABLE} ceiling on a scoped search and is refused on a wide sweep."
-            ),
-        ),
-    ] = _DEFAULT_MAX_ROWS,
     fields: Annotated[
         list[SearchRowField] | None,
         Field(
@@ -286,7 +272,9 @@ async def search_activities(
     """Search activities firm-wide or for one party: meetings, calls, notes, emails, documents.
 
     Always start here when the question has a date window. Pass `start_date` and `end_date`;
-    omitting `start_date` uses one year before `end_date`, omitting `end_date` uses today.
+    omitting `start_date` uses one year before `end_date`, omitting `end_date` uses today, so
+    "since March" is only `start_date`. A named calendar day is both `start_date` and
+    `end_date`; then match the title. Do not answer from the newest row of a wider window.
     Optionally scope to a party (`search_type` plus `party_id` or `search` — a `party_id`
     without `search_type` is rejected), restrict `types`,
     filter `activity_tag_ids` (OR, unlike get_activity_history), and filter `authors` by email.
@@ -307,7 +295,16 @@ async def search_activities(
     A party missing from a firm-wide row sample is not
     inactive; for "who has had no activity since X" use get_last_activity_for_parties.
     `attachments_count` is a count only — pass the row `activity_id` (or `id`) to
-    `get_activity_detail` for the names. Do not assume what the files are. Meeting, call,
+    `get_activity_detail` for the names. Do not assume what the files are. Whether a promised
+    follow-up was sent is that attachment list on get_activity_detail: a later email is not
+    evidence the earlier ask was inside it.
+
+    A strategy in activities is list_activity_tags with that term, then every returned id in
+    `activity_tag_ids`. Tag names carry prefixes, so an exact name misses. Description text
+    is not searchable; read bodies after the rows are back. Who a colleague updates on a
+    fund is the meetings on that fund they attend, grouped by investor; a fund named without
+    a feeder is every feeder. The representative is the one on the organization. Balance can
+    order that list; it is not the answer. Meeting, call,
     note, and document rows from `get_activity_history` use the
     same argument; history email ids do not. Attendee columns use the structured
     `attendees` names on these rows, not names read out of the title or body.
@@ -358,7 +355,6 @@ async def search_activities(
             + "or authors, or use mode=rows"
         )
 
-    row_cap = min(max_rows, _DESCRIPTION_MAX_ROWS) if include_description else max_rows
     # `description` is added to the *default* set when it was opted into, and never forced onto
     # an explicit `fields` list: a caller who names the fields they want has said what they want.
     if fields:
@@ -386,7 +382,6 @@ async def search_activities(
             activity_tags=tag_ids,
             authors=author_emails,
             include_description=include_description,
-            max_rows=None if mode == "aggregate" else row_cap,
         )
     except BackstopAuthError, BackstopRateLimitError:
         # Neither is "this endpoint is unavailable". A dead credential fails the documented
@@ -420,6 +415,5 @@ async def search_activities(
         if mode == "rows" and "url" in selected_fields
         else {},
         aggregates=aggregates,
-        description_row_capped=include_description and max_rows > _DESCRIPTION_MAX_ROWS,
         ceiling=MAX_RETRIEVABLE,
     )

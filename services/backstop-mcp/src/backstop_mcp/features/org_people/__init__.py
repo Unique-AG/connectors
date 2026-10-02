@@ -29,11 +29,9 @@ from backstop_mcp.features.org_people.queries import (
     GetOrganizationQuery,
     GetPeopleForOrganizationQuery,
     GetPersonQuery,
-    OrganizationCustomFieldMatch,
     SearchOrganizationsQuery,
 )
 from backstop_mcp.features.org_people.responses import (
-    MatchedCustomFieldResponse,
     OrganizationRecordResponse,
     OrganizationResolvedResponse,
     OrgPeopleResolvedResponse,
@@ -54,10 +52,8 @@ __all__ = [
     "GetOrganizationQuery",
     "GetPeopleForOrganizationQuery",
     "GetPersonQuery",
-    "MatchedCustomFieldResponse",
     "OrgPeopleResolvedResponse",
     "OrganizationAttributes",
-    "OrganizationCustomFieldMatch",
     "OrganizationRecordResponse",
     "OrganizationResolvedResponse",
     "PartyOrgPeopleResponse",

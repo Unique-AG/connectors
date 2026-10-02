@@ -16,9 +16,9 @@ from mcp.types import ToolAnnotations
 from opentelemetry import trace
 from pydantic import BaseModel, Field
 
+from backstop_mcp.features.custom_fields import CustomFieldMatch
 from backstop_mcp.features.org_people import (
     MAX_ORGANIZATION_SCAN_RECORDS,
-    OrganizationCustomFieldMatch,
     SearchOrganizationsQuery,
     SearchOrganizationsResolvedResponse,
 )
@@ -27,9 +27,6 @@ from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
-
-_DEFAULT_MAX_ROWS = 100
-_MAX_ROWS = 1_000
 
 SearchOrganizationField = Literal[
     "id",
@@ -74,11 +71,11 @@ class OrganizationCustomFieldFilter(BaseModel):
 
 def _predicates(
     custom_fields: Sequence[OrganizationCustomFieldFilter] | None,
-) -> tuple[OrganizationCustomFieldMatch, ...]:
+) -> tuple[CustomFieldMatch, ...]:
     if not custom_fields:
         return ()
     return tuple(
-        OrganizationCustomFieldMatch(definition_id=item.definition_id, values=tuple(item.values))
+        CustomFieldMatch(definition_id=item.definition_id, values=tuple(item.values))
         for item in custom_fields
     )
 
@@ -159,38 +156,26 @@ async def search_organizations(
             )
         ),
     ] = None,
-    custom_field_columns: Annotated[
-        list[CoercedId] | None,
+    exclude_custom_fields: Annotated[
+        bool,
         Field(
             description=(
-                "Custom-field definition ids from list_custom_fields whose values to publish "
-                "on every row as `custom_field_columns` — the fields a table is grouped or "
-                "labelled by (e.g. Grade, Investor Type). Does not filter. One walk answers "
-                "'grouped by X and Y'; never call get_organization per row for these."
+                "Every row's custom fields come back as `custom_field_values` by default — "
+                "the fields a table is grouped or labelled by (Grade, Investor Type). Leave "
+                "this false. Set it true only to retry a call that timed out, to see whether "
+                "reading the custom fields is what made it slow. Refused together with "
+                "`custom_fields`, which needs them."
             )
         ),
-    ] = None,
-    max_rows: Annotated[
-        int,
-        Field(
-            ge=1,
-            le=_MAX_ROWS,
-            description=(
-                "Row-body cap. Does not limit a walk that has an in-memory predicate: "
-                f"that walk reads up to {MAX_ORGANIZATION_SCAN_RECORDS} rows. When every "
-                "predicate is a server filter, the read stops at this cap."
-            ),
-        ),
-    ] = _DEFAULT_MAX_ROWS,
+    ] = False,
     fields: Annotated[
         list[SearchOrganizationField] | None,
         Field(
             description=(
                 "Sparse row fields. Defaults to id, name, legal_name, email, city, "
                 "country. `id` is always included. Select `url` when the answer will "
-                "link to the organization — it is off by default. Matching custom-field "
-                "values are included automatically when `custom_fields` is set, and "
-                "requested columns when `custom_field_columns` is set."
+                "link to the organization — it is off by default. `custom_field_values` is "
+                "included automatically unless `exclude_custom_fields` is set."
             )
         ),
     ] = None,
@@ -209,14 +194,22 @@ async def search_organizations(
     Custom-field ids come from list_custom_fields. Match by definition id, not the
     label. A missing custom-field value is not a match.
 
-    "Prospects", "current investors", and "former investors" are organizations, found by
-    an organization status custom field (e.g. an "Investor Status" select) — not by
-    opportunity stage, and not by search_opportunities. Read that field's options in
-    list_custom_fields(entity_types=["organizations"]) and filter on the one the user
-    named. A qualifier such as "active" usually maps to a second organization status
-    field (dialogue or relationship stage): pass every option that counts as active in
-    `values`, and state which options you applied. To group rows by Grade, Investor Type,
-    or any other field, pass those ids as `custom_field_columns`.
+    Before choosing between this tool and search_opportunities, call list_custom_fields for
+    both organizations and opportunities, and search the collection where the user's words
+    exist. "Prospects", "current investors", and "former investors" are organizations,
+    found by an organization status custom field (e.g. an "Investor Status" select) — not
+    by opportunity stage, and not by search_opportunities. Prospect, Grade, and Investor
+    Type are organization fields. Filter on the option the user named. A qualifier such as
+    "active" usually maps to a second organization status field (dialogue or relationship
+    stage): pass every option that counts as active in `values`, and state which options
+    you applied. To group rows by Grade, Investor Type, or any other field, read it from each
+    row's `custom_field_values`. A field missing from
+    list_custom_fields for organizations (often Strategy) cannot come from the company;
+    say so rather than filling the column. `country` is the stored full name.
+
+    Every row carries its custom fields as `custom_field_values`. If a call times out,
+    retry once with `exclude_custom_fields=true` to see whether reading them is the cause;
+    otherwise leave it false.
 
     `coverage.visible_count` is Backstop's total for the server-side filters, before
     the in-memory predicates. An empty `rows` list means nothing matched.
@@ -224,9 +217,12 @@ async def search_organizations(
     Call like: {"country": "Finland",
     "custom_fields": [{"definition_id": "<definition id from list_custom_fields>",
     "values": ["Prospect"]}],
-    "custom_field_columns": ["<definition id from list_custom_fields>"],
     "fields": ["name", "city", "country"]}
     """
+    if custom_fields and exclude_custom_fields:
+        raise ValueError(
+            "exclude_custom_fields cannot be combined with custom_fields: the filter reads them"
+        )
     predicates = _predicates(custom_fields)
     chosen = frozenset(fields) if fields is not None else _DEFAULT_FIELDS
     with _tracer.start_as_current_span("org_people.search") as span:
@@ -234,7 +230,7 @@ async def search_organizations(
         logger.info(
             "org_people.search.start",
             extra={
-                "name": name is not None,
+                "has_name": name is not None,
                 "email": email is not None,
                 "other_id": other_id is not None,
                 "matching_domain": matching_domain is not None,
@@ -246,8 +242,7 @@ async def search_organizations(
                 "ria": ria is not None,
                 "internal_organization": internal_organization is not None,
                 "custom_fields": len(predicates),
-                "custom_field_columns": len(custom_field_columns or ()),
-                "max_rows": max_rows,
+                "exclude_custom_fields": exclude_custom_fields,
             },
         )
         return await search_organizations_query.run(
@@ -263,7 +258,6 @@ async def search_organizations(
             ria=ria,
             internal_organization=internal_organization,
             custom_fields=predicates,
-            custom_field_columns=tuple(custom_field_columns or ()),
-            max_rows=max_rows,
+            exclude_custom_fields=exclude_custom_fields,
             fields=chosen,
         )

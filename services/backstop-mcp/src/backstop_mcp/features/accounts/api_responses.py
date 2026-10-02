@@ -92,10 +92,15 @@ class AccountAttributes(BaseModel):
     aml_check_complete: LenientBool = Field(default=None, alias="amlCheckComplete")
     new_issue_eligible: StrippedStr | None = Field(default=None, alias="newIssueEligible")
     us_domiciled: LenientBool = Field(default=None, alias="usDomiciled")
+    regular_custom_field_values: RegularCustomFieldValues = Field(
+        default_factory=list, alias="regularCustomFieldValues"
+    )
 
 
-# Exactly the attributes `AccountAttributes` reads, by wire name. Anything added there has to be
-# added here too, or it arrives as `None` on every row instead of failing loudly.
+# Exactly the attributes `AccountAttributes` reads, by wire name, except `regularCustomFieldValues`.
+# That one is appended by `get_product_investors` unless it is asked to `exclude_custom_fields`, so
+# the holdings walk stays without it. Anything else added to `AccountAttributes`
+# has to be added here too, or it arrives as `None` on every row instead of failing loudly.
 #
 # `closedDate` has to stay in this fieldset and stay meaningful: open is *the key was absent on
 # the wire*, so a `fields=` set that materialized it as null would report every account closed.
@@ -134,11 +139,16 @@ class OwnerAttributes(BaseModel):
 
 
 class InvestorTypeAttributes(BaseModel):
-    """Wire shape of the `investorType` side-load's `attributes`."""
+    """Wire shape of the `investorType` side-load's `attributes`.
+
+    Some tenants leave `name` empty and carry the label in `classificationType`
+    (e.g. `Endowment/Foundation`), so both are read and published separately.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     name: _CleanStr = None
+    classification_type: _CleanStr = Field(default=None, alias="classificationType")
 
 
 class SeriesPointAttributes(BaseModel):

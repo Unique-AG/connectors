@@ -50,7 +50,7 @@ class TestSearchOrganizations:
         doc = " ".join((search_organizations.__doc__ or "").split())
         assert "Prospects" in doc
         assert "not by opportunity stage" in doc
-        assert "custom_field_columns" in doc
+        assert "custom_field_values" in doc
         annotations = cast("dict[str, object]", search_organizations.__annotations__)
         country = next(
             item
@@ -62,7 +62,7 @@ class TestSearchOrganizations:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_passes_any_of_values_and_columns_to_the_walk(self) -> None:
+    async def test_passes_any_of_values_and_publishes_every_field(self) -> None:
         base_url = f"{BASE_URL}/org-search-tool-columns"
         respx.get(f"{base_url}/organizations").mock(
             return_value=_page(
@@ -103,7 +103,6 @@ class TestSearchOrganizations:
                             definition_id="261621", values=["Prospect", "Former Investor"]
                         )
                     ],
-                    custom_field_columns=["8646227"],
                     search_organizations_query=make_search_organizations_query(client),
                 ),
                 SearchOrganizationsResolvedResponse,
@@ -113,9 +112,22 @@ class TestSearchOrganizations:
         assert len(rows) == 1
         row = object_dict(rows[0])
         assert row["id"] == "7"
-        assert row["custom_field_columns"] == [
-            {"definition_id": "8646227", "name": "Grade", "value": "Focus"}
+        assert row["custom_field_values"] == [
+            {"definition_id": "261621", "name": "Investor Status", "value": "Prospect"},
+            {"definition_id": "8646227", "name": "Grade", "value": "Focus"},
         ]
+
+    @pytest.mark.asyncio
+    async def test_exclude_custom_fields_is_refused_with_a_custom_field_filter(self) -> None:
+        async with tool_client(f"{BASE_URL}/org-search-refused") as client:
+            with pytest.raises(ValueError, match="exclude_custom_fields"):
+                await search_organizations(
+                    custom_fields=[
+                        OrganizationCustomFieldFilter(definition_id="1", values=["Yes"])
+                    ],
+                    exclude_custom_fields=True,
+                    search_organizations_query=make_search_organizations_query(client),
+                )
 
     @pytest.mark.asyncio
     @respx.mock

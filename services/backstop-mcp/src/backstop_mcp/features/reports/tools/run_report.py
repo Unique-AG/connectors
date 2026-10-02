@@ -88,9 +88,17 @@ async def run_report(
     need from the data and what the columns mean — do not invent a schema or a column's
     meaning.
 
-    One page only. `total` is the full row count; `next_offset` is present when more rows
-    remain. Continuation must repeat the same `as_of_date` (the default is today). Do not
-    walk every page unless the user asked for the whole report.
+    A quoted report name, or "pull my X report", is this tool with that exact string. Do not
+    rebuild it with get_capital_flows. This tool cannot filter by product or date. For a cut
+    of the report (one fund, a date range), follow `next_offset` to the end, then keep rows
+    by the product column and the effective-date column the report returned. Resolve a short
+    name with get_product when that column holds the legal name. Keep every transaction type
+    inside the cut. A follow-up that moves to other feeders replaces the product set; run
+    both only when the user asks for both.
+
+    One page per call. `total` is the full row count; `next_offset` is present when more
+    rows remain. Continuation must repeat the same `as_of_date` (the default is today). Do
+    not walk every page unless the user asked for the whole report or a cut of it.
 
     Call like: {"report_name": "<exact Report Center name>"}
     Continue: {"report_name": "<same name>", "as_of_date": "<same date, or today if omitted>",

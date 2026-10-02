@@ -8,7 +8,11 @@ from pydantic import TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
 
 from backstop_mcp.features.opportunities import SearchOpportunitiesResolvedResponse
-from backstop_mcp.features.opportunities.tools.search_opportunities import search_opportunities
+from backstop_mcp.features.opportunities.tools.search_opportunities import (
+    OpportunityCustomFieldFilter,
+    search_opportunities,
+)
+from backstop_mcp.models import CoercedId
 from backstop_mcp.server.tools import TOOLS
 from tests.features.opportunities.conftest import VOCABULARY, make_search_opportunities_query
 from tests.helpers import (
@@ -69,11 +73,16 @@ def _deal(
     is_open: bool = True,
     investor_id: str | None = "c1",
     product_id: str | None = "p1",
+    representative_id: str | None = None,
     **attrs: object,
 ) -> dict[str, object]:
     relationships: dict[str, object] = {
         "stage": {"data": {"id": stage_id, "type": "opportunity-stages"}},
     }
+    if representative_id is not None:
+        relationships["representative"] = {
+            "data": {"id": representative_id, "type": "system-users"}
+        }
     if investor_id is not None:
         relationships["investor"] = {"data": {"id": investor_id, "type": "contacts"}}
     if product_id is not None:
@@ -126,6 +135,9 @@ class TestSearchOpportunities:
         assert "list_system_users" in doc
         assert "get_opportunities" in doc
         assert "get_opportunities_by_ids" in doc
+        assert "custom_fields" in doc
+        assert "Convert Arb" in doc
+        assert "Investor Status" in doc
         annotations = cast("dict[str, object]", search_opportunities.__annotations__)
         field_info = next(
             item
@@ -137,7 +149,7 @@ class TestSearchOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_pins_login_filter_and_sparse_contact_fields(self) -> None:
+    async def test_pins_sparse_fields_and_both_representative_includes(self) -> None:
         base_url = tenant("so-filter")
         opportunities = respx.get(f"{base_url}/opportunities").mock(
             return_value=_page(
@@ -151,7 +163,6 @@ class TestSearchOpportunities:
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_opportunities(
-                    representative="blazarus",
                     search_opportunities_query=make_search_opportunities_query(client),
                 ),
                 SearchOpportunitiesResolvedResponse,
@@ -159,11 +170,17 @@ class TestSearchOpportunities:
 
         assert opportunities.call_count == 1
         params = recorded_requests(opportunities.calls)[0].url.params
-        assert params["filter[representative.name][eq]"] == "blazarus"
-        assert params["include"] == "investor,product,stage"
-        assert params["fields[contacts]"] == "name,country,state,city,specificResource"
+        assert "filter[representative.name][eq]" not in params
+        assert params["include"] == "investor,investor.representative,representative,product,stage"
+        # Without `representative` here Backstop drops the organization's linkage.
+        assert params["fields[contacts]"] == (
+            "name,country,state,city,specificResource,representative"
+        )
+        assert params["fields[system-users]"] == "userName"
+        assert "representative" in params["fields[opportunities]"].split(",")
         assert "weightedValue" in params["fields[opportunities]"]
         assert "weightedAllocatedValue" in params["fields[opportunities]"]
+        assert "regularCustomFieldValues" in params["fields[opportunities]"]
         assert params["page[limit]"] == "500"
         assert params["page[offset]"] == "0"
         assert "filter[isOpen]" not in params
@@ -181,6 +198,61 @@ class TestSearchOpportunities:
         assert "specificResource" not in investor
         product = object_dict(rows[0]["product"])
         assert product["name"] == "Harbor Select"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_representative_is_the_investor_organization_book(self) -> None:
+        base_url = tenant("so-representative")
+        opportunities = respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                _deal("1", name="Deal and org", stage_id="42482", representative_id="u1"),
+                _deal("2", name="Org only", stage_id="42482"),
+                _deal(
+                    "3",
+                    name="Deal only",
+                    stage_id="42482",
+                    investor_id="c2",
+                    representative_id="u1",
+                ),
+                included=[
+                    resource("42482", "opportunity-stages", name="IDD"),
+                    {
+                        **resource("c1", "contacts", name="Contoso"),
+                        "relationships": {
+                            "representative": {"data": {"id": "u1", "type": "system-users"}}
+                        },
+                    },
+                    {
+                        **resource("c2", "contacts", name="Fabrikam"),
+                        "relationships": {
+                            "representative": {"data": {"id": "u2", "type": "system-users"}}
+                        },
+                    },
+                    resource("u1", "system-users", userName="jskeggs"),
+                    resource("u2", "system-users", userName="crohrbacker"),
+                ],
+                total=3,
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    representative="JSkeggs",
+                    fields=["name", "representative"],
+                    search_opportunities_query=make_search_opportunities_query(client),
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        params = recorded_requests(opportunities.calls)[0].url.params
+        assert "filter[representative.name][eq]" not in params
+        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        assert [row["id"] for row in rows] == ["1", "2"]
+        assert [row["investor_representative"] for row in rows] == ["jskeggs", "jskeggs"]
+        assert rows[0]["representative"] == "jskeggs"
+        assert "representative" not in rows[1]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -481,7 +553,177 @@ class TestSearchOpportunitiesProductFilter:
         assert product["short_name"] == "NWON"
 
 
+def _custom_fields(*rows: tuple[str, str, str]) -> list[dict[str, object]]:
+    return [
+        {"definitionId": definition_id, "name": name, "value": value}
+        for definition_id, name, value in rows
+    ]
+
+
+class TestSearchOpportunitiesCustomFields:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_filters_the_exact_stored_option_and_publishes_columns(self) -> None:
+        base_url = tenant("so-cf")
+        route = respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                _deal(
+                    "convert",
+                    name="Cornell - Converts",
+                    stage_id="42478",
+                    regularCustomFieldValues=_custom_fields(
+                        ("8648257", "Product", "Convert Arb"),
+                        ("8651233", "Opportunity Type", "NTE"),
+                    ),
+                ),
+                _deal(
+                    "named-only",
+                    name="SWIB - Converts",
+                    stage_id="42478",
+                    regularCustomFieldValues=_custom_fields(
+                        ("8648257", "Product", "Long Vol"),
+                    ),
+                ),
+                _deal(
+                    "other-case",
+                    name="Quiet book",
+                    stage_id="42478",
+                    regularCustomFieldValues=_custom_fields(
+                        ("8648257", "Product", "convert arb"),
+                    ),
+                ),
+                included=_included() + [resource("42478", "opportunity-stages", name="Prospect")],
+                total=3,
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    is_open=True,
+                    custom_fields=[
+                        OpportunityCustomFieldFilter(
+                            definition_id="8648257", values=["Convert Arb"]
+                        )
+                    ],
+                    fields=["name", "stage", "investor"],
+                    search_opportunities_query=make_search_opportunities_query(client),
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        params = recorded_requests(route.calls)[0].url.params
+        assert "regularCustomFieldValues" in params["fields[opportunities]"]
+        assert "filter[regularCustomFieldValues]" not in params
+        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        assert [item["id"] for item in rows] == ["convert", "other-case"]
+        published = [object_dict(item) for item in object_list(rows[0]["custom_field_values"])]
+        assert published == [
+            {"definition_id": "8648257", "name": "Product", "value": "Convert Arb"},
+            {"definition_id": "8651233", "name": "Opportunity Type", "value": "NTE"},
+        ]
+        other = [object_dict(item) for item in object_list(rows[1]["custom_field_values"])]
+        assert other == [{"definition_id": "8648257", "name": "Product", "value": "convert arb"}]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_exclude_custom_fields_does_not_request_them(self) -> None:
+        base_url = tenant("so-cf-exclude")
+        route = respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                _deal(
+                    "convert",
+                    name="Cornell - Converts",
+                    stage_id="42478",
+                    regularCustomFieldValues=_custom_fields(("8648257", "Product", "Convert Arb")),
+                ),
+                included=_included() + [resource("42478", "opportunity-stages", name="Prospect")],
+                total=1,
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    exclude_custom_fields=True,
+                    search_opportunities_query=make_search_opportunities_query(client),
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        params = recorded_requests(route.calls)[0].url.params
+        assert "regularCustomFieldValues" not in params["fields[opportunities]"]
+        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        assert "custom_field_values" not in rows[0]
+
+    @pytest.mark.asyncio
+    async def test_exclude_custom_fields_is_refused_with_a_custom_field_filter(self) -> None:
+        async with tool_client(tenant("so-cf-refused")) as client:
+            with pytest.raises(ValueError, match="exclude_custom_fields"):
+                await search_opportunities(
+                    custom_fields=[OpportunityCustomFieldFilter(definition_id="1", values=["Yes"])],
+                    exclude_custom_fields=True,
+                    search_opportunities_query=make_search_opportunities_query(client),
+                )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_predicates_and_together(self) -> None:
+        base_url = tenant("so-cf-and")
+        respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                _deal(
+                    "both",
+                    name="ADIA 3rd",
+                    stage_id="42482",
+                    regularCustomFieldValues=_custom_fields(
+                        ("8648257", "Product", "Convert Arb"),
+                        ("8651233", "Opportunity Type", "NTN"),
+                    ),
+                ),
+                _deal(
+                    "product-only",
+                    name="VRS",
+                    stage_id="42482",
+                    regularCustomFieldValues=_custom_fields(
+                        ("8648257", "Product", "Convert Arb"),
+                        ("8651233", "Opportunity Type", "NTE"),
+                    ),
+                ),
+                included=_included(),
+                total=2,
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    custom_fields=[
+                        OpportunityCustomFieldFilter(
+                            definition_id="8648257", values=["Convert Arb"]
+                        ),
+                        OpportunityCustomFieldFilter(definition_id="8651233", values=["NTN"]),
+                    ],
+                    search_opportunities_query=make_search_opportunities_query(client),
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        assert [item["id"] for item in rows] == ["both"]
+
+
 class TestSearchOpportunitiesInput:
+    def test_custom_field_ids_accept_json_numbers(self) -> None:
+        parsed = OpportunityCustomFieldFilter.model_validate(
+            {"definition_id": 8648257, "values": ["Convert Arb"]}
+        )
+        assert parsed.definition_id == "8648257"
+        assert TypeAdapter(list[CoercedId]).validate_python([8651233]) == ["8651233"]
+
     def test_product_must_be_a_list(self) -> None:
         with pytest.raises(ValidationError):
             _INPUT.validate_python({"product": "NWON"})

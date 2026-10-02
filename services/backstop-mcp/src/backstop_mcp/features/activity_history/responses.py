@@ -99,10 +99,6 @@ __all__ = [
 _MAX_RECIPIENTS = 3
 _FULL_BODY_MAX_CHARS = 10_000_000
 _SHORT_DESCRIPTION_MAX_CHARS = 400
-_DESCRIPTION_ROW_CAP_DISCLAIMER = (
-    "include_description capped row bodies at 50; raising max_rows has no effect while that "
-    "flag is set."
-)
 
 
 def _markdown(html: str | None, *, max_chars: int) -> str | None:
@@ -959,18 +955,16 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
         ceiling: int,
         urls: Mapping[str, str | None],
         aggregates: tuple[AggregateBucketDto, ...] = (),
-        description_row_capped: bool = False,
     ) -> Self:
-        extra = (_DESCRIPTION_ROW_CAP_DISCLAIMER,) if description_row_capped else ()
+        extra: tuple[str, ...] = ()
         if any(name != "total_count" for name in fetch.server_filter_ignored):
-            extra = (*extra, FILTER_IGNORED_DISCLAIMER)
+            extra = (FILTER_IGNORED_DISCLAIMER,)
         coverage = scan_coverage(
             rows_scanned=fetch.rows_received,
             visible_count=fetch.total_count,
             rows_dropped=fetch.rows_dropped,
             ceiling=ceiling,
             ceiling_clamped=fetch.ceiling_clamped,
-            truncated_by_row_cap=fetch.truncated_by_row_cap,
             partial_due_to_error=fetch.partial_due_to_error,
             extra_disclaimers=extra,
         )
