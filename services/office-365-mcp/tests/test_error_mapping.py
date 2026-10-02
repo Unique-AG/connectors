@@ -83,6 +83,10 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "outlook_respond_to_invite",
         "outlook_send_draft",
         "outlook_update_event",
+        "sharepoint_copy_item",
+        "sharepoint_create_folder",
+        "sharepoint_create_text_file",
+        "sharepoint_invite",
         "teams_send_channel_message",
         "teams_send_chat_message",
     }
@@ -341,6 +345,21 @@ class TestEveryToolTranslatesItsOwnRefusal:
         assert str(after.value) == await _advice_for(
             _EVERY_TOOL["teams_search_messages"].permissions
         )
+
+    def test_a_tool_that_words_its_own_403_gets_that_wording_from_the_registry(self) -> None:
+        modules = {tool: import_module(f"office_365_mcp.tools.{tool}") for tool in TOOL_NAMES}
+        declared = {
+            tool: cast("str", module.GRAPH_FORBIDDEN)
+            for tool, module in modules.items()
+            if hasattr(module, "GRAPH_FORBIDDEN")
+        }
+
+        assert declared, "no tool words its own 403, so this check guards nothing"
+        assert declared == {
+            tool: advice.forbidden
+            for tool, advice in _EVERY_ADVICE.items()
+            if advice.forbidden is not None
+        }
 
 
 class TestWhereTheMappingSits:

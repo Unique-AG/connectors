@@ -73,9 +73,11 @@ _ONE_OF_EACH: Mapping[type[GraphFailure], GraphFailure] = {
 }
 
 
-async def _message(failure: GraphFailure, *, not_found: str | None = None) -> str:
+async def _message(
+    failure: GraphFailure, *, not_found: str | None = None, forbidden: str | None = None
+) -> str:
     advice = GraphAdviceMiddleware(
-        {_TOOL: ToolAdvice(permissions=(_PERMISSION,), not_found=not_found)}
+        {_TOOL: ToolAdvice(permissions=(_PERMISSION,), not_found=not_found, forbidden=forbidden)}
     )
     server: FastMCP[None] = FastMCP("reader", middleware=[advice])
 
@@ -285,8 +287,6 @@ class TestRetryAdvice:
         assert "not allowed to know it exists" in message
 
     async def test_a_tool_whose_id_came_from_another_tool_can_say_so_instead(self) -> None:
-        """Only the 404 advice is replaceable: it is the only one whose remedy depends on where
-        the argument came from."""
         message = await _message(
             GraphNotFound("gone", status=404, code=None, request_id="req-7"), not_found="Gone."
         )
@@ -300,6 +300,47 @@ class TestRetryAdvice:
 
         assert "Gone." not in message
         assert _PERMISSION in message
+
+    async def test_a_tool_can_word_its_own_403_and_keep_the_diagnostics(self) -> None:
+        message = await _message(
+            GraphForbidden("nope", status=403, code=None, request_id="req-8"), forbidden="Refused."
+        )
+
+        assert message == "Refused. (HTTP 403, Graph request id req-8)"
+        assert _PERMISSION not in message
+
+    async def test_a_401_still_asks_the_user_to_sign_in_when_the_tool_words_its_403(
+        self,
+    ) -> None:
+        message = await _message(
+            GraphForbidden("nope", status=401, code="InvalidAuthenticationToken", request_id=None),
+            forbidden="Refused.",
+        )
+
+        assert "sign in" in message
+        assert "Refused." not in message
+
+    async def test_the_transcript_switch_still_wins_when_the_tool_words_its_403(self) -> None:
+        message = await _message(
+            GraphForbidden(
+                "nope",
+                status=403,
+                code="Forbidden",
+                request_id=None,
+                inner_code="GraphAccessToTranscriptsDisabled",
+            ),
+            forbidden="Refused.",
+        )
+
+        assert "Teams administrator" in message
+        assert "Refused." not in message
+
+    async def test_the_403_wording_does_not_replace_the_404_advice(self) -> None:
+        message = await _message(
+            GraphNotFound("gone", status=404, code=None, request_id=None), forbidden="Refused."
+        )
+
+        assert "Refused." not in message
 
 
 class TestEveryFailureGetsItsOwnRemedy:

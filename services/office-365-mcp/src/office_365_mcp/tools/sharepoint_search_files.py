@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from datetime import date, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
 import httpx
 from fastmcp import FastMCP
@@ -16,6 +16,7 @@ from msgraph.generated.models.search_hit import SearchHit
 from msgraph.generated.models.search_hits_container import SearchHitsContainer
 from msgraph.generated.models.search_query import SearchQuery
 from msgraph.generated.models.search_request import SearchRequest
+from msgraph.generated.models.sort_property import SortProperty
 from msgraph.generated.search.query.query_post_request_body import QueryPostRequestBody
 from msgraph.generated.search.query.query_post_response import QueryPostResponse
 from msgraph.graph_service_client import GraphServiceClient
@@ -37,20 +38,28 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "budget"}
 
 _SITE_FIELD = "SPSiteURL"
 
+SortBy = Literal["last_modified", "created", "name", "size"]
+
+_SORT_PROPERTIES: Mapping[SortBy, tuple[str, bool]] = {
+    "last_modified": ("LastModifiedTime", True),
+    "created": ("Created", True),
+    "name": ("Filename", False),
+    "size": ("Size", True),
+}
+
 _DESCRIPTION = """\
 This tool searches the files and folders that the signed-in user can see across OneDrive and \
-SharePoint. It sorts matches by the Microsoft search index, not by file name or date. This tool \
-finds a file or a folder by its name or by the words inside it. The tool \
+SharePoint. It finds a file or a folder by its name or by the words inside it. By default, it \
+sorts the matches by relevance. Set `sort_by` to sort them by a file property instead. The tool \
 `sharepoint_browse_folder` lists every item directly inside one named folder, and this includes \
 items that are outside the search index. If the user names a specific folder and wants every \
 item in it, use `sharepoint_browse_folder` instead.
 
 Notes:
-- Every argument other than `query` narrows the result with AND. Each such argument only makes \
-the result smaller.
-- The matches have no sort order. `modified_after` and `modified_before` set the limits of a \
-time window, and they do not rank the matches inside it. You cannot use them to find the newest \
-file.
+- The arguments `file_type`, `path`, `modified_after` and `modified_before` narrow the result \
+with AND. Each one only makes the result smaller.
+- `modified_after` and `modified_before` limit a time window. They do not sort the matches. To \
+find the newest file, set `sort_by` to `last_modified`.
 - Put the earlier date in `modified_after`, and put the later date in `modified_before`. A \
 reversed pair of dates matches nothing.
 """
@@ -127,6 +136,7 @@ async def sharepoint_search_files(
     path: str | None = None,
     modified_after: date | datetime | None = None,
     modified_before: date | datetime | None = None,
+    sort_by: SortBy | None = None,
     offset: int,
     limit: int,
 ) -> FileSearchResults:
@@ -151,6 +161,7 @@ async def sharepoint_search_files(
                 query=SearchQuery(query_string=asked),
                 from_=offset,
                 size=limit,
+                sort_properties=_sort_properties(sort_by),
                 aggregations=[
                     AggregationOption(
                         field=_SITE_FIELD,
@@ -177,6 +188,13 @@ async def sharepoint_search_files(
         sites=_sites(container),
         next_offset=offset + len(hits) if more_to_come and hits else None,
     )
+
+
+def _sort_properties(sort_by: SortBy | None) -> list[SortProperty] | None:
+    if sort_by is None:
+        return None
+    name, is_descending = _SORT_PROPERTIES[sort_by]
+    return [SortProperty(name=name, is_descending=is_descending)]
 
 
 def _sites(container: SearchHitsContainer | None) -> list[SiteMatches]:
@@ -316,6 +334,16 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 )
             ),
         ] = None,
+        sort_by: Annotated[
+            SortBy | None,
+            Field(
+                description=(
+                    "How to sort the matches. `last_modified` puts the newest change first. "
+                    + "`created` puts the newest file first. `name` sorts A to Z by file name. "
+                    + "`size` puts the largest file first. Omit it to sort by relevance."
+                )
+            ),
+        ] = None,
         offset: Annotated[
             int,
             Field(
@@ -342,6 +370,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             path=path,
             modified_after=modified_after,
             modified_before=modified_before,
+            sort_by=sort_by,
             offset=offset,
             limit=limit,
         )
