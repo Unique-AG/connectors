@@ -1,6 +1,7 @@
 import ast
 import logging
 import pathlib
+import re
 from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Mapping
 from importlib import import_module
 from types import ModuleType
@@ -31,6 +32,7 @@ from office_365_mcp.shared.seam import (
     ToolAdvice,
 )
 from office_365_mcp.tools import (
+    PRESETS,
     TOOL_NAMES,
     GraphCallExample,
     Selection,
@@ -39,6 +41,7 @@ from office_365_mcp.tools import (
     onenote_append_to_page,
     onenote_edit_page,
     onenote_rename_page,
+    register_tools,
     resolve,
 )
 
@@ -86,6 +89,12 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "teams_react_to_message",
         "teams_send_channel_message",
         "teams_send_chat_message",
+    }
+)
+
+_CHANNEL_WRITES_IN_PRESETS_THAT_READ_NO_CHANNEL_ON_PURPOSE: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("teams-write", "teams_send_channel_message"),
     }
 )
 
@@ -532,6 +541,27 @@ class TestAToolsOwnWordsForALandedWrite:
         )
 
 
+async def _registered_descriptions(selection: Selection) -> dict[str, str]:
+    server: FastMCP = FastMCP("descriptions-under-test", version="0")
+    async with httpx.AsyncClient() as transport:
+        register_tools(server, transport, selection)
+        return {tool.name: tool.description or "" for tool in await server.list_tools()}
+
+
+def _tools_named_by_the_retry_advice(description: str) -> set[str]:
+    bullets = [
+        line
+        for line in description.partition("Notes:")[2].splitlines()
+        if line.startswith("- ") and "times out" in line
+    ]
+    return {
+        name
+        for name in TOOL_NAMES
+        for bullet in bullets
+        if re.search(rf"\b{re.escape(name)}\b", bullet)
+    }
+
+
 class TestAWriteThatFailsCanAlreadyBeDone:
     @pytest.mark.usefixtures("obo")
     @_A_WRITE_FAILS
@@ -626,6 +656,38 @@ class TestAWriteThatFailsCanAlreadyBeDone:
 
         assert _EVERY_ADVICE[channel].shown_by == ("teams_browse_channel",)
         assert graph_advice(resolve(preset="teams-write", enabled=None))[channel].shown_by == ()
+
+    async def test_a_retry_bullet_that_names_a_tool_is_in_the_registered_descriptions(self) -> None:
+        descriptions = await _registered_descriptions(resolve(preset=None, enabled=TOOL_NAMES))
+
+        assert any(_tools_named_by_the_retry_advice(text) for text in descriptions.values())
+
+    @pytest.mark.parametrize("preset", list(PRESETS))
+    async def test_the_retry_advice_of_a_tool_names_only_tools_that_its_preset_registers(
+        self, preset: str
+    ) -> None:
+        selection = resolve(preset=preset, enabled=None)
+        descriptions = await _registered_descriptions(selection)
+
+        unregistered = {
+            tool: sorted(named)
+            for tool, text in descriptions.items()
+            if (named := _tools_named_by_the_retry_advice(text) - set(selection.tools))
+        }
+
+        assert not unregistered, f"{preset} sends the model to tools it lacks: {unregistered}"
+
+    def test_a_write_shows_its_change_in_every_preset_but_the_ones_that_read_no_channel(
+        self,
+    ) -> None:
+        shown_by_nothing = {
+            (preset, tool)
+            for preset in PRESETS
+            for tool, advice in graph_advice(resolve(preset=preset, enabled=None)).items()
+            if tool in _A_REPEAT_CAN_WRITE_TWICE and not advice.shown_by
+        }
+
+        assert shown_by_nothing == _CHANNEL_WRITES_IN_PRESETS_THAT_READ_NO_CHANNEL_ON_PURPOSE
 
     @pytest.mark.usefixtures("obo", "retry_sleeps")
     @pytest.mark.parametrize("tool", TOOL_NAMES)
