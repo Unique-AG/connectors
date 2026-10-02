@@ -43,7 +43,7 @@ class TestGetPeopleForParty:
                             "id": "p1",
                             "type": "employees",
                             "attributes": {
-                                "name": "Glenn, Phil",
+                                "name": "Ben, West",
                                 "jobTitle": "Tax Director",
                                 "email": "phil@example.com",
                                 "categories": ["Investor", "Decision Maker"],
@@ -84,7 +84,7 @@ class TestGetPeopleForParty:
         row = result.people[0]
         assert row.id == "p1"
         assert row.search_type == "people"
-        assert row.name == "Glenn, Phil"
+        assert row.name == "Ben, West"
         assert row.job_title == "Tax Director"
         assert row.categories == ("Investor", "Decision Maker")
         assert row.is_key_employee is True

@@ -107,7 +107,7 @@ def _stub_supporting_collections(base_url: str) -> None:
 
 def _included() -> list[dict[str, object]]:
     return [
-        resource("42482", "opportunity-stages", name="IDD"),
+        resource("42482", "opportunity-stages", name="Stage B"),
         resource(
             "c1",
             "contacts",
@@ -189,7 +189,7 @@ class TestSearchOpportunities:
         payload = tool_payload(result)
         rows = [object_dict(item) for item in object_list(payload["rows"])]
         assert rows[0]["id"] == "1"
-        assert rows[0]["stage"] == "IDD"
+        assert rows[0]["stage"] == "Stage B"
         investor = object_dict(rows[0]["investor"])
         assert investor["name"] == "Contoso"
         assert investor["country"] == "United States of America"
@@ -215,7 +215,7 @@ class TestSearchOpportunities:
                     representative_id="u1",
                 ),
                 included=[
-                    resource("42482", "opportunity-stages", name="IDD"),
+                    resource("42482", "opportunity-stages", name="Stage B"),
                     {
                         **resource("c1", "contacts", name="Contoso"),
                         "relationships": {
@@ -228,8 +228,8 @@ class TestSearchOpportunities:
                             "representative": {"data": {"id": "u2", "type": "system-users"}}
                         },
                     },
-                    resource("u1", "system-users", userName="jskeggs"),
-                    resource("u2", "system-users", userName="crohrbacker"),
+                    resource("u1", "system-users", userName="jdoe"),
+                    resource("u2", "system-users", userName="asmith"),
                 ],
                 total=3,
             )
@@ -239,7 +239,7 @@ class TestSearchOpportunities:
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_opportunities(
-                    representative="JSkeggs",
+                    representative="Jdoe",
                     fields=["name", "representative"],
                     search_opportunities_query=make_search_opportunities_query(client),
                 ),
@@ -250,8 +250,8 @@ class TestSearchOpportunities:
         assert "filter[representative.name][eq]" not in params
         rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
         assert [row["id"] for row in rows] == ["1", "2"]
-        assert [row["investor_representative"] for row in rows] == ["jskeggs", "jskeggs"]
-        assert rows[0]["representative"] == "jskeggs"
+        assert [row["investor_representative"] for row in rows] == ["jdoe", "jdoe"]
+        assert rows[0]["representative"] == "jdoe"
         assert "representative" not in rows[1]
 
     @pytest.mark.asyncio
@@ -263,7 +263,7 @@ class TestSearchOpportunities:
                 _deal("1", name="open-idd", stage_id="42482", is_open=True),
                 _deal("2", name="closed-idd", stage_id="42482", is_open=False),
                 _deal("3", name="open-other", stage_id="42478", is_open=True),
-                included=_included() + [resource("42478", "opportunity-stages", name="Prospect")],
+                included=_included() + [resource("42478", "opportunity-stages", name="Stage A")],
                 total=3,
             )
         )
@@ -273,7 +273,7 @@ class TestSearchOpportunities:
             result = tool_model(
                 await search_opportunities(
                     is_open=True,
-                    stage="IDD",
+                    stage="Stage B",
                     search_opportunities_query=make_search_opportunities_query(client),
                 ),
                 SearchOpportunitiesResolvedResponse,
@@ -291,7 +291,7 @@ class TestSearchOpportunities:
                 _deal("1", name="a", stage_id="42482"),
                 _deal("2", name="b", stage_id="42482"),
                 _deal("3", name="c", stage_id="42478"),
-                included=_included() + [resource("42478", "opportunity-stages", name="Prospect")],
+                included=_included() + [resource("42478", "opportunity-stages", name="Stage A")],
                 total=3,
             )
         )
@@ -310,7 +310,7 @@ class TestSearchOpportunities:
         payload = tool_payload(result)
         assert object_list(payload["rows"]) == []
         buckets = [object_dict(item) for item in object_list(payload["aggregates"])]
-        assert buckets[0]["label"] == "IDD"
+        assert buckets[0]["label"] == "Stage B"
         assert buckets[0]["count"] == 2
 
     @pytest.mark.asyncio
@@ -475,7 +475,7 @@ def _product_page() -> httpx.Response:
         _deal("off", name="offshore deal", stage_id="42482", product_id="p-off"),
         _deal("none", name="no product", stage_id="42482", product_id=None),
         included=[
-            resource("42482", "opportunity-stages", name="IDD"),
+            resource("42482", "opportunity-stages", name="Stage B"),
             resource("c1", "contacts", name="Contoso"),
             resource(
                 "p-on",
@@ -569,19 +569,19 @@ class TestSearchOpportunitiesCustomFields:
             return_value=_page(
                 _deal(
                     "convert",
-                    name="Cornell - Converts",
+                    name="Contoso - Alpha",
                     stage_id="42478",
                     regularCustomFieldValues=_custom_fields(
-                        ("8648257", "Product", "Convert Arb"),
-                        ("8651233", "Opportunity Type", "NTE"),
+                        ("900001", "Flavor", "Alpha"),
+                        ("900002", "Deal Kind", "Kind A"),
                     ),
                 ),
                 _deal(
                     "named-only",
-                    name="SWIB - Converts",
+                    name="Northwind - Alpha",
                     stage_id="42478",
                     regularCustomFieldValues=_custom_fields(
-                        ("8648257", "Product", "Long Vol"),
+                        ("900001", "Flavor", "Beta"),
                     ),
                 ),
                 _deal(
@@ -589,10 +589,10 @@ class TestSearchOpportunitiesCustomFields:
                     name="Quiet book",
                     stage_id="42478",
                     regularCustomFieldValues=_custom_fields(
-                        ("8648257", "Product", "convert arb"),
+                        ("900001", "Flavor", "alpha"),
                     ),
                 ),
-                included=_included() + [resource("42478", "opportunity-stages", name="Prospect")],
+                included=_included() + [resource("42478", "opportunity-stages", name="Stage A")],
                 total=3,
             )
         )
@@ -603,9 +603,7 @@ class TestSearchOpportunitiesCustomFields:
                 await search_opportunities(
                     is_open=True,
                     custom_fields=[
-                        OpportunityCustomFieldFilter(
-                            definition_id="8648257", values=["Convert Arb"]
-                        )
+                        OpportunityCustomFieldFilter(definition_id="900001", values=["Alpha"])
                     ],
                     fields=["name", "stage", "investor"],
                     search_opportunities_query=make_search_opportunities_query(client),
@@ -620,11 +618,11 @@ class TestSearchOpportunitiesCustomFields:
         assert [item["id"] for item in rows] == ["convert", "other-case"]
         published = [object_dict(item) for item in object_list(rows[0]["custom_field_values"])]
         assert published == [
-            {"definition_id": "8648257", "name": "Product", "value": "Convert Arb"},
-            {"definition_id": "8651233", "name": "Opportunity Type", "value": "NTE"},
+            {"definition_id": "900001", "name": "Flavor", "value": "Alpha"},
+            {"definition_id": "900002", "name": "Deal Kind", "value": "Kind A"},
         ]
         other = [object_dict(item) for item in object_list(rows[1]["custom_field_values"])]
-        assert other == [{"definition_id": "8648257", "name": "Product", "value": "convert arb"}]
+        assert other == [{"definition_id": "900001", "name": "Flavor", "value": "alpha"}]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -634,11 +632,11 @@ class TestSearchOpportunitiesCustomFields:
             return_value=_page(
                 _deal(
                     "convert",
-                    name="Cornell - Converts",
+                    name="Contoso - Alpha",
                     stage_id="42478",
-                    regularCustomFieldValues=_custom_fields(("8648257", "Product", "Convert Arb")),
+                    regularCustomFieldValues=_custom_fields(("900001", "Flavor", "Alpha")),
                 ),
-                included=_included() + [resource("42478", "opportunity-stages", name="Prospect")],
+                included=_included() + [resource("42478", "opportunity-stages", name="Stage A")],
                 total=1,
             )
         )
@@ -676,20 +674,20 @@ class TestSearchOpportunitiesCustomFields:
             return_value=_page(
                 _deal(
                     "both",
-                    name="ADIA 3rd",
+                    name="Fabrikam",
                     stage_id="42482",
                     regularCustomFieldValues=_custom_fields(
-                        ("8648257", "Product", "Convert Arb"),
-                        ("8651233", "Opportunity Type", "NTN"),
+                        ("900001", "Flavor", "Alpha"),
+                        ("900002", "Deal Kind", "Kind B"),
                     ),
                 ),
                 _deal(
                     "product-only",
-                    name="VRS",
+                    name="Contoso Pension",
                     stage_id="42482",
                     regularCustomFieldValues=_custom_fields(
-                        ("8648257", "Product", "Convert Arb"),
-                        ("8651233", "Opportunity Type", "NTE"),
+                        ("900001", "Flavor", "Alpha"),
+                        ("900002", "Deal Kind", "Kind A"),
                     ),
                 ),
                 included=_included(),
@@ -702,10 +700,8 @@ class TestSearchOpportunitiesCustomFields:
             result = tool_model(
                 await search_opportunities(
                     custom_fields=[
-                        OpportunityCustomFieldFilter(
-                            definition_id="8648257", values=["Convert Arb"]
-                        ),
-                        OpportunityCustomFieldFilter(definition_id="8651233", values=["NTN"]),
+                        OpportunityCustomFieldFilter(definition_id="900001", values=["Alpha"]),
+                        OpportunityCustomFieldFilter(definition_id="900002", values=["Kind B"]),
                     ],
                     search_opportunities_query=make_search_opportunities_query(client),
                 ),
@@ -719,10 +715,10 @@ class TestSearchOpportunitiesCustomFields:
 class TestSearchOpportunitiesInput:
     def test_custom_field_ids_accept_json_numbers(self) -> None:
         parsed = OpportunityCustomFieldFilter.model_validate(
-            {"definition_id": 8648257, "values": ["Convert Arb"]}
+            {"definition_id": 900001, "values": ["Alpha"]}
         )
-        assert parsed.definition_id == "8648257"
-        assert TypeAdapter(list[CoercedId]).validate_python([8651233]) == ["8651233"]
+        assert parsed.definition_id == "900001"
+        assert TypeAdapter(list[CoercedId]).validate_python([900002]) == ["900002"]
 
     def test_product_must_be_a_list(self) -> None:
         with pytest.raises(ValidationError):

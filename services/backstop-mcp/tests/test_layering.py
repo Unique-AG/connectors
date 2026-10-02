@@ -1147,10 +1147,12 @@ def _client_tenant_scan_sources() -> list[pathlib.Path]:
     )
     python = (*_SRC.rglob("*.py"), *_TESTS.rglob("*.py"))
     explore = (service / "agent-explore").glob("*.py")
+    docs = (service / "docs").rglob("*")
     return [
         *sorted(source for source in python if source != layering),
         *sorted(path for path in extras if path.is_file()),
         *sorted(source for source in explore if source.is_file()),
+        *sorted(path for path in docs if path.suffix in {".json", ".yaml", ".yml"}),
     ]
 
 

@@ -403,12 +403,12 @@ class TestIncludedResource:
         )
         assert account is not None
 
-        owner = Included([{"id": "o1", "type": "contacts", "attributes": {"name": "Koch"}}]).first(
-            account, "owner", schema=IncludedResource[_Attrs]
-        )
+        owner = Included(
+            [{"id": "o1", "type": "contacts", "attributes": {"name": "Contoso"}}]
+        ).first(account, "owner", schema=IncludedResource[_Attrs])
 
         assert owner is not None
-        assert (owner.id, owner.attributes.name) == ("o1", "Koch")
+        assert (owner.id, owner.attributes.name) == ("o1", "Contoso")
 
     def test_a_blank_id_is_dropped_like_a_missing_one(self) -> None:
         assert (

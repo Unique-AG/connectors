@@ -113,7 +113,7 @@ class TestGetActivityDetailQuery:
         respx.get(f"{BASE_URL}/meeting-or-calls/{activity_id}").mock(
             return_value=httpx.Response(
                 200,
-                json=_specifics_document(activity_id, location="Koch HQ"),
+                json=_specifics_document(activity_id, location="Contoso HQ"),
             )
         )
         respx.get(f"{BASE_URL}/meeting-or-calls/{activity_id}/attendees").mock(
@@ -122,7 +122,7 @@ class TestGetActivityDetailQuery:
 
         result = await _run(client, activity_id)
 
-        assert result.location == "Koch HQ"
+        assert result.location == "Contoso HQ"
         assert result.attendees == []
 
     @pytest.mark.asyncio

@@ -146,7 +146,7 @@ class TestGetOpportunities:
         assert result.total == 1
         assert result.open_count == 1
         assert result.closed_count == 0
-        assert result.opportunities[0].stage == "IDD"
+        assert result.opportunities[0].stage == "Stage B"
         assert result.opportunities[0].previous_stage == "Client Approval"
         assert result.custom_fields_unavailable is False
 

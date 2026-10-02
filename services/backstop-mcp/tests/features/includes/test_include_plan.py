@@ -33,7 +33,7 @@ def _organization(
             "data": {
                 "id": "341208613",
                 "type": "organizations",
-                "attributes": {"name": "Koch Investments Group"},
+                "attributes": {"name": "Contoso Pension"},
                 "relationships": relationships,
             },
             "included": included,
@@ -47,7 +47,7 @@ def _location(resource_id: str, title: str) -> dict[str, object]:
         "id": resource_id,
         "attributes": {
             "locationTitle": title,
-            "address": "18867 North Thompson Peak Parkway, Suite 250",
+            "address": "1 Contoso Way",
             "city": "Scottsdale",
             "cityResolvedName": "Scottsdale",
             "state": "AZ",
@@ -55,7 +55,7 @@ def _location(resource_id: str, title: str) -> dict[str, object]:
             "country": "United States of America",
             "countryResolvedName": "United States of America",
             "postalCode": "85255",
-            "phoneNumber": "(480) 419-3625",
+            "phoneNumber": "(555) 010-0000",
             "isPrimaryLocation": title == "Business",
             "primaryLocation": title == "Business",
             "fax": "",
@@ -157,12 +157,12 @@ class TestProjectToMany:
         assert locations[0].model_dump() == {
             "id": "loc-1",
             "location_title": "Business",
-            "address": "18867 North Thompson Peak Parkway, Suite 250",
+            "address": "1 Contoso Way",
             "city": "Scottsdale",
             "state": "AZ",
             "country": "United States of America",
             "postal_code": "85255",
-            "phone": "(480) 419-3625",
+            "phone": "(555) 010-0000",
             "is_primary": True,
         }
 
@@ -199,7 +199,7 @@ class TestProjectToMany:
                     "attributes": {
                         "sortOrder": 0,
                         "retired": True,
-                        "email": "kent.voss@kochind.com",
+                        "email": "ben@northwind.example",
                     },
                 },
                 {
@@ -208,7 +208,7 @@ class TestProjectToMany:
                     "attributes": {
                         "sortOrder": 0,
                         "retired": False,
-                        "email": "vossk@kochinvests.com",
+                        "email": "ada@contoso.example",
                     },
                 },
             ],
@@ -221,8 +221,8 @@ class TestProjectToMany:
         emails = included.email_addresses
         assert emails is not None
         assert [(email.email, email.retired) for email in emails] == [
-            ("kent.voss@kochind.com", True),
-            ("vossk@kochinvests.com", False),
+            ("ben@northwind.example", True),
+            ("ada@contoso.example", False),
         ]
 
 
@@ -235,12 +235,12 @@ class TestProjectToOne:
                     "type": "people",
                     "id": "p1",
                     "attributes": {
-                        "name": "Voss, Kent",
+                        "name": "Ada, North",
                         "jobTitle": "Managing Director, Research",
-                        "email": "vossk@kochinvests.com",
-                        "phone": "(480) 419-3625",
-                        "companyName": "Koch Investments Group",
-                        "streetAddress": "18867 North Thompson Peak Parkway",
+                        "email": "ada@contoso.example",
+                        "phone": "(555) 010-0000",
+                        "companyName": "Contoso Pension",
+                        "streetAddress": "1 Contoso Way",
                         "regularCustomFieldValues": {"1": "noise"},
                     },
                 }
@@ -255,11 +255,11 @@ class TestProjectToOne:
         assert card is not None
         assert card.model_dump() == {
             "id": "p1",
-            "name": "Voss, Kent",
+            "name": "Ada, North",
             "job_title": "Managing Director, Research",
-            "email": "vossk@kochinvests.com",
-            "phone": "(480) 419-3625",
-            "company_name": "Koch Investments Group",
+            "email": "ada@contoso.example",
+            "phone": "(555) 010-0000",
+            "company_name": "Contoso Pension",
         }
 
     def test_projects_the_representative_to_our_internal_owner(self) -> None:
@@ -310,7 +310,7 @@ class TestAProjectionCarriesTheRecordsOwnId:
     def test_the_primary_contact_carries_the_people_id_get_person_takes(self) -> None:
         document = _organization(
             relationships={"primaryContact": {"data": {"type": "people", "id": "341688185"}}},
-            included=[{"type": "people", "id": "341688185", "attributes": {"name": "Voss, Kent"}}],
+            included=[{"type": "people", "id": "341688185", "attributes": {"name": "Ada, North"}}],
         )
 
         included = include_plan(
@@ -328,7 +328,7 @@ class TestAProjectionCarriesTheRecordsOwnId:
                 {
                     "type": "organizations",
                     "id": "341208613",
-                    "attributes": {"name": "Koch Investments Group"},
+                    "attributes": {"name": "Contoso Pension"},
                 }
             ],
         )
@@ -349,7 +349,7 @@ class TestAProjectionCarriesTheRecordsOwnId:
                 {
                     "type": "people",
                     "id": "p1",
-                    "attributes": {"id": "some-foreign-key", "name": "Voss, Kent"},
+                    "attributes": {"id": "some-foreign-key", "name": "Ada, North"},
                 }
             ],
         )
@@ -450,7 +450,7 @@ class TestASideLoadOfTheWrongTypeIsDropped:
                 {
                     "type": "organizations",
                     "id": "org-1",
-                    "attributes": {"locationTitle": "Koch Investments Group"},
+                    "attributes": {"locationTitle": "Contoso Pension"},
                 },
                 _location("loc-2", "Home"),
             ],
@@ -471,7 +471,7 @@ class TestASideLoadOfTheWrongTypeIsDropped:
     def test_a_to_one_include_whose_only_resource_is_dropped_is_none(self) -> None:
         document = _organization(
             relationships={"representative": {"data": {"type": "people", "id": "p1"}}},
-            included=[{"type": "people", "id": "p1", "attributes": {"name": "Voss, Kent"}}],
+            included=[{"type": "people", "id": "p1", "attributes": {"name": "Ada, North"}}],
         )
 
         included = include_plan(OrganizationIncludesResponse, requested=["representative"]).project(
@@ -522,7 +522,7 @@ class TestAPlanAnswersInTheModelItWasBuiltFrom:
     def test_a_plan_built_from_the_organization_model_answers_in_it(self) -> None:
         document = _organization(
             relationships={"primaryContact": {"data": {"type": "people", "id": "p1"}}},
-            included=[{"type": "people", "id": "p1", "attributes": {"name": "Voss, Kent"}}],
+            included=[{"type": "people", "id": "p1", "attributes": {"name": "Ada, North"}}],
         )
 
         included = include_plan(
@@ -530,7 +530,7 @@ class TestAPlanAnswersInTheModelItWasBuiltFrom:
         ).project(document=document)
 
         assert isinstance(included, OrganizationIncludesResponse)
-        assert included.primary_contact == ContactCardResponse(id="p1", name="Voss, Kent")
+        assert included.primary_contact == ContactCardResponse(id="p1", name="Ada, North")
 
     def test_a_plan_built_from_the_person_model_answers_in_it(self) -> None:
         document = _organization(
@@ -539,7 +539,7 @@ class TestAPlanAnswersInTheModelItWasBuiltFrom:
                 {
                     "type": "organizations",
                     "id": "o1",
-                    "attributes": {"name": "Koch Investments Group"},
+                    "attributes": {"name": "Contoso Pension"},
                 }
             ],
         )
@@ -550,4 +550,4 @@ class TestAPlanAnswersInTheModelItWasBuiltFrom:
 
         assert isinstance(included, PersonIncludesResponse)
         assert included.company is not None
-        assert included.company.name == "Koch Investments Group"
+        assert included.company.name == "Contoso Pension"

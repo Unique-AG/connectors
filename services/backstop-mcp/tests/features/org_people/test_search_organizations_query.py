@@ -55,7 +55,7 @@ class TestSearchOrganizationsQuery:
                     "1",
                     name="Zebra",
                     city="Wichita",
-                    legal_name="Koch Holdings",
+                    legal_name="Contoso Holdings",
                     ria=True,
                     custom_fields=[
                         {"definitionId": "10", "name": "Registered", "value": "Yes"},
@@ -67,7 +67,7 @@ class TestSearchOrganizationsQuery:
                     "2",
                     name="Alpha",
                     city="Wichita",
-                    legal_name="Koch Holdings",
+                    legal_name="Contoso Holdings",
                     ria=True,
                     custom_fields=[
                         {"definitionId": "11", "name": "Registered", "value": "Yes"},
@@ -89,7 +89,7 @@ class TestSearchOrganizationsQuery:
 
         async with tool_client(base_url) as client:
             result = await make_search_organizations_query(client).run(
-                name="Koch",
+                name="Contoso",
                 email="a@example.com",
                 other_id="OID",
                 matching_domain="example.com",
@@ -105,7 +105,7 @@ class TestSearchOrganizationsQuery:
 
         assert isinstance(result, SearchOrganizationsResolvedResponse)
         params = recorded_requests(route.calls)[0].url.params
-        assert params["filter[name][like]"] == "Koch"
+        assert params["filter[name][like]"] == "Contoso"
         assert params["filter[email][eq]"] == "a@example.com"
         assert params["filter[otherId][eq]"] == "OID"
         assert params["filter[matchingDomains][eq]"] == "example.com"
@@ -128,40 +128,40 @@ class TestSearchOrganizationsQuery:
     @respx.mock
     async def test_a_predicate_matches_any_of_its_values(self) -> None:
         base_url = f"{BASE_URL}/org-search-any-of"
-        investor_status = {"definitionId": "261621", "name": "Investor Status"}
-        status = {"definitionId": "8646237", "name": "Status"}
+        investor_status = {"definitionId": "900011", "name": "Tier"}
+        status = {"definitionId": "900014", "name": "Status"}
         respx.get(f"{base_url}/organizations").mock(
             return_value=_page(
                 _org(
                     "1",
-                    name="Dialogue Prospect",
+                    name="Dialogue Tier",
                     custom_fields=[
-                        {**investor_status, "value": "Prospect"},
-                        {**status, "value": "1 - Dialogue"},
+                        {**investor_status, "value": "Tier 1"},
+                        {**status, "value": "Stage A"},
                     ],
                 ),
                 _org(
                     "2",
-                    name="Project Prospect",
+                    name="Project Tier",
                     custom_fields=[
-                        {**investor_status, "value": "Prospect"},
-                        {**status, "value": "2 - Project"},
+                        {**investor_status, "value": "Tier 1"},
+                        {**status, "value": "Stage B"},
                     ],
                 ),
                 _org(
                     "3",
-                    name="Dead Prospect",
+                    name="Dead Tier",
                     custom_fields=[
-                        {**investor_status, "value": "Prospect"},
-                        {**status, "value": "0 - Dead"},
+                        {**investor_status, "value": "Tier 1"},
+                        {**status, "value": "Stage C"},
                     ],
                 ),
                 _org(
                     "4",
                     name="Client",
                     custom_fields=[
-                        {**investor_status, "value": "Current Investor"},
-                        {**status, "value": "4 - Client"},
+                        {**investor_status, "value": "Tier 2"},
+                        {**status, "value": "Stage D"},
                     ],
                 ),
                 total=4,
@@ -171,10 +171,8 @@ class TestSearchOrganizationsQuery:
         async with tool_client(base_url) as client:
             result = await make_search_organizations_query(client).run(
                 custom_fields=(
-                    CustomFieldMatch(definition_id="261621", values=("prospect",)),
-                    CustomFieldMatch(
-                        definition_id="8646237", values=("1 - Dialogue", "2 - Project")
-                    ),
+                    CustomFieldMatch(definition_id="900011", values=("tier 1",)),
+                    CustomFieldMatch(definition_id="900014", values=("Stage A", "Stage B")),
                 ),
                 fields=_FIELDS,
             )
@@ -184,8 +182,8 @@ class TestSearchOrganizationsQuery:
         assert {
             (item.definition_id, item.value) for item in result.rows[1].custom_field_values
         } == {
-            ("261621", "Prospect"),
-            ("8646237", "2 - Project"),
+            ("900011", "Tier 1"),
+            ("900014", "Stage B"),
         }
 
     @pytest.mark.asyncio
@@ -196,25 +194,25 @@ class TestSearchOrganizationsQuery:
             return_value=_page(
                 _org(
                     "1",
-                    name="Helsinki Pension",
+                    name="Contoso Pension",
                     custom_fields=[
-                        {"definitionId": "8646227", "name": "Grade", "value": "Focus"},
+                        {"definitionId": "900013", "name": "Relationship", "value": "Tier 1"},
                         {
-                            "definitionId": "261623",
-                            "name": "Investor Type",
-                            "value": "Public Pension",
+                            "definitionId": "900012",
+                            "name": "Kind",
+                            "value": "Kind A",
                         },
                         {"definitionId": "99", "name": "Regions", "value": ["EMEA", "APAC"]},
                     ],
                 ),
-                _org("2", name="Helsinki Family Office", custom_fields=[]),
+                _org("2", name="Northwind Family Office", custom_fields=[]),
                 total=2,
             )
         )
 
         async with tool_client(base_url) as client:
             result = await make_search_organizations_query(client).run(
-                name="Helsinki",
+                name="Contoso",
                 fields=_FIELDS,
             )
 
@@ -224,8 +222,8 @@ class TestSearchOrganizationsQuery:
         first = result.rows[0].custom_field_values
         assert first is not None
         assert [(item.definition_id, item.name, item.value) for item in first] == [
-            ("8646227", "Grade", "Focus"),
-            ("261623", "Investor Type", "Public Pension"),
+            ("900013", "Relationship", "Tier 1"),
+            ("900012", "Kind", "Kind A"),
             ("99", "Regions", "EMEA; APAC"),
         ]
         assert result.rows[1].custom_field_values is None
@@ -238,8 +236,10 @@ class TestSearchOrganizationsQuery:
             return_value=_page(
                 _org(
                     "1",
-                    name="Helsinki Pension",
-                    custom_fields=[{"definitionId": "8646227", "name": "Grade", "value": "Focus"}],
+                    name="Contoso Pension",
+                    custom_fields=[
+                        {"definitionId": "900013", "name": "Relationship", "value": "Tier 1"}
+                    ],
                 ),
                 total=1,
             )
@@ -247,7 +247,7 @@ class TestSearchOrganizationsQuery:
 
         async with tool_client(base_url) as client:
             result = await make_search_organizations_query(client).run(
-                name="Helsinki",
+                name="Contoso",
                 exclude_custom_fields=True,
                 fields=_FIELDS,
             )
@@ -283,7 +283,7 @@ class TestSearchOrganizationsQuery:
         route = respx.get(f"{base_url}/organizations").mock(
             return_value=_page(
                 *(
-                    _org(str(index), name=f"Koch {index:03}", city="Wichita")
+                    _org(str(index), name=f"Contoso {index:03}", city="Wichita")
                     for index in range(150)
                 ),
                 total=150,
@@ -292,7 +292,7 @@ class TestSearchOrganizationsQuery:
 
         async with tool_client(base_url) as client:
             result = await make_search_organizations_query(client).run(
-                name="Koch",
+                name="Contoso",
                 fields=_FIELDS,
             )
 

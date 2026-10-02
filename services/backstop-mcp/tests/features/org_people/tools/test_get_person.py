@@ -65,12 +65,12 @@ CONTACT_EMAILS: list[dict[str, object]] = [
     {
         "type": "contact-emails",
         "id": "e2",
-        "attributes": {"sortOrder": 0, "retired": True, "email": "kent.voss@kochind.com"},
+        "attributes": {"sortOrder": 0, "retired": True, "email": "ben@northwind.example"},
     },
     {
         "type": "contact-emails",
         "id": "e3",
-        "attributes": {"sortOrder": 0, "retired": False, "email": "vossk@kochinvests.com"},
+        "attributes": {"sortOrder": 0, "retired": False, "email": "ada@contoso.example"},
     },
 ]
 
@@ -473,8 +473,8 @@ class TestGetPersonIncludes:
         assert included.email_addresses is not None
         assert [(email.email, email.retired) for email in included.email_addresses] == [
             ("bbetten@macfound.org", True),
-            ("kent.voss@kochind.com", True),
-            ("vossk@kochinvests.com", False),
+            ("ben@northwind.example", True),
+            ("ada@contoso.example", False),
         ]
 
     @pytest.mark.asyncio
@@ -499,9 +499,9 @@ class TestGetPersonIncludes:
                             "type": "organizations",
                             "id": "o1",
                             "attributes": {
-                                "name": "Koch Investments Group",
-                                "legalName": "Koch Investments Group, LLC",
-                                "website": "www.kochinvests.com",
+                                "name": "Contoso Pension",
+                                "legalName": "Contoso Pension, LLC",
+                                "website": "www.contoso.example",
                                 "city": "Scottsdale",
                                 "state": "AZ",
                                 "country": "United States of America",
@@ -532,7 +532,7 @@ class TestGetPersonIncludes:
         included = result.included
         assert included is not None
         assert included.company is not None
-        assert included.company.name == "Koch Investments Group"
+        assert included.company.name == "Contoso Pension"
         # The employment index reads the same document; asking for includes does not disturb it.
         assert [link.status for link in result.employments] == ["former"]
         assert result.employments[0].organization_id == "o1"
@@ -588,12 +588,12 @@ class TestGetPersonIncludes:
                             "id": "loc-1",
                             "attributes": {
                                 "locationTitle": "Business",
-                                "address": "18867 North Thompson Peak Parkway, Suite 250",
+                                "address": "1 Contoso Way",
                                 "city": "Scottsdale",
                                 "state": "AZ",
                                 "country": "United States of America",
                                 "postalCode": "85255",
-                                "phoneNumber": "(480) 419-3625",
+                                "phoneNumber": "(555) 010-0000",
                                 "isPrimaryLocation": True,
                             },
                         },

@@ -75,7 +75,7 @@ class TestPeopleForOrganizationQuery:
                 (
                     "p1",
                     {
-                        "name": "Glenn, Phil",
+                        "name": "Ben, West",
                         "jobTitle": "Tax Director",
                         "email": "phil@example.com",
                         "categories": ["Investor", "Decision Maker"],
@@ -99,7 +99,7 @@ class TestPeopleForOrganizationQuery:
 
         assert [row.employment.person_id for row in listing.people] == ["p1"]
         assert listing.people[0].employment.status == "current"
-        assert listing.people[0].name == "Glenn, Phil"
+        assert listing.people[0].name == "Ben, West"
         assert listing.people[0].job_title == "Tax Director"
         assert listing.people[0].categories == ("Investor", "Decision Maker")
         assert listing.people[0].is_key_employee is True
@@ -123,7 +123,7 @@ class TestPeopleForOrganizationQuery:
     ) -> None:
         respx.get(_EMPLOYEES_URL).mock(
             return_value=_employees_page(
-                ("p1", {"name": "Glenn, Phil"}),
+                ("p1", {"name": "Ben, West"}),
                 included=[
                     _person_link("er-current", person_id="p1", type_id=EMPLOYEE_TYPE),
                     *relationship_types(EMPLOYEE_TYPE),
@@ -148,7 +148,7 @@ class TestPeopleForOrganizationQuery:
         caplog.set_level(logging.WARNING)
         respx.get(_EMPLOYEES_URL).mock(
             return_value=_employees_page(
-                ("p1", {"name": "Glenn, Phil"}),
+                ("p1", {"name": "Ben, West"}),
                 included=[
                     _person_link("er-current", person_id="p1", type_id=EMPLOYEE_TYPE),
                     {"type": "entity-relationships", "attributes": {}},
