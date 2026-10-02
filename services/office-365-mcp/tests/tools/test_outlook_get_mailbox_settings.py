@@ -896,6 +896,14 @@ class TestWhatItPublishes:
         assert "outlook_move_mail" in text
         assert "`folder_ref`" in text
 
+    def test_the_time_zone_field_claims_only_what_microsoft_365_reports(
+        self, published: Tool
+    ) -> None:
+        text = _described(published)["answer.time_zone"] or ""
+
+        assert "as Microsoft 365 reports it" in text
+        assert "administrator" not in text
+
     def test_a_rule_predicate_that_is_not_set_is_not_a_required_key(self, published: Tool) -> None:
         answer = cast("Mapping[str, object]", published.output_schema)
         definitions = cast("Mapping[str, Mapping[str, object]]", answer["$defs"])

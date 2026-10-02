@@ -25,8 +25,8 @@ given name, surname, email, sign-in name, job title, office location, telephone 
 preferred language. This tool applies when a request depends on who "I", "me", or "my" refers to.
 
 Notes:
-- This tool describes only the caller. Resolve someone else's address with a directory or \
-contacts lookup instead.
+- This tool describes only the caller. If this deployment exposes outlook_find_recipient, that \
+tool finds the address of somebody else.
 """
 
 

@@ -205,9 +205,9 @@ class MailboxSettingsReport(BaseModel):
     )
     time_zone: str | None = Field(
         description=(
-            "The default time zone of the mailbox, in the spelling that the administrator chose. "
-            + "It is a Windows name such as `Pacific Standard Time`, or an IANA name. Null when "
-            + "`include` did not ask for it, or when Graph reports none."
+            "The default time zone of the mailbox, as Microsoft 365 reports it. It is a Windows "
+            + "name such as `Pacific Standard Time`, or an IANA name. Null when `include` did not "
+            + "ask for it, or when Graph reports none."
         )
     )
     working_hours: WorkingHoursSummary | None = Field(

@@ -3,6 +3,7 @@
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
@@ -117,6 +118,24 @@ class TestTheProfileItReturns:
         _ = await get_me.get_signed_in_user(client)
 
         assert route.calls.last.request.headers["authorization"] == f"Bearer {CALLER_TOKEN}"
+
+
+class TestWhatItPublishes:
+    async def test_the_description_names_the_recipient_lookup_behind_the_preset_guard(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        get_me.register(mcp, transport)
+
+        tool = await mcp.get_tool(get_me.TOOL_NAME)
+
+        assert tool is not None, "register left the tool off the server"
+        description = tool.description or ""
+        assert (
+            "If this deployment exposes outlook_find_recipient, that tool finds the address of "
+            "somebody else"
+        ) in description
+        assert "directory or contacts lookup" not in description
 
 
 class TestGraphFailures:
