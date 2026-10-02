@@ -47,7 +47,7 @@ type GetProductInvestorsResponse = (
 
 _MAX_PRODUCTS = 10
 
-# Enough for an onshore/offshore pair of a typical fund. Past this the answer is slow enough that
+# Enough for a typical fund's vehicles. Past this the answer is slow enough that
 # the user should narrow the scope rather than wait.
 _MAX_VALUED_ACCOUNTS = 50
 
@@ -71,9 +71,9 @@ async def get_product_investors(
             description=(
                 "One to ten products: ids echoed from a prior response, short names (`NWON`), "
                 "or names. An id, exact short name, or exact name is that one vehicle. A partial "
-                "name returns every vehicle whose name contains it, up to 6 (e.g. onshore and "
-                "offshore feeders) — `['Northwind Dispersion']` returns both; more matches ask "
-                "the user. Pass several (`['NWON', 'NWOF']`) when the user names specific ones. "
+                "name returns every vehicle whose name contains it, up to 6 (several vehicles "
+                "sharing a name). More matches ask the user. Pass several (`['NWON', 'NWOF']`) "
+                "when the user names specific ones. "
                 "Never invent an id."
             ),
         ),
@@ -122,7 +122,7 @@ async def get_product_investors(
 ) -> GetProductInvestorsResponse | InputRequiredResult:
     """The accounts in one or more products, and who owns them.
 
-    A partial fund name returns every vehicle whose name contains it (onshore and offshore); an
+    A partial fund name returns every vehicle whose name contains it; an
     id, exact short name, or exact name is one vehicle. No figures by default.
 
     Sizing ("list investors by size", "biggest holders"): first call without figures, tell
@@ -149,14 +149,8 @@ async def get_product_investors(
     account by `latest_value.amount` (`include_latest_value=true` on that call). An account
     without that field in `custom_field_values` has no value — group it as blank.
 
-    A fund named without a feeder, by name or by the user's abbreviation, is every feeder in
-    this one call. Find them with get_product and pass them together. Do not ask onshore or
-    offshore before continuing. Who a colleague updates on a fund is meetings, not balances:
-    search_activities for that fund's meetings they attend, grouped by investor. Balance can
-    order that list; it is not the answer.
-
     Call like: {"products": ["NGUP"], "include_latest_value": false}
-    Both feeders: {"products": ["NWON", "NWOF"]}
+    Several vehicles: {"products": ["NWON", "NWOF"]}
     Geography: {"products": ["NWON", "NWOF"], "include_latest_value": true}, then group on
     the location field you found in `custom_field_values`
     """

@@ -1,6 +1,6 @@
 """`get_product`: one product or the catalog, with custom-field values.
 
-Strategy, Domicile, Fee Structure and the rest live here — not on get_product_investors
+Product custom fields live here — not on get_product_investors
 (owners only) and not on list_custom_fields (definitions only).
 """
 
@@ -107,7 +107,8 @@ async def get_product(
         Sequence[str],
         Field(
             description=(
-                "Custom-field names whose values to keep, e.g. Strategy. Case-insensitive. "
+                'Custom-field names whose values to keep, e.g. "<name from list_custom_fields>". '
+                "Case-insensitive. "
                 "Omit to keep every name."
             ),
         ),
@@ -117,13 +118,12 @@ async def get_product(
     get_product_query: GetProductQuery = Depends(get_product_query_factory),
     build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> GetProductResponse | InputRequiredResult:
-    """Product identity and custom-field values — Strategy, Domicile, Fee Structure, and the rest.
+    """Product identity and custom-field values.
 
     Pass a trusted `product_id`, or `search` / `product` (short name or display name) for one
     product; `search` and `product` are the same lookup. Omit all three to walk the whole
-    catalog in one tool call. That is how you answer
-    "which of our products are Convertible Arbitrage": walk with
-    `custom_field_names=["Strategy"]` and read the values. Do not iterate
+    catalog in one tool call. To see which products carry a custom-field value, walk with
+    `custom_field_names` set to that field's name and read the values. Do not iterate
     `get_product_investors` or `get_time_series` for this —
     those tools do not publish product custom fields.
     """

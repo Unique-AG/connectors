@@ -46,10 +46,10 @@ class TestSearchOrganizations:
         assert city.description is not None
         assert "Applied after the server-side read" in city.description
 
-    def test_says_prospects_are_organizations_not_opportunity_stages(self) -> None:
+    def test_says_a_status_word_is_not_an_opportunity_stage(self) -> None:
         doc = " ".join((search_organizations.__doc__ or "").split())
-        assert "Prospects" in doc
-        assert "not by opportunity stage" in doc
+        assert "list_custom_fields" in doc
+        assert "not an opportunity stage" in doc
         assert "custom_field_values" in doc
         annotations = cast("dict[str, object]", search_organizations.__annotations__)
         country = next(

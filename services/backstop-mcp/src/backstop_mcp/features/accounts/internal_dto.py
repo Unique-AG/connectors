@@ -496,7 +496,7 @@ class ProductCatalogFetchDto(BaseModel):
     """The product catalog walk, and whether it read all of it.
 
     `scan_truncated` is the walk's scan ceiling firing, which turns "the catalog" into "the
-    first N products" — the difference between "no product has this Strategy" and "none of the
+    first N products" — the difference between "no product has this field" and "none of the
     ones I looked at did".
     """
 

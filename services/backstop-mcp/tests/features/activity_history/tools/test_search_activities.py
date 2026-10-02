@@ -404,8 +404,8 @@ class TestSearchActivities:
             return_value=_page(
                 _row(
                     1,
-                    shortDescription="Ross Kasarda, Greg Hines&nbsp;",
-                    formattedDescription="<p>Discussed <b>dispersion</b>.</p>",
+                    shortDescription="Ada North, Ben West&nbsp;",
+                    formattedDescription="<p>Discussed <b>alpha</b>.</p>",
                 ),
                 total=1,
             )
@@ -427,7 +427,7 @@ class TestSearchActivities:
         row = object_dict(object_list(tool_payload(result)["rows"])[0])
         assert "&nbsp;" not in str(row.get("short_description", ""))
         assert "<p>" not in str(row.get("description", ""))
-        assert "dispersion" in str(row.get("description", ""))
+        assert "alpha" in str(row.get("description", ""))
 
     @pytest.mark.asyncio
     @respx.mock

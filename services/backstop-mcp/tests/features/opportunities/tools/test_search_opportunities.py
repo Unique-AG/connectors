@@ -136,8 +136,8 @@ class TestSearchOpportunities:
         assert "get_opportunities" in doc
         assert "get_opportunities_by_ids" in doc
         assert "custom_fields" in doc
-        assert "Convert Arb" in doc
-        assert "Investor Status" in doc
+        assert "list_custom_fields" in doc
+        assert "exact option" in doc
         annotations = cast("dict[str, object]", search_opportunities.__annotations__)
         field_info = next(
             item
@@ -471,8 +471,8 @@ class TestSearchOpportunities:
 
 def _product_page() -> httpx.Response:
     return _page(
-        _deal("on", name="onshore deal", stage_id="42482", product_id="p-on"),
-        _deal("off", name="offshore deal", stage_id="42482", product_id="p-off"),
+        _deal("on", name="north vehicle", stage_id="42482", product_id="p-on"),
+        _deal("off", name="second vehicle", stage_id="42482", product_id="p-off"),
         _deal("none", name="no product", stage_id="42482", product_id=None),
         included=[
             resource("42482", "opportunity-stages", name="Stage B"),
@@ -480,13 +480,13 @@ def _product_page() -> httpx.Response:
             resource(
                 "p-on",
                 "products",
-                name="Northwind Dispersion Fund (Onshore)",
+                name="Northwind Harbor Fund (Alpha)",
                 configuration={"productShortName": "NWON"},
             ),
             resource(
                 "p-off",
                 "products",
-                name="Northwind Dispersion Fund (Offshore)",
+                name="Northwind Harbor Fund (Beta)",
                 configuration={"productShortName": "NWOF"},
             ),
         ],
@@ -503,8 +503,8 @@ class TestSearchOpportunitiesProductFilter:
             pytest.param(["NWON"], ["on"], id="short-name-exact"),
             pytest.param([" nwon "], ["on"], id="short-name-case-and-space-insensitive"),
             pytest.param(["NWO"], [], id="short-name-is-not-a-prefix-match"),
-            pytest.param(["dispersion"], ["on", "off"], id="display-name-substring"),
-            pytest.param(["offshore"], ["off"], id="display-name-substring-narrows"),
+            pytest.param(["harbor"], ["on", "off"], id="display-name-substring"),
+            pytest.param(["beta"], ["off"], id="display-name-substring-narrows"),
             pytest.param(["NWON", "NWOF"], ["on", "off"], id="several-products-are-or"),
             pytest.param(["unrelated"], [], id="no-match"),
         ],

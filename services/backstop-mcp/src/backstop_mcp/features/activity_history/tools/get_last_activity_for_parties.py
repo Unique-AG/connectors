@@ -115,8 +115,8 @@ async def get_last_activity_for_parties(
     Use for "which deals / investors have had no activity in 30, 60, 90 days": take the
     open deals from search_opportunities with the `investor` field, pass each distinct
     `investor.id` with `investor.search_type` here, then bucket by
-    `days_since_last_activity` (`none_in_window` is older than the whole window). Rank
-    within a bucket by the deal's amount. One request per party, so the answer covers
+    `days_since_last_activity` (`none_in_window` is older than the whole window). One
+    request per party, so the answer covers
     every party — never infer inactivity from a party's absence in a firm-wide
     search_activities sample, which caps and saturates.
 

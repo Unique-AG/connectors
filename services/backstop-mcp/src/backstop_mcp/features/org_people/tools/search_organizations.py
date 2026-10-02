@@ -62,7 +62,7 @@ class OrganizationCustomFieldFilter(BaseModel):
         description=(
             "Stored values that satisfy this predicate, OR. Each is compared whole and "
             "case-insensitively against the select options list_custom_fields returns — "
-            "pass every option that counts (e.g. every status that means 'in dialogue'), "
+            "pass every option that counts, "
             "not a substring. A list value matches when any element equals one of these. "
             "A missing value does not match — this filter cannot mean 'the field is empty'."
         ),
@@ -161,7 +161,7 @@ async def search_organizations(
         Field(
             description=(
                 "Every row's custom fields come back as `custom_field_values` by default — "
-                "the fields a table is grouped or labelled by (Grade, Investor Type). Leave "
+                "the fields a table is grouped or labelled by. Leave "
                 "this false. Set it true only to retry a call that timed out, to see whether "
                 "reading the custom fields is what made it slow. Refused together with "
                 "`custom_fields`, which needs them."
@@ -194,18 +194,14 @@ async def search_organizations(
     Custom-field ids come from list_custom_fields. Match by definition id, not the
     label. A missing custom-field value is not a match.
 
-    Before choosing between this tool and search_opportunities, call list_custom_fields for
-    both organizations and opportunities, and search the collection where the user's words
-    exist. "Prospects", "current investors", and "former investors" are organizations,
-    found by an organization status custom field (e.g. an "Investor Status" select) — not
-    by opportunity stage, and not by search_opportunities. Prospect, Grade, and Investor
-    Type are organization fields. Filter on the option the user named. A qualifier such as
-    "active" usually maps to a second organization status field (dialogue or relationship
-    stage): pass every option that counts as active in `values`, and state which options
-    you applied. To group rows by Grade, Investor Type, or any other field, read it from each
-    row's `custom_field_values`. A field missing from
-    list_custom_fields for organizations (often Strategy) cannot come from the company;
-    say so rather than filling the column. `country` is the stored full name.
+    Business terms such as strategy, status, tier, investor type, or region are usually
+    custom fields. Call list_custom_fields for organizations and opportunities, pick the
+    field whose name or options match the user's words, then filter or group by its
+    definition id and the exact option. If no field or several fields could be it, ask
+    which one. Say which field and options you used. A status-like word is not an
+    opportunity stage. To group or label rows, read the field from each row's
+    `custom_field_values`. If no field on organizations matches, say so rather than
+    filling the column. `country` is the stored full name.
 
     Every row carries its custom fields as `custom_field_values`. If a call times out,
     retry once with `exclude_custom_fields=true` to see whether reading them is the cause;
@@ -216,7 +212,7 @@ async def search_organizations(
 
     Call like: {"country": "Finland",
     "custom_fields": [{"definition_id": "<definition id from list_custom_fields>",
-    "values": ["Prospect"]}],
+    "values": ["<option from list_custom_fields>"]}],
     "fields": ["name", "city", "country"]}
     """
     if custom_fields and exclude_custom_fields:
