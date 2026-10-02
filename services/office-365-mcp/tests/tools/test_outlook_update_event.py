@@ -189,7 +189,6 @@ class _Options(TypedDict, total=False):
     reminder_minutes_before_start: int
     hide_attendees: bool
     response_requested: bool
-    allow_new_time_proposals: bool
     body_html: str
     online_meeting: bool
 
@@ -694,7 +693,6 @@ class TestWhatItRefuses:
             pytest.param(_Options(sensitivity="private"), id="sensitivity"),
             pytest.param(_Options(hide_attendees=True), id="hide-attendees"),
             pytest.param(_Options(response_requested=False), id="response-requested"),
-            pytest.param(_Options(allow_new_time_proposals=False), id="new-time-proposals"),
             pytest.param(_Options(body_html=_AGENDA), id="body"),
             pytest.param(_Options(online_meeting=True), id="online-meeting"),
         ],
@@ -918,7 +916,6 @@ class TestWhatItAnswers:
                 "reminderMinutesBeforeStart": 30,
                 "hideAttendees": True,
                 "responseRequested": False,
-                "allowNewTimeProposals": False,
             },
         )
 
@@ -926,11 +923,16 @@ class TestWhatItAnswers:
 
         assert (answer.show_as, answer.sensitivity) == ("oof", "private")
         assert (answer.is_reminder_on, answer.reminder_minutes_before_start) == (False, 30)
-        assert (
-            answer.hide_attendees,
-            answer.response_requested,
-            answer.allow_new_time_proposals,
-        ) == (True, False, False)
+        assert (answer.hide_attendees, answer.response_requested) == (True, False)
+
+    async def test_the_answer_names_no_new_time_proposals_even_when_the_response_has_them(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph, _event() | {"allowNewTimeProposals": False})
+
+        answer = await _update(client, subject="Renamed")
+
+        assert "allow_new_time_proposals" not in answer.model_dump()
 
     async def test_options_the_response_leaves_out_are_reported_as_unknown(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -943,7 +945,6 @@ class TestWhatItAnswers:
         assert answer.reminder_minutes_before_start is None
         assert answer.hide_attendees is None
         assert answer.response_requested is None
-        assert answer.allow_new_time_proposals is None
 
 
 class TestTheOptionsItSendsToGraph:
@@ -976,12 +977,6 @@ class TestTheOptionsItSendsToGraph:
                 _Options(response_requested=True), "responseRequested", True, id="response"
             ),
             pytest.param(
-                _Options(allow_new_time_proposals=False),
-                "allowNewTimeProposals",
-                False,
-                id="no-proposals",
-            ),
-            pytest.param(
                 _Options(body_html=_AGENDA),
                 "body",
                 {"content": _AGENDA, "contentType": "html"},
@@ -1002,6 +997,34 @@ class TestTheOptionsItSendsToGraph:
         _ = await _update(client, **options)
 
         assert _sent(patch) == {key: value, "@odata.type": "#microsoft.graph.event"}
+
+    async def test_no_set_of_options_puts_new_time_proposals_in_the_body(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget"))
+        _ = _calendar(graph)
+        patch = _updates(graph)
+
+        _ = await _update(
+            client,
+            subject="Renamed",
+            location="Room 9",
+            show_as="free",
+            add_categories=["Blue category"],
+            remove_categories=["Budget"],
+            importance="high",
+            sensitivity="private",
+            is_reminder_on=True,
+            reminder_minutes_before_start=15,
+            hide_attendees=True,
+            response_requested=False,
+            body_html=_AGENDA,
+            online_meeting=True,
+        )
+
+        sent = _sent(patch)
+        assert {"hideAttendees", "responseRequested", "isReminderOn", "body"} <= set(sent)
+        assert "allowNewTimeProposals" not in sent
 
     async def test_the_read_before_the_change_asks_for_the_categories(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1184,16 +1207,6 @@ class TestWhatTheQuestionSaysAboutTheOptions:
                 id="no-response",
             ),
             pytest.param(
-                _Options(allow_new_time_proposals=True),
-                "let the attendees propose a new time",
-                id="proposals",
-            ),
-            pytest.param(
-                _Options(allow_new_time_proposals=False),
-                "let no attendee propose a new time",
-                id="no-proposals",
-            ),
-            pytest.param(
                 _Options(body_html=_AGENDA),
                 "replace the body with a body of 22 characters that starts 'Agenda: pricing'",
                 id="body",
@@ -1276,7 +1289,6 @@ class TestTheIdAnAnswerIsBoundTo:
             pytest.param(_Options(reminder_minutes_before_start=15), id="reminder-minutes"),
             pytest.param(_Options(hide_attendees=True), id="hide-attendees"),
             pytest.param(_Options(response_requested=False), id="response-requested"),
-            pytest.param(_Options(allow_new_time_proposals=False), id="new-time-proposals"),
             pytest.param(_Options(body_html=_AGENDA), id="body"),
         ],
     )
@@ -1361,6 +1373,13 @@ async def _parameters(transport: httpx.AsyncClient) -> Mapping[str, object]:
 class TestHowItDeclaresItself:
     async def test_only_the_handle_is_required(self, transport: httpx.AsyncClient) -> None:
         assert (await _parameters(transport))["required"] == ["uri"]
+
+    async def test_it_takes_no_new_time_proposals_argument(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters = await _parameters(transport)
+
+        assert "allow_new_time_proposals" not in _object(parameters["properties"])
 
     async def test_the_description_is_a_lead_and_a_few_notes_of_the_house_length(
         self, transport: httpx.AsyncClient
@@ -1507,7 +1526,6 @@ class TestTheNothingToChangeRefusal:
             "reminder_minutes_before_start",
             "hide_attendees",
             "response_requested",
-            "allow_new_time_proposals",
             "body_html",
             "online_meeting",
         ],
@@ -1520,6 +1538,17 @@ class TestTheNothingToChangeRefusal:
 
         assert f"`{argument}`" in str(refused.value)
         assert "NOTHING WAS CHANGED" in str(refused.value)
+        assert len(graph.calls) == 0
+
+    async def test_it_names_no_new_time_proposals_and_ends_the_list_at_the_last_argument(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(client)
+
+        message = str(refused.value)
+        assert "allow_new_time_proposals" not in message
+        assert "`hide_attendees`, and `response_requested`. Pass at least one of them." in message
         assert len(graph.calls) == 0
 
     async def test_empty_category_lists_are_no_change(

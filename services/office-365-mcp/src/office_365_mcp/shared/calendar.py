@@ -183,8 +183,6 @@ ALLOW_NEW_TIME_PROPOSALS_FIELD = (
     + " Null sends nothing, and Microsoft then uses true, so attendees can propose a new time."
 )
 
-ALLOW_NEW_TIME_PROPOSALS_CHANGE_FIELD = _ALLOW_NEW_TIME_PROPOSALS + _KEPT_WHEN_NULL
-
 RECURRENCE_FIELD = (
     "Set this parameter to make the event repeat as a series. Null creates one event that does "
     + "not repeat. The series starts on the date of `starts_at` and uses `time_zone`. Give a "
@@ -1206,7 +1204,6 @@ class EventPatch:
     reminder_minutes_before_start: int | None = None
     hide_attendees: bool | None = None
     response_requested: bool | None = None
-    allow_new_time_proposals: bool | None = None
     body_html: str | None = None
     online_meeting: bool = False
 
@@ -1242,11 +1239,6 @@ def patch_changes(patch: EventPatch) -> list[str]:
                 patch.response_requested,
                 yes="ask the attendees for a response",
                 no="ask the attendees for no response",
-            ),
-            _either(
-                patch.allow_new_time_proposals,
-                yes="let the attendees propose a new time",
-                no="let no attendee propose a new time",
             ),
             (
                 ""
@@ -1312,7 +1304,6 @@ def event_patch_body(patch: EventPatch) -> Event:
         reminder_minutes_before_start=patch.reminder_minutes_before_start,
         hide_attendees=patch.hide_attendees,
         response_requested=patch.response_requested,
-        allow_new_time_proposals=patch.allow_new_time_proposals,
         body=(
             None
             if patch.body_html is None

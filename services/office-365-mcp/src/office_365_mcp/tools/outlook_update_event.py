@@ -20,7 +20,6 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import (
-    ALLOW_NEW_TIME_PROPOSALS_CHANGE_FIELD,
     HIDE_ATTENDEES_CHANGE_FIELD,
     IMPORTANCE_CHANGE_FIELD,
     IS_REMINDER_ON_CHANGE_FIELD,
@@ -28,7 +27,6 @@ from office_365_mcp.shared.calendar import (
     RESPONSE_REQUESTED_CHANGE_FIELD,
     SENSITIVITY_CHANGE_FIELD,
     SHOW_AS_CHANGE_FIELD,
-    STORED_ALLOW_NEW_TIME_PROPOSALS_FIELD,
     STORED_HIDE_ATTENDEES_FIELD,
     STORED_IS_REMINDER_ON_FIELD,
     STORED_REMINDER_MINUTES_FIELD,
@@ -138,8 +136,8 @@ _NOTHING_TO_CHANGE = (
     + "arguments that change the event are `subject`, the time arguments, `location`, "
     + "`body_html`, `online_meeting`, the two attendee lists, `show_as`, `add_categories`, and "
     + "`remove_categories`. The other arguments that change it are `importance`, `sensitivity`, "
-    + "`is_reminder_on`, `reminder_minutes_before_start`, `hide_attendees`, `response_requested`, "
-    + "and `allow_new_time_proposals`. Pass at least one of them. If you are not sure what the "
+    + "`is_reminder_on`, `reminder_minutes_before_start`, `hide_attendees`, and "
+    + "`response_requested`. Pass at least one of them. If you are not sure what the "
     + "event currently holds, call outlook_read_event first."
 )
 
@@ -274,7 +272,6 @@ class UpdatedEvent(EventSummary):
     reminder_minutes_before_start: int | None = Field(description=STORED_REMINDER_MINUTES_FIELD)
     hide_attendees: bool | None = Field(description=STORED_HIDE_ATTENDEES_FIELD)
     response_requested: bool | None = Field(description=STORED_RESPONSE_REQUESTED_FIELD)
-    allow_new_time_proposals: bool | None = Field(description=STORED_ALLOW_NEW_TIME_PROPOSALS_FIELD)
 
 
 async def update_event(
@@ -297,7 +294,6 @@ async def update_event(
     reminder_minutes_before_start: int | None = None,
     hide_attendees: bool | None = None,
     response_requested: bool | None = None,
-    allow_new_time_proposals: bool | None = None,
     body_html: str | None = None,
     online_meeting: bool = False,
     confirm: Confirm,
@@ -326,7 +322,6 @@ async def update_event(
                 reminder_minutes_before_start,
                 hide_attendees,
                 response_requested,
-                allow_new_time_proposals,
                 body_html,
             )
         )
@@ -378,7 +373,6 @@ async def update_event(
             reminder_minutes_before_start=reminder_minutes_before_start,
             hide_attendees=hide_attendees,
             response_requested=response_requested,
-            allow_new_time_proposals=allow_new_time_proposals,
             body_html=body_html,
             online_meeting=online_meeting,
         )
@@ -572,7 +566,6 @@ def _about(uri: str, patch: EventPatch) -> str:
                 patch.reminder_minutes_before_start,
                 patch.hide_attendees,
                 patch.response_requested,
-                patch.allow_new_time_proposals,
                 patch.online_meeting,
             )
         ),
@@ -602,7 +595,6 @@ def _answer(updated: Event, *, calendar_id: str, time_zone: str | None) -> Updat
             "reminder_minutes_before_start": updated.reminder_minutes_before_start,
             "hide_attendees": updated.hide_attendees,
             "response_requested": updated.response_requested,
-            "allow_new_time_proposals": updated.allow_new_time_proposals,
         }
     )
 
@@ -702,9 +694,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         response_requested: Annotated[
             bool | None, Field(description=RESPONSE_REQUESTED_CHANGE_FIELD)
         ] = None,
-        allow_new_time_proposals: Annotated[
-            bool | None, Field(description=ALLOW_NEW_TIME_PROPOSALS_CHANGE_FIELD)
-        ] = None,
         body_html: Annotated[
             str | None,
             Field(
@@ -750,7 +739,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             reminder_minutes_before_start=reminder_minutes_before_start,
             hide_attendees=hide_attendees,
             response_requested=response_requested,
-            allow_new_time_proposals=allow_new_time_proposals,
             body_html=body_html,
             online_meeting=online_meeting is True,
             confirm=a_person_agrees(ctx),

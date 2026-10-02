@@ -8,6 +8,7 @@ read the serialized JSON rather than the object.
 import ast
 import json
 import uuid
+from dataclasses import fields
 from datetime import UTC, date, datetime, time
 from typing import cast
 from zoneinfo import ZoneInfo
@@ -464,8 +465,6 @@ class TestOneCalendarRow:
         assert row.default_online_meeting_provider == "teamsForBusiness"
 
     def test_a_provider_this_sdk_cannot_name_is_left_out_of_the_row(self) -> None:
-        """kiota puts None in the list for a provider it has no member for, so the row reports the
-        providers it can name and drops the rest."""
         calendar = Calendar(
             id=_CALENDAR_ID,
             allowed_online_meeting_providers=cast(
@@ -1205,7 +1204,6 @@ class TestThePatchBody:
             (EventPatch(reminder_minutes_before_start=0), "reminderMinutesBeforeStart", 0),
             (EventPatch(hide_attendees=True), "hideAttendees", True),
             (EventPatch(response_requested=False), "responseRequested", False),
-            (EventPatch(allow_new_time_proposals=False), "allowNewTimeProposals", False),
             (
                 EventPatch(body_html="<p>A &amp; B</p>"),
                 "body",
@@ -1223,7 +1221,6 @@ class TestThePatchBody:
             "reminder-minutes",
             "hide-attendees",
             "no-response",
-            "no-proposals",
             "body",
         ],
     )
@@ -1241,6 +1238,9 @@ class TestThePatchBody:
             "onlineMeetingProvider": "teamsForBusiness",
             "@odata.type": "#microsoft.graph.event",
         }
+
+    def test_a_patch_has_no_new_time_proposals_option(self) -> None:
+        assert "allow_new_time_proposals" not in {field.name for field in fields(EventPatch)}
 
 
 class TestWhatAPatchSays:
@@ -1283,8 +1283,6 @@ class TestWhatAPatchSays:
             (EventPatch(hide_attendees=False), "show the attendee list to every attendee"),
             (EventPatch(response_requested=True), "ask the attendees for a response"),
             (EventPatch(response_requested=False), "ask the attendees for no response"),
-            (EventPatch(allow_new_time_proposals=True), "let the attendees propose a new time"),
-            (EventPatch(allow_new_time_proposals=False), "let no attendee propose a new time"),
             (
                 EventPatch(body_html="<p>Agenda: pricing</p>"),
                 "replace the body with a body of 22 characters that starts 'Agenda: pricing'",
@@ -1314,8 +1312,6 @@ class TestWhatAPatchSays:
             "show-attendees",
             "response",
             "no-response",
-            "proposals",
-            "no-proposals",
             "body",
             "online-meeting",
         ],
@@ -1343,7 +1339,6 @@ class TestWhatAPatchSays:
             reminder_minutes_before_start=10,
             hide_attendees=True,
             response_requested=False,
-            allow_new_time_proposals=False,
             body_html="<p>Agenda</p>",
             online_meeting=True,
         )
@@ -1360,7 +1355,6 @@ class TestWhatAPatchSays:
             "set the reminder time to 10 minutes before the start",
             "hide the attendee list",
             "ask the attendees for no response",
-            "let no attendee propose a new time",
             "replace the body with a body of 13 characters that starts 'Agenda'",
             "add a Teams meeting that this connector cannot remove later",
             f"change the attendee list to 1 person: {_MINE}",
