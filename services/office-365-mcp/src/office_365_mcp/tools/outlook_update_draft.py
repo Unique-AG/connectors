@@ -24,7 +24,13 @@ from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName, merged_categories
 from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
+from office_365_mcp.shared.mail import (
+    AddressFault,
+    MailAddress,
+    MailImportance,
+    one_address_each,
+    repeated_address,
+)
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import body_opening, cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -141,6 +147,25 @@ def _repeated(argument: str, address: str) -> str:
     )
 
 
+def _in_to_and_cc(address: str) -> str:
+    return (
+        f"outlook_update_draft was given {address!r} in both `to` and `cc`. Each address "
+        + "belongs in one of the two lists. Nothing was changed. Decide which list the person "
+        + "belongs in, and call again with the address in that list only. If you call this tool "
+        + "again with the same arguments, the call will fail the same way."
+    )
+
+
+def _in_the_stored_list(address: str, *, given: str, other: str) -> str:
+    return (
+        f"outlook_update_draft was given {address!r} in `{given}`, and the draft already has "
+        + f"that address in {other.capitalize()}. Each address belongs in one of the two lists. "
+        + f"Nothing was changed. Leave the address out of `{given}`, or also give `{other}` "
+        + "without it. If you call this tool again with the same arguments, the call will fail "
+        + "the same way."
+    )
+
+
 class UpdatedDraft(BaseModel):
     uri: str = Field(
         description=(
@@ -239,6 +264,10 @@ async def update_draft(
         cc=_addresses(change.cc, argument="cc"),
         categories=named,
     )
+    if wanted.to is not None and wanted.cc is not None:
+        in_both = repeated_address((*wanted.to, *wanted.cc))
+        if in_both is not None:
+            raise ToolError(_in_to_and_cc(in_both))
     reached = graph_mailbox(client, mailbox)
 
     asked: InputRequiredResult | None = None
@@ -253,8 +282,8 @@ async def update_draft(
             )
         refused: str | None = _NOT_A_DRAFT_NOW
         if draft is not None and draft.is_draft is True:
-            refused = None
-            if mailbox is not None:
+            refused = _against_the_stored_list(draft, change=wanted)
+            if refused is None and mailbox is not None:
                 with not_graph():
                     answer = await confirm(
                         _question(mailbox, draft=draft, change=wanted),
@@ -299,6 +328,18 @@ def _addresses(addresses: Sequence[str] | None, *, argument: str) -> tuple[str, 
             else _bad_address(argument, checked.entry)
         )
     return checked
+
+
+def _against_the_stored_list(draft: Message, *, change: DraftChange) -> str | None:
+    if change.to is not None and change.cc is None:
+        given, other, wanted, stored = "to", "cc", change.to, draft.cc_recipients
+    elif change.cc is not None and change.to is None:
+        given, other, wanted, stored = "cc", "to", change.cc, draft.to_recipients
+    else:
+        return None
+    held = {one.address.casefold() for one in MailAddress.each_of(stored) if one.address}
+    clash = next((address for address in wanted if address.casefold() in held), None)
+    return None if clash is None else _in_the_stored_list(clash, given=given, other=other)
 
 
 def _recipients(addresses: Sequence[str]) -> list[Recipient]:
@@ -451,8 +492,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str] | None,
             Field(
                 description=(
-                    "The full new list of Cc recipients, under the same rule as `to`. An empty "
-                    + "list removes every Cc recipient from the draft."
+                    "The full new list of Cc recipients, under the same rule as `to`. An address "
+                    + "in `to` cannot also be in `cc`. An empty list removes every Cc recipient "
+                    + "from the draft."
                 )
             ),
         ] = None,

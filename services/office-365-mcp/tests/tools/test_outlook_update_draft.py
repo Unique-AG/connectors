@@ -253,7 +253,7 @@ class TestWhatItSendsToGraph:
     ) -> None:
         patch = _ready(graph)
 
-        _ = await _update(client, cc=[_ADA])
+        _ = await _update(client, cc=[_PAM])
         assert "toRecipients" not in _sent(patch)
 
         _ = await _update(client, to=[_GRACE])
@@ -408,6 +408,108 @@ class TestWhatItRefuses:
         assert str(raised.value).endswith(_RETRY_SENTENCE)
         assert len(graph.calls) == 0
 
+    async def test_an_address_in_both_new_lists_is_refused_whatever_its_case(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        with pytest.raises(ToolError) as raised:
+            _ = await _update(client, to=[_ADA], cc=[_PAM, _ADA.upper()])
+
+        assert str(raised.value) == (
+            f"outlook_update_draft was given {_ADA.upper()!r} in both `to` and `cc`. Each "
+            + "address belongs in one of the two lists. Nothing was changed. Decide which list "
+            + "the person belongs in, and call again with the address in that list only. "
+            + _RETRY_SENTENCE
+        )
+        assert len(graph.calls) == 0
+
+    @pytest.mark.parametrize(
+        ("given", "other", "stored_in", "stored_as"),
+        [("to", "cc", "Cc", _ADA), ("cc", "to", "To", _ADA.upper())],
+    )
+    async def test_an_address_the_draft_already_has_in_the_other_list_is_refused_before_a_change(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        given: str,
+        other: str,
+        stored_in: str,
+        stored_as: str,
+    ) -> None:
+        stored = [_recipient(None, stored_as)]
+        read = _reads(graph, _stored(to=stored) if given == "cc" else _stored(cc=stored))
+        patch = _patches(graph)
+
+        with pytest.raises(ToolError) as raised:
+            _ = await _update(client, **{given: [_ADA]})
+
+        assert str(raised.value) == (
+            f"outlook_update_draft was given {_ADA!r} in `{given}`, and the draft already has "
+            + f"that address in {stored_in}. Each address belongs in one of the two lists. "
+            + f"Nothing was changed. Leave the address out of `{given}`, or also give `{other}` "
+            + "without it. "
+            + _RETRY_SENTENCE
+        )
+        assert read.call_count == 1
+        assert patch.call_count == 0
+        assert _methods(graph) == ["GET"]
+
+    async def test_a_new_list_that_avoids_the_other_stored_list_is_sent(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _stored(cc=[_recipient(None, _GRACE)]))
+        patch = _patches(graph)
+
+        _ = await _update(client, to=[_ADA, _PAM])
+
+        assert _addressed(_sent(patch), "toRecipients") == [_ADA, _PAM]
+        assert "ccRecipients" not in _sent(patch)
+
+    async def test_a_stored_recipient_with_no_address_is_skipped_when_the_lists_are_compared(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _stored(cc=[{"emailAddress": {"name": "Ghost", "address": None}}]))
+        patch = _patches(graph)
+
+        _ = await _update(client, to=[_ADA])
+
+        assert patch.call_count == 1
+
+    async def test_both_new_lists_are_not_compared_with_the_stored_ones(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _stored(to=[_recipient(None, _GRACE)], cc=[_recipient(None, _ADA)]))
+        patch = _patches(graph)
+
+        _ = await _update(client, to=[_ADA], cc=[_GRACE])
+
+        assert _addressed(_sent(patch), "toRecipients") == [_ADA]
+        assert _addressed(_sent(patch), "ccRecipients") == [_GRACE]
+
+    async def test_a_clash_with_the_other_stored_list_is_refused_before_anybody_is_asked(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _stored(cc=[_recipient(None, _ADA)]), path=_SHARED_DRAFT_PATH)
+        patch = _patches(graph, path=_SHARED_DRAFT_PATH)
+
+        with pytest.raises(ToolError, match="already has that address in Cc"):
+            _ = await _update(client, to=[_ADA], mailbox=_SHARED_MAILBOX, confirm=_never_asked)
+
+        assert patch.call_count == 0
+
+    async def test_a_clash_between_both_new_lists_is_refused_before_graph_and_before_a_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph, _SHARED_DRAFT_PATH)
+
+        with pytest.raises(ToolError, match="in both `to` and `cc`"):
+            _ = await _update(
+                client, to=[_ADA], cc=[_ADA], mailbox=_SHARED_MAILBOX, confirm=_never_asked
+            )
+
+        assert len(graph.calls) == 0
+
 
 class TestTheSchemaItPublishes:
     async def test_it_takes_eight_arguments_and_only_the_draft_is_required(
@@ -445,6 +547,15 @@ class TestTheSchemaItPublishes:
         )
         assert listed["minItems"] == 1
         assert "maxItems" not in listed
+
+    async def test_the_cc_argument_says_an_address_in_to_cannot_also_be_in_cc(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        described = cast("str", _properties(parameters)["cc"]["description"])
+        assert "An address in `to` cannot also be in `cc`." in described
+        assert 15 <= len(described.split()) <= 60
 
     async def test_a_category_name_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)
