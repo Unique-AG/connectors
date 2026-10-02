@@ -157,8 +157,10 @@ async def delete_folder(
         if refused is None and await made_by_outlook(folders, folder.id, folder.parent_folder_id):
             refused = _outlook_makes(folder.display_name or handle.uri)
         if refused is None:
+            question = _question(mailbox, handle, folder)
+            about = confirmation_digest(TOOL_NAME, mailbox, handle.folder_id, question)
             with not_graph():
-                answer = await confirm(_question(mailbox, handle, folder), _about(mailbox, handle))
+                answer = await confirm(question, about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
@@ -228,10 +230,6 @@ def _counted(count: int | None, noun: str) -> str:
     if count is None:
         return f"an unknown number of {noun}s"
     return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
-
-
-def _about(mailbox: str | None, handle: MailFolderHandle) -> str:
-    return confirmation_digest(mailbox, handle.folder_id)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

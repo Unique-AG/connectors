@@ -538,6 +538,16 @@ async def _asked(
     return question
 
 
+async def _bound(
+    client: GraphServiceClient, graph: respx.MockRouter, *reads: dict[str, object]
+) -> list[str]:
+    asked, capturing = _questions()
+    for folder in reads:
+        _ = _ready(graph, folder=folder)
+        _ = await _delete(client, confirm=capturing)
+    return [about for _question, about in asked]
+
+
 class TestThePersonBeforeTheFolderMoves:
     async def test_the_own_mailbox_is_asked_about_too(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -632,6 +642,25 @@ class TestThePersonBeforeTheFolderMoves:
         bound = [about for _question, about in asked]
         assert bound[0] == bound[1]
         assert len({*bound}) == 3
+
+    async def test_the_same_folder_read_twice_with_the_same_counts_binds_the_same_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        first, second = await _bound(client, graph, _folder(), _folder())
+
+        assert first == second
+
+    @pytest.mark.parametrize(
+        ("items", "subfolders"), [(13, 3), (12, 4)], ids=["item-count", "subfolder-count"]
+    )
+    async def test_a_count_that_changes_between_two_reads_binds_another_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter, items: int, subfolders: int
+    ) -> None:
+        first, second = await _bound(
+            client, graph, _folder(), _folder(items=items, subfolders=subfolders)
+        )
+
+        assert first != second
 
 
 def _context(answer: object) -> Context:
@@ -734,6 +763,18 @@ class TestTheEraWithNoBackChannel:
             )
 
         assert (own.call_count, shared.call_count) == (0, 0)
+
+    async def test_an_answer_for_a_folder_whose_counts_changed_moves_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+        key, state = await _first_round(client)
+        move = _ready(graph, folder=_folder(items=13))
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await delete_folder(client, folder_ref=_FOLDER_REF, confirm=_accepted(key, state))
+
+        assert move.call_count == 0
 
 
 class TestTheHandshakeEra:
