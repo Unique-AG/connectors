@@ -2146,7 +2146,8 @@ class TestTheCreateBodyOfASeries:
 
 
 _REFUSED = "outlook_create_event cannot send this `recurrence`."
-_NOTHING_HAPPENED = "NO EVENT WAS CREATED and nobody was invited."
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
+_NOTHING_HAPPENED = f"NO EVENT WAS CREATED and nobody was invited. {_RETRY}"
 
 
 class TestWhatARuleIsRefusedFor:

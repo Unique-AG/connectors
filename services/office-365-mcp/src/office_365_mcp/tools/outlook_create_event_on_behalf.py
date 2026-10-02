@@ -73,6 +73,7 @@ from office_365_mcp.shared.calendar import (
     wall_clock,
     zone_named,
 )
+from office_365_mcp.shared.categories import CategoryName
 from office_365_mcp.shared.handles import EventHandle, calendar_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import AddressFault, MailAddress, one_address_each, repeated_address
@@ -761,7 +762,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         room_addresses: Annotated[list[str], Field(default=[], description=ROOM_ADDRESSES_FIELD)],
-        categories: Annotated[list[str], Field(default=[], description=CATEGORIES_FIELD)],
+        categories: Annotated[list[CategoryName], Field(default=[], description=CATEGORIES_FIELD)],
         ctx: Context,
         body_html: Annotated[
             str | None,

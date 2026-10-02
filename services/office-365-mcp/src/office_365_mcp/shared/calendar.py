@@ -948,7 +948,8 @@ def recurrence_refusal(tool: str, rule: RecurrenceRule | None, *, starts_on: dat
         return None
     return (
         f"{tool} cannot send this `recurrence`. {problem} NO EVENT WAS CREATED and nobody was "
-        + "invited."
+        + "invited. If you call this tool again with the same arguments, the call will fail the "
+        + "same way."
     )
 
 

@@ -72,6 +72,7 @@ from office_365_mcp.shared.calendar import (
     wall_clock,
     zone_named,
 )
+from office_365_mcp.shared.categories import CategoryName
 from office_365_mcp.shared.handles import EventHandle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import AddressFault, MailAddress, one_address_each, repeated_address
@@ -211,7 +212,8 @@ def _room_also_invited(address: str) -> str:
         f"outlook_create_event was given {address!r} in `room_addresses` and also in "
         + "`attendees` or `optional_attendees`. This tool invites a room once, as a `resource` "
         + "attendee. NO EVENT WAS CREATED and nobody was invited. Keep the address in one list "
-        + "only and call again. Retrying these lists will fail identically."
+        + "only and call again. If you call this tool again with the same arguments, the call "
+        + "will fail the same way."
     )
 
 
@@ -697,7 +699,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         room_addresses: Annotated[list[str], Field(default=[], description=ROOM_ADDRESSES_FIELD)],
-        categories: Annotated[list[str], Field(default=[], description=CATEGORIES_FIELD)],
+        categories: Annotated[list[CategoryName], Field(default=[], description=CATEGORIES_FIELD)],
         ctx: Context,
         body_html: Annotated[
             str | None,

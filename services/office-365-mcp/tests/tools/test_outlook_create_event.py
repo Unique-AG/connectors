@@ -78,6 +78,8 @@ _JOIN_URL = "https://teams.microsoft.invalid/l/meetup-join/SYNTHETIC-0001"
 
 _TRANSACTION_ID = "0f3b6e21-SYNTHETIC-4f0a-9c2d-7b1e5a8c4d90"
 
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
+
 
 def _calendar(
     *,
@@ -1518,6 +1520,7 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
         assert "NO EVENT WAS CREATED" in str(raised.value)
+        assert str(raised.value).endswith(_RETRY)
 
     async def test_an_empty_subject_is_a_programming_error_too(
         self, client: GraphServiceClient
@@ -1624,7 +1627,8 @@ class TestASeries:
         refusal = str(raised.value)
         assert refusal.startswith("outlook_create_event cannot send this `recurrence`.")
         assert said in refusal
-        assert refusal.endswith("NO EVENT WAS CREATED and nobody was invited.")
+        assert "NO EVENT WAS CREATED and nobody was invited." in refusal
+        assert refusal.endswith(_RETRY)
         assert len(graph.calls) == 0
 
     async def test_the_schema_root_stays_one_object_and_the_rule_is_a_nested_object(
@@ -2335,6 +2339,22 @@ class TestTheSchemaItPublishes:
         )
         assert LIST_CATEGORIES_GUARD in described
         assert "outlook_list_categories" not in described.replace(LIST_CATEGORIES_GUARD, "")
+
+    async def test_a_category_name_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
+        parameters, _tool = await _registered(transport)
+
+        items = _object(_object(_object(parameters["properties"])["categories"])["items"])
+        assert items["minLength"] == 1
+
+    async def test_a_blank_category_name_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run({**creator.GRAPH_CALL_EXAMPLE, "categories": [""]})
+
+        assert len(graph.calls) == 0, "a blank category name reached Graph"
 
 
 class TestHowItDeclaresItself:

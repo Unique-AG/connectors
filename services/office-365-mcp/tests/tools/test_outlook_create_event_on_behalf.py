@@ -94,6 +94,8 @@ _DRAFT = EventDraft(
 # What the answer is bound to and what Graph is told to dedupe on: one string for both.
 _TRANSACTION = transaction_id_for(_CALENDAR_ID, _DRAFT)
 
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
+
 
 def _calendar_payload(
     *,
@@ -1417,10 +1419,7 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
         assert "NO EVENT WAS CREATED" in str(raised.value)
-        assert (
-            "If you call this tool again with the same arguments, the call will fail the same way."
-            in str(raised.value)
-        )
+        assert str(raised.value).endswith(_RETRY)
 
     async def test_twenty_one_attendees_reach_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1511,7 +1510,8 @@ class TestASeries:
         assert str(raised.value) == (
             "outlook_create_event_on_behalf cannot send this `recurrence`. The `relativeYearly` "
             + "pattern needs `days_of_week` and `month`. Add `days_of_week` and `month` to "
-            + "`recurrence`. NO EVENT WAS CREATED and nobody was invited."
+            + "`recurrence`. NO EVENT WAS CREATED and nobody was invited. "
+            + _RETRY
         )
         assert len(graph.calls) == 0
 
@@ -2037,6 +2037,23 @@ class TestTheSchemaItPublishes:
         described = cast("str", properties["categories"]["description"])
         assert LIST_CATEGORIES_GUARD in described
         assert "outlook_list_categories" not in described.replace(LIST_CATEGORIES_GUARD, "")
+
+    async def test_a_category_name_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        items = cast("Mapping[str, object]", properties["categories"]["items"])
+        assert items["minLength"] == 1
+
+    async def test_a_blank_category_name_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run({**creator.GRAPH_CALL_EXAMPLE, "categories": [""]})
+
+        assert len(graph.calls) == 0, "a blank category name reached Graph"
 
 
 class TestHowItDeclaresItself:
