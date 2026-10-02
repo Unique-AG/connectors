@@ -261,6 +261,10 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_list_chat_messages": {"chat_id": ("teams_list_chats",)},
     "teams_list_chat_members": {"chat_id": ("teams_list_chats",)},
     "teams_list_channels": {"team_id": ("teams_list_my_teams",)},
+    "teams_get_channel_files_folder": {
+        "team_id": ("teams_list_my_teams",),
+        "channel_id": ("teams_list_channels", "teams_search_messages"),
+    },
     "teams_browse_channel": {
         "team_id": ("teams_list_my_teams",),
         "channel_id": ("teams_list_channels", "teams_search_messages"),
@@ -683,6 +687,12 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ),
         0,
         9,
+    ),
+    (
+        ToolsPreset.TEAMS_FILES,
+        ("User.Read", "Team.ReadBasic.All", "Channel.ReadBasic.All", "Files.Read.All"),
+        1,
+        6,
     ),
     (
         ToolsPreset.OUTLOOK_READ,

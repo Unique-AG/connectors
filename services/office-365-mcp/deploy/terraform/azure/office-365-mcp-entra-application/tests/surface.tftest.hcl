@@ -202,6 +202,27 @@ run "preset_teams_write" {
   }
 }
 
+run "preset_teams_files" {
+  variables {
+    tools_preset = "teams-files"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Team.ReadBasic.All,Channel.ReadBasic.All,Files.Read.All"
+    error_message = "teams-files composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 6
+    error_message = "teams-files resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All"]
+    error_message = "teams-files costs an administrator only for Files.Read.All, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
 run "the_mock_covers_every_requestable_permission" {
   variables {
     tools_preset = "teams"

@@ -39,6 +39,12 @@
           ]
         },
         {
+          "name": "teams_get_channel_files_folder",
+          "permissions": [
+            "Files.Read.All"
+          ]
+        },
+        {
           "name": "teams_browse_channel",
           "permissions": [
             "ChannelMessage.Read.All"
@@ -425,6 +431,7 @@
         "teams_list_chat_members",
         "teams_list_my_teams",
         "teams_list_channels",
+        "teams_get_channel_files_folder",
         "teams_browse_channel",
         "teams_list_message_replies",
         "teams_search_messages",
@@ -541,6 +548,13 @@
           "teams_list_chat_messages",
           "teams_react_to_message",
           "teams_list_chat_members"
+        ],
+        "teams-files": [
+          "teams_list_my_teams",
+          "teams_list_channels",
+          "teams_get_channel_files_folder",
+          "sharepoint_browse_folder",
+          "sharepoint_read_file"
         ],
         "outlook-read": [
           "outlook_search_mail",
@@ -682,6 +696,7 @@
         "Chat.Read",
         "Team.ReadBasic.All",
         "Channel.ReadBasic.All",
+        "Files.Read.All",
         "ChannelMessage.Read.All",
         "ChatMessage.Send",
         "ChannelMessage.Send",
@@ -703,7 +718,6 @@
         "Calendars.ReadBasic",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
-        "Files.Read.All",
         "Notes.Read",
         "Notes.Create",
         "Notes.ReadWrite"

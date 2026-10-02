@@ -701,6 +701,7 @@ GRAPH_STEPS = frozenset(
         "channel_message",
         "channel_reply",
         "channel_replies",
+        "channel_files_folder",
         "send_chat_message",
         "send_channel_message",
         "reply_channel_message",
