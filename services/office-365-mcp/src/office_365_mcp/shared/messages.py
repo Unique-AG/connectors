@@ -26,11 +26,11 @@ from msgraph.generated.models.identity import Identity
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.teamwork_user_identity_type import TeamworkUserIdentityType
 from msgraph.generated.models.user import User
-from msgraph.generated.teams.item.channels.item.messages.item.chat_message_item_request_builder import (  # noqa: E501
-    ChatMessageItemRequestBuilder as ChannelMessageRequestBuilder,
+from msgraph.generated.teams.item.channels.item.messages.item import (
+    chat_message_item_request_builder as channel_post,
 )
-from msgraph.generated.teams.item.channels.item.messages.item.replies.item.chat_message_item_request_builder import (  # noqa: E501
-    ChatMessageItemRequestBuilder as ChannelReplyRequestBuilder,
+from msgraph.generated.teams.item.channels.item.messages.item.replies.item import (
+    chat_message_item_request_builder as channel_reply,
 )
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
@@ -206,9 +206,11 @@ _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 
 type _ChatMessageQuery = ChatMessageRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
 type _ChannelMessageQuery = (
-    ChannelMessageRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
+    channel_post.ChatMessageItemRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
 )
-type _ChannelReplyQuery = ChannelReplyRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
+type _ChannelReplyQuery = (
+    channel_reply.ChatMessageItemRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
+)
 
 
 async def get_message(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage | None:
@@ -422,7 +424,7 @@ class Mention(BaseModel, frozen=True):
         min_length=1,
         description=(
             "The text that Teams shows for the mention, usually the display name of the person. "
-            + "Use the `display_name` that comes from the same result as the `user_id`."
+            + "Use the `display_name` from the same result as the `user_id`."
         ),
     )
 
@@ -531,8 +533,8 @@ MENTIONS_FIELD: str = (
 )
 
 CHAT_IMPORTANCE_FIELD: str = (
-    "The importance of the new message: `normal`, `high`, or `urgent`. Set this parameter only "
-    + "when the user asks for an importance."
+    "The importance of the new message: `normal`, `high`, or `urgent`. If the user does not ask "
+    + "for an importance, omit this parameter."
 )
 
 CHAT_SUBJECT_FIELD: str = (
@@ -567,8 +569,8 @@ CHANNEL_SUBJECT_FIELD: str = (
 )
 
 CHANNEL_IMPORTANCE_FIELD: str = (
-    "The importance of the new message: `normal` or `high`. Set this parameter only when the user "
-    + "asks for an importance."
+    "The importance of the new message: `normal` or `high`. If the user does not ask for an "
+    + "importance, omit this parameter."
 )
 
 
