@@ -4,22 +4,10 @@ from typing import Annotated
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.headers_collection import HeadersCollection
-from msgraph.generated.chats.item.messages.item.chat_message_item_request_builder import (
-    ChatMessageItemRequestBuilder as ChatMessageRequestBuilder,
-)
-from msgraph.generated.models.chat_message import ChatMessage
-from msgraph.generated.teams.item.channels.item.messages.item.chat_message_item_request_builder import (  # noqa: E501
-    ChatMessageItemRequestBuilder as ChannelMessageRequestBuilder,
-)
-from msgraph.generated.teams.item.channels.item.messages.item.replies.item.chat_message_item_request_builder import (  # noqa: E501
-    ChatMessageItemRequestBuilder as ChannelReplyRequestBuilder,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step
+from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import (
     CHANNEL_PERMISSION,
     CHAT_PERMISSION,
@@ -27,14 +15,10 @@ from office_365_mcp.shared.handles import (
     message_handle,
     not_a_message_handle,
 )
-from office_365_mcp.shared.messages import TeamsMessage
+from office_365_mcp.shared.messages import TeamsMessage, get_message
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narrowed_to
 
 TOOL_NAME = "teams_read_message"
-
-STEP_CHAT_MESSAGE = "chat_message"
-STEP_CHANNEL_MESSAGE = "channel_message"
-STEP_CHANNEL_REPLY = "channel_reply"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
@@ -74,62 +58,13 @@ _HANDLE_SOURCES = (
     + "teams_list_chat_messages give a message handle."
 )
 
-_PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
-
-type _ChatMessageQuery = ChatMessageRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
-type _ChannelMessageQuery = (
-    ChannelMessageRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
-)
-type _ChannelReplyQuery = ChannelReplyRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
-
 
 async def teams_read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:
     with graph_errors(TOOL_NAME):
-        message = await _get(client, handle)
+        message = await get_message(client, handle)
 
     assert message is not None, "Graph answered a message read with no message"
     return TeamsMessage.from_message(message, handle=handle)
-
-
-async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage | None:
-    if handle.chat_id is not None:
-        with graph_step(STEP_CHAT_MESSAGE):
-            return await (
-                client.chats.by_chat_id(handle.chat_id)
-                .messages.by_chat_message_id(handle.message_id)
-                .get(
-                    request_configuration=RequestConfiguration[_ChatMessageQuery](
-                        headers=_headers()
-                    )
-                )
-            )
-    assert handle.team_id is not None and handle.channel_id is not None, (
-        "a handle addresses either a chat or a team channel"
-    )
-    messages = (
-        client.teams.by_team_id(handle.team_id).channels.by_channel_id(handle.channel_id).messages
-    )
-    if handle.reply_to_id is not None:
-        with graph_step(STEP_CHANNEL_REPLY):
-            return await (
-                messages.by_chat_message_id(handle.reply_to_id)
-                .replies.by_chat_message_id1(handle.message_id)
-                .get(
-                    request_configuration=RequestConfiguration[_ChannelReplyQuery](
-                        headers=_headers()
-                    )
-                )
-            )
-    with graph_step(STEP_CHANNEL_MESSAGE):
-        return await messages.by_chat_message_id(handle.message_id).get(
-            request_configuration=RequestConfiguration[_ChannelMessageQuery](headers=_headers())
-        )
-
-
-def _headers() -> HeadersCollection:
-    headers = HeadersCollection()
-    headers.add(*_PREFER_UNKNOWN_ENUMS)
-    return headers
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

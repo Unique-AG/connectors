@@ -1,5 +1,6 @@
 import json
-from collections.abc import Mapping, Sequence
+import re
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import cast
 
 import httpx
@@ -18,9 +19,11 @@ from mcp.types import (
 )
 from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import MessageHandle, message_handle
+from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Confirmed
 from office_365_mcp.tools import PRESETS, TOOL_NAMES, graph_advice, resolve
 from office_365_mcp.tools import teams_react_to_message as reactor
@@ -29,6 +32,8 @@ from office_365_mcp.tools.teams_react_to_message import (
     a_person_agrees,
     react_to_message,
 )
+
+from .conftest import message_payload
 
 _CHAT_ID = "19:release@thread.v2"
 _TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
@@ -43,13 +48,25 @@ _REPLY_HANDLE = MessageHandle(
 )
 
 _CHAT_PATH = f"/chats/19%3Arelease%40thread.v2/messages/{_MESSAGE_ID}"
-_CHANNEL_PATH = f"/teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages/{_MESSAGE_ID}"
+_TEAM_PATH = f"/teams/{_TEAM_ID}"
+_CHANNEL_ONLY_PATH = f"{_TEAM_PATH}/channels/19%3Ageneral%40thread.tacv2"
+_CHANNEL_PATH = f"{_CHANNEL_ONLY_PATH}/messages/{_MESSAGE_ID}"
 _REPLY_PATH = f"{_CHANNEL_PATH}/replies/{_REPLY_ID}"
 
 _THUMBS_UP = "\U0001f44d"
 _HEART = "❤️"
 
 _NOTHING_CHANGED = "No reaction was changed."
+
+_SENDER = "Ada Lovelace"
+_TEXT = "Ship it Monday"
+_CHANNEL_NAME = "General"
+_TEAM_NAME = "Release"
+
+_CHAT_MESSAGE = message_payload(content=f"<p>{_TEXT}</p>")
+
+_CHAT_PERMISSIONS = ("ChatMessage.Send", "Chat.Read")
+_CHANNEL_PERMISSIONS = ("ChannelMessage.Send", "Channel.ReadBasic.All", "Team.ReadBasic.All")
 
 _EVERY_ENDPOINT: tuple[str, ...] = tuple(
     f"{path}/{action}"
@@ -68,7 +85,22 @@ async def _refuses(question: str, about: str) -> Confirmed:
     return _NOTHING_CHANGED
 
 
+def _targets(
+    graph: respx.MockRouter, message: Mapping[str, object] = _CHAT_MESSAGE
+) -> Mapping[str, respx.Route]:
+    return {
+        _CHAT_PATH: graph.get(_CHAT_PATH).mock(return_value=httpx.Response(200, json=message)),
+        _CHANNEL_ONLY_PATH: graph.get(_CHANNEL_ONLY_PATH).mock(
+            return_value=httpx.Response(200, json={"id": _CHANNEL_ID, "displayName": _CHANNEL_NAME})
+        ),
+        _TEAM_PATH: graph.get(_TEAM_PATH).mock(
+            return_value=httpx.Response(200, json={"id": _TEAM_ID, "displayName": _TEAM_NAME})
+        ),
+    }
+
+
 def _every_endpoint(graph: respx.MockRouter) -> Mapping[str, respx.Route]:
+    _ = _targets(graph)
     return {
         endpoint: graph.post(endpoint).mock(return_value=httpx.Response(204))
         for endpoint in _EVERY_ENDPOINT
@@ -76,7 +108,21 @@ def _every_endpoint(graph: respx.MockRouter) -> Mapping[str, respx.Route]:
 
 
 def _reacts(graph: respx.MockRouter, endpoint: str = f"{_CHAT_PATH}/setReaction") -> respx.Route:
+    _ = _targets(graph)
     return graph.post(endpoint).mock(return_value=httpx.Response(204))
+
+
+def _methods(graph: respx.MockRouter) -> list[str]:
+    return [call.request.method for call in cast("Sequence[Call]", graph.calls)]
+
+
+def _asking(asked: list[str]) -> Callable[[str, str], Awaitable[Confirmed]]:
+    async def capturing(question: str, about: str) -> Confirmed:
+        assert about
+        asked.append(question)
+        return None
+
+    return capturing
 
 
 class _ModernRequest:
@@ -169,9 +215,66 @@ class TestTheRequestItMakes:
         assert {path: route.call_count for path, route in routes.items()} == {
             path: 1 if path == endpoint else 0 for path in _EVERY_ENDPOINT
         }
-        assert len(graph.calls) == 1, "one reaction change costs one Graph call, and nothing else"
+        assert _methods(graph).count("POST") == 1, "one reaction change costs one write"
         body = cast("Mapping[str, object]", json.loads(routes[endpoint].calls.last.request.content))
         assert body == {"reactionType": _THUMBS_UP}
+
+    @pytest.mark.parametrize(
+        ("handle", "read"),
+        [
+            pytest.param(_CHAT_HANDLE, (_CHAT_PATH,), id="chat"),
+            pytest.param(_CHANNEL_HANDLE, (_CHANNEL_ONLY_PATH, _TEAM_PATH), id="post"),
+            pytest.param(_REPLY_HANDLE, (_CHANNEL_ONLY_PATH, _TEAM_PATH), id="reply"),
+        ],
+    )
+    async def test_each_handle_reads_only_what_its_question_names(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        handle: MessageHandle,
+        read: tuple[str, ...],
+    ) -> None:
+        reads = _targets(graph)
+        posts_read = graph.get(_CHANNEL_PATH).mock(return_value=httpx.Response(200, json={}))
+        replies_read = graph.get(_REPLY_PATH).mock(return_value=httpx.Response(200, json={}))
+
+        with pytest.raises(ToolError, match=_NOTHING_CHANGED):
+            _ = await react_to_message(
+                client, handle=handle, reaction=_THUMBS_UP, remove=False, confirm=_refuses
+            )
+
+        assert {path: route.call_count for path, route in reads.items()} == {
+            path: 1 if path in read else 0 for path in reads
+        }
+        assert posts_read.call_count == replies_read.call_count == 0, (
+            "a channel post needs ChannelMessage.Read.All, which no preset with this tool asks for"
+        )
+        assert _methods(graph) == ["GET"] * len(read)
+
+    @pytest.mark.parametrize("path", [_CHANNEL_ONLY_PATH, _TEAM_PATH])
+    async def test_the_channel_and_the_team_are_read_for_their_name_alone(
+        self, client: GraphServiceClient, graph: respx.MockRouter, path: str
+    ) -> None:
+        routes = _targets(graph)
+
+        with pytest.raises(ToolError, match=_NOTHING_CHANGED):
+            _ = await react_to_message(
+                client, handle=_CHANNEL_HANDLE, reaction=_THUMBS_UP, remove=False, confirm=_refuses
+            )
+
+        assert routes[path].calls.last.request.url.params["$select"] == "displayName"
+
+    async def test_the_chat_message_is_read_with_the_message_types_graph_hides_by_default(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _targets(graph)[_CHAT_PATH]
+
+        with pytest.raises(ToolError, match=_NOTHING_CHANGED):
+            _ = await react_to_message(
+                client, handle=_CHAT_HANDLE, reaction=_THUMBS_UP, remove=False, confirm=_refuses
+            )
+
+        assert route.calls.last.request.headers["prefer"] == "include-unknown-enum-members"
 
     async def test_the_reaction_reaches_graph_as_the_unicode_it_was_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -198,7 +301,7 @@ class TestThePersonBeforeTheChange:
             )
 
         assert all(route.call_count == 0 for route in routes.values())
-        assert len(graph.calls) == 0
+        assert "POST" not in _methods(graph)
 
     async def test_a_decline_changes_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -234,23 +337,34 @@ class TestThePersonBeforeTheChange:
 
         assert route.call_count == 1
 
-    async def test_the_question_happens_before_the_post(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+    @pytest.mark.parametrize(
+        ("handle", "reads"),
+        [
+            pytest.param(_CHAT_HANDLE, ["GET"], id="chat"),
+            pytest.param(_CHANNEL_HANDLE, ["GET", "GET"], id="post"),
+        ],
+    )
+    async def test_the_read_happens_before_the_question_and_the_write_after_it(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        handle: MessageHandle,
+        reads: list[str],
     ) -> None:
-        route = _reacts(graph)
-        calls_when_asked: list[int] = []
+        _ = _every_endpoint(graph)
+        calls_when_asked: list[list[str]] = []
 
         async def watching(question: str, about: str) -> Confirmed:
             assert question and about
-            calls_when_asked.append(len(graph.calls))
+            calls_when_asked.append(_methods(graph))
             return None
 
         _ = await react_to_message(
-            client, handle=_CHAT_HANDLE, reaction=_THUMBS_UP, remove=False, confirm=watching
+            client, handle=handle, reaction=_THUMBS_UP, remove=False, confirm=watching
         )
 
-        assert calls_when_asked == [0], "asked after the reaction already changed"
-        assert route.call_count == 1
+        assert calls_when_asked == [reads], "asked before the read, or after the change"
+        assert _methods(graph) == [*reads, "POST"]
 
     @pytest.mark.parametrize(("remove", "verb"), [(False, "Add"), (True, "Remove")])
     async def test_the_question_names_the_reaction_the_action_the_message_and_who_sees_it(
@@ -259,22 +373,129 @@ class TestThePersonBeforeTheChange:
         _ = _every_endpoint(graph)
         asked: list[str] = []
 
-        async def capturing(question: str, _about: str) -> Confirmed:
-            asked.append(question)
-            return None
-
         _ = await react_to_message(
-            client, handle=_REPLY_HANDLE, reaction=_THUMBS_UP, remove=remove, confirm=capturing
+            client, handle=_REPLY_HANDLE, reaction=_THUMBS_UP, remove=remove, confirm=_asking(asked)
         )
 
         assert len(asked) == 1
         assert asked[0].startswith(f"{verb} the reaction {_THUMBS_UP!r}")
-        assert _REPLY_HANDLE.uri in asked[0]
         assert "Everyone in the conversation can see this change." in asked[0]
+        assert "teams:///" not in asked[0], "a handle means nothing to the person who agrees"
+
+    async def test_the_question_names_the_sender_and_the_text_of_a_chat_message(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _every_endpoint(graph)
+        asked: list[str] = []
+
+        _ = await react_to_message(
+            client, handle=_CHAT_HANDLE, reaction=_THUMBS_UP, remove=False, confirm=_asking(asked)
+        )
+
+        assert asked == [
+            f"Add the reaction {_THUMBS_UP!r} to the Teams message from {_SENDER!r} that says "
+            + f"{_TEXT!r}? Everyone in the conversation can see this change."
+        ]
+        assert "teams:///" not in asked[0]
+
+    async def test_the_question_cuts_a_long_chat_message(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        text = " ".join(["word"] * 100)
+        _ = _every_endpoint(graph)
+        _ = _targets(graph, message_payload(content=text))
+        asked: list[str] = []
+
+        _ = await react_to_message(
+            client, handle=_CHAT_HANDLE, reaction=_THUMBS_UP, remove=False, confirm=_asking(asked)
+        )
+
+        assert len(asked) == 1
+        assert f"that says {f'{text[:PREVIEW_CHARACTERS]}…'!r}?" in asked[0]
+
+    @pytest.mark.parametrize(
+        ("message", "named"),
+        [
+            pytest.param(
+                message_payload(content="<p></p>"),
+                f"to the Teams message from {_SENDER!r} that has no text?",
+                id="no-text",
+            ),
+            pytest.param(
+                message_payload(content=f"<p>{_TEXT}</p>", sender=None),
+                f"to the Teams message that says {_TEXT!r}?",
+                id="no-sender",
+            ),
+        ],
+    )
+    async def test_the_question_says_what_a_chat_message_lacks(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        message: Mapping[str, object],
+        named: str,
+    ) -> None:
+        _ = _every_endpoint(graph)
+        _ = _targets(graph, message)
+        asked: list[str] = []
+
+        _ = await react_to_message(
+            client, handle=_CHAT_HANDLE, reaction=_THUMBS_UP, remove=False, confirm=_asking(asked)
+        )
+
+        assert len(asked) == 1
+        assert named in asked[0]
+
+    @pytest.mark.parametrize(
+        ("handle", "kind"),
+        [
+            pytest.param(_CHANNEL_HANDLE, "a post", id="post"),
+            pytest.param(_REPLY_HANDLE, "a reply", id="reply"),
+        ],
+    )
+    async def test_the_question_names_the_channel_and_the_team_of_a_channel_message(
+        self, client: GraphServiceClient, graph: respx.MockRouter, handle: MessageHandle, kind: str
+    ) -> None:
+        _ = _every_endpoint(graph)
+        asked: list[str] = []
+
+        _ = await react_to_message(
+            client, handle=handle, reaction=_THUMBS_UP, remove=True, confirm=_asking(asked)
+        )
+
+        assert asked == [
+            f"Remove the reaction {_THUMBS_UP!r} from {kind} in the channel {_CHANNEL_NAME!r} of "
+            + f"the team {_TEAM_NAME!r}? Everyone in the conversation can see this change."
+        ]
+
+    async def test_a_deleted_chat_message_is_refused_before_any_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = _every_endpoint(graph)
+        _ = _targets(graph, message_payload(deleted_at="2026-02-11T10:00:00Z"))
+        session = _Session(modern=False, elicited=AcceptedElicitation(data="add"))
+
+        with pytest.raises(ToolError) as refused:
+            _ = await react_to_message(
+                client,
+                handle=_CHAT_HANDLE,
+                reaction=_THUMBS_UP,
+                remove=False,
+                confirm=a_person_agrees(session.context, remove=False),
+            )
+
+        assert str(refused.value) == (
+            "This message is already deleted. No reaction was changed. If you call this tool "
+            + "again with this handle, the call will fail the same way."
+        )
+        assert session.asked == []
+        assert all(route.call_count == 0 for route in routes.values())
+        assert _methods(graph) == ["GET"]
 
     async def test_the_binding_differs_for_another_reaction_another_action_and_another_message(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _targets(graph)
         bound: list[str] = []
 
         async def capturing(question: str, about: str) -> Confirmed:
@@ -294,7 +515,7 @@ class TestThePersonBeforeTheChange:
                 )
 
         assert len(bound) == len(set(bound)) == 4
-        assert len(graph.calls) == 0
+        assert "POST" not in _methods(graph)
 
 
 class TestTheEraWithNoBackChannel:
@@ -354,7 +575,7 @@ class TestTheEraWithNoBackChannel:
         )
 
         assert routes[endpoint].call_count == 1, "the agreed change did not happen exactly once"
-        assert len(graph.calls) == 1
+        assert _methods(graph).count("POST") == 1
         assert answer == ChangedReaction(uri=_CHAT_HANDLE.uri, reaction=_THUMBS_UP, removed=remove)
 
     async def test_an_answer_bound_to_another_reaction_changes_nothing(
@@ -398,6 +619,7 @@ class TestTheRetryItRefuses:
     async def test_a_reaction_graph_answers_503_is_never_posted_a_second_time(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _targets(graph)
         route = graph.post(f"{_CHAT_PATH}/setReaction").mock(return_value=httpx.Response(503))
 
         with pytest.raises(GraphUnavailable):
@@ -426,6 +648,7 @@ class TestTheFailuresItPassesOn:
     async def test_a_refused_reaction_is_a_forbidden(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _targets(graph)
         _ = graph.post(f"{_CHANNEL_PATH}/setReaction").mock(
             return_value=httpx.Response(
                 403, json={"error": {"code": "Forbidden", "message": "denied"}}
@@ -440,6 +663,7 @@ class TestTheFailuresItPassesOn:
     async def test_a_message_graph_does_not_find_is_a_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _targets(graph)
         _ = graph.post(f"{_CHAT_PATH}/unsetReaction").mock(
             return_value=httpx.Response(
                 404, json={"error": {"code": "NotFound", "message": "Not Found"}}
@@ -451,23 +675,50 @@ class TestTheFailuresItPassesOn:
                 client, handle=_CHAT_HANDLE, reaction=_THUMBS_UP, remove=True, confirm=_agrees
             )
 
+    @pytest.mark.parametrize(
+        ("handle", "path"),
+        [
+            pytest.param(_CHAT_HANDLE, _CHAT_PATH, id="chat-message"),
+            pytest.param(_CHANNEL_HANDLE, _CHANNEL_ONLY_PATH, id="channel"),
+            pytest.param(_REPLY_HANDLE, _TEAM_PATH, id="team"),
+        ],
+    )
+    async def test_a_read_graph_does_not_find_is_a_not_found_before_any_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter, handle: MessageHandle, path: str
+    ) -> None:
+        routes = _every_endpoint(graph)
+        _ = graph.get(path).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "NotFound", "message": "Not Found"}}
+            )
+        )
+        asked: list[str] = []
+
+        with pytest.raises(GraphNotFound):
+            _ = await react_to_message(
+                client, handle=handle, reaction=_THUMBS_UP, remove=False, confirm=_asking(asked)
+            )
+
+        assert asked == []
+        assert all(route.call_count == 0 for route in routes.values())
+
 
 class TestHowRegisterWiresTheHandle:
     @pytest.mark.parametrize(
-        ("handle", "permission"),
+        ("handle", "permissions"),
         [
-            pytest.param(_CHAT_HANDLE, "ChatMessage.Send", id="chat"),
-            pytest.param(_CHANNEL_HANDLE, "ChannelMessage.Send", id="post"),
-            pytest.param(_REPLY_HANDLE, "ChannelMessage.Send", id="reply"),
+            pytest.param(_CHAT_HANDLE, _CHAT_PERMISSIONS, id="chat"),
+            pytest.param(_CHANNEL_HANDLE, _CHANNEL_PERMISSIONS, id="post"),
+            pytest.param(_REPLY_HANDLE, _CHANNEL_PERMISSIONS, id="reply"),
         ],
     )
-    async def test_the_call_is_narrowed_to_the_permission_of_its_surface(
+    async def test_the_call_is_narrowed_to_the_permissions_of_its_surface(
         self,
         transport: httpx.AsyncClient,
         client: GraphServiceClient,
         graph: respx.MockRouter,
         handle: MessageHandle,
-        permission: str,
+        permissions: tuple[str, ...],
     ) -> None:
         routes = _every_endpoint(graph)
         tool = await _registered(transport)
@@ -479,7 +730,7 @@ class TestHowRegisterWiresTheHandle:
         )
 
         assert isinstance(answer, InputRequiredResult)
-        assert session.narrowed == [(permission,)]
+        assert session.narrowed == [permissions]
         assert all(route.call_count == 0 for route in routes.values())
 
     @pytest.mark.parametrize(
@@ -515,16 +766,23 @@ class TestHowRegisterWiresTheHandle:
 
 
 class TestHowItDeclaresItself:
-    def test_it_declares_the_send_permission_of_each_surface(self) -> None:
-        assert reactor.GRAPH_PERMISSIONS == ("ChatMessage.Send", "ChannelMessage.Send")
+    def test_it_declares_the_send_and_the_read_permissions_of_each_surface(self) -> None:
+        assert reactor.GRAPH_PERMISSIONS == (
+            "ChatMessage.Send",
+            "ChannelMessage.Send",
+            "Chat.Read",
+            "Channel.ReadBasic.All",
+            "Team.ReadBasic.All",
+        )
+        assert set(_CHAT_PERMISSIONS) | set(_CHANNEL_PERMISSIONS) == set(reactor.GRAPH_PERMISSIONS)
 
-    def test_its_example_call_is_narrowed_to_the_chat_permission(self) -> None:
+    def test_its_example_call_is_narrowed_to_the_chat_permissions(self) -> None:
         example = cast("Mapping[str, str]", reactor.GRAPH_CALL_EXAMPLE)
         handle = message_handle(example["uri"])
 
         assert handle is not None, "GRAPH_CALL_EXAMPLE's own uri is not a message handle"
         assert handle.chat_id is not None
-        assert reactor.GRAPH_CALL_NARROWS_TO == ("ChatMessage.Send",)
+        assert reactor.GRAPH_CALL_NARROWS_TO == _CHAT_PERMISSIONS
 
     def test_the_read_tools_whose_rows_carry_reactions_show_the_change(self) -> None:
         assert reactor.CHANGE_SHOWN_BY == (
@@ -571,9 +829,41 @@ class TestHowItDeclaresItself:
             + "sure that the conversation does not already show the change."
         ) in " ".join(description.split())
         assert "Everyone in the conversation can see the change." in " ".join(description.split())
+        assert ("teams_list_chat_messages shows the reactions of a chat message.") in " ".join(
+            description.split()
+        )
+
+    async def test_the_description_says_what_the_question_names_on_each_surface(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
         assert (
-            "teams_list_chat_messages and teams_read_message show the reactions of a message."
-        ) in " ".join(description.split())
+            "For a chat message, the question names the sender and the text. For a channel post or "
+            + "a reply, the question names only the channel and the team."
+        ) in " ".join((tool.description or "").split())
+
+    @pytest.mark.parametrize("unregistered", ["teams_read_message", "teams_search_messages"])
+    async def test_neither_the_description_nor_the_uri_names_a_reader_its_presets_lack(
+        self, transport: httpx.AsyncClient, unregistered: str
+    ) -> None:
+        tool = await _registered(transport)
+        properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+        uri = str(properties["uri"]["description"])
+
+        assert not re.search(rf"\b{unregistered}\b", tool.description or "")
+        assert not re.search(rf"\b{unregistered}\b", uri)
+
+    async def test_the_uri_names_the_chat_lister_and_any_other_teams_tool(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+        properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+        uri = " ".join(str(properties["uri"]["description"]).split())
+
+        assert "teams_list_chat_messages" in uri
+        assert "the `uri` of a message from another Teams tool" in uri
+        assert "question" not in uri, "the question is described once, in the description"
 
     async def test_the_retry_note_names_no_tool(self, transport: httpx.AsyncClient) -> None:
         tool = await _registered(transport)

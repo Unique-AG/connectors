@@ -80,7 +80,10 @@
           "name": "teams_react_to_message",
           "permissions": [
             "ChatMessage.Send",
-            "ChannelMessage.Send"
+            "ChannelMessage.Send",
+            "Chat.Read",
+            "Channel.ReadBasic.All",
+            "Team.ReadBasic.All"
           ]
         },
         {

@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import cast, final
@@ -282,15 +283,7 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
         "channel_id": ("teams_list_channels", "teams_search_messages"),
         "user_id": _MENTION_SOURCES,
     },
-    "teams_react_to_message": {
-        "uri": (
-            "teams_list_chat_messages",
-            "teams_browse_channel",
-            "teams_list_message_replies",
-            "teams_search_messages",
-            "teams_read_message",
-        )
-    },
+    "teams_react_to_message": {"uri": ("teams_list_chat_messages",)},
     "teams_search_messages": {"mentions": ("get_me",)},
     "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
@@ -563,6 +556,71 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         named = {tool for tools in PRESETS.values() for tool in tools} | {ALWAYS_ON}
 
         assert set(TOOL_NAMES) == named, f"no preset names {sorted(set(TOOL_NAMES) - named)}"
+
+
+_NAMES_ONLY_ITS_PRESETS_TOOLS: frozenset[str] = frozenset({"teams_react_to_message"})
+
+
+def _descriptions(schema: Mapping[str, object]) -> list[str]:
+    found: list[str] = []
+    pending: list[object] = [schema]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, Mapping):
+            for key, value in cast("Mapping[str, object]", node).items():
+                if key == "description" and isinstance(value, str):
+                    found.append(value)
+                else:
+                    pending.append(value)
+        elif isinstance(node, list):
+            pending.extend(cast("list[object]", node))
+    return found
+
+
+def _tools_named_in(texts: list[str], *, besides: str) -> set[str]:
+    return {
+        name
+        for text in texts
+        for name in TOOL_NAMES
+        if name != besides and re.search(rf"\b{re.escape(name)}\b", text)
+    }
+
+
+class TestAToolNamesOnlyTheToolsOfItsPresets:
+    def test_every_listed_tool_is_registered_by_some_preset(self) -> None:
+        registered = {tool for tools in PRESETS.values() for tool in tools}
+
+        assert not _NAMES_ONLY_ITS_PRESETS_TOOLS - registered, (
+            f"no preset registers {sorted(_NAMES_ONLY_ITS_PRESETS_TOOLS - registered)}, so the "
+            + "check below asserts nothing about it"
+        )
+
+    @pytest.mark.parametrize("preset", list(ToolsPreset))
+    async def test_its_prose_names_no_tool_that_the_preset_leaves_out(
+        self, preset: ToolsPreset
+    ) -> None:
+        selection = resolve(preset=preset, enabled=None)
+        mcp: FastMCP = FastMCP("preset-prose-survey", version="0")
+        async with httpx.AsyncClient() as transport:
+            register_tools(mcp, transport, selection)
+            listed = [
+                tool
+                for tool in await mcp.list_tools()
+                if tool.name in _NAMES_ONLY_ITS_PRESETS_TOOLS
+            ]
+
+        unregistered = {
+            tool.name: sorted(named)
+            for tool in listed
+            if (
+                named := _tools_named_in(
+                    [tool.description or "", *_descriptions(tool.parameters)], besides=tool.name
+                )
+                - set(selection.tools)
+            )
+        }
+
+        assert not unregistered, f"{preset} sends the model to tools it lacks: {unregistered}"
 
 
 PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
