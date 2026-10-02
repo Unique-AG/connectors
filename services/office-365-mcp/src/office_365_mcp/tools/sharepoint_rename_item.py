@@ -79,7 +79,7 @@ GRAPH_NOT_FOUND = (
     + "so the argument is not the problem. The item was most probably deleted, or somebody moved "
     + "it to another drive. A handle names the drive as well as the item, so an item in another "
     + "drive needs a new handle. Find the item again with sharepoint_search_files or "
-    + "sharepoint_browse_folder, and take the `uri` from that new result. The same handle fails "
+    + "sharepoint_browse_folder. Then take the `uri` from that new result. The same handle fails "
     + "the same way, so do not retry it."
 )
 
@@ -200,8 +200,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The new name for the file or folder, as the user writes it. "
                     + NAME_RULES
-                    + " The answer's `item.name` is what Microsoft stored. Read the new name from "
-                    + "the answer, not from this argument."
+                    + " The answer's `item.name` is what Microsoft stored."
                 ),
             ),
         ],

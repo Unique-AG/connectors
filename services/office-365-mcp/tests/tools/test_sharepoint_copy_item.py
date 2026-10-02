@@ -83,8 +83,8 @@ _LATEST_VERSION_ONLY = (
     + "original."
 )
 _NAME_CLASH = (
-    "If the destination already holds an item with the same name, the copy fails. This failure "
-    + "can come after this call returns, and then this tool cannot show it. To copy an item into "
+    "If the destination already holds an item with the same name, the copy fails. This error "
+    + "can occur after this call returns, and then this tool cannot show it. To copy an item into "
     + "its own folder, give the copy a new `name`."
 )
 _RETRY = (

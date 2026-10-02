@@ -54,9 +54,9 @@ _DO_NOT_MOVE = "do not move"
 _NOTHING_MOVED = "Nothing was moved."
 
 _TO_A_DIFFERENT_DRIVE = (
-    "To move an item to a different drive, copy it with sharepoint_copy_item. The copy has only "
-    + "the latest version of a file, so tell the user before the delete. Use "
-    + "sharepoint_delete_item on the original only after sharepoint_browse_folder shows the copy."
+    "To move an item to a different drive, copy it with sharepoint_copy_item. Before you delete "
+    + "the original, tell the user that the copy has only the latest version of a file. If "
+    + "sharepoint_browse_folder shows the copy, use sharepoint_delete_item on the original."
 )
 
 _DESCRIPTION = f"""\
@@ -74,7 +74,7 @@ _NOT_AN_ITEM_HANDLE = (
     "sharepoint_move_item takes a file handle or a folder handle in `item`. A file handle looks "
     + "like sharepoint:///files/{drive_id}/{item_id}. A folder handle looks like "
     + "sharepoint:///folders/{drive_id}/{item_id}. Both ids are percent-encoded. A web address, "
-    + "a path, a name and a bare id are not handles. "
+    + "a path, a name and a bare item id are not handles. "
     + ITEM_HANDLE_SOURCES
     + " This same value fails again, so do not retry it."
 )
@@ -109,8 +109,8 @@ _THE_TOP_FOLDER_STAYS = (
 
 _NOT_A_FOLDER = (
     "Nothing was moved. `to_folder` names an item that Microsoft 365 does not hold as a folder, "
-    + "so it cannot hold other items. Take the `uri` of a folder from sharepoint_browse_folder, "
-    + "and copy it word for word. This same value fails again, so do not retry it."
+    + "so it cannot hold other items. Take the `uri` of a folder from sharepoint_browse_folder. "
+    + "Copy it word for word. This same value fails again, so do not retry it."
 )
 
 _ALREADY_THERE = (
@@ -132,10 +132,10 @@ GRAPH_NOT_FOUND = (
 GRAPH_FORBIDDEN = item_access_refused(_NOTHING_MOVED)
 
 _MOVED_BUT_UNREAD = (
-    "Microsoft 365 moved the item. Then this connector did not get a complete answer about the "
-    + "item from Microsoft 365. Use sharepoint_browse_folder on `to_folder` to see the item in its "
-    + "new folder. A second call to sharepoint_move_item with the same arguments makes no second "
-    + "change."
+    "Microsoft 365 moved the item. Then this connector did not receive a complete answer about "
+    + "the item from Microsoft 365. Use sharepoint_browse_folder on `to_folder` to see the item "
+    + "in its new folder. A second call to sharepoint_move_item with the same arguments makes no "
+    + "second change."
 )
 
 
@@ -150,8 +150,8 @@ class MovedItem(BaseModel):
     previous_parent_uri: str | None = Field(
         description=(
             "The handle of the folder that held the item before the move. This tool read it "
-            + "before the write. To move the item back, pass this value as `to_folder`. Null when "
-            + "Graph reported no parent folder."
+            + "before the write. To move the item to its old folder, pass this value as "
+            + "`to_folder`. Null when Graph reported no parent folder."
         )
     )
 

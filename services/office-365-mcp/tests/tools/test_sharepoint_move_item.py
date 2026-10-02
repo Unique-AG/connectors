@@ -83,10 +83,11 @@ _ROOT_BY_ALIAS = DriveFolderHandle(DRIVE_ID, "root").uri
 _ELSEWHERE = DriveFolderHandle(OTHER_DRIVE_ID, FOLDER_ID).uri
 
 _LATEST_VERSION_BEFORE_THE_DELETE = (
-    "The copy has only the latest version of a file, so tell the user before the delete."
+    "Before you delete the original, tell the user that the copy has only the latest version of "
+    + "a file."
 )
 _DELETE_AFTER_THE_COPY_SHOWS = (
-    "Use sharepoint_delete_item on the original only after sharepoint_browse_folder shows the copy."
+    "If sharepoint_browse_folder shows the copy, use sharepoint_delete_item on the original."
 )
 
 _DRIVE_PATH = "/drives/b%21SYNTHETICDRIVE0000/items"
