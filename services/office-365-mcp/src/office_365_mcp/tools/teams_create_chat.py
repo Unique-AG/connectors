@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.identity import Person
+from office_365_mcp.shared.meetings import named_people
 from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT_TOPIC_PATTERN
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -36,7 +38,7 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_list_chats",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "chat_type": "oneOnOne",
-    "members": ["00000000-0000-4000-8000-000000000002"],
+    "members": [{"user_id": "00000000-0000-4000-8000-000000000002", "name": "Grace Hopper"}],
 }
 
 type NewChatKind = Literal["oneOnOne", "group"]
@@ -56,7 +58,7 @@ _FAILS_THE_SAME_WAY = (
 _DESCRIPTION = """\
 Creates one Teams chat for the signed-in user with the people in `members`: a one-to-one chat \
 with one other person, or a group chat. This tool adds the signed-in user to the chat, and it \
-posts no message. teams_send_chat_message posts to the chat, and teams_list_chats shows it.
+posts no message. teams_list_chats shows the new chat.
 
 Notes:
 - This tool asks the user to agree before it creates a chat, every time. This tool creates \
@@ -94,8 +96,8 @@ class CreatedChat(BaseModel):
     chat_id: str = Field(
         description=(
             "Graph's id for the chat, for example `19:...@thread.v2`. Pass this id as `chat_id` "
-            + "to teams_send_chat_message to post a message, or to teams_list_chat_members to see "
-            + "who is in the chat."
+            + "to a tool that sends chat messages, or to teams_list_chat_members to see who is in "
+            + "the chat."
         )
     )
     chat_type: str = Field(
@@ -134,7 +136,7 @@ async def create_chat(
     client: GraphServiceClient,
     *,
     chat_type: NewChatKind,
-    members: Sequence[str],
+    members: Sequence[Person],
     topic: str | None = None,
     confirm: Confirm,
 ) -> CreatedChat | InputRequiredResult:
@@ -148,19 +150,20 @@ async def create_chat(
     with graph_errors(TOOL_NAME):
         user = await identity.signed_in_user(client)
         assert user.id is not None, "identity.signed_in_user returned a user with no id"
-        others = tuple(one for one in given if one.casefold() != user.id.casefold())
+        others = tuple(one for one in given if one.user_id.casefold() != user.id.casefold())
         refused = None if others else _NOBODY_ELSE
         if refused is None:
             with not_graph():
                 answer = await confirm(
-                    _question(chat_type, others, topic), _about(chat_type, others, topic)
+                    _question(chat_type, others, topic),
+                    _about(chat_type, [one.user_id for one in others], topic),
                 )
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with graph_step(STEP_CREATE):
                 created = await client.chats.post(
-                    _new_chat(chat_type, (user.id, *others), topic),
+                    _new_chat(chat_type, (user.id, *(one.user_id for one in others)), topic),
                     request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
                 )
 
@@ -172,14 +175,14 @@ async def create_chat(
     return CreatedChat.from_chat(created)
 
 
-def _distinct(members: Sequence[str]) -> tuple[str, ...]:
-    kept: dict[str, str] = {}
+def _distinct(members: Sequence[Person]) -> tuple[Person, ...]:
+    kept: dict[str, Person] = {}
     for member in members:
-        _ = kept.setdefault(member.casefold(), member)
+        _ = kept.setdefault(member.user_id.casefold(), member)
     return tuple(kept.values())
 
 
-def _refusal(chat_type: NewChatKind, given: Sequence[str], topic: str | None) -> str | None:
+def _refusal(chat_type: NewChatKind, given: Sequence[Person], topic: str | None) -> str | None:
     if chat_type == "oneOnOne" and len(given) != 1:
         return _not_one_other(len(given))
     if chat_type == "oneOnOne" and topic is not None:
@@ -187,12 +190,11 @@ def _refusal(chat_type: NewChatKind, given: Sequence[str], topic: str | None) ->
     return None
 
 
-def _question(chat_type: NewChatKind, others: Sequence[str], topic: str | None) -> str:
-    people = ", ".join(others)
+def _question(chat_type: NewChatKind, others: Sequence[Person], topic: str | None) -> str:
     if chat_type == "oneOnOne":
-        return f"Create a one-to-one Teams chat with {people}?"
+        return f"Create a one-to-one Teams chat with {cut_for_a_question(others[0].name)!r}?"
     named = "" if topic is None else f" named {cut_for_a_question(topic)!r}"
-    return f"Create a group Teams chat{named} with {people}?"
+    return f"Create a group Teams chat{named} with {named_people(others)}?"
 
 
 def _about(chat_type: NewChatKind, others: Sequence[str], topic: str | None) -> str:
@@ -241,15 +243,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         members: Annotated[
-            list[Annotated[str, Field(pattern=identity.ENTRA_OBJECT_ID_PATTERN)]],
+            list[Person],
             Field(
                 min_length=1,
                 description=(
-                    "The Microsoft Entra object ids of the other people, as GUIDs. Copy each "
-                    + "`user_id` from a teams_list_chat_members row, a teams_list_chats member, or "
-                    + "a message `sender`. Never build an id from a name or an email address. Do "
-                    + "not include the signed-in user. This tool adds every person as an owner, "
-                    + "and Microsoft accepts no in-tenant guest as an owner."
+                    "The other people in the chat, with one entry for each person. Do not include "
+                    + "the signed-in user, because this tool adds that user itself. This tool adds "
+                    + "every person as an owner, and Microsoft accepts no in-tenant guest as an "
+                    + "owner."
                 ),
             ),
         ],

@@ -22,6 +22,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphThrottled, GraphUnavailable
 from office_365_mcp.shared import identity
+from office_365_mcp.shared.identity import Person
 from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirmed
 from office_365_mcp.tools import teams_create_chat as creator
@@ -30,6 +31,11 @@ from office_365_mcp.tools.teams_create_chat import NewChatKind, a_person_agrees,
 from .conftest import ME, OTHER_USER_ID, SIGNED_IN_USER_ID
 
 _THIRD_USER_ID = "00000000-0000-4000-8000-000000000003"
+
+_GRACE = Person(user_id=OTHER_USER_ID, name="Grace Hopper")
+_BOB = Person(user_id=_THIRD_USER_ID, name="Bob Kelso")
+_ME = Person(user_id=SIGNED_IN_USER_ID, name="Ada Lovelace")
+_GRACE_ARGUMENT: Mapping[str, object] = _GRACE.model_dump()
 
 _CREATED_CHAT_ID = "19:3f1a2b@thread.v2"
 
@@ -105,9 +111,7 @@ class TestWhatItAsksGraphFor:
     ) -> None:
         post = _creates(graph)
 
-        _ = await create_chat(
-            client, chat_type="oneOnOne", members=[OTHER_USER_ID], confirm=_agrees
-        )
+        _ = await create_chat(client, chat_type="oneOnOne", members=[_GRACE], confirm=_agrees)
 
         made = cast("Sequence[Call]", graph.calls)
         assert [(call.request.method, call.request.url.path) for call in made] == [
@@ -124,7 +128,7 @@ class TestWhatItAsksGraphFor:
         _ = await create_chat(
             client,
             chat_type="group",
-            members=[OTHER_USER_ID, _THIRD_USER_ID],
+            members=[_GRACE, _BOB],
             topic="Release",
             confirm=_agrees,
         )
@@ -140,15 +144,15 @@ class TestWhatItAsksGraphFor:
             }
             for user_id in (SIGNED_IN_USER_ID, OTHER_USER_ID, _THIRD_USER_ID)
         ]
+        assert "Grace Hopper" not in post.calls.last.request.content.decode()
+        assert "Bob Kelso" not in post.calls.last.request.content.decode()
 
     async def test_the_bind_key_is_spelled_with_a_dot_and_not_an_underscore(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         post = _creates(graph)
 
-        _ = await create_chat(
-            client, chat_type="oneOnOne", members=[OTHER_USER_ID], confirm=_agrees
-        )
+        _ = await create_chat(client, chat_type="oneOnOne", members=[_GRACE], confirm=_agrees)
 
         raw = post.calls.last.request.content.decode()
         assert '"user@odata.bind"' in raw
@@ -159,9 +163,7 @@ class TestWhatItAsksGraphFor:
     ) -> None:
         post = _creates(graph)
 
-        _ = await create_chat(
-            client, chat_type="oneOnOne", members=[OTHER_USER_ID], confirm=_agrees
-        )
+        _ = await create_chat(client, chat_type="oneOnOne", members=[_GRACE], confirm=_agrees)
 
         body = _sent(post)
         assert body["chatType"] == "oneOnOne"
@@ -170,12 +172,12 @@ class TestWhatItAsksGraphFor:
     @pytest.mark.parametrize(
         "members",
         [
-            [OTHER_USER_ID, SIGNED_IN_USER_ID],
-            [SIGNED_IN_USER_ID.upper(), OTHER_USER_ID, SIGNED_IN_USER_ID],
+            [_GRACE, _ME],
+            [Person(user_id=SIGNED_IN_USER_ID.upper(), name="Ada"), _GRACE, _ME],
         ],
     )
     async def test_the_signed_in_user_is_bound_exactly_once(
-        self, client: GraphServiceClient, graph: respx.MockRouter, members: list[str]
+        self, client: GraphServiceClient, graph: respx.MockRouter, members: list[Person]
     ) -> None:
         post = _creates(graph, _chat_payload(chat_type="group"))
 
@@ -192,7 +194,7 @@ class TestWhatItAsksGraphFor:
         _ = await create_chat(
             client,
             chat_type="group",
-            members=[OTHER_USER_ID, _THIRD_USER_ID, OTHER_USER_ID.upper(), _THIRD_USER_ID],
+            members=[_GRACE, _BOB, Person(user_id=OTHER_USER_ID.upper(), name="Grace"), _BOB],
             confirm=_agrees,
         )
 
@@ -204,12 +206,12 @@ class TestTheRefusalsBeforeAnyRequest:
     @pytest.mark.parametrize(
         "members",
         [
-            [OTHER_USER_ID, _THIRD_USER_ID],
-            [OTHER_USER_ID, SIGNED_IN_USER_ID],
+            [_GRACE, _BOB],
+            [_GRACE, _ME],
         ],
     )
     async def test_a_one_to_one_chat_with_more_than_one_person_is_refused(
-        self, client: GraphServiceClient, graph: respx.MockRouter, members: list[str]
+        self, client: GraphServiceClient, graph: respx.MockRouter, members: list[Person]
     ) -> None:
         _ = _creates(graph)
 
@@ -227,7 +229,7 @@ class TestTheRefusalsBeforeAnyRequest:
             _ = await create_chat(
                 client,
                 chat_type="oneOnOne",
-                members=[OTHER_USER_ID],
+                members=[_GRACE],
                 topic="Release",
                 confirm=_agrees,
             )
@@ -243,7 +245,7 @@ class TestTheRefusalsBeforeAnyRequest:
             _ = await create_chat(
                 client,
                 chat_type="oneOnOne",
-                members=[OTHER_USER_ID, _THIRD_USER_ID],
+                members=[_GRACE, _BOB],
                 confirm=_agrees,
             )
 
@@ -259,9 +261,7 @@ class TestTheRefusalsBeforeAnyRequest:
             return None
 
         with pytest.raises(ToolError, match="only the signed-in user"):
-            _ = await create_chat(
-                client, chat_type=chat_type, members=[SIGNED_IN_USER_ID], confirm=capturing
-            )
+            _ = await create_chat(client, chat_type=chat_type, members=[_ME], confirm=capturing)
 
         assert asked == [], "a chat with nobody else was put to the person"
         assert post.call_count == 0
@@ -271,12 +271,23 @@ class TestTheSchemaRefusals:
     @pytest.mark.parametrize(
         ("arguments", "match"),
         [
-            ({"chat_type": "group", "members": [OTHER_USER_ID], "topic": "Q3: plan"}, "pattern"),
-            ({"chat_type": "group", "members": [OTHER_USER_ID], "topic": "x" * 251}, "at most"),
-            ({"chat_type": "group", "members": [OTHER_USER_ID], "topic": ""}, "at least"),
-            ({"chat_type": "group", "members": ["jane@example.invalid"]}, "pattern"),
+            ({"chat_type": "group", "members": [_GRACE_ARGUMENT], "topic": "Q3: plan"}, "pattern"),
+            ({"chat_type": "group", "members": [_GRACE_ARGUMENT], "topic": "x" * 251}, "at most"),
+            ({"chat_type": "group", "members": [_GRACE_ARGUMENT], "topic": ""}, "at least"),
+            (
+                {
+                    "chat_type": "group",
+                    "members": [{"user_id": "jane@example.invalid", "name": "Jane"}],
+                },
+                "pattern",
+            ),
+            (
+                {"chat_type": "group", "members": [{"user_id": OTHER_USER_ID, "name": ""}]},
+                "at least",
+            ),
+            ({"chat_type": "group", "members": [OTHER_USER_ID]}, "valid dictionary"),
             ({"chat_type": "group", "members": []}, "at least"),
-            ({"chat_type": "meeting", "members": [OTHER_USER_ID]}, "oneOnOne"),
+            ({"chat_type": "meeting", "members": [_GRACE_ARGUMENT]}, "oneOnOne"),
         ],
     )
     async def test_a_value_the_schema_refuses_never_reaches_graph(
@@ -307,9 +318,7 @@ class TestThePersonBeforeTheCreate:
         post = _creates(graph)
 
         with pytest.raises(ToolError, match=_NOTHING_CREATED):
-            _ = await create_chat(
-                client, chat_type="oneOnOne", members=[OTHER_USER_ID], confirm=_refuses
-            )
+            _ = await create_chat(client, chat_type="oneOnOne", members=[_GRACE], confirm=_refuses)
 
         assert post.call_count == 0, "a declined create still reached Graph"
 
@@ -326,14 +335,16 @@ class TestThePersonBeforeTheCreate:
         _ = await create_chat(
             client,
             chat_type="group",
-            members=[OTHER_USER_ID, _THIRD_USER_ID],
+            members=[_GRACE, _BOB],
             topic="Release",
             confirm=capturing,
         )
 
         assert asked == [
-            f"Create a group Teams chat named 'Release' with {OTHER_USER_ID}, {_THIRD_USER_ID}?"
+            "Create a group Teams chat named 'Release' with 2 people: 'Grace Hopper', 'Bob Kelso'?"
         ]
+        assert OTHER_USER_ID not in asked[0]
+        assert _THIRD_USER_ID not in asked[0]
 
     async def test_the_question_for_a_one_to_one_chat_names_the_person(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -345,11 +356,9 @@ class TestThePersonBeforeTheCreate:
             asked.append(question)
             return None
 
-        _ = await create_chat(
-            client, chat_type="oneOnOne", members=[OTHER_USER_ID], confirm=capturing
-        )
+        _ = await create_chat(client, chat_type="oneOnOne", members=[_GRACE], confirm=capturing)
 
-        assert asked == [f"Create a one-to-one Teams chat with {OTHER_USER_ID}?"]
+        assert asked == ["Create a one-to-one Teams chat with 'Grace Hopper'?"]
 
     async def test_the_question_leaves_out_the_signed_in_user(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -364,13 +373,13 @@ class TestThePersonBeforeTheCreate:
         _ = await create_chat(
             client,
             chat_type="group",
-            members=[SIGNED_IN_USER_ID, OTHER_USER_ID],
+            members=[_ME, _GRACE],
             confirm=capturing,
         )
 
-        assert len(asked) == 1
+        assert asked == ["Create a group Teams chat with 1 person: 'Grace Hopper'?"]
         assert SIGNED_IN_USER_ID not in asked[0]
-        assert OTHER_USER_ID in asked[0]
+        assert "Ada Lovelace" not in asked[0]
 
     async def test_the_confirmation_happens_before_the_post(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -383,9 +392,7 @@ class TestThePersonBeforeTheCreate:
             calls_when_asked.append(len(graph.calls))
             return None
 
-        _ = await create_chat(
-            client, chat_type="oneOnOne", members=[OTHER_USER_ID], confirm=watching
-        )
+        _ = await create_chat(client, chat_type="oneOnOne", members=[_GRACE], confirm=watching)
 
         assert calls_when_asked == [1], "asked after the create already went out"
         assert post.call_count == 1
@@ -448,9 +455,7 @@ class TestHowTheQuestionReachesAPerson:
         confirm = a_person_agrees(self._context(DeclinedElicitation()))
 
         with pytest.raises(ToolError, match=_NOTHING_CREATED):
-            _ = await create_chat(
-                client, chat_type="oneOnOne", members=[OTHER_USER_ID], confirm=confirm
-            )
+            _ = await create_chat(client, chat_type="oneOnOne", members=[_GRACE], confirm=confirm)
 
         assert post.call_count == 0
 
@@ -461,9 +466,7 @@ class TestHowTheQuestionReachesAPerson:
         confirm = a_person_agrees(self._context(AcceptedElicitation(data="do not create")))
 
         with pytest.raises(ToolError, match=_NOTHING_CREATED):
-            _ = await create_chat(
-                client, chat_type="oneOnOne", members=[OTHER_USER_ID], confirm=confirm
-            )
+            _ = await create_chat(client, chat_type="oneOnOne", members=[_GRACE], confirm=confirm)
 
         assert post.call_count == 0
 
@@ -516,7 +519,7 @@ class TestTheEraWithNoBackChannel:
         answer = await create_chat(
             client,
             chat_type="oneOnOne",
-            members=[OTHER_USER_ID],
+            members=[_GRACE],
             confirm=a_person_agrees(_modern_context()),
         )
 
@@ -532,7 +535,7 @@ class TestTheEraWithNoBackChannel:
             await create_chat(
                 client,
                 chat_type="group",
-                members=[OTHER_USER_ID, _THIRD_USER_ID],
+                members=[_GRACE, _BOB],
                 topic="Release",
                 confirm=a_person_agrees(_modern_context()),
             )
@@ -541,7 +544,7 @@ class TestTheEraWithNoBackChannel:
         answer = await create_chat(
             client,
             chat_type="group",
-            members=[_THIRD_USER_ID, OTHER_USER_ID],
+            members=[_BOB, _GRACE],
             topic="Release",
             confirm=a_person_agrees(
                 _modern_context(
@@ -562,7 +565,7 @@ class TestTheEraWithNoBackChannel:
             await create_chat(
                 client,
                 chat_type="group",
-                members=[OTHER_USER_ID],
+                members=[_GRACE],
                 confirm=a_person_agrees(_modern_context()),
             )
         )
@@ -571,7 +574,7 @@ class TestTheEraWithNoBackChannel:
             _ = await create_chat(
                 client,
                 chat_type="group",
-                members=[OTHER_USER_ID, _THIRD_USER_ID],
+                members=[_GRACE, _BOB],
                 confirm=a_person_agrees(
                     _modern_context(
                         answers={
@@ -592,7 +595,7 @@ class TestTheEraWithNoBackChannel:
             await create_chat(
                 client,
                 chat_type="group",
-                members=[OTHER_USER_ID],
+                members=[_GRACE],
                 topic="Release",
                 confirm=a_person_agrees(_modern_context()),
             )
@@ -602,7 +605,7 @@ class TestTheEraWithNoBackChannel:
             _ = await create_chat(
                 client,
                 chat_type="group",
-                members=[OTHER_USER_ID],
+                members=[_GRACE],
                 topic="Layoffs",
                 confirm=a_person_agrees(
                     _modern_context(
@@ -616,6 +619,66 @@ class TestTheEraWithNoBackChannel:
 
         assert post.call_count == 0, "a chat with another topic went out on an accept for Release"
 
+    async def test_the_same_ids_under_other_names_still_create_the_chat_the_user_agreed_to(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _creates(graph, _chat_payload(chat_type="group"))
+        key, state, agrees_with = _the_question(
+            await create_chat(
+                client,
+                chat_type="group",
+                members=[_GRACE, _BOB],
+                confirm=a_person_agrees(_modern_context()),
+            )
+        )
+
+        _ = await create_chat(
+            client,
+            chat_type="group",
+            members=[
+                Person(user_id=OTHER_USER_ID, name="grace@example.invalid"),
+                Person(user_id=_THIRD_USER_ID, name="Bob"),
+            ],
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": agrees_with})},
+                    state=state,
+                )
+            ),
+        )
+
+        assert post.call_count == 1
+
+    async def test_the_same_names_under_other_ids_create_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _creates(graph, _chat_payload(chat_type="group"))
+        key, state, agrees_with = _the_question(
+            await create_chat(
+                client,
+                chat_type="group",
+                members=[_GRACE],
+                confirm=a_person_agrees(_modern_context()),
+            )
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await create_chat(
+                client,
+                chat_type="group",
+                members=[Person(user_id=_THIRD_USER_ID, name=_GRACE.name)],
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+            )
+
+        assert post.call_count == 0, "a chat with another person went out under the same name"
+
 
 class TestTheRetryItRefuses:
     @pytest.mark.usefixtures("retry_sleeps")
@@ -626,9 +689,7 @@ class TestTheRetryItRefuses:
         post = graph.post("/chats").mock(return_value=httpx.Response(503))
 
         with pytest.raises(GraphUnavailable):
-            _ = await create_chat(
-                client, chat_type="group", members=[OTHER_USER_ID], confirm=_agrees
-            )
+            _ = await create_chat(client, chat_type="group", members=[_GRACE], confirm=_agrees)
 
         assert post.call_count == 1
 
@@ -642,9 +703,7 @@ class TestTheRetryItRefuses:
         )
 
         with pytest.raises(GraphThrottled):
-            _ = await create_chat(
-                client, chat_type="group", members=[OTHER_USER_ID], confirm=_agrees
-            )
+            _ = await create_chat(client, chat_type="group", members=[_GRACE], confirm=_agrees)
 
         assert post.call_count == 1
 
@@ -658,7 +717,7 @@ class TestWhatItAnswers:
         answer = await create_chat(
             client,
             chat_type="group",
-            members=[OTHER_USER_ID],
+            members=[_GRACE],
             topic="Release",
             confirm=_agrees,
         )
@@ -675,9 +734,7 @@ class TestWhatItAnswers:
     ) -> None:
         _ = _creates(graph, _chat_payload(created_at="2024-02-01T08:00:00Z"))
 
-        answer = await create_chat(
-            client, chat_type="oneOnOne", members=[OTHER_USER_ID], confirm=_agrees
-        )
+        answer = await create_chat(client, chat_type="oneOnOne", members=[_GRACE], confirm=_agrees)
 
         assert not isinstance(answer, InputRequiredResult)
         assert answer.chat_type == "oneOnOne"
@@ -698,9 +755,7 @@ class TestTheFailuresItPassesOn:
         )
 
         with pytest.raises(GraphForbidden):
-            _ = await create_chat(
-                client, chat_type="oneOnOne", members=[OTHER_USER_ID], confirm=_agrees
-            )
+            _ = await create_chat(client, chat_type="oneOnOne", members=[_GRACE], confirm=_agrees)
 
 
 class TestHowItDeclaresItself:
@@ -745,6 +800,21 @@ class TestHowItDeclaresItself:
             + "Microsoft returns it and creates no new chat."
         ) in " ".join((tool.description or "").split())
 
+    async def test_the_description_names_no_tool_that_its_preset_leaves_out(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = " ".join((tool.description or "").split())
+        assert "it posts no message. teams_list_chats shows the new chat." in description
+        assert "teams_send_chat_message" not in description
+
+    def test_the_answer_says_where_the_chat_id_goes_without_naming_a_tool_for_it(self) -> None:
+        chat_id = str(creator.CreatedChat.model_fields["chat_id"].description)
+
+        assert "Pass this id as `chat_id` to a tool that sends chat messages" in chat_id
+        assert "teams_send_chat_message" not in chat_id
+
     async def test_the_description_says_how_to_retry(self, transport: httpx.AsyncClient) -> None:
         tool = await _registered(transport)
 
@@ -769,9 +839,24 @@ class TestHowItDeclaresItself:
 
         assert chat_type["enum"] == ["oneOnOne", "group"]
 
-    async def test_every_member_is_a_guid(self, transport: httpx.AsyncClient) -> None:
+    async def test_every_member_is_a_guid_with_a_name(self, transport: httpx.AsyncClient) -> None:
         members = (await _listed(transport))["members"]
 
         assert members["minItems"] == 1
         items = cast("Mapping[str, object]", members["items"])
-        assert items["pattern"] == identity.ENTRA_OBJECT_ID_PATTERN
+        properties = cast("Mapping[str, Mapping[str, object]]", items["properties"])
+        assert properties["user_id"]["pattern"] == identity.ENTRA_OBJECT_ID_PATTERN
+        assert properties["name"]["minLength"] == 1
+        assert items["required"] == ["user_id", "name"]
+
+    async def test_the_members_say_the_owner_role_leaves_out_an_in_tenant_guest(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        described = " ".join(str((await _listed(transport))["members"]["description"]).split())
+
+        assert "Do not include the signed-in user" in described
+        assert (
+            "This tool adds every person as an owner, and Microsoft accepts no in-tenant guest as "
+            + "an owner."
+        ) in described
+        assert 15 <= len(described.split()) <= 60

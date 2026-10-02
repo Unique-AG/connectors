@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from contextlib import suppress
 from typing import Annotated
 
 import httpx
@@ -7,11 +8,15 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
+from msgraph.generated.models.aad_user_conversation_member import AadUserConversationMember
+from msgraph.generated.models.conversation_member import ConversationMember
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
+from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.handles import CHAT_PERMISSION
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
     Confirm,
@@ -21,9 +26,10 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "teams_remove_chat_member"
 
+STEP_READ = "chat_member"
 STEP = "remove_chat_member"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMember.ReadWrite",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMember.ReadWrite", CHAT_PERMISSION)
 
 CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_list_chat_members",)
 
@@ -39,6 +45,16 @@ _AGREE = "remove"
 _DECLINE = "do not remove"
 _NOTHING_REMOVED = "Nobody was removed."
 _EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
+_NO_NAME = "a member with no name"
+_FAILS_THE_SAME_WAY = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
+
+_NO_SUCH_MEMBER = (
+    "Microsoft 365 has no member with this `membership_id` in this chat. "
+    + f"{_NOTHING_REMOVED} Call teams_list_chat_members to see the current members of the chat. "
+    + f"Copy the `membership_id` from that list. {_FAILS_THE_SAME_WAY}"
+)
 
 _DESCRIPTION = """\
 Removes one member from an existing Teams chat, as the signed-in user. The chat is the `chat_id` \
@@ -75,20 +91,27 @@ class RemovedChatMember(BaseModel):
 async def remove_chat_member(
     client: GraphServiceClient, *, chat_id: str, membership_id: str, confirm: Confirm
 ) -> RemovedChatMember | InputRequiredResult:
-    with graph_errors(TOOL_NAME, step=STEP):
-        with not_graph():
-            answer = await confirm(
-                _question(chat_id, membership_id), _about(chat_id, membership_id)
-            )
-        asked = answer if isinstance(answer, InputRequiredResult) else None
-        refused = answer if isinstance(answer, str) else None
-        if refused is None and asked is None:
-            member = client.chats.by_chat_id(chat_id).members.by_conversation_member_id(
-                membership_id
-            )
-            await member.delete(
-                request_configuration=RequestConfiguration[QueryParameters](options=no_retry())
-            )
+    member = client.chats.by_chat_id(chat_id).members.by_conversation_member_id(membership_id)
+    found: ConversationMember | None = None
+    asked: InputRequiredResult | None = None
+    refused: str | None = None
+    with graph_errors(TOOL_NAME):
+        with suppress(GraphNotFound), graph_step(STEP_READ):
+            found = await member.get()
+        if found is None:
+            refused = _NO_SUCH_MEMBER
+        else:
+            with not_graph():
+                answer = await confirm(_question(found), _about(chat_id, membership_id))
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
+            if refused is None and asked is None:
+                with graph_step(STEP):
+                    await member.delete(
+                        request_configuration=RequestConfiguration[QueryParameters](
+                            options=no_retry()
+                        )
+                    )
 
     if asked is not None:
         return asked
@@ -97,11 +120,16 @@ async def remove_chat_member(
     return RemovedChatMember(chat_id=chat_id, membership_id=membership_id)
 
 
-def _question(chat_id: str, membership_id: str) -> str:
-    return (
-        f"Remove the member with the membership id {membership_id!r} from the Teams chat "
-        + f"{chat_id!r}? {_EVERYONE_SEES_IT}"
-    )
+def _question(member: ConversationMember) -> str:
+    return f"Remove {_who(member)} from the Teams chat? {_EVERYONE_SEES_IT}"
+
+
+def _who(member: ConversationMember) -> str:
+    name = repr(cut_for_a_question(member.display_name)) if member.display_name else None
+    email = (member.email if isinstance(member, AadUserConversationMember) else None) or None
+    if name is None:
+        return email or _NO_NAME
+    return name if email is None else f"{name} ({email})"
 
 
 def _about(chat_id: str, membership_id: str) -> str:

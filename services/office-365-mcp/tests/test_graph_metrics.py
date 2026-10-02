@@ -719,6 +719,7 @@ GRAPH_STEPS = frozenset(
         "delete_meeting",
         "create_chat",
         "add_chat_member",
+        "chat_member",
         "remove_chat_member",
         "rename_chat",
         "mail_search",

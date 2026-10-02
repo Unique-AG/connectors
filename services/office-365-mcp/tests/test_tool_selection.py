@@ -331,9 +331,13 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
         "user_id": ("get_me", "teams_list_chats", "teams_list_chat_members"),
     },
     "teams_delete_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
-    "teams_create_chat": {"members": ("teams_list_chat_members", "teams_list_chats")},
+    "teams_create_chat": {
+        "members": ("teams_list_chat_members", "teams_list_chats"),
+        "user_id": ("teams_list_chat_members", "teams_list_chats"),
+    },
     "teams_add_chat_member": {
         "chat_id": ("teams_list_chats", "teams_create_chat"),
+        "member": ("teams_list_chat_members", "teams_list_chats"),
         "user_id": ("teams_list_chat_members", "teams_list_chats"),
     },
     "teams_remove_chat_member": {
@@ -438,7 +442,8 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "teams_edit_message": frozenset({"message", "name"}),
     "teams_create_meeting": frozenset({"subject", "starts_at", "ends_at", "name"}),
     "teams_update_meeting": frozenset({"name"}),
-    "teams_create_chat": frozenset({"chat_type", "topic"}),
+    "teams_create_chat": frozenset({"chat_type", "topic", "name"}),
+    "teams_add_chat_member": frozenset({"name"}),
     "teams_rename_chat": frozenset({"topic"}),
     "teams_search_messages": frozenset(
         {
@@ -627,6 +632,10 @@ _NAMES_ONLY_ITS_PRESETS_TOOLS: frozenset[str] = frozenset(
         "teams_create_meeting",
         "teams_update_meeting",
         "teams_delete_meeting",
+        "teams_create_chat",
+        "teams_add_chat_member",
+        "teams_remove_chat_member",
+        "teams_rename_chat",
     }
 )
 

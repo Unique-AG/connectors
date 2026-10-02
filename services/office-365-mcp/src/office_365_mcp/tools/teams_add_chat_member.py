@@ -13,7 +13,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
 from office_365_mcp.shared.calendar import confirmation_id_for
-from office_365_mcp.shared.identity import ENTRA_OBJECT_ID_PATTERN
+from office_365_mcp.shared.identity import Person
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -31,7 +32,7 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_list_chat_members",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "chat_id": "19:release@thread.v2",
-    "user_id": "00000000-0000-4000-8000-000000000002",
+    "member": {"user_id": "00000000-0000-4000-8000-000000000002", "name": "Grace Hopper"},
 }
 
 _OWNER = "owner"
@@ -86,21 +87,21 @@ async def add_chat_member(
     client: GraphServiceClient,
     *,
     chat_id: str,
-    user_id: str,
+    member: Person,
     share_history: bool,
     confirm: Confirm,
 ) -> AddedChatMember | InputRequiredResult:
     with graph_errors(TOOL_NAME, step=STEP):
         with not_graph():
             answer = await confirm(
-                _question(chat_id, user_id, share_history=share_history),
-                _about(chat_id, user_id, share_history=share_history),
+                _question(member, share_history=share_history),
+                _about(chat_id, member.user_id, share_history=share_history),
             )
         asked = answer if isinstance(answer, InputRequiredResult) else None
         refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             _ = await client.chats.by_chat_id(chat_id).members.post(
-                _member(user_id, share_history=share_history),
+                _member(member.user_id, share_history=share_history),
                 request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
             )
 
@@ -108,7 +109,7 @@ async def add_chat_member(
         return asked
     if refused is not None:
         raise ToolError(refused)
-    return AddedChatMember(chat_id=chat_id, user_id=user_id, shared_history=share_history)
+    return AddedChatMember(chat_id=chat_id, user_id=member.user_id, shared_history=share_history)
 
 
 def _member(user_id: str, *, share_history: bool) -> AadUserConversationMember:
@@ -117,9 +118,10 @@ def _member(user_id: str, *, share_history: bool) -> AadUserConversationMember:
     return AadUserConversationMember(roles=[_OWNER], additional_data={**bind, **history})
 
 
-def _question(chat_id: str, user_id: str, *, share_history: bool) -> str:
+def _question(member: Person, *, share_history: bool) -> str:
     history = _ALL_HISTORY_SHOWN if share_history else _NO_HISTORY_SHOWN
-    return f"Add the user {user_id!r} to the Teams chat {chat_id!r}? {history} {_EVERYONE_SEES_IT}"
+    name = cut_for_a_question(member.name)
+    return f"Add {name!r} to the Teams chat? {history} {_EVERYONE_SEES_IT}"
 
 
 def _about(chat_id: str, user_id: str, *, share_history: bool) -> str:
@@ -151,16 +153,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        user_id: Annotated[
-            str,
+        member: Annotated[
+            Person,
             Field(
-                pattern=ENTRA_OBJECT_ID_PATTERN,
                 description=(
-                    "The Microsoft Entra object id of the person to add, as a GUID. Copy it from "
-                    + "the `user_id` of a teams_list_chat_members row, of a teams_list_chats "
-                    + "member, or of a message `sender`. Never build it from a name or an email "
-                    + "address. This tool adds the person as an owner, and Microsoft accepts no "
-                    + "in-tenant guest as an owner."
+                    "The person to add to the chat. This tool adds the person as an owner, and "
+                    + "Microsoft accepts no in-tenant guest as an owner."
                 ),
             ),
         ],
@@ -180,7 +178,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await add_chat_member(
             client,
             chat_id=chat_id,
-            user_id=user_id,
+            member=member,
             share_history=share_history,
             confirm=a_person_agrees(ctx),
         )

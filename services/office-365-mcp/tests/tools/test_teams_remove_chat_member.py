@@ -17,6 +17,7 @@ from mcp.types import (
 )
 from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
 
 from office_365_mcp.graph_client import (
     GraphFailure,
@@ -32,14 +33,29 @@ from office_365_mcp.tools.teams_remove_chat_member import (
     remove_chat_member,
 )
 
+from .conftest import OTHER_USER_ID
+
 _CHAT_ID = "19:release@thread.v2"
 _OTHER_CHAT_ID = "19:pricing@thread.v2"
 _MEMBERSHIP_ID = cast("str", remover.GRAPH_CALL_EXAMPLE["membership_id"])
 _OTHER_MEMBERSHIP_ID = "MCMjU1lOVEhFVElDMSMj"
 
 _MEMBER_PATH = f"/chats/19%3Arelease%40thread.v2/members/{_MEMBERSHIP_ID.replace('=', '%3D')}"
+_OTHER_MEMBER_PATH = f"/chats/19%3Arelease%40thread.v2/members/{_OTHER_MEMBERSHIP_ID}"
 
 _NOTHING_REMOVED = "Nobody was removed."
+_EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
+
+_ADA: Mapping[str, object] = {
+    "@odata.type": "#microsoft.graph.aadUserConversationMember",
+    "id": _MEMBERSHIP_ID,
+    "displayName": "Ada Lovelace",
+    "email": "ada@example.invalid",
+    "userId": OTHER_USER_ID,
+    "roles": ["owner"],
+}
+
+_NOT_FOUND = {"error": {"code": "NotFound", "message": "Not Found"}}
 
 
 async def _agrees(question: str, about: str) -> Confirmed:
@@ -52,8 +68,33 @@ async def _refuses(question: str, about: str) -> Confirmed:
     return _NOTHING_REMOVED
 
 
+def _reads(
+    graph: respx.MockRouter, member: Mapping[str, object] = _ADA, path: str = _MEMBER_PATH
+) -> respx.Route:
+    return graph.get(path).mock(return_value=httpx.Response(200, json=dict(member)))
+
+
 def _removes(graph: respx.MockRouter) -> respx.Route:
+    _ = _reads(graph)
     return graph.delete(_MEMBER_PATH).mock(return_value=httpx.Response(204))
+
+
+def _deletes(graph: respx.MockRouter) -> list[Call]:
+    made = cast("Sequence[Call]", graph.calls)
+    return [call for call in made if call.request.method == "DELETE"]
+
+
+async def _asked(client: GraphServiceClient) -> list[str]:
+    asked: list[str] = []
+
+    async def capturing(question: str, _about: str) -> Confirmed:
+        asked.append(question)
+        return None
+
+    _ = await remove_chat_member(
+        client, chat_id=_CHAT_ID, membership_id=_MEMBERSHIP_ID, confirm=capturing
+    )
+    return asked
 
 
 class _ModernRequest:
@@ -113,7 +154,7 @@ async def _registered(transport: httpx.AsyncClient) -> FunctionTool:
 
 
 class TestWhatItSendsToGraph:
-    async def test_it_deletes_the_one_membership_of_the_chat_and_nothing_else(
+    async def test_it_reads_the_one_membership_and_then_deletes_it_and_nothing_else(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         route = _removes(graph)
@@ -122,11 +163,40 @@ class TestWhatItSendsToGraph:
             client, chat_id=_CHAT_ID, membership_id=_MEMBERSHIP_ID, confirm=_agrees
         )
 
+        made = cast("Sequence[Call]", graph.calls)
+        member = f"/v1.0/chats/{_CHAT_ID}/members/{_MEMBERSHIP_ID}"
+        assert [(call.request.method, call.request.url.path) for call in made] == [
+            ("GET", member),
+            ("DELETE", member),
+        ]
         assert route.call_count == 1
-        assert len(graph.calls) == 1, "one removal costs one Graph call, and nothing else"
-        request = route.calls.last.request
-        assert request.url.path == f"/v1.0/chats/{_CHAT_ID}/members/{_MEMBERSHIP_ID}"
-        assert request.content == b""
+        assert route.calls.last.request.content == b""
+
+    async def test_a_membership_graph_does_not_find_is_refused_before_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_MEMBER_PATH).mock(return_value=httpx.Response(404, json=_NOT_FOUND))
+        route = graph.delete(_MEMBER_PATH).mock(return_value=httpx.Response(204))
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        with pytest.raises(ToolError) as refused:
+            _ = await remove_chat_member(
+                client, chat_id=_CHAT_ID, membership_id=_MEMBERSHIP_ID, confirm=capturing
+            )
+
+        assert str(refused.value) == (
+            "Microsoft 365 has no member with this `membership_id` in this chat. Nobody was "
+            + "removed. Call teams_list_chat_members to see the current members of the chat. "
+            + "Copy the `membership_id` from that list. If you call this tool again with the "
+            + "same arguments, the call will fail the same way."
+        )
+        assert refused.value.__cause__ is None, "the advice of the server would replace it"
+        assert asked == [], "a member that Graph does not find was put to the person"
+        assert route.call_count == 0
 
 
 class TestThePersonBeforeTheChange:
@@ -141,7 +211,7 @@ class TestThePersonBeforeTheChange:
             )
 
         assert route.call_count == 0
-        assert len(graph.calls) == 0
+        assert _deletes(graph) == []
 
     async def test_a_decline_removes_nobody(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -190,27 +260,63 @@ class TestThePersonBeforeTheChange:
             client, chat_id=_CHAT_ID, membership_id=_MEMBERSHIP_ID, confirm=watching
         )
 
-        assert calls_when_asked == [0], "asked after the member was already removed"
+        assert calls_when_asked == [1], "asked before the member was read, or after the delete"
         assert route.call_count == 1
 
-    async def test_the_question_names_the_membership_the_chat_and_who_sees_it(
+    @pytest.mark.parametrize(
+        ("member", "named"),
+        [
+            pytest.param(_ADA, "'Ada Lovelace' (ada@example.invalid)", id="name-and-email"),
+            pytest.param({**_ADA, "email": None}, "'Ada Lovelace'", id="name-only"),
+            pytest.param({**_ADA, "displayName": None}, "ada@example.invalid", id="email-only"),
+            pytest.param(
+                {**_ADA, "displayName": None, "email": None}, "a member with no name", id="neither"
+            ),
+            pytest.param(
+                {
+                    "@odata.type": "#microsoft.graph.anonymousGuestConversationMember",
+                    "id": _MEMBERSHIP_ID,
+                    "displayName": "Guest 1",
+                },
+                "'Guest 1'",
+                id="anonymous-guest",
+            ),
+        ],
+    )
+    async def test_the_question_names_the_member_and_who_sees_it(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        member: Mapping[str, object],
+        named: str,
+    ) -> None:
+        _ = _reads(graph, member)
+        _ = graph.delete(_MEMBER_PATH).mock(return_value=httpx.Response(204))
+
+        asked = await _asked(client)
+
+        assert asked == [f"Remove {named} from the Teams chat? {_EVERYONE_SEES_IT}"]
+
+    async def test_the_question_shows_no_membership_id_and_no_user_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _removes(graph)
-        asked: list[str] = []
 
-        async def capturing(question: str, _about: str) -> Confirmed:
-            asked.append(question)
-            return None
+        (question,) = await _asked(client)
 
-        _ = await remove_chat_member(
-            client, chat_id=_CHAT_ID, membership_id=_MEMBERSHIP_ID, confirm=capturing
-        )
+        assert _MEMBERSHIP_ID not in question
+        assert OTHER_USER_ID not in question
+        assert _CHAT_ID not in question
 
-        assert asked == [
-            f"Remove the member with the membership id {_MEMBERSHIP_ID!r} from the Teams chat "
-            + f"{_CHAT_ID!r}? Everyone in the conversation can see this change."
-        ]
+    async def test_the_question_cuts_a_long_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, {**_ADA, "displayName": "A" * 200, "email": None})
+        _ = graph.delete(_MEMBER_PATH).mock(return_value=httpx.Response(204))
+
+        (question,) = await _asked(client)
+
+        assert question == f"Remove {'A' * 120 + '…'!r} from the Teams chat? {_EVERYONE_SEES_IT}"
 
     def test_the_binding_differs_for_another_membership_and_another_chat(self) -> None:
         about = remover._about  # pyright: ignore[reportPrivateUsage]
@@ -236,7 +342,8 @@ class TestTheEraWithNoBackChannel:
 
         _key, _state, agrees_with, question = _the_question(answer)
         assert agrees_with == "remove"
-        assert _MEMBERSHIP_ID in question
+        assert "'Ada Lovelace' (ada@example.invalid)" in question
+        assert _MEMBERSHIP_ID not in question
         assert route.call_count == 0, "an unanswered question removed the member anyway"
 
     async def test_the_second_round_deletes_the_membership_the_answer_was_bound_to(
@@ -265,16 +372,15 @@ class TestTheEraWithNoBackChannel:
         )
 
         assert route.call_count == 1, "the agreed removal did not happen exactly once"
-        assert len(graph.calls) == 1
+        assert len(_deletes(graph)) == 1
         assert answer == RemovedChatMember(chat_id=_CHAT_ID, membership_id=_MEMBERSHIP_ID)
 
     async def test_an_answer_bound_to_another_membership_removes_nobody(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         route = _removes(graph)
-        other = graph.delete(
-            f"/chats/19%3Arelease%40thread.v2/members/{_OTHER_MEMBERSHIP_ID}"
-        ).mock(return_value=httpx.Response(204))
+        _ = _reads(graph, {**_ADA, "id": _OTHER_MEMBERSHIP_ID}, _OTHER_MEMBER_PATH)
+        other = graph.delete(_OTHER_MEMBER_PATH).mock(return_value=httpx.Response(204))
         key, state, agrees_with, _question = _the_question(
             await remove_chat_member(
                 client,
@@ -308,6 +414,7 @@ class TestTheRetryItRefuses:
     async def test_a_delete_graph_answers_503_is_never_sent_a_second_time(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph)
         route = graph.delete(_MEMBER_PATH).mock(return_value=httpx.Response(503))
 
         with pytest.raises(GraphUnavailable):
@@ -335,6 +442,7 @@ class TestTheFailuresItPassesOn:
     async def test_a_refused_removal_is_a_forbidden(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph)
         _ = graph.delete(_MEMBER_PATH).mock(
             return_value=httpx.Response(
                 403, json={"error": {"code": "Forbidden", "message": "denied"}}
@@ -346,14 +454,28 @@ class TestTheFailuresItPassesOn:
                 client, chat_id=_CHAT_ID, membership_id=_MEMBERSHIP_ID, confirm=_agrees
             )
 
-    async def test_a_membership_graph_does_not_find_is_a_not_found(
+    async def test_a_refused_read_is_a_forbidden_and_deletes_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = graph.delete(_MEMBER_PATH).mock(
+        _ = graph.get(_MEMBER_PATH).mock(
             return_value=httpx.Response(
-                404, json={"error": {"code": "NotFound", "message": "Not Found"}}
+                403, json={"error": {"code": "Forbidden", "message": "denied"}}
             )
         )
+        route = graph.delete(_MEMBER_PATH).mock(return_value=httpx.Response(204))
+
+        with pytest.raises(GraphForbidden):
+            _ = await remove_chat_member(
+                client, chat_id=_CHAT_ID, membership_id=_MEMBERSHIP_ID, confirm=_agrees
+            )
+
+        assert route.call_count == 0
+
+    async def test_a_membership_gone_between_the_read_and_the_delete_is_a_not_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = graph.delete(_MEMBER_PATH).mock(return_value=httpx.Response(404, json=_NOT_FOUND))
 
         with pytest.raises(GraphNotFound):
             _ = await remove_chat_member(
@@ -364,6 +486,7 @@ class TestTheFailuresItPassesOn:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         reason = "Cannot remove members from a oneOnOne chat."
+        _ = _reads(graph)
         _ = graph.delete(_MEMBER_PATH).mock(
             return_value=httpx.Response(
                 400, json={"error": {"code": "BadRequest", "message": reason}}
@@ -380,10 +503,11 @@ class TestTheFailuresItPassesOn:
 
 
 class TestHowItDeclaresItself:
-    def test_the_permission_is_chat_member_read_write(self) -> None:
-        assert remover.GRAPH_PERMISSIONS == ("ChatMember.ReadWrite",)
+    def test_the_permissions_are_chat_member_read_write_and_chat_read(self) -> None:
+        assert remover.GRAPH_PERMISSIONS == ("ChatMember.ReadWrite", "Chat.Read")
 
-    def test_its_one_step_is_the_one_call_it_makes(self) -> None:
+    def test_its_steps_are_the_read_and_the_delete(self) -> None:
+        assert remover.STEP_READ == "chat_member"
         assert remover.STEP == "remove_chat_member"
 
     def test_teams_list_chat_members_shows_the_change(self) -> None:

@@ -25,6 +25,7 @@ from office_365_mcp.graph_client import (
     GraphThrottled,
     GraphUnavailable,
 )
+from office_365_mcp.shared.identity import Person
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirmed
 from office_365_mcp.tools import teams_add_chat_member as adder
 from office_365_mcp.tools.teams_add_chat_member import (
@@ -40,8 +41,10 @@ _OTHER_CHAT_ID = "19:pricing@thread.v2"
 _MEMBERS_PATH = "/chats/19%3Arelease%40thread.v2/members"
 _LOCATION = f"/chats/{_CHAT_ID}/members/MCMjU1lOVEhFVElDMCMj"
 
-_GRACE = OTHER_USER_ID
-_JANE = "00000000-0000-4000-8000-000000000003"
+_GRACE_ID = OTHER_USER_ID
+_JANE_ID = "00000000-0000-4000-8000-000000000003"
+_GRACE = Person(user_id=_GRACE_ID, name="Grace Hopper")
+_JANE = Person(user_id=_JANE_ID, name="Jane Doe")
 
 _NOTHING_ADDED = "Nobody was added."
 
@@ -131,7 +134,7 @@ class TestWhatItSendsToGraph:
         route = _adds(graph)
 
         _ = await add_chat_member(
-            client, chat_id=_CHAT_ID, user_id=_GRACE, share_history=False, confirm=_agrees
+            client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=_agrees
         )
 
         assert route.call_count == 1
@@ -143,14 +146,15 @@ class TestWhatItSendsToGraph:
         route = _adds(graph)
 
         _ = await add_chat_member(
-            client, chat_id=_CHAT_ID, user_id=_GRACE, share_history=False, confirm=_agrees
+            client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=_agrees
         )
 
         assert _body(route) == {
             "@odata.type": "#microsoft.graph.aadUserConversationMember",
-            "user@odata.bind": f"https://graph.microsoft.com/v1.0/users/{_GRACE}",
+            "user@odata.bind": f"https://graph.microsoft.com/v1.0/users/{_GRACE_ID}",
             "roles": ["owner"],
         }
+        assert "Grace Hopper" not in route.calls.last.request.content.decode()
 
     async def test_sharing_history_sends_the_all_history_value_of_the_documentation(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -158,12 +162,12 @@ class TestWhatItSendsToGraph:
         route = _adds(graph)
 
         _ = await add_chat_member(
-            client, chat_id=_CHAT_ID, user_id=_GRACE, share_history=True, confirm=_agrees
+            client, chat_id=_CHAT_ID, member=_GRACE, share_history=True, confirm=_agrees
         )
 
         assert _body(route) == {
             "@odata.type": "#microsoft.graph.aadUserConversationMember",
-            "user@odata.bind": f"https://graph.microsoft.com/v1.0/users/{_GRACE}",
+            "user@odata.bind": f"https://graph.microsoft.com/v1.0/users/{_GRACE_ID}",
             "roles": ["owner"],
             "visibleHistoryStartDateTime": _ALL_HISTORY,
         }
@@ -177,7 +181,7 @@ class TestThePersonBeforeTheChange:
 
         with pytest.raises(ToolError, match=_NOTHING_ADDED):
             _ = await add_chat_member(
-                client, chat_id=_CHAT_ID, user_id=_GRACE, share_history=False, confirm=_refuses
+                client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=_refuses
             )
 
         assert route.call_count == 0
@@ -193,7 +197,7 @@ class TestThePersonBeforeTheChange:
             _ = await add_chat_member(
                 client,
                 chat_id=_CHAT_ID,
-                user_id=_GRACE,
+                member=_GRACE,
                 share_history=False,
                 confirm=a_person_agrees(session.context),
             )
@@ -210,7 +214,7 @@ class TestThePersonBeforeTheChange:
         _ = await add_chat_member(
             client,
             chat_id=_CHAT_ID,
-            user_id=_GRACE,
+            member=_GRACE,
             share_history=False,
             confirm=a_person_agrees(session.context),
         )
@@ -229,7 +233,7 @@ class TestThePersonBeforeTheChange:
             return None
 
         _ = await add_chat_member(
-            client, chat_id=_CHAT_ID, user_id=_GRACE, share_history=False, confirm=watching
+            client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=watching
         )
 
         assert calls_when_asked == [0], "asked after the member was already added"
@@ -242,7 +246,7 @@ class TestThePersonBeforeTheChange:
             (True, "The new member will see all earlier messages of the chat."),
         ],
     )
-    async def test_the_question_names_the_user_the_chat_the_history_and_who_sees_it(
+    async def test_the_question_names_the_person_the_history_and_who_sees_it(
         self,
         client: GraphServiceClient,
         graph: respx.MockRouter,
@@ -259,26 +263,63 @@ class TestThePersonBeforeTheChange:
         _ = await add_chat_member(
             client,
             chat_id=_CHAT_ID,
-            user_id=_GRACE,
+            member=_GRACE,
             share_history=share_history,
             confirm=capturing,
         )
 
-        assert len(asked) == 1
-        assert asked[0].startswith(f"Add the user {_GRACE!r} to the Teams chat {_CHAT_ID!r}?")
-        assert history in asked[0]
-        assert "Everyone in the conversation can see this change." in asked[0]
+        assert asked == [
+            f"Add 'Grace Hopper' to the Teams chat? {history} "
+            + "Everyone in the conversation can see this change."
+        ]
+
+    async def test_the_question_shows_no_user_id_and_no_chat_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _adds(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await add_chat_member(
+            client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=capturing
+        )
+
+        assert _GRACE_ID not in asked[0]
+        assert _CHAT_ID not in asked[0]
+
+    async def test_the_question_cuts_a_long_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _adds(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await add_chat_member(
+            client,
+            chat_id=_CHAT_ID,
+            member=Person(user_id=_GRACE_ID, name="G" * 200),
+            share_history=False,
+            confirm=capturing,
+        )
+
+        assert asked[0].startswith(f"Add {'G' * 120 + '…'!r} to the Teams chat?")
 
     def test_the_binding_differs_for_another_user_another_chat_and_another_history(
         self,
     ) -> None:
         about = adder._about  # pyright: ignore[reportPrivateUsage]
 
-        bound = about(_CHAT_ID, _GRACE, share_history=False)
+        bound = about(_CHAT_ID, _GRACE_ID, share_history=False)
 
-        assert bound != about(_CHAT_ID, _JANE, share_history=False)
-        assert bound != about(_OTHER_CHAT_ID, _GRACE, share_history=False)
-        assert bound != about(_CHAT_ID, _GRACE, share_history=True)
+        assert bound != about(_CHAT_ID, _JANE_ID, share_history=False)
+        assert bound != about(_OTHER_CHAT_ID, _GRACE_ID, share_history=False)
+        assert bound != about(_CHAT_ID, _GRACE_ID, share_history=True)
 
 
 class TestTheEraWithNoBackChannel:
@@ -290,14 +331,15 @@ class TestTheEraWithNoBackChannel:
         answer = await add_chat_member(
             client,
             chat_id=_CHAT_ID,
-            user_id=_GRACE,
+            member=_GRACE,
             share_history=False,
             confirm=a_person_agrees(_Session().context),
         )
 
         _key, _state, agrees_with, question = _the_question(answer)
         assert agrees_with == "add"
-        assert _GRACE in question
+        assert "'Grace Hopper'" in question
+        assert _GRACE_ID not in question
         assert route.call_count == 0, "an unanswered question added the member anyway"
 
     @pytest.mark.parametrize("share_history", [False, True])
@@ -309,7 +351,7 @@ class TestTheEraWithNoBackChannel:
             await add_chat_member(
                 client,
                 chat_id=_CHAT_ID,
-                user_id=_GRACE,
+                member=_GRACE,
                 share_history=share_history,
                 confirm=a_person_agrees(_Session().context),
             )
@@ -318,7 +360,7 @@ class TestTheEraWithNoBackChannel:
         answer = await add_chat_member(
             client,
             chat_id=_CHAT_ID,
-            user_id=_GRACE,
+            member=_GRACE,
             share_history=share_history,
             confirm=a_person_agrees(
                 _Session(
@@ -331,13 +373,14 @@ class TestTheEraWithNoBackChannel:
         assert route.call_count == 1, "the agreed addition did not happen exactly once"
         assert len(graph.calls) == 1
         assert answer == AddedChatMember(
-            chat_id=_CHAT_ID, user_id=_GRACE, shared_history=share_history
+            chat_id=_CHAT_ID, user_id=_GRACE_ID, shared_history=share_history
         )
 
     @pytest.mark.parametrize(
-        ("user_id", "share_history"),
+        ("member", "share_history"),
         [
             pytest.param(_JANE, False, id="another-user"),
+            pytest.param(Person(user_id=_JANE_ID, name=_GRACE.name), False, id="same-name"),
             pytest.param(_GRACE, True, id="with-history"),
         ],
     )
@@ -345,7 +388,7 @@ class TestTheEraWithNoBackChannel:
         self,
         client: GraphServiceClient,
         graph: respx.MockRouter,
-        user_id: str,
+        member: Person,
         share_history: bool,
     ) -> None:
         route = _adds(graph)
@@ -353,7 +396,7 @@ class TestTheEraWithNoBackChannel:
             await add_chat_member(
                 client,
                 chat_id=_CHAT_ID,
-                user_id=_GRACE,
+                member=_GRACE,
                 share_history=False,
                 confirm=a_person_agrees(_Session().context),
             )
@@ -363,7 +406,7 @@ class TestTheEraWithNoBackChannel:
             _ = await add_chat_member(
                 client,
                 chat_id=_CHAT_ID,
-                user_id=user_id,
+                member=member,
                 share_history=share_history,
                 confirm=a_person_agrees(
                     _Session(
@@ -377,6 +420,38 @@ class TestTheEraWithNoBackChannel:
 
         assert route.call_count == 0, "a member was added under an answer nobody gave for it"
 
+    async def test_the_same_id_under_another_name_adds_the_person_the_user_agreed_to(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _adds(graph)
+        key, state, agrees_with, _question = _the_question(
+            await add_chat_member(
+                client,
+                chat_id=_CHAT_ID,
+                member=_GRACE,
+                share_history=False,
+                confirm=a_person_agrees(_Session().context),
+            )
+        )
+
+        _ = await add_chat_member(
+            client,
+            chat_id=_CHAT_ID,
+            member=Person(user_id=_GRACE_ID, name="grace@example.invalid"),
+            share_history=False,
+            confirm=a_person_agrees(
+                _Session(
+                    answers={key: ElicitResult(action="accept", content={"value": agrees_with})},
+                    state=state,
+                ).context
+            ),
+        )
+
+        assert route.call_count == 1
+        assert (
+            _body(route)["user@odata.bind"] == f"https://graph.microsoft.com/v1.0/users/{_GRACE_ID}"
+        )
+
 
 class TestTheRetryItRefuses:
     @pytest.mark.usefixtures("retry_sleeps")
@@ -387,7 +462,7 @@ class TestTheRetryItRefuses:
 
         with pytest.raises(GraphUnavailable):
             _ = await add_chat_member(
-                client, chat_id=_CHAT_ID, user_id=_GRACE, share_history=False, confirm=_agrees
+                client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=_agrees
             )
 
         assert route.call_count == 1
@@ -402,7 +477,7 @@ class TestTheRetryItRefuses:
 
         with pytest.raises(GraphThrottled):
             _ = await add_chat_member(
-                client, chat_id=_CHAT_ID, user_id=_GRACE, share_history=False, confirm=_agrees
+                client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=_agrees
             )
 
         assert route.call_count == 1
@@ -418,13 +493,13 @@ class TestWhatItAnswers:
         answer = await add_chat_member(
             client,
             chat_id=_CHAT_ID,
-            user_id=_GRACE,
+            member=_GRACE,
             share_history=share_history,
             confirm=_agrees,
         )
 
         assert answer == AddedChatMember(
-            chat_id=_CHAT_ID, user_id=_GRACE, shared_history=share_history
+            chat_id=_CHAT_ID, user_id=_GRACE_ID, shared_history=share_history
         )
 
 
@@ -440,7 +515,7 @@ class TestTheFailuresItPassesOn:
 
         with pytest.raises(GraphForbidden):
             _ = await add_chat_member(
-                client, chat_id=_CHAT_ID, user_id=_GRACE, share_history=False, confirm=_agrees
+                client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=_agrees
             )
 
     async def test_an_addition_graph_rejects_passes_on_graphs_reason(
@@ -455,7 +530,7 @@ class TestTheFailuresItPassesOn:
 
         with pytest.raises(GraphFailure) as rejected:
             _ = await add_chat_member(
-                client, chat_id=_CHAT_ID, user_id=_GRACE, share_history=False, confirm=_agrees
+                client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=_agrees
             )
 
         assert rejected.value.status == 400
@@ -509,24 +584,24 @@ class TestHowItDeclaresItself:
         assert "keeps the members of a `oneOnOne` chat fixed" in description
         assert "at most 4 additions a minute to one chat" in description
 
-    async def test_the_arguments_are_chat_id_user_id_and_share_history_and_nothing_else(
+    async def test_the_arguments_are_chat_id_member_and_share_history_and_nothing_else(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
         properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
-        assert set(properties) == {"chat_id", "user_id", "share_history"}
-        assert set(cast("Sequence[str]", tool.parameters["required"])) == {"chat_id", "user_id"}
+        assert set(properties) == {"chat_id", "member", "share_history"}
+        assert set(cast("Sequence[str]", tool.parameters["required"])) == {"chat_id", "member"}
         assert properties["share_history"]["default"] is False
         assert set(adder.GRAPH_CALL_EXAMPLE) <= set(properties)
 
-    async def test_the_user_id_says_the_owner_role_leaves_out_an_in_tenant_guest(
+    async def test_the_member_says_the_owner_role_leaves_out_an_in_tenant_guest(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
         properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
-        described = " ".join(str(properties["user_id"]["description"]).split())
+        described = " ".join(str(properties["member"]["description"]).split())
         assert (
             "This tool adds the person as an owner, and Microsoft accepts no in-tenant guest as "
             + "an owner."
@@ -539,6 +614,23 @@ class TestHowItDeclaresItself:
         tool = await _registered(transport)
 
         with pytest.raises(ValidationError, match="match pattern"):
-            _ = await tool.run({**adder.GRAPH_CALL_EXAMPLE, "user_id": "grace@example.invalid"})
+            _ = await tool.run(
+                {
+                    **adder.GRAPH_CALL_EXAMPLE,
+                    "member": {"user_id": "grace@example.invalid", "name": "Grace Hopper"},
+                }
+            )
 
         assert len(graph.calls) == 0, "a user id the schema refuses reached Graph"
+
+    async def test_a_person_with_no_name_never_reaches_graph(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        tool = await _registered(transport)
+
+        with pytest.raises(ValidationError, match="at least 1 character"):
+            _ = await tool.run(
+                {**adder.GRAPH_CALL_EXAMPLE, "member": {"user_id": _GRACE_ID, "name": ""}}
+            )
+
+        assert len(graph.calls) == 0
