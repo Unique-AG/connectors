@@ -52,6 +52,21 @@ _TEAM_GROUP_AUDIENCE_PATH = f"/groups/{_TEAM_ID}/onenote/sectionGroups/{_GROUP_I
 _TEAM_NOTEBOOK_SECTIONS_PATH = f"/groups/{_TEAM_ID}/onenote/notebooks/{_NOTEBOOK_ID}/sections"
 _TEAM_GROUP_SECTIONS_PATH = f"/groups/{_TEAM_ID}/onenote/sectionGroups/{_GROUP_ID}/sections"
 
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_REASON = "which belongs to a SharePoint site"
+
+_SITE_NOTEBOOK = OnenoteNotebookHandle(_NOTEBOOK_ID, owner=_SITE).uri
+_SITE_GROUP = OnenoteSectionGroupHandle(_GROUP_ID, owner=_SITE).uri
+
+_SITE_NOTEBOOK_AUDIENCE_PATH = f"/sites/{_SITE_ID}/onenote/notebooks/{_NOTEBOOK_ID}"
+_SITE_GROUP_AUDIENCE_PATH = f"/sites/{_SITE_ID}/onenote/sectionGroups/{_GROUP_ID}"
+_SITE_NOTEBOOK_SECTIONS_PATH = f"/sites/{_SITE_ID}/onenote/notebooks/{_NOTEBOOK_ID}/sections"
+_SITE_GROUP_SECTIONS_PATH = f"/sites/{_SITE_ID}/onenote/sectionGroups/{_GROUP_ID}/sections"
+
 
 def _notebook_payload(
     *,
@@ -151,6 +166,44 @@ def team_notebook_sections(graph: respx.MockRouter) -> respx.Route:
 @pytest.fixture
 def team_group_sections(graph: respx.MockRouter) -> respx.Route:
     return graph.post(_TEAM_GROUP_SECTIONS_PATH).mock(
+        return_value=httpx.Response(201, json=_section_payload())
+    )
+
+
+@pytest.fixture
+def site_notebook_audience(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_SITE_NOTEBOOK_AUDIENCE_PATH).mock(
+        return_value=httpx.Response(200, json=_notebook_payload())
+    )
+
+
+@pytest.fixture
+def site_group_audience(graph: respx.MockRouter) -> respx.Route:
+    _ = graph.get(_SITE_NOTEBOOK_AUDIENCE_PATH).mock(
+        return_value=httpx.Response(200, json=_notebook_payload())
+    )
+    return graph.get(_SITE_GROUP_AUDIENCE_PATH).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": _GROUP_ID,
+                "displayName": "Projects",
+                "parentNotebook": {"id": _NOTEBOOK_ID},
+            },
+        )
+    )
+
+
+@pytest.fixture
+def site_notebook_sections(graph: respx.MockRouter) -> respx.Route:
+    return graph.post(_SITE_NOTEBOOK_SECTIONS_PATH).mock(
+        return_value=httpx.Response(201, json=_section_payload())
+    )
+
+
+@pytest.fixture
+def site_group_sections(graph: respx.MockRouter) -> respx.Route:
+    return graph.post(_SITE_GROUP_SECTIONS_PATH).mock(
         return_value=httpx.Response(201, json=_section_payload())
     )
 
@@ -910,4 +963,126 @@ class TestANotebookThatBelongsToAGroup:
         assert tool is not None
         assert "one that a Microsoft 365 group or a SharePoint site owns" in (
             tool.description or ""
+        )
+
+
+class TestANotebookThatASiteOwns:
+    @pytest.mark.usefixtures("site_notebook_audience")
+    async def test_a_site_notebook_parent_asks_then_posts_once_under_the_site(
+        self,
+        client: GraphServiceClient,
+        site_notebook_sections: respx.Route,
+        notebook_sections: respx.Route,
+    ) -> None:
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            assert site_notebook_sections.call_count == 0, "the section was written unasked"
+            asked.append(question)
+            return None
+
+        _ = await _create(client, parent=_SITE_NOTEBOOK, confirm=counting)
+
+        assert len(asked) == 1, "a site notebook the user owns was written without a question"
+        assert site_notebook_sections.call_count == 1
+        assert _sent(site_notebook_sections)["displayName"] == _NAME
+        assert notebook_sections.call_count == 0
+
+    @pytest.mark.usefixtures("site_group_audience")
+    async def test_a_site_section_group_parent_asks_then_posts_once_under_the_site(
+        self,
+        client: GraphServiceClient,
+        site_group_sections: respx.Route,
+        group_sections: respx.Route,
+    ) -> None:
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            assert site_group_sections.call_count == 0, "the section was written unasked"
+            asked.append(question)
+            return None
+
+        _ = await _create(client, parent=_SITE_GROUP, confirm=counting)
+
+        assert len(asked) == 1
+        assert site_group_sections.call_count == 1
+        assert _sent(site_group_sections)["displayName"] == _NAME
+        assert group_sections.call_count == 0
+
+    @pytest.mark.usefixtures("site_notebook_audience", "site_notebook_sections")
+    async def test_the_question_gives_the_site_as_the_reason(
+        self, client: GraphServiceClient
+    ) -> None:
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, parent=_SITE_NOTEBOOK, confirm=capturing)
+
+        assert asked == [f"Create the section {_NAME!r} in the notebook 'Work', {_SITE_REASON}?"]
+
+    @pytest.mark.usefixtures("site_group_audience", "site_group_sections")
+    async def test_the_question_names_the_site_section_group_and_the_site_reason(
+        self, client: GraphServiceClient
+    ) -> None:
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, parent=_SITE_GROUP, confirm=capturing)
+
+        assert asked == [
+            f"Create the section {_NAME!r} in the section group 'Projects' of the notebook "
+            + f"'Work', {_SITE_REASON}?"
+        ]
+
+    @pytest.mark.parametrize(
+        "parent", [_SITE_NOTEBOOK, _SITE_GROUP], ids=["notebook", "section-group"]
+    )
+    @pytest.mark.usefixtures("site_group_audience", "site_notebook_sections", "site_group_sections")
+    async def test_a_site_parent_answers_with_site_handles(
+        self, client: GraphServiceClient, parent: str
+    ) -> None:
+        answer = await _create(client, parent=parent)
+
+        assert answer.uri == OnenoteSectionHandle(_SECTION_ID, owner=_SITE).uri
+        assert answer.parent_uri == parent
+
+    @pytest.mark.usefixtures("site_notebook_audience")
+    async def test_the_first_round_binds_the_agreement_to_the_site_handle(
+        self, client: GraphServiceClient, site_notebook_sections: respx.Route
+    ) -> None:
+        answer = await create_section(
+            client,
+            parent=_SITE_NOTEBOOK,
+            name=_NAME,
+            confirm=a_person_agrees(_modern_context()),
+        )
+
+        assert isinstance(answer, InputRequiredResult)
+        assert answer.request_state == write_state_for("create_section", _SITE_NOTEBOOK, _NAME)
+        assert answer.request_state != write_state_for("create_section", _TEAM_NOTEBOOK, _NAME)
+        assert site_notebook_sections.call_count == 0
+
+    @pytest.mark.parametrize(
+        "parent", [_SITE_NOTEBOOK, _SITE_GROUP], ids=["notebook", "section-group"]
+    )
+    @pytest.mark.usefixtures("site_group_audience", "site_notebook_sections", "site_group_sections")
+    async def test_a_site_parent_only_reaches_site_routes(
+        self, client: GraphServiceClient, graph: respx.MockRouter, parent: str
+    ) -> None:
+        _ = await _create(client, parent=parent)
+
+        calls = cast("Sequence[Call]", graph.calls)
+        assert len(calls) > 0
+        assert all(
+            call.request.url.path.startswith(f"/v1.0/sites/{_SITE_ID}/onenote/") for call in calls
         )
